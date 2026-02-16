@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="HomeSuiteHome.AppHost/HomeSuiteHome.AppHost.csproj" />
+  <Project Path="HomeSuiteHome.ServiceDefaults/HomeSuiteHome.ServiceDefaults.csproj" />
+</Solution>
