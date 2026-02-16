@@ -8,4 +8,8 @@
         <UserSecretsId>0deba5e3-7b67-402a-8f16-ab2788876f62</UserSecretsId>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\HomeSuiteHome.WebApi\HomeSuiteHome.WebApi.csproj" />
+    </ItemGroup>
+
 </Project>
