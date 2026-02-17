@@ -1,6 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres");
+var postgres = builder.AddPostgres("postgres")
+    .WithPgWeb();
 var postgresdb = postgres.AddDatabase("postgresdb");
 
 builder.AddProject<Projects.HomeSuiteHome_WebApi>("homesuitehome-webapi")
