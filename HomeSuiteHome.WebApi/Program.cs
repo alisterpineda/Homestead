@@ -1,3 +1,4 @@
+using HomeSuiteHome.WebApi.Features.Documents;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+app.MapDocumentsEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
