@@ -12,4 +12,8 @@
       <ProjectReference Include="..\HomeSuiteHome.WebApi\HomeSuiteHome.WebApi.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.1.1" />
+    </ItemGroup>
+
 </Project>
