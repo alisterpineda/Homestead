@@ -1,5 +1,7 @@
 using Asp.Versioning.Builder;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentFile;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
@@ -15,6 +17,8 @@ public static class DocumentsModule
             .WithTags("Documents");
 
         CreateDocumentEndpoint.Map(v1);
+        GetDocumentEndpoint.Map(v1);
+        GetDocumentFileEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
 
         return app;
