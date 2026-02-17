@@ -64,9 +64,36 @@ To add a new endpoint: create the four files under the appropriate `Features/{Do
 
 `HomeSuiteHome.AppHost` orchestrates PostgreSQL (with pgWeb admin UI) and the WebApi. The WebApi connects to PostgreSQL via the `postgresdb` connection name. `HomeSuiteHome.ServiceDefaults` provides shared config for OpenTelemetry, health checks, and HTTP resilience.
 
+## Syncing Frontend with Backend API Changes
+
+When backend endpoints are added or modified, the frontend API client must be regenerated:
+
+1. **Run the backend** so the OpenAPI spec is available (via Aspire or `dotnet run` in WebApi)
+2. **Download the updated OpenAPI spec** from the running backend:
+   ```bash
+   curl -k https://localhost:7248/openapi/v1.json -o HomeSuiteHome.WebApp/openapi.json
+   ```
+3. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
+   ```bash
+   npm run generate-api
+   ```
+   This runs Orval, which reads `openapi.json` and outputs generated React Query hooks and TypeScript types to `src/api/generated/`.
+4. **Update frontend code** to use the new/modified generated hooks and types.
+
+### Building the Frontend for Production
+
+The frontend must be rebuilt after changes for the WebApi to serve the updated app:
+
+```bash
+cd HomeSuiteHome.WebApp && npm run build
+```
+
+This compiles TypeScript and outputs to `HomeSuiteHome.WebApi/wwwroot/`, which the backend serves as static files with SPA fallback.
+
+During development, use `npm run dev` instead — the Vite dev server proxies `/api` and `/openapi` requests to the backend at `https://localhost:7248`.
+
 ## Key Conventions
 
 - Backend uses Minimal APIs (no controllers), Scalar for API docs (at `/scalar/v1` in dev)
 - Frontend build output goes to `HomeSuiteHome.WebApi/wwwroot` and is served as static files with SPA fallback
-- The Vite dev server proxies `/api` and `/openapi` requests to the backend
-- Orval reads a local `openapi.json` file in the WebApp directory — update this file when API changes are made, then run `npm run generate-api`
+- Generated files (`src/api/generated/`, `routeTree.gen.ts`) should not be manually edited
