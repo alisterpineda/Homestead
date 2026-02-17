@@ -14,5 +14,21 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
 
         builder.Property(d => d.Name)
             .IsRequired();
+
+        builder.Property(d => d.FileName)
+            .IsRequired();
+
+        builder.Property(d => d.ContentType)
+            .IsRequired();
+
+        builder.Property(d => d.FileSize)
+            .IsRequired();
+
+        builder.Property(d => d.FilePath)
+            .IsRequired();
+
+        builder.Property(d => d.FileHash)
+            .IsRequired()
+            .HasMaxLength(64);
     }
 }

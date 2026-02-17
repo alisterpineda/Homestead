@@ -1,11 +1,50 @@
+using System.Security.Cryptography;
 using HomeSuiteHome.WebApi.Common;
+using HomeSuiteHome.WebApi.Domains.Documents;
+using HomeSuiteHome.WebApi.Persistence;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.CreateDocument;
 
-public class CreateDocumentHandler : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
+public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration)
+    : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
-    public Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
+    public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var file = request.File;
+        var extension = Path.GetExtension(file.FileName);
+        var storedFileName = $"{Guid.NewGuid()}{extension}";
+
+        var basePath = configuration["FileStorage:BasePath"]
+            ?? throw new InvalidOperationException("FileStorage:BasePath is not configured.");
+        var uploadsDir = Path.Combine(basePath, "documents");
+        Directory.CreateDirectory(uploadsDir);
+
+        var filePath = Path.Combine(uploadsDir, storedFileName);
+
+        string fileHash;
+        await using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream, ct);
+
+            stream.Position = 0;
+            var hashBytes = await SHA256.HashDataAsync(stream, ct);
+            fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+        var document = new Document
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name ?? Path.GetFileNameWithoutExtension(file.FileName),
+            FileName = file.FileName,
+            ContentType = file.ContentType,
+            FileSize = file.Length,
+            FilePath = Path.Combine("documents", storedFileName),
+            FileHash = fileHash
+        };
+
+        db.Documents.Add(document);
+        await db.SaveChangesAsync(ct);
+
+        return new CreateDocumentResponse { DocumentId = document.Id };
     }
 }
