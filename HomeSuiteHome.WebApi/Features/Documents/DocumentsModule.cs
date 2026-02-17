@@ -1,6 +1,6 @@
 using Asp.Versioning.Builder;
-using HomeSuiteHome.WebApi.Features.Documents.CreateDocument;
-using HomeSuiteHome.WebApi.Features.Documents.GetDocuments;
+using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
 

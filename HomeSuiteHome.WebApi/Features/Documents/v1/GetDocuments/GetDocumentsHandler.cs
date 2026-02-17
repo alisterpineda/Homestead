@@ -2,7 +2,7 @@ using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace HomeSuiteHome.WebApi.Features.Documents.GetDocuments;
+namespace HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db)
     : IQueryHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>

@@ -1,4 +1,4 @@
-namespace HomeSuiteHome.WebApi.Features.Documents.GetDocuments;
+namespace HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
 
 public record GetDocumentsResponse
 {

@@ -3,7 +3,7 @@ using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Domains.Documents;
 using HomeSuiteHome.WebApi.Persistence;
 
-namespace HomeSuiteHome.WebApi.Features.Documents.CreateDocument;
+namespace HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration)
     : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>

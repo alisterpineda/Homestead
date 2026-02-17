@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace HomeSuiteHome.WebApi.Features.Documents.CreateDocument;
+namespace HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentEndpoint
 {
