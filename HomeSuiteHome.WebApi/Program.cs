@@ -1,6 +1,8 @@
+using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Features.Documents;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,9 @@ builder.AddServiceDefaults();
 builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
 
 // Add services to the container.
+
+builder.Services.AddHandlers();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -28,6 +33,7 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
