@@ -1,4 +1,5 @@
 using HomeSuiteHome.WebApi.Features.Documents.CreateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.GetDocuments;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
 
@@ -10,7 +11,8 @@ public static class DocumentsModule
             .WithTags("Documents");
 
         CreateDocumentEndpoint.Map(group);
-        
+        GetDocumentsEndpoint.Map(group);
+
         return app;
     }
 }
