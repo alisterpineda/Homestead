@@ -76,4 +76,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Serve the React frontend
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
+
 app.Run();
