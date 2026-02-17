@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace HomeSuiteHome.WebApi.Infrastructure.Migrations
+namespace HomeSuiteHome.WebApi.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
