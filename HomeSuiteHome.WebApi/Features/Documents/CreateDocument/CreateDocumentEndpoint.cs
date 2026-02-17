@@ -10,7 +10,7 @@ public class CreateDocumentEndpoint
         {
             var request = new CreateDocumentRequest { Name = name, File = file };
             var response = await handler.HandleAsync(request, ct);
-            return Results.Created($"/api/documents/{response.DocumentId}", response);
+            return Results.Created($"/api/v1/documents/{response.DocumentId}", response);
         })
         .WithName("CreateDocument")
         .Produces<CreateDocumentResponse>(StatusCodes.Status201Created)
