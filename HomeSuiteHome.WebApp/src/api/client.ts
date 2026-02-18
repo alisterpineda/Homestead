@@ -23,6 +23,7 @@ export async function customFetch<TResult>(config: RequestConfig): Promise<TResu
   let body: BodyInit | undefined;
   if (config.data instanceof FormData) {
     body = config.data;
+    headers.delete("Content-Type");
   } else if (config.data !== undefined) {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(config.data);

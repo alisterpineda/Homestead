@@ -23,7 +23,7 @@ export function DocumentTable({ documents }: DocumentTableProps) {
               <td className="px-4 py-3 font-medium text-text-primary">{doc.name}</td>
               <td className="px-4 py-3 text-text-secondary">{doc.fileName}</td>
               <td className="px-4 py-3 text-text-secondary">{doc.contentType}</td>
-              <td className="px-4 py-3 text-text-secondary text-right">{formatBytes(doc.fileSize)}</td>
+              <td className="px-4 py-3 text-text-secondary text-right">{formatBytes(Number(doc.fileSize))}</td>
             </tr>
           ))}
         </tbody>

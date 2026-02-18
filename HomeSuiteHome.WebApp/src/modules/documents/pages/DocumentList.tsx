@@ -13,7 +13,7 @@ export function DocumentList() {
   const navigate = useNavigate();
   const page = (search as { page?: number }).page ?? 1;
 
-  const { data, isLoading, isError } = useGetDocuments({ page, pageSize: 10 });
+  const { data, isLoading, isError } = useGetDocuments({ Page: page, PageSize: 10 });
 
   const handlePageChange = (newPage: number) => {
     navigate({ to: "/documents", search: { page: newPage } });
@@ -68,8 +68,8 @@ export function DocumentList() {
         <>
           <DocumentTable documents={data.items} />
           <Pagination
-            page={data.page}
-            totalPages={data.totalPages}
+            page={Number(data.page)}
+            totalPages={Number(data.totalPages)}
             onPageChange={handlePageChange}
           />
         </>

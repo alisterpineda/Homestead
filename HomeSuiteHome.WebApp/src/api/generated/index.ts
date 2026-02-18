@@ -1,2 +1,2 @@
-export * from "./documents";
+export * from "./documents/documents";
 export * from "./model";

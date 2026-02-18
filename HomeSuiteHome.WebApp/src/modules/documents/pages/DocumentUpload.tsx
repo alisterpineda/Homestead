@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useCreateDocument } from "@/api/generated";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCreateDocument, getGetDocumentsQueryKey } from "@/api/generated";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -9,6 +10,7 @@ import { UploadDropzone } from "../components/UploadDropzone";
 
 export function DocumentUpload() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const mutation = useCreateDocument();
@@ -18,9 +20,10 @@ export function DocumentUpload() {
     if (!file) return;
 
     mutation.mutate(
-      { name: name || undefined, file },
+      { data: { name: name || undefined, file } },
       {
         onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetDocumentsQueryKey() });
           navigate({ to: "/documents" });
         },
       },
