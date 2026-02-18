@@ -189,7 +189,62 @@ export function useGetDocuments<TData = Awaited<ReturnType<typeof getDocuments>>
 
 
 
-export const getDocument = (
+export const deleteDocument = (
+    id: string,
+ ) => {
+      
+      
+      return customFetch<void>(
+      {url: `/api/v1/documents/${id}`, method: 'DELETE'
+    },
+      );
+    }
+  
+
+
+export const getDeleteDocumentMutationOptions = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDocument>>, TError,{id: string}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDocument>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteDocument'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDocument>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteDocument(id,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDocument>>>
+    
+    export type DeleteDocumentMutationError = void
+
+    export const useDeleteDocument = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDocument>>, TError,{id: string}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDocument>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+
+      const mutationOptions = getDeleteDocumentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export const getDocument = (
     id: string,
  signal?: AbortSignal
 ) => {
