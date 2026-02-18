@@ -4,6 +4,7 @@ using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteDocument;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocument;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentFile;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
+using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
 
@@ -22,6 +23,7 @@ public static class DocumentsModule
         GetDocumentEndpoint.Map(v1);
         GetDocumentFileEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
+        UpdateDocumentEndpoint.Map(v1);
 
         return app;
     }

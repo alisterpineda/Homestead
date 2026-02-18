@@ -29,7 +29,9 @@ import type {
   GetDocumentFileParams,
   GetDocumentResponse,
   GetDocumentsParams,
-  PaginatedResponseOfGetDocumentsResponse
+  PaginatedResponseOfGetDocumentsResponse,
+  UpdateDocumentRequest,
+  UpdateDocumentResponse
 } from '.././model';
 
 import { customFetch } from '../../client';
@@ -331,7 +333,65 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
 
 
 
-export const getDocumentFile = (
+export const updateDocument = (
+    id: string,
+    updateDocumentRequest: UpdateDocumentRequest,
+ ) => {
+      
+      
+      return customFetch<UpdateDocumentResponse>(
+      {url: `/api/v1/documents/${id}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateDocumentRequest
+    },
+      );
+    }
+  
+
+
+export const getUpdateDocumentMutationOptions = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDocument>>, TError,{id: string;data: UpdateDocumentRequest}, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof updateDocument>>, TError,{id: string;data: UpdateDocumentRequest}, TContext> => {
+
+const mutationKey = ['updateDocument'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+      
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDocument>>, {id: string;data: UpdateDocumentRequest}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDocument(id,data,)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof updateDocument>>>
+    export type UpdateDocumentMutationBody = UpdateDocumentRequest
+    export type UpdateDocumentMutationError = void
+
+    export const useUpdateDocument = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDocument>>, TError,{id: string;data: UpdateDocumentRequest}, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateDocument>>,
+        TError,
+        {id: string;data: UpdateDocumentRequest},
+        TContext
+      > => {
+
+      const mutationOptions = getUpdateDocumentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    export const getDocumentFile = (
     id: string,
     params?: GetDocumentFileParams,
  signal?: AbortSignal

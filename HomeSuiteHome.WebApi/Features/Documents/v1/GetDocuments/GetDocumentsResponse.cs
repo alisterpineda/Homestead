@@ -7,4 +7,12 @@ public record GetDocumentsResponse
     public required string FileName { get; init; }
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
+    public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
+}
+
+public record GetDocumentsTagDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
 }

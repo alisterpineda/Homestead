@@ -20,7 +20,13 @@ public class GetDocumentHandler(AppDbContext db)
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
                 FileHash = d.FileHash,
-                CreatedAt = d.CreatedAt
+                CreatedAt = d.CreatedAt,
+                Tags = d.DocumentTags.Select(dt => new GetDocumentTagDto
+                {
+                    Id = dt.Tag.Id,
+                    Name = dt.Tag.Name,
+                    Path = dt.Tag.Path
+                }).ToList()
             })
             .FirstOrDefaultAsync(ct);
     }

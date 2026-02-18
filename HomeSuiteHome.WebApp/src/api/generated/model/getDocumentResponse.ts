@@ -5,6 +5,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { GetDocumentResponseFileSize } from './getDocumentResponseFileSize';
+import type { GetDocumentTagDto } from './getDocumentTagDto';
 
 export interface GetDocumentResponse {
   id: string;
@@ -15,4 +16,5 @@ export interface GetDocumentResponse {
   fileSize: GetDocumentResponseFileSize;
   fileHash: string;
   createdAt: string;
+  tags: GetDocumentTagDto[];
 }

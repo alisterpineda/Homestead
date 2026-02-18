@@ -9,4 +9,12 @@ public record GetDocumentResponse
     public required long FileSize { get; init; }
     public required string FileHash { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+    public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }
+}
+
+public record GetDocumentTagDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
 }

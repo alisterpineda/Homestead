@@ -1,3 +1,5 @@
+using HomeSuiteHome.WebApi.Domains.Tags;
+
 namespace HomeSuiteHome.WebApi.Domains.Documents;
 
 public class Document
@@ -10,4 +12,6 @@ public class Document
     public required string FilePath { get; set; }
     public required string FileHash { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+
+    public ICollection<DocumentTag> DocumentTags { get; set; } = [];
 }

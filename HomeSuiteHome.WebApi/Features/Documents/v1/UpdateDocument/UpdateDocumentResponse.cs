@@ -1,0 +1,20 @@
+namespace HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
+
+public record UpdateDocumentResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string FileName { get; init; }
+    public required string ContentType { get; init; }
+    public required long FileSize { get; init; }
+    public required string FileHash { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public required IReadOnlyList<TagDto> Tags { get; init; }
+}
+
+public record TagDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
+}

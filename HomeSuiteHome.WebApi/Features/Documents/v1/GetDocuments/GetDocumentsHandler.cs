@@ -24,7 +24,13 @@ public class GetDocumentsHandler(AppDbContext db)
                 Name = d.Name,
                 FileName = d.FileName,
                 ContentType = d.ContentType,
-                FileSize = d.FileSize
+                FileSize = d.FileSize,
+                Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
+                {
+                    Id = dt.Tag.Id,
+                    Name = dt.Tag.Name,
+                    Path = dt.Tag.Path
+                }).ToList()
             })
             .ToListAsync(ct);
 

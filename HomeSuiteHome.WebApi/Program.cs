@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Features.Documents;
+using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -64,6 +65,7 @@ app.MapDefaultEndpoints();
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
+versionedApi.MapTagsEndpoints();
 
 if (!string.IsNullOrEmpty(connectionString))
 {
