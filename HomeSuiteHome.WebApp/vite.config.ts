@@ -5,7 +5,8 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiUrl = env.VITE_API_URL || "https://localhost:7248";
+  const apiUrl =
+    process.env.VITE_API_URL || env.VITE_API_URL || "https://localhost:7248";
 
   return {
     plugins: [tanstackRouter(), tailwindcss()],
