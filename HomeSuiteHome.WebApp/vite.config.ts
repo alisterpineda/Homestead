@@ -23,6 +23,15 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "../HomeSuiteHome.WebApi/wwwroot",
       emptyOutDir: true,
+      // Suppress "use client" warnings from TanStack React Query.
+      // These directives are for React Server Components and are
+      // irrelevant in a Vite SPA build.
+      rollupOptions: {
+        onwarn(warning, defaultHandler) {
+          if (warning.code === "MODULE_LEVEL_DIRECTIVE") return;
+          defaultHandler(warning);
+        },
+      },
     },
   };
 });
