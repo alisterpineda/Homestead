@@ -1,5 +1,16 @@
 import { useState, useEffect } from "react";
-import { X, Download, Trash2, FileText, Pencil, Check } from "lucide-react";
+import {
+  X,
+  Download,
+  Trash2,
+  FileText,
+  Pencil,
+  Check,
+  Tag,
+  Calendar,
+  HardDrive,
+  FileType,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetDocument,
@@ -96,13 +107,23 @@ export function DocumentDetailPanel({
       {document && (
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="truncate text-lg font-semibold text-text-primary">
-              {document.fileName}
-            </h2>
+          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+            <div className="min-w-0 flex-1">
+              {editing ? (
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-lg font-semibold text-text-primary transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                />
+              ) : (
+                <h2 className="truncate text-lg font-semibold text-text-primary">
+                  {document.name}
+                </h2>
+              )}
+            </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+              className="shrink-0 rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
             >
               <X size={20} />
             </button>
@@ -126,27 +147,54 @@ export function DocumentDetailPanel({
 
           {/* Actions */}
           <div className="flex gap-2 border-b border-border px-4 py-3">
-            <a
-              href={`${fileUrl}?download=true`}
-              download
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-raised px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-overlay"
-            >
-              <Download size={16} />
-              Download
-            </a>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (documentId) {
-                  deleteMutation.mutate({ id: documentId });
-                }
-              }}
-              disabled={deleteMutation.isPending}
-              className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-            >
-              <Trash2 size={16} />
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </Button>
+            {editing ? (
+              <>
+                <Button
+                  variant="primary"
+                  onClick={handleSave}
+                  disabled={updateMutation.isPending}
+                >
+                  <Check size={16} />
+                  {updateMutation.isPending ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleCancelEdit}
+                  disabled={updateMutation.isPending}
+                >
+                  <X size={16} />
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  <Pencil size={16} />
+                  Edit
+                </Button>
+                <a
+                  href={`${fileUrl}?download=true`}
+                  download
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+                >
+                  <Download size={16} />
+                  Download
+                </a>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    if (documentId) {
+                      deleteMutation.mutate({ id: documentId });
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                >
+                  <Trash2 size={16} />
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Tabs */}
@@ -157,92 +205,53 @@ export function DocumentDetailPanel({
                   id: "info",
                   label: "Info",
                   content: (
-                    <div className="space-y-3">
-                      {editing ? (
-                        <>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-text-secondary">
-                              Name
-                            </label>
-                            <input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
-                            />
+                    <div className="space-y-4">
+                      {/* Tags */}
+                      <IconInfoRow icon={<Tag size={16} />} label="Tags">
+                        {editing ? (
+                          <TagInput value={editTags} onChange={setEditTags} />
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {document.tags && document.tags.length > 0 ? (
+                              document.tags.map((tag) => (
+                                <TagBadge key={tag.id} path={tag.path} />
+                              ))
+                            ) : (
+                              <span className="text-sm text-text-muted">
+                                No tags
+                              </span>
+                            )}
                           </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-text-secondary">
-                              Tags
-                            </label>
-                            <TagInput value={editTags} onChange={setEditTags} />
-                          </div>
-                          <div className="flex gap-2 pt-1">
-                            <Button
-                              variant="primary"
-                              onClick={handleSave}
-                              disabled={updateMutation.isPending}
-                            >
-                              <Check size={14} />
-                              {updateMutation.isPending ? "Saving..." : "Save"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              onClick={handleCancelEdit}
-                              disabled={updateMutation.isPending}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-3 flex-1">
-                              <InfoRow label="Name" value={document.name} />
-                              <InfoRow
-                                label="Added"
-                                value={new Date(
-                                  document.createdAt,
-                                ).toLocaleDateString(undefined, {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
-                              />
-                              <InfoRow
-                                label="Size"
-                                value={formatBytes(Number(document.fileSize))}
-                              />
-                              <InfoRow
-                                label="Type"
-                                value={document.contentType}
-                              />
-                            </div>
-                            <button
-                              onClick={() => setEditing(true)}
-                              className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          </div>
-                          <div className="pt-1">
-                            <span className="text-sm text-text-secondary">
-                              Tags
-                            </span>
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              {document.tags && document.tags.length > 0 ? (
-                                document.tags.map((tag) => (
-                                  <TagBadge key={tag.id} path={tag.path} />
-                                ))
-                              ) : (
-                                <span className="text-sm text-text-muted">
-                                  No tags
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
+                        )}
+                      </IconInfoRow>
+
+                      {/* Added */}
+                      <IconInfoRow icon={<Calendar size={16} />} label="Added">
+                        <span className="text-sm text-text-primary">
+                          {new Date(document.createdAt).toLocaleDateString(
+                            undefined,
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            },
+                          )}
+                        </span>
+                      </IconInfoRow>
+
+                      {/* Size */}
+                      <IconInfoRow icon={<HardDrive size={16} />} label="Size">
+                        <span className="text-sm text-text-primary">
+                          {formatBytes(Number(document.fileSize))}
+                        </span>
+                      </IconInfoRow>
+
+                      {/* Type */}
+                      <IconInfoRow icon={<FileType size={16} />} label="Type">
+                        <span className="text-sm text-text-primary">
+                          {document.contentType}
+                        </span>
+                      </IconInfoRow>
                     </div>
                   ),
                 },
@@ -255,11 +264,22 @@ export function DocumentDetailPanel({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function IconInfoRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex justify-between text-sm">
-      <span className="text-text-secondary">{label}</span>
-      <span className="text-text-primary">{value}</span>
+    <div className="flex gap-3">
+      <div className="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+        {icon}
+        <span className="w-12 text-sm font-medium">{label}</span>
+      </div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
