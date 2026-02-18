@@ -32,6 +32,7 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasMaxLength(64);
 
         builder.Property(d => d.CreatedAt)
-            .IsRequired();
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
     }
 }
