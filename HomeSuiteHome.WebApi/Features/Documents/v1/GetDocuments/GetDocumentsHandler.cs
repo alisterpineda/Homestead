@@ -22,7 +22,6 @@ public class GetDocumentsHandler(AppDbContext db)
             {
                 Id = d.Id,
                 Name = d.Name,
-                FileName = d.FileName,
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto

@@ -16,7 +16,6 @@ public class GetDocumentHandler(AppDbContext db)
             {
                 Id = d.Id,
                 Name = d.Name,
-                FileName = d.FileName,
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
                 FileHash = d.FileHash,

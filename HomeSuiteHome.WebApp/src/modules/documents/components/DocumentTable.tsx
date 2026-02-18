@@ -25,7 +25,6 @@ export function DocumentTable({ documents, selectedDocumentId, onDocumentSelect 
             )}
           >
             <p className="font-medium text-text-primary">{doc.name}</p>
-            <p className="mt-1 truncate text-sm text-text-secondary">{doc.fileName}</p>
             <div className="mt-2 flex items-center gap-3 text-xs text-text-muted">
               <span>{doc.contentType}</span>
               <span>{formatBytes(Number(doc.fileSize))}</span>
@@ -47,7 +46,6 @@ export function DocumentTable({ documents, selectedDocumentId, onDocumentSelect 
           <thead>
             <tr className="border-b border-border bg-surface-raised">
               <th className="px-4 py-3 font-medium text-text-secondary">Name</th>
-              <th className="px-4 py-3 font-medium text-text-secondary">File Name</th>
               <th className="px-4 py-3 font-medium text-text-secondary">Tags</th>
               <th className="px-4 py-3 font-medium text-text-secondary">Content Type</th>
               <th className="px-4 py-3 font-medium text-text-secondary text-right">File Size</th>
@@ -66,7 +64,6 @@ export function DocumentTable({ documents, selectedDocumentId, onDocumentSelect 
                 )}
               >
                 <td className="px-4 py-3 font-medium text-text-primary">{doc.name}</td>
-                <td className="px-4 py-3 text-text-secondary">{doc.fileName}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {doc.tags?.map((tag) => (

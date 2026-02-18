@@ -42,10 +42,6 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("FilePath")
                         .IsRequired()
                         .HasColumnType("text");

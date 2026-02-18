@@ -135,7 +135,7 @@ export function DocumentDetailPanel({
               <iframe
                 src={fileUrl}
                 className="h-80 w-full"
-                title={`Preview of ${document.fileName}`}
+                title={`Preview of ${document.name}`}
               />
             ) : (
               <div className="flex h-48 flex-col items-center justify-center gap-2 text-text-secondary">

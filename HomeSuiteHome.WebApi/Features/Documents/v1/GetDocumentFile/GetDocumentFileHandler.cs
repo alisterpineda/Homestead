@@ -12,7 +12,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         var document = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
-            .Select(d => new { d.FilePath, d.ContentType, d.FileName })
+            .Select(d => new { d.FilePath, d.ContentType, d.Name })
             .FirstOrDefaultAsync(ct);
 
         if (document is null)
@@ -26,6 +26,6 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         if (!File.Exists(physicalPath))
             return null;
 
-        return new GetDocumentFileResponse(physicalPath, document.ContentType, document.FileName);
+        return new GetDocumentFileResponse(physicalPath, document.ContentType, document.Name);
     }
 }

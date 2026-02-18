@@ -34,8 +34,7 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
         var document = new Document
         {
             Id = Guid.NewGuid(),
-            Name = request.Name ?? Path.GetFileNameWithoutExtension(file.FileName),
-            FileName = file.FileName,
+            Name = request.Name ?? file.FileName,
             ContentType = file.ContentType,
             FileSize = file.Length,
             FilePath = Path.Combine("documents", storedFileName),

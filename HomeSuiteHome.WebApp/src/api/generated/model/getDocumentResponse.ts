@@ -10,7 +10,6 @@ import type { GetDocumentTagDto } from './getDocumentTagDto';
 export interface GetDocumentResponse {
   id: string;
   name: string;
-  fileName: string;
   contentType: string;
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
   fileSize: GetDocumentResponseFileSize;

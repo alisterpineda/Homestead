@@ -51,7 +51,6 @@ public class UpdateDocumentHandler(AppDbContext db)
         {
             Id = document.Id,
             Name = document.Name,
-            FileName = document.FileName,
             ContentType = document.ContentType,
             FileSize = document.FileSize,
             FileHash = document.FileHash,

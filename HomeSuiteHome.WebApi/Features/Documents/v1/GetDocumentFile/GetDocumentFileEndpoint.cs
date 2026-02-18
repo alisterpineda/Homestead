@@ -12,7 +12,7 @@ public static class GetDocumentFileEndpoint
                 return Results.NotFound();
 
             return download == true
-                ? Results.File(response.PhysicalPath, response.ContentType, response.FileName)
+                ? Results.File(response.PhysicalPath, response.ContentType, response.Name)
                 : Results.File(response.PhysicalPath, response.ContentType);
         })
         .WithName("GetDocumentFile")
