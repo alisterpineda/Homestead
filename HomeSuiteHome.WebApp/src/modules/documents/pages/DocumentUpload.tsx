@@ -33,7 +33,7 @@ export function DocumentUpload() {
   return (
     <div>
       <PageHeader title="Upload Document" description="Upload a new document to the system" />
-      <Card className="max-w-xl">
+      <Card className="md:max-w-xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <Input
             id="name"

@@ -36,7 +36,7 @@ export function Popover({ trigger, children, align = "left" }: PopoverProps) {
       <div onClick={() => setOpen(!open)}>{trigger}</div>
       {open && (
         <div
-          className={`absolute top-full z-50 mt-2 rounded-xl border border-border bg-surface-overlay p-3 shadow-lg ${align === "right" ? "right-0" : "left-0"}`}
+          className={`absolute top-full z-50 mt-2 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface-overlay p-3 shadow-lg ${align === "right" ? "right-0" : "left-0"}`}
           onClick={() => setOpen(false)}
         >
           {children}

@@ -14,7 +14,7 @@ export function SidebarNavItem({ item }: SidebarNavItemProps) {
     <Link
       to={item.path}
       className={cn(
-        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors md:py-2",
         isActive
           ? "bg-sidebar-active text-text-primary"
           : "text-sidebar-text hover:bg-sidebar-hover hover:text-text-primary",

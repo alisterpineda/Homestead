@@ -25,7 +25,7 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
       <div className="fixed inset-0 bg-black/30" onClick={onClose} />
       <div
         className={cn(
-          "relative z-10 h-full w-full max-w-lg overflow-y-auto border-l border-border bg-surface shadow-xl",
+          "relative z-10 h-full w-full max-w-full overflow-y-auto border-l border-border bg-surface shadow-xl md:max-w-lg",
           className,
         )}
       >

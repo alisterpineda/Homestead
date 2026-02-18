@@ -45,7 +45,7 @@ export function UploadDropzone({ file, onFileSelect }: UploadDropzoneProps) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors",
+        "flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors md:p-8",
         dragOver
           ? "border-accent-500 bg-accent-50"
           : file
