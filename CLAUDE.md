@@ -66,19 +66,21 @@ To add a new endpoint: create the four files under the appropriate `Features/{Do
 
 ## Syncing Frontend with Backend API Changes
 
-When backend endpoints are added or modified, the frontend API client must be regenerated:
+The OpenAPI spec is generated at build time via `Microsoft.Extensions.ApiDescription.Server` — no running backend needed.
 
-1. **Run the backend** so the OpenAPI spec is available (via Aspire or `dotnet run` in WebApi)
-2. **Download the updated OpenAPI spec** from the running backend:
+When backend endpoints are added or modified, regenerate the frontend API client:
+
+1. **Build the WebApi** to generate the OpenAPI spec:
    ```bash
-   curl -k https://localhost:7248/openapi/v1.json -o HomeSuiteHome.WebApp/openapi.json
+   dotnet build HomeSuiteHome.WebApi
    ```
-3. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
+   This outputs the spec to `HomeSuiteHome.WebApi/obj/HomeSuiteHome.WebApi.json`.
+2. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
    ```bash
    npm run generate-api
    ```
-   This runs Orval, which reads `openapi.json` and outputs generated React Query hooks and TypeScript types to `src/api/generated/`.
-4. **Update frontend code** to use the new/modified generated hooks and types.
+   This runs Orval, which reads the generated spec and outputs React Query hooks and TypeScript types to `src/api/generated/`.
+3. **Update frontend code** to use the new/modified generated hooks and types.
 
 ### Building the Frontend for Production
 

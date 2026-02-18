@@ -9,8 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+var connectionString = builder.Configuration.GetConnectionString("postgresdb");
 
-builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
+if (!string.IsNullOrEmpty(connectionString))
+{
+    builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
+}
 
 // Add services to the container.
 
@@ -61,8 +65,9 @@ app.MapDefaultEndpoints();
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
 
-using (var scope = app.Services.CreateScope())
+if (!string.IsNullOrEmpty(connectionString))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
