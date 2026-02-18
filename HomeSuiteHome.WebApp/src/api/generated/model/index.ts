@@ -9,6 +9,7 @@ export * from './createDocumentBody';
 export * from './createDocumentBodyAllOf';
 export * from './createDocumentBodyAllOfTwo';
 export * from './createDocumentResponse';
+export * from './getDocumentFileParams';
 export * from './getDocumentResponse';
 export * from './getDocumentResponseFileSize';
 export * from './getDocumentsParams';

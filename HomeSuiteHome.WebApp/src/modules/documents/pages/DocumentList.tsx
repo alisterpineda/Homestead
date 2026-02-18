@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { FileText, Plus } from "lucide-react";
 import { useGetDocuments } from "@/api/generated";
@@ -6,12 +7,14 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DocumentTable } from "../components/DocumentTable";
+import { DocumentDetailPanel } from "../components/DocumentDetailPanel";
 import { Pagination } from "../components/Pagination";
 
 export function DocumentList() {
   const search = useSearch({ from: "/_app/documents/" });
   const navigate = useNavigate();
   const page = (search as { page?: number }).page ?? 1;
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useGetDocuments({ Page: page, PageSize: 10 });
 
@@ -66,7 +69,11 @@ export function DocumentList() {
 
       {data && data.items.length > 0 && (
         <>
-          <DocumentTable documents={data.items} />
+          <DocumentTable
+            documents={data.items}
+            selectedDocumentId={selectedDocumentId}
+            onDocumentSelect={setSelectedDocumentId}
+          />
           <Pagination
             page={Number(data.page)}
             totalPages={Number(data.totalPages)}
@@ -74,6 +81,11 @@ export function DocumentList() {
           />
         </>
       )}
+
+      <DocumentDetailPanel
+        documentId={selectedDocumentId}
+        onClose={() => setSelectedDocumentId(null)}
+      />
     </div>
   );
 }

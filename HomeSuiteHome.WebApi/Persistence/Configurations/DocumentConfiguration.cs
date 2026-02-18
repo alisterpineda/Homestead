@@ -30,5 +30,8 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.FileHash)
             .IsRequired()
             .HasMaxLength(64);
+
+        builder.Property(d => d.CreatedAt)
+            .IsRequired();
     }
 }

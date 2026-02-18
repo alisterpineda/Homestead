@@ -39,7 +39,8 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
             ContentType = file.ContentType,
             FileSize = file.Length,
             FilePath = Path.Combine("documents", storedFileName),
-            FileHash = fileHash
+            FileHash = fileHash,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         db.Documents.Add(document);

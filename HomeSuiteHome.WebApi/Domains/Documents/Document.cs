@@ -9,4 +9,5 @@ public class Document
     public long FileSize { get; set; }
     public required string FilePath { get; set; }
     public required string FileHash { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }

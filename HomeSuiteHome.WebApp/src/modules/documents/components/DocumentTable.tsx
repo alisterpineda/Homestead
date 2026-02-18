@@ -1,11 +1,13 @@
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, cn } from "@/lib/utils";
 import type { GetDocumentsResponse } from "@/api/generated";
 
 interface DocumentTableProps {
   documents: GetDocumentsResponse[];
+  selectedDocumentId?: string | null;
+  onDocumentSelect?: (id: string) => void;
 }
 
-export function DocumentTable({ documents }: DocumentTableProps) {
+export function DocumentTable({ documents, selectedDocumentId, onDocumentSelect }: DocumentTableProps) {
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       <table className="w-full text-left text-sm">
@@ -19,7 +21,16 @@ export function DocumentTable({ documents }: DocumentTableProps) {
         </thead>
         <tbody>
           {documents.map((doc) => (
-            <tr key={doc.id} className="border-b border-border last:border-0 hover:bg-surface-raised transition-colors">
+            <tr
+              key={doc.id}
+              onClick={() => onDocumentSelect?.(doc.id)}
+              className={cn(
+                "border-b border-border last:border-0 cursor-pointer transition-colors",
+                selectedDocumentId === doc.id
+                  ? "bg-accent-50 dark:bg-accent-950"
+                  : "hover:bg-surface-raised",
+              )}
+            >
               <td className="px-4 py-3 font-medium text-text-primary">{doc.name}</td>
               <td className="px-4 py-3 text-text-secondary">{doc.fileName}</td>
               <td className="px-4 py-3 text-text-secondary">{doc.contentType}</td>

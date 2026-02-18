@@ -14,4 +14,5 @@ export interface GetDocumentResponse {
   /** @pattern ^-?(?:0|[1-9]\d*)$ */
   fileSize: GetDocumentResponseFileSize;
   fileHash: string;
+  createdAt: string;
 }

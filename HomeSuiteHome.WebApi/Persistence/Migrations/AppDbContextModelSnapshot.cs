@@ -32,6 +32,9 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FileHash")
                         .IsRequired()
                         .HasMaxLength(64)

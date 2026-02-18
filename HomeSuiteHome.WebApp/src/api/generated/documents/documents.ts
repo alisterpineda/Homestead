@@ -26,6 +26,7 @@ import type {
 import type {
   CreateDocumentBody,
   CreateDocumentResponse,
+  GetDocumentFileParams,
   GetDocumentResponse,
   GetDocumentsParams,
   PaginatedResponseOfGetDocumentsResponse
@@ -332,12 +333,14 @@ export function useGetDocument<TData = Awaited<ReturnType<typeof getDocument>>, 
 
 export const getDocumentFile = (
     id: string,
+    params?: GetDocumentFileParams,
  signal?: AbortSignal
 ) => {
       
       
       return customFetch<void>(
-      {url: `/api/v1/documents/${id}/file`, method: 'GET', signal
+      {url: `/api/v1/documents/${id}/file`, method: 'GET',
+        params, signal
     },
       );
     }
@@ -345,23 +348,25 @@ export const getDocumentFile = (
 
 
 
-export const getGetDocumentFileQueryKey = (id?: string,) => {
+export const getGetDocumentFileQueryKey = (id?: string,
+    params?: GetDocumentFileParams,) => {
     return [
-    `/api/v1/documents/${id}/file`
+    `/api/v1/documents/${id}/file`, ...(params ? [params]: [])
     ] as const;
     }
 
     
-export const getGetDocumentFileQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
+export const getGetDocumentFileQueryOptions = <TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(id: string,
+    params?: GetDocumentFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
 ) => {
 
 const {query: queryOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDocumentFileQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetDocumentFileQueryKey(id,params);
 
   
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentFile>>> = ({ signal }) => getDocumentFile(id, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDocumentFile>>> = ({ signal }) => getDocumentFile(id,params, signal);
 
       
 
@@ -375,7 +380,8 @@ export type GetDocumentFileQueryError = void
 
 
 export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>> & Pick<
+ id: string,
+    params: undefined |  GetDocumentFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocumentFile>>,
           TError,
@@ -385,7 +391,8 @@ export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocument
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>> & Pick<
+ id: string,
+    params?: GetDocumentFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDocumentFile>>,
           TError,
@@ -395,16 +402,18 @@ export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocument
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
+ id: string,
+    params?: GetDocumentFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 
 export function useGetDocumentFile<TData = Awaited<ReturnType<typeof getDocumentFile>>, TError = void>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
+ id: string,
+    params?: GetDocumentFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDocumentFile>>, TError, TData>>, }
  , queryClient?: QueryClient 
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetDocumentFileQueryOptions(id,options)
+  const queryOptions = getGetDocumentFileQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

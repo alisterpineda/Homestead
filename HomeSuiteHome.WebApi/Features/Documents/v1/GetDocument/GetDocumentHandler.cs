@@ -19,7 +19,8 @@ public class GetDocumentHandler(AppDbContext db)
                 FileName = d.FileName,
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
-                FileHash = d.FileHash
+                FileHash = d.FileHash,
+                CreatedAt = d.CreatedAt
             })
             .FirstOrDefaultAsync(ct);
     }

@@ -8,4 +8,5 @@ public record GetDocumentResponse
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
     public required string FileHash { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
 }
