@@ -62,7 +62,7 @@ To add a new endpoint: create the four files under the appropriate `Features/{Do
 
 ### Aspire Orchestration
 
-`HomeSuiteHome.AppHost` orchestrates PostgreSQL (with pgWeb admin UI) and the WebApi. The WebApi connects to PostgreSQL via the `postgresdb` connection name. `HomeSuiteHome.ServiceDefaults` provides shared config for OpenTelemetry, health checks, and HTTP resilience.
+`HomeSuiteHome.AppHost` orchestrates PostgreSQL (with pgWeb admin UI), the WebApi, and the Vite dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Vite frontend is added via `AddViteApp` (from `Aspire.Hosting.JavaScript`) and receives the WebApi URL dynamically through `VITE_API_URL`. `HomeSuiteHome.ServiceDefaults` provides shared config for OpenTelemetry, health checks, and HTTP resilience.
 
 ## Syncing Frontend with Backend API Changes
 
@@ -92,7 +92,7 @@ cd HomeSuiteHome.WebApp && npm run build
 
 This compiles TypeScript and outputs to `HomeSuiteHome.WebApi/wwwroot/`, which the backend serves as static files with SPA fallback.
 
-During development, use `npm run dev` instead — the Vite dev server proxies `/api` and `/openapi` requests to the backend at `https://localhost:7248`.
+During development, Aspire manages the Vite dev server automatically. The `VITE_API_URL` environment variable is injected by Aspire with the WebApi's HTTP endpoint, and `vite.config.ts` reads it via `process.env.VITE_API_URL` for the proxy target. If running Vite standalone (`npm run dev`), it falls back to `https://localhost:7248`.
 
 ## Key Conventions
 
