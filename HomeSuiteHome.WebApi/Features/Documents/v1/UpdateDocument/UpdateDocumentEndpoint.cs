@@ -7,7 +7,13 @@ public static class UpdateDocumentEndpoint
         group.MapPut("/{id:guid}", async (Guid id, UpdateDocumentRequest request,
             UpdateDocumentHandler handler, CancellationToken ct) =>
         {
-            var command = request with { Id = id };
+            var command = new UpdateDocumentCommand
+            {
+                Id = id,
+                Name = request.Name,
+                TagPaths = request.TagPaths,
+                PartyIds = request.PartyIds
+            };
             return await handler.HandleAsync(command, ct);
         })
         .WithName("UpdateDocument")

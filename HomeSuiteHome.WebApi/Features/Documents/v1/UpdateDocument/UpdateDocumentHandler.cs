@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
 
 public class UpdateDocumentHandler(AppDbContext db)
-    : ICommandHandler<UpdateDocumentRequest, IResult>
+    : ICommandHandler<UpdateDocumentCommand, IResult>
 {
-    public async Task<IResult> HandleAsync(UpdateDocumentRequest request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(UpdateDocumentCommand request, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags)

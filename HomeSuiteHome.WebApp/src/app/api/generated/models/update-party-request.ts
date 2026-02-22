@@ -3,6 +3,5 @@
 
 export interface UpdatePartyRequest {
   description?: (string | null);
-  id?: string;
   name: string;
 }

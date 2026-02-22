@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.UpdateParty;
 
 public class UpdatePartyHandler(AppDbContext db)
-    : ICommandHandler<UpdatePartyRequest, UpdatePartyResponse?>
+    : ICommandHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
-    public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyRequest request, CancellationToken ct)
+    public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyCommand request, CancellationToken ct)
     {
         var party = await db.Parties
             .FirstOrDefaultAsync(p => p.Id == request.Id, ct);

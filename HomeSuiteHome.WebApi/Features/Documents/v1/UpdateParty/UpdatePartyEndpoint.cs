@@ -7,7 +7,12 @@ public static class UpdatePartyEndpoint
         group.MapPut("/{id:guid}", async (Guid id, UpdatePartyRequest request,
             UpdatePartyHandler handler, CancellationToken ct) =>
         {
-            var command = request with { Id = id };
+            var command = new UpdatePartyCommand
+            {
+                Id = id,
+                Name = request.Name,
+                Description = request.Description
+            };
             var response = await handler.HandleAsync(command, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
