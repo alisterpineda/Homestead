@@ -1,12 +1,13 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { cn, formatBytes } from '@/shared/utils';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
+import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 
 @Component({
   selector: 'app-document-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TagBadgeComponent],
+  imports: [TagBadgeComponent, PartyBadgeComponent],
   template: `
     <!-- Mobile card layout -->
     <div class="flex flex-col gap-3 md:hidden">
@@ -34,6 +35,13 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
               }
             </div>
           }
+          @if (doc.parties && doc.parties.length > 0) {
+            <div class="mt-2 flex flex-wrap gap-1">
+              @for (party of doc.parties; track party.id) {
+                <app-party-badge [name]="party.name" />
+              }
+            </div>
+          }
         </div>
       }
     </div>
@@ -45,6 +53,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
           <tr class="border-b border-border bg-surface-raised">
             <th class="px-4 py-3 font-medium text-text-secondary">Name</th>
             <th class="px-4 py-3 font-medium text-text-secondary">Tags</th>
+            <th class="px-4 py-3 font-medium text-text-secondary">Parties</th>
             <th class="px-4 py-3 font-medium text-text-secondary">Content Type</th>
             <th class="px-4 py-3 font-medium text-text-secondary text-right">File Size</th>
           </tr>
@@ -67,6 +76,13 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                 <div class="flex flex-wrap gap-1">
                   @for (tag of doc.tags; track tag.id) {
                     <app-tag-badge [path]="tag.path" />
+                  }
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1">
+                  @for (party of doc.parties; track party.id) {
+                    <app-party-badge [name]="party.name" />
                   }
                 </div>
               </td>

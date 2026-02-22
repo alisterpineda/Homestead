@@ -11,7 +11,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 import {
   X,
@@ -24,6 +24,7 @@ import {
   Calendar,
   HardDrive,
   FileType,
+  Users,
 } from 'lucide-angular';
 import { SheetComponent } from '@/shared/components/ui/sheet/sheet.component';
 import { TabsComponent, TabDefDirective } from '@/shared/components/ui/tabs/tabs.component';
@@ -31,6 +32,9 @@ import { ButtonComponent } from '@/shared/components/ui/button/button.component'
 import { SpinnerComponent } from '@/shared/components/ui/spinner/spinner.component';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { TagInputComponent } from '../tag-input/tag-input.component';
+import { PartyBadgeComponent } from '../party-badge/party-badge.component';
+import { PartyInputComponent } from '../party-input/party-input.component';
+import type { PartyOption } from '../party-input/party-input.component';
 import { formatBytes } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
@@ -50,6 +54,8 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
     SpinnerComponent,
     TagBadgeComponent,
     TagInputComponent,
+    PartyBadgeComponent,
+    PartyInputComponent,
   ],
   template: `
     <app-sheet [open]="!!documentId()" (closed)="closed.emit()">
@@ -162,6 +168,29 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                     </div>
                   </div>
 
+                  <!-- Parties -->
+                  <div class="flex gap-3">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                      <lucide-icon [img]="icons.users" [size]="16" />
+                      <span class="w-12 text-sm font-medium">Parties</span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      @if (editing()) {
+                        <app-party-input [value]="editParties()" (valueChange)="editParties.set($event)" />
+                      } @else {
+                        <div class="flex flex-wrap gap-1.5">
+                          @if (document()!.parties && document()!.parties.length > 0) {
+                            @for (party of document()!.parties; track party.id) {
+                              <app-party-badge [name]="party.name" />
+                            }
+                          } @else {
+                            <span class="text-sm text-text-muted">No parties</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+
                   <!-- Added -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
@@ -215,11 +244,13 @@ export class DocumentDetailPanelComponent {
   editing = signal(false);
   editName = signal('');
   editTags = signal<string[]>([]);
+  editParties = signal<PartyOption[]>([]);
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
+  private refreshTrigger = signal(0);
 
-  icons = { x: X, download: Download, trash: Trash2, fileText: FileText, pencil: Pencil, check: Check, tag: Tag, calendar: Calendar, hardDrive: HardDrive, fileType: FileType };
+  icons = { x: X, download: Download, trash: Trash2, fileText: FileText, pencil: Pencil, check: Check, tag: Tag, calendar: Calendar, hardDrive: HardDrive, fileType: FileType, users: Users };
   formatBytes = formatBytes;
 
   private http = inject(HttpClient);
@@ -232,8 +263,8 @@ export class DocumentDetailPanelComponent {
   });
 
   private documentData = toSignal(
-    toObservable(this.documentId).pipe(
-      switchMap((id) => {
+    combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
+      switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
         return getDocument(this.http, this.apiConfig.rootUrl, { id }).pipe(
@@ -260,6 +291,7 @@ export class DocumentDetailPanelComponent {
       if (doc) {
         this.editName.set(doc.name);
         this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
+        this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
       }
     });
 
@@ -297,25 +329,17 @@ export class DocumentDetailPanelComponent {
     this.saving.set(true);
     updateDocument(this.http, this.apiConfig.rootUrl, {
       id,
-      body: { name: this.editName(), tagPaths: this.editTags() },
+      body: {
+        name: this.editName(),
+        tagPaths: this.editTags(),
+        partyIds: this.editParties().map((p) => p.id),
+      },
     }).subscribe({
       next: () => {
         this.saving.set(false);
         this.editing.set(false);
         this.refreshList.emit();
-        // Reload document data by re-triggering the observable
-        const currentId = this.documentId();
-        // Force a refetch by closing and reopening (a bit of a workaround)
-        // Instead, we update the edit state from the new data
-        if (currentId) {
-          getDocument(this.http, this.apiConfig.rootUrl, { id: currentId }).subscribe({
-            next: (r) => {
-              const doc = r.body as GetDocumentResponse;
-              this.editName.set(doc.name);
-              this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
-            },
-          });
-        }
+        this.refreshTrigger.update((v) => v + 1);
       },
       error: () => {
         this.saving.set(false);
@@ -329,6 +353,7 @@ export class DocumentDetailPanelComponent {
     if (doc) {
       this.editName.set(doc.name);
       this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
+      this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
     }
   }
 
