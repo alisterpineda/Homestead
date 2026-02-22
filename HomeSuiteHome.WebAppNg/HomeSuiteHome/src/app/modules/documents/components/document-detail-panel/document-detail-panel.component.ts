@@ -6,8 +6,10 @@ import {
   signal,
   inject,
   effect,
+  computed,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer } from '@angular/platform-browser';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
@@ -85,7 +87,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
           <!-- Preview -->
           <div class="border-b border-border bg-surface-raised">
             @if (isPdf()) {
-              <iframe [src]="fileUrl()" class="h-80 w-full" [title]="'Preview of ' + document()!.name"></iframe>
+              <iframe [src]="safeFileUrl()" class="h-80 w-full" [title]="'Preview of ' + document()!.name"></iframe>
             } @else {
               <div
                 class="flex h-48 flex-col items-center justify-center gap-2 text-text-secondary"
@@ -222,6 +224,12 @@ export class DocumentDetailPanelComponent {
 
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
+  private sanitizer = inject(DomSanitizer);
+
+  safeFileUrl = computed(() => {
+    const id = this.documentId();
+    return id ? this.sanitizer.bypassSecurityTrustResourceUrl(`/api/v1/documents/${id}/file`) : null;
+  });
 
   private documentData = toSignal(
     toObservable(this.documentId).pipe(

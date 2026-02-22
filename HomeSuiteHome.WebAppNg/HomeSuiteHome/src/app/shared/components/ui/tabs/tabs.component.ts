@@ -7,7 +7,7 @@ import {
   input,
   contentChildren,
   signal,
-  computed,
+  effect,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { cn } from '@/shared/utils';
@@ -60,11 +60,12 @@ export class TabsComponent {
 
   cn = cn;
 
-  activeContent = computed(() => {
-    const tabs = this.tabs();
-    if (tabs.length > 0 && !this.activeTab()) {
-      this.activeTab.set(tabs[0].id());
-    }
-    return tabs.find((t) => t.id() === this.activeTab());
-  });
+  constructor() {
+    effect(() => {
+      const tabs = this.tabs();
+      if (tabs.length > 0 && !this.activeTab()) {
+        this.activeTab.set(tabs[0].id());
+      }
+    });
+  }
 }
