@@ -1,1 +1,0 @@
-export { adminSidebar } from "./sidebar";

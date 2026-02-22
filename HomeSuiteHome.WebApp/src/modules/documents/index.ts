@@ -1,1 +1,0 @@
-export { documentsSidebar } from "./sidebar";

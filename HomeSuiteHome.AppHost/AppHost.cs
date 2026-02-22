@@ -11,10 +11,6 @@ var webapi = builder.AddProject<Projects.HomeSuiteHome_WebApi>("homesuitehome-we
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })
     .WithUrlForEndpoint("https", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" });
 
-builder.AddViteApp("homesuitehome-webapp", "../HomeSuiteHome.WebApp")
-    .WithReference(webapi)
-    .WithEnvironment("VITE_API_URL", webapi.GetEndpoint("http"));
-
 builder.AddJavaScriptApp("homesuitehome-webappng", "../HomeSuiteHome.WebAppNg/HomeSuiteHome", "start")
     .WithReference(webapi)
     .WithHttpEndpoint(port: 4200, env: "PORT")

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HomeSuiteHome is a full-stack document management application with a .NET 10 backend API and React 19 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL.
+HomeSuiteHome is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL.
 
 ## Commands
 
@@ -24,17 +24,16 @@ cd HomeSuiteHome.WebApi && dotnet run
 dotnet ef migrations add <MigrationName> --project HomeSuiteHome.WebApi
 ```
 
-### Frontend (React)
+### Frontend (Angular)
 
-All frontend commands run from `HomeSuiteHome.WebApp/`:
+All frontend commands run from `HomeSuiteHome.WebAppNg/HomeSuiteHome/`:
 
 ```bash
 npm install          # Install dependencies
-npm run dev          # Dev server with proxy to https://localhost:7248
-npm run build        # Build to HomeSuiteHome.WebApi/wwwroot
-npm run lint         # ESLint
-npm run format       # Prettier
-npm run generate-api # Regenerate API clients from openapi.json via Orval
+npm start            # Dev server on port 4200 with API proxy
+npm run build        # Production build
+npm test             # Run tests (Vitest)
+npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-gen
 ```
 
 ## Architecture
@@ -52,17 +51,20 @@ The WebApi uses vertical slice architecture with CQRS handlers:
 
 To add a new endpoint: create the four files under the appropriate `Features/{Domain}/v1/{Operation}/` folder, then register it in the domain's module class.
 
-### Frontend: Module-Based with TanStack
+### Frontend: Angular Standalone Components
 
-- **Modules** (`src/modules/`): Self-contained feature areas (documents, admin) each with pages, components, and sidebar config. Registered in `modules/registry.ts`
-- **Routing**: TanStack Router with file-based routes in `src/routes/`. Route tree is auto-generated (`routeTree.gen.ts`)
-- **API layer**: Orval generates React Query hooks and TypeScript types from the backend OpenAPI spec. Config in `orval.config.ts`, output in `src/api/generated/`. Uses a custom fetch client (`src/api/client.ts`)
-- **Components**: `src/components/ui/` for base components, `src/components/layout/` for app shell/sidebar/header, `src/components/theme/` for dark mode
-- **Path alias**: `@` maps to `src/`
+- **Modules** (`src/app/modules/`): Self-contained feature areas (documents, admin) each with pages, components, routes, and sidebar config. Registered in `modules/registry.ts`
+- **Routing**: Angular Router with lazy-loaded feature routes defined in `app.routes.ts`. Each module has its own `*.routes.ts` file
+- **API layer**: ng-openapi-gen generates Angular services and TypeScript models from the backend OpenAPI spec. Config in `ng-openapi-gen.json`, output in `src/app/api/generated/`
+- **Shared**: `src/app/shared/components/ui/` for base components, `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
+- **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
+- **Styling**: Tailwind CSS v4
+
+See `HomeSuiteHome.WebAppNg/CLAUDE.md` for detailed Angular conventions and best practices.
 
 ### Aspire Orchestration
 
-`HomeSuiteHome.AppHost` orchestrates PostgreSQL (with pgWeb admin UI), the WebApi, and the Vite dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Vite frontend is added via `AddViteApp` (from `Aspire.Hosting.JavaScript`) and receives the WebApi URL dynamically through `VITE_API_URL`. `HomeSuiteHome.ServiceDefaults` provides shared config for OpenTelemetry, health checks, and HTTP resilience.
+`HomeSuiteHome.AppHost` orchestrates PostgreSQL (with pgWeb admin UI), the WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`. `HomeSuiteHome.ServiceDefaults` provides shared config for OpenTelemetry, health checks, and HTTP resilience.
 
 ## Syncing Frontend with Backend API Changes
 
@@ -75,27 +77,15 @@ When backend endpoints are added or modified, regenerate the frontend API client
    dotnet build HomeSuiteHome.WebApi
    ```
    This outputs the spec to `HomeSuiteHome.WebApi/obj/HomeSuiteHome.WebApi.json`.
-2. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
+2. **Regenerate the API client** (from `HomeSuiteHome.WebAppNg/HomeSuiteHome/`):
    ```bash
    npm run generate-api
    ```
-   This runs Orval, which reads the generated spec and outputs React Query hooks and TypeScript types to `src/api/generated/`.
-3. **Update frontend code** to use the new/modified generated hooks and types.
-
-### Building the Frontend for Production
-
-The frontend must be rebuilt after changes for the WebApi to serve the updated app:
-
-```bash
-cd HomeSuiteHome.WebApp && npm run build
-```
-
-This compiles TypeScript and outputs to `HomeSuiteHome.WebApi/wwwroot/`, which the backend serves as static files with SPA fallback.
-
-During development, Aspire manages the Vite dev server automatically. The `VITE_API_URL` environment variable is injected by Aspire with the WebApi's HTTP endpoint, and `vite.config.ts` reads it via `process.env.VITE_API_URL` for the proxy target. If running Vite standalone (`npm run dev`), it falls back to `https://localhost:7248`.
+   This runs ng-openapi-gen, which reads the generated spec and outputs Angular services and TypeScript models to `src/app/api/generated/`.
+3. **Update frontend code** to use the new/modified generated services and models.
 
 ## Key Conventions
 
 - Backend uses Minimal APIs (no controllers), Scalar for API docs (at `/scalar/v1` in dev)
-- Frontend build output goes to `HomeSuiteHome.WebApi/wwwroot` and is served as static files with SPA fallback
-- Generated files (`src/api/generated/`, `routeTree.gen.ts`) should not be manually edited
+- Frontend uses standalone components (default in Angular v21), signals for state, OnPush change detection
+- Generated files (`src/app/api/generated/`) should not be manually edited
