@@ -8,11 +8,11 @@ public static class UpdateDocumentEndpoint
             UpdateDocumentHandler handler, CancellationToken ct) =>
         {
             var command = request with { Id = id };
-            var response = await handler.HandleAsync(command, ct);
-            return response is not null ? Results.Ok(response) : Results.NotFound();
+            return await handler.HandleAsync(command, ct);
         })
         .WithName("UpdateDocument")
         .Produces<UpdateDocumentResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound);
     }
 }

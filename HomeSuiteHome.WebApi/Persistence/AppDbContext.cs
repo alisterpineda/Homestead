@@ -1,4 +1,5 @@
 using HomeSuiteHome.WebApi.Domains.Documents;
+using HomeSuiteHome.WebApi.Domains.Parties;
 using HomeSuiteHome.WebApi.Domains.Tags;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Document> Documents { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<DocumentTag> DocumentTags { get; set; }
+    public DbSet<Party> Parties { get; set; }
+    public DbSet<DocumentParty> DocumentParties { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

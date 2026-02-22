@@ -25,6 +25,12 @@ public class GetDocumentHandler(AppDbContext db)
                     Id = dt.Tag.Id,
                     Name = dt.Tag.Name,
                     Path = dt.Tag.Path
+                }).ToList(),
+                Parties = d.DocumentParties.Select(dp => new GetDocumentPartyDto
+                {
+                    Id = dp.Party.Id,
+                    Name = dp.Party.Name,
+                    Description = dp.Party.Description
                 }).ToList()
             })
             .FirstOrDefaultAsync(ct);

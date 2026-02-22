@@ -3,8 +3,6 @@
 # Compiled output
 /dist
 
-# Generated API client
-/src/app/api/generated
 /tmp
 /out-tsc
 /bazel-out

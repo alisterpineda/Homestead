@@ -1,10 +1,15 @@
 using Asp.Versioning.Builder;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.CreateParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocument;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentFile;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetParties;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateParty;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
 
@@ -24,6 +29,13 @@ public static class DocumentsModule
         GetDocumentFileEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
         UpdateDocumentEndpoint.Map(v1);
+
+        var parties = v1.MapGroup("/parties");
+        CreatePartyEndpoint.Map(parties);
+        DeletePartyEndpoint.Map(parties);
+        GetPartiesEndpoint.Map(parties);
+        GetPartyEndpoint.Map(parties);
+        UpdatePartyEndpoint.Map(parties);
 
         return app;
     }

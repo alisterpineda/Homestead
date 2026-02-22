@@ -9,6 +9,7 @@ public record GetDocumentResponse
     public required string FileHash { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }
+    public required IReadOnlyList<GetDocumentPartyDto> Parties { get; init; }
 }
 
 public record GetDocumentTagDto
@@ -16,4 +17,11 @@ public record GetDocumentTagDto
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required string Path { get; init; }
+}
+
+public record GetDocumentPartyDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
 }

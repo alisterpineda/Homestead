@@ -9,6 +9,7 @@ public record UpdateDocumentResponse
     public required string FileHash { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required IReadOnlyList<TagDto> Tags { get; init; }
+    public required IReadOnlyList<PartyDto> Parties { get; init; }
 }
 
 public record TagDto
@@ -16,4 +17,11 @@ public record TagDto
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required string Path { get; init; }
+}
+
+public record PartyDto
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
 }

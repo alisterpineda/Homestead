@@ -1,4 +1,5 @@
 using HomeSuiteHome.WebApi.Common;
+using HomeSuiteHome.WebApi.Domains.Parties;
 using HomeSuiteHome.WebApi.Domains.Tags;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,16 +7,31 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
 
 public class UpdateDocumentHandler(AppDbContext db)
-    : ICommandHandler<UpdateDocumentRequest, UpdateDocumentResponse?>
+    : ICommandHandler<UpdateDocumentRequest, IResult>
 {
-    public async Task<UpdateDocumentResponse?> HandleAsync(UpdateDocumentRequest request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(UpdateDocumentRequest request, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentParties)
             .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
 
         if (document is null)
-            return null;
+            return Results.NotFound();
+
+        // Validate party IDs
+        if (request.PartyIds.Count > 0)
+        {
+            var existingPartyIds = await db.Parties
+                .Where(p => request.PartyIds.Contains(p.Id))
+                .Select(p => p.Id)
+                .ToListAsync(ct);
+
+            var invalidIds = request.PartyIds.Except(existingPartyIds).ToList();
+
+            if (invalidIds.Count > 0)
+                return Results.BadRequest(new { InvalidPartyIds = invalidIds });
+        }
 
         document.Name = request.Name;
 
@@ -33,6 +49,18 @@ public class UpdateDocumentHandler(AppDbContext db)
             });
         }
 
+        // Clear existing party associations and reassign
+        document.DocumentParties.Clear();
+
+        foreach (var partyId in request.PartyIds)
+        {
+            document.DocumentParties.Add(new DocumentParty
+            {
+                DocumentId = document.Id,
+                PartyId = partyId
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         // Load tags for response
@@ -47,7 +75,19 @@ public class UpdateDocumentHandler(AppDbContext db)
             })
             .ToListAsync(ct);
 
-        return new UpdateDocumentResponse
+        // Load parties for response
+        var parties = await db.DocumentParties
+            .AsNoTracking()
+            .Where(dp => dp.DocumentId == document.Id)
+            .Select(dp => new PartyDto
+            {
+                Id = dp.Party.Id,
+                Name = dp.Party.Name,
+                Description = dp.Party.Description
+            })
+            .ToListAsync(ct);
+
+        return Results.Ok(new UpdateDocumentResponse
         {
             Id = document.Id,
             Name = document.Name,
@@ -55,8 +95,9 @@ public class UpdateDocumentHandler(AppDbContext db)
             FileSize = document.FileSize,
             FileHash = document.FileHash,
             CreatedAt = document.CreatedAt,
-            Tags = tags
-        };
+            Tags = tags,
+            Parties = parties
+        });
     }
 
     private async Task<Tag> ResolveOrCreateTagAsync(string path, CancellationToken ct)

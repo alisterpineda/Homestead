@@ -1,3 +1,4 @@
+using HomeSuiteHome.WebApi.Domains.Parties;
 using HomeSuiteHome.WebApi.Domains.Tags;
 
 namespace HomeSuiteHome.WebApi.Domains.Documents;
@@ -13,4 +14,5 @@ public class Document
     public DateTimeOffset CreatedAt { get; set; }
 
     public ICollection<DocumentTag> DocumentTags { get; set; } = [];
+    public ICollection<DocumentParty> DocumentParties { get; set; } = [];
 }

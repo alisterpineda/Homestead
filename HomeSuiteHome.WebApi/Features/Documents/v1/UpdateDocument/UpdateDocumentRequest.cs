@@ -5,4 +5,5 @@ public record UpdateDocumentRequest
     public Guid Id { get; init; }
     public required string Name { get; init; }
     public List<string> TagPaths { get; init; } = [];
+    public List<Guid> PartyIds { get; init; } = [];
 }

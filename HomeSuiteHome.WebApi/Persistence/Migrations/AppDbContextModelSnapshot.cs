@@ -58,6 +58,48 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                     b.ToTable("documents", "documents");
                 });
 
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.DocumentParty", b =>
+                {
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DocumentId", "PartyId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("PartyId");
+
+                    b.ToTable("document_parties", "documents");
+                });
+
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.Party", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("parties", "documents");
+                });
+
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Tags.DocumentTag", b =>
                 {
                     b.Property<Guid>("DocumentId")
@@ -109,6 +151,25 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                     b.ToTable("tags", "tags");
                 });
 
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.DocumentParty", b =>
+                {
+                    b.HasOne("HomeSuiteHome.WebApi.Domains.Documents.Document", "Document")
+                        .WithMany("DocumentParties")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeSuiteHome.WebApi.Domains.Parties.Party", "Party")
+                        .WithMany("DocumentParties")
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Party");
+                });
+
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Tags.DocumentTag", b =>
                 {
                     b.HasOne("HomeSuiteHome.WebApi.Domains.Documents.Document", "Document")
@@ -140,7 +201,14 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.Document", b =>
                 {
+                    b.Navigation("DocumentParties");
+
                     b.Navigation("DocumentTags");
+                });
+
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.Party", b =>
+                {
+                    b.Navigation("DocumentParties");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Tags.Tag", b =>
