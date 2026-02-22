@@ -15,4 +15,9 @@ builder.AddViteApp("homesuitehome-webapp", "../HomeSuiteHome.WebApp")
     .WithReference(webapi)
     .WithEnvironment("VITE_API_URL", webapi.GetEndpoint("http"));
 
+builder.AddJavaScriptApp("homesuitehome-webappng", "../HomeSuiteHome.WebAppNg/HomeSuiteHome", "start")
+    .WithReference(webapi)
+    .WithHttpEndpoint(port: 4200, env: "PORT")
+    .WaitFor(webapi);
+
 builder.Build().Run();
