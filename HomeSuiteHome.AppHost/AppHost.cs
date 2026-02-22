@@ -11,7 +11,7 @@ var webapi = builder.AddProject<Projects.HomeSuiteHome_WebApi>("homesuitehome-we
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })
     .WithUrlForEndpoint("https", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" });
 
-builder.AddJavaScriptApp("homesuitehome-webappng", "../HomeSuiteHome.WebAppNg/HomeSuiteHome", "start")
+builder.AddJavaScriptApp("homesuitehome-webapp", "../HomeSuiteHome.WebApp", "start")
     .WithReference(webapi)
     .WithHttpEndpoint(port: 4200, env: "PORT")
     .WaitFor(webapi);

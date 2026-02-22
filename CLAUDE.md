@@ -26,7 +26,7 @@ dotnet ef migrations add <MigrationName> --project HomeSuiteHome.WebApi
 
 ### Frontend (Angular)
 
-All frontend commands run from `HomeSuiteHome.WebAppNg/HomeSuiteHome/`:
+All frontend commands run from `HomeSuiteHome.WebApp/`:
 
 ```bash
 npm install          # Install dependencies
@@ -60,7 +60,7 @@ To add a new endpoint: create the four files under the appropriate `Features/{Do
 - **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
 - **Styling**: Tailwind CSS v4
 
-See `HomeSuiteHome.WebAppNg/CLAUDE.md` for detailed Angular conventions and best practices.
+See `HomeSuiteHome.WebApp/CLAUDE.md` for detailed Angular conventions and best practices.
 
 ### Aspire Orchestration
 
@@ -77,7 +77,7 @@ When backend endpoints are added or modified, regenerate the frontend API client
    dotnet build HomeSuiteHome.WebApi
    ```
    This outputs the spec to `HomeSuiteHome.WebApi/obj/HomeSuiteHome.WebApi.json`.
-2. **Regenerate the API client** (from `HomeSuiteHome.WebAppNg/HomeSuiteHome/`):
+2. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
    ```bash
    npm run generate-api
    ```
