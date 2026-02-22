@@ -6,7 +6,8 @@
     "start": "ng serve --port ${PORT:-4200}",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "generate-api": "ng-openapi-gen"
   },
   "prettier": {
     "printWidth": 100,
@@ -29,6 +30,7 @@
     "@angular/forms": "^21.1.0",
     "@angular/platform-browser": "^21.1.0",
     "@angular/router": "^21.1.0",
+    "lucide-angular": "^0.575.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -38,6 +40,7 @@
     "@angular/compiler-cli": "^21.1.0",
     "@tailwindcss/postcss": "^4.1.12",
     "jsdom": "^27.1.0",
+    "ng-openapi-gen": "^1.0.5",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.12",
     "typescript": "~5.9.2",
