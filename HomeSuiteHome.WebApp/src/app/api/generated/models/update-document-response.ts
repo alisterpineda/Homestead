@@ -6,10 +6,14 @@ import { TagDto } from '../models/tag-dto';
 export interface UpdateDocumentResponse {
   contentType: string;
   createdAt: string;
+  createdByUserId?: (string | null);
+  createdByUserName?: (string | null);
   fileHash: string;
   fileSize: (number | string);
   id: string;
   name: string;
+  ownerUserId?: (string | null);
+  ownerUserName?: (string | null);
   parties: Array<PartyDto>;
   tags: Array<TagDto>;
 }

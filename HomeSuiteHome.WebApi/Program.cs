@@ -2,6 +2,7 @@ using Asp.Versioning;
 using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Features.Documents;
+using HomeSuiteHome.WebApi.Features.Auth;
 using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,7 @@ app.UseAuthorization();
 app.UseMiddleware<UserProvisioningMiddleware>();
 
 var versionedApi = app.NewVersionedApi();
+versionedApi.MapAuthEndpoints();
 versionedApi.MapDocumentsEndpoints();
 versionedApi.MapTagsEndpoints();
 

@@ -3,6 +3,7 @@ import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { SidebarHeaderComponent } from '../sidebar-header/sidebar-header.component';
+import { SidebarFooterComponent } from '../sidebar-footer/sidebar-footer.component';
 import { SidebarNavComponent } from '../sidebar-nav/sidebar-nav.component';
 import { SidebarService } from '@/shared/services/sidebar.service';
 import { cn } from '@/shared/utils';
@@ -11,7 +12,7 @@ import type { ModuleDefinition } from '@/shared/types/modules';
 @Component({
   selector: 'app-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SidebarHeaderComponent, SidebarNavComponent],
+  imports: [SidebarHeaderComponent, SidebarFooterComponent, SidebarNavComponent],
   template: `
     @if (sidebar.isOpen()) {
       <div
@@ -35,6 +36,7 @@ import type { ModuleDefinition } from '@/shared/types/modules';
           <app-sidebar-nav [items]="activeModule()!.sidebar" />
         }
       </div>
+      <app-sidebar-footer />
     </aside>
   `,
 })

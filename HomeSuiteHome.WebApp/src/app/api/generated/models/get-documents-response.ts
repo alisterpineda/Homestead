@@ -5,9 +5,13 @@ import { GetDocumentsPartyDto } from '../models/get-documents-party-dto';
 import { GetDocumentsTagDto } from '../models/get-documents-tag-dto';
 export interface GetDocumentsResponse {
   contentType: string;
+  createdByUserId?: (string | null);
+  createdByUserName?: (string | null);
   fileSize: (number | string);
   id: string;
   name: string;
+  ownerUserId?: (string | null);
+  ownerUserName?: (string | null);
   parties: Array<GetDocumentsPartyDto>;
   tags: Array<GetDocumentsTagDto>;
 }

@@ -6,10 +6,14 @@ import { GetDocumentTagDto } from '../models/get-document-tag-dto';
 export interface GetDocumentResponse {
   contentType: string;
   createdAt: string;
+  createdByUserId?: (string | null);
+  createdByUserName?: (string | null);
   fileHash: string;
   fileSize: (number | string);
   id: string;
   name: string;
+  ownerUserId?: (string | null);
+  ownerUserName?: (string | null);
   parties: Array<GetDocumentPartyDto>;
   tags: Array<GetDocumentTagDto>;
 }

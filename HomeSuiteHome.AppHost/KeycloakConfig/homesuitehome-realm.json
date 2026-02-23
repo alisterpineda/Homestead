@@ -42,6 +42,17 @@
             "claim.name": "roles",
             "jsonType.label": "String"
           }
+        },
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "homesuitehome-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
         }
       ]
     }

@@ -6,6 +6,7 @@ export type { CreatePartyRequest } from './models/create-party-request';
 export type { CreatePartyResponse } from './models/create-party-response';
 export type { CreateTagRequest } from './models/create-tag-request';
 export type { CreateTagResponse } from './models/create-tag-response';
+export type { GetAuthConfigResponse } from './models/get-auth-config-response';
 export type { GetDocumentPartyDto } from './models/get-document-party-dto';
 export type { GetDocumentResponse } from './models/get-document-response';
 export type { GetDocumentsPartyDto } from './models/get-documents-party-dto';
