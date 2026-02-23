@@ -7,11 +7,12 @@ import {
   inject,
   effect,
   computed,
+  OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, tap } from 'rxjs';
 import { LucideAngularModule } from 'lucide-angular';
 import {
   X,
@@ -121,8 +122,8 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                 Edit
               </app-button>
               <a
-                [href]="fileUrl() + '?download=true'"
-                download
+                [href]="fileBlobUrl()"
+                [download]="document()!.name"
                 class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 <lucide-icon [img]="icons.download" [size]="16" />
@@ -236,7 +237,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
     </app-sheet>
   `,
 })
-export class DocumentDetailPanelComponent {
+export class DocumentDetailPanelComponent implements OnDestroy {
   documentId = input<string | null>(null);
   closed = output<void>();
   refreshList = output<void>();
@@ -257,10 +258,27 @@ export class DocumentDetailPanelComponent {
   private apiConfig = inject(ApiConfiguration);
   private sanitizer = inject(DomSanitizer);
 
+  fileBlobUrl = signal<string | null>(null);
+
   safeFileUrl = computed(() => {
-    const id = this.documentId();
-    return id ? this.sanitizer.bypassSecurityTrustResourceUrl(`/api/v1/documents/${id}/file`) : null;
+    const url = this.fileBlobUrl();
+    return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
   });
+
+  private fileBlob = toSignal(
+    combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
+      tap(() => this.revokeCurrentBlobUrl()),
+      switchMap(([id]) => {
+        if (!id) return of(null);
+        return this.http.get(`/api/v1/documents/${id}/file`, { responseType: 'blob' }).pipe(
+          map((blob) => URL.createObjectURL(blob)),
+          catchError(() => of(null)),
+        );
+      }),
+      tap((url) => this.fileBlobUrl.set(url)),
+    ),
+    { initialValue: null },
+  );
 
   private documentData = toSignal(
     combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
@@ -302,13 +320,20 @@ export class DocumentDetailPanelComponent {
     });
   }
 
+  ngOnDestroy(): void {
+    this.revokeCurrentBlobUrl();
+  }
+
   isPdf(): boolean {
     return this.document()?.contentType === 'application/pdf';
   }
 
-  fileUrl(): string {
-    const id = this.documentId();
-    return id ? `/api/v1/documents/${id}/file` : '';
+  private revokeCurrentBlobUrl(): void {
+    const url = this.fileBlobUrl();
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.fileBlobUrl.set(null);
+    }
   }
 
   formatDate(dateStr: string): string {
