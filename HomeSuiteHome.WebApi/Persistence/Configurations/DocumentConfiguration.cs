@@ -31,5 +31,18 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.HasOne(d => d.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(d => d.OwnerUser)
+            .WithMany()
+            .HasForeignKey(d => d.OwnerUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(d => d.CreatedByUserId);
+        builder.HasIndex(d => d.OwnerUserId);
     }
 }

@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
+using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Domains.Documents;
 using HomeSuiteHome.WebApi.Persistence;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration)
+public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser)
     : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
     public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
@@ -31,6 +32,8 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
             fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
+        var userId = currentUser.User?.Id;
+
         var document = new Document
         {
             Id = Guid.NewGuid(),
@@ -39,7 +42,9 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
             FileSize = file.Length,
             FilePath = Path.Combine("documents", storedFileName),
             FileHash = fileHash,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedByUserId = userId,
+            OwnerUserId = userId
         };
 
         db.Documents.Add(document);

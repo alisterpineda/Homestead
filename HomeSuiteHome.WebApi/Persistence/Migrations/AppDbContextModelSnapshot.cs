@@ -37,6 +37,9 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("FileHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -53,9 +56,50 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("OwnerUserId");
+
                     b.ToTable("documents", "documents");
+                });
+
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Identity.AppUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ExternalSubject")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalSubject")
+                        .IsUnique();
+
+                    b.ToTable("app_users", "identity");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.DocumentParty", b =>
@@ -149,6 +193,23 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("tags", "tags");
+                });
+
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.Document", b =>
+                {
+                    b.HasOne("HomeSuiteHome.WebApi.Domains.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HomeSuiteHome.WebApi.Domains.Identity.AppUser", "OwnerUser")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("OwnerUser");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.DocumentParty", b =>

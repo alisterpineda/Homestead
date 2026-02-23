@@ -20,6 +20,10 @@ public class GetDocumentHandler(AppDbContext db)
                 FileSize = d.FileSize,
                 FileHash = d.FileHash,
                 CreatedAt = d.CreatedAt,
+                CreatedByUserId = d.CreatedByUserId,
+                CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
+                OwnerUserId = d.OwnerUserId,
+                OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentTagDto
                 {
                     Id = dt.Tag.Id,

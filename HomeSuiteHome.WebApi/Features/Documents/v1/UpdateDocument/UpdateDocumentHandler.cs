@@ -87,6 +87,24 @@ public class UpdateDocumentHandler(AppDbContext db)
             })
             .ToListAsync(ct);
 
+        // Load owner info for response
+        string? createdByUserName = null;
+        string? ownerUserName = null;
+        if (document.CreatedByUserId.HasValue)
+        {
+            createdByUserName = await db.AppUsers
+                .Where(u => u.Id == document.CreatedByUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
+        if (document.OwnerUserId.HasValue)
+        {
+            ownerUserName = await db.AppUsers
+                .Where(u => u.Id == document.OwnerUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return Results.Ok(new UpdateDocumentResponse
         {
             Id = document.Id,
@@ -95,6 +113,10 @@ public class UpdateDocumentHandler(AppDbContext db)
             FileSize = document.FileSize,
             FileHash = document.FileHash,
             CreatedAt = document.CreatedAt,
+            CreatedByUserId = document.CreatedByUserId,
+            CreatedByUserName = createdByUserName,
+            OwnerUserId = document.OwnerUserId,
+            OwnerUserName = ownerUserName,
             Tags = tags,
             Parties = parties
         });

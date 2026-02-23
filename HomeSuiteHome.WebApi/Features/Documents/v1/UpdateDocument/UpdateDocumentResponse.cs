@@ -8,6 +8,10 @@ public record UpdateDocumentResponse
     public required long FileSize { get; init; }
     public required string FileHash { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+    public Guid? CreatedByUserId { get; init; }
+    public string? CreatedByUserName { get; init; }
+    public Guid? OwnerUserId { get; init; }
+    public string? OwnerUserName { get; init; }
     public required IReadOnlyList<TagDto> Tags { get; init; }
     public required IReadOnlyList<PartyDto> Parties { get; init; }
 }

@@ -24,6 +24,10 @@ public class GetDocumentsHandler(AppDbContext db)
                 Name = d.Name,
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
+                CreatedByUserId = d.CreatedByUserId,
+                CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
+                OwnerUserId = d.OwnerUserId,
+                OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
                     Id = dt.Tag.Id,

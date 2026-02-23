@@ -1,9 +1,11 @@
 using Asp.Versioning;
+using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Features.Documents;
 using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +21,7 @@ if (!string.IsNullOrEmpty(connectionString))
 
 // Add services to the container.
 
+builder.AddAppAuthentication();
 builder.Services.AddHandlers();
 
 builder.Services.AddApiVersioning(options =>
@@ -57,11 +60,42 @@ builder.Services.AddOpenApi("v1", options =>
 
         return Task.CompletedTask;
     });
+
+    options.AddDocumentTransformer((document, context, ct) =>
+    {
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes = new Dictionary<string, IOpenApiSecurityScheme>
+        {
+            ["Bearer"] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                In = ParameterLocation.Header,
+                BearerFormat = "JWT",
+                Description = "JWT Bearer token from the identity provider"
+            }
+        };
+
+        foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations ?? []))
+        {
+            operation.Value.Security ??= [];
+            operation.Value.Security.Add(new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+            });
+        }
+
+        return Task.CompletedTask;
+    });
 });
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<UserProvisioningMiddleware>();
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
