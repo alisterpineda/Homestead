@@ -26,6 +26,6 @@ export class SpinnerComponent {
   className = input<string>('');
 
   classes = computed(() =>
-    cn('animate-spin text-accent-500', sizeStyles[this.size()], this.className()),
+    cn('animate-spin text-primary', sizeStyles[this.size()], this.className()),
   );
 }

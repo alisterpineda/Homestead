@@ -18,13 +18,13 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
             cn(
               'cursor-pointer rounded-lg border border-border p-4 transition-colors',
               selectedDocumentId() === doc.id
-                ? 'bg-accent-50'
-                : 'hover:bg-surface-raised'
+                ? 'bg-accent'
+                : 'hover:bg-muted'
             )
           "
         >
-          <p class="font-medium text-text-primary">{{ doc.name }}</p>
-          <div class="mt-2 flex items-center gap-3 text-xs text-text-muted">
+          <p class="font-medium text-foreground">{{ doc.name }}</p>
+          <div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
             <span>{{ doc.contentType }}</span>
             <span>{{ formatBytes(+doc.fileSize) }}</span>
           </div>
@@ -50,12 +50,12 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     <div class="hidden overflow-hidden rounded-lg border border-border md:block">
       <table class="w-full text-left text-sm">
         <thead>
-          <tr class="border-b border-border bg-surface-raised">
-            <th class="px-4 py-3 font-medium text-text-secondary">Name</th>
-            <th class="px-4 py-3 font-medium text-text-secondary">Tags</th>
-            <th class="px-4 py-3 font-medium text-text-secondary">Parties</th>
-            <th class="px-4 py-3 font-medium text-text-secondary">Content Type</th>
-            <th class="px-4 py-3 font-medium text-text-secondary text-right">File Size</th>
+          <tr class="border-b border-border bg-muted">
+            <th class="px-4 py-3 font-medium text-muted-foreground">Name</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Tags</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Parties</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Content Type</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground text-right">File Size</th>
           </tr>
         </thead>
         <tbody>
@@ -66,12 +66,12 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                 cn(
                   'border-b border-border last:border-0 cursor-pointer transition-colors',
                   selectedDocumentId() === doc.id
-                    ? 'bg-accent-50'
-                    : 'hover:bg-surface-raised'
+                    ? 'bg-accent'
+                    : 'hover:bg-muted'
                 )
               "
             >
-              <td class="px-4 py-3 font-medium text-text-primary">{{ doc.name }}</td>
+              <td class="px-4 py-3 font-medium text-foreground">{{ doc.name }}</td>
               <td class="px-4 py-3">
                 <div class="flex flex-wrap gap-1">
                   @for (tag of doc.tags; track tag.id) {
@@ -86,8 +86,8 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                   }
                 </div>
               </td>
-              <td class="px-4 py-3 text-text-secondary">{{ doc.contentType }}</td>
-              <td class="px-4 py-3 text-text-secondary text-right">
+              <td class="px-4 py-3 text-muted-foreground">{{ doc.contentType }}</td>
+              <td class="px-4 py-3 text-muted-foreground text-right">
                 {{ formatBytes(+doc.fileSize) }}
               </td>
             </tr>

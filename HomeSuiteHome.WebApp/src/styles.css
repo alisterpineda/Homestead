@@ -1,98 +1,133 @@
 @import "tailwindcss";
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-accent-50: var(--accent-50);
-  --color-accent-100: var(--accent-100);
-  --color-accent-200: var(--accent-200);
-  --color-accent-300: var(--accent-300);
-  --color-accent-400: var(--accent-400);
-  --color-accent-500: var(--accent-500);
-  --color-accent-600: var(--accent-600);
-  --color-accent-700: var(--accent-700);
-  --color-accent-800: var(--accent-800);
-  --color-accent-900: var(--accent-900);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
 
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-overlay: var(--surface-overlay);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
 
   --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --color-sidebar-bg: var(--sidebar-bg);
-  --color-sidebar-text: var(--sidebar-text);
-  --color-sidebar-hover: var(--sidebar-hover);
-  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  --accent-50: #eff6ff;
-  --accent-100: #dbeafe;
-  --accent-200: #bfdbfe;
-  --accent-300: #93c5fd;
-  --accent-400: #60a5fa;
-  --accent-500: #3b82f6;
-  --accent-600: #2563eb;
-  --accent-700: #1d4ed8;
-  --accent-800: #1e40af;
-  --accent-900: #1e3a8a;
+  --radius: 0.625rem;
 
-  --surface: #ffffff;
-  --surface-raised: #f9fafb;
-  --surface-overlay: #ffffff;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0.004 285.823);
 
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0.004 285.823);
 
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0.004 285.823);
 
-  --sidebar-bg: #f8fafc;
-  --sidebar-text: #334155;
-  --sidebar-hover: #f1f5f9;
-  --sidebar-active: #e2e8f0;
+  --primary: oklch(0.205 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.965 0.001 286.029);
+  --secondary-foreground: oklch(0.205 0.006 285.885);
+
+  --muted: oklch(0.965 0.001 286.029);
+  --muted-foreground: oklch(0.556 0.007 285.938);
+
+  --accent: oklch(0.965 0.001 286.029);
+  --accent-foreground: oklch(0.205 0.006 285.885);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.922 0.004 286.029);
+  --input: oklch(0.922 0.004 286.029);
+  --ring: oklch(0.708 0.005 286.029);
+
+  --sidebar: oklch(0.985 0.001 286.029);
+  --sidebar-foreground: oklch(0.145 0.004 285.823);
+  --sidebar-accent: oklch(0.965 0.001 286.029);
+  --sidebar-accent-foreground: oklch(0.205 0.006 285.885);
+  --sidebar-border: oklch(0.922 0.004 286.029);
 }
 
-[data-theme="dark"] {
-  --accent-50: #172554;
-  --accent-100: #1e3a8a;
-  --accent-200: #1e40af;
-  --accent-300: #2563eb;
-  --accent-400: #3b82f6;
-  --accent-500: #60a5fa;
-  --accent-600: #93c5fd;
-  --accent-700: #bfdbfe;
-  --accent-800: #dbeafe;
-  --accent-900: #eff6ff;
+.dark {
+  --background: oklch(0.145 0.004 285.823);
+  --foreground: oklch(0.985 0 0);
 
-  --surface: #0f172a;
-  --surface-raised: #1e293b;
-  --surface-overlay: #1e293b;
+  --card: oklch(0.145 0.004 285.823);
+  --card-foreground: oklch(0.985 0 0);
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --popover: oklch(0.145 0.004 285.823);
+  --popover-foreground: oklch(0.985 0 0);
 
-  --border: #334155;
-  --border-strong: #475569;
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0.006 285.885);
 
-  --sidebar-bg: #0f172a;
-  --sidebar-text: #cbd5e1;
-  --sidebar-hover: #1e293b;
-  --sidebar-active: #334155;
+  --secondary: oklch(0.269 0.006 285.885);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.269 0.006 285.885);
+  --muted-foreground: oklch(0.708 0.005 286.029);
+
+  --accent: oklch(0.269 0.006 285.885);
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.269 0.006 285.885);
+  --input: oklch(0.269 0.006 285.885);
+  --ring: oklch(0.439 0.006 285.885);
+
+  --sidebar: oklch(0.175 0.005 285.823);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0.006 285.885);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0.006 285.885);
 }
 
 body {
   margin: 0;
-  background-color: var(--surface);
-  color: var(--text-primary);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -17,7 +17,7 @@ const modes: { value: ThemeMode; icon: LucideIconData; label: string }[] = [
   template: `
     <button
       (click)="theme.cycleTheme()"
-      class="cursor-pointer rounded-md p-1.5 text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
+      class="cursor-pointer rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       [title]="'Theme: ' + current().label"
     >
       <lucide-icon [img]="current().icon" [size]="18" />

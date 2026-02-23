@@ -27,17 +27,17 @@ import { cn, formatBytes } from '@/shared/utils';
       <lucide-icon
         [img]="uploadIcon"
         [size]="32"
-        [class]="'mb-3 ' + (file() ? 'text-accent-500' : 'text-text-muted')"
+        [class]="'mb-3 ' + (file() ? 'text-primary' : 'text-muted-foreground')"
       />
       @if (file()) {
         <div class="text-center">
-          <p class="text-sm font-medium text-text-primary">{{ file()!.name }}</p>
-          <p class="mt-1 text-xs text-text-secondary">{{ formatBytes(file()!.size) }}</p>
+          <p class="text-sm font-medium text-foreground">{{ file()!.name }}</p>
+          <p class="mt-1 text-xs text-muted-foreground">{{ formatBytes(file()!.size) }}</p>
         </div>
       } @else {
         <div class="text-center">
-          <p class="text-sm font-medium text-text-primary">Drop a file here, or click to browse</p>
-          <p class="mt-1 text-xs text-text-secondary">Any file type accepted</p>
+          <p class="text-sm font-medium text-foreground">Drop a file here, or click to browse</p>
+          <p class="mt-1 text-xs text-muted-foreground">Any file type accepted</p>
         </div>
       }
     </div>
@@ -59,10 +59,10 @@ export class UploadDropzoneComponent {
     return cn(
       'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors md:p-8',
       drag
-        ? 'border-accent-500 bg-accent-50'
+        ? 'border-primary bg-accent'
         : f
-          ? 'border-accent-400 bg-accent-50'
-          : 'border-border hover:border-accent-400 hover:bg-surface-raised',
+          ? 'border-primary bg-accent'
+          : 'border-border hover:border-primary hover:bg-muted',
     );
   }
 

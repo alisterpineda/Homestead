@@ -53,3 +53,13 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Design services around a single responsibility
 - Use the `providedIn: 'root'` option for singleton services
 - Use the `inject()` function instead of constructor injection
+
+## Theming & Styling
+
+- Uses shadcn/ui default theme convention with OKLCH CSS variables defined in `src/styles.css`
+- Semantic color tokens: `background`/`foreground`, `primary`/`primary-foreground`, `secondary`/`secondary-foreground`, `muted`/`muted-foreground`, `accent`/`accent-foreground`, `destructive`/`destructive-foreground`, `card`/`card-foreground`, `popover`/`popover-foreground`, `input`, `ring`, `border`, `sidebar`/`sidebar-foreground`/`sidebar-accent`/`sidebar-accent-foreground`/`sidebar-border`
+- Dark mode via `.dark` class on `<html>` (toggled by `ThemeService`)
+- Border radius system via `--radius` variable (`radius-sm`, `radius-md`, `radius-lg`, `radius-xl`)
+- Font: Inter (self-hosted via `@fontsource/inter`)
+- Use Tailwind classes like `bg-primary`, `text-foreground`, `text-muted-foreground`, `bg-muted`, `border-border`, etc.
+- Do NOT use raw color values (e.g. `bg-gray-500`); always use semantic tokens

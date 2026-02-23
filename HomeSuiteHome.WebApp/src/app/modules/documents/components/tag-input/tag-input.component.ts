@@ -28,7 +28,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
   template: `
     <div class="relative" #container>
       <div
-        class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 transition-colors focus-within:border-accent-500 focus-within:ring-2 focus-within:ring-accent-500/20"
+        class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (tag of value(); track tag) {
           <app-tag-badge [path]="tag" [removable]="true" (removed)="removeTag(tag)" />
@@ -40,13 +40,13 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
           (focus)="onFocus()"
           (keydown)="onKeyDown($event)"
           [placeholder]="value().length === 0 ? 'Add tags...' : ''"
-          class="min-w-[80px] flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none"
+          class="min-w-[80px] flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 
       @if (showSuggestions() && filteredSuggestions().length > 0) {
         <div
-          class="absolute z-50 mt-1 w-full rounded-lg border border-border bg-surface-overlay shadow-lg"
+          class="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg"
         >
           @for (suggestion of filteredSuggestions(); track suggestion.id; let i = $index) {
             <button
@@ -55,8 +55,8 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
               [class]="
                 'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer ' +
                 (i === selectedIndex()
-                  ? 'bg-accent-50 text-accent-700'
-                  : 'text-text-primary hover:bg-surface-raised') +
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground hover:bg-accent') +
                 (i === 0 ? ' rounded-t-lg' : '') +
                 (i === filteredSuggestions().length - 1 ? ' rounded-b-lg' : '')
               "

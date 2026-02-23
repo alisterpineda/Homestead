@@ -12,7 +12,7 @@ import { ButtonComponent } from '@/shared/components/ui/button/button.component'
       <div
         class="flex flex-col items-center gap-3 pt-4 sm:flex-row sm:justify-between sm:gap-0"
       >
-        <span class="text-sm text-text-secondary">
+        <span class="text-sm text-muted-foreground">
           Page {{ page() }} of {{ totalPages() }}
         </span>
         <div class="flex gap-2">

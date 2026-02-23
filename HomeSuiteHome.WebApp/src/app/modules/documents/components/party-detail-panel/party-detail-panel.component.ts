@@ -52,17 +52,17 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                 <input
                   [value]="editName()"
                   (input)="editName.set(asInputValue($event))"
-                  class="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-lg font-semibold text-text-primary transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                  class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                 />
               } @else {
-                <h2 class="truncate text-lg font-semibold text-text-primary">
+                <h2 class="truncate text-lg font-semibold text-foreground">
                   {{ party()!.name }}
                 </h2>
               }
             </div>
             <button
               (click)="closed.emit()"
-              class="shrink-0 cursor-pointer rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+              class="shrink-0 cursor-pointer rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <lucide-icon [img]="icons.x" [size]="20" />
             </button>
@@ -88,7 +88,7 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                 variant="ghost"
                 (click)="handleDelete()"
                 [disabled]="deleting()"
-                className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <lucide-icon [img]="icons.trash" [size]="16" />
                 {{ deleting() ? 'Deleting...' : 'Delete' }}
@@ -103,7 +103,7 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                 <div class="space-y-4">
                   <!-- Description -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.alignLeft" [size]="16" />
                       <span class="w-16 text-sm font-medium">Description</span>
                     </div>
@@ -113,10 +113,10 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                           [value]="editDescription()"
                           (input)="editDescription.set(asTextareaValue($event))"
                           rows="3"
-                          class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                          class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                         ></textarea>
                       } @else {
-                        <span class="text-sm text-text-primary">
+                        <span class="text-sm text-foreground">
                           {{ party()!.description || 'No description' }}
                         </span>
                       }
@@ -125,12 +125,12 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
 
                   <!-- Created -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.calendar" [size]="16" />
                       <span class="w-16 text-sm font-medium">Created</span>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <span class="text-sm text-text-primary">
+                      <span class="text-sm text-foreground">
                         {{ formatDate(party()!.createdAt) }}
                       </span>
                     </div>
@@ -140,18 +140,18 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
 
               <ng-template appTabDef="documents" label="Documents">
                 @if (party()!.documents.length === 0) {
-                  <p class="text-sm text-text-muted">No linked documents</p>
+                  <p class="text-sm text-muted-foreground">No linked documents</p>
                 } @else {
                   <div class="space-y-2">
                     @for (doc of party()!.documents; track doc.id) {
                       <a
                         [routerLink]="['/documents']"
                         [queryParams]="{ selected: doc.id }"
-                        class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary transition-colors hover:bg-surface-raised"
+                        class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
                       >
-                        <lucide-icon [img]="icons.fileText" [size]="16" class="shrink-0 text-text-secondary" />
+                        <lucide-icon [img]="icons.fileText" [size]="16" class="shrink-0 text-muted-foreground" />
                         <span class="truncate">{{ doc.name }}</span>
-                        <span class="ml-auto shrink-0 text-xs text-text-muted">{{ doc.contentType }}</span>
+                        <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ doc.contentType }}</span>
                       </a>
                     }
                   </div>

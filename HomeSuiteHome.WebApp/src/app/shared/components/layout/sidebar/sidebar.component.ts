@@ -23,7 +23,7 @@ import type { ModuleDefinition } from '@/shared/types/modules';
     <aside
       [class]="
         cn(
-          'fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-border bg-sidebar-bg transition-transform duration-200',
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-200',
           sidebar.isOpen() ? 'translate-x-0' : '-translate-x-full',
           'md:static md:z-auto md:translate-x-0 md:shrink-0 md:transition-none'
         )

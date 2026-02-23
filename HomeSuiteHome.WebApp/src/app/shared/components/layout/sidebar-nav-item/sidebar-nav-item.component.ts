@@ -10,9 +10,9 @@ import type { SidebarItem } from '@/shared/types/modules';
   template: `
     <a
       [routerLink]="item().path"
-      routerLinkActive="bg-sidebar-active text-text-primary"
+      routerLinkActive="bg-sidebar-accent text-sidebar-accent-foreground"
       [routerLinkActiveOptions]="{ exact: true }"
-      class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-sidebar-text hover:bg-sidebar-hover hover:text-text-primary md:py-2"
+      class="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:py-2"
     >
       @if (item().icon) {
         <lucide-icon [img]="item().icon!" [size]="16" />

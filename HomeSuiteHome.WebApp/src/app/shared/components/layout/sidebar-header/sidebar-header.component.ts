@@ -9,16 +9,16 @@ import type { ModuleDefinition } from '@/shared/types/modules';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, AppSwitcherComponent, ThemeToggleComponent],
   template: `
-    <div class="flex items-center gap-2 border-b border-border px-3 py-3">
+    <div class="flex items-center gap-2 border-b border-sidebar-border px-3 py-3">
       <app-switcher />
       @if (activeModule()) {
         <div class="flex items-center gap-2 overflow-hidden">
           <lucide-icon
             [img]="activeModule()!.icon"
             [size]="16"
-            class="shrink-0 text-text-secondary"
+            class="shrink-0 text-sidebar-foreground/70"
           />
-          <span class="truncate text-sm font-semibold text-text-primary">
+          <span class="truncate text-sm font-semibold text-sidebar-foreground">
             {{ activeModule()!.label }}
           </span>
         </div>

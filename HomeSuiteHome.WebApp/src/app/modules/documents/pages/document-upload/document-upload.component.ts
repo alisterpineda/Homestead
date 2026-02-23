@@ -32,11 +32,11 @@ import { createDocument } from '@/api/generated/fn/documents/create-document';
             (valueChange)="name.set($event)"
           />
           <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-medium text-text-secondary">File</label>
+            <label class="text-sm font-medium text-foreground">File</label>
             <app-upload-dropzone [file]="file()" (fileSelect)="file.set($event)" />
           </div>
           @if (uploadError()) {
-            <p class="text-sm text-red-500">Upload failed. Please try again.</p>
+            <p class="text-sm text-destructive">Upload failed. Please try again.</p>
           }
           <div class="flex gap-3">
             <app-button type="submit" [disabled]="!file() || uploading()">

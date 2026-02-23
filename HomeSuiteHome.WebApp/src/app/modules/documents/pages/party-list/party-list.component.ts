@@ -48,7 +48,7 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
       <!-- Create Form -->
       @if (showCreateForm()) {
         <app-card className="mb-6">
-          <h3 class="mb-3 text-sm font-medium text-text-primary">Create New Party</h3>
+          <h3 class="mb-3 text-sm font-medium text-foreground">Create New Party</h3>
           <div class="flex flex-col gap-3 sm:flex-row">
             <div class="flex-1">
               <app-input

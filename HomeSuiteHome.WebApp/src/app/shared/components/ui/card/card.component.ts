@@ -14,6 +14,6 @@ export class CardComponent {
   className = input('');
 
   classes = computed(() =>
-    cn('rounded-xl border border-border bg-surface p-4 md:p-6', this.className()),
+    cn('rounded-xl border border-border bg-card text-card-foreground p-4 md:p-6', this.className()),
   );
 }

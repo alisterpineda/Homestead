@@ -8,13 +8,13 @@ import { BadgeComponent } from '@/shared/components/ui/badge/badge.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideAngularModule, BadgeComponent],
   template: `
-    <app-badge variant="accent" className="gap-1">
+    <app-badge variant="secondary" className="gap-1">
       {{ name() }}
       @if (removable()) {
         <button
           type="button"
           (click)="onRemove($event)"
-          class="ml-0.5 rounded hover:bg-accent-200 cursor-pointer"
+          class="ml-0.5 rounded hover:bg-muted-foreground/20 cursor-pointer"
         >
           <lucide-icon [img]="xIcon" [size]="12" />
         </button>

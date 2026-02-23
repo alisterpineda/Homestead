@@ -14,7 +14,7 @@ import { BadgeComponent } from '@/shared/components/ui/badge/badge.component';
         <button
           type="button"
           (click)="onRemove($event)"
-          class="ml-0.5 rounded hover:bg-surface-overlay cursor-pointer"
+          class="ml-0.5 rounded hover:bg-muted-foreground/20 cursor-pointer"
         >
           <lucide-icon [img]="xIcon" [size]="12" />
         </button>

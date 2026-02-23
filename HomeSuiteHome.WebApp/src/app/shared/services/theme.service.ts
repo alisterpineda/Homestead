@@ -19,7 +19,12 @@ export class ThemeService {
 
   constructor() {
     effect(() => {
-      document.documentElement.setAttribute('data-theme', this.resolved());
+      const resolved = this.resolved();
+      if (resolved === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     });
 
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

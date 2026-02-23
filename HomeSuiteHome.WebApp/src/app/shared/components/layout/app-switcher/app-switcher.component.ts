@@ -20,7 +20,7 @@ const colorMap: Record<string, string> = {
     <app-popover>
       <button
         trigger
-        class="cursor-pointer rounded-md p-1.5 text-text-secondary transition-colors hover:bg-sidebar-hover hover:text-text-primary"
+        class="cursor-pointer rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       >
         <lucide-icon [img]="layoutGridIcon" [size]="18" />
       </button>
@@ -28,12 +28,12 @@ const colorMap: Record<string, string> = {
         @for (mod of modules; track mod.id) {
           <a
             [routerLink]="mod.basePath"
-            class="flex flex-col items-center gap-2 rounded-lg p-3 text-center transition-colors hover:bg-surface-raised"
+            class="flex flex-col items-center gap-2 rounded-lg p-3 text-center transition-colors hover:bg-accent"
           >
             <div [class]="'rounded-lg p-2 ' + getColors(mod.labelColor)">
               <lucide-icon [img]="mod.icon" [size]="20" />
             </div>
-            <span class="text-xs font-medium text-text-primary">{{ mod.label }}</span>
+            <span class="text-xs font-medium text-popover-foreground">{{ mod.label }}</span>
           </a>
         }
       </div>

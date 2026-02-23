@@ -14,7 +14,7 @@ import { cn } from '@/shared/utils';
         <div
           [class]="
             cn(
-              'relative z-10 h-full w-full max-w-full overflow-y-auto border-l border-border bg-surface shadow-xl md:max-w-lg',
+              'relative z-10 h-full w-full max-w-full overflow-y-auto border-l border-border bg-background shadow-xl md:max-w-lg',
               className()
             )
           "

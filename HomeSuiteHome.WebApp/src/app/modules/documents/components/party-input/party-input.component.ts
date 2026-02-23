@@ -34,7 +34,7 @@ export interface PartyOption {
   template: `
     <div class="relative" #container>
       <div
-        class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 transition-colors focus-within:border-accent-500 focus-within:ring-2 focus-within:ring-accent-500/20"
+        class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (party of value(); track party.id) {
           <app-party-badge [name]="party.name" [removable]="true" (removed)="removeParty(party.id)" />
@@ -46,13 +46,13 @@ export interface PartyOption {
           (focus)="onFocus()"
           (keydown)="onKeyDown($event)"
           [placeholder]="value().length === 0 ? 'Add parties...' : ''"
-          class="min-w-[80px] flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none"
+          class="min-w-[80px] flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 
       @if (showSuggestions() && allOptions().length > 0) {
         <div
-          class="absolute z-50 mt-1 w-full rounded-lg border border-border bg-surface-overlay shadow-lg"
+          class="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg"
         >
           @for (option of allOptions(); track option.id; let i = $index) {
             <button
@@ -61,8 +61,8 @@ export interface PartyOption {
               [class]="
                 'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer ' +
                 (i === selectedIndex()
-                  ? 'bg-accent-50 text-accent-700'
-                  : 'text-text-primary hover:bg-surface-raised') +
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground hover:bg-accent') +
                 (i === 0 ? ' rounded-t-lg' : '') +
                 (i === allOptions().length - 1 ? ' rounded-b-lg' : '')
               "

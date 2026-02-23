@@ -17,18 +17,18 @@ import { getModuleByPath } from '@/modules/registry';
       <app-sidebar [activeModule]="activeModule()" />
       <div class="flex flex-1 flex-col overflow-hidden">
         <div
-          class="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-surface px-4 py-3 md:hidden"
+          class="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-background px-4 py-3 md:hidden"
         >
           <button
             (click)="sidebar.toggle()"
-            class="cursor-pointer rounded-lg p-1.5 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+            class="cursor-pointer rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             <lucide-icon [img]="menuIcon" [size]="20" />
           </button>
           @if (activeModule()) {
             <div class="flex items-center gap-2">
-              <lucide-icon [img]="activeModule()!.icon" [size]="16" class="text-text-secondary" />
-              <span class="text-sm font-semibold text-text-primary">
+              <lucide-icon [img]="activeModule()!.icon" [size]="16" class="text-muted-foreground" />
+              <span class="text-sm font-semibold text-foreground">
                 {{ activeModule()!.label }}
               </span>
             </div>

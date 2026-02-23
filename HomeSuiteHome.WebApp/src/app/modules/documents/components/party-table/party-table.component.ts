@@ -15,16 +15,16 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
             cn(
               'cursor-pointer rounded-lg border border-border p-4 transition-colors',
               selectedPartyId() === party.id
-                ? 'bg-accent-50'
-                : 'hover:bg-surface-raised'
+                ? 'bg-accent'
+                : 'hover:bg-muted'
             )
           "
         >
-          <p class="font-medium text-text-primary">{{ party.name }}</p>
+          <p class="font-medium text-foreground">{{ party.name }}</p>
           @if (party.description) {
-            <p class="mt-1 text-sm text-text-secondary line-clamp-2">{{ party.description }}</p>
+            <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ party.description }}</p>
           }
-          <div class="mt-2 text-xs text-text-muted">
+          <div class="mt-2 text-xs text-muted-foreground">
             {{ party.documentCount }} {{ +party.documentCount === 1 ? 'document' : 'documents' }}
           </div>
         </div>
@@ -35,10 +35,10 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
     <div class="hidden overflow-hidden rounded-lg border border-border md:block">
       <table class="w-full text-left text-sm">
         <thead>
-          <tr class="border-b border-border bg-surface-raised">
-            <th class="px-4 py-3 font-medium text-text-secondary">Name</th>
-            <th class="px-4 py-3 font-medium text-text-secondary">Description</th>
-            <th class="px-4 py-3 font-medium text-text-secondary text-right">Documents</th>
+          <tr class="border-b border-border bg-muted">
+            <th class="px-4 py-3 font-medium text-muted-foreground">Name</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground">Description</th>
+            <th class="px-4 py-3 font-medium text-muted-foreground text-right">Documents</th>
           </tr>
         </thead>
         <tbody>
@@ -49,16 +49,16 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
                 cn(
                   'border-b border-border last:border-0 cursor-pointer transition-colors',
                   selectedPartyId() === party.id
-                    ? 'bg-accent-50'
-                    : 'hover:bg-surface-raised'
+                    ? 'bg-accent'
+                    : 'hover:bg-muted'
                 )
               "
             >
-              <td class="px-4 py-3 font-medium text-text-primary">{{ party.name }}</td>
-              <td class="px-4 py-3 text-text-secondary">
+              <td class="px-4 py-3 font-medium text-foreground">{{ party.name }}</td>
+              <td class="px-4 py-3 text-muted-foreground">
                 <span class="line-clamp-1">{{ party.description || '—' }}</span>
               </td>
-              <td class="px-4 py-3 text-text-secondary text-right">{{ party.documentCount }}</td>
+              <td class="px-4 py-3 text-muted-foreground text-right">{{ party.documentCount }}</td>
             </tr>
           }
         </tbody>

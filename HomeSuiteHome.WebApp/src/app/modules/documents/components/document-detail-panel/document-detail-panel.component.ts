@@ -74,29 +74,29 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                 <input
                   [value]="editName()"
                   (input)="editName.set(asInputValue($event))"
-                  class="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-lg font-semibold text-text-primary transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+                  class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                 />
               } @else {
-                <h2 class="truncate text-lg font-semibold text-text-primary">
+                <h2 class="truncate text-lg font-semibold text-foreground">
                   {{ document()!.name }}
                 </h2>
               }
             </div>
             <button
               (click)="closed.emit()"
-              class="shrink-0 cursor-pointer rounded-lg p-1 text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+              class="shrink-0 cursor-pointer rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             >
               <lucide-icon [img]="icons.x" [size]="20" />
             </button>
           </div>
 
           <!-- Preview -->
-          <div class="border-b border-border bg-surface-raised">
+          <div class="border-b border-border bg-muted">
             @if (isPdf()) {
               <iframe [src]="safeFileUrl()" class="h-80 w-full" [title]="'Preview of ' + document()!.name"></iframe>
             } @else {
               <div
-                class="flex h-48 flex-col items-center justify-center gap-2 text-text-secondary"
+                class="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground"
               >
                 <lucide-icon [img]="icons.fileText" [size]="48" [strokeWidth]="1" />
                 <span class="text-sm">Preview not available</span>
@@ -123,7 +123,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
               <a
                 [href]="fileUrl() + '?download=true'"
                 download
-                class="inline-flex items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-600"
+                class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 <lucide-icon [img]="icons.download" [size]="16" />
                 Download
@@ -132,7 +132,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                 variant="ghost"
                 (click)="handleDelete()"
                 [disabled]="deleting()"
-                className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <lucide-icon [img]="icons.trash" [size]="16" />
                 {{ deleting() ? 'Deleting...' : 'Delete' }}
@@ -147,7 +147,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                 <div class="space-y-4">
                   <!-- Tags -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.tag" [size]="16" />
                       <span class="w-12 text-sm font-medium">Tags</span>
                     </div>
@@ -161,7 +161,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                               <app-tag-badge [path]="tag.path" />
                             }
                           } @else {
-                            <span class="text-sm text-text-muted">No tags</span>
+                            <span class="text-sm text-muted-foreground">No tags</span>
                           }
                         </div>
                       }
@@ -170,7 +170,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 
                   <!-- Parties -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.users" [size]="16" />
                       <span class="w-12 text-sm font-medium">Parties</span>
                     </div>
@@ -184,7 +184,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
                               <app-party-badge [name]="party.name" />
                             }
                           } @else {
-                            <span class="text-sm text-text-muted">No parties</span>
+                            <span class="text-sm text-muted-foreground">No parties</span>
                           }
                         </div>
                       }
@@ -193,12 +193,12 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 
                   <!-- Added -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.calendar" [size]="16" />
                       <span class="w-12 text-sm font-medium">Added</span>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <span class="text-sm text-text-primary">
+                      <span class="text-sm text-foreground">
                         {{ formatDate(document()!.createdAt) }}
                       </span>
                     </div>
@@ -206,12 +206,12 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 
                   <!-- Size -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.hardDrive" [size]="16" />
                       <span class="w-12 text-sm font-medium">Size</span>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <span class="text-sm text-text-primary">
+                      <span class="text-sm text-foreground">
                         {{ formatBytes(+document()!.fileSize) }}
                       </span>
                     </div>
@@ -219,12 +219,12 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 
                   <!-- Type -->
                   <div class="flex gap-3">
-                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-text-secondary">
+                    <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
                       <lucide-icon [img]="icons.fileType" [size]="16" />
                       <span class="w-12 text-sm font-medium">Type</span>
                     </div>
                     <div class="min-w-0 flex-1">
-                      <span class="text-sm text-text-primary">{{ document()!.contentType }}</span>
+                      <span class="text-sm text-foreground">{{ document()!.contentType }}</span>
                     </div>
                   </div>
                 </div>

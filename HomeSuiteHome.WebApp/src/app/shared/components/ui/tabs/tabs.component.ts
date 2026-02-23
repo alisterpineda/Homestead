@@ -33,8 +33,8 @@ export class TabDefDirective {
               cn(
                 'px-4 py-2 text-sm font-medium transition-colors cursor-pointer',
                 activeTab() === tab.id()
-                  ? 'border-b-2 border-accent-500 text-text-primary'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               )
             "
           >

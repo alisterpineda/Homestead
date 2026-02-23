@@ -5,11 +5,11 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-accent-500 text-white hover:bg-accent-600 focus-visible:ring-accent-500',
+  primary: 'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring',
   secondary:
-    'bg-surface-raised text-text-primary border border-border hover:bg-surface-overlay focus-visible:ring-accent-500',
+    'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80 focus-visible:ring-ring',
   ghost:
-    'text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:ring-accent-500',
+    'text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

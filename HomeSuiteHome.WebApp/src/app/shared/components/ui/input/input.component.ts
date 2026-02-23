@@ -7,7 +7,7 @@ import { cn } from '@/shared/utils';
   template: `
     <div class="flex flex-col gap-1.5">
       @if (label()) {
-        <label [for]="inputId()" class="text-sm font-medium text-text-secondary">
+        <label [for]="inputId()" class="text-sm font-medium text-foreground">
           {{ label() }}
         </label>
       }
@@ -32,7 +32,7 @@ export class InputComponent {
 
   classes = computed(() =>
     cn(
-      'rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20',
+      'rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20',
       this.className(),
     ),
   );

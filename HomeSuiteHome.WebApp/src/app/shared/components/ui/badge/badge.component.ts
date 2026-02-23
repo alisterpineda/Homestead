@@ -1,11 +1,12 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { cn } from '@/shared/utils';
 
-type BadgeVariant = 'default' | 'accent';
+type BadgeVariant = 'default' | 'secondary' | 'outline';
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-surface-raised text-text-secondary border border-border',
-  accent: 'bg-accent-100 text-accent-700',
+  default: 'bg-primary text-primary-foreground',
+  secondary: 'bg-secondary text-secondary-foreground',
+  outline: 'text-foreground border border-border',
 };
 
 @Component({
