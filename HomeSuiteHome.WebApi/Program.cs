@@ -135,6 +135,9 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
+// Serve static frontend assets before auth so they don't require authentication
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -164,8 +167,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Serve the frontend
-app.UseStaticFiles();
+// SPA fallback for client-side routing
 app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
