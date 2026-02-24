@@ -15,9 +15,9 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
         var extension = Path.GetExtension(file.FileName);
         var storedFileName = $"{Guid.NewGuid()}{extension}";
 
-        var basePath = configuration["FileStorage:BasePath"]
-            ?? throw new InvalidOperationException("FileStorage:BasePath is not configured.");
-        var uploadsDir = Path.Combine(basePath, "documents");
+        var mediaPath = configuration["FileStorage:MediaPath"]
+            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var uploadsDir = Path.Combine(mediaPath, "documents", "files");
         Directory.CreateDirectory(uploadsDir);
 
         var filePath = Path.Combine(uploadsDir, storedFileName);
@@ -40,7 +40,7 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
             Name = request.Name ?? file.FileName,
             ContentType = file.ContentType,
             FileSize = file.Length,
-            FilePath = Path.Combine("documents", storedFileName),
+            FilePath = Path.Combine("documents", "files", storedFileName),
             FileHash = fileHash,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = userId,

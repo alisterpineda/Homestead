@@ -25,13 +25,13 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/HomeSuiteHome/browser ./wwwroot/
 
-RUN mkdir -p /app/data/uploads && chown -R appuser:appgroup /app/data
+RUN mkdir -p /app/media && chown -R appuser:appgroup /app/media
 
 USER appuser
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
-ENV FileStorage__BasePath=/app/data/uploads
+ENV FileStorage__MediaPath=/app/media
 
 EXPOSE 8080
 

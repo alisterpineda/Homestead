@@ -12,9 +12,9 @@ public class DeleteDocumentHandler(AppDbContext db, IConfiguration configuration
         if (document is null)
             return null;
 
-        var basePath = configuration["FileStorage:BasePath"]
-            ?? throw new InvalidOperationException("FileStorage:BasePath is not configured.");
-        var filePath = Path.Combine(basePath, document.FilePath);
+        var mediaPath = configuration["FileStorage:MediaPath"]
+            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var filePath = Path.Combine(mediaPath, document.FilePath);
 
         db.Documents.Remove(document);
         await db.SaveChangesAsync(ct);

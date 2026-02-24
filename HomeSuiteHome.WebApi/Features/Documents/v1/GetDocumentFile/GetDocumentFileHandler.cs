@@ -18,10 +18,10 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         if (document is null)
             return null;
 
-        var basePath = configuration["FileStorage:BasePath"]
-            ?? throw new InvalidOperationException("FileStorage:BasePath is not configured.");
+        var mediaPath = configuration["FileStorage:MediaPath"]
+            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var physicalPath = Path.Combine(basePath, document.FilePath);
+        var physicalPath = Path.Combine(mediaPath, document.FilePath);
 
         if (!File.Exists(physicalPath))
             return null;
