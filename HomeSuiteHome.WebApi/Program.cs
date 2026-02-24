@@ -13,6 +13,47 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+// When running outside Aspire (e.g. Docker), map self-hoster-friendly env vars into .NET config
+if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")))
+{
+    var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
+    if (!string.IsNullOrEmpty(dbPassword))
+    {
+        var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+        var dbPort = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
+        var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "homesuitehome";
+        var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
+
+        builder.Configuration["ConnectionStrings:postgresdb"] =
+            $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword}";
+    }
+}
+
+// Map OIDC env vars into Auth config (only if set)
+var oidcIssuer = Environment.GetEnvironmentVariable("OIDC_ISSUER");
+if (!string.IsNullOrEmpty(oidcIssuer))
+    builder.Configuration["Auth:Authority"] = oidcIssuer;
+
+var oidcClientId = Environment.GetEnvironmentVariable("OIDC_CLIENT_ID");
+if (!string.IsNullOrEmpty(oidcClientId))
+    builder.Configuration["Auth:Audience"] = oidcClientId;
+
+var oidcClaimSubject = Environment.GetEnvironmentVariable("OIDC_CLAIM_SUBJECT");
+if (!string.IsNullOrEmpty(oidcClaimSubject))
+    builder.Configuration["Auth:ClaimMappings:Subject"] = oidcClaimSubject;
+
+var oidcClaimEmail = Environment.GetEnvironmentVariable("OIDC_CLAIM_EMAIL");
+if (!string.IsNullOrEmpty(oidcClaimEmail))
+    builder.Configuration["Auth:ClaimMappings:Email"] = oidcClaimEmail;
+
+var oidcClaimName = Environment.GetEnvironmentVariable("OIDC_CLAIM_NAME");
+if (!string.IsNullOrEmpty(oidcClaimName))
+    builder.Configuration["Auth:ClaimMappings:Name"] = oidcClaimName;
+
+var oidcClaimRoles = Environment.GetEnvironmentVariable("OIDC_CLAIM_ROLES");
+if (!string.IsNullOrEmpty(oidcClaimRoles))
+    builder.Configuration["Auth:ClaimMappings:Roles"] = oidcClaimRoles;
+
 var connectionString = builder.Configuration.GetConnectionString("postgresdb");
 
 if (!string.IsNullOrEmpty(connectionString))
@@ -96,7 +137,11 @@ app.MapDefaultEndpoints();
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<UserProvisioningMiddleware>();
+
+if (!string.IsNullOrEmpty(connectionString))
+{
+    app.UseMiddleware<UserProvisioningMiddleware>();
+}
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapAuthEndpoints();

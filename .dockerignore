@@ -1,0 +1,14 @@
+**/bin/
+**/bin\*
+**/obj/
+**/obj\*
+**/node_modules/
+**/dist/
+**/.angular/
+.git/
+.github/
+.claude/
+*.md
+*.sln.DotSettings
+.idea/
+.vscode/
