@@ -166,6 +166,6 @@ app.UseHttpsRedirection();
 
 // Serve the frontend
 app.UseStaticFiles();
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
