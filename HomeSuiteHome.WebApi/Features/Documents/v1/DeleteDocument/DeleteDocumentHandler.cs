@@ -14,13 +14,13 @@ public class DeleteDocumentHandler(AppDbContext db, IConfiguration configuration
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
-        var filePath = Path.Combine(mediaPath, document.FilePath);
+        var physicalPath = document.GetPhysicalPath(mediaPath);
 
         db.Documents.Remove(document);
         await db.SaveChangesAsync(ct);
 
-        if (File.Exists(filePath))
-            File.Delete(filePath);
+        if (File.Exists(physicalPath))
+            File.Delete(physicalPath);
 
         return new DeleteDocumentResponse();
     }

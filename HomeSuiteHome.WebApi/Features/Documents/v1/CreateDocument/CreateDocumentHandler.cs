@@ -13,17 +13,17 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
     {
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);
-        var storedFileName = $"{Guid.NewGuid()}{extension}";
+        var documentId = Guid.NewGuid();
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
-        var uploadsDir = Path.Combine(mediaPath, "documents", "files");
+        var uploadsDir = Path.Combine(mediaPath, Document.FilesSubroot);
         Directory.CreateDirectory(uploadsDir);
 
-        var filePath = Path.Combine(uploadsDir, storedFileName);
+        var physicalPath = Path.Combine(uploadsDir, $"{documentId}{extension}");
 
         string fileHash;
-        await using (var stream = new FileStream(filePath, FileMode.Create))
+        await using (var stream = new FileStream(physicalPath, FileMode.Create))
         {
             await file.CopyToAsync(stream, ct);
 
@@ -36,11 +36,11 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
 
         var document = new Document
         {
-            Id = Guid.NewGuid(),
+            Id = documentId,
             Name = request.Name ?? file.FileName,
             ContentType = file.ContentType,
             FileSize = file.Length,
-            FilePath = Path.Combine("documents", "files", storedFileName),
+            FilePath = Document.GetFilePath(documentId, extension),
             FileHash = fileHash,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = userId,

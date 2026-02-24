@@ -6,6 +6,14 @@ namespace HomeSuiteHome.WebApi.Domains.Documents;
 
 public class Document
 {
+    public const string FilesSubroot = "documents/files";
+
+    public static string GetFilePath(Guid id, string extension)
+        => Path.Combine(FilesSubroot, $"{id}{extension}");
+
+    public string GetPhysicalPath(string mediaPath)
+        => Path.Combine(mediaPath, FilePath);
+
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public required string ContentType { get; set; }

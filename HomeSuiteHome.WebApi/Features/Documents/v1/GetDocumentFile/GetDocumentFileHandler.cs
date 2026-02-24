@@ -12,7 +12,6 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         var document = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
-            .Select(d => new { d.FilePath, d.ContentType, d.Name })
             .FirstOrDefaultAsync(ct);
 
         if (document is null)
@@ -21,7 +20,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var physicalPath = Path.Combine(mediaPath, document.FilePath);
+        var physicalPath = document.GetPhysicalPath(mediaPath);
 
         if (!File.Exists(physicalPath))
             return null;
