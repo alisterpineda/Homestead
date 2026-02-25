@@ -1,3 +1,30 @@
+# HomeSuiteHome.WebApp
+
+## Commands
+
+All commands run from `HomeSuiteHome.WebApp/`:
+
+```bash
+npm install          # Install dependencies
+npm start            # Dev server on port 4200 with API proxy
+npm run build        # Production build
+npm test             # Run tests (Vitest)
+npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-gen
+```
+
+## Architecture
+
+- **Modules** (`src/app/modules/`): Self-contained feature areas (documents, admin) each with pages, components, routes, and sidebar config. Registered in `modules/registry.ts`
+- **Routing**: Angular Router with lazy-loaded feature routes defined in `app.routes.ts`. Each module has its own `*.routes.ts` file
+- **API layer**: ng-openapi-gen generates Angular services and TypeScript models from the backend OpenAPI spec. Config in `ng-openapi-gen.json`, output in `src/app/api/generated/`
+- **Shared**: `src/app/shared/components/ui/` for base components, `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
+- **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
+- **Styling**: Tailwind CSS v4 with shadcn/ui-style CSS variable theming (OKLCH colors)
+
+Generated files (`src/app/api/generated/`) should not be manually edited.
+
+---
+
 You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
 
 ## TypeScript Best Practices
