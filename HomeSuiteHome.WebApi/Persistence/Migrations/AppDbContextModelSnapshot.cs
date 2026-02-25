@@ -40,6 +40,9 @@ namespace HomeSuiteHome.WebApi.Persistence.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ExtractedText")
+                        .HasColumnType("text");
+
                     b.Property<string>("FileHash")
                         .IsRequired()
                         .HasMaxLength(64)

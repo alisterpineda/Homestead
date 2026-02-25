@@ -22,6 +22,7 @@ public class Document
     public required string FilePath { get; set; }
     public required string FileHash { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string? ExtractedText { get; set; }
 
     public Guid? CreatedByUserId { get; set; }
     public Guid? OwnerUserId { get; set; }

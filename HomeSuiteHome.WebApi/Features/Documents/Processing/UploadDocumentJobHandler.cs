@@ -3,12 +3,15 @@ using HomeSuiteHome.WebApi.Domains.Documents;
 using HomeSuiteHome.WebApi.Domains.Processing;
 using HomeSuiteHome.WebApi.Persistence;
 using HomeSuiteHome.WebApi.Processing;
+using HomeSuiteHome.WebApi.TextExtraction;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.Processing;
 
 public class UploadDocumentJobHandler(
     AppDbContext db,
     IConfiguration configuration,
+    IEnumerable<ITextExtractor> textExtractors,
+    ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
@@ -26,9 +29,20 @@ public class UploadDocumentJobHandler(
         if (!File.Exists(stagingPath))
             throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
-        // TODO: Remove this delay once real processing work (OCR, rule evaluation, etc.) is added.
-        // It exists only to make the loading → success toast transition visible during development.
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        // Text extraction (OCR for images)
+        string? extractedText = null;
+        var extractor = textExtractors.FirstOrDefault(e => e.CanExtract(payload.ContentType));
+        if (extractor is not null)
+        {
+            try
+            {
+                extractedText = await extractor.ExtractTextAsync(stagingPath, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Text extraction failed for upload {UploadId}", payload.UploadId);
+            }
+        }
 
         // Compute SHA256 hash
         string fileHash;
@@ -52,7 +66,8 @@ public class UploadDocumentJobHandler(
             FileHash = fileHash,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = job.CreatedByUserId,
-            OwnerUserId = job.CreatedByUserId
+            OwnerUserId = job.CreatedByUserId,
+            ExtractedText = extractedText
         };
 
         db.Documents.Add(document);

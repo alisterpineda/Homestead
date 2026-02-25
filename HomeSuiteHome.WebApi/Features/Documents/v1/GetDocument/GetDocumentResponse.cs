@@ -12,6 +12,7 @@ public record GetDocumentResponse
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }
     public string? OwnerUserName { get; init; }
+    public string? ExtractedText { get; init; }
     public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentPartyDto> Parties { get; init; }
 }

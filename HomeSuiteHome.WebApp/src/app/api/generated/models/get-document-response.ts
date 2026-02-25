@@ -8,6 +8,7 @@ export interface GetDocumentResponse {
   createdAt: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  extractedText?: (string | null);
   fileHash: string;
   fileSize: (number | string);
   id: string;

@@ -22,6 +22,8 @@ WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
+
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/HomeSuiteHome/browser ./wwwroot/
 
@@ -32,6 +34,7 @@ USER appuser
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 ENV FileStorage__MediaPath=/app/media
+ENV Ocr__Tesseract__TessDataPath=/usr/share/tessdata
 
 EXPOSE 8080
 

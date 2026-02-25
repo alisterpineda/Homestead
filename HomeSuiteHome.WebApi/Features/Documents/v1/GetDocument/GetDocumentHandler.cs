@@ -24,6 +24,7 @@ public class GetDocumentHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 OwnerUserId = d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
+                ExtractedText = d.ExtractedText,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentTagDto
                 {
                     Id = dt.Tag.Id,

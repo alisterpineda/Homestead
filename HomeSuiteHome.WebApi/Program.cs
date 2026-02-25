@@ -8,6 +8,7 @@ using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Processing;
 using HomeSuiteHome.WebApi.Processing.Hubs;
 using HomeSuiteHome.WebApi.Persistence;
+using HomeSuiteHome.WebApi.TextExtraction;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -71,6 +72,7 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddHandlers();
 builder.Services.AddProcessing();
+builder.Services.AddTextExtraction(builder.Configuration);
 
 builder.Services.AddApiVersioning(options =>
 {

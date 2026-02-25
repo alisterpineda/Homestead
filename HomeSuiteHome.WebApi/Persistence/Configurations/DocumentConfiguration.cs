@@ -32,6 +32,9 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(d => d.ExtractedText)
+            .HasColumnType("text");
+
         builder.HasOne(d => d.CreatedByUser)
             .WithMany()
             .HasForeignKey(d => d.CreatedByUserId)
