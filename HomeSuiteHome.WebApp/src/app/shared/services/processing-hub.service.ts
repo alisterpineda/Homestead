@@ -22,7 +22,6 @@ export class ProcessingHubService {
 
   readonly connected = signal(false);
 
-  /** Register a loading toast to be updated when the job completes or fails. */
   trackJob(jobId: string, toastId: string | number): void {
     this.trackedToasts.set(jobId, toastId);
   }

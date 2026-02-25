@@ -3,14 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, debounceTime } from 'rxjs';
-import { LucideAngularModule } from 'lucide-angular';
-import { Users, Plus, ChevronDown, ChevronUp } from 'lucide-angular';
-import { PageHeaderComponent } from '@/shared/components/ui/page-header/page-header.component';
-import { ButtonComponent } from '@/shared/components/ui/button/button.component';
-import { SpinnerComponent } from '@/shared/components/ui/spinner/spinner.component';
-import { EmptyStateComponent } from '@/shared/components/ui/empty-state/empty-state.component';
-import { InputComponent } from '@/shared/components/ui/input/input.component';
-import { CardComponent } from '@/shared/components/ui/card/card.component';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideUsers, lucidePlus, lucideChevronUp } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { HlmButton } from '@/components/ui/button';
+import { HlmSpinner } from '@/components/ui/spinner';
+import { HlmEmptyImports } from '@/components/ui/empty';
+import { HlmInput } from '@/components/ui/input';
+import { HlmLabel } from '@/components/ui/label';
+import { HlmCardImports } from '@/components/ui/card';
 import { PartyTableComponent } from '../../components/party-table/party-table.component';
 import { PartyDetailPanelComponent } from '../../components/party-detail-panel/party-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -23,98 +24,121 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
   selector: 'app-party-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LucideAngularModule,
-    PageHeaderComponent,
-    ButtonComponent,
-    SpinnerComponent,
-    EmptyStateComponent,
-    InputComponent,
-    CardComponent,
+    NgIcon,
+    HlmIconImports,
+    HlmButton,
+    HlmSpinner,
+    HlmEmptyImports,
+    HlmInput,
+    HlmLabel,
+    HlmCardImports,
     PartyTableComponent,
     PartyDetailPanelComponent,
     PaginationComponent,
   ],
+  providers: [provideIcons({ lucideUsers, lucidePlus, lucideChevronUp })],
   template: `
     <div>
-      <app-page-header title="Parties" description="Manage parties associated with your documents">
-        <button action (click)="showCreateForm.set(!showCreateForm())">
-          <app-button>
-            <lucide-icon [img]="showCreateForm() ? chevronUpIcon : plusIcon" [size]="16" />
-            {{ showCreateForm() ? 'Cancel' : 'New Party' }}
-          </app-button>
+      <!-- Page Header -->
+      <div class="mb-6 flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-foreground">Parties</h1>
+          <p class="text-sm text-muted-foreground">Manage parties associated with your documents</p>
+        </div>
+        <button hlmBtn (click)="showCreateForm.set(!showCreateForm())">
+          <ng-icon hlm [name]="showCreateForm() ? 'lucideChevronUp' : 'lucidePlus'" size="sm" />
+          {{ showCreateForm() ? 'Cancel' : 'New Party' }}
         </button>
-      </app-page-header>
+      </div>
 
       <!-- Create Form -->
       @if (showCreateForm()) {
-        <app-card className="mb-6">
-          <h3 class="mb-3 text-sm font-medium text-foreground">Create New Party</h3>
-          <div class="flex flex-col gap-3 sm:flex-row">
-            <div class="flex-1">
-              <app-input
-                label="Name"
-                placeholder="Party name"
-                [value]="createName()"
-                (valueChange)="createName.set($event)"
-              />
-            </div>
-            <div class="flex-1">
-              <app-input
-                label="Description"
-                placeholder="Optional description"
-                [value]="createDescription()"
-                (valueChange)="createDescription.set($event)"
-              />
-            </div>
-            <div class="flex items-end">
-              <app-button
-                [disabled]="!createName().trim() || creatingParty()"
-                (click)="handleCreate()"
-              >
-                {{ creatingParty() ? 'Creating...' : 'Create' }}
-              </app-button>
+        <hlm-card class="mb-6">
+          <div hlmCardContent class="pt-6">
+            <h3 class="mb-3 text-sm font-medium text-foreground">Create New Party</h3>
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <div class="flex flex-1 flex-col gap-1.5">
+                <label hlmLabel for="create-name">Name</label>
+                <input
+                  hlmInput
+                  id="create-name"
+                  placeholder="Party name"
+                  [value]="createName()"
+                  (input)="createName.set(asInputValue($event))"
+                />
+              </div>
+              <div class="flex flex-1 flex-col gap-1.5">
+                <label hlmLabel for="create-desc">Description</label>
+                <input
+                  hlmInput
+                  id="create-desc"
+                  placeholder="Optional description"
+                  [value]="createDescription()"
+                  (input)="createDescription.set(asInputValue($event))"
+                />
+              </div>
+              <div class="flex items-end">
+                <button
+                  hlmBtn
+                  [disabled]="!createName().trim() || creatingParty()"
+                  (click)="handleCreate()"
+                >
+                  {{ creatingParty() ? 'Creating...' : 'Create' }}
+                </button>
+              </div>
             </div>
           </div>
-        </app-card>
+        </hlm-card>
       }
 
       <!-- Search -->
       <div class="mb-4">
-        <app-input
+        <input
+          hlmInput
           placeholder="Search parties..."
           [value]="searchText()"
-          (valueChange)="searchText.set($event)"
+          (input)="searchText.set(asInputValue($event))"
+          class="w-full"
         />
       </div>
 
       @if (loading()) {
         <div class="flex justify-center py-16">
-          <app-spinner size="lg" />
+          <hlm-spinner />
         </div>
       }
 
       @if (error()) {
-        <app-empty-state
-          [icon]="usersIcon"
-          title="Failed to load parties"
-          description="There was an error loading the party list. Please try again."
-        />
+        <section hlmEmpty>
+          <hlm-empty-media variant="icon">
+            <ng-icon hlm name="lucideUsers" size="xl" />
+          </hlm-empty-media>
+          <div hlmEmptyHeader>
+            <h3 hlmEmptyTitle>Failed to load parties</h3>
+            <p hlmEmptyDescription>There was an error loading the party list. Please try again.</p>
+          </div>
+        </section>
       }
 
       @if (data(); as result) {
         @if (result.items.length === 0) {
-          <app-empty-state
-            [icon]="usersIcon"
-            title="No parties found"
-            [description]="searchText() ? 'No parties match your search.' : 'Create your first party to get started.'"
-          >
+          <section hlmEmpty>
+            <hlm-empty-media variant="icon">
+              <ng-icon hlm name="lucideUsers" size="xl" />
+            </hlm-empty-media>
+            <div hlmEmptyHeader>
+              <h3 hlmEmptyTitle>No parties found</h3>
+              <p hlmEmptyDescription>
+                {{ searchText() ? 'No parties match your search.' : 'Create your first party to get started.' }}
+              </p>
+            </div>
             @if (!searchText()) {
-              <app-button (click)="showCreateForm.set(true)">
-                <lucide-icon [img]="plusIcon" [size]="16" />
+              <button hlmBtn (click)="showCreateForm.set(true)">
+                <ng-icon hlm name="lucidePlus" size="sm" />
                 New Party
-              </app-button>
+              </button>
             }
-          </app-empty-state>
+          </section>
         } @else {
           <app-party-table
             [parties]="result.items"
@@ -138,10 +162,6 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
   `,
 })
 export class PartyListComponent {
-  usersIcon = Users;
-  plusIcon = Plus;
-  chevronUpIcon = ChevronUp;
-
   selectedPartyId = signal<string | null>(null);
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -196,6 +216,10 @@ export class PartyListComponent {
     ),
     { initialValue: null },
   );
+
+  asInputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
 
   onPageChange(newPage: number): void {
     this.router.navigate(['/documents/parties'], { queryParams: { page: newPage } });

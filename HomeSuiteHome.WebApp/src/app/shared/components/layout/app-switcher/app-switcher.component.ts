@@ -1,50 +1,33 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideAngularModule } from 'lucide-angular';
-import { LayoutGrid } from 'lucide-angular';
-import { PopoverComponent } from '@/shared/components/ui/popover/popover.component';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideLayoutGrid, lucideSettings, lucideFileText } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { HlmDropdownMenuImports } from '@/components/ui/dropdown-menu';
+import { HlmButton } from '@/components/ui/button';
 import { modules } from '@/modules/registry';
-
-const colorMap: Record<string, string> = {
-  slate: 'bg-slate-100 text-slate-600',
-  indigo: 'bg-indigo-100 text-indigo-600',
-  emerald: 'bg-emerald-100 text-emerald-600',
-  amber: 'bg-amber-100 text-amber-600',
-};
 
 @Component({
   selector: 'app-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideAngularModule, PopoverComponent],
+  imports: [RouterLink, NgIcon, HlmIconImports, HlmDropdownMenuImports, HlmButton],
+  providers: [provideIcons({ lucideLayoutGrid, lucideSettings, lucideFileText })],
   template: `
-    <app-popover>
-      <button
-        trigger
-        class="cursor-pointer rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      >
-        <lucide-icon [img]="layoutGridIcon" [size]="18" />
-      </button>
-      <div class="grid w-52 grid-cols-2 gap-2">
+    <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="menu">
+      <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+    </button>
+    <ng-template #menu>
+      <div hlmDropdownMenu class="w-52">
         @for (mod of modules; track mod.id) {
-          <a
-            [routerLink]="mod.basePath"
-            class="flex flex-col items-center gap-2 rounded-lg p-3 text-center transition-colors hover:bg-accent"
-          >
-            <div [class]="'rounded-lg p-2 ' + getColors(mod.labelColor)">
-              <lucide-icon [img]="mod.icon" [size]="20" />
-            </div>
-            <span class="text-xs font-medium text-popover-foreground">{{ mod.label }}</span>
+          <a [routerLink]="mod.basePath" hlmDropdownMenuItem class="gap-2">
+            <ng-icon hlm [name]="mod.icon" size="sm" />
+            {{ mod.label }}
           </a>
         }
       </div>
-    </app-popover>
+    </ng-template>
   `,
 })
 export class AppSwitcherComponent {
-  layoutGridIcon = LayoutGrid;
   modules = modules;
-
-  getColors(labelColor: string): string {
-    return colorMap[labelColor] ?? 'bg-gray-100 text-gray-600';
-  }
 }

@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
-import { cn } from '@/shared/utils';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 
 @Component({
@@ -9,15 +8,12 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
     <!-- Mobile card layout -->
     <div class="flex flex-col gap-3 md:hidden">
       @for (party of parties(); track party.id) {
-        <div
+        <button
+          type="button"
           (click)="partySelect.emit(party.id)"
           [class]="
-            cn(
-              'cursor-pointer rounded-lg border border-border p-4 transition-colors',
-              selectedPartyId() === party.id
-                ? 'bg-accent'
-                : 'hover:bg-muted'
-            )
+            'w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors ' +
+            (selectedPartyId() === party.id ? 'bg-accent' : 'hover:bg-muted')
           "
         >
           <p class="font-medium text-foreground">{{ party.name }}</p>
@@ -27,7 +23,7 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
           <div class="mt-2 text-xs text-muted-foreground">
             {{ party.documentCount }} {{ +party.documentCount === 1 ? 'document' : 'documents' }}
           </div>
-        </div>
+        </button>
       }
     </div>
 
@@ -44,19 +40,17 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
         <tbody>
           @for (party of parties(); track party.id) {
             <tr
+              tabindex="0"
               (click)="partySelect.emit(party.id)"
+              (keydown.enter)="partySelect.emit(party.id)"
               [class]="
-                cn(
-                  'border-b border-border last:border-0 cursor-pointer transition-colors',
-                  selectedPartyId() === party.id
-                    ? 'bg-accent'
-                    : 'hover:bg-muted'
-                )
+                'border-b border-border last:border-0 cursor-pointer transition-colors ' +
+                (selectedPartyId() === party.id ? 'bg-accent' : 'hover:bg-muted')
               "
             >
               <td class="px-4 py-3 font-medium text-foreground">{{ party.name }}</td>
               <td class="px-4 py-3 text-muted-foreground">
-                <span class="line-clamp-1">{{ party.description || '—' }}</span>
+                <span class="line-clamp-1">{{ party.description || '\u2014' }}</span>
               </td>
               <td class="px-4 py-3 text-muted-foreground text-right">{{ party.documentCount }}</td>
             </tr>
@@ -70,6 +64,4 @@ export class PartyTableComponent {
   parties = input.required<GetPartiesResponse[]>();
   selectedPartyId = input<string | null>(null);
   partySelect = output<string>();
-
-  cn = cn;
 }

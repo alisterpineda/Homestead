@@ -1,5 +1,3 @@
-/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
-/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 {
   "compileOnSave": false,
   "compilerOptions": {
@@ -16,7 +14,78 @@
     "module": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/app/*"]
+      "@/*": [
+        "./src/app/*"
+      ],
+      "@/components/ui/button": [
+        "./src/app/components/ui/button/src/index.ts"
+      ],
+      "@/components/ui/utils": [
+        "./src/app/components/ui/utils/src/index.ts"
+      ],
+      "@/components/ui/badge": [
+        "./src/app/components/ui/badge/src/index.ts"
+      ],
+      "@/components/ui/card": [
+        "./src/app/components/ui/card/src/index.ts"
+      ],
+      "@/components/ui/input": [
+        "./src/app/components/ui/input/src/index.ts"
+      ],
+      "@/components/ui/label": [
+        "./src/app/components/ui/label/src/index.ts"
+      ],
+      "@/components/ui/form-field": [
+        "./src/app/components/ui/form-field/src/index.ts"
+      ],
+      "@/components/ui/spinner": [
+        "./src/app/components/ui/spinner/src/index.ts"
+      ],
+      "@/components/ui/tabs": [
+        "./src/app/components/ui/tabs/src/index.ts"
+      ],
+      "@/components/ui/icon": [
+        "./src/app/components/ui/icon/src/index.ts"
+      ],
+      "@/components/ui/sheet": [
+        "./src/app/components/ui/sheet/src/index.ts"
+      ],
+      "@/components/ui/separator": [
+        "./src/app/components/ui/separator/src/index.ts"
+      ],
+      "@/components/ui/popover": [
+        "./src/app/components/ui/popover/src/index.ts"
+      ],
+      "@/components/ui/table": [
+        "./src/app/components/ui/table/src/index.ts"
+      ],
+      "@/components/ui/pagination": [
+        "./src/app/components/ui/pagination/src/index.ts"
+      ],
+      "@/components/ui/select": [
+        "./src/app/components/ui/select/src/index.ts"
+      ],
+      "@/components/ui/empty": [
+        "./src/app/components/ui/empty/src/index.ts"
+      ],
+      "@/components/ui/sidebar": [
+        "./src/app/components/ui/sidebar/src/index.ts"
+      ],
+      "@/components/ui/skeleton": [
+        "./src/app/components/ui/skeleton/src/index.ts"
+      ],
+      "@/components/ui/tooltip": [
+        "./src/app/components/ui/tooltip/src/index.ts"
+      ],
+      "@/components/ui/sonner": [
+        "./src/app/components/ui/sonner/src/index.ts"
+      ],
+      "@/components/ui/dropdown-menu": [
+        "./src/app/components/ui/dropdown-menu/src/index.ts"
+      ],
+      "@/components/ui/breadcrumb": [
+        "./src/app/components/ui/breadcrumb/src/index.ts"
+      ]
     }
   },
   "angularCompilerOptions": {

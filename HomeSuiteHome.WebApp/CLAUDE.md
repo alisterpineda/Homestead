@@ -14,16 +14,18 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 
 ## Architecture
 
+- **UI Library**: Spartan.NG (Angular port of shadcn/ui) — uses `@spartan-ng/brain` primitives + `hlm` (helm) UI directives/components generated via `@spartan-ng/cli`
+- **Icons**: `@ng-icons/core` + `@ng-icons/lucide` — usage: `<ng-icon hlmIcon name="lucideIconName" />` with `provideIcons()` in component providers
 - **Modules** (`src/app/modules/`): Self-contained feature areas (documents, admin) each with pages, components, routes, and sidebar config. Registered in `modules/registry.ts`
 - **Routing**: Angular Router with lazy-loaded feature routes defined in `app.routes.ts`. Each module has its own `*.routes.ts` file. `/login` and `/register` are public routes; the `AppShellComponent` route is protected by `authGuard`
 - **Authentication**: Cookie-based via ASP.NET Core Identity. `AuthService` (`shared/services/auth.service.ts`) manages login/register/logout and exposes `isAuthenticated`, `userName`, `userEmail` signals. `authGuard` (`shared/guards/auth.guard.ts`) protects routes. The auth interceptor redirects to `/login` on 401 responses. No Bearer tokens — cookies are sent automatically for same-origin requests
 - **Auth pages**: Login (`shared/components/auth/login/`) and Register (`shared/components/auth/register/`) are standalone lazy-loaded components
 - **API layer**: ng-openapi-gen generates Angular services and TypeScript models from the backend OpenAPI spec. Config in `ng-openapi-gen.json`, output in `src/app/api/generated/`
-- **Shared**: `src/app/shared/components/ui/` for base components, `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
+- **Shared**: `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
 - **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
-- **Styling**: Tailwind CSS v4 with shadcn/ui-style CSS variable theming (OKLCH colors)
+- **Styling**: Tailwind CSS v4 with Spartan.NG OKLCH CSS variable theming (neutral palette)
 
-Generated files (`src/app/api/generated/`) should not be manually edited.
+Generated files (`src/app/api/generated/` and `src/app/components/ui/`) should not be manually edited.
 
 ---
 
@@ -44,6 +46,13 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
 - Use `NgOptimizedImage` for all static images.
   - `NgOptimizedImage` does not work for inline base64 images.
+
+## Spartan.NG Patterns
+
+- Spartan uses **brain** (headless primitives from `@spartan-ng/brain`) + **helm** (styled UI from generated `src/app/components/ui/`)
+- Many Spartan UI elements are **directives** applied to native elements (e.g., `hlmBtn` on `<button>`, `hlmInput` on `<input>`, `hlmBadge` on `<span>`)
+- Others are **components** (e.g., `<hlm-card>`, `<hlm-tabs>`, `<hlm-sidebar>`)
+- Always import from the local `@/components/ui/` path aliases, not directly from `@spartan-ng/brain`
 
 ## Accessibility Requirements
 
@@ -85,7 +94,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 
 ## Theming & Styling
 
-- Uses shadcn/ui default theme convention with OKLCH CSS variables defined in `src/styles.css`
+- Uses Spartan.NG default theme convention with OKLCH CSS variables defined in `src/styles.css`
 - Semantic color tokens: `background`/`foreground`, `primary`/`primary-foreground`, `secondary`/`secondary-foreground`, `muted`/`muted-foreground`, `accent`/`accent-foreground`, `destructive`/`destructive-foreground`, `card`/`card-foreground`, `popover`/`popover-foreground`, `input`, `ring`, `border`, `sidebar`/`sidebar-foreground`/`sidebar-accent`/`sidebar-accent-foreground`/`sidebar-border`
 - Dark mode via `.dark` class on `<html>` (toggled by `ThemeService`)
 - Border radius system via `--radius` variable (`radius-sm`, `radius-md`, `radius-lg`, `radius-xl`)

@@ -13,25 +13,25 @@ import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, combineLatest, tap } from 'rxjs';
-import { LucideAngularModule } from 'lucide-angular';
+import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  X,
-  Download,
-  Trash2,
-  FileText,
-  FileSearch,
-  Pencil,
-  Check,
-  Tag,
-  Calendar,
-  HardDrive,
-  FileType,
-  Users,
-} from 'lucide-angular';
-import { SheetComponent } from '@/shared/components/ui/sheet/sheet.component';
-import { TabsComponent, TabDefDirective } from '@/shared/components/ui/tabs/tabs.component';
-import { ButtonComponent } from '@/shared/components/ui/button/button.component';
-import { SpinnerComponent } from '@/shared/components/ui/spinner/spinner.component';
+  lucideX,
+  lucideDownload,
+  lucideTrash2,
+  lucideFileText,
+  lucideFileSearch,
+  lucidePencil,
+  lucideCheck,
+  lucideTag,
+  lucideCalendar,
+  lucideHardDrive,
+  lucideFileType,
+  lucideUsers,
+} from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { HlmButton } from '@/components/ui/button';
+import { HlmSpinner } from '@/components/ui/spinner';
+import { HlmTabsImports } from '@/components/ui/tabs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { TagInputComponent } from '../tag-input/tag-input.component';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
@@ -49,109 +49,140 @@ import { toast } from 'ngx-sonner';
   selector: 'app-document-detail-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LucideAngularModule,
-    SheetComponent,
-    TabsComponent,
-    TabDefDirective,
-    ButtonComponent,
-    SpinnerComponent,
+    NgIcon,
+    HlmIconImports,
+    HlmButton,
+    HlmSpinner,
+    HlmTabsImports,
     TagBadgeComponent,
     TagInputComponent,
     PartyBadgeComponent,
     PartyInputComponent,
   ],
+  providers: [
+    provideIcons({
+      lucideX,
+      lucideDownload,
+      lucideTrash2,
+      lucideFileText,
+      lucideFileSearch,
+      lucidePencil,
+      lucideCheck,
+      lucideTag,
+      lucideCalendar,
+      lucideHardDrive,
+      lucideFileType,
+      lucideUsers,
+    }),
+  ],
+  host: {
+    '(document:keydown.escape)': 'onEscape()',
+  },
   template: `
-    <app-sheet [open]="!!documentId()" (closed)="closed.emit()">
-      @if (loading()) {
-        <div class="flex h-full items-center justify-center">
-          <app-spinner size="lg" />
-        </div>
-      }
+    @if (documentId()) {
+      <div class="fixed inset-0 z-50" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-black/50" (click)="closed.emit()"></div>
+        <div class="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-border bg-background shadow-xl">
+          @if (loading()) {
+            <div class="flex h-full items-center justify-center">
+              <hlm-spinner />
+            </div>
+          }
 
-      @if (document()) {
-        <div class="flex h-full flex-col">
-          <!-- Header -->
-          <div class="flex items-center gap-3 border-b border-border px-4 py-3">
-            <div class="min-w-0 flex-1">
-              @if (editing()) {
-                <input
-                  [value]="editName()"
-                  (input)="editName.set(asInputValue($event))"
-                  class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                />
+          @if (document()) {
+            <!-- Header -->
+            <div class="flex items-center gap-3 border-b border-border px-4 py-3">
+              <div class="min-w-0 flex-1">
+                @if (editing()) {
+                  <input
+                    [value]="editName()"
+                    (input)="editName.set(asInputValue($event))"
+                    class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                } @else {
+                  <h2 class="truncate text-lg font-semibold text-foreground">
+                    {{ document()!.name }}
+                  </h2>
+                }
+              </div>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                (click)="closed.emit()"
+                aria-label="Close panel"
+              >
+                <ng-icon hlm name="lucideX" size="sm" />
+              </button>
+            </div>
+
+            <!-- Preview -->
+            <div class="border-b border-border bg-muted">
+              @if (isPdf()) {
+                <iframe
+                  [src]="safeFileUrl()"
+                  class="h-80 w-full"
+                  [title]="'Preview of ' + document()!.name"
+                ></iframe>
               } @else {
-                <h2 class="truncate text-lg font-semibold text-foreground">
-                  {{ document()!.name }}
-                </h2>
+                <div
+                  class="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground"
+                >
+                  <ng-icon hlm name="lucideFileText" size="xl" />
+                  <span class="text-sm">Preview not available</span>
+                </div>
               }
             </div>
-            <button
-              (click)="closed.emit()"
-              class="shrink-0 cursor-pointer rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <lucide-icon [img]="icons.x" [size]="20" />
-            </button>
-          </div>
 
-          <!-- Preview -->
-          <div class="border-b border-border bg-muted">
-            @if (isPdf()) {
-              <iframe [src]="safeFileUrl()" class="h-80 w-full" [title]="'Preview of ' + document()!.name"></iframe>
-            } @else {
-              <div
-                class="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground"
-              >
-                <lucide-icon [img]="icons.fileText" [size]="48" [strokeWidth]="1" />
-                <span class="text-sm">Preview not available</span>
-              </div>
-            }
-          </div>
+            <!-- Actions -->
+            <div class="flex gap-2 border-b border-border px-4 py-3">
+              @if (editing()) {
+                <button hlmBtn (click)="handleSave()" [disabled]="saving()">
+                  <ng-icon hlm name="lucideCheck" size="sm" />
+                  {{ saving() ? 'Saving...' : 'Save' }}
+                </button>
+                <button hlmBtn variant="secondary" (click)="handleCancelEdit()" [disabled]="saving()">
+                  <ng-icon hlm name="lucideX" size="sm" />
+                  Cancel
+                </button>
+              } @else {
+                <button hlmBtn variant="secondary" (click)="editing.set(true)">
+                  <ng-icon hlm name="lucidePencil" size="sm" />
+                  Edit
+                </button>
+                <a
+                  hlmBtn
+                  [href]="fileBlobUrl()"
+                  [download]="document()!.name"
+                >
+                  <ng-icon hlm name="lucideDownload" size="sm" />
+                  Download
+                </a>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  (click)="handleDelete()"
+                  [disabled]="deleting()"
+                  class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <ng-icon hlm name="lucideTrash2" size="sm" />
+                  {{ deleting() ? 'Deleting...' : 'Delete' }}
+                </button>
+              }
+            </div>
 
-          <!-- Actions -->
-          <div class="flex gap-2 border-b border-border px-4 py-3">
-            @if (editing()) {
-              <app-button variant="primary" (click)="handleSave()" [disabled]="saving()">
-                <lucide-icon [img]="icons.check" [size]="16" />
-                {{ saving() ? 'Saving...' : 'Save' }}
-              </app-button>
-              <app-button variant="secondary" (click)="handleCancelEdit()" [disabled]="saving()">
-                <lucide-icon [img]="icons.x" [size]="16" />
-                Cancel
-              </app-button>
-            } @else {
-              <app-button variant="secondary" (click)="editing.set(true)">
-                <lucide-icon [img]="icons.pencil" [size]="16" />
-                Edit
-              </app-button>
-              <a
-                [href]="fileBlobUrl()"
-                [download]="document()!.name"
-                class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                <lucide-icon [img]="icons.download" [size]="16" />
-                Download
-              </a>
-              <app-button
-                variant="ghost"
-                (click)="handleDelete()"
-                [disabled]="deleting()"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              >
-                <lucide-icon [img]="icons.trash" [size]="16" />
-                {{ deleting() ? 'Deleting...' : 'Delete' }}
-              </app-button>
-            }
-          </div>
-
-          <!-- Tabs -->
-          <div class="flex-1 overflow-y-auto px-4 py-3">
-            <app-tabs>
-              <ng-template appTabDef="info" label="Info">
+            <!-- Tabs -->
+            <hlm-tabs tab="info" class="flex flex-1 flex-col overflow-hidden">
+              <hlm-tabs-list class="mx-4 mt-3">
+                <button hlmTabsTrigger="info">Info</button>
+                <button hlmTabsTrigger="text">Text</button>
+              </hlm-tabs-list>
+              <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
                 <div class="space-y-4">
                   <!-- Tags -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.tag" [size]="16" />
+                      <ng-icon hlm name="lucideTag" size="sm" />
                       <span class="w-12 text-sm font-medium">Tags</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -174,7 +205,7 @@ import { toast } from 'ngx-sonner';
                   <!-- Parties -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.users" [size]="16" />
+                      <ng-icon hlm name="lucideUsers" size="sm" />
                       <span class="w-12 text-sm font-medium">Parties</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -197,7 +228,7 @@ import { toast } from 'ngx-sonner';
                   <!-- Added -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.calendar" [size]="16" />
+                      <ng-icon hlm name="lucideCalendar" size="sm" />
                       <span class="w-12 text-sm font-medium">Added</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -210,7 +241,7 @@ import { toast } from 'ngx-sonner';
                   <!-- Size -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.hardDrive" [size]="16" />
+                      <ng-icon hlm name="lucideHardDrive" size="sm" />
                       <span class="w-12 text-sm font-medium">Size</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -223,7 +254,7 @@ import { toast } from 'ngx-sonner';
                   <!-- Type -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.fileType" [size]="16" />
+                      <ng-icon hlm name="lucideFileType" size="sm" />
                       <span class="w-12 text-sm font-medium">Type</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -231,24 +262,24 @@ import { toast } from 'ngx-sonner';
                     </div>
                   </div>
                 </div>
-              </ng-template>
-              <ng-template appTabDef="text" label="Text">
+              </div>
+              <div hlmTabsContent="text" class="flex-1 overflow-y-auto px-4 py-3">
                 @if (document()!.extractedText) {
-                  <div class="max-h-96 overflow-y-auto rounded-lg border border-border bg-muted p-4">
+                  <div class="max-h-96 overflow-y-auto rounded-md border border-border bg-muted p-4">
                     <pre class="whitespace-pre-wrap text-sm text-foreground">{{ document()!.extractedText }}</pre>
                   </div>
                 } @else {
                   <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-                    <lucide-icon [img]="icons.fileSearch" [size]="48" [strokeWidth]="1" />
+                    <ng-icon hlm name="lucideFileSearch" size="xl" />
                     <span class="text-sm">No extracted text available</span>
                   </div>
                 }
-              </ng-template>
-            </app-tabs>
-          </div>
+              </div>
+            </hlm-tabs>
+          }
         </div>
-      }
-    </app-sheet>
+      </div>
+    }
   `,
 })
 export class DocumentDetailPanelComponent implements OnDestroy {
@@ -265,7 +296,6 @@ export class DocumentDetailPanelComponent implements OnDestroy {
   loading = signal(false);
   private refreshTrigger = signal(0);
 
-  icons = { x: X, download: Download, trash: Trash2, fileText: FileText, fileSearch: FileSearch, pencil: Pencil, check: Check, tag: Tag, calendar: Calendar, hardDrive: HardDrive, fileType: FileType, users: Users };
   formatBytes = formatBytes;
 
   private http = inject(HttpClient);
@@ -317,7 +347,6 @@ export class DocumentDetailPanelComponent implements OnDestroy {
   document = this.documentData;
 
   constructor() {
-    // Sync edit state when document changes
     effect(() => {
       const doc = this.document();
       if (doc) {
@@ -327,7 +356,6 @@ export class DocumentDetailPanelComponent implements OnDestroy {
       }
     });
 
-    // Reset editing when documentId changes
     effect(() => {
       this.documentId();
       this.editing.set(false);
@@ -336,6 +364,12 @@ export class DocumentDetailPanelComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.revokeCurrentBlobUrl();
+  }
+
+  onEscape(): void {
+    if (this.documentId()) {
+      this.closed.emit();
+    }
   }
 
   isPdf(): boolean {

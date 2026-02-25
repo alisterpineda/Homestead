@@ -1,16 +1,14 @@
-import type { LucideIconData } from 'lucide-angular';
-
 export interface SidebarItem {
   label: string;
   path: string;
-  icon?: LucideIconData;
+  icon?: string;
 }
 
 export interface ModuleDefinition {
   id: string;
   label: string;
   labelColor: string;
-  icon: LucideIconData;
+  icon: string;
   basePath: string;
   sidebar: SidebarItem[];
 }

@@ -34,7 +34,7 @@ export interface PartyOption {
   template: `
     <div class="relative" #container>
       <div
-        class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
+        class="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (party of value(); track party.id) {
           <app-party-badge [name]="party.name" [removable]="true" (removed)="removeParty(party.id)" />
@@ -52,7 +52,7 @@ export interface PartyOption {
 
       @if (showSuggestions() && allOptions().length > 0) {
         <div
-          class="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg"
+          class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg"
         >
           @for (option of allOptions(); track option.id; let i = $index) {
             <button
@@ -63,8 +63,8 @@ export interface PartyOption {
                 (i === selectedIndex()
                   ? 'bg-accent text-accent-foreground'
                   : 'text-foreground hover:bg-accent') +
-                (i === 0 ? ' rounded-t-lg' : '') +
-                (i === allOptions().length - 1 ? ' rounded-b-lg' : '')
+                (i === 0 ? ' rounded-t-md' : '') +
+                (i === allOptions().length - 1 ? ' rounded-b-md' : '')
               "
             >
               @if (option.id === '__create__') {

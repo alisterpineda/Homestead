@@ -1,33 +1,33 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
-import { X } from 'lucide-angular';
-import { BadgeComponent } from '@/shared/components/ui/badge/badge.component';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideX } from '@ng-icons/lucide';
+import { HlmBadge } from '@/components/ui/badge';
+import { HlmIconImports } from '@/components/ui/icon';
 
 @Component({
   selector: 'app-tag-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule, BadgeComponent],
+  imports: [NgIcon, HlmIconImports, HlmBadge],
+  providers: [provideIcons({ lucideX })],
   template: `
-    <app-badge className="gap-1">
+    <span hlmBadge class="gap-1">
       {{ path() }}
       @if (removable()) {
         <button
           type="button"
           (click)="onRemove($event)"
-          class="ml-0.5 rounded hover:bg-muted-foreground/20 cursor-pointer"
+          class="ml-0.5 cursor-pointer rounded hover:bg-muted-foreground/20"
         >
-          <lucide-icon [img]="xIcon" [size]="12" />
+          <ng-icon hlm name="lucideX" size="xs" />
         </button>
       }
-    </app-badge>
+    </span>
   `,
 })
 export class TagBadgeComponent {
   path = input.required<string>();
   removable = input(false);
   removed = output<void>();
-
-  xIcon = X;
 
   onRemove(event: Event): void {
     event.stopPropagation();

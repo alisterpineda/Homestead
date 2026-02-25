@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { AppShellComponent } from '@/shared/components/layout/app-shell/app-shell.component';
 import { authGuard } from '@/shared/guards/auth.guard';
 
 export const routes: Routes = [
@@ -17,7 +16,10 @@ export const routes: Routes = [
   },
   {
     path: '',
-    component: AppShellComponent,
+    loadComponent: () =>
+      import('./shared/components/layout/app-shell/app-shell.component').then(
+        (m) => m.AppShellComponent,
+      ),
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'documents', pathMatch: 'full' },

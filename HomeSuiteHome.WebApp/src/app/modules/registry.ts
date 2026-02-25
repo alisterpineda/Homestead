@@ -1,4 +1,3 @@
-import { Settings, FileText } from 'lucide-angular';
 import type { ModuleDefinition } from '@/shared/types/modules';
 import { adminSidebar } from './admin/sidebar';
 import { documentsSidebar } from './documents/sidebar';
@@ -8,7 +7,7 @@ export const modules: ModuleDefinition[] = [
     id: 'admin',
     label: 'Admin',
     labelColor: 'slate',
-    icon: Settings,
+    icon: 'lucideSettings',
     basePath: '/admin',
     sidebar: adminSidebar,
   },
@@ -16,7 +15,7 @@ export const modules: ModuleDefinition[] = [
     id: 'documents',
     label: 'Documents',
     labelColor: 'indigo',
-    icon: FileText,
+    icon: 'lucideFileText',
     basePath: '/documents',
     sidebar: documentsSidebar,
   },

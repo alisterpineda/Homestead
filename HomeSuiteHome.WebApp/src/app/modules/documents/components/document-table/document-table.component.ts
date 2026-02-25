@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
-import { cn, formatBytes } from '@/shared/utils';
+import { formatBytes } from '@/shared/utils';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
@@ -12,15 +12,12 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     <!-- Mobile card layout -->
     <div class="flex flex-col gap-3 md:hidden">
       @for (doc of documents(); track doc.id) {
-        <div
+        <button
+          type="button"
           (click)="documentSelect.emit(doc.id)"
           [class]="
-            cn(
-              'cursor-pointer rounded-lg border border-border p-4 transition-colors',
-              selectedDocumentId() === doc.id
-                ? 'bg-accent'
-                : 'hover:bg-muted'
-            )
+            'w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors ' +
+            (selectedDocumentId() === doc.id ? 'bg-accent' : 'hover:bg-muted')
           "
         >
           <p class="font-medium text-foreground">{{ doc.name }}</p>
@@ -42,7 +39,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
               }
             </div>
           }
-        </div>
+        </button>
       }
     </div>
 
@@ -61,14 +58,12 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
         <tbody>
           @for (doc of documents(); track doc.id) {
             <tr
+              tabindex="0"
               (click)="documentSelect.emit(doc.id)"
+              (keydown.enter)="documentSelect.emit(doc.id)"
               [class]="
-                cn(
-                  'border-b border-border last:border-0 cursor-pointer transition-colors',
-                  selectedDocumentId() === doc.id
-                    ? 'bg-accent'
-                    : 'hover:bg-muted'
-                )
+                'border-b border-border last:border-0 cursor-pointer transition-colors ' +
+                (selectedDocumentId() === doc.id ? 'bg-accent' : 'hover:bg-muted')
               "
             >
               <td class="px-4 py-3 font-medium text-foreground">{{ doc.name }}</td>
@@ -102,6 +97,5 @@ export class DocumentTableComponent {
   selectedDocumentId = input<string | null>(null);
   documentSelect = output<string>();
 
-  cn = cn;
   formatBytes = formatBytes;
 }

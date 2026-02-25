@@ -7,26 +7,34 @@ import {
   viewChild,
   ElementRef,
 } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
-import { Upload } from 'lucide-angular';
-import { cn, formatBytes } from '@/shared/utils';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideUpload } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { formatBytes } from '@/shared/utils';
 
 @Component({
   selector: 'app-upload-dropzone',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({ lucideUpload })],
   template: `
     <div
       (click)="onClick()"
       (dragover)="onDragOver($event)"
       (dragleave)="onDragLeave($event)"
       (drop)="onDrop($event)"
-      [class]="dropzoneClasses()"
+      [class]="
+        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors md:p-8 ' +
+        (dragOver() || file()
+          ? 'border-primary bg-accent'
+          : 'border-border hover:border-primary hover:bg-muted')
+      "
     >
       <input #fileInput type="file" class="hidden" (change)="onFileChange($event)" />
-      <lucide-icon
-        [img]="uploadIcon"
-        [size]="32"
+      <ng-icon
+        hlm
+        name="lucideUpload"
+        size="lg"
         [class]="'mb-3 ' + (file() ? 'text-primary' : 'text-muted-foreground')"
       />
       @if (file()) {
@@ -47,24 +55,10 @@ export class UploadDropzoneComponent {
   file = input<File | null>(null);
   fileSelect = output<File>();
 
-  uploadIcon = Upload;
   formatBytes = formatBytes;
 
   dragOver = signal(false);
   fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
-
-  dropzoneClasses(): string {
-    const f = this.file();
-    const drag = this.dragOver();
-    return cn(
-      'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors md:p-8',
-      drag
-        ? 'border-primary bg-accent'
-        : f
-          ? 'border-primary bg-accent'
-          : 'border-border hover:border-primary hover:bg-muted',
-    );
-  }
 
   onClick(): void {
     this.fileInput()?.nativeElement.click();

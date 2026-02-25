@@ -12,7 +12,7 @@ HomeSuiteHome is a full-stack document management application with a .NET 10 bac
 |---|---|
 | `HomeSuiteHome.AppHost/` | .NET Aspire orchestrator — runs the full stack |
 | `HomeSuiteHome.WebApi/` | .NET 10 backend API ([CLAUDE.md](HomeSuiteHome.WebApi/CLAUDE.md)) |
-| `HomeSuiteHome.WebApp/` | Angular v21 frontend ([CLAUDE.md](HomeSuiteHome.WebApp/CLAUDE.md)) |
+| `HomeSuiteHome.WebApp/` | Angular v21 frontend with Spartan.NG ([CLAUDE.md](HomeSuiteHome.WebApp/CLAUDE.md)) |
 | `HomeSuiteHome.ServiceDefaults/` | Shared Aspire config (OpenTelemetry, health checks, HTTP resilience) |
 
 ## Running the Full Stack

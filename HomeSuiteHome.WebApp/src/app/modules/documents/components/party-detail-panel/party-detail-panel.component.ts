@@ -11,100 +11,131 @@ import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, combineLatest } from 'rxjs';
-import { LucideAngularModule } from 'lucide-angular';
-import { X, Trash2, Pencil, Check, Calendar, FileText, AlignLeft } from 'lucide-angular';
-import { SheetComponent } from '@/shared/components/ui/sheet/sheet.component';
-import { TabsComponent, TabDefDirective } from '@/shared/components/ui/tabs/tabs.component';
-import { ButtonComponent } from '@/shared/components/ui/button/button.component';
-import { SpinnerComponent } from '@/shared/components/ui/spinner/spinner.component';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import {
+  lucideX,
+  lucideTrash2,
+  lucidePencil,
+  lucideCheck,
+  lucideCalendar,
+  lucideFileText,
+  lucideAlignLeft,
+} from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { HlmButton } from '@/components/ui/button';
+import { HlmSpinner } from '@/components/ui/spinner';
+import { HlmTabsImports } from '@/components/ui/tabs';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getParty } from '@/api/generated/fn/documents/get-party';
 import { updateParty } from '@/api/generated/fn/documents/update-party';
 import { deleteParty } from '@/api/generated/fn/documents/delete-party';
 import type { GetPartyResponse } from '@/api/generated/models/get-party-response';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-party-detail-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
-    LucideAngularModule,
-    SheetComponent,
-    TabsComponent,
-    TabDefDirective,
-    ButtonComponent,
-    SpinnerComponent,
+    NgIcon,
+    HlmIconImports,
+    HlmButton,
+    HlmSpinner,
+    HlmTabsImports,
   ],
+  providers: [
+    provideIcons({
+      lucideX,
+      lucideTrash2,
+      lucidePencil,
+      lucideCheck,
+      lucideCalendar,
+      lucideFileText,
+      lucideAlignLeft,
+    }),
+  ],
+  host: {
+    '(document:keydown.escape)': 'onEscape()',
+  },
   template: `
-    <app-sheet [open]="!!partyId()" (closed)="closed.emit()">
-      @if (loading()) {
-        <div class="flex h-full items-center justify-center">
-          <app-spinner size="lg" />
-        </div>
-      }
+    @if (partyId()) {
+      <div class="fixed inset-0 z-50" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-black/50" (click)="closed.emit()"></div>
+        <div class="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-border bg-background shadow-xl">
+          @if (loading()) {
+            <div class="flex h-full items-center justify-center">
+              <hlm-spinner />
+            </div>
+          }
 
-      @if (party()) {
-        <div class="flex h-full flex-col">
-          <!-- Header -->
-          <div class="flex items-center gap-3 border-b border-border px-4 py-3">
-            <div class="min-w-0 flex-1">
+          @if (party()) {
+            <!-- Header -->
+            <div class="flex items-center gap-3 border-b border-border px-4 py-3">
+              <div class="min-w-0 flex-1">
+                @if (editing()) {
+                  <input
+                    [value]="editName()"
+                    (input)="editName.set(asInputValue($event))"
+                    class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                  />
+                } @else {
+                  <h2 class="truncate text-lg font-semibold text-foreground">
+                    {{ party()!.name }}
+                  </h2>
+                }
+              </div>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                (click)="closed.emit()"
+                aria-label="Close panel"
+              >
+                <ng-icon hlm name="lucideX" size="sm" />
+              </button>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 border-b border-border px-4 py-3">
               @if (editing()) {
-                <input
-                  [value]="editName()"
-                  (input)="editName.set(asInputValue($event))"
-                  class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-lg font-semibold text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                />
+                <button hlmBtn (click)="handleSave()" [disabled]="saving()">
+                  <ng-icon hlm name="lucideCheck" size="sm" />
+                  {{ saving() ? 'Saving...' : 'Save' }}
+                </button>
+                <button hlmBtn variant="secondary" (click)="handleCancelEdit()" [disabled]="saving()">
+                  <ng-icon hlm name="lucideX" size="sm" />
+                  Cancel
+                </button>
               } @else {
-                <h2 class="truncate text-lg font-semibold text-foreground">
-                  {{ party()!.name }}
-                </h2>
+                <button hlmBtn variant="secondary" (click)="editing.set(true)">
+                  <ng-icon hlm name="lucidePencil" size="sm" />
+                  Edit
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  (click)="handleDelete()"
+                  [disabled]="deleting()"
+                  class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <ng-icon hlm name="lucideTrash2" size="sm" />
+                  {{ deleting() ? 'Deleting...' : 'Delete' }}
+                </button>
               }
             </div>
-            <button
-              (click)="closed.emit()"
-              class="shrink-0 cursor-pointer rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <lucide-icon [img]="icons.x" [size]="20" />
-            </button>
-          </div>
 
-          <!-- Actions -->
-          <div class="flex gap-2 border-b border-border px-4 py-3">
-            @if (editing()) {
-              <app-button variant="primary" (click)="handleSave()" [disabled]="saving()">
-                <lucide-icon [img]="icons.check" [size]="16" />
-                {{ saving() ? 'Saving...' : 'Save' }}
-              </app-button>
-              <app-button variant="secondary" (click)="handleCancelEdit()" [disabled]="saving()">
-                <lucide-icon [img]="icons.x" [size]="16" />
-                Cancel
-              </app-button>
-            } @else {
-              <app-button variant="secondary" (click)="editing.set(true)">
-                <lucide-icon [img]="icons.pencil" [size]="16" />
-                Edit
-              </app-button>
-              <app-button
-                variant="ghost"
-                (click)="handleDelete()"
-                [disabled]="deleting()"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              >
-                <lucide-icon [img]="icons.trash" [size]="16" />
-                {{ deleting() ? 'Deleting...' : 'Delete' }}
-              </app-button>
-            }
-          </div>
-
-          <!-- Tabs -->
-          <div class="flex-1 overflow-y-auto px-4 py-3">
-            <app-tabs>
-              <ng-template appTabDef="info" label="Info">
+            <!-- Tabs -->
+            <hlm-tabs tab="info" class="flex flex-1 flex-col overflow-hidden">
+              <hlm-tabs-list class="mx-4 mt-3">
+                <button hlmTabsTrigger="info">Info</button>
+                <button hlmTabsTrigger="documents">Documents</button>
+              </hlm-tabs-list>
+              <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
                 <div class="space-y-4">
                   <!-- Description -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.alignLeft" [size]="16" />
+                      <ng-icon hlm name="lucideAlignLeft" size="sm" />
                       <span class="w-16 text-sm font-medium">Description</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -113,7 +144,7 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                           [value]="editDescription()"
                           (input)="editDescription.set(asTextareaValue($event))"
                           rows="3"
-                          class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
                         ></textarea>
                       } @else {
                         <span class="text-sm text-foreground">
@@ -126,7 +157,7 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                   <!-- Created -->
                   <div class="flex gap-3">
                     <div class="flex shrink-0 items-start gap-2 pt-0.5 text-muted-foreground">
-                      <lucide-icon [img]="icons.calendar" [size]="16" />
+                      <ng-icon hlm name="lucideCalendar" size="sm" />
                       <span class="w-16 text-sm font-medium">Created</span>
                     </div>
                     <div class="min-w-0 flex-1">
@@ -136,9 +167,9 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                     </div>
                   </div>
                 </div>
-              </ng-template>
+              </div>
 
-              <ng-template appTabDef="documents" label="Documents">
+              <div hlmTabsContent="documents" class="flex-1 overflow-y-auto px-4 py-3">
                 @if (party()!.documents.length === 0) {
                   <p class="text-sm text-muted-foreground">No linked documents</p>
                 } @else {
@@ -147,21 +178,21 @@ import type { GetPartyResponse } from '@/api/generated/models/get-party-response
                       <a
                         [routerLink]="['/documents']"
                         [queryParams]="{ selected: doc.id }"
-                        class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+                        class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
                       >
-                        <lucide-icon [img]="icons.fileText" [size]="16" class="shrink-0 text-muted-foreground" />
+                        <ng-icon hlm name="lucideFileText" size="sm" class="shrink-0 text-muted-foreground" />
                         <span class="truncate">{{ doc.name }}</span>
                         <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ doc.contentType }}</span>
                       </a>
                     }
                   </div>
                 }
-              </ng-template>
-            </app-tabs>
-          </div>
+              </div>
+            </hlm-tabs>
+          }
         </div>
-      }
-    </app-sheet>
+      </div>
+    }
   `,
 })
 export class PartyDetailPanelComponent {
@@ -176,8 +207,6 @@ export class PartyDetailPanelComponent {
   deleting = signal(false);
   loading = signal(false);
   private refreshTrigger = signal(0);
-
-  icons = { x: X, trash: Trash2, pencil: Pencil, check: Check, calendar: Calendar, fileText: FileText, alignLeft: AlignLeft };
 
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
@@ -219,6 +248,12 @@ export class PartyDetailPanelComponent {
     });
   }
 
+  onEscape(): void {
+    if (this.partyId()) {
+      this.closed.emit();
+    }
+  }
+
   formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString(undefined, {
       year: 'numeric',
@@ -248,9 +283,11 @@ export class PartyDetailPanelComponent {
         this.editing.set(false);
         this.refreshList.emit();
         this.refreshTrigger.update((v) => v + 1);
+        toast.success('Party updated.');
       },
       error: () => {
         this.saving.set(false);
+        toast.error('Failed to save changes.');
       },
     });
   }
@@ -273,9 +310,11 @@ export class PartyDetailPanelComponent {
         this.deleting.set(false);
         this.refreshList.emit();
         this.closed.emit();
+        toast.success('Party deleted.');
       },
       error: () => {
         this.deleting.set(false);
+        toast.error('Failed to delete party.');
       },
     });
   }

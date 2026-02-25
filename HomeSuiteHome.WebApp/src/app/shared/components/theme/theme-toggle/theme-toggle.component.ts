@@ -1,26 +1,27 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
-import { LucideAngularModule } from 'lucide-angular';
-import { Sun, Moon, Monitor } from 'lucide-angular';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideSun, lucideMoon, lucideMonitor } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
 import { ThemeService, type ThemeMode } from '@/shared/services/theme.service';
-import type { LucideIconData } from 'lucide-angular';
 
-const modes: { value: ThemeMode; icon: LucideIconData; label: string }[] = [
-  { value: 'light', icon: Sun, label: 'Light' },
-  { value: 'dark', icon: Moon, label: 'Dark' },
-  { value: 'system', icon: Monitor, label: 'System' },
+const modes: { value: ThemeMode; icon: string; label: string }[] = [
+  { value: 'light', icon: 'lucideSun', label: 'Light' },
+  { value: 'dark', icon: 'lucideMoon', label: 'Dark' },
+  { value: 'system', icon: 'lucideMonitor', label: 'System' },
 ];
 
 @Component({
   selector: 'app-theme-toggle',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideAngularModule],
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({ lucideSun, lucideMoon, lucideMonitor })],
   template: `
     <button
       (click)="theme.cycleTheme()"
       class="cursor-pointer rounded-md p-1.5 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       [title]="'Theme: ' + current().label"
     >
-      <lucide-icon [img]="current().icon" [size]="18" />
+      <ng-icon hlm [name]="current().icon" size="sm" />
     </button>
   `,
 })

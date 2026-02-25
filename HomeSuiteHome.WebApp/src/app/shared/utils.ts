@@ -1,7 +1,3 @@
-export function cn(...classes: (string | false | null | undefined)[]): string {
-  return classes.filter(Boolean).join(' ');
-}
-
 export function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return '0 B';
 

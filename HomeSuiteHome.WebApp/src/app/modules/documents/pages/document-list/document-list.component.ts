@@ -1,15 +1,15 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideFileText, lucidePlus } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/components/ui/icon';
+import { HlmButton } from '@/components/ui/button';
+import { HlmSpinner } from '@/components/ui/spinner';
+import { HlmEmptyImports } from '@/components/ui/empty';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
-import { LucideAngularModule } from 'lucide-angular';
-import { FileText, Plus } from 'lucide-angular';
-import { PageHeaderComponent } from '@/shared/components/ui/page-header/page-header.component';
-import { ButtonComponent } from '@/shared/components/ui/button/button.component';
-import { SpinnerComponent } from '@/shared/components/ui/spinner/spinner.component';
-import { EmptyStateComponent } from '@/shared/components/ui/empty-state/empty-state.component';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
 import { DocumentDetailPanelComponent } from '../../components/document-detail-panel/document-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -22,54 +22,67 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
-    LucideAngularModule,
-    PageHeaderComponent,
-    ButtonComponent,
-    SpinnerComponent,
-    EmptyStateComponent,
+    NgIcon,
+    HlmIconImports,
+    HlmButton,
+    HlmSpinner,
+    HlmEmptyImports,
     DocumentTableComponent,
     DocumentDetailPanelComponent,
     PaginationComponent,
   ],
+  providers: [provideIcons({ lucideFileText, lucidePlus })],
   template: `
     <div>
-      <app-page-header title="Documents" description="Manage your uploaded documents">
-        <a action routerLink="/documents/upload">
-          <app-button>
-            <lucide-icon [img]="plusIcon" [size]="16" />
+      <!-- Page Header -->
+      <div class="mb-6 flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-foreground">Documents</h1>
+          <p class="text-sm text-muted-foreground">Manage your uploaded documents</p>
+        </div>
+        <a routerLink="/documents/upload">
+          <button hlmBtn>
+            <ng-icon hlm name="lucidePlus" size="sm" />
             Upload
-          </app-button>
+          </button>
         </a>
-      </app-page-header>
+      </div>
 
       @if (loading()) {
         <div class="flex justify-center py-16">
-          <app-spinner size="lg" />
+          <hlm-spinner />
         </div>
       }
 
       @if (error()) {
-        <app-empty-state
-          [icon]="fileTextIcon"
-          title="Failed to load documents"
-          description="There was an error loading the document list. Please try again."
-        />
+        <section hlmEmpty>
+          <hlm-empty-media variant="icon">
+            <ng-icon hlm name="lucideFileText" size="xl" />
+          </hlm-empty-media>
+          <div hlmEmptyHeader>
+            <h3 hlmEmptyTitle>Failed to load documents</h3>
+            <p hlmEmptyDescription>There was an error loading the document list. Please try again.</p>
+          </div>
+        </section>
       }
 
       @if (data(); as result) {
         @if (result.items.length === 0) {
-          <app-empty-state
-            [icon]="fileTextIcon"
-            title="No documents yet"
-            description="Upload your first document to get started."
-          >
+          <section hlmEmpty>
+            <hlm-empty-media variant="icon">
+              <ng-icon hlm name="lucideFileText" size="xl" />
+            </hlm-empty-media>
+            <div hlmEmptyHeader>
+              <h3 hlmEmptyTitle>No documents yet</h3>
+              <p hlmEmptyDescription>Upload your first document to get started.</p>
+            </div>
             <a routerLink="/documents/upload">
-              <app-button>
-                <lucide-icon [img]="plusIcon" [size]="16" />
+              <button hlmBtn>
+                <ng-icon hlm name="lucidePlus" size="sm" />
                 Upload Document
-              </app-button>
+              </button>
             </a>
-          </app-empty-state>
+          </section>
         } @else {
           <app-document-table
             [documents]="result.items"
@@ -93,9 +106,6 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
   `,
 })
 export class DocumentListComponent implements OnDestroy {
-  fileTextIcon = FileText;
-  plusIcon = Plus;
-
   selectedDocumentId = signal<string | null>(null);
   refreshTrigger = signal(0);
   loading = signal(false);

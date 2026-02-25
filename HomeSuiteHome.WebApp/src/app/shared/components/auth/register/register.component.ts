@@ -2,110 +2,122 @@ import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/cor
 import { ReactiveFormsModule, FormBuilder, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
+import { HlmButton } from '@/components/ui/button';
+import { HlmInput } from '@/components/ui/input';
+import { HlmLabel } from '@/components/ui/label';
+import { HlmCardImports } from '@/components/ui/card';
+import { HlmSeparator } from '@/components/ui/separator';
 
 @Component({
   selector: 'app-register',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    HlmButton,
+    HlmInput,
+    HlmLabel,
+    HlmCardImports,
+    HlmSeparator,
+  ],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-background px-4">
-      <div class="w-full max-w-sm space-y-6">
-        <div class="space-y-2 text-center">
-          <h1 class="text-2xl font-semibold tracking-tight text-foreground">Create an account</h1>
-          <p class="text-sm text-muted-foreground">Enter your details to get started</p>
+      <div hlmCard class="w-full max-w-sm">
+        <div hlmCardHeader class="text-center">
+          <h1 hlmCardTitle>Create an account</h1>
+          <p hlmCardDescription>Enter your details to get started</p>
         </div>
 
-        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
-          @if (error()) {
-            <div
-              class="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              {{ error() }}
+        <div hlmCardContent>
+          <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-4">
+            @if (error()) {
+              <div
+                class="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                role="alert"
+              >
+                {{ error() }}
+              </div>
+            }
+
+            <div class="flex flex-col gap-2">
+              <label hlmLabel for="email">Email</label>
+              <input
+                hlmInput
+                id="email"
+                type="email"
+                formControlName="email"
+                autocomplete="email"
+                placeholder="name@example.com"
+              />
+              @if (submitted() && form.get('email')?.hasError('required')) {
+                <p class="text-xs text-destructive">Email is required.</p>
+              } @else if (submitted() && form.get('email')?.hasError('email')) {
+                <p class="text-xs text-destructive">Enter a valid email address.</p>
+              }
             </div>
-          }
 
-          <div class="space-y-2">
-            <label for="email" class="text-sm font-medium text-foreground">Email</label>
-            <input
-              id="email"
-              type="email"
-              formControlName="email"
-              autocomplete="email"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="name@example.com"
-            />
-            @if (submitted() && form.get('email')?.hasError('required')) {
-              <p class="text-xs text-destructive">Email is required.</p>
-            } @else if (submitted() && form.get('email')?.hasError('email')) {
-              <p class="text-xs text-destructive">Enter a valid email address.</p>
-            }
-          </div>
+            <div class="flex flex-col gap-2">
+              <label hlmLabel for="displayName">Display name</label>
+              <input
+                hlmInput
+                id="displayName"
+                type="text"
+                formControlName="displayName"
+                autocomplete="name"
+                placeholder="Your name"
+              />
+              @if (submitted() && form.get('displayName')?.hasError('required')) {
+                <p class="text-xs text-destructive">Display name is required.</p>
+              }
+            </div>
 
-          <div class="space-y-2">
-            <label for="displayName" class="text-sm font-medium text-foreground">Display name</label>
-            <input
-              id="displayName"
-              type="text"
-              formControlName="displayName"
-              autocomplete="name"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Your name"
-            />
-            @if (submitted() && form.get('displayName')?.hasError('required')) {
-              <p class="text-xs text-destructive">Display name is required.</p>
-            }
-          </div>
+            <div class="flex flex-col gap-2">
+              <label hlmLabel for="password">Password</label>
+              <input
+                hlmInput
+                id="password"
+                type="password"
+                formControlName="password"
+                autocomplete="new-password"
+              />
+              @if (submitted() && form.get('password')?.hasError('required')) {
+                <p class="text-xs text-destructive">Password is required.</p>
+              } @else if (submitted() && form.get('password')?.hasError('minlength')) {
+                <p class="text-xs text-destructive">Password must be at least 8 characters.</p>
+              }
+            </div>
 
-          <div class="space-y-2">
-            <label for="password" class="text-sm font-medium text-foreground">Password</label>
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              autocomplete="new-password"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            @if (submitted() && form.get('password')?.hasError('required')) {
-              <p class="text-xs text-destructive">Password is required.</p>
-            } @else if (submitted() && form.get('password')?.hasError('minlength')) {
-              <p class="text-xs text-destructive">Password must be at least 8 characters.</p>
-            }
-          </div>
+            <div class="flex flex-col gap-2">
+              <label hlmLabel for="confirmPassword">Confirm password</label>
+              <input
+                hlmInput
+                id="confirmPassword"
+                type="password"
+                formControlName="confirmPassword"
+                autocomplete="new-password"
+              />
+              @if (submitted() && form.get('confirmPassword')?.hasError('required')) {
+                <p class="text-xs text-destructive">Confirm your password.</p>
+              } @else if (submitted() && form.hasError('passwordMismatch')) {
+                <p class="text-xs text-destructive">Passwords do not match.</p>
+              }
+            </div>
 
-          <div class="space-y-2">
-            <label for="confirmPassword" class="text-sm font-medium text-foreground">
-              Confirm password
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              formControlName="confirmPassword"
-              autocomplete="new-password"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            @if (submitted() && form.get('confirmPassword')?.hasError('required')) {
-              <p class="text-xs text-destructive">Confirm your password.</p>
-            } @else if (submitted() && form.hasError('passwordMismatch')) {
-              <p class="text-xs text-destructive">Passwords do not match.</p>
-            }
-          </div>
+            <button hlmBtn type="submit" class="w-full" [disabled]="submitting()">
+              {{ submitting() ? 'Creating account...' : 'Create account' }}
+            </button>
+          </form>
+        </div>
 
-          <button
-            type="submit"
-            [disabled]="submitting()"
-            class="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-          >
-            {{ submitting() ? 'Creating account...' : 'Create account' }}
-          </button>
-        </form>
-
-        <p class="text-center text-sm text-muted-foreground">
-          Already have an account?
-          <a routerLink="/login" class="font-medium text-primary underline-offset-4 hover:underline">
-            Sign in
-          </a>
-        </p>
+        <div hlmCardContent class="pt-0">
+          <hlm-separator />
+          <p class="mt-4 text-center text-sm text-muted-foreground">
+            Already have an account?
+            <a routerLink="/login" class="font-medium text-primary underline-offset-4 hover:underline">
+              Sign in
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   `,
