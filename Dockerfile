@@ -1,5 +1,5 @@
 # Stage 1: Build Angular frontend
-FROM node:22-alpine AS frontend-build
+FROM node:25-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY HomeSuiteHome.WebApp/package.json HomeSuiteHome.WebApp/package-lock.json ./
 RUN npm ci
