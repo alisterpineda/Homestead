@@ -19,6 +19,7 @@ import {
   Download,
   Trash2,
   FileText,
+  FileSearch,
   Pencil,
   Check,
   Tag,
@@ -231,6 +232,18 @@ import { toast } from 'ngx-sonner';
                   </div>
                 </div>
               </ng-template>
+              <ng-template appTabDef="text" label="Text">
+                @if (document()!.extractedText) {
+                  <div class="max-h-96 overflow-y-auto rounded-lg border border-border bg-muted p-4">
+                    <pre class="whitespace-pre-wrap text-sm text-foreground">{{ document()!.extractedText }}</pre>
+                  </div>
+                } @else {
+                  <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+                    <lucide-icon [img]="icons.fileSearch" [size]="48" [strokeWidth]="1" />
+                    <span class="text-sm">No extracted text available</span>
+                  </div>
+                }
+              </ng-template>
             </app-tabs>
           </div>
         </div>
@@ -252,7 +265,7 @@ export class DocumentDetailPanelComponent implements OnDestroy {
   loading = signal(false);
   private refreshTrigger = signal(0);
 
-  icons = { x: X, download: Download, trash: Trash2, fileText: FileText, pencil: Pencil, check: Check, tag: Tag, calendar: Calendar, hardDrive: HardDrive, fileType: FileType, users: Users };
+  icons = { x: X, download: Download, trash: Trash2, fileText: FileText, fileSearch: FileSearch, pencil: Pencil, check: Check, tag: Tag, calendar: Calendar, hardDrive: HardDrive, fileType: FileType, users: Users };
   formatBytes = formatBytes;
 
   private http = inject(HttpClient);
