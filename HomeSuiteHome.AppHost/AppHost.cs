@@ -16,4 +16,9 @@ builder.AddJavaScriptApp("homesuitehome-webapp", "../HomeSuiteHome.WebApp", "sta
     .WithHttpEndpoint(port: 4200, env: "PORT")
     .WaitFor(webapi);
 
+builder.AddJavaScriptApp("homesuitehome-webapp2", "../HomeSuiteHome.WebApp2", "start")
+    .WithReference(webapi)
+    .WithHttpEndpoint(port: 4201, env: "PORT")
+    .WaitFor(webapi);
+
 builder.Build().Run();
