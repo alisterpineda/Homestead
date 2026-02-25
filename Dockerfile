@@ -14,7 +14,7 @@ COPY HomeSuiteHome.ServiceDefaults/HomeSuiteHome.ServiceDefaults.csproj HomeSuit
 RUN dotnet restore HomeSuiteHome.WebApi/HomeSuiteHome.WebApi.csproj
 COPY HomeSuiteHome.WebApi/ HomeSuiteHome.WebApi/
 COPY HomeSuiteHome.ServiceDefaults/ HomeSuiteHome.ServiceDefaults/
-RUN dotnet publish HomeSuiteHome.WebApi/HomeSuiteHome.WebApi.csproj -c Release -o /app/publish
+RUN dotnet publish HomeSuiteHome.WebApi/HomeSuiteHome.WebApi.csproj -c Release -o /app/publish -p:OpenApiGenerateDocuments=false
 
 # Stage 3: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
