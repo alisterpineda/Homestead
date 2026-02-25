@@ -42,6 +42,7 @@ import { getDocument } from '@/api/generated/fn/documents/get-document';
 import { updateDocument } from '@/api/generated/fn/documents/update-document';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-document-detail-panel',
@@ -365,9 +366,11 @@ export class DocumentDetailPanelComponent implements OnDestroy {
         this.editing.set(false);
         this.refreshList.emit();
         this.refreshTrigger.update((v) => v + 1);
+        toast.success('Document updated.');
       },
       error: () => {
         this.saving.set(false);
+        toast.error('Failed to save changes.');
       },
     });
   }
@@ -391,9 +394,11 @@ export class DocumentDetailPanelComponent implements OnDestroy {
         this.deleting.set(false);
         this.refreshList.emit();
         this.closed.emit();
+        toast.success('Document deleted.');
       },
       error: () => {
         this.deleting.set(false);
+        toast.error('Failed to delete document.');
       },
     });
   }

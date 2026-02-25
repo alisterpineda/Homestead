@@ -1,64 +1,50 @@
-using System.Security.Cryptography;
 using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Domains.Documents;
 using HomeSuiteHome.WebApi.Domains.Processing;
-using HomeSuiteHome.WebApi.Persistence;
+using HomeSuiteHome.WebApi.Features.Documents.Processing;
 using HomeSuiteHome.WebApi.Processing;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue)
+public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue)
     : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
     public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
     {
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);
-        var documentId = Guid.NewGuid();
+        var uploadId = Guid.NewGuid();
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
-        var uploadsDir = Path.Combine(mediaPath, Document.FilesSubroot);
+        var uploadsDir = Path.Combine(mediaPath, Document.UploadsSubroot);
         Directory.CreateDirectory(uploadsDir);
 
-        var physicalPath = Path.Combine(uploadsDir, $"{documentId}{extension}");
+        var stagingPath = Path.Combine(uploadsDir, $"{uploadId}{extension}");
 
-        string fileHash;
-        await using (var stream = new FileStream(physicalPath, FileMode.Create))
+        await using (var stream = new FileStream(stagingPath, FileMode.Create))
         {
             await file.CopyToAsync(stream, ct);
-
-            stream.Position = 0;
-            var hashBytes = await SHA256.HashDataAsync(stream, ct);
-            fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
         var userId = currentUser.User?.Id;
 
-        var document = new Document
-        {
-            Id = documentId,
-            Name = request.Name ?? file.FileName,
-            ContentType = file.ContentType,
-            FileSize = file.Length,
-            FilePath = Document.GetFilePath(documentId, extension),
-            FileHash = fileHash,
-            CreatedAt = DateTimeOffset.UtcNow,
-            CreatedByUserId = userId,
-            OwnerUserId = userId
-        };
+        var payload = new UploadDocumentPayload(
+            uploadId,
+            file.FileName,
+            request.Name,
+            file.ContentType,
+            file.Length,
+            extension);
 
-        db.Documents.Add(document);
-        await db.SaveChangesAsync(ct);
-
-        await jobQueue.EnqueueAsync(ProcessingJobType.DocumentProcess, opts =>
+        var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.UploadDocument, opts =>
         {
             opts.EntityType = ProcessingEntityType.Document;
-            opts.EntityId = document.Id;
             opts.CreatedByUserId = userId;
+            opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);
 
-        return new CreateDocumentResponse { DocumentId = document.Id };
+        return new CreateDocumentResponse { JobId = jobId };
     }
 }

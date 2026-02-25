@@ -10,10 +10,10 @@ public class CreateDocumentEndpoint
         {
             var request = new CreateDocumentRequest { Name = name, File = file };
             var response = await handler.HandleAsync(request, ct);
-            return Results.Created($"/api/v1/documents/{response.DocumentId}", response);
+            return Results.Accepted(null, response);
         })
         .WithName("CreateDocument")
-        .Produces<CreateDocumentResponse>(StatusCodes.Status201Created)
+        .Produces<CreateDocumentResponse>(StatusCodes.Status202Accepted)
         .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data");
     }

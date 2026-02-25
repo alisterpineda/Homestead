@@ -1,8 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { LucideAngularModule } from 'lucide-angular';
 import { FileText, Plus } from 'lucide-angular';
 import { PageHeaderComponent } from '@/shared/components/ui/page-header/page-header.component';
@@ -91,7 +92,7 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
     </div>
   `,
 })
-export class DocumentListComponent {
+export class DocumentListComponent implements OnDestroy {
   fileTextIcon = FileText;
   plusIcon = Plus;
 
@@ -104,6 +105,18 @@ export class DocumentListComponent {
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private processingHub = inject(ProcessingHubService);
+  private hubSub: Subscription;
+
+  constructor() {
+    this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
+      this.refreshTrigger.update((v) => v + 1);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.hubSub.unsubscribe();
+  }
 
   private page = toSignal(
     this.route.queryParamMap.pipe(map((params) => +(params.get('page') ?? 1))),

@@ -6,6 +6,7 @@ import { LucideAngularModule } from 'lucide-angular';
 import { Menu } from 'lucide-angular';
 import { SidebarComponent } from '../sidebar/sidebar.component';
 import { SidebarService } from '@/shared/services/sidebar.service';
+import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { getModuleByPath } from '@/modules/registry';
 
 @Component({
@@ -45,6 +46,11 @@ export class AppShellComponent {
   menuIcon = Menu;
   sidebar = inject(SidebarService);
   private router = inject(Router);
+  private processingHub = inject(ProcessingHubService);
+
+  constructor() {
+    this.processingHub.connect();
+  }
 
   private url = toSignal(
     this.router.events.pipe(

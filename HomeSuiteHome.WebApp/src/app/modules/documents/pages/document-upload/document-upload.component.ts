@@ -7,7 +7,8 @@ import { InputComponent } from '@/shared/components/ui/input/input.component';
 import { ButtonComponent } from '@/shared/components/ui/button/button.component';
 import { UploadDropzoneComponent } from '../../components/upload-dropzone/upload-dropzone.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createDocument } from '@/api/generated/fn/documents/create-document';
+import { ProcessingHubService } from '@/shared/services/processing-hub.service';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-document-upload',
@@ -60,6 +61,7 @@ export class DocumentUploadComponent {
   router = inject(Router);
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
+  private processingHub = inject(ProcessingHubService);
 
   handleSubmit(event: Event): void {
     event.preventDefault();
@@ -76,17 +78,20 @@ export class DocumentUploadComponent {
       formData.append('name', nameVal);
     }
 
-    // Use HttpClient directly for FormData upload since the generated function
-    // expects an IFormFile type which doesn't map well for browser FormData
-    this.http.post(`${this.apiConfig.rootUrl}/api/v1/documents`, formData).subscribe({
-      next: () => {
-        this.uploading.set(false);
-        this.router.navigate(['/documents']);
-      },
-      error: () => {
-        this.uploading.set(false);
-        this.uploadError.set(true);
-      },
-    });
+    this.http
+      .post<{ jobId: string }>(`${this.apiConfig.rootUrl}/api/v1/documents`, formData)
+      .subscribe({
+        next: (response) => {
+          this.uploading.set(false);
+          const toastId = toast.loading('Document uploaded. Processing...');
+          this.processingHub.trackJob(response.jobId, toastId);
+          this.router.navigate(['/documents']);
+        },
+        error: () => {
+          this.uploading.set(false);
+          this.uploadError.set(true);
+          toast.error('Upload failed. Please try again.');
+        },
+      });
   }
 }

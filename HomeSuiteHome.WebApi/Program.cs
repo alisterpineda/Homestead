@@ -6,6 +6,7 @@ using HomeSuiteHome.WebApi.Features.Auth;
 using HomeSuiteHome.WebApi.Features.Processing;
 using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Processing;
+using HomeSuiteHome.WebApi.Processing.Hubs;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -66,6 +67,8 @@ if (!string.IsNullOrEmpty(connectionString))
 // Add services to the container.
 
 builder.AddAppAuthentication();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddHandlers();
 builder.Services.AddProcessing();
 
@@ -148,6 +151,8 @@ if (!string.IsNullOrEmpty(connectionString))
 {
     app.UseMiddleware<UserProvisioningMiddleware>();
 }
+
+app.MapHub<ProcessingHub>("/hubs/processing");
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapAuthEndpoints();

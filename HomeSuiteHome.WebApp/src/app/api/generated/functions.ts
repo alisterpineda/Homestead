@@ -31,3 +31,7 @@ export type { CreateTag$Params as CreateTag$Params } from './fn/tags/create-tag'
 export { createTag as createTag } from './fn/tags/create-tag';
 export type { DeleteTag$Params as DeleteTag$Params } from './fn/tags/delete-tag';
 export { deleteTag as deleteTag } from './fn/tags/delete-tag';
+export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
+export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
+export type { RetriggerProcessingJob$Params as RetriggerProcessingJob$Params } from './fn/processing/retrigger-processing-job';
+export { retriggerProcessingJob as retriggerProcessingJob } from './fn/processing/retrigger-processing-job';

@@ -114,12 +114,21 @@ public class JobProcessorService(
                 await using var errorScope = scopeFactory.CreateAsyncScope();
                 var errorDb = errorScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-                await errorDb.ProcessingJobs
-                    .Where(j => j.Id == jobId)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(j => j.Status, ProcessingJobStatus.Failed)
-                        .SetProperty(j => j.Error, ex.Message)
-                        .SetProperty(j => j.CompletedAt, DateTimeOffset.UtcNow), ct);
+                var failedJob = await errorDb.ProcessingJobs.FirstOrDefaultAsync(j => j.Id == jobId, ct);
+                if (failedJob is not null)
+                {
+                    failedJob.Status = ProcessingJobStatus.Failed;
+                    failedJob.Error = ex.Message;
+                    failedJob.CompletedAt = DateTimeOffset.UtcNow;
+                    await errorDb.SaveChangesAsync(ct);
+
+                    var notifier = errorScope.ServiceProvider.GetRequiredService<IProcessingNotifier>();
+                    await notifier.NotifyJobStatusAsync(
+                        failedJob.Id, ProcessingJobStatus.Failed,
+                        failedJob.EntityType, failedJob.EntityId,
+                        documentName: null, error: ex.Message,
+                        failedJob.CreatedByUserId, ct);
+                }
             }
             catch (Exception innerEx)
             {

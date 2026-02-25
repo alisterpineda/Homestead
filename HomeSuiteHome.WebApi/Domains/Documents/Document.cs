@@ -7,6 +7,7 @@ namespace HomeSuiteHome.WebApi.Domains.Documents;
 public class Document
 {
     public const string FilesSubroot = "documents/files";
+    public const string UploadsSubroot = "documents/uploads";
 
     public static string GetFilePath(Guid id, string extension)
         => Path.Combine(FilesSubroot, $"{id}{extension}");

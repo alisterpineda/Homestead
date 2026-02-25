@@ -10,4 +10,11 @@ module.exports = [
     secure: false,
     changeOrigin: true,
   },
+  {
+    context: ["/hubs"],
+    target,
+    secure: false,
+    changeOrigin: true,
+    ws: true,
+  },
 ];
