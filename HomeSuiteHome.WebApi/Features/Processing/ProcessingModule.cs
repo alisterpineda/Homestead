@@ -12,7 +12,8 @@ public static class ProcessingModule
         var v1 = app.MapGroup("/api/v{version:apiVersion}/processing/jobs")
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
-            .WithTags("Processing");
+            .WithTags("Processing")
+            .RequireAuthorization();
 
         GetProcessingJobsEndpoint.Map(v1);
         RetriggerProcessingJobEndpoint.Map(v1);

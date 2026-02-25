@@ -13,7 +13,8 @@ public static class TagsModule
         var v1 = app.MapGroup("/api/v{version:apiVersion}/tags")
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
-            .WithTags("Tags");
+            .WithTags("Tags")
+            .RequireAuthorization();
 
         CreateTagEndpoint.Map(v1);
         DeleteTagEndpoint.Map(v1);

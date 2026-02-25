@@ -125,7 +125,7 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHub<ProcessingHub>("/hubs/processing");
+app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization();
 
 // Identity API endpoints under /api/auth
 var authGroup = app.MapGroup("/api/auth");

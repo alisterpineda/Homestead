@@ -23,7 +23,7 @@ Uses ASP.NET Core Identity with cookie-based auth:
 - Custom endpoints: `/api/auth/custom-register` (accepts displayName), `/api/auth/logout`, `/api/auth/user-info`
 - Cookie configured with `HttpOnly`, `SameSite=Strict`, 14-day sliding expiration
 - SPA-friendly: returns 401/403 status codes instead of redirects
-- Fallback authorization policy requires authentication on all endpoints unless `.AllowAnonymous()` is used
+- Protected endpoints use explicit `.RequireAuthorization()` (on modules, hub, and custom auth endpoints)
 - `ICurrentUserAccessor.UserId` reads `ClaimTypes.NameIdentifier` from the cookie claims
 - All Identity tables are in the `identity` schema (configured in `Persistence/Configurations/IdentitySchemaConfiguration.cs`)
 

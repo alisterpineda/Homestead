@@ -50,9 +50,7 @@ public static class AuthenticationExtensions
             };
         });
 
-        builder.Services.AddAuthorizationBuilder()
-            .AddFallbackPolicy("authenticated", policy =>
-                policy.RequireAuthenticatedUser());
+        builder.Services.AddAuthorization();
 
         builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 

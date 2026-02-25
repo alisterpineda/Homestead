@@ -21,7 +21,8 @@ public static class DocumentsModule
         var v1 = app.MapGroup("/api/v{version:apiVersion}/documents")
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
-            .WithTags("Documents");
+            .WithTags("Documents")
+            .RequireAuthorization();
 
         CreateDocumentEndpoint.Map(v1);
         DeleteDocumentEndpoint.Map(v1);
