@@ -2,11 +2,13 @@ using System.Security.Cryptography;
 using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Domains.Documents;
+using HomeSuiteHome.WebApi.Domains.Processing;
 using HomeSuiteHome.WebApi.Persistence;
+using HomeSuiteHome.WebApi.Processing;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser)
+public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue)
     : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
     public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
@@ -49,6 +51,13 @@ public class CreateDocumentHandler(AppDbContext db, IConfiguration configuration
 
         db.Documents.Add(document);
         await db.SaveChangesAsync(ct);
+
+        await jobQueue.EnqueueAsync(ProcessingJobType.DocumentProcess, opts =>
+        {
+            opts.EntityType = ProcessingEntityType.Document;
+            opts.EntityId = document.Id;
+            opts.CreatedByUserId = userId;
+        }, ct);
 
         return new CreateDocumentResponse { DocumentId = document.Id };
     }

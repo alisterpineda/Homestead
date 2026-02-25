@@ -3,7 +3,9 @@ using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
 using HomeSuiteHome.WebApi.Features.Documents;
 using HomeSuiteHome.WebApi.Features.Auth;
+using HomeSuiteHome.WebApi.Features.Processing;
 using HomeSuiteHome.WebApi.Features.Tags;
+using HomeSuiteHome.WebApi.Processing;
 using HomeSuiteHome.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -65,6 +67,7 @@ if (!string.IsNullOrEmpty(connectionString))
 
 builder.AddAppAuthentication();
 builder.Services.AddHandlers();
+builder.Services.AddProcessing();
 
 builder.Services.AddApiVersioning(options =>
 {
@@ -150,6 +153,7 @@ var versionedApi = app.NewVersionedApi();
 versionedApi.MapAuthEndpoints();
 versionedApi.MapDocumentsEndpoints();
 versionedApi.MapTagsEndpoints();
+versionedApi.MapProcessingEndpoints();
 
 if (!string.IsNullOrEmpty(connectionString))
 {

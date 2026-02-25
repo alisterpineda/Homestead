@@ -1,6 +1,7 @@
 using HomeSuiteHome.WebApi.Domains.Documents;
 using HomeSuiteHome.WebApi.Domains.Identity;
 using HomeSuiteHome.WebApi.Domains.Parties;
+using HomeSuiteHome.WebApi.Domains.Processing;
 using HomeSuiteHome.WebApi.Domains.Tags;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Party> Parties { get; set; }
     public DbSet<DocumentParty> DocumentParties { get; set; }
     public DbSet<AppUser> AppUsers { get; set; }
+    public DbSet<ProcessingJob> ProcessingJobs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
