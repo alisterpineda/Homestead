@@ -1,20 +1,18 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { OAuthService } from 'angular-oauth2-oidc';
+import { Router } from '@angular/router';
+import { tap } from 'rxjs';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!req.url.startsWith('/api') || req.url.startsWith('/api/v1/auth/config')) {
-    return next(req);
-  }
+  const router = inject(Router);
 
-  const oauthService = inject(OAuthService);
-  const token = oauthService.getAccessToken();
-
-  if (token) {
-    req = req.clone({
-      setHeaders: { Authorization: `Bearer ${token}` },
-    });
-  }
-
-  return next(req);
+  return next(req).pipe(
+    tap({
+      error: (err) => {
+        if (err.status === 401 && !req.url.includes('/api/auth/')) {
+          router.navigate(['/login']);
+        }
+      },
+    }),
+  );
 };

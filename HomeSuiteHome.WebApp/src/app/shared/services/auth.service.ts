@@ -1,62 +1,68 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { OAuthService, AuthConfig } from 'angular-oauth2-oidc';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-interface AuthConfigResponse {
-  authority: string;
-  clientId: string;
+interface UserInfo {
+  id: string;
+  email: string;
+  displayName: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
-  private oauthService = inject(OAuthService);
+  private router = inject(Router);
 
   readonly initialized = signal(false);
   readonly isAuthenticated = signal(false);
-
-  readonly userName = computed(() => {
-    const claims = this.oauthService.getIdentityClaims();
-    return (claims?.['preferred_username'] as string) ??
-      (claims?.['name'] as string) ?? '';
-  });
-
-  readonly userEmail = computed(() => {
-    const claims = this.oauthService.getIdentityClaims();
-    return (claims?.['email'] as string) ?? '';
-  });
+  readonly userName = signal('');
+  readonly userEmail = signal('');
 
   async initialize(): Promise<void> {
-    const config = await firstValueFrom(
-      this.http.get<AuthConfigResponse>('/api/v1/auth/config'),
-    );
-
-    const authConfig: AuthConfig = {
-      issuer: config.authority,
-      clientId: config.clientId,
-      redirectUri: window.location.origin,
-      responseType: 'code',
-      scope: 'openid profile email',
-      showDebugInformation: false,
-    };
-
-    this.oauthService.configure(authConfig);
-
-    await this.oauthService.loadDiscoveryDocumentAndTryLogin();
-
-    if (this.oauthService.hasValidAccessToken()) {
-      this.isAuthenticated.set(true);
+    try {
+      const user = await firstValueFrom(
+        this.http.get<UserInfo>('/api/auth/user-info'),
+      );
+      this.setUser(user);
+    } catch {
+      // Not authenticated — that's fine
+    } finally {
       this.initialized.set(true);
-      this.oauthService.setupAutomaticSilentRefresh();
-    } else {
-      this.oauthService.initCodeFlow();
-      // Return a never-resolving promise so the app doesn't render before redirect
-      return new Promise<void>(() => {});
     }
   }
 
-  logout(): void {
-    this.oauthService.logOut();
+  async login(email: string, password: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post('/api/auth/login?useCookies=true', { email, password }),
+    );
+    const user = await firstValueFrom(
+      this.http.get<UserInfo>('/api/auth/user-info'),
+    );
+    this.setUser(user);
+  }
+
+  async register(email: string, displayName: string, password: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post('/api/auth/custom-register', { email, displayName, password }),
+    );
+    const user = await firstValueFrom(
+      this.http.get<UserInfo>('/api/auth/user-info'),
+    );
+    this.setUser(user);
+  }
+
+  async logout(): Promise<void> {
+    await firstValueFrom(this.http.post('/api/auth/logout', {}));
+    this.isAuthenticated.set(false);
+    this.userName.set('');
+    this.userEmail.set('');
+    this.router.navigate(['/login']);
+  }
+
+  private setUser(user: UserInfo): void {
+    this.isAuthenticated.set(true);
+    this.userName.set(user.displayName || user.email);
+    this.userEmail.set(user.email);
   }
 }

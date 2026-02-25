@@ -92,14 +92,14 @@ public class UpdateDocumentHandler(AppDbContext db)
         string? ownerUserName = null;
         if (document.CreatedByUserId.HasValue)
         {
-            createdByUserName = await db.AppUsers
+            createdByUserName = await db.Users
                 .Where(u => u.Id == document.CreatedByUserId)
                 .Select(u => u.DisplayName)
                 .FirstOrDefaultAsync(ct);
         }
         if (document.OwnerUserId.HasValue)
         {
-            ownerUserName = await db.AppUsers
+            ownerUserName = await db.Users
                 .Where(u => u.Id == document.OwnerUserId)
                 .Select(u => u.DisplayName)
                 .FirstOrDefaultAsync(ct);

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HomeSuiteHome is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL.
+HomeSuiteHome is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL. Authentication is handled by ASP.NET Core Identity with cookie-based auth (no external identity provider).
 
 ## Project Structure
 
@@ -21,11 +21,11 @@ HomeSuiteHome is a full-stack document management application with a .NET 10 bac
 cd HomeSuiteHome.AppHost && dotnet run
 ```
 
-This starts PostgreSQL (with pgWeb admin UI), the WebApi, and the Angular dev server via Aspire.
+This starts PostgreSQL (with pgWeb admin UI), the WebApi, and the Angular dev server via Aspire. No external identity provider is needed.
 
 ## Aspire Orchestration
 
-`HomeSuiteHome.AppHost` orchestrates all services. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.
+`HomeSuiteHome.AppHost` orchestrates all services: PostgreSQL, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.
 
 ## Syncing Frontend with Backend API Changes
 

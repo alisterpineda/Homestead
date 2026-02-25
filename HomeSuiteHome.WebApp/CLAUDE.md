@@ -15,7 +15,9 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 ## Architecture
 
 - **Modules** (`src/app/modules/`): Self-contained feature areas (documents, admin) each with pages, components, routes, and sidebar config. Registered in `modules/registry.ts`
-- **Routing**: Angular Router with lazy-loaded feature routes defined in `app.routes.ts`. Each module has its own `*.routes.ts` file
+- **Routing**: Angular Router with lazy-loaded feature routes defined in `app.routes.ts`. Each module has its own `*.routes.ts` file. `/login` and `/register` are public routes; the `AppShellComponent` route is protected by `authGuard`
+- **Authentication**: Cookie-based via ASP.NET Core Identity. `AuthService` (`shared/services/auth.service.ts`) manages login/register/logout and exposes `isAuthenticated`, `userName`, `userEmail` signals. `authGuard` (`shared/guards/auth.guard.ts`) protects routes. The auth interceptor redirects to `/login` on 401 responses. No Bearer tokens — cookies are sent automatically for same-origin requests
+- **Auth pages**: Login (`shared/components/auth/login/`) and Register (`shared/components/auth/register/`) are standalone lazy-loaded components
 - **API layer**: ng-openapi-gen generates Angular services and TypeScript models from the backend OpenAPI spec. Config in `ng-openapi-gen.json`, output in `src/app/api/generated/`
 - **Shared**: `src/app/shared/components/ui/` for base components, `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
 - **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations

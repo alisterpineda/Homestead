@@ -1,8 +1,15 @@
-using HomeSuiteHome.WebApi.Domains.Identity;
+using System.Security.Claims;
 
 namespace HomeSuiteHome.WebApi.Authentication;
 
-public class CurrentUserAccessor : ICurrentUserAccessor
+public class CurrentUserAccessor(IHttpContextAccessor httpContextAccessor) : ICurrentUserAccessor
 {
-    public AppUser? User { get; set; }
+    public Guid? UserId
+    {
+        get
+        {
+            var value = httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return Guid.TryParse(value, out var id) ? id : null;
+        }
+    }
 }

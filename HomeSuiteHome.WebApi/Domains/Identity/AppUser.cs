@@ -1,10 +1,9 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace HomeSuiteHome.WebApi.Domains.Identity;
 
-public class AppUser
+public class AppUser : IdentityUser<Guid>
 {
-    public Guid Id { get; set; }
-    public required string ExternalSubject { get; set; }
-    public required string DisplayName { get; set; }
-    public required string Email { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
 }

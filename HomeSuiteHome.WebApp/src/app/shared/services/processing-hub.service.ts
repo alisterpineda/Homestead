@@ -1,5 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { OAuthService } from 'angular-oauth2-oidc';
+import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { toast } from 'ngx-sonner';
@@ -15,7 +14,6 @@ export interface JobStatusChangedMessage {
 
 @Injectable({ providedIn: 'root' })
 export class ProcessingHubService {
-  private oauthService = inject(OAuthService);
   private connection: HubConnection | null = null;
   private trackedToasts = new Map<string, string | number>();
 
@@ -33,9 +31,7 @@ export class ProcessingHubService {
     if (this.connection) return;
 
     this.connection = new HubConnectionBuilder()
-      .withUrl('/hubs/processing', {
-        accessTokenFactory: () => this.oauthService.getAccessToken(),
-      })
+      .withUrl('/hubs/processing')
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();

@@ -28,7 +28,7 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
             await file.CopyToAsync(stream, ct);
         }
 
-        var userId = currentUser.User?.Id;
+        var userId = currentUser.UserId;
 
         var payload = new UploadDocumentPayload(
             uploadId,

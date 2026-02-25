@@ -1,14 +1,16 @@
+using System.Security.Claims;
 using Asp.Versioning;
 using HomeSuiteHome.WebApi.Authentication;
 using HomeSuiteHome.WebApi.Common;
+using HomeSuiteHome.WebApi.Domains.Identity;
 using HomeSuiteHome.WebApi.Features.Documents;
-using HomeSuiteHome.WebApi.Features.Auth;
 using HomeSuiteHome.WebApi.Features.Processing;
 using HomeSuiteHome.WebApi.Features.Tags;
 using HomeSuiteHome.WebApi.Processing;
 using HomeSuiteHome.WebApi.Processing.Hubs;
 using HomeSuiteHome.WebApi.Persistence;
 using HomeSuiteHome.WebApi.TextExtraction;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -32,31 +34,6 @@ if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")
             $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword}";
     }
 }
-
-// Map OIDC env vars into Auth config (only if set)
-var oidcIssuer = Environment.GetEnvironmentVariable("OIDC_ISSUER");
-if (!string.IsNullOrEmpty(oidcIssuer))
-    builder.Configuration["Auth:Authority"] = oidcIssuer;
-
-var oidcClientId = Environment.GetEnvironmentVariable("OIDC_CLIENT_ID");
-if (!string.IsNullOrEmpty(oidcClientId))
-    builder.Configuration["Auth:Audience"] = oidcClientId;
-
-var oidcClaimSubject = Environment.GetEnvironmentVariable("OIDC_CLAIM_SUBJECT");
-if (!string.IsNullOrEmpty(oidcClaimSubject))
-    builder.Configuration["Auth:ClaimMappings:Subject"] = oidcClaimSubject;
-
-var oidcClaimEmail = Environment.GetEnvironmentVariable("OIDC_CLAIM_EMAIL");
-if (!string.IsNullOrEmpty(oidcClaimEmail))
-    builder.Configuration["Auth:ClaimMappings:Email"] = oidcClaimEmail;
-
-var oidcClaimName = Environment.GetEnvironmentVariable("OIDC_CLAIM_NAME");
-if (!string.IsNullOrEmpty(oidcClaimName))
-    builder.Configuration["Auth:ClaimMappings:Name"] = oidcClaimName;
-
-var oidcClaimRoles = Environment.GetEnvironmentVariable("OIDC_CLAIM_ROLES");
-if (!string.IsNullOrEmpty(oidcClaimRoles))
-    builder.Configuration["Auth:ClaimMappings:Roles"] = oidcClaimRoles;
 
 var connectionString = builder.Configuration.GetConnectionString("postgresdb");
 
@@ -116,13 +93,12 @@ builder.Services.AddOpenApi("v1", options =>
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes = new Dictionary<string, IOpenApiSecurityScheme>
         {
-            ["Bearer"] = new OpenApiSecurityScheme
+            ["CookieAuth"] = new OpenApiSecurityScheme
             {
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                In = ParameterLocation.Header,
-                BearerFormat = "JWT",
-                Description = "JWT Bearer token from the identity provider"
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Cookie,
+                Name = ".AspNetCore.Identity.Application",
+                Description = "ASP.NET Core Identity authentication cookie"
             }
         };
 
@@ -131,7 +107,7 @@ builder.Services.AddOpenApi("v1", options =>
             operation.Value.Security ??= [];
             operation.Value.Security.Add(new OpenApiSecurityRequirement
             {
-                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+                [new OpenApiSecuritySchemeReference("CookieAuth", document)] = []
             });
         }
 
@@ -149,15 +125,65 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (!string.IsNullOrEmpty(connectionString))
-{
-    app.UseMiddleware<UserProvisioningMiddleware>();
-}
-
 app.MapHub<ProcessingHub>("/hubs/processing");
 
+// Identity API endpoints under /api/auth
+var authGroup = app.MapGroup("/api/auth");
+authGroup.MapIdentityApi<AppUser>();
+
+// Custom registration endpoint that accepts displayName
+authGroup.MapPost("/custom-register", async (
+    CustomRegisterRequest request,
+    UserManager<AppUser> userManager,
+    SignInManager<AppUser> signInManager) =>
+{
+    var user = new AppUser
+    {
+        UserName = request.Email,
+        Email = request.Email,
+        DisplayName = request.DisplayName
+    };
+
+    var result = await userManager.CreateAsync(user, request.Password);
+    if (!result.Succeeded)
+    {
+        return Results.ValidationProblem(
+            result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
+    }
+
+    await signInManager.SignInAsync(user, isPersistent: true);
+    return Results.Ok();
+}).AllowAnonymous();
+
+// Logout endpoint
+authGroup.MapPost("/logout", async (SignInManager<AppUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Ok();
+}).RequireAuthorization();
+
+// User info endpoint for the SPA to check session status
+authGroup.MapGet("/user-info", async (
+    HttpContext context,
+    UserManager<AppUser> userManager) =>
+{
+    var user = context.User;
+    if (user.Identity?.IsAuthenticated != true)
+        return Results.Unauthorized();
+
+    var appUser = await userManager.GetUserAsync(user);
+    if (appUser is null)
+        return Results.Unauthorized();
+
+    return Results.Ok(new
+    {
+        id = appUser.Id,
+        email = appUser.Email,
+        displayName = appUser.DisplayName
+    });
+}).RequireAuthorization();
+
 var versionedApi = app.NewVersionedApi();
-versionedApi.MapAuthEndpoints();
 versionedApi.MapDocumentsEndpoints();
 versionedApi.MapTagsEndpoints();
 versionedApi.MapProcessingEndpoints();
@@ -182,3 +208,5 @@ app.UseHttpsRedirection();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
+
+record CustomRegisterRequest(string Email, string DisplayName, string Password);

@@ -19,7 +19,7 @@ public class RetriggerProcessingJobHandler(AppDbContext db, IJobQueue jobQueue, 
         if (existingJob is null)
             return null;
 
-        var userId = currentUser.User?.Id;
+        var userId = currentUser.UserId;
 
         var newJobId = await jobQueue.EnqueueAsync(existingJob.Type, opts =>
         {

@@ -13,6 +13,20 @@ cd HomeSuiteHome.WebApi && dotnet run
 dotnet ef migrations add <MigrationName> --project HomeSuiteHome.WebApi
 ```
 
+## Authentication
+
+Uses ASP.NET Core Identity with cookie-based auth:
+
+- `AppUser` extends `IdentityUser<Guid>` with custom `DisplayName` and `CreatedAt` properties
+- `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
+- Identity API endpoints mapped at `/api/auth` via `MapIdentityApi<AppUser>()`
+- Custom endpoints: `/api/auth/custom-register` (accepts displayName), `/api/auth/logout`, `/api/auth/user-info`
+- Cookie configured with `HttpOnly`, `SameSite=Strict`, 14-day sliding expiration
+- SPA-friendly: returns 401/403 status codes instead of redirects
+- Fallback authorization policy requires authentication on all endpoints unless `.AllowAnonymous()` is used
+- `ICurrentUserAccessor.UserId` reads `ClaimTypes.NameIdentifier` from the cookie claims
+- All Identity tables are in the `identity` schema (configured in `Persistence/Configurations/IdentitySchemaConfiguration.cs`)
+
 ## Architecture: Vertical Slice + CQRS
 
 The WebApi uses vertical slice architecture with CQRS handlers:
