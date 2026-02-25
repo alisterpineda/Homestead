@@ -6,6 +6,7 @@ public static class TextExtractionServiceExtensions
     {
         services.Configure<TesseractOptions>(configuration.GetSection(TesseractOptions.SectionName));
         services.AddSingleton<ITextExtractor, TesseractTextExtractor>();
+        services.AddSingleton<ITextExtractor, PdfTextExtractor>();
 
         return services;
     }
