@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUpload } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { formatBytes } from '@/shared/utils';
 
 @Component({

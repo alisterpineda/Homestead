@@ -1,10 +1,10 @@
 import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { HlmButton } from '@/components/ui/button';
-import { HlmCardImports } from '@/components/ui/card';
-import { HlmInput } from '@/components/ui/input';
-import { HlmLabel } from '@/components/ui/label';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmCardImports } from '@/shared/components/spartan/card';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { UploadDropzoneComponent } from '../../components/upload-dropzone/upload-dropzone.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';

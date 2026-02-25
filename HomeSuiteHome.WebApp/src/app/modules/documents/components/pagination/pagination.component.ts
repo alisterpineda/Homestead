@@ -1,8 +1,8 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronLeft, lucideChevronRight } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
-import { HlmButton } from '@/components/ui/button';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmButton } from '@/shared/components/spartan/button';
 
 @Component({
   selector: 'app-pagination',

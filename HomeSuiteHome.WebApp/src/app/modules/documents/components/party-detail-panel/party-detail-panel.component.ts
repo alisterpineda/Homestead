@@ -21,10 +21,10 @@ import {
   lucideFileText,
   lucideAlignLeft,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
-import { HlmButton } from '@/components/ui/button';
-import { HlmSpinner } from '@/components/ui/spinner';
-import { HlmTabsImports } from '@/components/ui/tabs';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmSpinner } from '@/shared/components/spartan/spinner';
+import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getParty } from '@/api/generated/fn/documents/get-party';
 import { updateParty } from '@/api/generated/fn/documents/update-party';

@@ -28,10 +28,10 @@ import {
   lucideFileType,
   lucideUsers,
 } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
-import { HlmButton } from '@/components/ui/button';
-import { HlmSpinner } from '@/components/ui/spinner';
-import { HlmTabsImports } from '@/components/ui/tabs';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmSpinner } from '@/shared/components/spartan/spinner';
+import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { TagInputComponent } from '../tag-input/tag-input.component';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';

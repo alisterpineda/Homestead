@@ -1,8 +1,8 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSettings } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
-import { HlmEmptyImports } from '@/components/ui/empty';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 
 @Component({
   selector: 'app-admin-index',

@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSun, lucideMoon, lucideMonitor } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { ThemeService, type ThemeMode } from '@/shared/services/theme.service';
 
 const modes: { value: ThemeMode; icon: string; label: string }[] = [

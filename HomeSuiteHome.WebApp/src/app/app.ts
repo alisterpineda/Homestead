@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { HlmToaster } from '@/components/ui/sonner';
+import { HlmToaster } from '@/shared/components/spartan/sonner';
 
 @Component({
   selector: 'app-root',

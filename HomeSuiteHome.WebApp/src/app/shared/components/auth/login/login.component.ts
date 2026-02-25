@@ -2,11 +2,11 @@ import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/cor
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
-import { HlmButton } from '@/components/ui/button';
-import { HlmInput } from '@/components/ui/input';
-import { HlmLabel } from '@/components/ui/label';
-import { HlmCardImports } from '@/components/ui/card';
-import { HlmSeparator } from '@/components/ui/separator';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmCardImports } from '@/shared/components/spartan/card';
+import { HlmSeparator } from '@/shared/components/spartan/separator';
 
 @Component({
   selector: 'app-login',

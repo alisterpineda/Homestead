@@ -2,9 +2,9 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLayoutGrid, lucideSettings, lucideFileText } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
-import { HlmDropdownMenuImports } from '@/components/ui/dropdown-menu';
-import { HlmButton } from '@/components/ui/button';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
+import { HlmButton } from '@/shared/components/spartan/button';
 import { modules } from '@/modules/registry';
 
 @Component({

@@ -25,7 +25,7 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 - **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
 - **Styling**: Tailwind CSS v4 with Spartan.NG OKLCH CSS variable theming (neutral palette)
 
-Generated files (`src/app/api/generated/` and `src/app/components/ui/`) should not be manually edited.
+Generated files (`src/app/api/generated/` and `src/app/shared/components/spartan/`) should not be manually edited.
 
 ---
 
@@ -49,10 +49,10 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 
 ## Spartan.NG Patterns
 
-- Spartan uses **brain** (headless primitives from `@spartan-ng/brain`) + **helm** (styled UI from generated `src/app/components/ui/`)
+- Spartan uses **brain** (headless primitives from `@spartan-ng/brain`) + **helm** (styled UI from generated `src/app/shared/components/spartan/`)
 - Many Spartan UI elements are **directives** applied to native elements (e.g., `hlmBtn` on `<button>`, `hlmInput` on `<input>`, `hlmBadge` on `<span>`)
 - Others are **components** (e.g., `<hlm-card>`, `<hlm-tabs>`, `<hlm-sidebar>`)
-- Always import from the local `@/components/ui/` path aliases, not directly from `@spartan-ng/brain`
+- Always import from the local `@/shared/components/spartan/` path aliases, not directly from `@spartan-ng/brain`
 
 ## Accessibility Requirements
 

@@ -4,19 +4,19 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSettings, lucideFileText, lucideLogOut } from '@ng-icons/lucide';
-import { HlmIconImports } from '@/components/ui/icon';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
   HlmSidebarService,
-} from '@/components/ui/sidebar';
-import { HlmSeparator } from '@/components/ui/separator';
+} from '@/shared/components/spartan/sidebar';
+import { HlmSeparator } from '@/shared/components/spartan/separator';
 import {
   HlmBreadcrumb,
   HlmBreadcrumbList,
   HlmBreadcrumbItem,
   HlmBreadcrumbPage,
-} from '@/components/ui/breadcrumb';
-import { HlmButton } from '@/components/ui/button';
+} from '@/shared/components/spartan/breadcrumb';
+import { HlmButton } from '@/shared/components/spartan/button';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
 import { AuthService } from '@/shared/services/auth.service';

@@ -1,8 +1,8 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
-import { HlmBadge } from '@/components/ui/badge';
-import { HlmIconImports } from '@/components/ui/icon';
+import { HlmBadge } from '@/shared/components/spartan/badge';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 
 @Component({
   selector: 'app-tag-badge',
