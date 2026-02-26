@@ -22,12 +22,6 @@ import { toast } from 'ngx-sonner';
   ],
   template: `
     <div>
-      <!-- Page Header -->
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold tracking-tight text-foreground">Upload Document</h1>
-        <p class="text-sm text-muted-foreground">Upload a new document to the system</p>
-      </div>
-
       <hlm-card class="md:max-w-xl">
         <div hlmCardContent class="pt-6">
           <form (submit)="handleSubmit($event)" class="flex flex-col gap-5">

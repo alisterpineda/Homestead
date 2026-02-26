@@ -11,12 +11,6 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
   providers: [provideIcons({ lucideSettings })],
   template: `
     <div>
-      <!-- Page Header -->
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold tracking-tight text-foreground">Admin</h1>
-        <p class="text-sm text-muted-foreground">System administration and settings</p>
-      </div>
-
       <section hlmEmpty>
         <hlm-empty-media variant="icon">
           <ng-icon hlm name="lucideSettings" size="xl" />

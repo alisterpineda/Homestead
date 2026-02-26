@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy, viewChild, afterNextRender, TemplateRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -12,6 +12,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCardImports } from '@/shared/components/spartan/card';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { PartyTableComponent } from '../../components/party-table/party-table.component';
 import { PartyDetailPanelComponent } from '../../components/party-detail-panel/party-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -38,19 +39,14 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
   ],
   providers: [provideIcons({ lucideUsers, lucidePlus, lucideChevronUp })],
   template: `
-    <div>
-      <!-- Page Header -->
-      <div class="mb-6 flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight text-foreground">Parties</h1>
-          <p class="text-sm text-muted-foreground">Manage parties associated with your documents</p>
-        </div>
-        <button hlmBtn (click)="showCreateForm.set(!showCreateForm())">
-          <ng-icon hlm [name]="showCreateForm() ? 'lucideChevronUp' : 'lucidePlus'" size="sm" />
-          {{ showCreateForm() ? 'Cancel' : 'New Party' }}
-        </button>
-      </div>
+    <ng-template #headerActions>
+      <button hlmBtn size="sm" (click)="showCreateForm.set(!showCreateForm())">
+        <ng-icon hlm [name]="showCreateForm() ? 'lucideChevronUp' : 'lucidePlus'" size="sm" />
+        {{ showCreateForm() ? 'Cancel' : 'New Party' }}
+      </button>
+    </ng-template>
 
+    <div>
       <!-- Create Form -->
       @if (showCreateForm()) {
         <hlm-card class="mb-6">
@@ -161,7 +157,7 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
     </div>
   `,
 })
-export class PartyListComponent {
+export class PartyListComponent implements OnDestroy {
   selectedPartyId = signal<string | null>(null);
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -173,10 +169,25 @@ export class PartyListComponent {
   createDescription = signal('');
   creatingParty = signal(false);
 
+  private headerActionsRef = viewChild<TemplateRef<unknown>>('headerActions');
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private pageHeaderService = inject(PageHeaderService);
+
+  constructor() {
+    afterNextRender(() => {
+      const tpl = this.headerActionsRef();
+      if (tpl) {
+        this.pageHeaderService.setActions(tpl);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.pageHeaderService.clearActions();
+  }
 
   private page = toSignal(
     this.route.queryParamMap.pipe(map((params) => +(params.get('page') ?? 1))),

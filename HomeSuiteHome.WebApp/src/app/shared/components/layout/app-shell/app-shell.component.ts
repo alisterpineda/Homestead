@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
-import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
+import { Router, RouterOutlet, NavigationEnd, NavigationStart, ActivatedRoute } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -10,17 +11,12 @@ import {
   HlmSidebarService,
 } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
-import {
-  HlmBreadcrumb,
-  HlmBreadcrumbList,
-  HlmBreadcrumbItem,
-  HlmBreadcrumbPage,
-} from '@/shared/components/spartan/breadcrumb';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { getModuleByPath, modules } from '@/modules/registry';
 import type { SidebarItem } from '@/shared/types/modules';
 import { RouterLink, RouterLinkActive } from '@angular/router';
@@ -32,14 +28,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
+    NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
     HlmSidebarImports,
     HlmSeparator,
-    HlmBreadcrumb,
-    HlmBreadcrumbList,
-    HlmBreadcrumbItem,
-    HlmBreadcrumbPage,
     HlmButton,
     AppSwitcherComponent,
     ThemeToggleComponent,
@@ -131,15 +124,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <button hlmSidebarTrigger></button>
           <hlm-separator orientation="vertical" class="mr-2 !h-4" />
-          <nav hlmBreadcrumb>
-            <ol hlmBreadcrumbList>
-              <li hlmBreadcrumbItem>
-                @if (activeModule()) {
-                  <span hlmBreadcrumbPage>{{ activeModule()!.label }}</span>
-                }
-              </li>
-            </ol>
-          </nav>
+          <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
+          <div class="ml-auto flex items-center gap-2">
+            @if (headerActions()) {
+              <ng-container *ngTemplateOutlet="headerActions()!" />
+            }
+          </div>
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 md:p-8">
@@ -152,11 +142,20 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class AppShellComponent {
   protected auth = inject(AuthService);
   private router = inject(Router);
+  private activatedRoute = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
   private sidebarService = inject(HlmSidebarService);
+  private pageHeaderService = inject(PageHeaderService);
+
+  headerActions = this.pageHeaderService.actions;
 
   constructor() {
     this.processingHub.connect();
+
+    // Auto-clear header actions on navigation to prevent stale buttons
+    this.router.events
+      .pipe(filter((e) => e instanceof NavigationStart))
+      .subscribe(() => this.pageHeaderService.clearActions());
   }
 
   private url = toSignal(
@@ -168,6 +167,22 @@ export class AppShellComponent {
   );
 
   activeModule = computed(() => getModuleByPath(this.url()));
+
+  pageTitle = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.getDeepestTitle()),
+    ),
+    { initialValue: '' },
+  );
+
+  private getDeepestTitle(): string {
+    let route: ActivatedRoute | null = this.activatedRoute;
+    while (route?.firstChild) {
+      route = route.firstChild;
+    }
+    return (route?.snapshot?.data?.['title'] as string) ?? '';
+  }
 
   protected initials = computed(() => {
     const name = this.auth.userName();
