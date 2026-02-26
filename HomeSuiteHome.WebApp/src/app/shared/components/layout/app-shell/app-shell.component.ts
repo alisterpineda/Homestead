@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideLogOut } from '@ng-icons/lucide';
+import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
@@ -37,7 +37,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut })],
+  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard })],
   template: `
     <div hlmSidebarWrapper>
       <hlm-sidebar variant="inset">
@@ -46,12 +46,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           <div class="flex items-center gap-2">
             <app-switcher />
             @if (activeModule()) {
-              <div class="flex items-center gap-2 overflow-hidden">
-                <ng-icon hlm [name]="activeModule()!.icon" size="sm" class="shrink-0 text-sidebar-foreground/70" />
-                <span class="truncate text-sm font-semibold text-sidebar-foreground">
-                  {{ activeModule()!.label }}
-                </span>
-              </div>
+              <span class="truncate text-sm font-semibold text-sidebar-foreground">
+                {{ activeModule()!.label }}
+              </span>
             }
             <div class="ml-auto">
               <app-theme-toggle />
@@ -62,28 +59,33 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <!-- Sidebar Content -->
         <div hlmSidebarContent>
           @if (activeModule()) {
-            <div hlmSidebarGroup>
-              <div hlmSidebarGroupContent>
-                <ul hlmSidebarMenu>
-                  @for (item of activeModule()!.sidebar; track item.path) {
-                    <li hlmSidebarMenuItem>
-                      <a
-                        hlmSidebarMenuButton
-                        [routerLink]="item.path"
-                        routerLinkActive="true"
-                        [routerLinkActiveOptions]="{ exact: true }"
-                        [isActive]="isItemActive(item)"
-                      >
-                        @if (item.icon) {
-                          <ng-icon hlm [name]="item.icon" size="sm" />
-                        }
-                        <span>{{ item.label }}</span>
-                      </a>
-                    </li>
-                  }
-                </ul>
+            @for (group of activeModule()!.sidebar; track group.label ?? $index) {
+              <div hlmSidebarGroup>
+                @if (group.label) {
+                  <div hlmSidebarGroupLabel>{{ group.label }}</div>
+                }
+                <div hlmSidebarGroupContent>
+                  <ul hlmSidebarMenu>
+                    @for (item of group.items; track item.path) {
+                      <li hlmSidebarMenuItem>
+                        <a
+                          hlmSidebarMenuButton
+                          [routerLink]="item.path"
+                          routerLinkActive="true"
+                          [routerLinkActiveOptions]="{ exact: true }"
+                          [isActive]="isItemActive(item)"
+                        >
+                          @if (item.icon) {
+                            <ng-icon hlm [name]="item.icon" size="sm" />
+                          }
+                          <span>{{ item.label }}</span>
+                        </a>
+                      </li>
+                    }
+                  </ul>
+                </div>
               </div>
-            </div>
+            }
           }
         </div>
 
@@ -210,7 +212,8 @@ export class AppShellComponent {
       const module = this.activeModule();
       if (!module) return true;
       // Check if a more specific sidebar item matches
-      return !module.sidebar.some(
+      const allItems = module.sidebar.flatMap((g) => g.items);
+      return !allItems.some(
         (other) => other.path !== item.path && urlPath.startsWith(other.path),
       );
     }

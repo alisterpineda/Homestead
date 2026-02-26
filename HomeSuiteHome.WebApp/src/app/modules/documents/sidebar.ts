@@ -1,6 +1,11 @@
-import type { SidebarItem } from '@/shared/types/modules';
+import type { SidebarGroup } from '@/shared/types/modules';
 
-export const documentsSidebar: SidebarItem[] = [
-  { label: 'All Documents', path: '/documents' },
-  { label: 'Parties', path: '/documents/parties' },
+export const documentsSidebar: SidebarGroup[] = [
+  {
+    items: [{ label: 'Documents', path: '/documents', icon: 'lucideFileText' }],
+  },
+  {
+    label: 'Manage',
+    items: [{ label: 'Parties', path: '/documents/parties', icon: 'lucideUsers' }],
+  },
 ];

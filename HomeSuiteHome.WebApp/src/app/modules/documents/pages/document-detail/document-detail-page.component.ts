@@ -80,7 +80,7 @@ import { toast } from 'ngx-sonner';
       <nav hlmBreadcrumb>
         <ol hlmBreadcrumbList>
           <li hlmBreadcrumbItem>
-            <a hlmBreadcrumbLink link="/documents">All Documents</a>
+            <a hlmBreadcrumbLink link="/documents">Documents</a>
           </li>
           <li hlmBreadcrumbSeparator></li>
           <li hlmBreadcrumbItem>

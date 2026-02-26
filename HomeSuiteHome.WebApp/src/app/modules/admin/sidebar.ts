@@ -1,3 +1,7 @@
-import type { SidebarItem } from '@/shared/types/modules';
+import type { SidebarGroup } from '@/shared/types/modules';
 
-export const adminSidebar: SidebarItem[] = [{ label: 'Overview', path: '/admin' }];
+export const adminSidebar: SidebarGroup[] = [
+  {
+    items: [{ label: 'Overview', path: '/admin', icon: 'lucideLayoutDashboard' }],
+  },
+];
