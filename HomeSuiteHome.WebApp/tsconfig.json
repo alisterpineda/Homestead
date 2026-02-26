@@ -85,6 +85,9 @@
       ],
       "@/shared/components/spartan/breadcrumb": [
         "./src/app/shared/components/spartan/breadcrumb/src/index.ts"
+      ],
+      "@/shared/components/spartan/dialog": [
+        "./src/app/shared/components/spartan/dialog/src/index.ts"
       ]
     }
   },

@@ -1,18 +1,18 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router, RouterLink, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
 import { DocumentDetailPanelComponent } from '../../components/document-detail-panel/document-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
+import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
@@ -21,15 +21,14 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
   selector: 'app-document-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     NgIcon,
     HlmIconImports,
-    HlmButton,
     HlmSpinner,
     HlmEmptyImports,
     DocumentTableComponent,
     DocumentDetailPanelComponent,
     PaginationComponent,
+    UploadDialogComponent,
   ],
   providers: [provideIcons({ lucideFileText, lucidePlus })],
   template: `
@@ -62,17 +61,17 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
               <h3 hlmEmptyTitle>No documents yet</h3>
               <p hlmEmptyDescription>Upload your first document to get started.</p>
             </div>
-            <a hlmBtn routerLink="/documents/upload">
+            <app-upload-dialog (uploaded)="onRefresh()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               Upload Document
-            </a>
+            </app-upload-dialog>
           </section>
         } @else {
           <div class="flex justify-end mb-4">
-            <a hlmBtn size="sm" routerLink="/documents/upload">
+            <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               Upload
-            </a>
+            </app-upload-dialog>
           </div>
           <app-document-table
             [documents]="result.items"
