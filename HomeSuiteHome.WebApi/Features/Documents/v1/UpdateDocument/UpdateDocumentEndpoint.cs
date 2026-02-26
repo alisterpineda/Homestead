@@ -11,6 +11,9 @@ public static class UpdateDocumentEndpoint
             {
                 Id = id,
                 Name = request.Name,
+                DocumentDate = request.DocumentDate,
+                ValidFrom = request.ValidFrom,
+                ValidUntil = request.ValidUntil,
                 TagPaths = request.TagPaths,
                 PartyIds = request.PartyIds
             };

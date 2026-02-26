@@ -8,6 +8,7 @@ export interface GetDocumentResponse {
   createdAt: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  documentDate?: (string | null);
   extractedText?: (string | null);
   fileExtension: string;
   fileHash: string;
@@ -18,4 +19,6 @@ export interface GetDocumentResponse {
   ownerUserName?: (string | null);
   parties: Array<GetDocumentPartyDto>;
   tags: Array<GetDocumentTagDto>;
+  validFrom?: (string | null);
+  validUntil?: (string | null);
 }

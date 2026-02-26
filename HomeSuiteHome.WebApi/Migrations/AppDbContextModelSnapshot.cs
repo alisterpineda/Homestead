@@ -40,6 +40,9 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DocumentDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ExtractedText")
                         .HasColumnType("text");
 
@@ -66,6 +69,12 @@ namespace HomeSuiteHome.WebApi.Migrations
 
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ValidUntil")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 

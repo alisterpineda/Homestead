@@ -7,6 +7,7 @@ export interface GetDocumentsResponse {
   contentType: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  documentDate?: (string | null);
   fileExtension: string;
   fileSize: (number | string);
   id: string;
@@ -15,4 +16,6 @@ export interface GetDocumentsResponse {
   ownerUserName?: (string | null);
   parties: Array<GetDocumentsPartyDto>;
   tags: Array<GetDocumentsTagDto>;
+  validFrom?: (string | null);
+  validUntil?: (string | null);
 }

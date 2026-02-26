@@ -8,6 +8,7 @@ export interface UpdateDocumentResponse {
   createdAt: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  documentDate?: (string | null);
   fileExtension: string;
   fileHash: string;
   fileSize: (number | string);
@@ -17,4 +18,6 @@ export interface UpdateDocumentResponse {
   ownerUserName?: (string | null);
   parties: Array<PartyDto>;
   tags: Array<TagDto>;
+  validFrom?: (string | null);
+  validUntil?: (string | null);
 }

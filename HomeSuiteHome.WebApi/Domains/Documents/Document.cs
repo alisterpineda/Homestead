@@ -26,6 +26,9 @@ public class Document
     public required string FileHash { get; set; }
     public required string FileExtension { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? DocumentDate { get; set; }
+    public DateTimeOffset? ValidFrom { get; set; }
+    public DateTimeOffset? ValidUntil { get; set; }
     public string? ExtractedText { get; set; }
 
     public Guid? CreatedByUserId { get; set; }

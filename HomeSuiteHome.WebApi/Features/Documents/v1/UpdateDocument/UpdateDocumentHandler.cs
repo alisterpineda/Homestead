@@ -34,6 +34,9 @@ public class UpdateDocumentHandler(AppDbContext db)
         }
 
         document.Name = request.Name;
+        document.DocumentDate = request.DocumentDate;
+        document.ValidFrom = request.ValidFrom;
+        document.ValidUntil = request.ValidUntil;
 
         // Clear existing tag associations
         document.DocumentTags.Clear();
@@ -114,6 +117,9 @@ public class UpdateDocumentHandler(AppDbContext db)
             FileHash = document.FileHash,
             FileExtension = document.FileExtension,
             CreatedAt = document.CreatedAt,
+            DocumentDate = document.DocumentDate,
+            ValidFrom = document.ValidFrom,
+            ValidUntil = document.ValidUntil,
             CreatedByUserId = document.CreatedByUserId,
             CreatedByUserName = createdByUserName,
             OwnerUserId = document.OwnerUserId,
