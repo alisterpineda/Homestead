@@ -148,7 +148,7 @@ import { toast } from 'ngx-sonner';
             <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
           </button>
           <ng-template #moreMenu>
-            <hlm-dropdown-menu>
+            <hlm-dropdown-menu class="w-48">
               <button hlmDropdownMenuItem (triggered)="addRevisionDialog.open()">
                 <ng-icon hlm name="lucideFilePlus2" size="sm" />
                 <span>Add Revision</span>
