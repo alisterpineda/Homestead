@@ -99,12 +99,12 @@ import { toast } from 'ngx-sonner';
           <li hlmBreadcrumbSeparator></li>
           @if (hasMultipleRevisions()) {
             <li hlmBreadcrumbItem class="min-w-0">
-              <a hlmBreadcrumbLink
-                 [link]="['/documents', documentId()]"
+              <button
+                 (click)="navigateToLatestRevision()"
                  [title]="document()?.name ?? 'Document'"
-                 class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
+                 class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px] hover:text-foreground transition-colors">
                 {{ document()?.name ?? 'Document' }}
-              </a>
+              </button>
             </li>
             <li hlmBreadcrumbSeparator></li>
             <li hlmBreadcrumbItem>
@@ -620,6 +620,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   private location = inject(Location);
+
+  navigateToLatestRevision(): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    this.revisionId.set(null);
+    this.location.go(`/documents/${docId}`);
+  }
 
   onRevisionSelected(revisionId: string): void {
     const docId = this.documentId();
