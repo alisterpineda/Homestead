@@ -44,14 +44,14 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     </div>
 
     <!-- Desktop table layout -->
-    <div class="hidden overflow-hidden rounded-lg border border-border md:block">
+    <div class="hidden overflow-x-auto rounded-lg border border-border md:block">
       <table class="w-full text-left text-sm">
         <thead>
           <tr class="border-b border-border bg-muted">
             <th class="px-4 py-3 font-medium text-muted-foreground">Name</th>
             <th class="px-4 py-3 font-medium text-muted-foreground">Tags</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground">Parties</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground">Content Type</th>
+            <th class="hidden xl:table-cell px-4 py-3 font-medium text-muted-foreground">Parties</th>
+            <th class="hidden lg:table-cell px-4 py-3 font-medium text-muted-foreground">Content Type</th>
             <th class="px-4 py-3 font-medium text-muted-foreground text-right">File Size</th>
           </tr>
         </thead>
@@ -74,14 +74,14 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
                   }
                 </div>
               </td>
-              <td class="px-4 py-3">
+              <td class="hidden xl:table-cell px-4 py-3">
                 <div class="flex flex-wrap gap-1">
                   @for (party of doc.parties; track party.id) {
                     <app-party-badge [name]="party.name" />
                   }
                 </div>
               </td>
-              <td class="px-4 py-3 text-muted-foreground">{{ doc.contentType }}</td>
+              <td class="hidden lg:table-cell px-4 py-3 text-muted-foreground">{{ doc.contentType }}</td>
               <td class="px-4 py-3 text-muted-foreground text-right">
                 {{ formatBytes(+doc.fileSize) }}
               </td>
