@@ -27,6 +27,8 @@ export type { ApiAuthLogoutPost$Params as ApiAuthLogoutPost$Params } from './fn/
 export { apiAuthLogoutPost as apiAuthLogoutPost } from './fn/home-suite-home-web-api/api-auth-logout-post';
 export type { ApiAuthUserInfoGet$Params as ApiAuthUserInfoGet$Params } from './fn/home-suite-home-web-api/api-auth-user-info-get';
 export { apiAuthUserInfoGet as apiAuthUserInfoGet } from './fn/home-suite-home-web-api/api-auth-user-info-get';
+export type { BulkDeleteDocuments$Params as BulkDeleteDocuments$Params } from './fn/documents/bulk-delete-documents';
+export { bulkDeleteDocuments as bulkDeleteDocuments } from './fn/documents/bulk-delete-documents';
 export type { GetDocuments$Params as GetDocuments$Params } from './fn/documents/get-documents';
 export { getDocuments as getDocuments } from './fn/documents/get-documents';
 export type { CreateDocument$Params as CreateDocument$Params } from './fn/documents/create-document';

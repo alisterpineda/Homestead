@@ -97,6 +97,12 @@
       ],
       "@/shared/components/spartan/button-group": [
         "./src/app/shared/components/spartan/button-group/src/index.ts"
+      ],
+      "@/shared/components/spartan/checkbox": [
+        "./src/app/shared/components/spartan/checkbox/src/index.ts"
+      ],
+      "@/shared/components/spartan/alert-dialog": [
+        "./src/app/shared/components/spartan/alert-dialog/src/index.ts"
       ]
     }
   },

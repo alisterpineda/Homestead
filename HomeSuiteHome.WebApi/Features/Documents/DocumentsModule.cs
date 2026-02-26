@@ -1,4 +1,5 @@
 using Asp.Versioning.Builder;
+using HomeSuiteHome.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteDocument;
@@ -24,6 +25,7 @@ public static class DocumentsModule
             .WithTags("Documents")
             .RequireAuthorization();
 
+        BulkDeleteDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
         DeleteDocumentEndpoint.Map(v1);
         GetDocumentEndpoint.Map(v1);

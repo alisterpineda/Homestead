@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { formatBytes } from '@/shared/utils';
 import { HlmTableImports } from '@/shared/components/spartan/table';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
@@ -8,12 +9,20 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
 @Component({
   selector: 'app-document-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTableImports, TagBadgeComponent, PartyBadgeComponent],
+  imports: [HlmTableImports, HlmCheckboxImports, TagBadgeComponent, PartyBadgeComponent],
   template: `
     <div hlmTableContainer class="overflow-hidden rounded-md border">
       <table hlmTable>
         <thead hlmTHead>
           <tr hlmTr>
+            <th hlmTh class="w-12">
+              <hlm-checkbox
+                [checked]="allSelected()"
+                [indeterminate]="someSelected()"
+                (checkedChange)="selectAllChange.emit($event)"
+                aria-label="Select all"
+              />
+            </th>
             <th hlmTh>Name</th>
             <th hlmTh>Tags</th>
             <th hlmTh class="hidden xl:table-cell">Parties</th>
@@ -29,7 +38,15 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
               (click)="documentSelect.emit(doc.id)"
               (keydown.enter)="documentSelect.emit(doc.id)"
               class="cursor-pointer"
+              [attr.data-state]="selectedIds()?.has(doc.id) ? 'selected' : undefined"
             >
+              <td hlmTd class="w-12" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+                <hlm-checkbox
+                  [checked]="!!selectedIds()?.has(doc.id)"
+                  (checkedChange)="selectionChange.emit({ id: doc.id, checked: $event })"
+                  [attr.aria-label]="'Select ' + doc.name"
+                />
+              </td>
               <td hlmTd class="font-medium">{{ doc.name }}</td>
               <td hlmTd>
                 <div class="flex flex-wrap gap-1">
@@ -58,7 +75,12 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
 })
 export class DocumentTableComponent {
   documents = input.required<GetDocumentsResponse[]>();
+  selectedIds = input<Set<string>>();
+  allSelected = input(false);
+  someSelected = input(false);
   documentSelect = output<string>();
+  selectionChange = output<{ id: string; checked: boolean }>();
+  selectAllChange = output<boolean>();
 
   formatBytes = formatBytes;
 }
