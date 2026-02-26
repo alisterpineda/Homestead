@@ -4,18 +4,20 @@ import {
   signal,
   inject,
   effect,
+  untracked,
   computed,
   OnDestroy,
   viewChild,
   afterNextRender,
   TemplateRef,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { Location, NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, tap, Subscription } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
@@ -24,7 +26,9 @@ import {
   lucideTrash2,
   lucideSave,
   lucideEllipsisVertical,
+  lucideFilePlus2,
 } from '@ng-icons/lucide';
+import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -32,6 +36,7 @@ import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
+import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -40,12 +45,15 @@ import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
+import { AddRevisionDialogComponent } from '../../components/add-revision-dialog/add-revision-dialog.component';
 import { formatBytes } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
+import { getDocumentRevision } from '@/api/generated/fn/documents/get-document-revision';
 import { updateDocument } from '@/api/generated/fn/documents/update-document';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import type { GetDocumentRevisionResponse } from '@/api/generated/models/get-document-revision-response';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from 'ngx-sonner';
@@ -55,7 +63,9 @@ import { toast } from 'ngx-sonner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
+    FormsModule,
     NgIcon,
+    BrnSelectImports,
     HlmIconImports,
     HlmButton,
     HlmSpinner,
@@ -63,12 +73,14 @@ import { toast } from 'ngx-sonner';
     HlmResizableImports,
     HlmBreadCrumbImports,
     HlmDropdownMenuImports,
+    HlmSelectImports,
     HlmInput,
     HlmFormFieldImports,
     HlmLabel,
     TagInputComponent,
     PartyInputComponent,
     HlmTextareaImports,
+    AddRevisionDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -78,6 +90,7 @@ import { toast } from 'ngx-sonner';
       lucideTrash2,
       lucideSave,
       lucideEllipsisVertical,
+      lucideFilePlus2,
     }),
   ],
   template: `
@@ -88,9 +101,28 @@ import { toast } from 'ngx-sonner';
             <a hlmBreadcrumbLink link="/documents">Documents</a>
           </li>
           <li hlmBreadcrumbSeparator></li>
-          <li hlmBreadcrumbItem>
-            <span hlmBreadcrumbPage>{{ document()?.name ?? 'Document' }}</span>
-          </li>
+          @if (hasMultipleRevisions()) {
+            <li hlmBreadcrumbItem>
+              <a hlmBreadcrumbLink [link]="['/documents', documentId()]">{{ document()?.name ?? 'Document' }}</a>
+            </li>
+            <li hlmBreadcrumbSeparator></li>
+            <li hlmBreadcrumbItem>
+              <brn-select [ngModel]="selectedRevisionValue()" (ngModelChange)="onRevisionSelected($event)" placeholder="Revision">
+                <hlm-select-trigger size="sm" class="h-7 text-xs">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content>
+                  @for (rev of sortedRevisions(); track rev.id) {
+                    <hlm-option [value]="rev.id">{{ revisionLabel(rev) }}</hlm-option>
+                  }
+                </hlm-select-content>
+              </brn-select>
+            </li>
+          } @else {
+            <li hlmBreadcrumbItem>
+              <span hlmBreadcrumbPage>{{ document()?.name ?? 'Document' }}</span>
+            </li>
+          }
         </ol>
       </nav>
     </ng-template>
@@ -117,6 +149,10 @@ import { toast } from 'ngx-sonner';
           </button>
           <ng-template #moreMenu>
             <hlm-dropdown-menu>
+              <button hlmDropdownMenuItem (triggered)="addRevisionDialog.open()">
+                <ng-icon hlm name="lucideFilePlus2" size="sm" />
+                <span>Add Revision</span>
+              </button>
               <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
                 <ng-icon hlm name="lucideTrash2" size="sm" />
                 <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
@@ -126,21 +162,31 @@ import { toast } from 'ngx-sonner';
         </div>
       </div>
 
+      <app-add-revision-dialog
+        #addRevisionDialog
+        [documentId]="doc.id"
+        (revisionCreated)="refreshTrigger.update(v => v + 1)"
+      />
+
       <!-- Shared content templates -->
       <ng-template #previewContent>
-        @if (isPdf()) {
+        @if (isPdf() && safeFileUrl()) {
           <iframe
             [src]="safeFileUrl()"
             class="h-full w-full"
             [title]="'Preview of ' + doc.name"
           ></iframe>
-        } @else if (isImage()) {
+        } @else if (isImage() && fileBlobUrl()) {
           <div class="flex h-full w-full items-center justify-center bg-black">
             <img
               [src]="fileBlobUrl()"
               [alt]="doc.name"
               class="checkerboard max-h-full max-w-full"
             />
+          </div>
+        } @else if (!fileBlobUrl() && (isPdf() || isImage())) {
+          <div class="flex h-full items-center justify-center">
+            <hlm-spinner />
           </div>
         } @else {
           <div
@@ -225,25 +271,25 @@ import { toast } from 'ngx-sonner';
           <div class="space-y-2">
             <label hlmLabel>Size</label>
             <p class="text-sm text-muted-foreground">
-              {{ formatBytes(+doc.fileSize) }}
+              {{ formatBytes(+displayFileSize()) }}
             </p>
           </div>
 
           <!-- Type -->
           <div class="space-y-2">
             <label hlmLabel>Type</label>
-            <p class="text-sm text-muted-foreground">{{ doc.contentType }}</p>
+            <p class="text-sm text-muted-foreground">{{ displayContentType() }}</p>
           </div>
         </div>
       </ng-template>
 
       <ng-template #textContent>
-        @if (doc.extractedText) {
+        @if (displayExtractedText()) {
           <textarea
             hlmTextarea
             readonly
             class="h-full resize-none [field-sizing:fixed] bg-muted"
-            [value]="doc.extractedText"
+            [value]="displayExtractedText()"
           ></textarea>
         } @else {
           <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
@@ -326,7 +372,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
-  private refreshTrigger = signal(0);
+  refreshTrigger = signal(0);
 
   formatBytes = formatBytes;
 
@@ -344,10 +390,12 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
 
-  private documentId = toSignal(
+  documentId = toSignal(
     this.route.paramMap.pipe(map((p) => p.get('id'))),
     { initialValue: null },
   );
+
+  private revisionId = signal<string | null>(this.route.snapshot.paramMap.get('revisionId'));
 
   fileBlobUrl = signal<string | null>(null);
 
@@ -377,22 +425,68 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return false;
   });
 
-  private _fileBlob = toSignal(
-    combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
-      tap(() => this.revokeCurrentBlobUrl()),
-      switchMap(([id]) => {
-        if (!id) return of(null);
-        return this.http
-          .get(`/api/v1/documents/${id}/file`, { responseType: 'blob' })
-          .pipe(
-            map((blob) => URL.createObjectURL(blob)),
-            catchError(() => of(null)),
-          );
-      }),
-      tap((url) => this.fileBlobUrl.set(url)),
-    ),
-    { initialValue: null },
-  );
+  // Revision computed signals
+  sortedRevisions = computed(() => {
+    const doc = this.document();
+    if (!doc?.revisions) return [];
+    return [...doc.revisions].sort((a, b) => +b.revisionNumber - +a.revisionNumber);
+  });
+
+  private latestRevision = computed(() => {
+    const revisions = this.sortedRevisions();
+    return revisions.length > 0 ? revisions[0] : null;
+  });
+
+  activeRevision = computed(() => {
+    const revId = this.revisionId();
+    const doc = this.document();
+    if (!doc?.revisions) return null;
+    if (revId) {
+      return doc.revisions.find((r) => r.id === revId) ?? this.latestRevision();
+    }
+    return this.latestRevision();
+  });
+
+  hasMultipleRevisions = computed(() => {
+    const doc = this.document();
+    return (doc?.revisions?.length ?? 0) >= 2;
+  });
+
+  selectedRevisionValue = computed(() => {
+    return this.revisionId() ?? this.latestRevision()?.id ?? '';
+  });
+
+  // Revision detail (for extractedText of non-latest revisions)
+  private revisionDetail = signal<GetDocumentRevisionResponse | null>(null);
+
+  // Revision-aware display signals
+  displayContentType = computed(() => {
+    const rev = this.activeRevision();
+    return rev?.contentType ?? this.document()?.contentType ?? '';
+  });
+
+  displayFileSize = computed(() => {
+    const rev = this.activeRevision();
+    return rev?.fileSize ?? this.document()?.fileSize ?? 0;
+  });
+
+  displayFileExtension = computed(() => {
+    const rev = this.activeRevision();
+    return rev?.fileExtension ?? this.document()?.fileExtension ?? '';
+  });
+
+  displayExtractedText = computed(() => {
+    const revId = this.revisionId();
+    if (revId) {
+      // Viewing a specific revision — use revision detail's extractedText
+      return this.revisionDetail()?.extractedText ?? null;
+    }
+    // Viewing latest — use document-level extractedText
+    return this.document()?.extractedText ?? null;
+  });
+
+  private fileSub: Subscription | null = null;
+  private revisionDetailSub: Subscription | null = null;
 
   private documentData = toSignal(
     combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
@@ -429,6 +523,60 @@ export class DocumentDetailPageComponent implements OnDestroy {
       }
     });
 
+    // Load file blob reactively — reads all signals atomically
+    effect(() => {
+      const id = this.documentId();
+      const revId = this.revisionId();
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      this.refreshTrigger(); // track refresh trigger
+
+      // untracked: revokeCurrentBlobUrl reads fileBlobUrl — must not become a dependency
+      untracked(() => {
+        this.fileSub?.unsubscribe();
+        this.revokeCurrentBlobUrl();
+      });
+
+      if (!id) return;
+
+      let url = `/api/v1/documents/${id}/file`;
+      if (revId) {
+        url += `?revisionId=${revId}`;
+      }
+
+      this.fileSub = this.http
+        .get(url, { responseType: 'blob' })
+        .pipe(
+          map((blob) => URL.createObjectURL(blob)),
+          catchError(() => of(null)),
+        )
+        .subscribe((blobUrl) => this.fileBlobUrl.set(blobUrl));
+    });
+
+    // Load revision detail when viewing a specific revision
+    effect(() => {
+      const docId = this.documentId();
+      const revId = this.revisionId();
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      this.refreshTrigger();
+
+      this.revisionDetailSub?.unsubscribe();
+
+      if (!docId || !revId) {
+        this.revisionDetail.set(null);
+        return;
+      }
+
+      this.revisionDetailSub = getDocumentRevision(this.http, this.apiConfig.rootUrl, {
+        documentId: docId,
+        id: revId,
+      })
+        .pipe(
+          map((r) => r.body as GetDocumentRevisionResponse),
+          catchError(() => of(null)),
+        )
+        .subscribe((detail) => this.revisionDetail.set(detail));
+    });
+
     afterNextRender(() => {
       const tpl = this.headerTitleRef();
       if (tpl) {
@@ -442,17 +590,39 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.fileSub?.unsubscribe();
+    this.revisionDetailSub?.unsubscribe();
     this.revokeCurrentBlobUrl();
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
   }
 
   isPdf(): boolean {
-    return this.document()?.contentType === 'application/pdf';
+    return this.displayContentType() === 'application/pdf';
   }
 
   isImage(): boolean {
-    return this.document()?.contentType?.startsWith('image/') ?? false;
+    return this.displayContentType()?.startsWith('image/') ?? false;
+  }
+
+  revisionLabel(rev: { revisionNumber: number | string; label?: string | null }): string {
+    const base = `Revision ${rev.revisionNumber}`;
+    return rev.label ? `${base} - ${rev.label}` : base;
+  }
+
+  private location = inject(Location);
+
+  onRevisionSelected(revisionId: string): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    const latest = this.latestRevision();
+    const isLatest = latest && revisionId === latest.id;
+    this.revisionId.set(isLatest ? null : revisionId);
+
+    const path = isLatest
+      ? `/documents/${docId}`
+      : `/documents/${docId}/revisions/${revisionId}`;
+    this.location.go(path);
   }
 
   private revokeCurrentBlobUrl(): void {
@@ -485,7 +655,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (!url || !doc) return;
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${doc.name}${doc.fileExtension}`;
+    a.download = `${doc.name}${this.displayFileExtension()}`;
     a.click();
   }
 
