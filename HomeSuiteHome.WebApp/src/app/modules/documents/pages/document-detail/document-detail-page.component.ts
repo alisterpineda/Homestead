@@ -131,6 +131,14 @@ import { toast } from 'ngx-sonner';
               class="h-full w-full"
               [title]="'Preview of ' + doc.name"
             ></iframe>
+          } @else if (isImage()) {
+            <div class="flex h-full w-full items-center justify-center bg-black">
+              <img
+                [src]="fileBlobUrl()"
+                [alt]="doc.name"
+                class="checkerboard max-h-full max-w-full"
+              />
+            </div>
           } @else {
             <div
               class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
@@ -218,6 +226,18 @@ import { toast } from 'ngx-sonner';
       </div>
     }
   `,
+  styles: [
+    `
+      .checkerboard {
+        background-color: var(--background);
+        background-image: repeating-conic-gradient(
+          var(--muted) 0% 25%,
+          transparent 0% 50%
+        );
+        background-size: 20px 20px;
+      }
+    `,
+  ],
   host: {
     class: 'flex flex-col h-full',
   },
@@ -343,6 +363,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   isPdf(): boolean {
     return this.document()?.contentType === 'application/pdf';
+  }
+
+  isImage(): boolean {
+    return this.document()?.contentType?.startsWith('image/') ?? false;
   }
 
   private revokeCurrentBlobUrl(): void {
