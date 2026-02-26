@@ -22,7 +22,10 @@ public class GetPartyHandler(AppDbContext db)
                 {
                     Id = dp.Document.Id,
                     Name = dp.Document.Name,
-                    ContentType = dp.Document.ContentType
+                    ContentType = dp.Document.Revisions
+                        .OrderByDescending(r => r.RevisionNumber)
+                        .Select(r => r.ContentType)
+                        .FirstOrDefault() ?? ""
                 }).ToList()
             })
             .FirstOrDefaultAsync(ct);

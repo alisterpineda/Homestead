@@ -28,10 +28,6 @@ namespace HomeSuiteHome.WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -42,6 +38,46 @@ namespace HomeSuiteHome.WebApi.Migrations
 
                     b.Property<DateOnly?>("DocumentDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidUntil")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("documents", "documents");
+                });
+
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ExtractedText")
                         .HasColumnType("text");
@@ -63,29 +99,28 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Property<long>("FileSize")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<string>("Label")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
-                    b.Property<Guid?>("OwnerUserId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
-                    b.Property<DateOnly?>("ValidFrom")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ValidUntil")
-                        .HasColumnType("date");
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("DocumentId");
 
                     b.HasIndex("FileHash")
                         .IsUnique();
 
-                    b.HasIndex("OwnerUserId");
+                    b.HasIndex("DocumentId", "RevisionNumber")
+                        .IsUnique();
 
-                    b.ToTable("documents", "documents");
+                    b.ToTable("document_revisions", "documents");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Identity.AppUser", b =>
@@ -459,6 +494,17 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Navigation("OwnerUser");
                 });
 
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentRevision", b =>
+                {
+                    b.HasOne("HomeSuiteHome.WebApi.Domains.Documents.Document", "Document")
+                        .WithMany("Revisions")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+                });
+
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.DocumentParty", b =>
                 {
                     b.HasOne("HomeSuiteHome.WebApi.Domains.Documents.Document", "Document")
@@ -563,6 +609,8 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Navigation("DocumentParties");
 
                     b.Navigation("DocumentTags");
+
+                    b.Navigation("Revisions");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.Party", b =>

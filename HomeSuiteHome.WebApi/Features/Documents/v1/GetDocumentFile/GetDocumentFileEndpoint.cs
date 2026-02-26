@@ -4,9 +4,9 @@ public static class GetDocumentFileEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/{id:guid}/file", async (Guid id, bool? download, GetDocumentFileHandler handler, CancellationToken ct) =>
+        group.MapGet("/{id:guid}/file", async (Guid id, Guid? revisionId, bool? download, GetDocumentFileHandler handler, CancellationToken ct) =>
         {
-            var request = new GetDocumentFileRequest(id);
+            var request = new GetDocumentFileRequest(id, revisionId);
             var response = await handler.HandleAsync(request, ct);
             if (response is null)
                 return Results.NotFound();

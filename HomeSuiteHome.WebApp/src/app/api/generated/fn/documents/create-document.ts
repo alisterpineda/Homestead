@@ -14,6 +14,8 @@ export interface CreateDocument$Params {
       body: {
 'name'?: string;
 } & {
+'label'?: string;
+} & {
 'file'?: IFormFile;
 } & {
 }

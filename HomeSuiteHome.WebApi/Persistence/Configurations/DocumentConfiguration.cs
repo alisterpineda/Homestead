@@ -15,23 +15,6 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.Name)
             .IsRequired();
 
-        builder.Property(d => d.ContentType)
-            .IsRequired();
-
-        builder.Property(d => d.FileSize)
-            .IsRequired();
-
-        builder.Property(d => d.FilePath)
-            .IsRequired();
-
-        builder.Property(d => d.FileHash)
-            .IsRequired()
-            .HasMaxLength(64);
-
-        builder.Property(d => d.FileExtension)
-            .IsRequired()
-            .HasMaxLength(16);
-
         builder.Property(d => d.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -39,9 +22,6 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.DocumentDate);
         builder.Property(d => d.ValidFrom);
         builder.Property(d => d.ValidUntil);
-
-        builder.Property(d => d.ExtractedText)
-            .HasColumnType("text");
 
         builder.HasOne(d => d.CreatedByUser)
             .WithMany()
@@ -53,7 +33,6 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(d => d.OwnerUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(d => d.FileHash).IsUnique();
         builder.HasIndex(d => d.CreatedByUserId);
         builder.HasIndex(d => d.OwnerUserId);
     }

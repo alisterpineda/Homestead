@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<Document> Documents { get; set; }
+    public DbSet<DocumentRevision> DocumentRevisions { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<DocumentTag> DocumentTags { get; set; }
     public DbSet<Party> Parties { get; set; }

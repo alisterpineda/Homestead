@@ -1,15 +1,20 @@
 using Asp.Versioning.Builder;
 using HomeSuiteHome.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.CreateDocumentRevision;
 using HomeSuiteHome.WebApi.Features.Documents.v1.CreateParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteDocumentRevision;
 using HomeSuiteHome.WebApi.Features.Documents.v1.DeleteParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocument;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentFile;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentRevision;
+using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentRevisions;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetDocuments;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetParties;
 using HomeSuiteHome.WebApi.Features.Documents.v1.GetParty;
 using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocument;
+using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateDocumentRevision;
 using HomeSuiteHome.WebApi.Features.Documents.v1.UpdateParty;
 
 namespace HomeSuiteHome.WebApi.Features.Documents;
@@ -32,6 +37,13 @@ public static class DocumentsModule
         GetDocumentFileEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
         UpdateDocumentEndpoint.Map(v1);
+
+        var revisions = v1.MapGroup("/{documentId:guid}/revisions");
+        CreateDocumentRevisionEndpoint.Map(revisions);
+        DeleteDocumentRevisionEndpoint.Map(revisions);
+        GetDocumentRevisionsEndpoint.Map(revisions);
+        GetDocumentRevisionEndpoint.Map(revisions);
+        UpdateDocumentRevisionEndpoint.Map(revisions);
 
         var parties = v1.MapGroup("/parties");
         CreatePartyEndpoint.Map(parties);

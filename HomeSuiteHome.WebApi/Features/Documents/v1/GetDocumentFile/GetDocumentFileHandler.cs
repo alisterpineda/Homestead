@@ -9,22 +9,37 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
 {
     public async Task<GetDocumentFileResponse?> HandleAsync(GetDocumentFileRequest request, CancellationToken ct)
     {
-        var document = await db.Documents
+        var documentName = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
+            .Select(d => d.Name)
             .FirstOrDefaultAsync(ct);
 
-        if (document is null)
+        if (documentName is null)
+            return null;
+
+        var revisionQuery = db.DocumentRevisions
+            .AsNoTracking()
+            .Where(r => r.DocumentId == request.Id);
+
+        if (request.RevisionId.HasValue)
+            revisionQuery = revisionQuery.Where(r => r.Id == request.RevisionId.Value);
+        else
+            revisionQuery = revisionQuery.OrderByDescending(r => r.RevisionNumber);
+
+        var revision = await revisionQuery.FirstOrDefaultAsync(ct);
+
+        if (revision is null)
             return null;
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var physicalPath = document.GetPhysicalPath(mediaPath);
+        var physicalPath = revision.GetPhysicalPath(mediaPath);
 
         if (!File.Exists(physicalPath))
             return null;
 
-        return new GetDocumentFileResponse(physicalPath, document.ContentType, document.GetDownloadFileName());
+        return new GetDocumentFileResponse(physicalPath, revision.ContentType, revision.GetDownloadFileName(documentName));
     }
 }

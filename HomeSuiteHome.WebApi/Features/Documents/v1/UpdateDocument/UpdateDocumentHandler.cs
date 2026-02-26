@@ -108,14 +108,21 @@ public class UpdateDocumentHandler(AppDbContext db)
                 .FirstOrDefaultAsync(ct);
         }
 
+        // Load latest revision for file fields
+        var latestRevision = await db.DocumentRevisions
+            .AsNoTracking()
+            .Where(r => r.DocumentId == document.Id)
+            .OrderByDescending(r => r.RevisionNumber)
+            .FirstAsync(ct);
+
         return Results.Ok(new UpdateDocumentResponse
         {
             Id = document.Id,
             Name = document.Name,
-            ContentType = document.ContentType,
-            FileSize = document.FileSize,
-            FileHash = document.FileHash,
-            FileExtension = document.FileExtension,
+            ContentType = latestRevision.ContentType,
+            FileSize = latestRevision.FileSize,
+            FileHash = latestRevision.FileHash,
+            FileExtension = latestRevision.FileExtension,
             CreatedAt = document.CreatedAt,
             DocumentDate = document.DocumentDate,
             ValidFrom = document.ValidFrom,

@@ -18,20 +18,22 @@ public class GetDocumentsHandler(AppDbContext db)
             .OrderBy(d => d.Name)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(d => new GetDocumentsResponse
+            .Select(d => new
             {
-                Id = d.Id,
-                Name = d.Name,
-                ContentType = d.ContentType,
-                FileSize = d.FileSize,
-                FileExtension = d.FileExtension,
-                DocumentDate = d.DocumentDate,
-                ValidFrom = d.ValidFrom,
-                ValidUntil = d.ValidUntil,
-                CreatedByUserId = d.CreatedByUserId,
+                d.Id,
+                d.Name,
+                LatestRevision = d.Revisions
+                    .OrderByDescending(r => r.RevisionNumber)
+                    .Select(r => new { r.ContentType, r.FileSize, r.FileExtension })
+                    .FirstOrDefault(),
+                d.DocumentDate,
+                d.ValidFrom,
+                d.ValidUntil,
+                d.CreatedByUserId,
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
-                OwnerUserId = d.OwnerUserId,
+                d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
+                RevisionCount = d.Revisions.Count,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
                     Id = dt.Tag.Id,
@@ -43,6 +45,24 @@ public class GetDocumentsHandler(AppDbContext db)
                     Id = dp.Party.Id,
                     Name = dp.Party.Name
                 }).ToList()
+            })
+            .Select(d => new GetDocumentsResponse
+            {
+                Id = d.Id,
+                Name = d.Name,
+                ContentType = d.LatestRevision != null ? d.LatestRevision.ContentType : "",
+                FileSize = d.LatestRevision != null ? d.LatestRevision.FileSize : 0,
+                FileExtension = d.LatestRevision != null ? d.LatestRevision.FileExtension : "",
+                DocumentDate = d.DocumentDate,
+                ValidFrom = d.ValidFrom,
+                ValidUntil = d.ValidUntil,
+                CreatedByUserId = d.CreatedByUserId,
+                CreatedByUserName = d.CreatedByUserName,
+                OwnerUserId = d.OwnerUserId,
+                OwnerUserName = d.OwnerUserName,
+                RevisionCount = d.RevisionCount,
+                Tags = d.Tags,
+                Parties = d.Parties
             })
             .ToListAsync(ct);
 
