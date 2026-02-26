@@ -28,7 +28,6 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
               tabindex="0"
               (click)="documentSelect.emit(doc.id)"
               (keydown.enter)="documentSelect.emit(doc.id)"
-              [attr.data-state]="selectedDocumentId() === doc.id ? 'selected' : null"
               class="cursor-pointer"
             >
               <td hlmTd class="font-medium">{{ doc.name }}</td>
@@ -59,7 +58,6 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
 })
 export class DocumentTableComponent {
   documents = input.required<GetDocumentsResponse[]>();
-  selectedDocumentId = input<string | null>(null);
   documentSelect = output<string>();
 
   formatBytes = formatBytes;

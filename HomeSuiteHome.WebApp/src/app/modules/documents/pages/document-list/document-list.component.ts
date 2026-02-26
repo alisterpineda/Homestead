@@ -10,7 +10,6 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
-import { DocumentDetailPanelComponent } from '../../components/document-detail-panel/document-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -26,7 +25,6 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
     HlmSpinner,
     HlmEmptyImports,
     DocumentTableComponent,
-    DocumentDetailPanelComponent,
     PaginationComponent,
     UploadDialogComponent,
   ],
@@ -75,8 +73,7 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
           </div>
           <app-document-table
             [documents]="result.items"
-            [selectedDocumentId]="selectedDocumentId()"
-            (documentSelect)="selectedDocumentId.set($event)"
+            (documentSelect)="onDocumentSelect($event)"
           />
           <app-pagination
             [page]="+result.page"
@@ -86,16 +83,10 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
         }
       }
 
-      <app-document-detail-panel
-        [documentId]="selectedDocumentId()"
-        (closed)="selectedDocumentId.set(null)"
-        (refreshList)="onRefresh()"
-      />
     </div>
   `,
 })
 export class DocumentListComponent implements OnDestroy {
-  selectedDocumentId = signal<string | null>(null);
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
@@ -145,6 +136,10 @@ export class DocumentListComponent implements OnDestroy {
 
   onPageChange(newPage: number): void {
     this.router.navigate(['/documents'], { queryParams: { page: newPage } });
+  }
+
+  onDocumentSelect(id: string): void {
+    this.router.navigate(['/documents', id]);
   }
 
   onRefresh(): void {

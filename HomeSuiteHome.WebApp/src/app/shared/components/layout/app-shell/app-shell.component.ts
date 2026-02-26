@@ -124,7 +124,11 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <button hlmSidebarTrigger></button>
           <hlm-separator orientation="vertical" class="mr-2 !h-4" />
-          <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
+          @if (headerTitle()) {
+            <ng-container *ngTemplateOutlet="headerTitle()!" />
+          } @else {
+            <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
+          }
           <div class="ml-auto flex items-center gap-2">
             @if (headerActions()) {
               <ng-container *ngTemplateOutlet="headerActions()!" />
@@ -132,7 +136,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
           </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-4">
+        <div class="flex flex-1 flex-col overflow-y-auto p-4">
           <router-outlet />
         </div>
       </main>
@@ -148,6 +152,7 @@ export class AppShellComponent {
   private pageHeaderService = inject(PageHeaderService);
 
   headerActions = this.pageHeaderService.actions;
+  headerTitle = this.pageHeaderService.title;
 
   constructor() {
     this.processingHub.connect();
@@ -155,7 +160,10 @@ export class AppShellComponent {
     // Auto-clear header actions on navigation to prevent stale buttons
     this.router.events
       .pipe(filter((e) => e instanceof NavigationStart))
-      .subscribe(() => this.pageHeaderService.clearActions());
+      .subscribe(() => {
+        this.pageHeaderService.clearActions();
+        this.pageHeaderService.clearTitle();
+      });
   }
 
   private url = toSignal(
@@ -196,6 +204,16 @@ export class AppShellComponent {
   });
 
   isItemActive(item: SidebarItem): boolean {
-    return this.router.url === item.path || this.router.url.startsWith(item.path + '?');
+    const urlPath = this.router.url.split('?')[0];
+    if (urlPath === item.path) return true;
+    if (urlPath.startsWith(item.path + '/')) {
+      const module = this.activeModule();
+      if (!module) return true;
+      // Check if a more specific sidebar item matches
+      return !module.sidebar.some(
+        (other) => other.path !== item.path && urlPath.startsWith(other.path),
+      );
+    }
+    return false;
   }
 }

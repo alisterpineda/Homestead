@@ -1,43 +1,54 @@
 import {
   Component,
   ChangeDetectionStrategy,
-  input,
-  output,
   signal,
   inject,
   effect,
   computed,
   OnDestroy,
+  viewChild,
+  afterNextRender,
+  TemplateRef,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
+import { ActivatedRoute, Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, tap } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, tap, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
   lucideFileSearch,
+  lucideDownload,
+  lucideTrash2,
+  lucideSave,
+  lucideEllipsisVertical,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
-import { HlmSheetImports } from '@/shared/components/spartan/sheet';
+import { HlmResizableImports } from '@/shared/components/spartan/resizable';
+import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { TagInputComponent } from '../tag-input/tag-input.component';
-import { PartyInputComponent } from '../party-input/party-input.component';
-import type { PartyOption } from '../party-input/party-input.component';
+import { TagInputComponent } from '../../components/tag-input/tag-input.component';
+import { PartyInputComponent } from '../../components/party-input/party-input.component';
+import type { PartyOption } from '../../components/party-input/party-input.component';
 import { formatBytes } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
 import { updateDocument } from '@/api/generated/fn/documents/update-document';
+import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import { ProcessingHubService } from '@/shared/services/processing-hub.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from 'ngx-sonner';
 
 @Component({
-  selector: 'app-document-detail-panel',
+  selector: 'app-document-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
@@ -45,7 +56,9 @@ import { toast } from 'ngx-sonner';
     HlmButton,
     HlmSpinner,
     HlmTabsImports,
-    HlmSheetImports,
+    HlmResizableImports,
+    HlmBreadCrumbImports,
+    HlmDropdownMenuImports,
     HlmInput,
     HlmFormFieldImports,
     HlmLabel,
@@ -56,46 +69,80 @@ import { toast } from 'ngx-sonner';
     provideIcons({
       lucideFileText,
       lucideFileSearch,
+      lucideDownload,
+      lucideTrash2,
+      lucideSave,
+      lucideEllipsisVertical,
     }),
   ],
   template: `
-    <hlm-sheet side="right" [state]="sheetState()" (stateChanged)="onSheetStateChanged($event)">
-      <hlm-sheet-content *hlmSheetPortal="let ctx"
-        class="w-full max-w-md sm:max-w-md gap-0 p-0">
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb>
+        <ol hlmBreadcrumbList>
+          <li hlmBreadcrumbItem>
+            <a hlmBreadcrumbLink link="/documents">All Documents</a>
+          </li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem>
+            <span hlmBreadcrumbPage>{{ document()?.name ?? 'Document' }}</span>
+          </li>
+        </ol>
+      </nav>
+    </ng-template>
 
-        @if (loading()) {
-          <div class="flex h-full items-center justify-center">
-            <hlm-spinner />
-          </div>
-        }
+    @if (loading()) {
+      <div class="flex h-full items-center justify-center">
+        <hlm-spinner />
+      </div>
+    }
 
-        @if (document()) {
-          <!-- Header -->
-          <div hlmSheetHeader class="pr-10">
-            <h2 hlmSheetTitle class="truncate text-lg">
-              {{ document()!.name }}
-            </h2>
-          </div>
+    @if (document(); as doc) {
+      <div class="flex justify-end gap-2 mb-4">
+        <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
+          <ng-icon hlm name="lucideDownload" size="sm" />
+          Download
+        </button>
+        <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+          <ng-icon hlm name="lucideSave" size="sm" />
+          {{ saving() ? 'Saving...' : 'Save' }}
+        </button>
+        <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
+          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+        </button>
+        <ng-template #moreMenu>
+          <hlm-dropdown-menu>
+            <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
+              <ng-icon hlm name="lucideTrash2" size="sm" />
+              <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
+            </button>
+          </hlm-dropdown-menu>
+        </ng-template>
+      </div>
 
-          <!-- Preview -->
-          <div class="bg-muted">
-            @if (isPdf()) {
-              <iframe
-                [src]="safeFileUrl()"
-                class="h-80 w-full"
-                [title]="'Preview of ' + document()!.name"
-              ></iframe>
-            } @else {
-              <div
-                class="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground"
-              >
-                <ng-icon hlm name="lucideFileText" size="xl" />
-                <span class="text-sm">Preview not available</span>
-              </div>
-            }
-          </div>
+      <!-- Resizable layout -->
+      <div hlmResizableGroup direction="horizontal" class="min-h-0 flex-1 rounded-md border">
+        <!-- Preview panel -->
+        <div hlmResizablePanel [defaultSize]="60" [minSize]="30" class="overflow-hidden">
+          @if (isPdf()) {
+            <iframe
+              [src]="safeFileUrl()"
+              class="h-full w-full"
+              [title]="'Preview of ' + doc.name"
+            ></iframe>
+          } @else {
+            <div
+              class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
+            >
+              <ng-icon hlm name="lucideFileText" size="xl" />
+              <span class="text-sm">Preview not available</span>
+            </div>
+          }
+        </div>
 
-          <!-- Tabs -->
+        <hlm-resizable-handle withHandle />
+
+        <!-- Info/Text tabs panel -->
+        <div hlmResizablePanel [defaultSize]="40" [minSize]="25" class="flex flex-col overflow-hidden">
           <hlm-tabs tab="info" class="flex flex-1 flex-col overflow-hidden">
             <hlm-tabs-list variant="line" class="mx-4 mt-3">
               <button hlmTabsTrigger="info">Info</button>
@@ -130,7 +177,7 @@ import { toast } from 'ngx-sonner';
                 <div class="space-y-2">
                   <label hlmLabel>Added</label>
                   <p class="text-sm text-muted-foreground">
-                    {{ formatDate(document()!.createdAt) }}
+                    {{ formatDate(doc.createdAt) }}
                   </p>
                 </div>
 
@@ -138,21 +185,21 @@ import { toast } from 'ngx-sonner';
                 <div class="space-y-2">
                   <label hlmLabel>Size</label>
                   <p class="text-sm text-muted-foreground">
-                    {{ formatBytes(+document()!.fileSize) }}
+                    {{ formatBytes(+doc.fileSize) }}
                   </p>
                 </div>
 
                 <!-- Type -->
                 <div class="space-y-2">
                   <label hlmLabel>Type</label>
-                  <p class="text-sm text-muted-foreground">{{ document()!.contentType }}</p>
+                  <p class="text-sm text-muted-foreground">{{ doc.contentType }}</p>
                 </div>
               </div>
             </div>
             <div hlmTabsContent="text" class="flex-1 overflow-y-auto px-4 py-3">
-              @if (document()!.extractedText) {
+              @if (doc.extractedText) {
                 <div class="max-h-96 overflow-y-auto rounded-md border border-border bg-muted p-4">
-                  <pre class="whitespace-pre-wrap text-sm text-foreground">{{ document()!.extractedText }}</pre>
+                  <pre class="whitespace-pre-wrap text-sm text-foreground">{{ doc.extractedText }}</pre>
                 </div>
               } @else {
                 <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
@@ -162,28 +209,20 @@ import { toast } from 'ngx-sonner';
               }
             </div>
           </hlm-tabs>
-
-          <!-- Footer -->
-          <div hlmSheetFooter>
-            <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || saving()">
-              {{ saving() ? 'Saving...' : 'Save changes' }}
-            </button>
-          </div>
-        }
-
-      </hlm-sheet-content>
-    </hlm-sheet>
+        </div>
+      </div>
+    }
   `,
+  host: {
+    class: 'flex flex-col h-full',
+  },
 })
-export class DocumentDetailPanelComponent implements OnDestroy {
-  documentId = input<string | null>(null);
-  closed = output<void>();
-  refreshList = output<void>();
-
+export class DocumentDetailPageComponent implements OnDestroy {
   editName = signal('');
   editTags = signal<string[]>([]);
   editParties = signal<PartyOption[]>([]);
   saving = signal(false);
+  deleting = signal(false);
   loading = signal(false);
   private refreshTrigger = signal(0);
 
@@ -192,10 +231,20 @@ export class DocumentDetailPanelComponent implements OnDestroy {
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private sanitizer = inject(DomSanitizer);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private processingHub = inject(ProcessingHubService);
+  private pageHeaderService = inject(PageHeaderService);
+  private hubSub: Subscription;
+
+  private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
+
+  private documentId = toSignal(
+    this.route.paramMap.pipe(map((p) => p.get('id'))),
+    { initialValue: null },
+  );
 
   fileBlobUrl = signal<string | null>(null);
-
-  sheetState = computed<'open' | 'closed'>(() => this.documentId() ? 'open' : 'closed');
 
   safeFileUrl = computed(() => {
     const url = this.fileBlobUrl();
@@ -206,12 +255,17 @@ export class DocumentDetailPanelComponent implements OnDestroy {
     const doc = this.document();
     if (!doc) return false;
     if (this.editName() !== doc.name) return true;
-    const origTags = (doc.tags?.map(t => t.path) ?? []).slice().sort();
+    const origTags = (doc.tags?.map((t) => t.path) ?? []).slice().sort();
     const currTags = this.editTags().slice().sort();
-    if (origTags.length !== currTags.length || origTags.some((t, i) => t !== currTags[i])) return true;
-    const origPartyIds = (doc.parties?.map(p => p.id) ?? []).slice().sort();
-    const currPartyIds = this.editParties().map(p => p.id).slice().sort();
-    if (origPartyIds.length !== currPartyIds.length || origPartyIds.some((id, i) => id !== currPartyIds[i])) return true;
+    if (origTags.length !== currTags.length || origTags.some((t, i) => t !== currTags[i]))
+      return true;
+    const origPartyIds = (doc.parties?.map((p) => p.id) ?? []).slice().sort();
+    const currPartyIds = this.editParties().map((p) => p.id).slice().sort();
+    if (
+      origPartyIds.length !== currPartyIds.length ||
+      origPartyIds.some((id, i) => id !== currPartyIds[i])
+    )
+      return true;
     return false;
   });
 
@@ -220,10 +274,12 @@ export class DocumentDetailPanelComponent implements OnDestroy {
       tap(() => this.revokeCurrentBlobUrl()),
       switchMap(([id]) => {
         if (!id) return of(null);
-        return this.http.get(`/api/v1/documents/${id}/file`, { responseType: 'blob' }).pipe(
-          map((blob) => URL.createObjectURL(blob)),
-          catchError(() => of(null)),
-        );
+        return this.http
+          .get(`/api/v1/documents/${id}/file`, { responseType: 'blob' })
+          .pipe(
+            map((blob) => URL.createObjectURL(blob)),
+            catchError(() => of(null)),
+          );
       }),
       tap((url) => this.fileBlobUrl.set(url)),
     ),
@@ -261,16 +317,23 @@ export class DocumentDetailPanelComponent implements OnDestroy {
         this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
       }
     });
+
+    afterNextRender(() => {
+      const tpl = this.headerTitleRef();
+      if (tpl) {
+        this.pageHeaderService.setTitle(tpl);
+      }
+    });
+
+    this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
+      this.refreshTrigger.update((v) => v + 1);
+    });
   }
 
   ngOnDestroy(): void {
     this.revokeCurrentBlobUrl();
-  }
-
-  onSheetStateChanged(state: string): void {
-    if (state === 'closed') {
-      this.closed.emit();
-    }
+    this.hubSub.unsubscribe();
+    this.pageHeaderService.clearTitle();
   }
 
   isPdf(): boolean {
@@ -297,6 +360,32 @@ export class DocumentDetailPanelComponent implements OnDestroy {
     return (event.target as HTMLInputElement).value;
   }
 
+  handleDownload(): void {
+    const url = this.fileBlobUrl();
+    const doc = this.document();
+    if (!url || !doc) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.name;
+    a.click();
+  }
+
+  handleDelete(): void {
+    const id = this.documentId();
+    if (!id) return;
+    this.deleting.set(true);
+    deleteDocument(this.http, this.apiConfig.rootUrl, { id }).subscribe({
+      next: () => {
+        toast.success('Document deleted.');
+        this.router.navigate(['/documents']);
+      },
+      error: () => {
+        this.deleting.set(false);
+        toast.error('Failed to delete document.');
+      },
+    });
+  }
+
   handleSave(): void {
     const id = this.documentId();
     if (!id) return;
@@ -311,7 +400,6 @@ export class DocumentDetailPanelComponent implements OnDestroy {
     }).subscribe({
       next: () => {
         this.saving.set(false);
-        this.refreshList.emit();
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },

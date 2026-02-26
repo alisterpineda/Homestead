@@ -88,6 +88,9 @@
       ],
       "@/shared/components/spartan/dialog": [
         "./src/app/shared/components/spartan/dialog/src/index.ts"
+      ],
+      "@/shared/components/spartan/resizable": [
+        "./src/app/shared/components/spartan/resizable/src/index.ts"
       ]
     }
   },
