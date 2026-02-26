@@ -171,6 +171,42 @@ import { toast } from 'ngx-sonner';
                   />
                 </hlm-form-field>
 
+                <!-- Document Date -->
+                <hlm-form-field>
+                  <label hlmLabel for="doc-date">Document Date</label>
+                  <input
+                    hlmInput
+                    type="date"
+                    id="doc-date"
+                    [value]="editDocumentDate()"
+                    (input)="editDocumentDate.set(asInputValue($event))"
+                  />
+                </hlm-form-field>
+
+                <!-- Valid From / Valid Until -->
+                <div class="grid grid-cols-2 gap-3">
+                  <hlm-form-field>
+                    <label hlmLabel for="doc-valid-from">Valid From</label>
+                    <input
+                      hlmInput
+                      type="date"
+                      id="doc-valid-from"
+                      [value]="editValidFrom()"
+                      (input)="editValidFrom.set(asInputValue($event))"
+                    />
+                  </hlm-form-field>
+                  <hlm-form-field>
+                    <label hlmLabel for="doc-valid-until">Valid Until</label>
+                    <input
+                      hlmInput
+                      type="date"
+                      id="doc-valid-until"
+                      [value]="editValidUntil()"
+                      (input)="editValidUntil.set(asInputValue($event))"
+                    />
+                  </hlm-form-field>
+                </div>
+
                 <!-- Tags -->
                 <div class="space-y-2">
                   <label hlmLabel>Tags</label>
@@ -246,6 +282,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editName = signal('');
   editTags = signal<string[]>([]);
   editParties = signal<PartyOption[]>([]);
+  editDocumentDate = signal('');
+  editValidFrom = signal('');
+  editValidUntil = signal('');
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
@@ -291,6 +330,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
       origPartyIds.some((id, i) => id !== currPartyIds[i])
     )
       return true;
+    if (this.editDocumentDate() !== this.toDateInputValue(doc.documentDate)) return true;
+    if (this.editValidFrom() !== this.toDateInputValue(doc.validFrom)) return true;
+    if (this.editValidUntil() !== this.toDateInputValue(doc.validUntil)) return true;
     return false;
   });
 
@@ -340,6 +382,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.editName.set(doc.name);
         this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
         this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
+        this.editDocumentDate.set(this.toDateInputValue(doc.documentDate));
+        this.editValidFrom.set(this.toDateInputValue(doc.validFrom));
+        this.editValidUntil.set(this.toDateInputValue(doc.validUntil));
       }
     });
 
@@ -385,6 +430,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
+  toDateInputValue(isoString: string | null | undefined): string {
+    return isoString ? isoString.substring(0, 10) : '';
+  }
+
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
@@ -423,6 +472,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
       id,
       body: {
         name: this.editName(),
+        documentDate: this.editDocumentDate() || null,
+        validFrom: this.editValidFrom() || null,
+        validUntil: this.editValidUntil() || null,
         tagPaths: this.editTags(),
         partyIds: this.editParties().map((p) => p.id),
       },

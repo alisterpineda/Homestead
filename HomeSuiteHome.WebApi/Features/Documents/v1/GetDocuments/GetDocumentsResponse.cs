@@ -7,9 +7,9 @@ public record GetDocumentsResponse
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
     public required string FileExtension { get; init; }
-    public DateTimeOffset? DocumentDate { get; init; }
-    public DateTimeOffset? ValidFrom { get; init; }
-    public DateTimeOffset? ValidUntil { get; init; }
+    public DateOnly? DocumentDate { get; init; }
+    public DateOnly? ValidFrom { get; init; }
+    public DateOnly? ValidUntil { get; init; }
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }
