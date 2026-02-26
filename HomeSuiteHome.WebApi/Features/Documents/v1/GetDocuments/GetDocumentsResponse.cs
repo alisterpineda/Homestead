@@ -6,6 +6,7 @@ public record GetDocumentsResponse
     public required string Name { get; init; }
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
+    public required string FileExtension { get; init; }
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }

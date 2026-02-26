@@ -25,6 +25,6 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         if (!File.Exists(physicalPath))
             return null;
 
-        return new GetDocumentFileResponse(physicalPath, document.ContentType, document.Name);
+        return new GetDocumentFileResponse(physicalPath, document.ContentType, document.GetDownloadFileName());
     }
 }

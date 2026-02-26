@@ -19,6 +19,7 @@ public class GetDocumentHandler(AppDbContext db)
                 ContentType = d.ContentType,
                 FileSize = d.FileSize,
                 FileHash = d.FileHash,
+                FileExtension = d.FileExtension,
                 CreatedAt = d.CreatedAt,
                 CreatedByUserId = d.CreatedByUserId,
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,

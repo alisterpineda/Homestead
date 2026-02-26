@@ -4,6 +4,7 @@ using HomeSuiteHome.WebApi.Domains.Processing;
 using HomeSuiteHome.WebApi.Persistence;
 using HomeSuiteHome.WebApi.Processing;
 using HomeSuiteHome.WebApi.TextExtraction;
+using Microsoft.EntityFrameworkCore;
 
 namespace HomeSuiteHome.WebApi.Features.Documents.Processing;
 
@@ -52,9 +53,17 @@ public class UploadDocumentJobHandler(
             fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
+        // Duplicate check
+        var isDuplicate = await db.Documents.AnyAsync(d => d.FileHash == fileHash, ct);
+        if (isDuplicate)
+        {
+            File.Delete(stagingPath);
+            throw new InvalidOperationException("A document with the same content already exists.");
+        }
+
         // Create document entity
         var documentId = Guid.NewGuid();
-        var documentName = payload.Name ?? payload.OriginalFileName;
+        var documentName = payload.Name ?? Path.GetFileNameWithoutExtension(payload.OriginalFileName);
 
         var document = new Document
         {
@@ -62,8 +71,9 @@ public class UploadDocumentJobHandler(
             Name = documentName,
             ContentType = payload.ContentType,
             FileSize = payload.FileSize,
-            FilePath = Document.GetFilePath(documentId, payload.FileExtension),
+            FilePath = Document.GetFilePath(fileHash, payload.FileExtension),
             FileHash = fileHash,
+            FileExtension = payload.FileExtension,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = job.CreatedByUserId,
             OwnerUserId = job.CreatedByUserId,
@@ -74,9 +84,8 @@ public class UploadDocumentJobHandler(
         await db.SaveChangesAsync(ct);
 
         // Move file to final location
-        var finalDir = Path.Combine(mediaPath, Document.FilesSubroot);
-        Directory.CreateDirectory(finalDir);
-        var finalPath = Path.Combine(finalDir, $"{documentId}{payload.FileExtension}");
+        var finalPath = Path.Combine(mediaPath, Document.GetFilePath(fileHash, payload.FileExtension));
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         File.Move(stagingPath, finalPath);
 
         // Update job with entity reference

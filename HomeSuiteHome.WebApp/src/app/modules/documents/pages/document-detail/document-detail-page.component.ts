@@ -366,7 +366,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (!url || !doc) return;
     const a = document.createElement('a');
     a.href = url;
-    a.download = doc.name;
+    a.download = `${doc.name}${doc.fileExtension}`;
     a.click();
   }
 

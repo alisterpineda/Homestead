@@ -7,6 +7,7 @@ export interface GetDocumentsResponse {
   contentType: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  fileExtension: string;
   fileSize: (number | string);
   id: string;
   name: string;

@@ -112,6 +112,7 @@ public class UpdateDocumentHandler(AppDbContext db)
             ContentType = document.ContentType,
             FileSize = document.FileSize,
             FileHash = document.FileHash,
+            FileExtension = document.FileExtension,
             CreatedAt = document.CreatedAt,
             CreatedByUserId = document.CreatedByUserId,
             CreatedByUserName = createdByUserName,

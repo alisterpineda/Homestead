@@ -8,6 +8,7 @@ export interface UpdateDocumentResponse {
   createdAt: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  fileExtension: string;
   fileHash: string;
   fileSize: (number | string);
   id: string;

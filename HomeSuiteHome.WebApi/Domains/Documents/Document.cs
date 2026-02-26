@@ -9,8 +9,11 @@ public class Document
     public const string FilesSubroot = "documents/files";
     public const string UploadsSubroot = "documents/uploads";
 
-    public static string GetFilePath(Guid id, string extension)
-        => Path.Combine(FilesSubroot, $"{id}{extension}");
+    public static string GetFilePath(string fileHash, string extension)
+        => Path.Combine(FilesSubroot, fileHash[..4], $"{fileHash}{extension}");
+
+    public string GetDownloadFileName()
+        => $"{Name}{FileExtension}";
 
     public string GetPhysicalPath(string mediaPath)
         => Path.Combine(mediaPath, FilePath);
@@ -21,6 +24,7 @@ public class Document
     public long FileSize { get; set; }
     public required string FilePath { get; set; }
     public required string FileHash { get; set; }
+    public required string FileExtension { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public string? ExtractedText { get; set; }
 

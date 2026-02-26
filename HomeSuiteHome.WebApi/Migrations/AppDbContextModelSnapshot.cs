@@ -43,6 +43,11 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Property<string>("ExtractedText")
                         .HasColumnType("text");
 
+                    b.Property<string>("FileExtension")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("FileHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -65,6 +70,9 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("FileHash")
+                        .IsUnique();
 
                     b.HasIndex("OwnerUserId");
 

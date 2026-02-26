@@ -7,6 +7,7 @@ public record UpdateDocumentResponse
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
     public required string FileHash { get; init; }
+    public required string FileExtension { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }

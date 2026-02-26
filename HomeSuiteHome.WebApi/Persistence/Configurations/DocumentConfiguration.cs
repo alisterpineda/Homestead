@@ -28,6 +28,10 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .IsRequired()
             .HasMaxLength(64);
 
+        builder.Property(d => d.FileExtension)
+            .IsRequired()
+            .HasMaxLength(16);
+
         builder.Property(d => d.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -45,6 +49,7 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(d => d.OwnerUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasIndex(d => d.FileHash).IsUnique();
         builder.HasIndex(d => d.CreatedByUserId);
         builder.HasIndex(d => d.OwnerUserId);
     }
