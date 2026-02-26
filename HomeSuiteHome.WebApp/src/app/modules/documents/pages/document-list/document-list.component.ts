@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy, viewChild, afterNextRender, TemplateRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -10,7 +10,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
-import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
 import { DocumentDetailPanelComponent } from '../../components/document-detail-panel/document-detail-panel.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -34,13 +33,6 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
   ],
   providers: [provideIcons({ lucideFileText, lucidePlus })],
   template: `
-    <ng-template #headerActions>
-      <a hlmBtn size="sm" routerLink="/documents/upload">
-        <ng-icon hlm name="lucidePlus" size="sm" />
-        Upload
-      </a>
-    </ng-template>
-
     <div>
       @if (loading()) {
         <div class="flex justify-center py-16">
@@ -70,14 +62,18 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
               <h3 hlmEmptyTitle>No documents yet</h3>
               <p hlmEmptyDescription>Upload your first document to get started.</p>
             </div>
-            <a routerLink="/documents/upload">
-              <button hlmBtn>
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                Upload Document
-              </button>
+            <a hlmBtn routerLink="/documents/upload">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              Upload Document
             </a>
           </section>
         } @else {
+          <div class="flex justify-end mb-4">
+            <a hlmBtn size="sm" routerLink="/documents/upload">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              Upload
+            </a>
+          </div>
           <app-document-table
             [documents]="result.items"
             [selectedDocumentId]="selectedDocumentId()"
@@ -105,31 +101,21 @@ export class DocumentListComponent implements OnDestroy {
   loading = signal(false);
   error = signal(false);
 
-  private headerActionsRef = viewChild<TemplateRef<unknown>>('headerActions');
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
-  private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
 
   constructor() {
     this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
       this.refreshTrigger.update((v) => v + 1);
     });
-
-    afterNextRender(() => {
-      const tpl = this.headerActionsRef();
-      if (tpl) {
-        this.pageHeaderService.setActions(tpl);
-      }
-    });
   }
 
   ngOnDestroy(): void {
     this.hubSub.unsubscribe();
-    this.pageHeaderService.clearActions();
   }
 
   private page = toSignal(
