@@ -3,12 +3,12 @@ using UglyToad.PdfPig;
 
 namespace HomeSuiteHome.WebApi.TextExtraction;
 
-public class PdfTextExtractor(ILogger<PdfTextExtractor> logger) : ITextExtractor
+public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtractor> logger) : ITextExtractor
 {
     public bool CanExtract(string contentType)
         => contentType is "application/pdf";
 
-    public Task<string?> ExtractTextAsync(string filePath, CancellationToken ct)
+    public async Task<string?> ExtractTextAsync(string filePath, CancellationToken ct)
     {
         try
         {
@@ -26,11 +26,28 @@ public class PdfTextExtractor(ILogger<PdfTextExtractor> logger) : ITextExtractor
                         sb.AppendLine();
 
                     sb.Append(pageText);
+                    continue;
+                }
+
+                // No embedded text on this page — try OCR on page images
+                foreach (var image in page.GetImages())
+                {
+                    if (!image.TryGetPng(out var pngBytes))
+                        continue;
+
+                    using var stream = new MemoryStream(pngBytes);
+                    var ocrText = await tesseract.OcrAsync(stream, ct);
+                    if (!string.IsNullOrWhiteSpace(ocrText))
+                    {
+                        if (sb.Length > 0)
+                            sb.AppendLine();
+
+                        sb.Append(ocrText);
+                    }
                 }
             }
 
-            var result = sb.Length > 0 ? sb.ToString().Trim() : null;
-            return Task.FromResult(result);
+            return sb.Length > 0 ? sb.ToString().Trim() : null;
         }
         catch (OperationCanceledException)
         {
@@ -39,7 +56,7 @@ public class PdfTextExtractor(ILogger<PdfTextExtractor> logger) : ITextExtractor
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to extract text from PDF {FilePath}", filePath);
-            return Task.FromResult<string?>(null);
+            return null;
         }
     }
 }
