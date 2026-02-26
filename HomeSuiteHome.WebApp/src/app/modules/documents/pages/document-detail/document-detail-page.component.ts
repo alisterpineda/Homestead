@@ -12,7 +12,6 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { Location, NgTemplateOutlet } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,8 +26,8 @@ import {
   lucideSave,
   lucideEllipsisVertical,
   lucideFilePlus2,
+  lucideChevronDown,
 } from '@ng-icons/lucide';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -36,7 +35,6 @@ import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
-import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -63,9 +61,7 @@ import { toast } from 'ngx-sonner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
-    FormsModule,
     NgIcon,
-    BrnSelectImports,
     HlmIconImports,
     HlmButton,
     HlmSpinner,
@@ -73,7 +69,6 @@ import { toast } from 'ngx-sonner';
     HlmResizableImports,
     HlmBreadCrumbImports,
     HlmDropdownMenuImports,
-    HlmSelectImports,
     HlmInput,
     HlmFormFieldImports,
     HlmLabel,
@@ -91,36 +86,49 @@ import { toast } from 'ngx-sonner';
       lucideSave,
       lucideEllipsisVertical,
       lucideFilePlus2,
+      lucideChevronDown,
     }),
   ],
   template: `
     <ng-template #headerTitle>
-      <nav hlmBreadcrumb>
-        <ol hlmBreadcrumbList>
+      <nav hlmBreadcrumb class="min-w-0">
+        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
           <li hlmBreadcrumbItem>
             <a hlmBreadcrumbLink link="/documents">Documents</a>
           </li>
           <li hlmBreadcrumbSeparator></li>
           @if (hasMultipleRevisions()) {
-            <li hlmBreadcrumbItem>
-              <a hlmBreadcrumbLink [link]="['/documents', documentId()]">{{ document()?.name ?? 'Document' }}</a>
+            <li hlmBreadcrumbItem class="min-w-0">
+              <a hlmBreadcrumbLink
+                 [link]="['/documents', documentId()]"
+                 [title]="document()?.name ?? 'Document'"
+                 class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
+                {{ document()?.name ?? 'Document' }}
+              </a>
             </li>
             <li hlmBreadcrumbSeparator></li>
             <li hlmBreadcrumbItem>
-              <brn-select [ngModel]="selectedRevisionValue()" (ngModelChange)="onRevisionSelected($event)" placeholder="Revision">
-                <hlm-select-trigger size="sm" class="h-7 text-xs">
-                  <hlm-select-value />
-                </hlm-select-trigger>
-                <hlm-select-content>
+              <button class="flex items-center gap-1" [hlmDropdownMenuTrigger]="revisionMenu">
+                <span hlmBreadcrumbPage>{{ selectedRevisionLabel() }}</span>
+                <ng-icon hlm size="xs" name="lucideChevronDown" />
+              </button>
+              <ng-template #revisionMenu>
+                <hlm-dropdown-menu>
                   @for (rev of sortedRevisions(); track rev.id) {
-                    <hlm-option [value]="rev.id">{{ revisionLabel(rev) }}</hlm-option>
+                    <button hlmDropdownMenuItem (triggered)="onRevisionSelected(rev.id)">
+                      {{ revisionLabel(rev) }}
+                    </button>
                   }
-                </hlm-select-content>
-              </brn-select>
+                </hlm-dropdown-menu>
+              </ng-template>
             </li>
           } @else {
-            <li hlmBreadcrumbItem>
-              <span hlmBreadcrumbPage>{{ document()?.name ?? 'Document' }}</span>
+            <li hlmBreadcrumbItem class="min-w-0">
+              <span hlmBreadcrumbPage
+                    [title]="document()?.name ?? 'Document'"
+                    class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
+                {{ document()?.name ?? 'Document' }}
+              </span>
             </li>
           }
         </ol>
@@ -452,8 +460,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return (doc?.revisions?.length ?? 0) >= 2;
   });
 
-  selectedRevisionValue = computed(() => {
-    return this.revisionId() ?? this.latestRevision()?.id ?? '';
+  selectedRevisionLabel = computed(() => {
+    const rev = this.activeRevision();
+    return rev ? this.revisionLabel(rev) : 'Revision';
   });
 
   // Revision detail (for extractedText of non-latest revisions)
