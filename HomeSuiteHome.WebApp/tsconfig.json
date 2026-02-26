@@ -94,6 +94,9 @@
       ],
       "@/shared/components/spartan/textarea": [
         "./src/app/shared/components/spartan/textarea/src/index.ts"
+      ],
+      "@/shared/components/spartan/button-group": [
+        "./src/app/shared/components/spartan/button-group/src/index.ts"
       ]
     }
   },

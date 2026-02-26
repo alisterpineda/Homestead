@@ -99,26 +99,28 @@ import { toast } from 'ngx-sonner';
     }
 
     @if (document(); as doc) {
-      <div class="flex justify-end gap-2 mb-4">
-        <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
-          <ng-icon hlm name="lucideDownload" size="sm" />
-          Download
-        </button>
-        <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
-          <ng-icon hlm name="lucideSave" size="sm" />
-          {{ saving() ? 'Saving...' : 'Save' }}
-        </button>
-        <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
-          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
-        </button>
-        <ng-template #moreMenu>
-          <hlm-dropdown-menu>
-            <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
-              <ng-icon hlm name="lucideTrash2" size="sm" />
-              <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
-            </button>
-          </hlm-dropdown-menu>
-        </ng-template>
+      <div class="flex items-center gap-2 mb-4">
+        <div class="ml-auto flex items-center gap-2">
+          <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
+            <ng-icon hlm name="lucideDownload" size="sm" />
+            Download
+          </button>
+          <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+            <ng-icon hlm name="lucideSave" size="sm" />
+            {{ saving() ? 'Saving...' : 'Save' }}
+          </button>
+          <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
+            <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+          </button>
+          <ng-template #moreMenu>
+            <hlm-dropdown-menu>
+              <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
+                <ng-icon hlm name="lucideTrash2" size="sm" />
+                <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
+              </button>
+            </hlm-dropdown-menu>
+          </ng-template>
+        </div>
       </div>
 
       <!-- Resizable layout -->

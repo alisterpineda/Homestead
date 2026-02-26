@@ -4,10 +4,13 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -24,11 +27,14 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
+    HlmInput,
+    HlmButton,
+    HlmButtonGroup,
     DocumentTableComponent,
     PaginationComponent,
     UploadDialogComponent,
   ],
-  providers: [provideIcons({ lucideFileText, lucidePlus })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid })],
   template: `
     <div>
       @if (loading()) {
@@ -65,11 +71,32 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
             </app-upload-dialog>
           </section>
         } @else {
-          <div class="flex justify-end mb-4">
-            <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              Upload
-            </app-upload-dialog>
+          <div class="flex items-center gap-2 mb-4">
+            <!-- TODO: Wire up search to filter documents by name/content -->
+            <div class="relative">
+              <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-[200px]" />
+            </div>
+            <div class="ml-auto flex items-center gap-2">
+              <!-- TODO: Wire up filters (e.g. by date, type, tags) -->
+              <button hlmBtn variant="outline" size="sm">
+                <ng-icon hlm name="lucideListFilter" size="sm" />
+                Filters
+              </button>
+              <!-- TODO: Wire up view toggle to switch between table and grid views -->
+              <div hlmButtonGroup aria-label="View mode">
+                <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
+                  <ng-icon hlm name="lucideLayoutList" size="sm" />
+                </button>
+                <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('grid')" aria-label="Grid view">
+                  <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+                </button>
+              </div>
+              <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Upload
+              </app-upload-dialog>
+            </div>
           </div>
           <app-document-table
             [documents]="result.items"
@@ -87,6 +114,7 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
   `,
 })
 export class DocumentListComponent implements OnDestroy {
+  viewMode = signal<'table' | 'grid'>('table');
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);

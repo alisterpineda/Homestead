@@ -4,7 +4,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, debounceTime } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideUsers, lucidePlus, lucideChevronUp } from '@ng-icons/lucide';
+import { lucideUsers, lucidePlus, lucideChevronUp, lucideSearch } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -37,7 +37,7 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
     PartyDetailPanelComponent,
     PaginationComponent,
   ],
-  providers: [provideIcons({ lucideUsers, lucidePlus, lucideChevronUp })],
+  providers: [provideIcons({ lucideUsers, lucidePlus, lucideChevronUp, lucideSearch })],
   template: `
     <ng-template #headerActions>
       <button hlmBtn size="sm" (click)="showCreateForm.set(!showCreateForm())">
@@ -87,15 +87,17 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
         </hlm-card>
       }
 
-      <!-- Search -->
-      <div class="mb-4">
-        <input
-          hlmInput
-          placeholder="Search parties..."
-          [value]="searchText()"
-          (input)="searchText.set(asInputValue($event))"
-          class="w-full"
-        />
+      <div class="flex items-center gap-2 mb-4">
+        <div class="relative">
+          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            hlmInput
+            placeholder="Search parties..."
+            [value]="searchText()"
+            (input)="searchText.set(asInputValue($event))"
+            class="pl-8 h-8 w-[200px]"
+          />
+        </div>
       </div>
 
       @if (loading()) {
