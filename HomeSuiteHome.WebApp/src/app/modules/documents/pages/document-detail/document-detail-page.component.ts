@@ -34,6 +34,7 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
@@ -64,6 +65,7 @@ import { toast } from 'ngx-sonner';
     HlmLabel,
     TagInputComponent,
     PartyInputComponent,
+    HlmTextareaImports,
   ],
   providers: [
     provideIcons({
@@ -143,7 +145,7 @@ import { toast } from 'ngx-sonner';
 
         <!-- Info/Text tabs panel -->
         <div hlmResizablePanel [defaultSize]="40" [minSize]="25" class="flex flex-col overflow-hidden">
-          <hlm-tabs tab="info" class="flex flex-1 flex-col overflow-hidden">
+          <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
             <hlm-tabs-list variant="line" class="mx-4 mt-3">
               <button hlmTabsTrigger="info">Info</button>
               <button hlmTabsTrigger="text">Text</button>
@@ -196,11 +198,14 @@ import { toast } from 'ngx-sonner';
                 </div>
               </div>
             </div>
-            <div hlmTabsContent="text" class="flex-1 overflow-y-auto px-4 py-3">
+            <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
               @if (doc.extractedText) {
-                <div class="max-h-96 overflow-y-auto rounded-md border border-border bg-muted p-4">
-                  <pre class="whitespace-pre-wrap text-sm text-foreground">{{ doc.extractedText }}</pre>
-                </div>
+                <textarea
+                  hlmTextarea
+                  readonly
+                  class="h-full resize-none [field-sizing:fixed] bg-muted"
+                  [value]="doc.extractedText"
+                ></textarea>
               } @else {
                 <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
                   <ng-icon hlm name="lucideFileSearch" size="xl" />

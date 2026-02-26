@@ -91,6 +91,9 @@
       ],
       "@/shared/components/spartan/resizable": [
         "./src/app/shared/components/spartan/resizable/src/index.ts"
+      ],
+      "@/shared/components/spartan/textarea": [
+        "./src/app/shared/components/spartan/textarea/src/index.ts"
       ]
     }
   },
