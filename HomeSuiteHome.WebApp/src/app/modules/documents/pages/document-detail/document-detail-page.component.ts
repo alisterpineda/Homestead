@@ -10,6 +10,7 @@ import {
   afterNextRender,
   TemplateRef,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -35,6 +36,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
+import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
@@ -52,6 +54,7 @@ import { toast } from 'ngx-sonner';
   selector: 'app-document-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
     HlmButton,
@@ -123,145 +126,178 @@ import { toast } from 'ngx-sonner';
         </div>
       </div>
 
-      <!-- Resizable layout -->
-      <div hlmResizableGroup direction="horizontal" class="min-h-0 flex-1 rounded-md border">
-        <!-- Preview panel -->
-        <div hlmResizablePanel [defaultSize]="60" [minSize]="30" class="overflow-hidden">
-          @if (isPdf()) {
-            <iframe
-              [src]="safeFileUrl()"
-              class="h-full w-full"
-              [title]="'Preview of ' + doc.name"
-            ></iframe>
-          } @else if (isImage()) {
-            <div class="flex h-full w-full items-center justify-center bg-black">
-              <img
-                [src]="fileBlobUrl()"
-                [alt]="doc.name"
-                class="checkerboard max-h-full max-w-full"
+      <!-- Shared content templates -->
+      <ng-template #previewContent>
+        @if (isPdf()) {
+          <iframe
+            [src]="safeFileUrl()"
+            class="h-full w-full"
+            [title]="'Preview of ' + doc.name"
+          ></iframe>
+        } @else if (isImage()) {
+          <div class="flex h-full w-full items-center justify-center bg-black">
+            <img
+              [src]="fileBlobUrl()"
+              [alt]="doc.name"
+              class="checkerboard max-h-full max-w-full"
+            />
+          </div>
+        } @else {
+          <div
+            class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
+          >
+            <ng-icon hlm name="lucideFileText" size="xl" />
+            <span class="text-sm">Preview not available</span>
+          </div>
+        }
+      </ng-template>
+
+      <ng-template #infoContent>
+        <div class="space-y-4">
+          <!-- Name -->
+          <hlm-form-field>
+            <label hlmLabel for="doc-name">Name</label>
+            <input
+              hlmInput
+              id="doc-name"
+              [value]="editName()"
+              (input)="editName.set(asInputValue($event))"
+            />
+          </hlm-form-field>
+
+          <!-- Document Date -->
+          <hlm-form-field>
+            <label hlmLabel for="doc-date">Document Date</label>
+            <input
+              hlmInput
+              type="date"
+              id="doc-date"
+              [value]="editDocumentDate()"
+              (input)="editDocumentDate.set(asInputValue($event))"
+            />
+          </hlm-form-field>
+
+          <!-- Valid From / Valid Until -->
+          <div class="grid grid-cols-2 gap-3">
+            <hlm-form-field>
+              <label hlmLabel for="doc-valid-from">Valid From</label>
+              <input
+                hlmInput
+                type="date"
+                id="doc-valid-from"
+                [value]="editValidFrom()"
+                (input)="editValidFrom.set(asInputValue($event))"
               />
-            </div>
-          } @else {
-            <div
-              class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
-            >
-              <ng-icon hlm name="lucideFileText" size="xl" />
-              <span class="text-sm">Preview not available</span>
-            </div>
-          }
+            </hlm-form-field>
+            <hlm-form-field>
+              <label hlmLabel for="doc-valid-until">Valid Until</label>
+              <input
+                hlmInput
+                type="date"
+                id="doc-valid-until"
+                [value]="editValidUntil()"
+                (input)="editValidUntil.set(asInputValue($event))"
+              />
+            </hlm-form-field>
+          </div>
+
+          <!-- Tags -->
+          <div class="space-y-2">
+            <label hlmLabel>Tags</label>
+            <app-tag-input [value]="editTags()" (valueChange)="editTags.set($event)" />
+          </div>
+
+          <!-- Parties -->
+          <div class="space-y-2">
+            <label hlmLabel>Parties</label>
+            <app-party-input [value]="editParties()" (valueChange)="editParties.set($event)" />
+          </div>
+
+          <!-- Added -->
+          <div class="space-y-2">
+            <label hlmLabel>Added</label>
+            <p class="text-sm text-muted-foreground">
+              {{ formatDate(doc.createdAt) }}
+            </p>
+          </div>
+
+          <!-- Size -->
+          <div class="space-y-2">
+            <label hlmLabel>Size</label>
+            <p class="text-sm text-muted-foreground">
+              {{ formatBytes(+doc.fileSize) }}
+            </p>
+          </div>
+
+          <!-- Type -->
+          <div class="space-y-2">
+            <label hlmLabel>Type</label>
+            <p class="text-sm text-muted-foreground">{{ doc.contentType }}</p>
+          </div>
         </div>
+      </ng-template>
 
-        <hlm-resizable-handle withHandle />
+      <ng-template #textContent>
+        @if (doc.extractedText) {
+          <textarea
+            hlmTextarea
+            readonly
+            class="h-full resize-none [field-sizing:fixed] bg-muted"
+            [value]="doc.extractedText"
+          ></textarea>
+        } @else {
+          <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+            <ng-icon hlm name="lucideFileSearch" size="xl" />
+            <span class="text-sm">No extracted text available</span>
+          </div>
+        }
+      </ng-template>
 
-        <!-- Info/Text tabs panel -->
-        <div hlmResizablePanel [defaultSize]="40" [minSize]="25" class="flex flex-col overflow-hidden">
-          <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
-            <hlm-tabs-list variant="line" class="mx-4 mt-3">
-              <button hlmTabsTrigger="info">Info</button>
-              <button hlmTabsTrigger="text">Text</button>
-            </hlm-tabs-list>
-            <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
-              <div class="space-y-4">
-                <!-- Name -->
-                <hlm-form-field>
-                  <label hlmLabel for="doc-name">Name</label>
-                  <input
-                    hlmInput
-                    id="doc-name"
-                    [value]="editName()"
-                    (input)="editName.set(asInputValue($event))"
-                  />
-                </hlm-form-field>
+      @if (isMobile()) {
+        <!-- Mobile: single tabbed layout -->
+        <hlm-tabs tab="preview" class="min-w-0 flex flex-1 flex-col overflow-hidden rounded-md border">
+          <hlm-tabs-list variant="line" class="mx-4 mt-3">
+            <button hlmTabsTrigger="preview">Preview</button>
+            <button hlmTabsTrigger="info">Info</button>
+            <button hlmTabsTrigger="text">Text</button>
+          </hlm-tabs-list>
+          <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
+            <ng-container [ngTemplateOutlet]="previewContent" />
+          </div>
+          <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
+            <ng-container [ngTemplateOutlet]="infoContent" />
+          </div>
+          <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
+            <ng-container [ngTemplateOutlet]="textContent" />
+          </div>
+        </hlm-tabs>
+      } @else {
+        <!-- Desktop: resizable two-panel layout -->
+        <div hlmResizableGroup direction="horizontal" class="min-h-0 flex-1 rounded-md border">
+          <!-- Preview panel -->
+          <div hlmResizablePanel [defaultSize]="75" [minSize]="50" class="overflow-hidden">
+            <ng-container [ngTemplateOutlet]="previewContent" />
+          </div>
 
-                <!-- Document Date -->
-                <hlm-form-field>
-                  <label hlmLabel for="doc-date">Document Date</label>
-                  <input
-                    hlmInput
-                    type="date"
-                    id="doc-date"
-                    [value]="editDocumentDate()"
-                    (input)="editDocumentDate.set(asInputValue($event))"
-                  />
-                </hlm-form-field>
+          <hlm-resizable-handle withHandle />
 
-                <!-- Valid From / Valid Until -->
-                <div class="grid grid-cols-2 gap-3">
-                  <hlm-form-field>
-                    <label hlmLabel for="doc-valid-from">Valid From</label>
-                    <input
-                      hlmInput
-                      type="date"
-                      id="doc-valid-from"
-                      [value]="editValidFrom()"
-                      (input)="editValidFrom.set(asInputValue($event))"
-                    />
-                  </hlm-form-field>
-                  <hlm-form-field>
-                    <label hlmLabel for="doc-valid-until">Valid Until</label>
-                    <input
-                      hlmInput
-                      type="date"
-                      id="doc-valid-until"
-                      [value]="editValidUntil()"
-                      (input)="editValidUntil.set(asInputValue($event))"
-                    />
-                  </hlm-form-field>
-                </div>
-
-                <!-- Tags -->
-                <div class="space-y-2">
-                  <label hlmLabel>Tags</label>
-                  <app-tag-input [value]="editTags()" (valueChange)="editTags.set($event)" />
-                </div>
-
-                <!-- Parties -->
-                <div class="space-y-2">
-                  <label hlmLabel>Parties</label>
-                  <app-party-input [value]="editParties()" (valueChange)="editParties.set($event)" />
-                </div>
-
-                <!-- Added -->
-                <div class="space-y-2">
-                  <label hlmLabel>Added</label>
-                  <p class="text-sm text-muted-foreground">
-                    {{ formatDate(doc.createdAt) }}
-                  </p>
-                </div>
-
-                <!-- Size -->
-                <div class="space-y-2">
-                  <label hlmLabel>Size</label>
-                  <p class="text-sm text-muted-foreground">
-                    {{ formatBytes(+doc.fileSize) }}
-                  </p>
-                </div>
-
-                <!-- Type -->
-                <div class="space-y-2">
-                  <label hlmLabel>Type</label>
-                  <p class="text-sm text-muted-foreground">{{ doc.contentType }}</p>
-                </div>
+          <!-- Info/Text tabs panel -->
+          <div hlmResizablePanel [defaultSize]="25" [minSize]="20" class="flex flex-col overflow-hidden">
+            <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
+              <hlm-tabs-list variant="line" class="mx-4 mt-3">
+                <button hlmTabsTrigger="info">Info</button>
+                <button hlmTabsTrigger="text">Text</button>
+              </hlm-tabs-list>
+              <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
+                <ng-container [ngTemplateOutlet]="infoContent" />
               </div>
-            </div>
-            <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
-              @if (doc.extractedText) {
-                <textarea
-                  hlmTextarea
-                  readonly
-                  class="h-full resize-none [field-sizing:fixed] bg-muted"
-                  [value]="doc.extractedText"
-                ></textarea>
-              } @else {
-                <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-                  <ng-icon hlm name="lucideFileSearch" size="xl" />
-                  <span class="text-sm">No extracted text available</span>
-                </div>
-              }
-            </div>
-          </hlm-tabs>
+              <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
+                <ng-container [ngTemplateOutlet]="textContent" />
+              </div>
+            </hlm-tabs>
+          </div>
         </div>
-      </div>
+      }
     }
   `,
   styles: [
@@ -293,6 +329,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private refreshTrigger = signal(0);
 
   formatBytes = formatBytes;
+
+  private sidebarService = inject(HlmSidebarService);
+  isMobile = this.sidebarService.isMobile;
 
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
