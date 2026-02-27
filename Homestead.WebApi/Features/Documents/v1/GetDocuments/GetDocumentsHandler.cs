@@ -18,6 +18,36 @@ public class GetDocumentsHandler(AppDbContext db)
                 d.DocumentParties.Any(dp => request.PartyIds.Contains(dp.PartyId)));
         }
 
+        if (request.TagIds is { Length: > 0 })
+        {
+            if (request.IncludeChildTags)
+            {
+                var selectedPaths = await db.Tags.AsNoTracking()
+                    .Where(t => request.TagIds.Contains(t.Id))
+                    .Select(t => t.Path)
+                    .ToListAsync(ct);
+
+                var expandedTagIds = db.Tags.AsNoTracking()
+                    .Where(t => request.TagIds.Contains(t.Id));
+
+                foreach (var path in selectedPaths)
+                {
+                    expandedTagIds = expandedTagIds.Union(
+                        db.Tags.AsNoTracking().Where(t => t.Path.StartsWith(path + "/")));
+                }
+
+                var tagIdList = await expandedTagIds.Select(t => t.Id).ToListAsync(ct);
+
+                query = query.Where(d =>
+                    d.DocumentTags.Any(dt => tagIdList.Contains(dt.TagId)));
+            }
+            else
+            {
+                query = query.Where(d =>
+                    d.DocumentTags.Any(dt => request.TagIds.Contains(dt.TagId)));
+            }
+        }
+
         var totalCount = await query.CountAsync(ct);
 
         var items = await query

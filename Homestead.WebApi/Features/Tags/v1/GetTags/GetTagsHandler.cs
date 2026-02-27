@@ -35,11 +35,7 @@ public class GetTagsHandler(AppDbContext db)
                     : query.Where(t => false);
             }
         }
-        else
-        {
-            // No params: return root tags only
-            query = query.Where(t => t.ParentId == null);
-        }
+        // No params: return all tags
 
         return await query
             .OrderBy(t => t.Path)

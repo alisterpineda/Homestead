@@ -11,6 +11,8 @@ import { PaginatedResponseOfGetDocumentsResponse } from '../../models/paginated-
 
 export interface GetDocuments$Params {
   PartyIds?: Array<string>;
+  TagIds?: Array<string>;
+  IncludeChildTags: boolean;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -19,6 +21,8 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
   const rb = new RequestBuilder(rootUrl, getDocuments.PATH, 'get');
   if (params) {
     rb.query('PartyIds', params.PartyIds, {});
+    rb.query('TagIds', params.TagIds, {});
+    rb.query('IncludeChildTags', params.IncludeChildTags, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

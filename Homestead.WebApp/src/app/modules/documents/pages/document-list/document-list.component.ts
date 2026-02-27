@@ -22,6 +22,7 @@ import { UploadDialogComponent } from '../../components/upload-dialog/upload-dia
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
+import { getTags } from '@/api/generated/fn/tags/get-tags';
 import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import { toast } from 'ngx-sonner';
@@ -128,6 +129,19 @@ import { toast } from 'ngx-sonner';
                   (selectionChange)="onPartyFilterChange($event)"
                   (searchChange)="onPartySearchChange($event)"
                 />
+                <app-filter-popover
+                  label="Tags"
+                  [options]="tagOptions()"
+                  [selectedIds]="selectedTagIds()"
+                  searchPlaceholder="Search tags..."
+                  [loading]="tagOptionsLoading()"
+                  [showIncludeChildren]="true"
+                  [includeChildren]="includeChildTags()"
+                  includeChildrenLabel="Include sub-tags"
+                  (selectionChange)="onTagFilterChange($event)"
+                  (searchChange)="onTagSearchChange($event)"
+                  (includeChildrenChange)="onIncludeChildTagsChange($event)"
+                />
                 @if (hasActiveFilters()) {
                   <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
                     Reset
@@ -202,7 +216,21 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: [] as string[] },
   );
 
-  hasActiveFilters = computed(() => this.selectedPartyIds().length > 0);
+  // Tag filter
+  tagFilterSearch = signal('');
+  tagOptionsLoading = signal(false);
+
+  selectedTagIds = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.getAll('tagIds'))),
+    { initialValue: [] as string[] },
+  );
+
+  includeChildTags = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('includeChildTags') === 'true')),
+    { initialValue: false },
+  );
+
+  hasActiveFilters = computed(() => this.selectedPartyIds().length > 0 || this.selectedTagIds().length > 0);
 
   partyOptions = toSignal(
     toObservable(this.partyFilterSearch).pipe(
@@ -222,6 +250,31 @@ export class DocumentListComponent implements OnDestroy {
           }),
           catchError(() => {
             this.partyOptionsLoading.set(false);
+            return of([] as FilterOption[]);
+          }),
+        );
+      }),
+    ),
+    { initialValue: [] as FilterOption[] },
+  );
+
+  tagOptions = toSignal(
+    toObservable(this.tagFilterSearch).pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(search => {
+        this.tagOptionsLoading.set(true);
+        return getTags(this.http, this.apiConfig.rootUrl, {
+          Search: search || undefined,
+          IncludeChildren: false,
+        }).pipe(
+          map(r => {
+            this.tagOptionsLoading.set(false);
+            const items = r.body ?? [];
+            return items.map(t => ({ id: t.id, label: t.path } as FilterOption));
+          }),
+          catchError(() => {
+            this.tagOptionsLoading.set(false);
             return of([] as FilterOption[]);
           }),
         );
@@ -260,14 +313,22 @@ export class DocumentListComponent implements OnDestroy {
   );
 
   data = toSignal(
-    combineLatest([toObservable(this.page), toObservable(this.refreshTrigger), toObservable(this.selectedPartyIds)]).pipe(
-      switchMap(([page, , partyIds]) => {
+    combineLatest([
+      toObservable(this.page),
+      toObservable(this.refreshTrigger),
+      toObservable(this.selectedPartyIds),
+      toObservable(this.selectedTagIds),
+      toObservable(this.includeChildTags),
+    ]).pipe(
+      switchMap(([page, , partyIds, tagIds, includeChildTags]) => {
         this.loading.set(true);
         this.error.set(false);
         return getDocuments(this.http, this.apiConfig.rootUrl, {
           Page: page,
           PageSize: 10,
           PartyIds: partyIds.length > 0 ? partyIds : undefined,
+          TagIds: tagIds.length > 0 ? tagIds : undefined,
+          IncludeChildTags: includeChildTags,
         }).pipe(
           map((r) => {
             this.loading.set(false);
@@ -335,10 +396,30 @@ export class DocumentListComponent implements OnDestroy {
     this.partyFilterSearch.set(search);
   }
 
+  onTagFilterChange(ids: string[]): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, tagIds: ids.length > 0 ? ids : null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  onTagSearchChange(search: string): void {
+    this.tagFilterSearch.set(search);
+  }
+
+  onIncludeChildTagsChange(includeChildren: boolean): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, includeChildTags: includeChildren || null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
   resetFilters(): void {
     this.clearSelection();
     this.router.navigate(['/documents'], {
-      queryParams: { page: 1, partyIds: null },
+      queryParams: { page: 1, partyIds: null, tagIds: null, includeChildTags: null },
       queryParamsHandling: 'merge',
     });
   }

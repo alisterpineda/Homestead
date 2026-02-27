@@ -54,6 +54,18 @@ export interface FilterOption {
           />
         </div>
         <span hlmSeparator></span>
+        @if (showIncludeChildren()) {
+          <div class="p-1">
+            <label class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer">
+              <hlm-checkbox
+                [checked]="includeChildren()"
+                (checkedChange)="onIncludeChildrenToggle($event)"
+              />
+              <span>{{ includeChildrenLabel() }}</span>
+            </label>
+          </div>
+          <span hlmSeparator></span>
+        }
         <div class="max-h-[200px] overflow-y-auto p-1">
           @if (loading()) {
             <p class="py-4 text-center text-sm text-muted-foreground">Loading...</p>
@@ -97,8 +109,13 @@ export class FilterPopoverComponent {
   searchPlaceholder = input('Search...');
   loading = input(false);
 
+  showIncludeChildren = input(false);
+  includeChildren = input(false);
+  includeChildrenLabel = input('Include children');
+
   selectionChange = output<string[]>();
   searchChange = output<string>();
+  includeChildrenChange = output<boolean>();
 
   searchText = signal('');
 
@@ -136,5 +153,9 @@ export class FilterPopoverComponent {
     const value = (event.target as HTMLInputElement).value;
     this.searchText.set(value);
     this.searchChange.emit(value);
+  }
+
+  onIncludeChildrenToggle(checked: boolean): void {
+    this.includeChildrenChange.emit(checked);
   }
 }
