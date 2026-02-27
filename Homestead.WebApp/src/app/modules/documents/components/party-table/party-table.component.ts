@@ -1,9 +1,11 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { HlmTableImports } from '@/shared/components/spartan/table';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 
 @Component({
   selector: 'app-party-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTableImports],
   template: `
     <!-- Mobile card layout -->
     <div class="flex flex-col gap-3 md:hidden">
@@ -11,10 +13,7 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
         <button
           type="button"
           (click)="partySelect.emit(party.id)"
-          [class]="
-            'w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors ' +
-            (selectedPartyId() === party.id ? 'bg-accent' : 'hover:bg-muted')
-          "
+          class="w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors hover:bg-muted"
         >
           <p class="font-medium text-foreground">{{ party.name }}</p>
           @if (party.description) {
@@ -28,40 +27,39 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
     </div>
 
     <!-- Desktop table layout -->
-    <div class="hidden overflow-hidden rounded-lg border border-border md:block">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-border bg-muted">
-            <th class="px-4 py-3 font-medium text-muted-foreground">Name</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground">Description</th>
-            <th class="px-4 py-3 font-medium text-muted-foreground text-right">Documents</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (party of parties(); track party.id) {
-            <tr
-              tabindex="0"
-              (click)="partySelect.emit(party.id)"
-              (keydown.enter)="partySelect.emit(party.id)"
-              [class]="
-                'border-b border-border last:border-0 cursor-pointer transition-colors ' +
-                (selectedPartyId() === party.id ? 'bg-accent' : 'hover:bg-muted')
-              "
-            >
-              <td class="px-4 py-3 font-medium text-foreground">{{ party.name }}</td>
-              <td class="px-4 py-3 text-muted-foreground">
-                <span class="line-clamp-1">{{ party.description || '\u2014' }}</span>
-              </td>
-              <td class="px-4 py-3 text-muted-foreground text-right">{{ party.documentCount }}</td>
+    <div class="hidden overflow-hidden rounded-md border md:block">
+      <div hlmTableContainer>
+        <table hlmTable>
+          <thead hlmTHead>
+            <tr hlmTr>
+              <th hlmTh>Name</th>
+              <th hlmTh>Description</th>
+              <th hlmTh class="text-right">Documents</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody hlmTBody>
+            @for (party of parties(); track party.id) {
+              <tr
+                hlmTr
+                tabindex="0"
+                (click)="partySelect.emit(party.id)"
+                (keydown.enter)="partySelect.emit(party.id)"
+                class="cursor-pointer"
+              >
+                <td hlmTd class="font-medium">{{ party.name }}</td>
+                <td hlmTd class="text-muted-foreground">
+                  <span class="line-clamp-1">{{ party.description || '\u2014' }}</span>
+                </td>
+                <td hlmTd class="text-right text-muted-foreground">{{ party.documentCount }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </div>
   `,
 })
 export class PartyTableComponent {
   parties = input.required<GetPartiesResponse[]>();
-  selectedPartyId = input<string | null>(null);
   partySelect = output<string>();
 }

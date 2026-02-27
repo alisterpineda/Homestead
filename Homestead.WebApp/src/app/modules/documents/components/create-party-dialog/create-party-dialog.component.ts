@@ -1,0 +1,118 @@
+import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BrnDialog } from '@spartan-ng/brain/dialog';
+import { HlmDialogImports } from '@/shared/components/spartan/dialog';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
+import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { createParty } from '@/api/generated/fn/documents/create-party';
+import { toast } from 'ngx-sonner';
+
+@Component({
+  selector: 'app-create-party-dialog',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    HlmDialogImports,
+    HlmButton,
+    HlmInput,
+    HlmLabel,
+  ],
+  template: `
+    <hlm-dialog (stateChanged)="onStateChanged($event)">
+      <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
+        <ng-content />
+      </button>
+
+      <hlm-dialog-content *hlmDialogPortal="let ctx">
+        <div hlmDialogHeader>
+          <h2 hlmDialogTitle>Create Party</h2>
+          <p hlmDialogDescription>Add a new party to organize your documents.</p>
+        </div>
+
+        <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel for="create-party-name">Name</label>
+            <input
+              hlmInput
+              id="create-party-name"
+              placeholder="Enter a name for this party"
+              [value]="name()"
+              (input)="name.set(asInputValue($event))"
+            />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel for="create-party-desc">Description (optional)</label>
+            <input
+              hlmInput
+              id="create-party-desc"
+              placeholder="Enter a description"
+              [value]="description()"
+              (input)="description.set(asInputValue($event))"
+            />
+          </div>
+          @if (createError()) {
+            <p class="text-sm text-destructive">Failed to create party. Please try again.</p>
+          }
+          <div hlmDialogFooter>
+            <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
+            <button hlmBtn type="submit" [disabled]="!name().trim() || creating()">
+              {{ creating() ? 'Creating...' : 'Create' }}
+            </button>
+          </div>
+        </form>
+      </hlm-dialog-content>
+    </hlm-dialog>
+  `,
+})
+export class CreatePartyDialogComponent {
+  triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
+  created = output();
+
+  name = signal('');
+  description = signal('');
+  creating = signal(false);
+  createError = signal(false);
+
+  private dialog = viewChild(BrnDialog);
+  private http = inject(HttpClient);
+  private apiConfig = inject(ApiConfiguration);
+
+  asInputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  onStateChanged(state: 'open' | 'closed'): void {
+    if (state === 'open') {
+      this.name.set('');
+      this.description.set('');
+      this.creating.set(false);
+      this.createError.set(false);
+    }
+  }
+
+  handleSubmit(event: Event): void {
+    event.preventDefault();
+    const nameVal = this.name().trim();
+    if (!nameVal) return;
+
+    this.creating.set(true);
+    this.createError.set(false);
+
+    createParty(this.http, this.apiConfig.rootUrl, {
+      body: { name: nameVal, description: this.description().trim() || null },
+    }).subscribe({
+      next: () => {
+        this.creating.set(false);
+        toast.success('Party created.');
+        this.dialog()?.close();
+        this.created.emit();
+      },
+      error: () => {
+        this.creating.set(false);
+        this.createError.set(true);
+        toast.error('Failed to create party. Please try again.');
+      },
+    });
+  }
+}
