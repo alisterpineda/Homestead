@@ -86,8 +86,77 @@ import { toast } from 'ngx-sonner';
             </app-upload-dialog>
           </section>
         } @else {
-          @if (hasSelection()) {
-            <div class="flex items-center gap-2 mb-4">
+          <div class="relative">
+            <!-- Normal toolbar: always rendered to hold layout height -->
+            <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="relative flex-1 min-w-0">
+                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
+                    <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
+                    Columns
+                  </button>
+                  <ng-template #columnsMenu>
+                    <hlm-dropdown-menu class="w-40">
+                      @for (col of hideableColumns; track col.id) {
+                        <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
+                          <hlm-dropdown-menu-checkbox-indicator />
+                          {{ col.label }}
+                        </button>
+                      }
+                    </hlm-dropdown-menu>
+                  </ng-template>
+                  <div hlmButtonGroup aria-label="View mode">
+                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
+                      <ng-icon hlm name="lucideLayoutList" size="sm" />
+                    </button>
+                    <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('grid')" aria-label="Grid view">
+                      <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+                    </button>
+                  </div>
+                  <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
+                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    Upload
+                  </app-upload-dialog>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 mb-4">
+                <app-filter-popover
+                  label="Parties"
+                  [options]="partyOptions()"
+                  [selectedIds]="selectedPartyIds()"
+                  searchPlaceholder="Search parties..."
+                  [loading]="partyOptionsLoading()"
+                  (selectionChange)="onPartyFilterChange($event)"
+                  (searchChange)="onPartySearchChange($event)"
+                />
+                <app-filter-popover
+                  label="Tags"
+                  [options]="tagOptions()"
+                  [selectedIds]="selectedTagIds()"
+                  searchPlaceholder="Search tags..."
+                  [loading]="tagOptionsLoading()"
+                  [showIncludeChildren]="true"
+                  [includeChildren]="includeChildTags()"
+                  includeChildrenLabel="Include sub-tags"
+                  (selectionChange)="onTagFilterChange($event)"
+                  (searchChange)="onTagSearchChange($event)"
+                  (includeChildrenChange)="onIncludeChildTagsChange($event)"
+                />
+                @if (hasActiveFilters()) {
+                  <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
+                    Reset
+                    <ng-icon hlm name="lucideX" size="xs" />
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Selection toolbar: absolute overlay -->
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
               </span>
@@ -118,72 +187,7 @@ import { toast } from 'ngx-sonner';
                 </hlm-alert-dialog>
               </div>
             </div>
-          } @else {
-            <div class="flex items-center gap-2 mb-3">
-              <div class="relative flex-1 min-w-0">
-                <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
-              </div>
-              <div class="flex items-center gap-2">
-                <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
-                  <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
-                  Columns
-                </button>
-                <ng-template #columnsMenu>
-                  <hlm-dropdown-menu class="w-40">
-                    @for (col of hideableColumns; track col.id) {
-                      <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
-                        <hlm-dropdown-menu-checkbox-indicator />
-                        {{ col.label }}
-                      </button>
-                    }
-                  </hlm-dropdown-menu>
-                </ng-template>
-                <div hlmButtonGroup aria-label="View mode">
-                  <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
-                    <ng-icon hlm name="lucideLayoutList" size="sm" />
-                  </button>
-                  <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('grid')" aria-label="Grid view">
-                    <ng-icon hlm name="lucideLayoutGrid" size="sm" />
-                  </button>
-                </div>
-                <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
-                  <ng-icon hlm name="lucidePlus" size="sm" />
-                  Upload
-                </app-upload-dialog>
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 mb-4">
-              <app-filter-popover
-                label="Parties"
-                [options]="partyOptions()"
-                [selectedIds]="selectedPartyIds()"
-                searchPlaceholder="Search parties..."
-                [loading]="partyOptionsLoading()"
-                (selectionChange)="onPartyFilterChange($event)"
-                (searchChange)="onPartySearchChange($event)"
-              />
-              <app-filter-popover
-                label="Tags"
-                [options]="tagOptions()"
-                [selectedIds]="selectedTagIds()"
-                searchPlaceholder="Search tags..."
-                [loading]="tagOptionsLoading()"
-                [showIncludeChildren]="true"
-                [includeChildren]="includeChildTags()"
-                includeChildrenLabel="Include sub-tags"
-                (selectionChange)="onTagFilterChange($event)"
-                (searchChange)="onTagSearchChange($event)"
-                (includeChildrenChange)="onIncludeChildTagsChange($event)"
-              />
-              @if (hasActiveFilters()) {
-                <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
-                  Reset
-                  <ng-icon hlm name="lucideX" size="xs" />
-                </button>
-              }
-            </div>
-          }
+          </div>
 
           @if (result.items.length === 0) {
             <section hlmEmpty>
