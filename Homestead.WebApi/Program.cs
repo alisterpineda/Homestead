@@ -5,7 +5,6 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Features.Documents;
 using Homestead.WebApi.Features.Processing;
-using Homestead.WebApi.Features.Tags;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
 using Homestead.WebApi.Persistence;
@@ -192,7 +191,6 @@ authGroup.MapGet("/user-info", async (
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
-versionedApi.MapTagsEndpoints();
 versionedApi.MapProcessingEndpoints();
 
 if (!string.IsNullOrEmpty(connectionString))

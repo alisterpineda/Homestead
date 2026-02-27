@@ -61,12 +61,12 @@ export type { UpdateParty$Params as UpdateParty$Params } from './fn/documents/up
 export { updateParty as updateParty } from './fn/documents/update-party';
 export type { DeleteParty$Params as DeleteParty$Params } from './fn/documents/delete-party';
 export { deleteParty as deleteParty } from './fn/documents/delete-party';
-export type { GetTags$Params as GetTags$Params } from './fn/tags/get-tags';
-export { getTags as getTags } from './fn/tags/get-tags';
-export type { CreateTag$Params as CreateTag$Params } from './fn/tags/create-tag';
-export { createTag as createTag } from './fn/tags/create-tag';
-export type { DeleteTag$Params as DeleteTag$Params } from './fn/tags/delete-tag';
-export { deleteTag as deleteTag } from './fn/tags/delete-tag';
+export type { GetTags$Params as GetTags$Params } from './fn/documents/get-tags';
+export { getTags as getTags } from './fn/documents/get-tags';
+export type { CreateTag$Params as CreateTag$Params } from './fn/documents/create-tag';
+export { createTag as createTag } from './fn/documents/create-tag';
+export type { DeleteTag$Params as DeleteTag$Params } from './fn/documents/delete-tag';
+export { deleteTag as deleteTag } from './fn/documents/delete-tag';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
 export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
 export type { RetriggerProcessingJob$Params as RetriggerProcessingJob$Params } from './fn/processing/retrigger-processing-job';

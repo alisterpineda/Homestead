@@ -33,4 +33,4 @@ export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Param
   );
 }
 
-getTags.PATH = '/api/v1/tags';
+getTags.PATH = '/api/v1/documents/tags';

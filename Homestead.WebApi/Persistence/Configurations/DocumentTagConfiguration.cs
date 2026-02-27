@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Tags;
+using Homestead.WebApi.Domains.Documents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

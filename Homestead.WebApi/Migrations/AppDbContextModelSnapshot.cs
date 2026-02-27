@@ -69,6 +69,23 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("documents", "documents");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentTag", b =>
+                {
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TagId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DocumentId", "TagId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("document_tags", "documents");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -129,6 +146,40 @@ namespace Homestead.WebApi.Migrations
                         .IsUnique();
 
                     b.ToTable("document_versions", "documents");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.Tag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("Path")
+                        .IsUnique();
+
+                    b.ToTable("tags", "documents");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Identity.AppUser", b =>
@@ -304,57 +355,6 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("jobs", "processing");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domains.Tags.DocumentTag", b =>
-                {
-                    b.Property<Guid>("DocumentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TagId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("DocumentId", "TagId");
-
-                    b.HasIndex("DocumentId");
-
-                    b.HasIndex("TagId");
-
-                    b.ToTable("document_tags", "documents");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domains.Tags.Tag", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Path")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("Path")
-                        .IsUnique();
-
-                    b.ToTable("tags", "tags");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -502,6 +502,25 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("OwnerUser");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentTag", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Documents.Document", "Document")
+                        .WithMany("DocumentTags")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domains.Documents.Tag", "Tag")
+                        .WithMany("DocumentTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Tag");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentVersion", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domains.Documents.Document", "Document")
@@ -511,6 +530,16 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired();
 
                     b.Navigation("Document");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.Tag", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Documents.Tag", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Parties.DocumentParty", b =>
@@ -530,35 +559,6 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Document");
 
                     b.Navigation("Party");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domains.Tags.DocumentTag", b =>
-                {
-                    b.HasOne("Homestead.WebApi.Domains.Documents.Document", "Document")
-                        .WithMany("DocumentTags")
-                        .HasForeignKey("DocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Homestead.WebApi.Domains.Tags.Tag", "Tag")
-                        .WithMany("DocumentTags")
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Document");
-
-                    b.Navigation("Tag");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domains.Tags.Tag", b =>
-                {
-                    b.HasOne("Homestead.WebApi.Domains.Tags.Tag", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -621,16 +621,16 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Versions");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domains.Parties.Party", b =>
-                {
-                    b.Navigation("DocumentParties");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domains.Tags.Tag", b =>
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.Tag", b =>
                 {
                     b.Navigation("Children");
 
                     b.Navigation("DocumentTags");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Parties.Party", b =>
+                {
+                    b.Navigation("DocumentParties");
                 });
 #pragma warning restore 612, 618
         }

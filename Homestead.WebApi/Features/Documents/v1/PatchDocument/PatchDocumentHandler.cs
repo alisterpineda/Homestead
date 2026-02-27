@@ -1,6 +1,6 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Parties;
-using Homestead.WebApi.Domains.Tags;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;

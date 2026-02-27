@@ -1,9 +1,9 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Tags;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Tags.v1.CreateTag;
+namespace Homestead.WebApi.Features.Documents.v1.CreateTag;
 
 public class CreateTagHandler(AppDbContext db)
     : ICommandHandler<CreateTagRequest, CreateTagResponse>

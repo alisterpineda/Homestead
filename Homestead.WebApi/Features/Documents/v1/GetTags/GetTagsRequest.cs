@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace Homestead.WebApi.Features.Tags.v1.GetTags;
+namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public record GetTagsRequest
 {

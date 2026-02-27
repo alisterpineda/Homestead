@@ -1,8 +1,9 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Tags.v1.DeleteTag;
+namespace Homestead.WebApi.Features.Documents.v1.DeleteTag;
 
 public class DeleteTagHandler(AppDbContext db)
     : ICommandHandler<DeleteTagRequest, DeleteTagResponse?>
@@ -43,7 +44,7 @@ public class DeleteTagHandler(AppDbContext db)
         return new DeleteTagResponse();
     }
 
-    private async Task UpdateDescendantPathsAsync(Domains.Tags.Tag parent, CancellationToken ct)
+    private async Task UpdateDescendantPathsAsync(Tag parent, CancellationToken ct)
     {
         var children = await db.Tags
             .Where(t => t.ParentId == parent.Id)

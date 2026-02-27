@@ -15,7 +15,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map } from 'rxjs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getTags } from '@/api/generated/fn/tags/get-tags';
+import { getTags } from '@/api/generated/fn/documents/get-tags';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 
 @Component({

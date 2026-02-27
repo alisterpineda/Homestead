@@ -15,6 +15,9 @@ using Homestead.WebApi.Features.Documents.v1.GetParties;
 using Homestead.WebApi.Features.Documents.v1.GetParty;
 using Homestead.WebApi.Features.Documents.v1.PatchDocument;
 using Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
+using Homestead.WebApi.Features.Documents.v1.CreateTag;
+using Homestead.WebApi.Features.Documents.v1.DeleteTag;
+using Homestead.WebApi.Features.Documents.v1.GetTags;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
 namespace Homestead.WebApi.Features.Documents;
@@ -51,6 +54,11 @@ public static class DocumentsModule
         GetPartiesEndpoint.Map(parties);
         GetPartyEndpoint.Map(parties);
         UpdatePartyEndpoint.Map(parties);
+
+        var tags = v1.MapGroup("/tags");
+        CreateTagEndpoint.Map(tags);
+        DeleteTagEndpoint.Map(tags);
+        GetTagsEndpoint.Map(tags);
 
         return app;
     }

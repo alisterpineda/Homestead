@@ -1,4 +1,4 @@
-namespace Homestead.WebApi.Domains.Tags;
+namespace Homestead.WebApi.Domains.Documents;
 
 public class Tag
 {

@@ -1,4 +1,4 @@
-namespace Homestead.WebApi.Features.Tags.v1.DeleteTag;
+namespace Homestead.WebApi.Features.Documents.v1.DeleteTag;
 
 public static class DeleteTagEndpoint
 {

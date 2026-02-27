@@ -28,4 +28,4 @@ export function deleteTag(http: HttpClient, rootUrl: string, params: DeleteTag$P
   );
 }
 
-deleteTag.PATH = '/api/v1/tags/{id}';
+deleteTag.PATH = '/api/v1/documents/tags/{id}';

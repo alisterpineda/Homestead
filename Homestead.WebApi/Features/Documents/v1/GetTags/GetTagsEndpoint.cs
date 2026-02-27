@@ -1,4 +1,4 @@
-namespace Homestead.WebApi.Features.Tags.v1.GetTags;
+namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public static class GetTagsEndpoint
 {

@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Tags;
+using Homestead.WebApi.Domains.Documents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,7 +8,7 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
 {
     public void Configure(EntityTypeBuilder<Tag> builder)
     {
-        builder.ToTable("tags", "tags");
+        builder.ToTable("tags", "documents");
 
         builder.HasKey(t => t.Id);
 

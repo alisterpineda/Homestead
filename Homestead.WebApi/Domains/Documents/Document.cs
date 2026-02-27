@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
-using Homestead.WebApi.Domains.Tags;
 using NpgsqlTypes;
 
 namespace Homestead.WebApi.Domains.Documents;

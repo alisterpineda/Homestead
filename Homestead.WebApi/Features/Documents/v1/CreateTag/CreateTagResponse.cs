@@ -1,6 +1,6 @@
-namespace Homestead.WebApi.Features.Tags.v1.GetTags;
+namespace Homestead.WebApi.Features.Documents.v1.CreateTag;
 
-public record GetTagsResponse
+public record CreateTagResponse
 {
     public required Guid Id { get; init; }
     public required string Name { get; init; }

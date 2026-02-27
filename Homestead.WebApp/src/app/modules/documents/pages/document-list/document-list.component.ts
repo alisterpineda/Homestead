@@ -24,7 +24,7 @@ import { UploadDialogComponent } from '../../components/upload-dialog/upload-dia
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { getTags } from '@/api/generated/fn/tags/get-tags';
+import { getTags } from '@/api/generated/fn/documents/get-tags';
 import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';

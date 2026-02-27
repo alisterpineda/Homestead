@@ -2,7 +2,6 @@ using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Processing;
-using Homestead.WebApi.Domains.Tags;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;

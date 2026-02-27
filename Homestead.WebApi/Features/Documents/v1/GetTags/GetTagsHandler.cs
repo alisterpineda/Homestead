@@ -2,7 +2,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Tags.v1.GetTags;
+namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
     : IQueryHandler<GetTagsRequest, IReadOnlyList<GetTagsResponse>>
