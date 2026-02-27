@@ -146,6 +146,8 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
           <app-pagination
             [page]="+result.page"
             [totalPages]="+(result.totalPages ?? 0)"
+            [totalCount]="+result.totalCount"
+            [pageSize]="+result.pageSize"
             (pageChange)="onPageChange($event)"
           />
         }

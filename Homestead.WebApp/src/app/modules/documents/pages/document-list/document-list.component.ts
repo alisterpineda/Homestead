@@ -180,7 +180,10 @@ import { toast } from 'ngx-sonner';
           <app-pagination
             [page]="+result.page"
             [totalPages]="+(result.totalPages ?? 0)"
+            [totalCount]="+result.totalCount"
+            [pageSize]="+result.pageSize"
             (pageChange)="onPageChange($event)"
+            (pageSizeChange)="onPageSizeChange($event)"
           />
         }
       }
@@ -312,20 +315,26 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: 1 },
   );
 
+  private pageSize = toSignal(
+    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? 10))),
+    { initialValue: 10 },
+  );
+
   data = toSignal(
     combineLatest([
       toObservable(this.page),
+      toObservable(this.pageSize),
       toObservable(this.refreshTrigger),
       toObservable(this.selectedPartyIds),
       toObservable(this.selectedTagIds),
       toObservable(this.includeChildTags),
     ]).pipe(
-      switchMap(([page, , partyIds, tagIds, includeChildTags]) => {
+      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags]) => {
         this.loading.set(true);
         this.error.set(false);
         return getDocuments(this.http, this.apiConfig.rootUrl, {
           Page: page,
-          PageSize: 10,
+          PageSize: pageSize,
           PartyIds: partyIds.length > 0 ? partyIds : undefined,
           TagIds: tagIds.length > 0 ? tagIds : undefined,
           IncludeChildTags: includeChildTags,
@@ -349,6 +358,14 @@ export class DocumentListComponent implements OnDestroy {
     this.clearSelection();
     this.router.navigate(['/documents'], {
       queryParams: { page: newPage },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  onPageSizeChange(newSize: number): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
     });
   }
