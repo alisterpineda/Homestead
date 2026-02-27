@@ -114,9 +114,9 @@ import { toast } from 'ngx-sonner';
               </button>
               <ng-template #versionMenu>
                 <hlm-dropdown-menu>
-                  @for (rev of sortedVersions(); track rev.id) {
+                  @for (rev of sortedVersions(); track rev.id; let first = $first) {
                     <button hlmDropdownMenuItem (triggered)="onVersionSelected(rev.id)">
-                      {{ versionLabel(rev) }}
+                      {{ first ? 'Latest' : versionLabel(rev) }}
                     </button>
                   }
                 </hlm-dropdown-menu>
@@ -462,7 +462,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   selectedVersionLabel = computed(() => {
     const ver = this.activeVersion();
-    return ver ? this.versionLabel(ver) : 'Version';
+    if (!ver) return 'Version';
+    const latest = this.latestVersion();
+    return ver.id === latest?.id ? 'Latest' : this.versionLabel(ver);
   });
 
   // Version detail (for extractedText of non-latest versions)
@@ -615,7 +617,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   versionLabel(ver: { versionNumber: number | string; label?: string | null }): string {
-    const base = `Version ${ver.versionNumber}`;
+    const base = `v${ver.versionNumber}`;
     return ver.label ? `${base} - ${ver.label}` : base;
   }
 
