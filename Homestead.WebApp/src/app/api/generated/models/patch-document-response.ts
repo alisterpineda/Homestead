@@ -3,7 +3,7 @@
 
 import { PartyDto } from '../models/party-dto';
 import { TagDto } from '../models/tag-dto';
-export interface UpdateDocumentResponse {
+export interface PatchDocumentResponse {
   contentType: string;
   createdAt: string;
   createdByUserId?: (string | null);

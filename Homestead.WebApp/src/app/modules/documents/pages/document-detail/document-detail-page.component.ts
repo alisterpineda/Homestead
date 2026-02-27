@@ -50,9 +50,11 @@ import { formatBytes } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
 import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-version';
-import { updateDocument } from '@/api/generated/fn/documents/update-document';
-import { updateDocumentVersion } from '@/api/generated/fn/documents/update-document-version';
+import { patchDocument } from '@/api/generated/fn/documents/patch-document';
+import { patchDocumentVersion } from '@/api/generated/fn/documents/patch-document-version';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
+import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
+import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
@@ -787,28 +789,17 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const ver = this.activeVersion();
     this.saving.set(true);
 
-    const docUpdate$ = this.hasDocumentChanges()
-      ? updateDocument(this.http, this.apiConfig.rootUrl, {
-          id,
-          body: {
-            name: this.editName(),
-            documentDate: this.editDocumentDate() || null,
-            validFrom: this.editValidFrom() || null,
-            validUntil: this.editValidUntil() || null,
-            tagPaths: this.editTags(),
-            partyIds: this.editParties().map((p) => p.id),
-          },
-        })
+    const docOps = this.buildDocumentPatchOps();
+    const docUpdate$ = docOps.length > 0
+      ? patchDocument(this.http, this.apiConfig.rootUrl, { id, body: docOps })
       : of(null);
 
-    const versionUpdate$ = this.hasVersionChanges() && ver
-      ? updateDocumentVersion(this.http, this.apiConfig.rootUrl, {
+    const verOps = this.buildVersionPatchOps();
+    const versionUpdate$ = verOps.length > 0 && ver
+      ? patchDocumentVersion(this.http, this.apiConfig.rootUrl, {
           documentId: id,
           id: ver.id,
-          body: {
-            label: this.editVersionLabel() || null,
-            notes: this.editVersionNotes() || null,
-          },
+          body: verOps,
         })
       : of(null);
 
@@ -823,5 +814,53 @@ export class DocumentDetailPageComponent implements OnDestroy {
         toast.error('Failed to save changes.');
       },
     });
+  }
+
+  private buildDocumentPatchOps(): JsonPatchDocument {
+    const doc = this.document();
+    if (!doc) return [];
+    const ops: JsonPatchDocument = [];
+
+    if (this.editName() !== doc.name) {
+      ops.push(replace('/name', this.editName()));
+    }
+    if (this.editDocumentDate() !== this.toDateInputValue(doc.documentDate)) {
+      ops.push(replace('/documentDate', this.editDocumentDate() || null));
+    }
+    if (this.editValidFrom() !== this.toDateInputValue(doc.validFrom)) {
+      ops.push(replace('/validFrom', this.editValidFrom() || null));
+    }
+    if (this.editValidUntil() !== this.toDateInputValue(doc.validUntil)) {
+      ops.push(replace('/validUntil', this.editValidUntil() || null));
+    }
+
+    const origTags = (doc.tags?.map((t) => t.path) ?? []).slice().sort();
+    const currTags = this.editTags().slice().sort();
+    if (origTags.length !== currTags.length || origTags.some((t, i) => t !== currTags[i])) {
+      ops.push(replace('/tagPaths', this.editTags()));
+    }
+
+    const origPartyIds = (doc.parties?.map((p) => p.id) ?? []).slice().sort();
+    const currPartyIds = this.editParties().map((p) => p.id).slice().sort();
+    if (origPartyIds.length !== currPartyIds.length || origPartyIds.some((pid, i) => pid !== currPartyIds[i])) {
+      ops.push(replace('/partyIds', this.editParties().map((p) => p.id)));
+    }
+
+    return ops;
+  }
+
+  private buildVersionPatchOps(): JsonPatchDocument {
+    const ver = this.activeVersion();
+    if (!ver) return [];
+    const ops: JsonPatchDocument = [];
+
+    if (this.editVersionLabel() !== (ver.label ?? '')) {
+      ops.push(replace('/label', this.editVersionLabel() || null));
+    }
+    if (this.editVersionNotes() !== (ver.notes ?? '')) {
+      ops.push(replace('/notes', this.editVersionNotes() || null));
+    }
+
+    return ops;
   }
 }

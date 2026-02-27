@@ -7,19 +7,19 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { UpdateDocumentRequest } from '../../models/update-document-request';
-import { UpdateDocumentResponse } from '../../models/update-document-response';
+import { JsonPatchDocument } from '../../models/json-patch-document';
+import { PatchDocumentResponse } from '../../models/patch-document-response';
 
-export interface UpdateDocument$Params {
+export interface PatchDocument$Params {
   id: string;
-      body: UpdateDocumentRequest
+      body: JsonPatchDocument
 }
 
-export function updateDocument(http: HttpClient, rootUrl: string, params: UpdateDocument$Params, context?: HttpContext): Observable<StrictHttpResponse<UpdateDocumentResponse>> {
-  const rb = new RequestBuilder(rootUrl, updateDocument.PATH, 'put');
+export function patchDocument(http: HttpClient, rootUrl: string, params: PatchDocument$Params, context?: HttpContext): Observable<StrictHttpResponse<PatchDocumentResponse>> {
+  const rb = new RequestBuilder(rootUrl, patchDocument.PATH, 'patch');
   if (params) {
     rb.path('id', params.id, {});
-    rb.body(params.body, 'application/json');
+    rb.body(params.body, 'application/json-patch+json');
   }
 
   return http.request(
@@ -27,9 +27,9 @@ export function updateDocument(http: HttpClient, rootUrl: string, params: Update
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<UpdateDocumentResponse>;
+      return r as StrictHttpResponse<PatchDocumentResponse>;
     })
   );
 }
 
-updateDocument.PATH = '/api/v1/documents/{id}';
+patchDocument.PATH = '/api/v1/documents/{id}';

@@ -1,6 +1,6 @@
-namespace Homestead.WebApi.Features.Documents.v1.UpdateDocumentVersion;
+namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
-public record UpdateDocumentVersionResponse
+public record PatchDocumentVersionResponse
 {
     public required Guid Id { get; init; }
     public required int VersionNumber { get; init; }

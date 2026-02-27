@@ -2,47 +2,78 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Tags;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Documents.v1.UpdateDocument;
+namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
-public class UpdateDocumentHandler(AppDbContext db)
-    : ICommandHandler<UpdateDocumentCommand, IResult>
+public class PatchDocumentHandler(AppDbContext db)
+    : ICommandHandler<PatchDocumentCommand, IResult>
 {
-    public async Task<IResult> HandleAsync(UpdateDocumentCommand request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
     {
         var document = await db.Documents
-            .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
             .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
 
         if (document is null)
             return Results.NotFound();
 
+        // Populate model from current DB state
+        var model = new PatchDocumentModel
+        {
+            Name = document.Name,
+            DocumentDate = document.DocumentDate,
+            ValidFrom = document.ValidFrom,
+            ValidUntil = document.ValidUntil,
+            TagPaths = document.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
+            PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList()
+        };
+
+        // Apply patch operations
+        var errors = new List<JsonPatchError>();
+        request.PatchDocument.ApplyTo(model, error => errors.Add(error));
+
+        if (errors.Count > 0)
+            return Results.BadRequest(new
+            {
+                Errors = errors.Select(e => new
+                {
+                    Operation = e.Operation?.ToString(),
+                    e.ErrorMessage
+                })
+            });
+
+        // Validate
+        if (string.IsNullOrWhiteSpace(model.Name))
+            return Results.BadRequest(new { Error = "Name is required." });
+
         // Validate party IDs
-        if (request.PartyIds.Count > 0)
+        if (model.PartyIds.Count > 0)
         {
             var existingPartyIds = await db.Parties
-                .Where(p => request.PartyIds.Contains(p.Id))
+                .Where(p => model.PartyIds.Contains(p.Id))
                 .Select(p => p.Id)
                 .ToListAsync(ct);
 
-            var invalidIds = request.PartyIds.Except(existingPartyIds).ToList();
+            var invalidIds = model.PartyIds.Except(existingPartyIds).ToList();
 
             if (invalidIds.Count > 0)
                 return Results.BadRequest(new { InvalidPartyIds = invalidIds });
         }
 
-        document.Name = request.Name;
-        document.DocumentDate = request.DocumentDate;
-        document.ValidFrom = request.ValidFrom;
-        document.ValidUntil = request.ValidUntil;
+        // Update entity from patched model
+        document.Name = model.Name;
+        document.DocumentDate = model.DocumentDate;
+        document.ValidFrom = model.ValidFrom;
+        document.ValidUntil = model.ValidUntil;
 
         // Clear existing tag associations
         document.DocumentTags.Clear();
 
         // Resolve or create each tag path and create associations
-        foreach (var tagPath in request.TagPaths)
+        foreach (var tagPath in model.TagPaths)
         {
             var tag = await ResolveOrCreateTagAsync(tagPath, ct);
             document.DocumentTags.Add(new DocumentTag
@@ -55,7 +86,7 @@ public class UpdateDocumentHandler(AppDbContext db)
         // Clear existing party associations and reassign
         document.DocumentParties.Clear();
 
-        foreach (var partyId in request.PartyIds)
+        foreach (var partyId in model.PartyIds)
         {
             document.DocumentParties.Add(new DocumentParty
             {
@@ -115,7 +146,7 @@ public class UpdateDocumentHandler(AppDbContext db)
             .OrderByDescending(r => r.VersionNumber)
             .FirstAsync(ct);
 
-        return Results.Ok(new UpdateDocumentResponse
+        return Results.Ok(new PatchDocumentResponse
         {
             Id = document.Id,
             Name = document.Name,

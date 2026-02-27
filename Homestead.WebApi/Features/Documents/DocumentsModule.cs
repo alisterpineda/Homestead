@@ -13,8 +13,8 @@ using Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 using Homestead.WebApi.Features.Documents.v1.GetDocuments;
 using Homestead.WebApi.Features.Documents.v1.GetParties;
 using Homestead.WebApi.Features.Documents.v1.GetParty;
-using Homestead.WebApi.Features.Documents.v1.UpdateDocument;
-using Homestead.WebApi.Features.Documents.v1.UpdateDocumentVersion;
+using Homestead.WebApi.Features.Documents.v1.PatchDocument;
+using Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
 namespace Homestead.WebApi.Features.Documents;
@@ -36,14 +36,14 @@ public static class DocumentsModule
         GetDocumentEndpoint.Map(v1);
         GetDocumentFileEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
-        UpdateDocumentEndpoint.Map(v1);
+        PatchDocumentEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);
         DeleteDocumentVersionEndpoint.Map(versions);
         GetDocumentVersionsEndpoint.Map(versions);
         GetDocumentVersionEndpoint.Map(versions);
-        UpdateDocumentVersionEndpoint.Map(versions);
+        PatchDocumentVersionEndpoint.Map(versions);
 
         var parties = v1.MapGroup("/parties");
         CreatePartyEndpoint.Map(parties);

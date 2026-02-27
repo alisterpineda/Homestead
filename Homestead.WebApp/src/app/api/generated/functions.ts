@@ -35,10 +35,10 @@ export type { CreateDocument$Params as CreateDocument$Params } from './fn/docume
 export { createDocument as createDocument } from './fn/documents/create-document';
 export type { GetDocument$Params as GetDocument$Params } from './fn/documents/get-document';
 export { getDocument as getDocument } from './fn/documents/get-document';
-export type { UpdateDocument$Params as UpdateDocument$Params } from './fn/documents/update-document';
-export { updateDocument as updateDocument } from './fn/documents/update-document';
 export type { DeleteDocument$Params as DeleteDocument$Params } from './fn/documents/delete-document';
 export { deleteDocument as deleteDocument } from './fn/documents/delete-document';
+export type { PatchDocument$Params as PatchDocument$Params } from './fn/documents/patch-document';
+export { patchDocument as patchDocument } from './fn/documents/patch-document';
 export type { GetDocumentFile$Params as GetDocumentFile$Params } from './fn/documents/get-document-file';
 export { getDocumentFile as getDocumentFile } from './fn/documents/get-document-file';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';
@@ -47,10 +47,10 @@ export type { CreateDocumentVersion$Params as CreateDocumentVersion$Params } fro
 export { createDocumentVersion as createDocumentVersion } from './fn/documents/create-document-version';
 export type { GetDocumentVersion$Params as GetDocumentVersion$Params } from './fn/documents/get-document-version';
 export { getDocumentVersion as getDocumentVersion } from './fn/documents/get-document-version';
-export type { UpdateDocumentVersion$Params as UpdateDocumentVersion$Params } from './fn/documents/update-document-version';
-export { updateDocumentVersion as updateDocumentVersion } from './fn/documents/update-document-version';
 export type { DeleteDocumentVersion$Params as DeleteDocumentVersion$Params } from './fn/documents/delete-document-version';
 export { deleteDocumentVersion as deleteDocumentVersion } from './fn/documents/delete-document-version';
+export type { PatchDocumentVersion$Params as PatchDocumentVersion$Params } from './fn/documents/patch-document-version';
+export { patchDocumentVersion as patchDocumentVersion } from './fn/documents/patch-document-version';
 export type { GetParties$Params as GetParties$Params } from './fn/documents/get-parties';
 export { getParties as getParties } from './fn/documents/get-parties';
 export type { CreateParty$Params as CreateParty$Params } from './fn/documents/create-party';

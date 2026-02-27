@@ -30,12 +30,15 @@ export type { HttpValidationProblemDetails } from './models/http-validation-prob
 export type { IFormFile } from './models/i-form-file';
 export type { InfoRequest } from './models/info-request';
 export type { InfoResponse } from './models/info-response';
+export type { JsonPatchDocument } from './models/json-patch-document';
 export type { LoginRequest } from './models/login-request';
 export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated-response-of-get-documents-response';
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
 export type { PartyDto } from './models/party-dto';
+export type { PatchDocumentResponse } from './models/patch-document-response';
+export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';
 export type { ProcessingEntityType } from './models/processing-entity-type';
 export type { ProcessingJobStatus } from './models/processing-job-status';
 export type { ProcessingJobType } from './models/processing-job-type';
@@ -47,9 +50,5 @@ export type { RetriggerProcessingJobResponse } from './models/retrigger-processi
 export type { TagDto } from './models/tag-dto';
 export type { TwoFactorRequest } from './models/two-factor-request';
 export type { TwoFactorResponse } from './models/two-factor-response';
-export type { UpdateDocumentRequest } from './models/update-document-request';
-export type { UpdateDocumentResponse } from './models/update-document-response';
-export type { UpdateDocumentVersionRequest } from './models/update-document-version-request';
-export type { UpdateDocumentVersionResponse } from './models/update-document-version-response';
 export type { UpdatePartyRequest } from './models/update-party-request';
 export type { UpdatePartyResponse } from './models/update-party-response';
