@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, effect, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, effect, signal, computed, untracked } from '@angular/core';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type ColumnDef,
@@ -47,16 +47,22 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTableImports, FlexRenderDirective],
   template: `
-    <div class="overflow-hidden rounded-md border">
+    <div
+      class="overflow-hidden rounded-md border"
+      [class.select-none]="isResizing()"
+      [style]="columnSizeVars()"
+    >
       <div hlmTableContainer>
-        <table hlmTable>
+        <table hlmTable style="table-layout: fixed; width: 100%">
           <thead hlmTHead>
             @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
               <tr hlmTr>
                 @for (header of headerGroup.headers; track header.id) {
                   <th
                     hlmTh
+                    class="group/resize relative"
                     [class]="getThClass(header.column.id)"
+                    [style.width]="'var(--header-' + header.id + '-size)'"
                     [attr.colSpan]="header.colSpan"
                   >
                     @if (!header.isPlaceholder) {
@@ -65,6 +71,16 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
                       >
                         <div [innerHTML]="headerText"></div>
                       </ng-container>
+                    }
+                    @if (header.column.getCanResize()) {
+                      <div
+                        class="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none touch-none
+                               opacity-0 group-hover/resize:opacity-100 bg-border"
+                        [class.!opacity-100]="header.column.getIsResizing()"
+                        [class.!bg-primary]="header.column.getIsResizing()"
+                        (mousedown)="header.getResizeHandler()($event)"
+                        (touchstart)="header.getResizeHandler()($event)"
+                      ></div>
                     }
                   </th>
                 }
@@ -85,6 +101,7 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
                   <td
                     hlmTd
                     [class]="getTdClass(cell.column.id)"
+                    [style.width]="'var(--col-' + cell.column.id + '-size)'"
                     [attr.data-click-passthrough]="cell.column.id === 'select' ? '' : null"
                     (click)="cell.column.id === 'select' ? $event.stopPropagation() : null"
                     (keydown.enter)="cell.column.id === 'select' ? $event.stopPropagation() : null"
@@ -124,6 +141,10 @@ export class DocumentTableComponent {
       cell: () => flexRenderComponent(TableRowSelection),
       enableSorting: false,
       enableHiding: false,
+      enableResizing: false,
+      size: 48,
+      minSize: 48,
+      maxSize: 48,
     },
     {
       accessorKey: 'name',
@@ -131,30 +152,40 @@ export class DocumentTableComponent {
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
       cell: (info) => `<span class="font-medium">${escapeHtml(info.getValue<string>())}</span>`,
       enableHiding: false,
+      size: 300,
+      minSize: 120,
     },
     {
       id: 'tags',
       header: 'Tags',
       enableSorting: false,
       cell: () => flexRenderComponent(TagsCell),
+      size: 200,
+      minSize: 100,
     },
     {
       id: 'parties',
       header: 'Parties',
       enableSorting: false,
       cell: () => flexRenderComponent(PartiesCell),
+      size: 200,
+      minSize: 100,
     },
     {
       accessorKey: 'contentType',
       id: 'contentType',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Content Type' } }),
       cell: (info) => `<span class="text-muted-foreground">${escapeHtml(info.getValue<string>())}</span>`,
+      size: 150,
+      minSize: 80,
     },
     {
       accessorKey: 'fileSize',
       id: 'fileSize',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'File Size' } }),
       cell: () => flexRenderComponent(FileSizeCell),
+      size: 100,
+      minSize: 60,
     },
   ];
 
@@ -166,6 +197,9 @@ export class DocumentTableComponent {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     enableRowSelection: true,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
+    columnResizeDirection: 'ltr',
     onSortingChange: (updater) => {
       const newSorting = updater instanceof Function ? updater(this._sorting()) : updater;
       this._sorting.set(newSorting);
@@ -195,18 +229,41 @@ export class DocumentTableComponent {
     },
   }));
 
+  /** CSS variable map for column sizes — bound on the container so the CSS engine handles propagation. */
+  protected readonly columnSizeVars = computed(() => {
+    const sizing = this.table.getState().columnSizing;
+    const sizingInfo = this.table.getState().columnSizingInfo;
+    // Read both to establish signal dependencies
+    void sizing;
+    void sizingInfo;
+
+    const headers = untracked(() => this.table.getFlatHeaders());
+    const vars: Record<string, string> = {};
+    for (const header of headers) {
+      vars[`--header-${header.id}-size`] = `${header.getSize()}px`;
+      vars[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`;
+    }
+    return vars;
+  });
+
+  protected readonly isResizing = computed(
+    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+  );
+
   private readonly TH_CLASSES: Record<string, string> = {
-    select: 'w-12',
+    select: '',
     parties: 'hidden xl:table-cell',
     contentType: 'hidden lg:table-cell',
     fileSize: 'text-right',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
-    select: 'w-12',
-    parties: 'hidden xl:table-cell',
-    contentType: 'hidden lg:table-cell',
-    fileSize: 'text-right',
+    select: '',
+    parties: 'hidden xl:table-cell overflow-hidden',
+    contentType: 'hidden lg:table-cell overflow-hidden',
+    fileSize: 'text-right overflow-hidden',
+    name: 'overflow-hidden',
+    tags: 'overflow-hidden',
   };
 
   getThClass(columnId: string): string {
