@@ -10,7 +10,7 @@ import { RequestBuilder } from '../../request-builder';
 
 export interface GetDocumentFile$Params {
   id: string;
-  revisionId?: string;
+  versionId?: string;
   download?: boolean;
 }
 
@@ -18,7 +18,7 @@ export function getDocumentFile(http: HttpClient, rootUrl: string, params: GetDo
   const rb = new RequestBuilder(rootUrl, getDocumentFile.PATH, 'get');
   if (params) {
     rb.path('id', params.id, {});
-    rb.query('revisionId', params.revisionId, {});
+    rb.query('versionId', params.versionId, {});
     rb.query('download', params.download, {});
   }
 

@@ -22,8 +22,8 @@ public class GetPartyHandler(AppDbContext db)
                 {
                     Id = dp.Document.Id,
                     Name = dp.Document.Name,
-                    ContentType = dp.Document.Revisions
-                        .OrderByDescending(r => r.RevisionNumber)
+                    ContentType = dp.Document.Versions
+                        .OrderByDescending(r => r.VersionNumber)
                         .Select(r => r.ContentType)
                         .FirstOrDefault() ?? ""
                 }).ToList()

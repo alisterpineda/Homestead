@@ -1,3 +1,3 @@
 namespace HomeSuiteHome.WebApi.Features.Documents.v1.GetDocumentFile;
 
-public record GetDocumentFileRequest(Guid Id, Guid? RevisionId);
+public record GetDocumentFileRequest(Guid Id, Guid? VersionId);

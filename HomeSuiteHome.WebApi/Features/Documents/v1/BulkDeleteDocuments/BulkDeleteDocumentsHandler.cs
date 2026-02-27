@@ -10,7 +10,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
     public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsRequest request, CancellationToken ct)
     {
         var documents = await db.Documents
-            .Include(d => d.Revisions)
+            .Include(d => d.Versions)
             .Where(d => request.Ids.Contains(d.Id))
             .ToListAsync(ct);
 
@@ -21,7 +21,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
         var physicalPaths = documents
-            .SelectMany(d => d.Revisions)
+            .SelectMany(d => d.Versions)
             .Select(r => r.GetPhysicalPath(mediaPath))
             .ToList();
 

@@ -24,8 +24,8 @@ public class GetDocumentHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
-                LatestRevision = d.Revisions
-                    .OrderByDescending(r => r.RevisionNumber)
+                LatestVersion = d.Versions
+                    .OrderByDescending(r => r.VersionNumber)
                     .Select(r => new
                     {
                         r.ContentType,
@@ -35,12 +35,12 @@ public class GetDocumentHandler(AppDbContext db)
                         r.ExtractedText
                     })
                     .FirstOrDefault(),
-                Revisions = d.Revisions
-                    .OrderByDescending(r => r.RevisionNumber)
-                    .Select(r => new GetDocumentRevisionDto
+                Versions = d.Versions
+                    .OrderByDescending(r => r.VersionNumber)
+                    .Select(r => new GetDocumentVersionDto
                     {
                         Id = r.Id,
-                        RevisionNumber = r.RevisionNumber,
+                        VersionNumber = r.VersionNumber,
                         Label = r.Label,
                         Notes = r.Notes,
                         ContentType = r.ContentType,
@@ -49,7 +49,7 @@ public class GetDocumentHandler(AppDbContext db)
                         CreatedAt = r.CreatedAt
                     })
                     .ToList(),
-                RevisionCount = d.Revisions.Count,
+                VersionCount = d.Versions.Count,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentTagDto
                 {
                     Id = dt.Tag.Id,
@@ -63,14 +63,14 @@ public class GetDocumentHandler(AppDbContext db)
                     Description = dp.Party.Description
                 }).ToList()
             })
-            .Select(d => d.LatestRevision == null ? null : new GetDocumentResponse
+            .Select(d => d.LatestVersion == null ? null : new GetDocumentResponse
             {
                 Id = d.Id,
                 Name = d.Name,
-                ContentType = d.LatestRevision.ContentType,
-                FileSize = d.LatestRevision.FileSize,
-                FileHash = d.LatestRevision.FileHash,
-                FileExtension = d.LatestRevision.FileExtension,
+                ContentType = d.LatestVersion.ContentType,
+                FileSize = d.LatestVersion.FileSize,
+                FileHash = d.LatestVersion.FileHash,
+                FileExtension = d.LatestVersion.FileExtension,
                 CreatedAt = d.CreatedAt,
                 DocumentDate = d.DocumentDate,
                 ValidFrom = d.ValidFrom,
@@ -79,9 +79,9 @@ public class GetDocumentHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUserName,
                 OwnerUserId = d.OwnerUserId,
                 OwnerUserName = d.OwnerUserName,
-                ExtractedText = d.LatestRevision.ExtractedText,
-                RevisionCount = d.RevisionCount,
-                Revisions = d.Revisions,
+                ExtractedText = d.LatestVersion.ExtractedText,
+                VersionCount = d.VersionCount,
+                Versions = d.Versions,
                 Tags = d.Tags,
                 Parties = d.Parties
             })

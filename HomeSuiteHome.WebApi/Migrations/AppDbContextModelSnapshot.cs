@@ -61,7 +61,7 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.ToTable("documents", "documents");
                 });
 
-            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentRevision", b =>
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -107,7 +107,7 @@ namespace HomeSuiteHome.WebApi.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
-                    b.Property<int>("RevisionNumber")
+                    b.Property<int>("VersionNumber")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -117,10 +117,10 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.HasIndex("FileHash")
                         .IsUnique();
 
-                    b.HasIndex("DocumentId", "RevisionNumber")
+                    b.HasIndex("DocumentId", "VersionNumber")
                         .IsUnique();
 
-                    b.ToTable("document_revisions", "documents");
+                    b.ToTable("document_versions", "documents");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Identity.AppUser", b =>
@@ -494,10 +494,10 @@ namespace HomeSuiteHome.WebApi.Migrations
                     b.Navigation("OwnerUser");
                 });
 
-            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentRevision", b =>
+            modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Documents.DocumentVersion", b =>
                 {
                     b.HasOne("HomeSuiteHome.WebApi.Domains.Documents.Document", "Document")
-                        .WithMany("Revisions")
+                        .WithMany("Versions")
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -610,7 +610,7 @@ namespace HomeSuiteHome.WebApi.Migrations
 
                     b.Navigation("DocumentTags");
 
-                    b.Navigation("Revisions");
+                    b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("HomeSuiteHome.WebApi.Domains.Parties.Party", b =>

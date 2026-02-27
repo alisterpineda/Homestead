@@ -25,7 +25,7 @@ public class UploadDocumentJobHandler(
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var stagingPath = Path.Combine(mediaPath, DocumentRevision.UploadsSubroot, $"{payload.UploadId}{payload.FileExtension}");
+        var stagingPath = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot, $"{payload.UploadId}{payload.FileExtension}");
 
         if (!File.Exists(stagingPath))
             throw new FileNotFoundException($"Staged file not found: {stagingPath}");
@@ -53,8 +53,8 @@ public class UploadDocumentJobHandler(
             fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
-        // Duplicate check against revisions
-        var isDuplicate = await db.DocumentRevisions.AnyAsync(r => r.FileHash == fileHash, ct);
+        // Duplicate check against versions
+        var isDuplicate = await db.DocumentVersions.AnyAsync(r => r.FileHash == fileHash, ct);
         if (isDuplicate)
         {
             File.Delete(stagingPath);
@@ -74,14 +74,14 @@ public class UploadDocumentJobHandler(
             OwnerUserId = job.CreatedByUserId
         };
 
-        var revision = new DocumentRevision
+        var version = new DocumentVersion
         {
             Id = Guid.NewGuid(),
-            RevisionNumber = 1,
+            VersionNumber = 1,
             Label = payload.Label,
             ContentType = payload.ContentType,
             FileSize = payload.FileSize,
-            FilePath = DocumentRevision.GetFilePath(fileHash, payload.FileExtension),
+            FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),
             FileHash = fileHash,
             FileExtension = payload.FileExtension,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -90,11 +90,11 @@ public class UploadDocumentJobHandler(
         };
 
         db.Documents.Add(document);
-        db.DocumentRevisions.Add(revision);
+        db.DocumentVersions.Add(version);
         await db.SaveChangesAsync(ct);
 
         // Move file to final location
-        var finalPath = Path.Combine(mediaPath, DocumentRevision.GetFilePath(fileHash, payload.FileExtension));
+        var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
         Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
         File.Move(stagingPath, finalPath);
 

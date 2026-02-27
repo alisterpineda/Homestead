@@ -18,28 +18,28 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         if (documentName is null)
             return null;
 
-        var revisionQuery = db.DocumentRevisions
+        var versionQuery = db.DocumentVersions
             .AsNoTracking()
             .Where(r => r.DocumentId == request.Id);
 
-        if (request.RevisionId.HasValue)
-            revisionQuery = revisionQuery.Where(r => r.Id == request.RevisionId.Value);
+        if (request.VersionId.HasValue)
+            versionQuery = versionQuery.Where(r => r.Id == request.VersionId.Value);
         else
-            revisionQuery = revisionQuery.OrderByDescending(r => r.RevisionNumber);
+            versionQuery = versionQuery.OrderByDescending(r => r.VersionNumber);
 
-        var revision = await revisionQuery.FirstOrDefaultAsync(ct);
+        var version = await versionQuery.FirstOrDefaultAsync(ct);
 
-        if (revision is null)
+        if (version is null)
             return null;
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var physicalPath = revision.GetPhysicalPath(mediaPath);
+        var physicalPath = version.GetPhysicalPath(mediaPath);
 
         if (!File.Exists(physicalPath))
             return null;
 
-        return new GetDocumentFileResponse(physicalPath, revision.ContentType, revision.GetDownloadFileName(documentName));
+        return new GetDocumentFileResponse(physicalPath, version.ContentType, version.GetDownloadFileName(documentName));
     }
 }

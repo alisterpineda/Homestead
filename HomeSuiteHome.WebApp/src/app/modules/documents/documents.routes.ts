@@ -6,6 +6,6 @@ import { DocumentDetailPageComponent } from './pages/document-detail/document-de
 export const DOCUMENTS_ROUTES: Routes = [
   { path: '', component: DocumentListComponent, data: { title: 'Documents' } },
   { path: 'parties', component: PartyListComponent, data: { title: 'Parties' } },
-  { path: ':id/revisions/:revisionId', component: DocumentDetailPageComponent, data: { title: 'Document' } },
+  { path: ':id/versions/:versionId', component: DocumentDetailPageComponent, data: { title: 'Document' } },
   { path: ':id', component: DocumentDetailPageComponent, data: { title: 'Document' } },
 ];

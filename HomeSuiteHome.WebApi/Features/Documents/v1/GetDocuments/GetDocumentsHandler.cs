@@ -22,8 +22,8 @@ public class GetDocumentsHandler(AppDbContext db)
             {
                 d.Id,
                 d.Name,
-                LatestRevision = d.Revisions
-                    .OrderByDescending(r => r.RevisionNumber)
+                LatestVersion = d.Versions
+                    .OrderByDescending(r => r.VersionNumber)
                     .Select(r => new { r.ContentType, r.FileSize, r.FileExtension })
                     .FirstOrDefault(),
                 d.DocumentDate,
@@ -33,7 +33,7 @@ public class GetDocumentsHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
-                RevisionCount = d.Revisions.Count,
+                VersionCount = d.Versions.Count,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
                     Id = dt.Tag.Id,
@@ -50,9 +50,9 @@ public class GetDocumentsHandler(AppDbContext db)
             {
                 Id = d.Id,
                 Name = d.Name,
-                ContentType = d.LatestRevision != null ? d.LatestRevision.ContentType : "",
-                FileSize = d.LatestRevision != null ? d.LatestRevision.FileSize : 0,
-                FileExtension = d.LatestRevision != null ? d.LatestRevision.FileExtension : "",
+                ContentType = d.LatestVersion != null ? d.LatestVersion.ContentType : "",
+                FileSize = d.LatestVersion != null ? d.LatestVersion.FileSize : 0,
+                FileExtension = d.LatestVersion != null ? d.LatestVersion.FileExtension : "",
                 DocumentDate = d.DocumentDate,
                 ValidFrom = d.ValidFrom,
                 ValidUntil = d.ValidUntil,
@@ -60,7 +60,7 @@ public class GetDocumentsHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUserName,
                 OwnerUserId = d.OwnerUserId,
                 OwnerUserName = d.OwnerUserName,
-                RevisionCount = d.RevisionCount,
+                VersionCount = d.VersionCount,
                 Tags = d.Tags,
                 Parties = d.Parties
             })

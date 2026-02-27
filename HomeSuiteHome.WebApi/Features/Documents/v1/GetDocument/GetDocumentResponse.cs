@@ -17,16 +17,16 @@ public record GetDocumentResponse
     public Guid? OwnerUserId { get; init; }
     public string? OwnerUserName { get; init; }
     public string? ExtractedText { get; init; }
-    public int RevisionCount { get; init; }
-    public required IReadOnlyList<GetDocumentRevisionDto> Revisions { get; init; }
+    public int VersionCount { get; init; }
+    public required IReadOnlyList<GetDocumentVersionDto> Versions { get; init; }
     public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentPartyDto> Parties { get; init; }
 }
 
-public record GetDocumentRevisionDto
+public record GetDocumentVersionDto
 {
     public required Guid Id { get; init; }
-    public required int RevisionNumber { get; init; }
+    public required int VersionNumber { get; init; }
     public string? Label { get; init; }
     public string? Notes { get; init; }
     public required string ContentType { get; init; }

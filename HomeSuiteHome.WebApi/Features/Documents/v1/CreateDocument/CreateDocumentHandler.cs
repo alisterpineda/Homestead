@@ -18,7 +18,7 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
-        var uploadsDir = Path.Combine(mediaPath, DocumentRevision.UploadsSubroot);
+        var uploadsDir = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot);
         Directory.CreateDirectory(uploadsDir);
 
         var stagingPath = Path.Combine(uploadsDir, $"{uploadId}{extension}");

@@ -43,15 +43,15 @@ import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
-import { AddRevisionDialogComponent } from '../../components/add-revision-dialog/add-revision-dialog.component';
+import { AddVersionDialogComponent } from '../../components/add-version-dialog/add-version-dialog.component';
 import { formatBytes } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
-import { getDocumentRevision } from '@/api/generated/fn/documents/get-document-revision';
+import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-version';
 import { updateDocument } from '@/api/generated/fn/documents/update-document';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
-import type { GetDocumentRevisionResponse } from '@/api/generated/models/get-document-revision-response';
+import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from 'ngx-sonner';
@@ -75,7 +75,7 @@ import { toast } from 'ngx-sonner';
     TagInputComponent,
     PartyInputComponent,
     HlmTextareaImports,
-    AddRevisionDialogComponent,
+    AddVersionDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -97,10 +97,10 @@ import { toast } from 'ngx-sonner';
             <a hlmBreadcrumbLink link="/documents">Documents</a>
           </li>
           <li hlmBreadcrumbSeparator></li>
-          @if (hasMultipleRevisions()) {
+          @if (hasMultipleVersions()) {
             <li hlmBreadcrumbItem class="min-w-0">
               <button
-                 (click)="navigateToLatestRevision()"
+                 (click)="navigateToLatestVersion()"
                  [title]="document()?.name ?? 'Document'"
                  class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px] hover:text-foreground transition-colors">
                 {{ document()?.name ?? 'Document' }}
@@ -108,15 +108,15 @@ import { toast } from 'ngx-sonner';
             </li>
             <li hlmBreadcrumbSeparator></li>
             <li hlmBreadcrumbItem>
-              <button class="flex items-center gap-1" [hlmDropdownMenuTrigger]="revisionMenu">
-                <span hlmBreadcrumbPage>{{ selectedRevisionLabel() }}</span>
+              <button class="flex items-center gap-1" [hlmDropdownMenuTrigger]="versionMenu">
+                <span hlmBreadcrumbPage>{{ selectedVersionLabel() }}</span>
                 <ng-icon hlm size="xs" name="lucideChevronDown" />
               </button>
-              <ng-template #revisionMenu>
+              <ng-template #versionMenu>
                 <hlm-dropdown-menu>
-                  @for (rev of sortedRevisions(); track rev.id) {
-                    <button hlmDropdownMenuItem (triggered)="onRevisionSelected(rev.id)">
-                      {{ revisionLabel(rev) }}
+                  @for (rev of sortedVersions(); track rev.id) {
+                    <button hlmDropdownMenuItem (triggered)="onVersionSelected(rev.id)">
+                      {{ versionLabel(rev) }}
                     </button>
                   }
                 </hlm-dropdown-menu>
@@ -157,9 +157,9 @@ import { toast } from 'ngx-sonner';
           </button>
           <ng-template #moreMenu>
             <hlm-dropdown-menu class="w-48">
-              <button hlmDropdownMenuItem (triggered)="addRevisionDialog.open()">
+              <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
                 <ng-icon hlm name="lucideFilePlus2" size="sm" />
-                <span>Add Revision</span>
+                <span>Add Version</span>
               </button>
               <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
                 <ng-icon hlm name="lucideTrash2" size="sm" />
@@ -170,10 +170,10 @@ import { toast } from 'ngx-sonner';
         </div>
       </div>
 
-      <app-add-revision-dialog
-        #addRevisionDialog
+      <app-add-version-dialog
+        #addVersionDialog
         [documentId]="doc.id"
-        (revisionCreated)="refreshTrigger.update(v => v + 1)"
+        (versionCreated)="refreshTrigger.update(v => v + 1)"
       />
 
       <!-- Shared content templates -->
@@ -403,7 +403,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  private revisionId = signal<string | null>(this.route.snapshot.paramMap.get('revisionId'));
+  private versionId = signal<string | null>(this.route.snapshot.paramMap.get('versionId'));
 
   fileBlobUrl = signal<string | null>(null);
 
@@ -433,69 +433,69 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return false;
   });
 
-  // Revision computed signals
-  sortedRevisions = computed(() => {
+  // Version computed signals
+  sortedVersions = computed(() => {
     const doc = this.document();
-    if (!doc?.revisions) return [];
-    return [...doc.revisions].sort((a, b) => +b.revisionNumber - +a.revisionNumber);
+    if (!doc?.versions) return [];
+    return [...doc.versions].sort((a, b) => +b.versionNumber - +a.versionNumber);
   });
 
-  private latestRevision = computed(() => {
-    const revisions = this.sortedRevisions();
-    return revisions.length > 0 ? revisions[0] : null;
+  private latestVersion = computed(() => {
+    const versions = this.sortedVersions();
+    return versions.length > 0 ? versions[0] : null;
   });
 
-  activeRevision = computed(() => {
-    const revId = this.revisionId();
+  activeVersion = computed(() => {
+    const verId = this.versionId();
     const doc = this.document();
-    if (!doc?.revisions) return null;
-    if (revId) {
-      return doc.revisions.find((r) => r.id === revId) ?? this.latestRevision();
+    if (!doc?.versions) return null;
+    if (verId) {
+      return doc.versions.find((r) => r.id === verId) ?? this.latestVersion();
     }
-    return this.latestRevision();
+    return this.latestVersion();
   });
 
-  hasMultipleRevisions = computed(() => {
+  hasMultipleVersions = computed(() => {
     const doc = this.document();
-    return (doc?.revisions?.length ?? 0) >= 2;
+    return (doc?.versions?.length ?? 0) >= 2;
   });
 
-  selectedRevisionLabel = computed(() => {
-    const rev = this.activeRevision();
-    return rev ? this.revisionLabel(rev) : 'Revision';
+  selectedVersionLabel = computed(() => {
+    const ver = this.activeVersion();
+    return ver ? this.versionLabel(ver) : 'Version';
   });
 
-  // Revision detail (for extractedText of non-latest revisions)
-  private revisionDetail = signal<GetDocumentRevisionResponse | null>(null);
+  // Version detail (for extractedText of non-latest versions)
+  private versionDetail = signal<GetDocumentVersionResponse | null>(null);
 
-  // Revision-aware display signals
+  // Version-aware display signals
   displayContentType = computed(() => {
-    const rev = this.activeRevision();
-    return rev?.contentType ?? this.document()?.contentType ?? '';
+    const ver = this.activeVersion();
+    return ver?.contentType ?? this.document()?.contentType ?? '';
   });
 
   displayFileSize = computed(() => {
-    const rev = this.activeRevision();
-    return rev?.fileSize ?? this.document()?.fileSize ?? 0;
+    const ver = this.activeVersion();
+    return ver?.fileSize ?? this.document()?.fileSize ?? 0;
   });
 
   displayFileExtension = computed(() => {
-    const rev = this.activeRevision();
-    return rev?.fileExtension ?? this.document()?.fileExtension ?? '';
+    const ver = this.activeVersion();
+    return ver?.fileExtension ?? this.document()?.fileExtension ?? '';
   });
 
   displayExtractedText = computed(() => {
-    const revId = this.revisionId();
-    if (revId) {
-      // Viewing a specific revision — use revision detail's extractedText
-      return this.revisionDetail()?.extractedText ?? null;
+    const verId = this.versionId();
+    if (verId) {
+      // Viewing a specific version — use version detail's extractedText
+      return this.versionDetail()?.extractedText ?? null;
     }
     // Viewing latest — use document-level extractedText
     return this.document()?.extractedText ?? null;
   });
 
   private fileSub: Subscription | null = null;
-  private revisionDetailSub: Subscription | null = null;
+  private versionDetailSub: Subscription | null = null;
 
   private documentData = toSignal(
     combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
@@ -535,7 +535,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     // Load file blob reactively — reads all signals atomically
     effect(() => {
       const id = this.documentId();
-      const revId = this.revisionId();
+      const verId = this.versionId();
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       this.refreshTrigger(); // track refresh trigger
 
@@ -548,8 +548,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
       if (!id) return;
 
       let url = `/api/v1/documents/${id}/file`;
-      if (revId) {
-        url += `?revisionId=${revId}`;
+      if (verId) {
+        url += `?versionId=${verId}`;
       }
 
       this.fileSub = this.http
@@ -561,29 +561,29 @@ export class DocumentDetailPageComponent implements OnDestroy {
         .subscribe((blobUrl) => this.fileBlobUrl.set(blobUrl));
     });
 
-    // Load revision detail when viewing a specific revision
+    // Load version detail when viewing a specific version
     effect(() => {
       const docId = this.documentId();
-      const revId = this.revisionId();
+      const verId = this.versionId();
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       this.refreshTrigger();
 
-      this.revisionDetailSub?.unsubscribe();
+      this.versionDetailSub?.unsubscribe();
 
-      if (!docId || !revId) {
-        this.revisionDetail.set(null);
+      if (!docId || !verId) {
+        this.versionDetail.set(null);
         return;
       }
 
-      this.revisionDetailSub = getDocumentRevision(this.http, this.apiConfig.rootUrl, {
+      this.versionDetailSub = getDocumentVersion(this.http, this.apiConfig.rootUrl, {
         documentId: docId,
-        id: revId,
+        id: verId,
       })
         .pipe(
-          map((r) => r.body as GetDocumentRevisionResponse),
+          map((r) => r.body as GetDocumentVersionResponse),
           catchError(() => of(null)),
         )
-        .subscribe((detail) => this.revisionDetail.set(detail));
+        .subscribe((detail) => this.versionDetail.set(detail));
     });
 
     afterNextRender(() => {
@@ -600,7 +600,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.fileSub?.unsubscribe();
-    this.revisionDetailSub?.unsubscribe();
+    this.versionDetailSub?.unsubscribe();
     this.revokeCurrentBlobUrl();
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
@@ -614,30 +614,30 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return this.displayContentType()?.startsWith('image/') ?? false;
   }
 
-  revisionLabel(rev: { revisionNumber: number | string; label?: string | null }): string {
-    const base = `Revision ${rev.revisionNumber}`;
-    return rev.label ? `${base} - ${rev.label}` : base;
+  versionLabel(ver: { versionNumber: number | string; label?: string | null }): string {
+    const base = `Version ${ver.versionNumber}`;
+    return ver.label ? `${base} - ${ver.label}` : base;
   }
 
   private location = inject(Location);
 
-  navigateToLatestRevision(): void {
+  navigateToLatestVersion(): void {
     const docId = this.documentId();
     if (!docId) return;
-    this.revisionId.set(null);
+    this.versionId.set(null);
     this.location.go(`/documents/${docId}`);
   }
 
-  onRevisionSelected(revisionId: string): void {
+  onVersionSelected(versionId: string): void {
     const docId = this.documentId();
     if (!docId) return;
-    const latest = this.latestRevision();
-    const isLatest = latest && revisionId === latest.id;
-    this.revisionId.set(isLatest ? null : revisionId);
+    const latest = this.latestVersion();
+    const isLatest = latest && versionId === latest.id;
+    this.versionId.set(isLatest ? null : versionId);
 
     const path = isLatest
       ? `/documents/${docId}`
-      : `/documents/${docId}/revisions/${revisionId}`;
+      : `/documents/${docId}/versions/${versionId}`;
     this.location.go(path);
   }
 

@@ -4,6 +4,7 @@ obj/
 obj\*
 /packages/
 riderModule.iml
+.idea/
 /_ReSharper.Caches/
 **/dataSources.xml
 
