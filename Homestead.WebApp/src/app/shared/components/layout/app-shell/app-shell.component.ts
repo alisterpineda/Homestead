@@ -121,7 +121,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         </div>
       </hlm-sidebar>
 
-      <main hlmSidebarInset>
+      <main hlmSidebarInset class="min-w-0">
         <!-- Inset Header -->
         <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <button hlmSidebarTrigger></button>

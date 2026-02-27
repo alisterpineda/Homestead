@@ -86,8 +86,8 @@ import { toast } from 'ngx-sonner';
             </app-upload-dialog>
           </section>
         } @else {
-          <div class="flex flex-wrap items-center gap-2 mb-4">
-            @if (hasSelection()) {
+          @if (hasSelection()) {
+            <div class="flex items-center gap-2 mb-4">
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
               </span>
@@ -117,45 +117,14 @@ import { toast } from 'ngx-sonner';
                   </hlm-alert-dialog-content>
                 </hlm-alert-dialog>
               </div>
-            } @else {
-              <!-- Search: shares row with actions on mobile, inline on desktop -->
-              <div class="relative order-1 flex-1 sm:flex-none min-w-0">
+            </div>
+          } @else {
+            <div class="flex items-center gap-2 mb-3">
+              <div class="relative flex-1 min-w-0">
                 <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full sm:w-[200px]" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
+                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
               </div>
-              <!-- Filters: own row on mobile, inline between search & actions on desktop -->
-              <div class="flex flex-wrap items-center gap-2 order-3 sm:order-2 basis-full sm:basis-auto">
-                <app-filter-popover
-                  label="Parties"
-                  [options]="partyOptions()"
-                  [selectedIds]="selectedPartyIds()"
-                  searchPlaceholder="Search parties..."
-                  [loading]="partyOptionsLoading()"
-                  (selectionChange)="onPartyFilterChange($event)"
-                  (searchChange)="onPartySearchChange($event)"
-                />
-                <app-filter-popover
-                  label="Tags"
-                  [options]="tagOptions()"
-                  [selectedIds]="selectedTagIds()"
-                  searchPlaceholder="Search tags..."
-                  [loading]="tagOptionsLoading()"
-                  [showIncludeChildren]="true"
-                  [includeChildren]="includeChildTags()"
-                  includeChildrenLabel="Include sub-tags"
-                  (selectionChange)="onTagFilterChange($event)"
-                  (searchChange)="onTagSearchChange($event)"
-                  (includeChildrenChange)="onIncludeChildTagsChange($event)"
-                />
-                @if (hasActiveFilters()) {
-                  <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
-                    Reset
-                    <ng-icon hlm name="lucideX" size="xs" />
-                  </button>
-                }
-              </div>
-              <!-- Actions: next to search on mobile, pushed right on desktop -->
-              <div class="flex items-center gap-2 order-2 sm:order-3 sm:ml-auto">
+              <div class="flex items-center gap-2">
                 <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
                   <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
                   Columns
@@ -170,7 +139,6 @@ import { toast } from 'ngx-sonner';
                     }
                   </hlm-dropdown-menu>
                 </ng-template>
-                <!-- TODO: Wire up view toggle to switch between table and grid views -->
                 <div hlmButtonGroup aria-label="View mode">
                   <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
                     <ng-icon hlm name="lucideLayoutList" size="sm" />
@@ -184,8 +152,38 @@ import { toast } from 'ngx-sonner';
                   Upload
                 </app-upload-dialog>
               </div>
-            }
-          </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+              <app-filter-popover
+                label="Parties"
+                [options]="partyOptions()"
+                [selectedIds]="selectedPartyIds()"
+                searchPlaceholder="Search parties..."
+                [loading]="partyOptionsLoading()"
+                (selectionChange)="onPartyFilterChange($event)"
+                (searchChange)="onPartySearchChange($event)"
+              />
+              <app-filter-popover
+                label="Tags"
+                [options]="tagOptions()"
+                [selectedIds]="selectedTagIds()"
+                searchPlaceholder="Search tags..."
+                [loading]="tagOptionsLoading()"
+                [showIncludeChildren]="true"
+                [includeChildren]="includeChildTags()"
+                includeChildrenLabel="Include sub-tags"
+                (selectionChange)="onTagFilterChange($event)"
+                (searchChange)="onTagSearchChange($event)"
+                (includeChildrenChange)="onIncludeChildTagsChange($event)"
+              />
+              @if (hasActiveFilters()) {
+                <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
+                  Reset
+                  <ng-icon hlm name="lucideX" size="xs" />
+                </button>
+              }
+            </div>
+          }
 
           @if (result.items.length === 0) {
             <section hlmEmpty>
