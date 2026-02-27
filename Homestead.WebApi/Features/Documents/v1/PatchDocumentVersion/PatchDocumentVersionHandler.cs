@@ -21,7 +21,8 @@ public class PatchDocumentVersionHandler(AppDbContext db)
         var model = new PatchDocumentVersionModel
         {
             Label = version.Label,
-            Notes = version.Notes
+            Notes = version.Notes,
+            ExtractedText = version.ExtractedText
         };
 
         // Apply patch operations
@@ -41,6 +42,7 @@ public class PatchDocumentVersionHandler(AppDbContext db)
         // Update entity from patched model
         version.Label = model.Label;
         version.Notes = model.Notes;
+        version.ExtractedText = model.ExtractedText;
 
         await db.SaveChangesAsync(ct);
 

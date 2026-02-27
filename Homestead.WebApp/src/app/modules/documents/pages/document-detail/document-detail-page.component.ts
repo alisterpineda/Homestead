@@ -343,19 +343,14 @@ import { toast } from 'ngx-sonner';
       </ng-template>
 
       <ng-template #textContent>
-        @if (displayExtractedText()) {
-          <textarea
-            hlmTextarea
-            readonly
-            class="h-full resize-none [field-sizing:fixed] bg-muted"
-            [value]="displayExtractedText()"
-          ></textarea>
-        } @else {
-          <div class="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
-            <ng-icon hlm name="lucideFileSearch" size="xl" />
-            <span class="text-sm">No extracted text available</span>
-          </div>
-        }
+        <textarea
+          hlmTextarea
+          aria-label="Extracted text"
+          class="h-full resize-none [field-sizing:fixed]"
+          placeholder="No extracted text available"
+          [value]="editExtractedText()"
+          (input)="editExtractedText.set(asInputValue($event))"
+        ></textarea>
       </ng-template>
 
       @if (isMobile()) {
@@ -434,6 +429,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editValidUntil = signal('');
   editVersionLabel = signal('');
   editVersionNotes = signal('');
+  editExtractedText = signal('');
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
@@ -493,8 +489,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private hasVersionChanges = computed(() => {
     const ver = this.activeVersion();
     if (!ver) return false;
-    return this.editVersionLabel() !== (ver.label ?? '') ||
-           this.editVersionNotes() !== (ver.notes ?? '');
+    if (this.editVersionLabel() !== (ver.label ?? '')) return true;
+    if (this.editVersionNotes() !== (ver.notes ?? '')) return true;
+    const origText = this.displayExtractedText() ?? '';
+    if (this.editExtractedText() !== origText) return true;
+    return false;
   });
 
   hasChanges = computed(() => this.hasDocumentChanges() || this.hasVersionChanges());
@@ -622,6 +621,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.editVersionLabel.set(ver.label ?? '');
         this.editVersionNotes.set(ver.notes ?? '');
       }
+    });
+
+    effect(() => {
+      const text = this.displayExtractedText();
+      this.editExtractedText.set(text ?? '');
     });
 
     // Load file blob reactively — reads all signals atomically
@@ -859,6 +863,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
     if (this.editVersionNotes() !== (ver.notes ?? '')) {
       ops.push(replace('/notes', this.editVersionNotes() || null));
+    }
+    const origText = this.displayExtractedText() ?? '';
+    if (this.editExtractedText() !== origText) {
+      ops.push(replace('/extractedText', this.editExtractedText() || null));
     }
 
     return ops;

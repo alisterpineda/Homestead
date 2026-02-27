@@ -6,6 +6,7 @@ public class PatchDocumentVersionModel
 {
     public string? Label { get; set; }
     public string? Notes { get; set; }
+    public string? ExtractedText { get; set; }
 }
 
 public record PatchDocumentVersionCommand
