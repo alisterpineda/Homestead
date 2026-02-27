@@ -66,7 +66,7 @@ import { toast } from 'ngx-sonner';
       }
 
       @if (data(); as result) {
-        @if (result.items.length === 0) {
+        @if (result.items.length === 0 && !hasActiveFilters() && !loading()) {
           <section hlmEmpty>
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideFileText" size="xl" />
@@ -168,23 +168,38 @@ import { toast } from 'ngx-sonner';
             }
           </div>
 
-          <app-document-table
-            [documents]="result.items"
-            [selectedIds]="selectedDocumentIds()"
-            [allSelected]="allSelected()"
-            [someSelected]="someSelected()"
-            (documentSelect)="onDocumentSelect($event)"
-            (selectionChange)="onSelectionChange($event)"
-            (selectAllChange)="onSelectAll($event)"
-          />
-          <app-pagination
-            [page]="+result.page"
-            [totalPages]="+(result.totalPages ?? 0)"
-            [totalCount]="+result.totalCount"
-            [pageSize]="+result.pageSize"
-            (pageChange)="onPageChange($event)"
-            (pageSizeChange)="onPageSizeChange($event)"
-          />
+          @if (result.items.length === 0) {
+            <section hlmEmpty>
+              <hlm-empty-media variant="icon">
+                <ng-icon hlm name="lucideFileText" size="xl" />
+              </hlm-empty-media>
+              <div hlmEmptyHeader>
+                <h3 hlmEmptyTitle>No matching documents</h3>
+                <p hlmEmptyDescription>Try adjusting your filters to find what you're looking for.</p>
+              </div>
+              <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
+                Reset filters
+              </button>
+            </section>
+          } @else {
+            <app-document-table
+              [documents]="result.items"
+              [selectedIds]="selectedDocumentIds()"
+              [allSelected]="allSelected()"
+              [someSelected]="someSelected()"
+              (documentSelect)="onDocumentSelect($event)"
+              (selectionChange)="onSelectionChange($event)"
+              (selectAllChange)="onSelectAll($event)"
+            />
+            <app-pagination
+              [page]="+result.page"
+              [totalPages]="+(result.totalPages ?? 0)"
+              [totalCount]="+result.totalCount"
+              [pageSize]="+result.pageSize"
+              (pageChange)="onPageChange($event)"
+              (pageSizeChange)="onPageSizeChange($event)"
+            />
+          }
         }
       }
 
