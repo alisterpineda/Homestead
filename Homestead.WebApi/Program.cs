@@ -42,6 +42,13 @@ if (!string.IsNullOrEmpty(connectionString))
     builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
 }
 
+// Serialize enums as strings in JSON responses and OpenAPI spec,
+// without interfering with query parameter binding (which uses Enum.TryParse).
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
+
 // Add services to the container.
 
 builder.AddAppAuthentication();

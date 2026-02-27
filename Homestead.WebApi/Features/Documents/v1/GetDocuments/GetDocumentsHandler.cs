@@ -50,8 +50,7 @@ public class GetDocumentsHandler(AppDbContext db)
 
         var totalCount = await query.CountAsync(ct);
 
-        var items = await query
-            .OrderBy(d => d.Name)
+        var items = await ApplySort(query, request.SortBy ?? DocumentSortBy.Name, request.SortDir ?? SortDirection.Asc)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(d => new
@@ -108,6 +107,27 @@ public class GetDocumentsHandler(AppDbContext db)
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
+        };
+    }
+
+    private static IOrderedQueryable<Domains.Documents.Document> ApplySort(
+        IQueryable<Domains.Documents.Document> query, DocumentSortBy sortBy, SortDirection sortDir)
+    {
+        return (sortBy, sortDir) switch
+        {
+            (DocumentSortBy.Name, SortDirection.Asc) => query.OrderBy(d => d.Name),
+            (DocumentSortBy.Name, SortDirection.Desc) => query.OrderByDescending(d => d.Name),
+            (DocumentSortBy.FileSize, SortDirection.Asc) => query.OrderBy(d =>
+                d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.FileSize).FirstOrDefault()),
+            (DocumentSortBy.FileSize, SortDirection.Desc) => query.OrderByDescending(d =>
+                d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.FileSize).FirstOrDefault()),
+            (DocumentSortBy.ContentType, SortDirection.Asc) => query.OrderBy(d =>
+                d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
+            (DocumentSortBy.ContentType, SortDirection.Desc) => query.OrderByDescending(d =>
+                d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
+            (DocumentSortBy.DocumentDate, SortDirection.Asc) => query.OrderBy(d => d.DocumentDate),
+            (DocumentSortBy.DocumentDate, SortDirection.Desc) => query.OrderByDescending(d => d.DocumentDate),
+            _ => query.OrderBy(d => d.Name),
         };
     }
 }

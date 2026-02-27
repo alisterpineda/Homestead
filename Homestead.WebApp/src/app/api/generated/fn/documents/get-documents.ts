@@ -7,12 +7,16 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { DocumentSortBy } from '../../models/document-sort-by';
 import { PaginatedResponseOfGetDocumentsResponse } from '../../models/paginated-response-of-get-documents-response';
+import { SortDirection } from '../../models/sort-direction';
 
 export interface GetDocuments$Params {
   PartyIds?: Array<string>;
   TagIds?: Array<string>;
   IncludeChildTags: boolean;
+  SortBy?: DocumentSortBy;
+  SortDir?: SortDirection;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -23,6 +27,8 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('PartyIds', params.PartyIds, {});
     rb.query('TagIds', params.TagIds, {});
     rb.query('IncludeChildTags', params.IncludeChildTags, {});
+    rb.query('SortBy', params.SortBy, {});
+    rb.query('SortDir', params.SortDir, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

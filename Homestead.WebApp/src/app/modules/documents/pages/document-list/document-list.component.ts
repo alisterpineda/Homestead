@@ -4,7 +4,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal } from '@ng-icons/lucide';
 import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -13,10 +13,12 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { FilterPopoverComponent } from '@/shared/components/filter-popover/filter-popover.component';
 import type { FilterOption } from '@/shared/components/filter-popover/filter-popover.component';
-import { DocumentTableComponent } from '../../components/document-table/document-table.component';
+import { DocumentTableComponent, HIDEABLE_COLUMNS } from '../../components/document-table/document-table.component';
+import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -25,6 +27,8 @@ import { getParties } from '@/api/generated/fn/documents/get-parties';
 import { getTags } from '@/api/generated/fn/tags/get-tags';
 import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
+import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
+import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -39,12 +43,13 @@ import { toast } from 'ngx-sonner';
     HlmButton,
     HlmButtonGroup,
     HlmAlertDialogImports,
+    HlmDropdownMenuImports,
     FilterPopoverComponent,
     DocumentTableComponent,
     PaginationComponent,
     UploadDialogComponent,
   ],
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal })],
   template: `
     <div>
       @if (loading() && !data()) {
@@ -151,6 +156,22 @@ import { toast } from 'ngx-sonner';
               </div>
               <!-- Actions: next to search on mobile, pushed right on desktop -->
               <div class="flex items-center gap-2 order-2 sm:order-3 sm:ml-auto">
+                <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
+                  <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
+                  Columns
+                </button>
+                <ng-template #columnsMenu>
+                  <hlm-dropdown-menu class="w-40">
+                    <span hlmDropdownMenuLabel>Toggle columns</span>
+                    <hr hlmDropdownMenuSeparator />
+                    @for (col of hideableColumns; track col.id) {
+                      <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
+                        <hlm-dropdown-menu-checkbox-indicator />
+                        {{ col.label }}
+                      </button>
+                    }
+                  </hlm-dropdown-menu>
+                </ng-template>
                 <!-- TODO: Wire up view toggle to switch between table and grid views -->
                 <div hlmButtonGroup aria-label="View mode">
                   <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
@@ -185,11 +206,12 @@ import { toast } from 'ngx-sonner';
             <app-document-table
               [documents]="result.items"
               [selectedIds]="selectedDocumentIds()"
-              [allSelected]="allSelected()"
-              [someSelected]="someSelected()"
+              [sortBy]="sortBy()"
+              [sortDir]="sortDir()"
+              [columnVisibility]="columnVisibility()"
               (documentSelect)="onDocumentSelect($event)"
-              (selectionChange)="onSelectionChange($event)"
-              (selectAllChange)="onSelectAll($event)"
+              (selectionChange)="selectedDocumentIds.set($event)"
+              (sortChange)="onSortChange($event)"
             />
             <app-pagination
               [page]="+result.page"
@@ -215,6 +237,7 @@ export class DocumentListComponent implements OnDestroy {
   private processingHub = inject(ProcessingHubService);
   private hubSub: Subscription;
 
+  hideableColumns = HIDEABLE_COLUMNS;
   viewMode = signal<'table' | 'grid'>('table');
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -224,6 +247,9 @@ export class DocumentListComponent implements OnDestroy {
   selectedDocumentIds = signal<Set<string>>(new Set());
   selectionCount = computed(() => this.selectedDocumentIds().size);
   hasSelection = computed(() => this.selectionCount() > 0);
+
+  // Column visibility (TanStack VisibilityState: { [columnId]: boolean })
+  columnVisibility = signal<VisibilityState>({});
 
   // Party filter
   partyFilterSearch = signal('');
@@ -248,7 +274,20 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: false },
   );
 
-  hasActiveFilters = computed(() => this.selectedPartyIds().length > 0 || this.selectedTagIds().length > 0);
+  // Sort state from query params
+  sortBy = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('sortBy') as DocumentSortBy | null)),
+  );
+
+  sortDir = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('sortDir') as SortDirection | null)),
+  );
+
+  hasActiveFilters = computed(() =>
+    this.selectedPartyIds().length > 0 ||
+    this.selectedTagIds().length > 0 ||
+    this.sortBy() !== null,
+  );
 
   partyOptions = toSignal(
     toObservable(this.partyFilterSearch).pipe(
@@ -301,19 +340,6 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: [] as FilterOption[] },
   );
 
-  allSelected = computed(() => {
-    const items = this.data()?.items;
-    const selected = this.selectedDocumentIds();
-    return !!items && items.length > 0 && items.every((doc) => selected.has(doc.id));
-  });
-
-  someSelected = computed(() => {
-    const items = this.data()?.items;
-    const selected = this.selectedDocumentIds();
-    if (!items || items.length === 0) return false;
-    const selectedCount = items.filter((doc) => selected.has(doc.id)).length;
-    return selectedCount > 0 && selectedCount < items.length;
-  });
 
   constructor() {
     this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
@@ -343,8 +369,10 @@ export class DocumentListComponent implements OnDestroy {
       toObservable(this.selectedPartyIds),
       toObservable(this.selectedTagIds),
       toObservable(this.includeChildTags),
+      toObservable(this.sortBy),
+      toObservable(this.sortDir),
     ]).pipe(
-      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags]) => {
+      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir]) => {
         this.loading.set(true);
         this.error.set(false);
         return getDocuments(this.http, this.apiConfig.rootUrl, {
@@ -353,6 +381,8 @@ export class DocumentListComponent implements OnDestroy {
           PartyIds: partyIds.length > 0 ? partyIds : undefined,
           TagIds: tagIds.length > 0 ? tagIds : undefined,
           IncludeChildTags: includeChildTags,
+          SortBy: sortBy || undefined,
+          SortDir: sortDir || undefined,
         }).pipe(
           map((r) => {
             this.loading.set(false);
@@ -393,29 +423,6 @@ export class DocumentListComponent implements OnDestroy {
     this.refreshTrigger.update((v) => v + 1);
   }
 
-  onSelectionChange(event: { id: string; checked: boolean }): void {
-    this.selectedDocumentIds.update((prev) => {
-      const next = new Set(prev);
-      if (event.checked) {
-        next.add(event.id);
-      } else {
-        next.delete(event.id);
-      }
-      return next;
-    });
-  }
-
-  onSelectAll(checked: boolean): void {
-    if (checked) {
-      const items = this.data()?.items;
-      if (items) {
-        this.selectedDocumentIds.set(new Set(items.map((doc) => doc.id)));
-      }
-    } else {
-      this.clearSelection();
-    }
-  }
-
   onPartyFilterChange(ids: string[]): void {
     this.clearSelection();
     this.router.navigate(['/documents'], {
@@ -448,10 +455,29 @@ export class DocumentListComponent implements OnDestroy {
     });
   }
 
+  onSortChange(event: { sortBy: DocumentSortBy; sortDir: SortDirection } | null): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: {
+        page: 1,
+        sortBy: event?.sortBy ?? null,
+        sortDir: event?.sortDir ?? null,
+      },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  onToggleColumn(id: string): void {
+    this.columnVisibility.update(prev => ({
+      ...prev,
+      [id]: prev[id] === false,
+    }));
+  }
+
   resetFilters(): void {
     this.clearSelection();
     this.router.navigate(['/documents'], {
-      queryParams: { page: 1, partyIds: null, tagIds: null, includeChildTags: null },
+      queryParams: { page: 1, partyIds: null, tagIds: null, includeChildTags: null, sortBy: null, sortDir: null },
       queryParamsHandling: 'merge',
     });
   }
