@@ -36,8 +36,8 @@ export interface HideableColumn {
 }
 
 export const HIDEABLE_COLUMNS: HideableColumn[] = [
-  { id: 'tags', label: 'Tags' },
   { id: 'parties', label: 'Parties' },
+  { id: 'tags', label: 'Tags' },
   { id: 'contentType', label: 'Content Type' },
   { id: 'fileSize', label: 'File Size' },
 ];
@@ -156,18 +156,18 @@ export class DocumentTableComponent {
       minSize: 120,
     },
     {
-      id: 'tags',
-      header: 'Tags',
-      enableSorting: false,
-      cell: () => flexRenderComponent(TagsCell),
-      size: 200,
-      minSize: 100,
-    },
-    {
       id: 'parties',
       header: 'Parties',
       enableSorting: false,
       cell: () => flexRenderComponent(PartiesCell),
+      size: 200,
+      minSize: 100,
+    },
+    {
+      id: 'tags',
+      header: 'Tags',
+      enableSorting: false,
+      cell: () => flexRenderComponent(TagsCell),
       size: 200,
       minSize: 100,
     },

@@ -262,16 +262,16 @@ import { toast } from 'ngx-sonner';
             </hlm-form-field>
           </div>
 
-          <!-- Tags -->
-          <div class="space-y-2">
-            <label hlmLabel>Tags</label>
-            <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
-          </div>
-
           <!-- Parties -->
           <div class="space-y-2">
             <label hlmLabel>Parties</label>
             <app-party-input [value]="editParties()" (valueChange)="editParties.set($event)" />
+          </div>
+
+          <!-- Tags -->
+          <div class="space-y-2">
+            <label hlmLabel>Tags</label>
+            <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
           </div>
 
           <!-- Added -->
