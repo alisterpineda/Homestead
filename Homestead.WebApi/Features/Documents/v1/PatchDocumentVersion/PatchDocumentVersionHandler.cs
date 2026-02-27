@@ -46,6 +46,8 @@ public class PatchDocumentVersionHandler(AppDbContext db)
 
         await db.SaveChangesAsync(ct);
 
+        await SearchVectorHelper.UpdateSearchVectorAsync(db, version.DocumentId, ct);
+
         return Results.Ok(new PatchDocumentVersionResponse
         {
             Id = version.Id,

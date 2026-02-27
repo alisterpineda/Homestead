@@ -15,6 +15,7 @@ export interface GetDocuments$Params {
   PartyIds?: Array<string>;
   TagIds?: Array<string>;
   IncludeChildTags: boolean;
+  Search?: string;
   SortBy?: DocumentSortBy;
   SortDir?: SortDirection;
   Page: (number | string);
@@ -27,6 +28,7 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('PartyIds', params.PartyIds, {});
     rb.query('TagIds', params.TagIds, {});
     rb.query('IncludeChildTags', params.IncludeChildTags, {});
+    rb.query('Search', params.Search, {});
     rb.query('SortBy', params.SortBy, {});
     rb.query('SortDir', params.SortDir, {});
     rb.query('Page', params.Page, {});

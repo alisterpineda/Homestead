@@ -43,6 +43,15 @@ The WebApi uses vertical slice architecture with CQRS handlers:
 1. Create four files under `Features/{Domain}/v1/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Request.cs`, `Response.cs`
 2. Register the endpoint in the domain's module class (e.g., `DocumentsModule.cs`)
 
+## Full-Text Search
+
+Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) column on the `documents` table, indexed with GIN.
+
+- **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B
+- **`SearchVectorHelper.UpdateSearchVectorAsync()`** in `Persistence/SearchVectorHelper.cs` must be called after any mutation that changes a document's name or its latest version's extracted text
+- **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
+- Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
+
 ## Conventions
 
 - Minimal APIs (no controllers)

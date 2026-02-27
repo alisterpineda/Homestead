@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -46,6 +47,9 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .HasColumnType("tsvector");
+
                     b.Property<DateOnly?>("ValidFrom")
                         .HasColumnType("date");
 
@@ -57,6 +61,10 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("SearchVector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "GIN");
 
                     b.ToTable("documents", "documents");
                 });

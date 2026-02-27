@@ -28,8 +28,12 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
 
         var physicalPath = version.GetPhysicalPath(mediaPath);
 
+        var documentId = version.DocumentId;
+
         db.DocumentVersions.Remove(version);
         await db.SaveChangesAsync(ct);
+
+        await SearchVectorHelper.UpdateSearchVectorAsync(db, documentId, ct);
 
         if (File.Exists(physicalPath))
             File.Delete(physicalPath);

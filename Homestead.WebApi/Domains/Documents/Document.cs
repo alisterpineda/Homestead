@@ -1,6 +1,7 @@
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Tags;
+using NpgsqlTypes;
 
 namespace Homestead.WebApi.Domains.Documents;
 
@@ -12,6 +13,7 @@ public class Document
     public DateOnly? DocumentDate { get; set; }
     public DateOnly? ValidFrom { get; set; }
     public DateOnly? ValidUntil { get; set; }
+    public NpgsqlTsVector? SearchVector { get; set; }
 
     public Guid? CreatedByUserId { get; set; }
     public Guid? OwnerUserId { get; set; }

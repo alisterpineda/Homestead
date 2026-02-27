@@ -93,6 +93,8 @@ public class UploadDocumentVersionJobHandler(
         db.DocumentVersions.Add(version);
         await db.SaveChangesAsync(ct);
 
+        await SearchVectorHelper.UpdateSearchVectorAsync(db, payload.DocumentId, ct);
+
         // Move file to final location
         var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
         Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);

@@ -14,6 +14,9 @@ public record GetDocumentsRequest : PaginatedRequest
     [FromQuery(Name = "IncludeChildTags")]
     public bool IncludeChildTags { get; init; }
 
+    [FromQuery(Name = "Search")]
+    public string? Search { get; init; }
+
     [FromQuery(Name = "SortBy")]
     public DocumentSortBy? SortBy { get; init; }
 

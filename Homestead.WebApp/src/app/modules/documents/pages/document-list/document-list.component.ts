@@ -121,7 +121,7 @@ import { toast } from 'ngx-sonner';
               <!-- Search: shares row with actions on mobile, inline on desktop -->
               <div class="relative order-1 flex-1 sm:flex-none min-w-0">
                 <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full sm:w-[200px]" />
+                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full sm:w-[200px]" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
               </div>
               <!-- Filters: own row on mobile, inline between search & actions on desktop -->
               <div class="flex flex-wrap items-center gap-2 order-3 sm:order-2 basis-full sm:basis-auto">
@@ -196,7 +196,7 @@ import { toast } from 'ngx-sonner';
               </hlm-empty-media>
               <div hlmEmptyHeader>
                 <h3 hlmEmptyTitle>No matching documents</h3>
-                <p hlmEmptyDescription>Try adjusting your filters to find what you're looking for.</p>
+                <p hlmEmptyDescription>Try adjusting your search or filters to find what you're looking for.</p>
               </div>
               <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
                 Reset filters
@@ -248,6 +248,13 @@ export class DocumentListComponent implements OnDestroy {
   selectionCount = computed(() => this.selectedDocumentIds().size);
   hasSelection = computed(() => this.selectionCount() > 0);
 
+  // Search
+  searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
+  searchTerm = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.get('search') ?? '')),
+    { initialValue: this.route.snapshot.queryParamMap.get('search') ?? '' },
+  );
+
   // Column visibility (TanStack VisibilityState: { [columnId]: boolean })
   columnVisibility = signal<VisibilityState>({});
 
@@ -284,6 +291,7 @@ export class DocumentListComponent implements OnDestroy {
   );
 
   hasActiveFilters = computed(() =>
+    this.searchTerm().length > 0 ||
     this.selectedPartyIds().length > 0 ||
     this.selectedTagIds().length > 0 ||
     this.sortBy() !== null,
@@ -341,14 +349,27 @@ export class DocumentListComponent implements OnDestroy {
   );
 
 
+  private searchSub: Subscription;
+
   constructor() {
     this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
       this.refreshTrigger.update((v) => v + 1);
+    });
+
+    this.searchSub = toObservable(this.searchInput).pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+    ).subscribe(value => {
+      this.router.navigate(['/documents'], {
+        queryParams: { page: 1, search: value || null },
+        queryParamsHandling: 'merge',
+      });
     });
   }
 
   ngOnDestroy(): void {
     this.hubSub.unsubscribe();
+    this.searchSub.unsubscribe();
   }
 
   private page = toSignal(
@@ -371,13 +392,15 @@ export class DocumentListComponent implements OnDestroy {
       toObservable(this.includeChildTags),
       toObservable(this.sortBy),
       toObservable(this.sortDir),
+      toObservable(this.searchTerm),
     ]).pipe(
-      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir]) => {
+      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
         return getDocuments(this.http, this.apiConfig.rootUrl, {
           Page: page,
           PageSize: pageSize,
+          Search: search || undefined,
           PartyIds: partyIds.length > 0 ? partyIds : undefined,
           TagIds: tagIds.length > 0 ? tagIds : undefined,
           IncludeChildTags: includeChildTags,
@@ -476,8 +499,9 @@ export class DocumentListComponent implements OnDestroy {
 
   resetFilters(): void {
     this.clearSelection();
+    this.searchInput.set('');
     this.router.navigate(['/documents'], {
-      queryParams: { page: 1, partyIds: null, tagIds: null, includeChildTags: null, sortBy: null, sortDir: null },
+      queryParams: { page: 1, search: null, partyIds: null, tagIds: null, includeChildTags: null, sortBy: null, sortDir: null },
       queryParamsHandling: 'merge',
     });
   }

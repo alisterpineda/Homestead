@@ -48,9 +48,20 @@ public class GetDocumentsHandler(AppDbContext db)
             }
         }
 
+        var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+
+        if (search is not null)
+        {
+            var namePattern = $"%{search}%";
+            query = query.Where(d =>
+                EF.Functions.ILike(d.Name, namePattern) ||
+                (d.SearchVector != null &&
+                 d.SearchVector.Matches(EF.Functions.WebSearchToTsQuery("english", search))));
+        }
+
         var totalCount = await query.CountAsync(ct);
 
-        var items = await ApplySort(query, request.SortBy ?? DocumentSortBy.Name, request.SortDir ?? SortDirection.Asc)
+        var items = await ApplySort(query, request.SortBy, request.SortDir, search)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .Select(d => new
@@ -111,9 +122,20 @@ public class GetDocumentsHandler(AppDbContext db)
     }
 
     private static IOrderedQueryable<Domains.Documents.Document> ApplySort(
-        IQueryable<Domains.Documents.Document> query, DocumentSortBy sortBy, SortDirection sortDir)
+        IQueryable<Domains.Documents.Document> query, DocumentSortBy? sortBy, SortDirection? sortDir,
+        string? search = null)
     {
-        return (sortBy, sortDir) switch
+        // When searching without an explicit sort, order by relevance
+        if (sortBy is null && search is not null)
+        {
+            return query.OrderByDescending(d =>
+                d.SearchVector!.RankCoverDensity(EF.Functions.WebSearchToTsQuery("english", search)));
+        }
+
+        var effectiveSortBy = sortBy ?? DocumentSortBy.Name;
+        var effectiveSortDir = sortDir ?? SortDirection.Asc;
+
+        return (effectiveSortBy, effectiveSortDir) switch
         {
             (DocumentSortBy.Name, SortDirection.Asc) => query.OrderBy(d => d.Name),
             (DocumentSortBy.Name, SortDirection.Desc) => query.OrderByDescending(d => d.Name),

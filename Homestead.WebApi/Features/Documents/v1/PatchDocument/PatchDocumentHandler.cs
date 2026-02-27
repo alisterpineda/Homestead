@@ -97,6 +97,8 @@ public class PatchDocumentHandler(AppDbContext db)
 
         await db.SaveChangesAsync(ct);
 
+        await SearchVectorHelper.UpdateSearchVectorAsync(db, document.Id, ct);
+
         // Load tags for response
         var tags = await db.DocumentTags
             .AsNoTracking()

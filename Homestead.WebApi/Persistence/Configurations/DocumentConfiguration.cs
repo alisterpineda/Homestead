@@ -33,6 +33,12 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(d => d.OwnerUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.Property(d => d.SearchVector)
+            .HasColumnType("tsvector");
+
+        builder.HasIndex(d => d.SearchVector)
+            .HasMethod("GIN");
+
         builder.HasIndex(d => d.CreatedByUserId);
         builder.HasIndex(d => d.OwnerUserId);
     }
