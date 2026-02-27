@@ -10,7 +10,7 @@ import { type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-t
   imports: [HlmButton, NgIcon, HlmIconImports],
   providers: [provideIcons({ lucideArrowDown, lucideArrowUp, lucideArrowUpDown })],
   template: `
-    <button hlmBtn size="sm" variant="ghost" (click)="handleClick()">
+    <button hlmBtn size="sm" variant="ghost" class="-ml-3" (click)="handleClick()">
       {{ label() }}
       <ng-icon hlm size="sm" [name]="sortIcon()" />
     </button>
