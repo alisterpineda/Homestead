@@ -25,6 +25,7 @@ public record TagDto
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required string Path { get; init; }
+    public string? Color { get; init; }
 }
 
 public record PartyDto

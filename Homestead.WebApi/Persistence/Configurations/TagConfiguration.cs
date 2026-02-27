@@ -23,6 +23,9 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
         builder.HasIndex(t => t.Path)
             .IsUnique();
 
+        builder.Property(t => t.Color)
+            .HasMaxLength(7);
+
         builder.Property(t => t.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

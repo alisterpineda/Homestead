@@ -6,6 +6,7 @@ public class Tag
     public required string Name { get; set; }
     public required string Path { get; set; }
     public Guid? ParentId { get; set; }
+    public string? Color { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
     public Tag? Parent { get; set; }

@@ -65,6 +65,8 @@ export type { GetTags$Params as GetTags$Params } from './fn/documents/get-tags';
 export { getTags as getTags } from './fn/documents/get-tags';
 export type { CreateTag$Params as CreateTag$Params } from './fn/documents/create-tag';
 export { createTag as createTag } from './fn/documents/create-tag';
+export type { UpdateTag$Params as UpdateTag$Params } from './fn/documents/update-tag';
+export { updateTag as updateTag } from './fn/documents/update-tag';
 export type { DeleteTag$Params as DeleteTag$Params } from './fn/documents/delete-tag';
 export { deleteTag as deleteTag } from './fn/documents/delete-tag';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';

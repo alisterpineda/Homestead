@@ -15,7 +15,12 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
           (click)="tagSelect.emit(tag.id)"
           class="w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors hover:bg-muted"
         >
-          <p class="font-medium text-foreground">{{ tag.name }}</p>
+          <div class="flex items-center gap-2">
+            @if (tag.color) {
+              <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="tag.color"></span>
+            }
+            <p class="font-medium text-foreground">{{ tag.name }}</p>
+          </div>
           <p class="mt-1 text-sm text-muted-foreground">{{ tag.path }}</p>
         </button>
       }
@@ -40,7 +45,14 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                 (keydown.enter)="tagSelect.emit(tag.id)"
                 class="cursor-pointer"
               >
-                <td hlmTd class="font-medium">{{ tag.name }}</td>
+                <td hlmTd class="font-medium">
+                  <span class="flex items-center gap-2">
+                    @if (tag.color) {
+                      <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="tag.color"></span>
+                    }
+                    {{ tag.name }}
+                  </span>
+                </td>
                 <td hlmTd class="text-muted-foreground">{{ tag.path }}</td>
               </tr>
             }

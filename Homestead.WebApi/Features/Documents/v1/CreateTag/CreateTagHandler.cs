@@ -25,6 +25,8 @@ public class CreateTagHandler(AppDbContext db)
 
             tag = await db.Tags.FirstOrDefaultAsync(t => t.Path == currentPath, ct);
 
+            var isLeaf = i == segments.Length - 1;
+
             if (tag is null)
             {
                 tag = new Tag
@@ -33,9 +35,14 @@ public class CreateTagHandler(AppDbContext db)
                     Name = segments[i],
                     Path = currentPath,
                     ParentId = parent?.Id,
+                    Color = isLeaf ? request.Color : null,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
                 db.Tags.Add(tag);
+            }
+            else if (isLeaf && request.Color is not null)
+            {
+                tag.Color = request.Color;
             }
 
             parent = tag;
@@ -48,7 +55,8 @@ public class CreateTagHandler(AppDbContext db)
             Id = tag!.Id,
             Name = tag.Name,
             Path = tag.Path,
-            ParentId = tag.ParentId
+            ParentId = tag.ParentId,
+            Color = tag.Color
         };
     }
 }

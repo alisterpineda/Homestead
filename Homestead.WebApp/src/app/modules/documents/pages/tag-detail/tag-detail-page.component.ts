@@ -25,9 +25,12 @@ import { PageHeaderService } from '@/shared/services/page-header.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getTags } from '@/api/generated/fn/documents/get-tags';
 import { deleteTag } from '@/api/generated/fn/documents/delete-tag';
+import { updateTag } from '@/api/generated/fn/documents/update-tag';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
+import { ColorPickerComponent } from '../../components/color-picker/color-picker.component';
+import { TagBadgeComponent } from '../../components/tag-badge/tag-badge.component';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -42,6 +45,8 @@ import { toast } from 'ngx-sonner';
     HlmBreadCrumbImports,
     HlmLabel,
     HlmAlertDialogImports,
+    ColorPickerComponent,
+    TagBadgeComponent,
   ],
   providers: [
     provideIcons({
@@ -113,6 +118,20 @@ import { toast } from 'ngx-sonner';
           <p class="text-sm text-foreground">{{ t.path }}</p>
         </div>
 
+        <!-- Color -->
+        <div class="space-y-2">
+          <label hlmLabel>Color</label>
+          <div class="flex items-center gap-3">
+            <app-color-picker [color]="t.color ?? null" (colorChange)="handleColorChange($event)" />
+          </div>
+          @if (t.color) {
+            <div class="mt-2">
+              <span class="text-xs text-muted-foreground mr-2">Preview:</span>
+              <app-tag-badge [path]="t.path" [color]="t.color" />
+            </div>
+          }
+        </div>
+
         <!-- Child Tags -->
         @if (childTags().length > 0) {
           <div class="space-y-2">
@@ -123,6 +142,9 @@ import { toast } from 'ngx-sonner';
                   [routerLink]="['/documents/tags', child.id]"
                   class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
                 >
+                  @if (child.color) {
+                    <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="child.color"></span>
+                  }
                   <span class="truncate">{{ child.name }}</span>
                   <span class="ml-auto shrink-0 text-xs text-muted-foreground">{{ child.path }}</span>
                 </a>
@@ -159,6 +181,7 @@ import { toast } from 'ngx-sonner';
 export class TagDetailPageComponent implements OnDestroy {
   deleting = signal(false);
   loading = signal(false);
+  private refreshTrigger = signal(0);
 
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
@@ -174,8 +197,8 @@ export class TagDetailPageComponent implements OnDestroy {
   );
 
   private allTags = toSignal(
-    toObservable(this.tagId).pipe(
-      switchMap((id) => {
+    combineLatest([toObservable(this.tagId), toObservable(this.refreshTrigger)]).pipe(
+      switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
         return getTags(this.http, this.apiConfig.rootUrl, { IncludeChildren: true }).pipe(
@@ -238,6 +261,23 @@ export class TagDetailPageComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.pageHeaderService.clearTitle();
+  }
+
+  handleColorChange(color: string | null): void {
+    const id = this.tagId();
+    if (!id) return;
+    updateTag(this.http, this.apiConfig.rootUrl, {
+      id,
+      body: { color },
+    }).subscribe({
+      next: () => {
+        toast.success('Tag color updated.');
+        this.refreshTrigger.update((v) => v + 1);
+      },
+      error: () => {
+        toast.error('Failed to update tag color.');
+      },
+    });
   }
 
   handleDelete(): void {

@@ -1,0 +1,10 @@
+namespace Homestead.WebApi.Features.Documents.v1.UpdateTag;
+
+public record UpdateTagResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Path { get; init; }
+    public Guid? ParentId { get; init; }
+    public string? Color { get; init; }
+}

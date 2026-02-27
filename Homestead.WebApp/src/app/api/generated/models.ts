@@ -54,3 +54,5 @@ export type { TwoFactorRequest } from './models/two-factor-request';
 export type { TwoFactorResponse } from './models/two-factor-response';
 export type { UpdatePartyRequest } from './models/update-party-request';
 export type { UpdatePartyResponse } from './models/update-party-response';
+export type { UpdateTagRequest } from './models/update-tag-request';
+export type { UpdateTagResponse } from './models/update-tag-response';

@@ -19,6 +19,7 @@ using Homestead.WebApi.Features.Documents.v1.CreateTag;
 using Homestead.WebApi.Features.Documents.v1.DeleteTag;
 using Homestead.WebApi.Features.Documents.v1.GetTags;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
+using Homestead.WebApi.Features.Documents.v1.UpdateTag;
 
 namespace Homestead.WebApi.Features.Documents;
 
@@ -59,6 +60,7 @@ public static class DocumentsModule
         CreateTagEndpoint.Map(tags);
         DeleteTagEndpoint.Map(tags);
         GetTagsEndpoint.Map(tags);
+        UpdateTagEndpoint.Map(tags);
 
         return app;
     }

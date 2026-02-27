@@ -265,7 +265,7 @@ import { toast } from 'ngx-sonner';
           <!-- Tags -->
           <div class="space-y-2">
             <label hlmLabel>Tags</label>
-            <app-tag-input [value]="editTags()" (valueChange)="editTags.set($event)" />
+            <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
           </div>
 
           <!-- Parties -->
@@ -601,6 +601,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
   );
 
   document = this.documentData;
+
+  tagColorMap = computed(() => {
+    const doc = this.document();
+    if (!doc?.tags) return {};
+    const map: Record<string, string> = {};
+    for (const t of doc.tags) {
+      if (t.color) map[t.path] = t.color;
+    }
+    return map;
+  });
 
   constructor() {
     effect(() => {

@@ -31,7 +31,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
         class="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (tag of value(); track tag) {
-          <app-tag-badge [path]="tag" [removable]="true" (removed)="removeTag(tag)" />
+          <app-tag-badge [path]="tag" [color]="colorMap().get(tag) ?? null" [removable]="true" (removed)="removeTag(tag)" />
         }
         <input
           #inputEl
@@ -51,9 +51,9 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
           @for (suggestion of filteredSuggestions(); track suggestion.id; let i = $index) {
             <button
               type="button"
-              (click)="addTag(suggestion.path)"
+              (click)="addTag(suggestion.path, suggestion.color)"
               [class]="
-                'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer ' +
+                'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer flex items-center gap-2 ' +
                 (i === selectedIndex()
                   ? 'bg-accent text-accent-foreground'
                   : 'text-foreground hover:bg-accent') +
@@ -61,6 +61,9 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                 (i === filteredSuggestions().length - 1 ? ' rounded-b-md' : '')
               "
             >
+              @if (suggestion.color) {
+                <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="suggestion.color"></span>
+              }
               {{ suggestion.path }}
             </button>
           }
@@ -71,11 +74,26 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 })
 export class TagInputComponent {
   value = input.required<string[]>();
+  initialColorMap = input<Record<string, string>>({});
   valueChange = output<string[]>();
 
   searchText = signal('');
   showSuggestions = signal(false);
   selectedIndex = signal(0);
+  private addedColorMap = signal<Map<string, string>>(new Map());
+
+  colorMap = computed(() => {
+    const initial = this.initialColorMap();
+    const added = this.addedColorMap();
+    const merged = new Map<string, string>();
+    for (const [k, v] of Object.entries(initial)) {
+      if (v) merged.set(k, v);
+    }
+    for (const [k, v] of added) {
+      merged.set(k, v);
+    }
+    return merged;
+  });
 
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
@@ -109,10 +127,17 @@ export class TagInputComponent {
     });
   }
 
-  addTag(path: string): void {
+  addTag(path: string, color?: string | null): void {
     const normalized = path.trim().toLowerCase();
     if (normalized && !this.value().includes(normalized)) {
       this.valueChange.emit([...this.value(), normalized]);
+      if (color) {
+        this.addedColorMap.update((m) => {
+          const next = new Map(m);
+          next.set(normalized, color);
+          return next;
+        });
+      }
     }
     this.searchText.set('');
     this.showSuggestions.set(false);
@@ -121,6 +146,11 @@ export class TagInputComponent {
 
   removeTag(path: string): void {
     this.valueChange.emit(this.value().filter((t) => t !== path));
+    this.addedColorMap.update((m) => {
+      const next = new Map(m);
+      next.delete(path);
+      return next;
+    });
   }
 
   onSearchInput(event: Event): void {
@@ -140,7 +170,8 @@ export class TagInputComponent {
     if (event.key === 'Enter') {
       event.preventDefault();
       if (this.showSuggestions() && filtered.length > 0 && filtered[this.selectedIndex()]) {
-        this.addTag(filtered[this.selectedIndex()].path);
+        const suggestion = filtered[this.selectedIndex()];
+        this.addTag(suggestion.path, suggestion.color);
       } else if (this.searchText().trim()) {
         this.addTag(this.searchText());
       }

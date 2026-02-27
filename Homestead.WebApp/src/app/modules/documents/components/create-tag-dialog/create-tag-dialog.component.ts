@@ -7,6 +7,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createTag } from '@/api/generated/fn/documents/create-tag';
+import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -17,6 +18,7 @@ import { toast } from 'ngx-sonner';
     HlmButton,
     HlmInput,
     HlmLabel,
+    ColorPickerComponent,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -41,6 +43,10 @@ import { toast } from 'ngx-sonner';
               (input)="path.set(asInputValue($event))"
             />
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Color</label>
+            <app-color-picker [color]="selectedColor()" (colorChange)="selectedColor.set($event)" />
+          </div>
           @if (createError()) {
             <p class="text-sm text-destructive">Failed to create tag. Please try again.</p>
           }
@@ -60,6 +66,7 @@ export class CreateTagDialogComponent {
   created = output();
 
   path = signal('');
+  selectedColor = signal<string | null>(null);
   creating = signal(false);
   createError = signal(false);
 
@@ -74,6 +81,7 @@ export class CreateTagDialogComponent {
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.path.set('');
+      this.selectedColor.set(null);
       this.creating.set(false);
       this.createError.set(false);
     }
@@ -88,7 +96,7 @@ export class CreateTagDialogComponent {
     this.createError.set(false);
 
     createTag(this.http, this.apiConfig.rootUrl, {
-      body: { path: pathVal },
+      body: { path: pathVal, color: this.selectedColor() },
     }).subscribe({
       next: () => {
         this.creating.set(false);

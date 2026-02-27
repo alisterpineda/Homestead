@@ -84,7 +84,8 @@ public class GetDocumentsHandler(AppDbContext db)
                 {
                     Id = dt.Tag.Id,
                     Name = dt.Tag.Name,
-                    Path = dt.Tag.Path
+                    Path = dt.Tag.Path,
+                    Color = dt.Tag.Color
                 }).ToList(),
                 Parties = d.DocumentParties.Select(dp => new GetDocumentsPartyDto
                 {

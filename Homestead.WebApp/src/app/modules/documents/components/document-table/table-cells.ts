@@ -11,7 +11,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
   template: `
     <div class="flex flex-wrap gap-1">
       @for (tag of context.row.original.tags; track tag.id) {
-        <app-tag-badge [path]="tag.path" />
+        <app-tag-badge [path]="tag.path" [color]="tag.color" />
       }
     </div>
   `,

@@ -107,7 +107,8 @@ public class PatchDocumentHandler(AppDbContext db)
             {
                 Id = dt.Tag.Id,
                 Name = dt.Tag.Name,
-                Path = dt.Tag.Path
+                Path = dt.Tag.Path,
+                Color = dt.Tag.Color
             })
             .ToListAsync(ct);
 
