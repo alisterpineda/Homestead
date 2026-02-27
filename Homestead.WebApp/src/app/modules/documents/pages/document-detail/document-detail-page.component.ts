@@ -16,7 +16,7 @@ import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, Subscription } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, forkJoin, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
@@ -39,6 +39,8 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
+import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
+import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
@@ -49,6 +51,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
 import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-version';
 import { updateDocument } from '@/api/generated/fn/documents/update-document';
+import { updateDocumentVersion } from '@/api/generated/fn/documents/update-document-version';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
@@ -75,6 +78,8 @@ import { toast } from 'ngx-sonner';
     TagInputComponent,
     PartyInputComponent,
     HlmTextareaImports,
+    HlmCollapsibleImports,
+    HlmSeparatorImports,
     AddVersionDialogComponent,
   ],
   providers: [
@@ -116,7 +121,7 @@ import { toast } from 'ngx-sonner';
                 <hlm-dropdown-menu>
                   @for (rev of sortedVersions(); track rev.id; let first = $first) {
                     <button hlmDropdownMenuItem (triggered)="onVersionSelected(rev.id)">
-                      {{ first ? 'Latest' : versionLabel(rev) }}
+                      {{ first ? (rev.label ? 'Latest - ' + rev.label : 'Latest') : versionLabel(rev) }}
                     </button>
                   }
                 </hlm-dropdown-menu>
@@ -275,18 +280,62 @@ import { toast } from 'ngx-sonner';
             </p>
           </div>
 
-          <!-- Size -->
-          <div class="space-y-2">
-            <label hlmLabel>Size</label>
-            <p class="text-sm text-muted-foreground">
-              {{ formatBytes(+displayFileSize()) }}
-            </p>
-          </div>
+          <!-- Version Details -->
+          <hlm-separator />
 
-          <!-- Type -->
-          <div class="space-y-2">
-            <label hlmLabel>Type</label>
-            <p class="text-sm text-muted-foreground">{{ displayContentType() }}</p>
+          <div hlmCollapsible class="group">
+            <button hlmCollapsibleTrigger
+              class="flex w-full items-center justify-between py-1 text-sm font-medium hover:underline">
+              Version Details
+              <ng-icon hlm size="sm" name="lucideChevronDown"
+                class="transition-transform duration-200 group-data-[state=open]:rotate-180" />
+            </button>
+            <div hlmCollapsibleContent>
+              <div class="space-y-4 pt-3">
+                <hlm-form-field>
+                  <label hlmLabel for="version-label">Label</label>
+                  <input hlmInput id="version-label" maxlength="256"
+                    placeholder="e.g., Final Draft, Signed Copy"
+                    [value]="editVersionLabel()"
+                    (input)="editVersionLabel.set(asInputValue($event))" />
+                </hlm-form-field>
+                <hlm-form-field>
+                  <label hlmLabel for="version-notes">Notes</label>
+                  <textarea hlmTextarea id="version-notes" maxlength="2048" rows="3"
+                    placeholder="Version notes..."
+                    [value]="editVersionNotes()"
+                    (input)="editVersionNotes.set(asInputValue($event))"></textarea>
+                </hlm-form-field>
+                <!-- Added -->
+                @if (displayVersionCreatedAt()) {
+                  <div class="space-y-2">
+                    <label hlmLabel>Added</label>
+                    <p class="text-sm text-muted-foreground">
+                      {{ formatDate(displayVersionCreatedAt()) }}
+                    </p>
+                  </div>
+                }
+                <!-- Size -->
+                <div class="space-y-2">
+                  <label hlmLabel>Size</label>
+                  <p class="text-sm text-muted-foreground">
+                    {{ formatBytes(+displayFileSize()) }}
+                  </p>
+                </div>
+                <!-- Type -->
+                <div class="space-y-2">
+                  <label hlmLabel>Type</label>
+                  <p class="text-sm text-muted-foreground">{{ displayContentType() }}</p>
+                </div>
+                <!-- File Hash -->
+                @if (displayFileHash()) {
+                  <div class="space-y-2">
+                    <label hlmLabel>File Hash</label>
+                    <p class="text-sm text-muted-foreground break-all">{{ displayFileHash() }}</p>
+                  </div>
+                }
+              </div>
+            </div>
           </div>
         </div>
       </ng-template>
@@ -318,8 +367,10 @@ import { toast } from 'ngx-sonner';
           <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
             <ng-container [ngTemplateOutlet]="previewContent" />
           </div>
-          <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
-            <ng-container [ngTemplateOutlet]="infoContent" />
+          <div hlmTabsContent="info" class="relative min-h-0 flex-1">
+            <div class="absolute inset-0 overflow-y-auto px-4 py-3">
+              <ng-container [ngTemplateOutlet]="infoContent" />
+            </div>
           </div>
           <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
             <ng-container [ngTemplateOutlet]="textContent" />
@@ -342,8 +393,10 @@ import { toast } from 'ngx-sonner';
                 <button hlmTabsTrigger="info">Info</button>
                 <button hlmTabsTrigger="text">Text</button>
               </hlm-tabs-list>
-              <div hlmTabsContent="info" class="flex-1 overflow-y-auto px-4 py-3">
-                <ng-container [ngTemplateOutlet]="infoContent" />
+              <div hlmTabsContent="info" class="relative min-h-0 flex-1">
+                <div class="absolute inset-0 overflow-y-auto px-4 py-3">
+                  <ng-container [ngTemplateOutlet]="infoContent" />
+                </div>
               </div>
               <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
                 <ng-container [ngTemplateOutlet]="textContent" />
@@ -377,6 +430,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editDocumentDate = signal('');
   editValidFrom = signal('');
   editValidUntil = signal('');
+  editVersionLabel = signal('');
+  editVersionNotes = signal('');
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
@@ -412,7 +467,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null;
   });
 
-  hasChanges = computed(() => {
+  private hasDocumentChanges = computed(() => {
     const doc = this.document();
     if (!doc) return false;
     if (this.editName() !== doc.name) return true;
@@ -432,6 +487,15 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (this.editValidUntil() !== this.toDateInputValue(doc.validUntil)) return true;
     return false;
   });
+
+  private hasVersionChanges = computed(() => {
+    const ver = this.activeVersion();
+    if (!ver) return false;
+    return this.editVersionLabel() !== (ver.label ?? '') ||
+           this.editVersionNotes() !== (ver.notes ?? '');
+  });
+
+  hasChanges = computed(() => this.hasDocumentChanges() || this.hasVersionChanges());
 
   // Version computed signals
   sortedVersions = computed(() => {
@@ -464,7 +528,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const ver = this.activeVersion();
     if (!ver) return 'Version';
     const latest = this.latestVersion();
-    return ver.id === latest?.id ? 'Latest' : this.versionLabel(ver);
+    if (ver.id === latest?.id) {
+      return ver.label ? `Latest - ${ver.label}` : 'Latest';
+    }
+    return this.versionLabel(ver);
   });
 
   // Version detail (for extractedText of non-latest versions)
@@ -484,6 +551,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
   displayFileExtension = computed(() => {
     const ver = this.activeVersion();
     return ver?.fileExtension ?? this.document()?.fileExtension ?? '';
+  });
+
+  displayFileHash = computed(() => {
+    const verId = this.versionId();
+    if (verId) {
+      return this.versionDetail()?.fileHash ?? '';
+    }
+    return this.document()?.fileHash ?? '';
+  });
+
+  displayVersionCreatedAt = computed(() => {
+    const ver = this.activeVersion();
+    return ver?.createdAt ?? '';
   });
 
   displayExtractedText = computed(() => {
@@ -531,6 +611,14 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.editDocumentDate.set(this.toDateInputValue(doc.documentDate));
         this.editValidFrom.set(this.toDateInputValue(doc.validFrom));
         this.editValidUntil.set(this.toDateInputValue(doc.validUntil));
+      }
+    });
+
+    effect(() => {
+      const ver = this.activeVersion();
+      if (ver) {
+        this.editVersionLabel.set(ver.label ?? '');
+        this.editVersionNotes.set(ver.notes ?? '');
       }
     });
 
@@ -696,18 +784,35 @@ export class DocumentDetailPageComponent implements OnDestroy {
   handleSave(): void {
     const id = this.documentId();
     if (!id) return;
+    const ver = this.activeVersion();
     this.saving.set(true);
-    updateDocument(this.http, this.apiConfig.rootUrl, {
-      id,
-      body: {
-        name: this.editName(),
-        documentDate: this.editDocumentDate() || null,
-        validFrom: this.editValidFrom() || null,
-        validUntil: this.editValidUntil() || null,
-        tagPaths: this.editTags(),
-        partyIds: this.editParties().map((p) => p.id),
-      },
-    }).subscribe({
+
+    const docUpdate$ = this.hasDocumentChanges()
+      ? updateDocument(this.http, this.apiConfig.rootUrl, {
+          id,
+          body: {
+            name: this.editName(),
+            documentDate: this.editDocumentDate() || null,
+            validFrom: this.editValidFrom() || null,
+            validUntil: this.editValidUntil() || null,
+            tagPaths: this.editTags(),
+            partyIds: this.editParties().map((p) => p.id),
+          },
+        })
+      : of(null);
+
+    const versionUpdate$ = this.hasVersionChanges() && ver
+      ? updateDocumentVersion(this.http, this.apiConfig.rootUrl, {
+          documentId: id,
+          id: ver.id,
+          body: {
+            label: this.editVersionLabel() || null,
+            notes: this.editVersionNotes() || null,
+          },
+        })
+      : of(null);
+
+    forkJoin([docUpdate$, versionUpdate$]).subscribe({
       next: () => {
         this.saving.set(false);
         this.refreshTrigger.update((v) => v + 1);

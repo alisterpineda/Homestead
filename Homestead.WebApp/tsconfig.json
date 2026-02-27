@@ -103,6 +103,9 @@
       ],
       "@/shared/components/spartan/alert-dialog": [
         "./src/app/shared/components/spartan/alert-dialog/src/index.ts"
+      ],
+      "@/shared/components/spartan/collapsible": [
+        "./src/app/shared/components/spartan/collapsible/src/index.ts"
       ]
     }
   },
