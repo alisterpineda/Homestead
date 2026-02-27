@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard } from '@ng-icons/lucide';
+import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
@@ -37,7 +37,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard })],
+  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags })],
   template: `
     <div hlmSidebarWrapper>
       <hlm-sidebar variant="inset">

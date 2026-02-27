@@ -6,6 +6,9 @@ export const documentsSidebar: SidebarGroup[] = [
   },
   {
     label: 'Manage',
-    items: [{ label: 'Parties', path: '/documents/parties', icon: 'lucideUsers' }],
+    items: [
+      { label: 'Parties', path: '/documents/parties', icon: 'lucideUsers' },
+      { label: 'Tags', path: '/documents/tags', icon: 'lucideTags' },
+    ],
   },
 ];
