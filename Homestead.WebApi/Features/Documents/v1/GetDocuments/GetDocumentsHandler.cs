@@ -12,6 +12,12 @@ public class GetDocumentsHandler(AppDbContext db)
     {
         var query = db.Documents.AsNoTracking();
 
+        if (request.PartyIds is { Length: > 0 })
+        {
+            query = query.Where(d =>
+                d.DocumentParties.Any(dp => request.PartyIds.Contains(dp.PartyId)));
+        }
+
         var totalCount = await query.CountAsync(ct);
 
         var items = await query

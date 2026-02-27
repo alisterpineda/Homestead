@@ -10,6 +10,7 @@ import { RequestBuilder } from '../../request-builder';
 import { PaginatedResponseOfGetDocumentsResponse } from '../../models/paginated-response-of-get-documents-response';
 
 export interface GetDocuments$Params {
+  PartyIds?: Array<string>;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -17,6 +18,7 @@ export interface GetDocuments$Params {
 export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetDocumentsResponse>> {
   const rb = new RequestBuilder(rootUrl, getDocuments.PATH, 'get');
   if (params) {
+    rb.query('PartyIds', params.PartyIds, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

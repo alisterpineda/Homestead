@@ -2,9 +2,9 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2 } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus } from '@ng-icons/lucide';
 import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -14,11 +14,14 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
+import { FilterPopoverComponent } from '@/shared/components/filter-popover/filter-popover.component';
+import type { FilterOption } from '@/shared/components/filter-popover/filter-popover.component';
 import { DocumentTableComponent } from '../../components/document-table/document-table.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
+import { getParties } from '@/api/generated/fn/documents/get-parties';
 import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import { toast } from 'ngx-sonner';
@@ -35,14 +38,15 @@ import { toast } from 'ngx-sonner';
     HlmButton,
     HlmButtonGroup,
     HlmAlertDialogImports,
+    FilterPopoverComponent,
     DocumentTableComponent,
     PaginationComponent,
     UploadDialogComponent,
   ],
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2 })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus })],
   template: `
     <div>
-      @if (loading()) {
+      @if (loading() && !data()) {
         <div class="flex justify-center py-16">
           <hlm-spinner />
         </div>
@@ -76,7 +80,7 @@ import { toast } from 'ngx-sonner';
             </app-upload-dialog>
           </section>
         } @else {
-          <div class="flex items-center gap-2 mb-4">
+          <div class="flex flex-wrap items-center gap-2 mb-4">
             @if (hasSelection()) {
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
@@ -108,17 +112,31 @@ import { toast } from 'ngx-sonner';
                 </hlm-alert-dialog>
               </div>
             } @else {
-              <!-- TODO: Wire up search to filter documents by name/content -->
-              <div class="relative">
+              <!-- Search: shares row with actions on mobile, inline on desktop -->
+              <div class="relative order-1 flex-1 sm:flex-none min-w-0">
                 <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-[200px]" />
+                <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full sm:w-[200px]" />
               </div>
-              <div class="ml-auto flex items-center gap-2">
-                <!-- TODO: Wire up filters (e.g. by date, type, tags) -->
-                <button hlmBtn variant="outline" size="sm">
-                  <ng-icon hlm name="lucideListFilter" size="sm" />
-                  Filters
-                </button>
+              <!-- Filters: own row on mobile, inline between search & actions on desktop -->
+              <div class="flex flex-wrap items-center gap-2 order-3 sm:order-2 basis-full sm:basis-auto">
+                <app-filter-popover
+                  label="Parties"
+                  [options]="partyOptions()"
+                  [selectedIds]="selectedPartyIds()"
+                  searchPlaceholder="Search parties..."
+                  [loading]="partyOptionsLoading()"
+                  (selectionChange)="onPartyFilterChange($event)"
+                  (searchChange)="onPartySearchChange($event)"
+                />
+                @if (hasActiveFilters()) {
+                  <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
+                    Reset
+                    <ng-icon hlm name="lucideX" size="xs" />
+                  </button>
+                }
+              </div>
+              <!-- Actions: next to search on mobile, pushed right on desktop -->
+              <div class="flex items-center gap-2 order-2 sm:order-3 sm:ml-auto">
                 <!-- TODO: Wire up view toggle to switch between table and grid views -->
                 <div hlmButtonGroup aria-label="View mode">
                   <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
@@ -157,6 +175,14 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class DocumentListComponent implements OnDestroy {
+  private alertDialog = viewChild(BrnAlertDialog);
+  private http = inject(HttpClient);
+  private apiConfig = inject(ApiConfiguration);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private processingHub = inject(ProcessingHubService);
+  private hubSub: Subscription;
+
   viewMode = signal<'table' | 'grid'>('table');
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -166,6 +192,43 @@ export class DocumentListComponent implements OnDestroy {
   selectedDocumentIds = signal<Set<string>>(new Set());
   selectionCount = computed(() => this.selectedDocumentIds().size);
   hasSelection = computed(() => this.selectionCount() > 0);
+
+  // Party filter
+  partyFilterSearch = signal('');
+  partyOptionsLoading = signal(false);
+
+  selectedPartyIds = toSignal(
+    this.route.queryParamMap.pipe(map(p => p.getAll('partyIds'))),
+    { initialValue: [] as string[] },
+  );
+
+  hasActiveFilters = computed(() => this.selectedPartyIds().length > 0);
+
+  partyOptions = toSignal(
+    toObservable(this.partyFilterSearch).pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(search => {
+        this.partyOptionsLoading.set(true);
+        return getParties(this.http, this.apiConfig.rootUrl, {
+          Search: search || undefined,
+          Page: 1,
+          PageSize: 100,
+        }).pipe(
+          map(r => {
+            this.partyOptionsLoading.set(false);
+            const items = r.body?.items ?? [];
+            return items.map(p => ({ id: p.id, label: p.name } as FilterOption));
+          }),
+          catchError(() => {
+            this.partyOptionsLoading.set(false);
+            return of([] as FilterOption[]);
+          }),
+        );
+      }),
+    ),
+    { initialValue: [] as FilterOption[] },
+  );
 
   allSelected = computed(() => {
     const items = this.data()?.items;
@@ -180,14 +243,6 @@ export class DocumentListComponent implements OnDestroy {
     const selectedCount = items.filter((doc) => selected.has(doc.id)).length;
     return selectedCount > 0 && selectedCount < items.length;
   });
-
-  private alertDialog = viewChild(BrnAlertDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
-  private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  private processingHub = inject(ProcessingHubService);
-  private hubSub: Subscription;
 
   constructor() {
     this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
@@ -205,11 +260,15 @@ export class DocumentListComponent implements OnDestroy {
   );
 
   data = toSignal(
-    combineLatest([toObservable(this.page), toObservable(this.refreshTrigger)]).pipe(
-      switchMap(([page]) => {
+    combineLatest([toObservable(this.page), toObservable(this.refreshTrigger), toObservable(this.selectedPartyIds)]).pipe(
+      switchMap(([page, , partyIds]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getDocuments(this.http, this.apiConfig.rootUrl, { Page: page, PageSize: 10 }).pipe(
+        return getDocuments(this.http, this.apiConfig.rootUrl, {
+          Page: page,
+          PageSize: 10,
+          PartyIds: partyIds.length > 0 ? partyIds : undefined,
+        }).pipe(
           map((r) => {
             this.loading.set(false);
             return r.body as PaginatedResponseOfGetDocumentsResponse;
@@ -227,7 +286,10 @@ export class DocumentListComponent implements OnDestroy {
 
   onPageChange(newPage: number): void {
     this.clearSelection();
-    this.router.navigate(['/documents'], { queryParams: { page: newPage } });
+    this.router.navigate(['/documents'], {
+      queryParams: { page: newPage },
+      queryParamsHandling: 'merge',
+    });
   }
 
   onDocumentSelect(id: string): void {
@@ -259,6 +321,26 @@ export class DocumentListComponent implements OnDestroy {
     } else {
       this.clearSelection();
     }
+  }
+
+  onPartyFilterChange(ids: string[]): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, partyIds: ids.length > 0 ? ids : null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  onPartySearchChange(search: string): void {
+    this.partyFilterSearch.set(search);
+  }
+
+  resetFilters(): void {
+    this.clearSelection();
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, partyIds: null },
+      queryParamsHandling: 'merge',
+    });
   }
 
   clearSelection(): void {
