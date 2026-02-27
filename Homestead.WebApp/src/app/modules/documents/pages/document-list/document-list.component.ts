@@ -162,8 +162,6 @@ import { toast } from 'ngx-sonner';
                 </button>
                 <ng-template #columnsMenu>
                   <hlm-dropdown-menu class="w-40">
-                    <span hlmDropdownMenuLabel>Toggle columns</span>
-                    <hr hlmDropdownMenuSeparator />
                     @for (col of hideableColumns; track col.id) {
                       <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
                         <hlm-dropdown-menu-checkbox-indicator />
