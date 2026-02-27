@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="HomeSuiteHome.AppHost/HomeSuiteHome.AppHost.csproj" />
-  <Project Path="HomeSuiteHome.ServiceDefaults/HomeSuiteHome.ServiceDefaults.csproj" />
-  <Project Path="HomeSuiteHome.WebApi/HomeSuiteHome.WebApi.csproj" />
-</Solution>

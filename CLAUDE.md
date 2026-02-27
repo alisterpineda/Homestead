@@ -4,28 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HomeSuiteHome is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL. Authentication is handled by ASP.NET Core Identity with cookie-based auth (no external identity provider).
+Homestead is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi and PostgreSQL. Authentication is handled by ASP.NET Core Identity with cookie-based auth (no external identity provider).
 
 ## Project Structure
 
 | Directory | Description |
 |---|---|
-| `HomeSuiteHome.AppHost/` | .NET Aspire orchestrator — runs the full stack |
-| `HomeSuiteHome.WebApi/` | .NET 10 backend API ([CLAUDE.md](HomeSuiteHome.WebApi/CLAUDE.md)) |
-| `HomeSuiteHome.WebApp/` | Angular v21 frontend with Spartan.NG ([CLAUDE.md](HomeSuiteHome.WebApp/CLAUDE.md)) |
-| `HomeSuiteHome.ServiceDefaults/` | Shared Aspire config (OpenTelemetry, health checks, HTTP resilience) |
+| `Homestead.AppHost/` | .NET Aspire orchestrator — runs the full stack |
+| `Homestead.WebApi/` | .NET 10 backend API ([CLAUDE.md](Homestead.WebApi/CLAUDE.md)) |
+| `Homestead.WebApp/` | Angular v21 frontend with Spartan.NG ([CLAUDE.md](Homestead.WebApp/CLAUDE.md)) |
+| `Homestead.ServiceDefaults/` | Shared Aspire config (OpenTelemetry, health checks, HTTP resilience) |
 
 ## Running the Full Stack
 
 ```bash
-cd HomeSuiteHome.AppHost && dotnet run
+cd Homestead.AppHost && dotnet run
 ```
 
 This starts PostgreSQL (with pgWeb admin UI), the WebApi, and the Angular dev server via Aspire. No external identity provider is needed.
 
 ## Aspire Orchestration
 
-`HomeSuiteHome.AppHost` orchestrates all services: PostgreSQL, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.
+`Homestead.AppHost` orchestrates all services: PostgreSQL, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.
 
 ## Syncing Frontend with Backend API Changes
 
@@ -35,10 +35,10 @@ When backend endpoints are added or modified, regenerate the frontend API client
 
 1. **Build the WebApi** to generate the OpenAPI spec:
    ```bash
-   dotnet build HomeSuiteHome.WebApi
+   dotnet build Homestead.WebApi
    ```
-   This outputs the spec to `HomeSuiteHome.WebApi/obj/HomeSuiteHome.WebApi.json`.
-2. **Regenerate the API client** (from `HomeSuiteHome.WebApp/`):
+   This outputs the spec to `Homestead.WebApi/obj/Homestead.WebApi.json`.
+2. **Regenerate the API client** (from `Homestead.WebApp/`):
    ```bash
    npm run generate-api
    ```
