@@ -1,19 +1,25 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of } from 'rxjs';
+import { switchMap, map, catchError, of, forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideTags, lucidePlus, lucideSearch } from '@ng-icons/lucide';
+import { lucideTags, lucidePlus, lucideSearch, lucideTrash2, lucideX } from '@ng-icons/lucide';
+import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { TagTableComponent } from '../../components/tag-table/tag-table.component';
 import { CreateTagDialogComponent } from '../../components/create-tag-dialog/create-tag-dialog.component';
+import { EditTagSheetComponent } from '../../components/edit-tag-sheet/edit-tag-sheet.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getTags } from '@/api/generated/fn/documents/get-tags';
+import { deleteTag } from '@/api/generated/fn/documents/delete-tag';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-tag-list',
@@ -24,10 +30,13 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
     HlmSpinner,
     HlmEmptyImports,
     HlmInput,
+    HlmButton,
+    HlmAlertDialogImports,
     TagTableComponent,
     CreateTagDialogComponent,
+    EditTagSheetComponent,
   ],
-  providers: [provideIcons({ lucideTags, lucidePlus, lucideSearch })],
+  providers: [provideIcons({ lucideTags, lucidePlus, lucideSearch, lucideTrash2, lucideX })],
   template: `
     <div>
       @if (loading() && !allTags()) {
@@ -64,44 +73,100 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
             </app-create-tag-dialog>
           </section>
         } @else {
-          <div class="flex items-center gap-2 mb-4">
-            <div class="relative">
-              <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                hlmInput
-                type="text"
-                placeholder="Search tags..."
-                class="pl-8 h-8 w-[200px] text-sm"
-                [value]="searchInput()"
-                (input)="searchInput.set(asInputValue($event))"
-              />
+          <div class="relative">
+            <!-- Normal toolbar -->
+            <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="relative">
+                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    hlmInput
+                    type="text"
+                    placeholder="Search tags..."
+                    class="pl-8 h-8 w-[200px] text-sm"
+                    [value]="searchInput()"
+                    (input)="searchInput.set(asInputValue($event))"
+                  />
+                </div>
+                <div class="ml-auto flex items-center gap-2">
+                  <app-create-tag-dialog triggerSize="sm" (created)="onRefresh()">
+                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    New Tag
+                  </app-create-tag-dialog>
+                </div>
+              </div>
             </div>
-            <div class="ml-auto flex items-center gap-2">
-              <app-create-tag-dialog triggerSize="sm" (created)="onRefresh()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                New Tag
-              </app-create-tag-dialog>
+
+            <!-- Selection toolbar -->
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
+              <span class="text-sm text-muted-foreground">
+                {{ selectionCount() }} tag{{ selectionCount() > 1 ? 's' : '' }} selected
+              </span>
+              <div class="ml-auto flex items-center gap-2">
+                <button hlmBtn variant="outline" size="sm" (click)="clearSelection()">
+                  Clear selection
+                </button>
+                <hlm-alert-dialog>
+                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    Delete
+                  </button>
+                  <hlm-alert-dialog-content *hlmAlertDialogPortal>
+                    <div hlmAlertDialogHeader>
+                      <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} tag{{ selectionCount() > 1 ? 's' : '' }}?</h2>
+                      <p hlmAlertDialogDescription>
+                        This action cannot be undone. Any child tags will be re-parented to the deleted tag's parent.
+                      </p>
+                    </div>
+                    <div hlmAlertDialogFooter>
+                      <button hlmAlertDialogCancel>Cancel</button>
+                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete()" [disabled]="deleting()">
+                        {{ deleting() ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
+                  </hlm-alert-dialog-content>
+                </hlm-alert-dialog>
+              </div>
             </div>
           </div>
 
           <app-tag-table
             [tags]="filteredTags()"
+            [selectedIds]="selectedTagIds()"
             (tagSelect)="onTagSelect($event)"
+            (selectionChange)="selectedTagIds.set($event)"
           />
         }
       }
     </div>
+
+    <app-edit-tag-sheet
+      [tag]="selectedTag()"
+      [state]="sheetState()"
+      (saved)="onSheetSaved()"
+      (closed)="onSheetClosed()"
+    />
   `,
 })
 export class TagListComponent {
+  private alertDialog = viewChild(BrnAlertDialog);
+  private http = inject(HttpClient);
+  private apiConfig = inject(ApiConfiguration);
+
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
   searchInput = signal('');
+  deleting = signal(false);
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
-  private router = inject(Router);
+  // Selection state
+  selectedTagIds = signal<Set<string>>(new Set());
+  selectionCount = computed(() => this.selectedTagIds().size);
+  hasSelection = computed(() => this.selectionCount() > 0);
+
+  // Sheet state
+  selectedTag = signal<GetTagsResponse | null>(null);
+  sheetState = signal<BrnDialogState>('closed');
 
   allTags = toSignal(
     toObservable(this.refreshTrigger).pipe(
@@ -141,10 +206,52 @@ export class TagListComponent {
   }
 
   onTagSelect(id: string): void {
-    this.router.navigate(['/documents/tags', id]);
+    const tags = this.allTags();
+    const tag = tags?.find((t) => t.id === id) ?? null;
+    if (tag) {
+      this.selectedTag.set(tag);
+      this.sheetState.set('open');
+    }
+  }
+
+  onSheetSaved(): void {
+    this.sheetState.set('closed');
+    this.onRefresh();
+  }
+
+  onSheetClosed(): void {
+    this.sheetState.set('closed');
+    this.selectedTag.set(null);
   }
 
   onRefresh(): void {
     this.refreshTrigger.update((v) => v + 1);
+  }
+
+  clearSelection(): void {
+    this.selectedTagIds.set(new Set());
+  }
+
+  onBulkDelete(): void {
+    const ids = Array.from(this.selectedTagIds());
+    if (ids.length === 0) return;
+
+    this.deleting.set(true);
+
+    forkJoin(
+      ids.map((id) => deleteTag(this.http, this.apiConfig.rootUrl, { id })),
+    ).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.alertDialog()?.close();
+        toast.success(`${ids.length} tag${ids.length > 1 ? 's' : ''} deleted.`);
+        this.clearSelection();
+        this.onRefresh();
+      },
+      error: () => {
+        this.deleting.set(false);
+        toast.error('Failed to delete tags. Please try again.');
+      },
+    });
   }
 }
