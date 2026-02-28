@@ -359,8 +359,8 @@ import { toast } from 'ngx-sonner';
           <hlm-tabs-list variant="line" class="mx-4 mt-3">
             <button hlmTabsTrigger="preview">Preview</button>
             <button hlmTabsTrigger="info">Info</button>
+            <button hlmTabsTrigger="content">Content</button>
             <button hlmTabsTrigger="metadata">Metadata</button>
-            <button hlmTabsTrigger="text">Text</button>
           </hlm-tabs-list>
           <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
             <ng-container [ngTemplateOutlet]="previewContent" />
@@ -370,13 +370,13 @@ import { toast } from 'ngx-sonner';
               <ng-container [ngTemplateOutlet]="infoContent" />
             </div>
           </div>
+          <div hlmTabsContent="content" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
+            <ng-container [ngTemplateOutlet]="textContent" />
+          </div>
           <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
             <div class="absolute inset-0 overflow-y-auto px-4 py-3">
               <ng-container [ngTemplateOutlet]="metadataContent" />
             </div>
-          </div>
-          <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
-            <ng-container [ngTemplateOutlet]="textContent" />
           </div>
         </hlm-tabs>
       } @else {
@@ -394,21 +394,21 @@ import { toast } from 'ngx-sonner';
             <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
               <hlm-tabs-list variant="line" class="mx-4 mt-3">
                 <button hlmTabsTrigger="info">Info</button>
+                <button hlmTabsTrigger="content">Content</button>
                 <button hlmTabsTrigger="metadata">Metadata</button>
-                <button hlmTabsTrigger="text">Text</button>
               </hlm-tabs-list>
               <div hlmTabsContent="info" class="relative min-h-0 flex-1">
                 <div class="absolute inset-0 overflow-y-auto px-4 py-3">
                   <ng-container [ngTemplateOutlet]="infoContent" />
                 </div>
               </div>
+              <div hlmTabsContent="content" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
+                <ng-container [ngTemplateOutlet]="textContent" />
+              </div>
               <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
                 <div class="absolute inset-0 overflow-y-auto px-4 py-3">
                   <ng-container [ngTemplateOutlet]="metadataContent" />
                 </div>
-              </div>
-              <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
-                <ng-container [ngTemplateOutlet]="textContent" />
               </div>
             </hlm-tabs>
           </div>
