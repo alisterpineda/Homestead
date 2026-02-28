@@ -54,6 +54,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                 />
               </th>
               <th hlmTh>Name</th>
+              <th hlmTh class="w-8"></th>
               <th hlmTh>Path</th>
             </tr>
           </thead>
@@ -73,13 +74,11 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                     [aria-label]="'Select ' + tag.name"
                   />
                 </td>
-                <td hlmTd class="font-medium">
-                  <span class="flex items-center gap-2">
-                    @if (tag.color) {
-                      <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="tag.color"></span>
-                    }
-                    {{ tag.name }}
-                  </span>
+                <td hlmTd class="font-medium">{{ tag.name }}</td>
+                <td hlmTd class="w-8">
+                  @if (tag.color) {
+                    <span class="h-3 w-3 rounded-full inline-block" [style.background-color]="tag.color"></span>
+                  }
                 </td>
                 <td hlmTd class="text-muted-foreground">{{ tag.path }}</td>
               </tr>
