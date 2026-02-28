@@ -11,3 +11,5 @@ riderModule.iml
 # Frontend
 node_modules/
 Homestead.WebApi/wwwroot/
+
+.local/
