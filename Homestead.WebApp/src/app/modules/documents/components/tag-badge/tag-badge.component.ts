@@ -12,9 +12,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   template: `
     <span
       hlmBadge
-      class="gap-1"
-      [class]="color() ? 'tag-badge-colored' : 'tag-badge-gray'"
-      [style.--tag-color]="color()"
+      class="tag-badge-colored gap-1"
+      [style.--tag-color]="color() ?? '#808080'"
     >
       {{ path() }}
       @if (removable()) {
@@ -36,11 +35,6 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 
     :host-context(.dark) .tag-badge-colored {
       color: oklch(from var(--tag-color) max(l, 0.75) c h);
-    }
-
-    .tag-badge-gray {
-      background-color: color-mix(in oklch, gray 15%, transparent);
-      color: color-mix(in oklch, gray 70%, black);
     }
   `,
 })
