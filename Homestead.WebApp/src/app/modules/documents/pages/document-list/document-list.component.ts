@@ -169,7 +169,7 @@ import { toast } from 'ngx-sonner';
                     <ng-icon hlm name="lucideTrash2" size="sm" />
                     Delete
                   </button>
-                  <hlm-alert-dialog-content *hlmAlertDialogPortal>
+                  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
                     <div hlmAlertDialogHeader>
                       <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
                       <p hlmAlertDialogDescription>
@@ -178,7 +178,7 @@ import { toast } from 'ngx-sonner';
                       </p>
                     </div>
                     <div hlmAlertDialogFooter>
-                      <button hlmAlertDialogCancel>Cancel</button>
+                      <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
                       <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete()" [disabled]="deleting()">
                         {{ deleting() ? 'Deleting...' : 'Delete' }}
                       </button>
