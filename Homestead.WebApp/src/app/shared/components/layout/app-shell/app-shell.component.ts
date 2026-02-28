@@ -1,18 +1,19 @@
-import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, viewChild } from '@angular/core';
 import { Router, RouterOutlet, NavigationEnd, NavigationStart, ActivatedRoute } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags } from '@ng-icons/lucide';
+import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags, lucideEllipsisVertical, lucideCircleUserRound } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
   HlmSidebarService,
 } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
-import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmAlertDialog, HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
+import { ProfileDialogComponent } from '../../profile/profile.component';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
 import { AuthService } from '@/shared/services/auth.service';
@@ -34,12 +35,13 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     HlmIconImports,
     HlmSidebarImports,
     HlmSeparator,
-    HlmButton,
     HlmAlertDialogImports,
+    HlmDropdownMenuImports,
+    ProfileDialogComponent,
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags })],
+  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags, lucideEllipsisVertical, lucideCircleUserRound })],
   template: `
     <div hlmSidebarWrapper>
       <hlm-sidebar variant="inset">
@@ -93,47 +95,73 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 
         <!-- Sidebar Footer -->
         <div hlmSidebarFooter>
-          <div class="flex items-center gap-2">
-            <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-medium text-sidebar-accent-foreground"
-              aria-hidden="true"
-            >
-              {{ initials() }}
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium text-sidebar-foreground">
-                {{ auth.userName() }}
-              </p>
-              @if (auth.userEmail()) {
-                <p class="truncate text-xs text-sidebar-foreground/70">
-                  {{ auth.userEmail() }}
-                </p>
-              }
-            </div>
-            <hlm-alert-dialog>
-              <button
-                hlmBtn
-                variant="ghost"
-                size="icon-sm"
-                hlmAlertDialogTrigger
-                aria-label="Log out"
-              >
-                <ng-icon hlm name="lucideLogOut" size="sm" />
+          <ul hlmSidebarMenu>
+            <li hlmSidebarMenuItem>
+              <button hlmSidebarMenuButton [hlmDropdownMenuTrigger]="userMenu" side="top" align="end">
+                <div
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-medium text-sidebar-accent-foreground"
+                  aria-hidden="true"
+                >
+                  {{ initials() }}
+                </div>
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="truncate text-sm font-medium">{{ auth.userName() }}</p>
+                  <p class="truncate text-xs text-sidebar-foreground/70">{{ auth.userEmail() }}</p>
+                </div>
+                <ng-icon hlm name="lucideEllipsisVertical" size="sm" class="ml-auto" />
               </button>
-              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                <div hlmAlertDialogHeader>
-                  <h2 hlmAlertDialogTitle>Log out?</h2>
-                  <p hlmAlertDialogDescription>
-                    Are you sure you want to log out of your account?
-                  </p>
-                </div>
-                <div hlmAlertDialogFooter>
-                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                  <button hlmAlertDialogAction (click)="onLogout(ctx)">Log out</button>
-                </div>
-              </hlm-alert-dialog-content>
-            </hlm-alert-dialog>
-          </div>
+
+              <ng-template #userMenu>
+                <hlm-dropdown-menu class="w-56">
+                  <hlm-dropdown-menu-label class="font-normal">
+                    <div class="flex items-center gap-2">
+                      <div
+                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-medium text-accent-foreground"
+                        aria-hidden="true"
+                      >
+                        {{ initials() }}
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium">{{ auth.userName() }}</p>
+                        <p class="truncate text-xs text-muted-foreground">{{ auth.userEmail() }}</p>
+                      </div>
+                    </div>
+                  </hlm-dropdown-menu-label>
+                  <hlm-dropdown-menu-separator />
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuItem class="gap-2" (triggered)="profileDialog.open()">
+                      <ng-icon hlm name="lucideCircleUserRound" size="sm" />
+                      Profile
+                    </button>
+                  </hlm-dropdown-menu-group>
+                  <hlm-dropdown-menu-separator />
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuItem class="gap-2" (triggered)="onLogoutRequest()">
+                      <ng-icon hlm name="lucideLogOut" size="sm" />
+                      Log out
+                    </button>
+                  </hlm-dropdown-menu-group>
+                </hlm-dropdown-menu>
+              </ng-template>
+            </li>
+          </ul>
+
+          <app-profile-dialog #profileDialog />
+
+          <hlm-alert-dialog>
+            <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+              <div hlmAlertDialogHeader>
+                <h2 hlmAlertDialogTitle>Log out?</h2>
+                <p hlmAlertDialogDescription>
+                  Are you sure you want to log out of your account?
+                </p>
+              </div>
+              <div hlmAlertDialogFooter>
+                <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                <button hlmAlertDialogAction (click)="onLogout(ctx)">Log out</button>
+              </div>
+            </hlm-alert-dialog-content>
+          </hlm-alert-dialog>
         </div>
       </hlm-sidebar>
 
@@ -220,6 +248,12 @@ export class AppShellComponent {
       .toUpperCase()
       .slice(0, 2);
   });
+
+  private logoutDialog = viewChild(HlmAlertDialog);
+
+  protected onLogoutRequest(): void {
+    this.logoutDialog()?.open();
+  }
 
   protected async onLogout(ctx: { close: () => void }): Promise<void> {
     ctx.close();
