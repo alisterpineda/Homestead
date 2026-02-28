@@ -39,7 +39,6 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
-import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
@@ -80,7 +79,6 @@ import { toast } from 'ngx-sonner';
     TagInputComponent,
     PartyInputComponent,
     HlmTextareaImports,
-    HlmCollapsibleImports,
     HlmSeparatorImports,
     AddVersionDialogComponent,
   ],
@@ -274,6 +272,32 @@ import { toast } from 'ngx-sonner';
             <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
           </div>
 
+          <!-- Version Details -->
+          <hlm-separator />
+
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Version Details</p>
+
+          <hlm-form-field>
+            <label hlmLabel for="version-label">Label</label>
+            <input hlmInput id="version-label" maxlength="256"
+              placeholder="e.g., Final Draft, Signed Copy"
+              [value]="editVersionLabel()"
+              (input)="editVersionLabel.set(asInputValue($event))" />
+          </hlm-form-field>
+          <hlm-form-field>
+            <label hlmLabel for="version-notes">Notes</label>
+            <textarea hlmTextarea id="version-notes" maxlength="2048" rows="3"
+              placeholder="Version notes..."
+              [value]="editVersionNotes()"
+              (input)="editVersionNotes.set(asInputValue($event))"></textarea>
+          </hlm-form-field>
+        </div>
+      </ng-template>
+
+      <ng-template #metadataContent>
+        <div class="space-y-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Document</p>
+
           <!-- Added -->
           <div class="space-y-2">
             <label hlmLabel>Added</label>
@@ -282,63 +306,39 @@ import { toast } from 'ngx-sonner';
             </p>
           </div>
 
-          <!-- Version Details -->
+          <!-- Version -->
           <hlm-separator />
 
-          <div hlmCollapsible class="group">
-            <button hlmCollapsibleTrigger
-              class="flex w-full items-center justify-between py-1 text-sm font-medium hover:underline">
-              Version Details
-              <ng-icon hlm size="sm" name="lucideChevronDown"
-                class="transition-transform duration-200 group-data-[state=open]:rotate-180" />
-            </button>
-            <div hlmCollapsibleContent>
-              <div class="space-y-4 pt-3">
-                <hlm-form-field>
-                  <label hlmLabel for="version-label">Label</label>
-                  <input hlmInput id="version-label" maxlength="256"
-                    placeholder="e.g., Final Draft, Signed Copy"
-                    [value]="editVersionLabel()"
-                    (input)="editVersionLabel.set(asInputValue($event))" />
-                </hlm-form-field>
-                <hlm-form-field>
-                  <label hlmLabel for="version-notes">Notes</label>
-                  <textarea hlmTextarea id="version-notes" maxlength="2048" rows="3"
-                    placeholder="Version notes..."
-                    [value]="editVersionNotes()"
-                    (input)="editVersionNotes.set(asInputValue($event))"></textarea>
-                </hlm-form-field>
-                <!-- Added -->
-                @if (displayVersionCreatedAt()) {
-                  <div class="space-y-2">
-                    <label hlmLabel>Added</label>
-                    <p class="text-sm text-muted-foreground">
-                      {{ formatDate(displayVersionCreatedAt()) }}
-                    </p>
-                  </div>
-                }
-                <!-- Size -->
-                <div class="space-y-2">
-                  <label hlmLabel>Size</label>
-                  <p class="text-sm text-muted-foreground">
-                    {{ formatBytes(+displayFileSize()) }}
-                  </p>
-                </div>
-                <!-- Type -->
-                <div class="space-y-2">
-                  <label hlmLabel>Type</label>
-                  <p class="text-sm text-muted-foreground">{{ displayContentType() }}</p>
-                </div>
-                <!-- File Hash -->
-                @if (displayFileHash()) {
-                  <div class="space-y-2">
-                    <label hlmLabel>File Hash</label>
-                    <p class="text-sm text-muted-foreground break-all">{{ displayFileHash() }}</p>
-                  </div>
-                }
-              </div>
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Version</p>
+
+          <!-- Version Added -->
+          @if (displayVersionCreatedAt()) {
+            <div class="space-y-2">
+              <label hlmLabel>Added</label>
+              <p class="text-sm text-muted-foreground">
+                {{ formatDate(displayVersionCreatedAt()) }}
+              </p>
             </div>
+          }
+          <!-- Size -->
+          <div class="space-y-2">
+            <label hlmLabel>Size</label>
+            <p class="text-sm text-muted-foreground">
+              {{ formatBytes(+displayFileSize()) }}
+            </p>
           </div>
+          <!-- Type -->
+          <div class="space-y-2">
+            <label hlmLabel>Type</label>
+            <p class="text-sm text-muted-foreground">{{ displayContentType() }}</p>
+          </div>
+          <!-- File Hash -->
+          @if (displayFileHash()) {
+            <div class="space-y-2">
+              <label hlmLabel>File Hash</label>
+              <p class="text-sm text-muted-foreground break-all">{{ displayFileHash() }}</p>
+            </div>
+          }
         </div>
       </ng-template>
 
@@ -359,6 +359,7 @@ import { toast } from 'ngx-sonner';
           <hlm-tabs-list variant="line" class="mx-4 mt-3">
             <button hlmTabsTrigger="preview">Preview</button>
             <button hlmTabsTrigger="info">Info</button>
+            <button hlmTabsTrigger="metadata">Metadata</button>
             <button hlmTabsTrigger="text">Text</button>
           </hlm-tabs-list>
           <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
@@ -367,6 +368,11 @@ import { toast } from 'ngx-sonner';
           <div hlmTabsContent="info" class="relative min-h-0 flex-1">
             <div class="absolute inset-0 overflow-y-auto px-4 py-3">
               <ng-container [ngTemplateOutlet]="infoContent" />
+            </div>
+          </div>
+          <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
+            <div class="absolute inset-0 overflow-y-auto px-4 py-3">
+              <ng-container [ngTemplateOutlet]="metadataContent" />
             </div>
           </div>
           <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
@@ -388,11 +394,17 @@ import { toast } from 'ngx-sonner';
             <hlm-tabs tab="info" class="min-w-0 flex flex-1 flex-col overflow-hidden">
               <hlm-tabs-list variant="line" class="mx-4 mt-3">
                 <button hlmTabsTrigger="info">Info</button>
+                <button hlmTabsTrigger="metadata">Metadata</button>
                 <button hlmTabsTrigger="text">Text</button>
               </hlm-tabs-list>
               <div hlmTabsContent="info" class="relative min-h-0 flex-1">
                 <div class="absolute inset-0 overflow-y-auto px-4 py-3">
                   <ng-container [ngTemplateOutlet]="infoContent" />
+                </div>
+              </div>
+              <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
+                <div class="absolute inset-0 overflow-y-auto px-4 py-3">
+                  <ng-container [ngTemplateOutlet]="metadataContent" />
                 </div>
               </div>
               <div hlmTabsContent="text" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
