@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucidePlus, lucideSearch, lucideTrash2, lucideX } from '@ng-icons/lucide';
-import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -120,7 +119,7 @@ import { toast } from 'ngx-sonner';
                     </div>
                     <div hlmAlertDialogFooter>
                       <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete()" [disabled]="deleting()">
+                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
                         {{ deleting() ? 'Deleting...' : 'Delete' }}
                       </button>
                     </div>
@@ -150,7 +149,6 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class TagListComponent {
-  private alertDialog = viewChild(BrnAlertDialog);
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
 
@@ -233,7 +231,7 @@ export class TagListComponent {
     this.selectedTagIds.set(new Set());
   }
 
-  onBulkDelete(): void {
+  onBulkDelete(ctx: { close: () => void }): void {
     const ids = Array.from(this.selectedTagIds());
     if (ids.length === 0) return;
 
@@ -244,7 +242,7 @@ export class TagListComponent {
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
-        this.alertDialog()?.close();
+        ctx.close();
         const count = +response.body.deletedCount;
         toast.success(`${count} tag${count > 1 ? 's' : ''} deleted.`);
         this.clearSelection();
