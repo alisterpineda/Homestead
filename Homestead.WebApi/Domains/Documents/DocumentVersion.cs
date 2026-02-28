@@ -17,7 +17,6 @@ public class DocumentVersion
     public Guid Id { get; set; }
     public int VersionNumber { get; set; }
     public string? Label { get; set; }
-    public string? Notes { get; set; }
 
     public required string ContentType { get; set; }
     public long FileSize { get; set; }

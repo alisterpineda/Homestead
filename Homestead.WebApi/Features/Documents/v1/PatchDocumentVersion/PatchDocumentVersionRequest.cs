@@ -5,7 +5,6 @@ namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 public class PatchDocumentVersionModel
 {
     public string? Label { get; set; }
-    public string? Notes { get; set; }
     public string? ExtractedText { get; set; }
 }
 

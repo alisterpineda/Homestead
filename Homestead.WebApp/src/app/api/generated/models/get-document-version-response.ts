@@ -10,6 +10,5 @@ export interface GetDocumentVersionResponse {
   fileSize: (number | string);
   id: string;
   label?: (string | null);
-  notes?: (string | null);
   versionNumber: (number | string);
 }

@@ -45,7 +45,6 @@ public class CreateDocumentVersionHandler(
             request.DocumentId,
             file.FileName,
             request.Label,
-            request.Notes,
             file.ContentType,
             file.Length,
             extension);

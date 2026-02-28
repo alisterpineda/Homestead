@@ -79,7 +79,6 @@ public class UploadDocumentVersionJobHandler(
             Id = Guid.NewGuid(),
             VersionNumber = maxVersionNumber + 1,
             Label = payload.Label,
-            Notes = payload.Notes,
             ContentType = payload.ContentType,
             FileSize = payload.FileSize,
             FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),

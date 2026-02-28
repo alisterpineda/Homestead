@@ -15,8 +15,6 @@ export interface CreateDocumentVersion$Params {
       body: {
 'label'?: string;
 } & {
-'notes'?: string;
-} & {
 'file'?: IFormFile;
 } & {
 }

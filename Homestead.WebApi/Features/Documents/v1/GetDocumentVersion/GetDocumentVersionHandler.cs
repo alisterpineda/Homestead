@@ -17,7 +17,6 @@ public class GetDocumentVersionHandler(AppDbContext db)
                 Id = r.Id,
                 VersionNumber = r.VersionNumber,
                 Label = r.Label,
-                Notes = r.Notes,
                 ContentType = r.ContentType,
                 FileSize = r.FileSize,
                 FileHash = r.FileHash,

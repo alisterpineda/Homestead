@@ -284,13 +284,6 @@ import { toast } from 'ngx-sonner';
               [value]="editVersionLabel()"
               (input)="editVersionLabel.set(asInputValue($event))" />
           </hlm-form-field>
-          <hlm-form-field>
-            <label hlmLabel for="version-notes">Notes</label>
-            <textarea hlmTextarea id="version-notes" maxlength="2048" rows="3"
-              placeholder="Version notes..."
-              [value]="editVersionNotes()"
-              (input)="editVersionNotes.set(asInputValue($event))"></textarea>
-          </hlm-form-field>
         </div>
       </ng-template>
 
@@ -440,7 +433,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editValidFrom = signal('');
   editValidUntil = signal('');
   editVersionLabel = signal('');
-  editVersionNotes = signal('');
   editExtractedText = signal('');
   saving = signal(false);
   deleting = signal(false);
@@ -502,7 +494,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const ver = this.activeVersion();
     if (!ver) return false;
     if (this.editVersionLabel() !== (ver.label ?? '')) return true;
-    if (this.editVersionNotes() !== (ver.notes ?? '')) return true;
     const origText = this.displayExtractedText() ?? '';
     if (this.editExtractedText() !== origText) return true;
     return false;
@@ -641,7 +632,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       const ver = this.activeVersion();
       if (ver) {
         this.editVersionLabel.set(ver.label ?? '');
-        this.editVersionNotes.set(ver.notes ?? '');
       }
     });
 
@@ -882,9 +872,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
     if (this.editVersionLabel() !== (ver.label ?? '')) {
       ops.push(replace('/label', this.editVersionLabel() || null));
-    }
-    if (this.editVersionNotes() !== (ver.notes ?? '')) {
-      ops.push(replace('/notes', this.editVersionNotes() || null));
     }
     const origText = this.displayExtractedText() ?? '';
     if (this.editExtractedText() !== origText) {

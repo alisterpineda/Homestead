@@ -5,7 +5,6 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { UploadDropzoneComponent } from '../upload-dropzone/upload-dropzone.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
@@ -19,7 +18,6 @@ import { toast } from 'ngx-sonner';
     HlmButton,
     HlmInput,
     HlmLabel,
-    HlmTextareaImports,
     UploadDropzoneComponent,
   ],
   template: `
@@ -44,16 +42,6 @@ import { toast } from 'ngx-sonner';
             />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel for="version-notes">Notes (optional)</label>
-            <textarea
-              hlmTextarea
-              id="version-notes"
-              placeholder="Describe what changed in this version"
-              [value]="notes()"
-              (input)="notes.set(asTextareaValue($event))"
-            ></textarea>
-          </div>
-          <div class="flex flex-col gap-1.5">
             <label hlmLabel>File</label>
             <app-upload-dropzone [file]="file()" (fileSelect)="file.set($event)" />
           </div>
@@ -76,7 +64,6 @@ export class AddVersionDialogComponent {
   versionCreated = output();
 
   label = signal('');
-  notes = signal('');
   file = signal<File | null>(null);
   uploading = signal(false);
   uploadError = signal(false);
@@ -94,14 +81,9 @@ export class AddVersionDialogComponent {
     return (event.target as HTMLInputElement).value;
   }
 
-  asTextareaValue(event: Event): string {
-    return (event.target as HTMLTextAreaElement).value;
-  }
-
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.label.set('');
-      this.notes.set('');
       this.file.set(null);
       this.uploading.set(false);
       this.uploadError.set(false);
@@ -122,11 +104,6 @@ export class AddVersionDialogComponent {
     if (labelVal) {
       formData.append('label', labelVal);
     }
-    const notesVal = this.notes();
-    if (notesVal) {
-      formData.append('notes', notesVal);
-    }
-
     const docId = this.documentId();
     this.http
       .post<{ jobId: string }>(

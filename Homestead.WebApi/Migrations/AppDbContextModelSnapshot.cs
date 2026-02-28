@@ -128,10 +128,6 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<string>("Notes")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
-
                     b.Property<int>("VersionNumber")
                         .HasColumnType("integer");
 

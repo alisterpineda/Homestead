@@ -5,7 +5,6 @@ public record GetDocumentVersionResponse
     public required Guid Id { get; init; }
     public required int VersionNumber { get; init; }
     public string? Label { get; init; }
-    public string? Notes { get; init; }
     public required string ContentType { get; init; }
     public required long FileSize { get; init; }
     public required string FileHash { get; init; }

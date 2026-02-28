@@ -18,9 +18,6 @@ public class DocumentVersionConfiguration : IEntityTypeConfiguration<DocumentVer
         builder.Property(r => r.Label)
             .HasMaxLength(256);
 
-        builder.Property(r => r.Notes)
-            .HasMaxLength(2048);
-
         builder.Property(r => r.ContentType)
             .IsRequired();
 
