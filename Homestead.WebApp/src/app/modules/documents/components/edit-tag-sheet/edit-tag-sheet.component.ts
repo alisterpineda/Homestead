@@ -4,6 +4,7 @@ import {
   input,
   output,
   signal,
+  computed,
   inject,
   effect,
 } from '@angular/core';
@@ -62,7 +63,7 @@ import { toast } from 'ngx-sonner';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="save()" [disabled]="saving()">
+          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -78,6 +79,7 @@ export class EditTagSheetComponent {
 
   editColor = signal<string | null>(null);
   saving = signal(false);
+  hasChanges = computed(() => this.editColor() !== (this.tag()?.color ?? null));
 
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
