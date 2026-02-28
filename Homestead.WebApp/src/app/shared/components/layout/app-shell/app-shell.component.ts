@@ -12,6 +12,7 @@ import {
 } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
 import { AuthService } from '@/shared/services/auth.service';
@@ -34,6 +35,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     HlmSidebarImports,
     HlmSeparator,
     HlmButton,
+    HlmAlertDialogImports,
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
@@ -108,15 +110,29 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                 </p>
               }
             </div>
-            <button
-              hlmBtn
-              variant="ghost"
-              size="icon-sm"
-              (click)="auth.logout()"
-              aria-label="Log out"
-            >
-              <ng-icon hlm name="lucideLogOut" size="sm" />
-            </button>
+            <hlm-alert-dialog>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                hlmAlertDialogTrigger
+                aria-label="Log out"
+              >
+                <ng-icon hlm name="lucideLogOut" size="sm" />
+              </button>
+              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                <div hlmAlertDialogHeader>
+                  <h2 hlmAlertDialogTitle>Log out?</h2>
+                  <p hlmAlertDialogDescription>
+                    Are you sure you want to log out of your account?
+                  </p>
+                </div>
+                <div hlmAlertDialogFooter>
+                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                  <button hlmAlertDialogAction (click)="onLogout(ctx)">Log out</button>
+                </div>
+              </hlm-alert-dialog-content>
+            </hlm-alert-dialog>
           </div>
         </div>
       </hlm-sidebar>
@@ -204,6 +220,11 @@ export class AppShellComponent {
       .toUpperCase()
       .slice(0, 2);
   });
+
+  protected async onLogout(ctx: { close: () => void }): Promise<void> {
+    ctx.close();
+    await this.auth.logout();
+  }
 
   isItemActive(item: SidebarItem): boolean {
     const urlPath = this.router.url.split('?')[0];
