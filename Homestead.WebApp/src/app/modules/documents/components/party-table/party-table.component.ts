@@ -7,33 +7,13 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTableImports],
   template: `
-    <!-- Mobile card layout -->
-    <div class="flex flex-col gap-3 md:hidden">
-      @for (party of parties(); track party.id) {
-        <button
-          type="button"
-          (click)="partySelect.emit(party.id)"
-          class="w-full cursor-pointer rounded-lg border border-border p-4 text-left transition-colors hover:bg-muted"
-        >
-          <p class="font-medium text-foreground">{{ party.name }}</p>
-          @if (party.description) {
-            <p class="mt-1 text-sm text-muted-foreground line-clamp-2">{{ party.description }}</p>
-          }
-          <div class="mt-2 text-xs text-muted-foreground">
-            {{ party.documentCount }} {{ +party.documentCount === 1 ? 'document' : 'documents' }}
-          </div>
-        </button>
-      }
-    </div>
-
-    <!-- Desktop table layout -->
-    <div class="hidden overflow-hidden rounded-md border md:block">
+    <div class="overflow-hidden rounded-md border">
       <div hlmTableContainer>
         <table hlmTable>
           <thead hlmTHead>
             <tr hlmTr>
               <th hlmTh>Name</th>
-              <th hlmTh>Description</th>
+              <th hlmTh class="hidden md:table-cell">Description</th>
               <th hlmTh class="text-right">Documents</th>
             </tr>
           </thead>
@@ -47,7 +27,7 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
                 class="cursor-pointer"
               >
                 <td hlmTd class="font-medium">{{ party.name }}</td>
-                <td hlmTd class="text-muted-foreground">
+                <td hlmTd class="hidden text-muted-foreground md:table-cell">
                   <span class="line-clamp-1">{{ party.description || '\u2014' }}</span>
                 </td>
                 <td hlmTd class="text-right text-muted-foreground">{{ party.documentCount }}</td>

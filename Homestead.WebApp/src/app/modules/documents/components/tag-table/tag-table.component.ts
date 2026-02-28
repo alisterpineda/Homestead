@@ -8,39 +8,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTableImports, HlmCheckboxImports],
   template: `
-    <!-- Mobile card layout -->
-    <div class="flex flex-col gap-3 md:hidden">
-      @for (tag of tags(); track tag.id) {
-        <div
-          class="w-full rounded-lg border border-border p-4 transition-colors hover:bg-muted"
-        >
-          <div class="flex items-start gap-3">
-            <hlm-checkbox
-              [checked]="isSelected(tag.id)"
-              (checkedChange)="toggleSelection(tag.id, $event)"
-              [aria-label]="'Select ' + tag.name"
-              class="mt-0.5"
-            />
-            <button
-              type="button"
-              (click)="tagSelect.emit(tag.id)"
-              class="min-w-0 flex-1 cursor-pointer text-left"
-            >
-              <div class="flex items-center gap-2">
-                @if (tag.color) {
-                  <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="tag.color"></span>
-                }
-                <p class="font-medium text-foreground">{{ tag.name }}</p>
-              </div>
-              <p class="mt-1 text-sm text-muted-foreground">{{ tag.path }}</p>
-            </button>
-          </div>
-        </div>
-      }
-    </div>
-
-    <!-- Desktop table layout -->
-    <div class="hidden overflow-hidden rounded-md border md:block">
+    <div class="overflow-hidden rounded-md border">
       <div hlmTableContainer>
         <table hlmTable>
           <thead hlmTHead>
@@ -55,7 +23,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
               </th>
               <th hlmTh>Name</th>
               <th hlmTh class="w-8"></th>
-              <th hlmTh>Path</th>
+              <th hlmTh class="hidden md:table-cell">Path</th>
             </tr>
           </thead>
           <tbody hlmTBody>
@@ -80,7 +48,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                     <span class="h-3 w-3 rounded-full inline-block" [style.background-color]="tag.color"></span>
                   }
                 </td>
-                <td hlmTd class="text-muted-foreground">{{ tag.path }}</td>
+                <td hlmTd class="hidden text-muted-foreground md:table-cell">{{ tag.path }}</td>
               </tr>
             }
           </tbody>
