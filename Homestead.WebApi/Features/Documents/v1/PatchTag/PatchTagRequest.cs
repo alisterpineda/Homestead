@@ -1,0 +1,16 @@
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
+
+namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
+
+public class PatchTagModel
+{
+    public string Name { get; set; } = string.Empty;
+    public Guid? ParentId { get; set; }
+    public string? Color { get; set; }
+}
+
+public record PatchTagCommand
+{
+    public Guid Id { get; init; }
+    public required JsonPatchDocument<PatchTagModel> PatchDocument { get; init; }
+}

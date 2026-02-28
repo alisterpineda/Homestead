@@ -1,6 +1,6 @@
-namespace Homestead.WebApi.Features.Documents.v1.UpdateTag;
+namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
-public record UpdateTagResponse
+public record PatchTagResponse
 {
     public required Guid Id { get; init; }
     public required string Name { get; init; }

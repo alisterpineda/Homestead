@@ -7,19 +7,19 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { UpdateTagRequest } from '../../models/update-tag-request';
-import { UpdateTagResponse } from '../../models/update-tag-response';
+import { JsonPatchDocument } from '../../models/json-patch-document';
+import { PatchTagResponse } from '../../models/patch-tag-response';
 
-export interface UpdateTag$Params {
+export interface PatchTag$Params {
   id: string;
-      body: UpdateTagRequest
+      body: JsonPatchDocument
 }
 
-export function updateTag(http: HttpClient, rootUrl: string, params: UpdateTag$Params, context?: HttpContext): Observable<StrictHttpResponse<UpdateTagResponse>> {
-  const rb = new RequestBuilder(rootUrl, updateTag.PATH, 'put');
+export function patchTag(http: HttpClient, rootUrl: string, params: PatchTag$Params, context?: HttpContext): Observable<StrictHttpResponse<PatchTagResponse>> {
+  const rb = new RequestBuilder(rootUrl, patchTag.PATH, 'patch');
   if (params) {
     rb.path('id', params.id, {});
-    rb.body(params.body, 'application/json');
+    rb.body(params.body, 'application/json-patch+json');
   }
 
   return http.request(
@@ -27,9 +27,9 @@ export function updateTag(http: HttpClient, rootUrl: string, params: UpdateTag$P
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<UpdateTagResponse>;
+      return r as StrictHttpResponse<PatchTagResponse>;
     })
   );
 }
 
-updateTag.PATH = '/api/v1/documents/tags/{id}';
+patchTag.PATH = '/api/v1/documents/tags/{id}';

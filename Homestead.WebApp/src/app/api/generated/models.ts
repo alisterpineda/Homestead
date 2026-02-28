@@ -39,6 +39,7 @@ export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/pagi
 export type { PartyDto } from './models/party-dto';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';
+export type { PatchTagResponse } from './models/patch-tag-response';
 export type { ProcessingEntityType } from './models/processing-entity-type';
 export type { ProcessingJobStatus } from './models/processing-job-status';
 export type { ProcessingJobType } from './models/processing-job-type';
@@ -53,5 +54,3 @@ export type { TwoFactorRequest } from './models/two-factor-request';
 export type { TwoFactorResponse } from './models/two-factor-response';
 export type { UpdatePartyRequest } from './models/update-party-request';
 export type { UpdatePartyResponse } from './models/update-party-response';
-export type { UpdateTagRequest } from './models/update-tag-request';
-export type { UpdateTagResponse } from './models/update-tag-response';

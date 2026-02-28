@@ -142,6 +142,7 @@ import { toast } from 'ngx-sonner';
 
     <app-edit-tag-sheet
       [tag]="selectedTag()"
+      [allTags]="allTags() ?? []"
       [state]="sheetState()"
       (saved)="onSheetSaved()"
       (closed)="onSheetClosed()"
