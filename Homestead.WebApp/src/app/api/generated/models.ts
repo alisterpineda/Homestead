@@ -23,7 +23,6 @@ export type { GetDocumentVersionDto } from './models/get-document-version-dto';
 export type { GetDocumentVersionResponse } from './models/get-document-version-response';
 export type { GetDocumentVersionsResponse } from './models/get-document-versions-response';
 export type { GetPartiesResponse } from './models/get-parties-response';
-export type { GetPartyDocumentDto } from './models/get-party-document-dto';
 export type { GetPartyResponse } from './models/get-party-response';
 export type { GetProcessingJobsResponse } from './models/get-processing-jobs-response';
 export type { GetTagsResponse } from './models/get-tags-response';

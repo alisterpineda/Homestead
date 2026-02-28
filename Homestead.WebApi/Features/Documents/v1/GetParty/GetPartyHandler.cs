@@ -18,15 +18,6 @@ public class GetPartyHandler(AppDbContext db)
                 Name = p.Name,
                 Description = p.Description,
                 CreatedAt = p.CreatedAt,
-                Documents = p.DocumentParties.Select(dp => new GetPartyDocumentDto
-                {
-                    Id = dp.Document.Id,
-                    Name = dp.Document.Name,
-                    ContentType = dp.Document.Versions
-                        .OrderByDescending(r => r.VersionNumber)
-                        .Select(r => r.ContentType)
-                        .FirstOrDefault() ?? ""
-                }).ToList()
             })
             .FirstOrDefaultAsync(ct);
     }
