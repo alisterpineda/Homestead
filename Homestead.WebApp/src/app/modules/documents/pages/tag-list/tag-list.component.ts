@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, forkJoin } from 'rxjs';
+import { switchMap, map, catchError, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucidePlus, lucideSearch, lucideTrash2, lucideX } from '@ng-icons/lucide';
 import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
@@ -16,7 +16,7 @@ import { CreateTagDialogComponent } from '../../components/create-tag-dialog/cre
 import { EditTagSheetComponent } from '../../components/edit-tag-sheet/edit-tag-sheet.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getTags } from '@/api/generated/fn/documents/get-tags';
-import { deleteTag } from '@/api/generated/fn/documents/delete-tag';
+import { bulkDeleteTags } from '@/api/generated/fn/documents/bulk-delete-tags';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
@@ -239,13 +239,14 @@ export class TagListComponent {
 
     this.deleting.set(true);
 
-    forkJoin(
-      ids.map((id) => deleteTag(this.http, this.apiConfig.rootUrl, { id })),
-    ).subscribe({
-      next: () => {
+    bulkDeleteTags(this.http, this.apiConfig.rootUrl, {
+      body: { ids },
+    }).subscribe({
+      next: (response) => {
         this.deleting.set(false);
         this.alertDialog()?.close();
-        toast.success(`${ids.length} tag${ids.length > 1 ? 's' : ''} deleted.`);
+        const count = +response.body.deletedCount;
+        toast.success(`${count} tag${count > 1 ? 's' : ''} deleted.`);
         this.clearSelection();
         this.onRefresh();
       },

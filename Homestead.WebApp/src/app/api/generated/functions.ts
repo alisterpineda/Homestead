@@ -51,6 +51,8 @@ export type { DeleteDocumentVersion$Params as DeleteDocumentVersion$Params } fro
 export { deleteDocumentVersion as deleteDocumentVersion } from './fn/documents/delete-document-version';
 export type { PatchDocumentVersion$Params as PatchDocumentVersion$Params } from './fn/documents/patch-document-version';
 export { patchDocumentVersion as patchDocumentVersion } from './fn/documents/patch-document-version';
+export type { BulkDeleteParties$Params as BulkDeleteParties$Params } from './fn/documents/bulk-delete-parties';
+export { bulkDeleteParties as bulkDeleteParties } from './fn/documents/bulk-delete-parties';
 export type { GetParties$Params as GetParties$Params } from './fn/documents/get-parties';
 export { getParties as getParties } from './fn/documents/get-parties';
 export type { CreateParty$Params as CreateParty$Params } from './fn/documents/create-party';
@@ -61,6 +63,8 @@ export type { UpdateParty$Params as UpdateParty$Params } from './fn/documents/up
 export { updateParty as updateParty } from './fn/documents/update-party';
 export type { DeleteParty$Params as DeleteParty$Params } from './fn/documents/delete-party';
 export { deleteParty as deleteParty } from './fn/documents/delete-party';
+export type { BulkDeleteTags$Params as BulkDeleteTags$Params } from './fn/documents/bulk-delete-tags';
+export { bulkDeleteTags as bulkDeleteTags } from './fn/documents/bulk-delete-tags';
 export type { GetTags$Params as GetTags$Params } from './fn/documents/get-tags';
 export { getTags as getTags } from './fn/documents/get-tags';
 export type { CreateTag$Params as CreateTag$Params } from './fn/documents/create-tag';

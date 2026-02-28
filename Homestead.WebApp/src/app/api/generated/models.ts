@@ -4,6 +4,10 @@
 export type { AccessTokenResponse } from './models/access-token-response';
 export type { BulkDeleteDocumentsRequest } from './models/bulk-delete-documents-request';
 export type { BulkDeleteDocumentsResponse } from './models/bulk-delete-documents-response';
+export type { BulkDeletePartiesRequest } from './models/bulk-delete-parties-request';
+export type { BulkDeletePartiesResponse } from './models/bulk-delete-parties-response';
+export type { BulkDeleteTagsRequest } from './models/bulk-delete-tags-request';
+export type { BulkDeleteTagsResponse } from './models/bulk-delete-tags-response';
 export type { CreateDocumentResponse } from './models/create-document-response';
 export type { CreateDocumentVersionResponse } from './models/create-document-version-response';
 export type { CreatePartyRequest } from './models/create-party-request';

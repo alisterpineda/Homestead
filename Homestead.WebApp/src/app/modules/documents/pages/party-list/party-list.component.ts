@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, forkJoin } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
 import { BrnAlertDialog } from '@spartan-ng/brain/alert-dialog';
@@ -17,7 +17,7 @@ import { EditPartySheetComponent } from '../../components/edit-party-sheet/edit-
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { deleteParty } from '@/api/generated/fn/documents/delete-party';
+import { bulkDeleteParties } from '@/api/generated/fn/documents/bulk-delete-parties';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/models/paginated-response-of-get-parties-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -250,13 +250,14 @@ export class PartyListComponent {
 
     this.deleting.set(true);
 
-    forkJoin(
-      ids.map((id) => deleteParty(this.http, this.apiConfig.rootUrl, { id })),
-    ).subscribe({
-      next: () => {
+    bulkDeleteParties(this.http, this.apiConfig.rootUrl, {
+      body: { ids },
+    }).subscribe({
+      next: (response) => {
         this.deleting.set(false);
         this.alertDialog()?.close();
-        toast.success(`${ids.length} ${ids.length > 1 ? 'parties' : 'party'} deleted.`);
+        const count = +response.body.deletedCount;
+        toast.success(`${count} ${count > 1 ? 'parties' : 'party'} deleted.`);
         this.clearSelection();
         this.onRefresh();
       },
