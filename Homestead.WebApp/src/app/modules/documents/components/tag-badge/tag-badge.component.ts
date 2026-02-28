@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
 import { HlmBadge } from '@/shared/components/spartan/badge';
@@ -13,7 +13,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
     <span
       hlmBadge
       class="gap-1"
-      [style]="badgeStyle()"
+      [class]="color() ? 'tag-badge-colored' : 'tag-badge-gray'"
+      [style.--tag-color]="color()"
     >
       {{ path() }}
       @if (removable()) {
@@ -27,18 +28,27 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
       }
     </span>
   `,
+  styles: `
+    .tag-badge-colored {
+      background-color: color-mix(in oklch, var(--tag-color) 15%, transparent);
+      color: oklch(from var(--tag-color) min(l, 0.5) c h);
+    }
+
+    :host-context(.dark) .tag-badge-colored {
+      color: oklch(from var(--tag-color) max(l, 0.75) c h);
+    }
+
+    .tag-badge-gray {
+      background-color: color-mix(in oklch, gray 15%, transparent);
+      color: color-mix(in oklch, gray 70%, black);
+    }
+  `,
 })
 export class TagBadgeComponent {
   path = input.required<string>();
   color = input<string | null | undefined>(null);
   removable = input(false);
   removed = output<void>();
-
-  badgeStyle = computed(() => {
-    const c = this.color();
-    if (!c) return 'background-color: color-mix(in oklch, gray 15%, transparent); color: color-mix(in oklch, gray 70%, black);';
-    return `background-color: color-mix(in oklch, ${c} 15%, transparent); color: ${c};`;
-  });
 
   onRemove(event: Event): void {
     event.stopPropagation();

@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, ElementRef, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, ElementRef, viewChild } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCheck, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { isLightColor } from '@/shared/utils/color-utils';
 
 export const PRESET_COLORS = [
   { name: 'Red', hex: '#ef4444' },
@@ -36,7 +37,7 @@ export const PRESET_COLORS = [
           [class]="color() === preset.hex ? 'border-foreground scale-110' : 'border-transparent hover:scale-110'"
         >
           @if (color() === preset.hex) {
-            <ng-icon hlm name="lucideCheck" size="xs" class="absolute inset-0 m-auto text-white drop-shadow-sm" />
+            <ng-icon hlm name="lucideCheck" size="xs" class="absolute inset-0 m-auto drop-shadow-sm" [class]="isLight(preset.hex) ? 'text-foreground' : 'text-white'" />
           }
         </button>
       }
@@ -51,7 +52,7 @@ export const PRESET_COLORS = [
         [class]="isCustomColor() ? 'border-foreground scale-110' : 'border-transparent hover:scale-110'"
       >
         @if (isCustomColor()) {
-          <ng-icon hlm name="lucideCheck" size="xs" class="absolute inset-0 m-auto text-white drop-shadow-sm" />
+          <ng-icon hlm name="lucideCheck" size="xs" class="absolute inset-0 m-auto drop-shadow-sm" [class]="isLight(color()!) ? 'text-foreground' : 'text-white'" />
         }
         <input
           #colorInput
@@ -86,6 +87,8 @@ export class ColorPickerComponent {
   private colorInputRef = viewChild<ElementRef<HTMLInputElement>>('colorInput');
 
   private presetHexes = new Set<string>(PRESET_COLORS.map((p) => p.hex));
+
+  isLight = isLightColor;
 
   isCustomColor = () => {
     const c = this.color();
