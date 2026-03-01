@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -70,7 +70,7 @@ import { toast } from 'ngx-sonner';
       }
 
       @if (data(); as result) {
-        @if (result.items.length === 0 && !hasActiveFilters() && !loading()) {
+        @if (result.items.length === 0 && !hasActiveFilters()) {
           <section hlmEmpty>
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideFileText" size="xl" />
@@ -357,6 +357,7 @@ export class DocumentListComponent implements OnDestroy {
     this.searchSub = toObservable(this.searchInput).pipe(
       debounceTime(300),
       distinctUntilChanged(),
+      filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
     ).subscribe(value => {
       this.router.navigate(['/documents'], {
         queryParams: { page: 1, search: value || null },

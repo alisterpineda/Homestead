@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideSearch } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -50,7 +50,7 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
       }
 
       @if (data(); as result) {
-        @if (result.items.length === 0 && !searchTerm() && !loading()) {
+        @if (result.items.length === 0 && !searchTerm()) {
           <section hlmEmpty>
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideUsers" size="xl" />
@@ -76,7 +76,7 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
             </div>
           </div>
 
-          @if (result.items.length === 0 && !loading()) {
+          @if (result.items.length === 0) {
             <section hlmEmpty>
               <hlm-empty-media variant="icon">
                 <ng-icon hlm name="lucideSearch" size="xl" />
@@ -160,7 +160,11 @@ export class UserListComponent implements OnDestroy {
 
   constructor() {
     this.searchSub = toObservable(this.searchInput)
-      .pipe(debounceTime(300), distinctUntilChanged())
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        filter((value) => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
+      )
       .subscribe((value) => {
         this.router.navigate(['/admin/users'], {
           queryParams: { page: 1, search: value || null },

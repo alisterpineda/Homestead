@@ -59,7 +59,7 @@ import { toast } from 'ngx-sonner';
       }
 
       @if (data(); as result) {
-        @if (result.items.length === 0 && !loading()) {
+        @if (result.items.length === 0) {
           <section hlmEmpty>
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideUsers" size="xl" />

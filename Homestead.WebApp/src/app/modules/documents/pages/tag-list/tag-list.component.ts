@@ -57,7 +57,7 @@ import { toast } from 'ngx-sonner';
       }
 
       @if (allTags(); as tags) {
-        @if (tags.length === 0 && !loading()) {
+        @if (tags.length === 0) {
           <section hlmEmpty>
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideTags" size="xl" />
