@@ -1,9 +1,8 @@
-using System.Security.Claims;
 using Asp.Versioning;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Features.Admin;
+using Homestead.WebApi.Features.Identity;
 using Homestead.WebApi.Features.Documents;
 using Homestead.WebApi.Features.Processing;
 using Homestead.WebApi.Processing;
@@ -136,66 +135,7 @@ app.UseAuthorization();
 
 app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization();
 
-// Identity API endpoints under /api/auth
-var authGroup = app.MapGroup("/api/auth");
-authGroup.MapIdentityApi<AppUser>();
-
-// Custom registration endpoint that accepts displayName
-authGroup.MapPost("/custom-register", async (
-    CustomRegisterRequest request,
-    UserManager<AppUser> userManager,
-    SignInManager<AppUser> signInManager) =>
-{
-    var user = new AppUser
-    {
-        UserName = request.Email,
-        Email = request.Email,
-        DisplayName = request.DisplayName
-    };
-
-    var result = await userManager.CreateAsync(user, request.Password);
-    if (!result.Succeeded)
-    {
-        return Results.ValidationProblem(
-            result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
-    }
-
-    if (!await userManager.Users.AnyAsync(u => u.Id != user.Id))
-        await userManager.AddToRoleAsync(user, "Admin");
-
-    await signInManager.SignInAsync(user, isPersistent: true);
-    return Results.Ok();
-}).AllowAnonymous();
-
-// Logout endpoint
-authGroup.MapPost("/logout", async (SignInManager<AppUser> signInManager) =>
-{
-    await signInManager.SignOutAsync();
-    return Results.Ok();
-}).RequireAuthorization();
-
-// User info endpoint for the SPA to check session status
-authGroup.MapGet("/user-info", async (
-    HttpContext context,
-    UserManager<AppUser> userManager) =>
-{
-    var user = context.User;
-    if (user.Identity?.IsAuthenticated != true)
-        return Results.Unauthorized();
-
-    var appUser = await userManager.GetUserAsync(user);
-    if (appUser is null)
-        return Results.Unauthorized();
-
-    var roles = await userManager.GetRolesAsync(appUser);
-    return Results.Ok(new
-    {
-        id = appUser.Id,
-        email = appUser.Email,
-        displayName = appUser.DisplayName,
-        roles
-    });
-}).RequireAuthorization();
+app.MapIdentityEndpoints();
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
@@ -226,5 +166,3 @@ app.UseHttpsRedirection();
 app.MapFallbackToFile("index.html").AllowAnonymous();
 
 app.Run();
-
-record CustomRegisterRequest(string Email, string DisplayName, string Password);

@@ -47,7 +47,7 @@ export class AuthService {
 
   async register(email: string, displayName: string, password: string): Promise<void> {
     await firstValueFrom(
-      this.http.post('/api/auth/custom-register', { email, displayName, password }),
+      this.http.post('/api/auth/register', { email, displayName, password }),
     );
     const user = await firstValueFrom(
       this.http.get<UserInfo>('/api/auth/user-info'),
