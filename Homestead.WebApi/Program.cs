@@ -35,12 +35,7 @@ if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")
     }
 }
 
-var connectionString = builder.Configuration.GetConnectionString("postgresdb");
-
-if (!string.IsNullOrEmpty(connectionString))
-{
-    builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
-}
+builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).
@@ -144,7 +139,7 @@ versionedApi.MapDocumentsEndpoints();
 versionedApi.MapProcessingEndpoints();
 versionedApi.MapAdminEndpoints();
 
-if (!string.IsNullOrEmpty(connectionString))
+if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
