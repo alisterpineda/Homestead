@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<Document> Documents { get; set; }
     public DbSet<DocumentVersion> DocumentVersions { get; set; }
+    public DbSet<DocumentComment> DocumentComments { get; set; }
     public DbSet<Tag> Tags { get; set; }
     public DbSet<DocumentTag> DocumentTags { get; set; }
     public DbSet<Party> Parties { get; set; }

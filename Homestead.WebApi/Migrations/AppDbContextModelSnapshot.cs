@@ -113,6 +113,39 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("documents", "documents");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("document_comments", "documents");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentTag", b =>
                 {
                     b.Property<Guid>("DocumentId")
@@ -546,6 +579,24 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("OwnerUser");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentComment", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domains.Documents.Document", "Document")
+                        .WithMany("Comments")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Document");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.DocumentTag", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domains.Documents.Document", "Document")
@@ -658,6 +709,8 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.Document", b =>
                 {
+                    b.Navigation("Comments");
+
                     b.Navigation("DocumentParties");
 
                     b.Navigation("DocumentTags");

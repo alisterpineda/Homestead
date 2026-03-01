@@ -20,6 +20,7 @@ public class Document
     public AppUser? OwnerUser { get; set; }
 
     public ICollection<DocumentVersion> Versions { get; set; } = [];
+    public ICollection<DocumentComment> Comments { get; set; } = [];
     public ICollection<DocumentTag> DocumentTags { get; set; } = [];
     public ICollection<DocumentParty> DocumentParties { get; set; } = [];
 }

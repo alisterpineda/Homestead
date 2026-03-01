@@ -2,6 +2,7 @@ using Asp.Versioning.Builder;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteParties;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
+using Homestead.WebApi.Features.Documents.v1.CreateComment;
 using Homestead.WebApi.Features.Documents.v1.CreateDocument;
 using Homestead.WebApi.Features.Documents.v1.CreateDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.CreateParty;
@@ -50,6 +51,9 @@ public static class DocumentsModule
         GetDocumentVersionsEndpoint.Map(versions);
         GetDocumentVersionEndpoint.Map(versions);
         PatchDocumentVersionEndpoint.Map(versions);
+
+        var comments = v1.MapGroup("/{documentId:guid}/comments");
+        CreateCommentEndpoint.Map(comments);
 
         var parties = v1.MapGroup("/parties");
         BulkDeletePartiesEndpoint.Map(parties);
