@@ -33,6 +33,7 @@ export type { GetPartiesResponse } from './models/get-parties-response';
 export type { GetPartyResponse } from './models/get-party-response';
 export type { GetProcessingJobsResponse } from './models/get-processing-jobs-response';
 export type { GetTagsResponse } from './models/get-tags-response';
+export type { GetUsersResponse } from './models/get-users-response';
 export type { HttpValidationProblemDetails } from './models/http-validation-problem-details';
 export type { IFormFile } from './models/i-form-file';
 export type { InfoRequest } from './models/info-request';
@@ -44,6 +45,7 @@ export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
+export type { PaginatedResponseOfGetUsersResponse } from './models/paginated-response-of-get-users-response';
 export type { PartyDto } from './models/party-dto';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';

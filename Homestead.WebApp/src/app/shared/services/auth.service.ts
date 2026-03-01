@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -7,6 +7,7 @@ interface UserInfo {
   id: string;
   email: string;
   displayName: string;
+  roles: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -18,6 +19,8 @@ export class AuthService {
   readonly isAuthenticated = signal(false);
   readonly userName = signal('');
   readonly userEmail = signal('');
+  readonly roles = signal<string[]>([]);
+  readonly isAdmin = computed(() => this.roles().includes('Admin'));
 
   async initialize(): Promise<void> {
     try {
@@ -57,6 +60,7 @@ export class AuthService {
     this.isAuthenticated.set(false);
     this.userName.set('');
     this.userEmail.set('');
+    this.roles.set([]);
     this.router.navigate(['/login']);
   }
 
@@ -64,5 +68,6 @@ export class AuthService {
     this.isAuthenticated.set(true);
     this.userName.set(user.displayName || user.email);
     this.userEmail.set(user.email);
+    this.roles.set(user.roles ?? []);
   }
 }

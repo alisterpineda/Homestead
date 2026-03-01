@@ -10,6 +10,7 @@ export const modules: ModuleDefinition[] = [
     icon: 'lucideSettings',
     basePath: '/admin',
     sidebar: adminSidebar,
+    requiredRole: 'Admin',
   },
   {
     id: 'documents',

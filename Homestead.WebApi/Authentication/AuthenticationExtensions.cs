@@ -21,6 +21,7 @@ public static class AuthenticationExtensions
                 options.Password.RequireUppercase = false;
                 options.Password.RequireNonAlphanumeric = false;
             })
+            .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<AppDbContext>();
 
         var isDev = builder.Environment.IsDevelopment();

@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLayoutGrid, lucideSettings, lucideFileText } from '@ng-icons/lucide';
@@ -6,6 +6,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { modules } from '@/modules/registry';
+import { AuthService } from '@/shared/services/auth.service';
 
 @Component({
   selector: 'app-switcher',
@@ -18,7 +19,7 @@ import { modules } from '@/modules/registry';
     </button>
     <ng-template #menu>
       <div hlmDropdownMenu class="w-52">
-        @for (mod of modules; track mod.id) {
+        @for (mod of visibleModules(); track mod.id) {
           <a [routerLink]="mod.basePath" hlmDropdownMenuItem class="gap-2">
             <ng-icon hlm [name]="mod.icon" size="sm" />
             {{ mod.label }}
@@ -29,5 +30,10 @@ import { modules } from '@/modules/registry';
   `,
 })
 export class AppSwitcherComponent {
-  modules = modules;
+  private auth = inject(AuthService);
+
+  visibleModules = computed(() => {
+    const roles = this.auth.roles();
+    return modules.filter((m) => !m.requiredRole || roles.includes(m.requiredRole));
+  });
 }

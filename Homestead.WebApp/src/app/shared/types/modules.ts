@@ -16,4 +16,5 @@ export interface ModuleDefinition {
   icon: string;
   basePath: string;
   sidebar: SidebarGroup[];
+  requiredRole?: string;
 }

@@ -3,6 +3,7 @@ using Asp.Versioning;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Features.Admin;
 using Homestead.WebApi.Features.Documents;
 using Homestead.WebApi.Features.Processing;
 using Homestead.WebApi.Processing;
@@ -159,6 +160,9 @@ authGroup.MapPost("/custom-register", async (
             result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description }));
     }
 
+    if (!await userManager.Users.AnyAsync(u => u.Id != user.Id))
+        await userManager.AddToRoleAsync(user, "Admin");
+
     await signInManager.SignInAsync(user, isPersistent: true);
     return Results.Ok();
 }).AllowAnonymous();
@@ -183,23 +187,30 @@ authGroup.MapGet("/user-info", async (
     if (appUser is null)
         return Results.Unauthorized();
 
+    var roles = await userManager.GetRolesAsync(appUser);
     return Results.Ok(new
     {
         id = appUser.Id,
         email = appUser.Email,
-        displayName = appUser.DisplayName
+        displayName = appUser.DisplayName,
+        roles
     });
 }).RequireAuthorization();
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
 versionedApi.MapProcessingEndpoints();
+versionedApi.MapAdminEndpoints();
 
 if (!string.IsNullOrEmpty(connectionString))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+    if (!await roleManager.RoleExistsAsync("Admin"))
+        await roleManager.CreateAsync(new IdentityRole<Guid>("Admin"));
 }
 
 // Configure the HTTP request pipeline.
