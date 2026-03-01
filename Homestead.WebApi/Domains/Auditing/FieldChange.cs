@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Homestead.WebApi.Domains.Auditing;
@@ -5,7 +6,13 @@ namespace Homestead.WebApi.Domains.Auditing;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(ScalarFieldChange), "scalar")]
 [JsonDerivedType(typeof(ArrayFieldChange), "array")]
-public abstract record FieldChange(string Field);
+public abstract record FieldChange(string Field)
+{
+    public static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+}
 
 public record ScalarFieldChange(string Field, string? OldValue, string? NewValue) : FieldChange(Field);
 

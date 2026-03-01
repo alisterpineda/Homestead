@@ -27,6 +27,9 @@ import {
   lucideEllipsisVertical,
   lucideFilePlus2,
   lucideChevronDown,
+  lucideMessageSquare,
+  lucideHistory,
+  lucideSend,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -40,7 +43,10 @@ import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
+import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
+import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { NgScrollbar } from 'ngx-scrollbar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
@@ -52,10 +58,13 @@ import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-ve
 import { patchDocument } from '@/api/generated/fn/documents/patch-document';
 import { patchDocumentVersion } from '@/api/generated/fn/documents/patch-document-version';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
+import { getDocumentActivity } from '@/api/generated/fn/documents/get-document-activity';
+import { createComment } from '@/api/generated/fn/documents/create-comment';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
+import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from 'ngx-sonner';
@@ -80,6 +89,9 @@ import { toast } from 'ngx-sonner';
     PartyInputComponent,
     HlmTextareaImports,
     HlmSeparatorImports,
+    HlmScrollAreaImports,
+    HlmInputGroupImports,
+    NgScrollbar,
     AddVersionDialogComponent,
   ],
   providers: [
@@ -92,6 +104,9 @@ import { toast } from 'ngx-sonner';
       lucideEllipsisVertical,
       lucideFilePlus2,
       lucideChevronDown,
+      lucideMessageSquare,
+      lucideHistory,
+      lucideSend,
     }),
   ],
   template: `
@@ -346,6 +361,75 @@ import { toast } from 'ngx-sonner';
         ></textarea>
       </ng-template>
 
+      <ng-template #activityContent>
+        <div class="flex h-full flex-col">
+          <ng-scrollbar hlm class="flex-1">
+            <div class="px-4 py-3">
+              @if (activityLoading()) {
+                <div class="flex justify-center py-8">
+                  <hlm-spinner />
+                </div>
+              } @else if (activityItems().length === 0) {
+                <p class="text-center text-sm text-muted-foreground py-8">No activity yet.</p>
+              } @else {
+                @for (item of activityItems(); track item.id) {
+                  @if (item.type === 'comment') {
+                    <div class="flex gap-2.5 py-2">
+                      <div class="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
+                        <ng-icon hlm size="xs" name="lucideMessageSquare" />
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-baseline gap-2">
+                          <span class="text-sm font-medium">{{ item.userDisplayName || item.userEmail || 'Someone' }}</span>
+                          <span class="text-xs text-muted-foreground">{{ formatRelativeTime(item.timestamp) }}</span>
+                        </div>
+                        <p class="mt-0.5 text-sm whitespace-pre-wrap">{{ item.body }}</p>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="flex items-center gap-2.5 py-1.5">
+                      <div class="flex size-6 shrink-0 items-center justify-center">
+                        <ng-icon hlm size="xs" name="lucideHistory" class="text-muted-foreground" />
+                      </div>
+                      <p class="text-xs text-muted-foreground">
+                        {{ item.summary }}
+                        <span class="mx-0.5">&middot;</span>
+                        {{ formatRelativeTime(item.timestamp) }}
+                      </p>
+                    </div>
+                  }
+                }
+              }
+            </div>
+          </ng-scrollbar>
+
+          <div class="border-t px-4 py-3">
+            <label class="sr-only" for="activity-comment">Add a comment</label>
+            <div hlmInputGroup>
+              <input
+                hlmInputGroupInput
+                id="activity-comment"
+                placeholder="Add a comment..."
+                [value]="commentBody()"
+                (input)="commentBody.set(asInputValue($event))"
+                (keydown.enter)="submitComment()"
+              />
+              <hlm-input-group-addon align="inline-end">
+                <button
+                  hlmInputGroupButton
+                  size="icon-xs"
+                  [disabled]="!commentBody().trim() || commentSubmitting()"
+                  (click)="submitComment()"
+                  aria-label="Send comment"
+                >
+                  <ng-icon hlm name="lucideSend" size="sm" />
+                </button>
+              </hlm-input-group-addon>
+            </div>
+          </div>
+        </div>
+      </ng-template>
+
       @if (isMobile()) {
         <!-- Mobile: single tabbed layout -->
         <hlm-tabs tab="preview" class="min-w-0 flex flex-1 flex-col overflow-hidden rounded-md border">
@@ -354,6 +438,7 @@ import { toast } from 'ngx-sonner';
             <button hlmTabsTrigger="info">Info</button>
             <button hlmTabsTrigger="content">Content</button>
             <button hlmTabsTrigger="metadata">Metadata</button>
+            <button hlmTabsTrigger="activity">Activity</button>
           </hlm-tabs-list>
           <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
             <ng-container [ngTemplateOutlet]="previewContent" />
@@ -369,6 +454,11 @@ import { toast } from 'ngx-sonner';
           <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
             <div class="absolute inset-0 overflow-y-auto px-4 py-3">
               <ng-container [ngTemplateOutlet]="metadataContent" />
+            </div>
+          </div>
+          <div hlmTabsContent="activity" class="relative min-h-0 flex-1">
+            <div class="absolute inset-0 flex flex-col">
+              <ng-container [ngTemplateOutlet]="activityContent" />
             </div>
           </div>
         </hlm-tabs>
@@ -389,6 +479,7 @@ import { toast } from 'ngx-sonner';
                 <button hlmTabsTrigger="info">Info</button>
                 <button hlmTabsTrigger="content">Content</button>
                 <button hlmTabsTrigger="metadata">Metadata</button>
+                <button hlmTabsTrigger="activity">Activity</button>
               </hlm-tabs-list>
               <div hlmTabsContent="info" class="relative min-h-0 flex-1">
                 <div class="absolute inset-0 overflow-y-auto px-4 py-3">
@@ -401,6 +492,11 @@ import { toast } from 'ngx-sonner';
               <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
                 <div class="absolute inset-0 overflow-y-auto px-4 py-3">
                   <ng-container [ngTemplateOutlet]="metadataContent" />
+                </div>
+              </div>
+              <div hlmTabsContent="activity" class="relative min-h-0 flex-1">
+                <div class="absolute inset-0 flex flex-col">
+                  <ng-container [ngTemplateOutlet]="activityContent" />
                 </div>
               </div>
             </hlm-tabs>
@@ -438,6 +534,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
   deleting = signal(false);
   loading = signal(false);
   refreshTrigger = signal(0);
+  activityItems = signal<GetActivityResponse[]>([]);
+  activityLoading = signal(false);
+  commentBody = signal('');
+  commentSubmitting = signal(false);
 
   formatBytes = formatBytes;
 
@@ -694,6 +794,15 @@ export class DocumentDetailPageComponent implements OnDestroy {
         .subscribe((detail) => this.versionDetail.set(detail));
     });
 
+    // Load activity when document changes or refresh triggers
+    effect(() => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      this.documentId();
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      this.refreshTrigger();
+      untracked(() => this.loadActivity());
+    });
+
     afterNextRender(() => {
       const tpl = this.headerTitleRef();
       if (tpl) {
@@ -879,5 +988,60 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
 
     return ops;
+  }
+
+  private loadActivity(): void {
+    const id = this.documentId();
+    if (!id) return;
+    this.activityLoading.set(true);
+    getDocumentActivity(this.http, this.apiConfig.rootUrl, {
+      documentId: id,
+      Page: 1,
+      PageSize: 100,
+    })
+      .pipe(
+        map((r) => r.body.items ?? []),
+        catchError(() => of([])),
+      )
+      .subscribe((items) => {
+        this.activityItems.set(items);
+        this.activityLoading.set(false);
+      });
+  }
+
+  submitComment(): void {
+    const id = this.documentId();
+    const body = this.commentBody().trim();
+    if (!id || !body) return;
+    this.commentSubmitting.set(true);
+    createComment(this.http, this.apiConfig.rootUrl, {
+      documentId: id,
+      body: { body },
+    }).subscribe({
+      next: () => {
+        this.commentBody.set('');
+        this.commentSubmitting.set(false);
+        this.loadActivity();
+      },
+      error: () => {
+        this.commentSubmitting.set(false);
+        toast.error('Failed to post comment.');
+      },
+    });
+  }
+
+  formatRelativeTime(timestamp: string): string {
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    const diffMs = now - then;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return this.formatDate(timestamp);
   }
 }

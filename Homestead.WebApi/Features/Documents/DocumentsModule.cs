@@ -3,6 +3,7 @@ using Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteParties;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 using Homestead.WebApi.Features.Documents.v1.CreateComment;
+using Homestead.WebApi.Features.Documents.v1.GetActivity;
 using Homestead.WebApi.Features.Documents.v1.CreateDocument;
 using Homestead.WebApi.Features.Documents.v1.CreateDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.CreateParty;
@@ -54,6 +55,9 @@ public static class DocumentsModule
 
         var comments = v1.MapGroup("/{documentId:guid}/comments");
         CreateCommentEndpoint.Map(comments);
+
+        var activity = v1.MapGroup("/{documentId:guid}/activity");
+        GetActivityEndpoint.Map(activity);
 
         var parties = v1.MapGroup("/parties");
         BulkDeletePartiesEndpoint.Map(parties);

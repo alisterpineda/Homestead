@@ -5,10 +5,6 @@ namespace Homestead.WebApi.Persistence;
 
 public class AuditLogger(AppDbContext db) : IAuditLogger
 {
-    private readonly JsonSerializerOptions _jsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public void LogCreated(string entityType, Guid entityId, Guid? userId,
         Guid? parentEntityId = null)
@@ -38,7 +34,7 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             EntityId = entityId,
             ParentEntityId = parentEntityId,
             Action = AuditAction.Updated,
-            Changes = JsonSerializer.Serialize(changes, _jsonOptions),
+            Changes = JsonSerializer.Serialize(changes, FieldChange.JsonOptions),
             UserId = userId,
             Timestamp = DateTimeOffset.UtcNow
         });
@@ -54,7 +50,7 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             {
                 new ScalarFieldChange("Description", description, null)
             };
-            changes = JsonSerializer.Serialize(fieldChanges, _jsonOptions);
+            changes = JsonSerializer.Serialize(fieldChanges, FieldChange.JsonOptions);
         }
 
         db.AuditLogs.Add(new AuditLog

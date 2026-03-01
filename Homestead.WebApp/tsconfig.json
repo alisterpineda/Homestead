@@ -106,6 +106,15 @@
       ],
       "@/shared/components/spartan/collapsible": [
         "./src/app/shared/components/spartan/collapsible/src/index.ts"
+      ],
+      "@/shared/components/spartan/scroll-area": [
+        "./src/app/shared/components/spartan/scroll-area/src/index.ts"
+      ],
+      "@/shared/components/spartan/input-group": [
+        "./src/app/shared/components/spartan/input-group/src/index.ts"
+      ],
+      "@/shared/components/spartan/item": [
+        "./src/app/shared/components/spartan/item/src/index.ts"
       ]
     }
   },
