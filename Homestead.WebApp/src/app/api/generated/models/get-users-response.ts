@@ -6,4 +6,5 @@ export interface GetUsersResponse {
   displayName: string;
   email?: (string | null);
   id: string;
+  isAdmin: boolean;
 }

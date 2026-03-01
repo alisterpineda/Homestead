@@ -1,5 +1,9 @@
 using Asp.Versioning.Builder;
+using Homestead.WebApi.Features.Admin.v1.BulkDeleteUsers;
+using Homestead.WebApi.Features.Admin.v1.CreateUser;
+using Homestead.WebApi.Features.Admin.v1.DeleteUser;
 using Homestead.WebApi.Features.Admin.v1.GetUsers;
+using Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
 namespace Homestead.WebApi.Features.Admin;
 
@@ -15,6 +19,10 @@ public static class AdminModule
             .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
         GetUsersEndpoint.Map(v1);
+        CreateUserEndpoint.Map(v1);
+        UpdateUserEndpoint.Map(v1);
+        DeleteUserEndpoint.Map(v1);
+        BulkDeleteUsersEndpoint.Map(v1);
 
         return app;
     }

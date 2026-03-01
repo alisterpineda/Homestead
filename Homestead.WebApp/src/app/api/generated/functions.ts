@@ -67,3 +67,11 @@ export type { RetriggerProcessingJob$Params as RetriggerProcessingJob$Params } f
 export { retriggerProcessingJob as retriggerProcessingJob } from './fn/processing/retrigger-processing-job';
 export type { GetUsers$Params as GetUsers$Params } from './fn/admin/get-users';
 export { getUsers as getUsers } from './fn/admin/get-users';
+export type { CreateUser$Params as CreateUser$Params } from './fn/admin/create-user';
+export { createUser as createUser } from './fn/admin/create-user';
+export type { UpdateUser$Params as UpdateUser$Params } from './fn/admin/update-user';
+export { updateUser as updateUser } from './fn/admin/update-user';
+export type { DeleteUser$Params as DeleteUser$Params } from './fn/admin/delete-user';
+export { deleteUser as deleteUser } from './fn/admin/delete-user';
+export type { BulkDeleteUsers$Params as BulkDeleteUsers$Params } from './fn/admin/bulk-delete-users';
+export { bulkDeleteUsers as bulkDeleteUsers } from './fn/admin/bulk-delete-users';

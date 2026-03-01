@@ -5,16 +5,24 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideUsers, lucideSearch } from '@ng-icons/lucide';
+import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { UserTableComponent } from '../../components/user-table/user-table.component';
+import { CreateUserDialogComponent } from '../../components/create-user-dialog/create-user-dialog.component';
+import { EditUserSheetComponent } from '../../components/edit-user-sheet/edit-user-sheet.component';
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getUsers } from '@/api/generated/fn/admin/get-users';
+import { bulkDeleteUsers } from '@/api/generated/fn/admin/bulk-delete-users';
+import type { GetUsersResponse } from '@/api/generated/models/get-users-response';
 import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models/paginated-response-of-get-users-response';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-user-list',
@@ -25,10 +33,14 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
     HlmSpinner,
     HlmEmptyImports,
     HlmInput,
+    HlmButton,
+    HlmAlertDialogImports,
     UserTableComponent,
+    CreateUserDialogComponent,
+    EditUserSheetComponent,
     PaginationComponent,
   ],
-  providers: [provideIcons({ lucideUsers, lucideSearch })],
+  providers: [provideIcons({ lucideUsers, lucideSearch, lucidePlus, lucideTrash2 })],
   template: `
     <div>
       @if (loading() && !data()) {
@@ -57,22 +69,69 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
             </hlm-empty-media>
             <div hlmEmptyHeader>
               <h3 hlmEmptyTitle>No users yet</h3>
-              <p hlmEmptyDescription>No registered users found.</p>
+              <p hlmEmptyDescription>Create your first user to get started.</p>
             </div>
+            <app-create-user-dialog (created)="onRefresh()">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              New User
+            </app-create-user-dialog>
           </section>
         } @else {
-          <div class="mb-4">
-            <div class="relative">
-              <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                hlmInput
-                type="text"
-                placeholder="Search users..."
-                class="pl-9"
-                [value]="searchInput()"
-                (input)="searchInput.set($any($event.target).value)"
-                aria-label="Search users"
-              />
+          <div class="relative">
+            <!-- Normal toolbar -->
+            <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="relative">
+                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    hlmInput
+                    type="text"
+                    placeholder="Search users..."
+                    class="pl-9"
+                    [value]="searchInput()"
+                    (input)="searchInput.set($any($event.target).value)"
+                    aria-label="Search users"
+                  />
+                </div>
+                <div class="ml-auto flex items-center gap-2">
+                  <app-create-user-dialog triggerSize="sm" (created)="onRefresh()">
+                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    New User
+                  </app-create-user-dialog>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selection toolbar -->
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
+              <span class="text-sm text-muted-foreground">
+                {{ selectionCount() }} {{ selectionCount() > 1 ? 'users' : 'user' }} selected
+              </span>
+              <div class="ml-auto flex items-center gap-2">
+                <button hlmBtn variant="outline" size="sm" (click)="clearSelection()">
+                  Clear selection
+                </button>
+                <hlm-alert-dialog>
+                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    Delete
+                  </button>
+                  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                    <div hlmAlertDialogHeader>
+                      <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} {{ selectionCount() > 1 ? 'users' : 'user' }}?</h2>
+                      <p hlmAlertDialogDescription>
+                        This action cannot be undone. The selected {{ selectionCount() > 1 ? 'users' : 'user' }} will be permanently deleted.
+                      </p>
+                    </div>
+                    <div hlmAlertDialogFooter>
+                      <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
+                        {{ deleting() ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
+                  </hlm-alert-dialog-content>
+                </hlm-alert-dialog>
+              </div>
             </div>
           </div>
 
@@ -87,7 +146,12 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
               </div>
             </section>
           } @else {
-            <app-user-table [users]="result.items" />
+            <app-user-table
+              [users]="result.items"
+              [selectedIds]="selectedUserIds()"
+              (userSelect)="onUserSelect($event)"
+              (selectionChange)="selectedUserIds.set($event)"
+            />
             <app-pagination
               [page]="+result.page"
               [totalPages]="+(result.totalPages ?? 0)"
@@ -100,6 +164,13 @@ import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models
         }
       }
     </div>
+
+    <app-edit-user-sheet
+      [user]="selectedUser()"
+      [state]="sheetState()"
+      (saved)="onSheetSaved()"
+      (closed)="onSheetClosed()"
+    />
   `,
 })
 export class UserListComponent implements OnDestroy {
@@ -108,8 +179,19 @@ export class UserListComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
+  refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
+  deleting = signal(false);
+
+  // Selection state
+  selectedUserIds = signal<Set<string>>(new Set());
+  selectionCount = computed(() => this.selectedUserIds().size);
+  hasSelection = computed(() => this.selectionCount() > 0);
+
+  // Sheet state
+  selectedUser = signal<GetUsersResponse | null>(null);
+  sheetState = signal<BrnDialogState>('closed');
 
   searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
   searchTerm = toSignal(
@@ -132,6 +214,7 @@ export class UserListComponent implements OnDestroy {
       toObservable(this.page),
       toObservable(this.pageSize),
       toObservable(this.searchTerm),
+      toObservable(this.refreshTrigger),
     ]).pipe(
       switchMap(([page, pageSize, search]) => {
         this.loading.set(true);
@@ -189,5 +272,57 @@ export class UserListComponent implements OnDestroy {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
     });
+  }
+
+  onUserSelect(id: string): void {
+    const users = this.data()?.items;
+    const user = users?.find((u) => u.id === id) ?? null;
+    if (user) {
+      this.selectedUser.set(user);
+      this.sheetState.set('open');
+    }
+  }
+
+  onSheetSaved(): void {
+    this.sheetState.set('closed');
+    this.onRefresh();
+  }
+
+  onSheetClosed(): void {
+    this.sheetState.set('closed');
+    this.selectedUser.set(null);
+  }
+
+  clearSelection(): void {
+    this.selectedUserIds.set(new Set());
+  }
+
+  onBulkDelete(ctx: { close: () => void }): void {
+    const ids = Array.from(this.selectedUserIds());
+    if (ids.length === 0) return;
+
+    this.deleting.set(true);
+
+    bulkDeleteUsers(this.http, this.apiConfig.rootUrl, {
+      body: { ids },
+    }).subscribe({
+      next: (response) => {
+        this.deleting.set(false);
+        ctx.close();
+        const count = +response.body.deletedCount;
+        toast.success(`${count} ${count > 1 ? 'users' : 'user'} deleted.`);
+        this.clearSelection();
+        this.onRefresh();
+      },
+      error: (err) => {
+        this.deleting.set(false);
+        const message = err?.error ?? 'Failed to delete users. Please try again.';
+        toast.error(typeof message === 'string' ? message : 'Failed to delete users. Please try again.');
+      },
+    });
+  }
+
+  onRefresh(): void {
+    this.refreshTrigger.update((v) => v + 1);
   }
 }

@@ -22,6 +22,11 @@ public class GetUsersHandler(AppDbContext db)
 
         var totalCount = await query.CountAsync(ct);
 
+        var adminRoleId = await db.Roles
+            .Where(r => r.Name == "Admin")
+            .Select(r => r.Id)
+            .FirstOrDefaultAsync(ct);
+
         var items = await query
             .OrderBy(u => u.DisplayName)
             .Skip((request.Page - 1) * request.PageSize)
@@ -31,6 +36,7 @@ public class GetUsersHandler(AppDbContext db)
                 Id = u.Id,
                 DisplayName = u.DisplayName,
                 Email = u.Email,
+                IsAdmin = db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == adminRoleId),
                 CreatedAt = u.CreatedAt
             })
             .ToListAsync(ct);
