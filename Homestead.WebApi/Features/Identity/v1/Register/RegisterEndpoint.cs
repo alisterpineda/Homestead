@@ -7,12 +7,15 @@ public static class RegisterEndpoint
         group.MapPost("/register", async (RegisterRequest request, RegisterHandler handler, CancellationToken ct) =>
         {
             var response = await handler.HandleAsync(request, ct);
+            if (response.SetupAlreadyComplete)
+                return Results.Forbid();
             return response.Succeeded
                 ? Results.Ok()
                 : Results.ValidationProblem(response.Errors!);
         })
         .WithName("Register")
         .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status403Forbidden)
         .ProducesValidationProblem()
         .AllowAnonymous();
     }

@@ -2,13 +2,8 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-
-interface UserInfo {
-  id: string;
-  email: string;
-  displayName: string;
-  roles: string[];
-}
+import { GetStatusResponse } from '@/api/generated/models/get-status-response';
+import { GetUserInfoResponse } from '@/api/generated/models/get-user-info-response';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -16,6 +11,7 @@ export class AuthService {
   private router = inject(Router);
 
   readonly initialized = signal(false);
+  readonly needsSetup = signal(false);
   readonly isAuthenticated = signal(false);
   readonly userName = signal('');
   readonly userEmail = signal('');
@@ -24,12 +20,20 @@ export class AuthService {
 
   async initialize(): Promise<void> {
     try {
-      const user = await firstValueFrom(
-        this.http.get<UserInfo>('/api/auth/user-info'),
-      );
-      this.setUser(user);
+      const [statusResult, userResult] = await Promise.allSettled([
+        firstValueFrom(this.http.get<GetStatusResponse>('/api/status')),
+        firstValueFrom(this.http.get<GetUserInfoResponse>('/api/auth/user-info')),
+      ]);
+
+      if (statusResult.status === 'fulfilled') {
+        this.needsSetup.set(statusResult.value.needsSetup);
+      }
+
+      if (!this.needsSetup() && userResult.status === 'fulfilled') {
+        this.setUser(userResult.value);
+      }
     } catch {
-      // Not authenticated — that's fine
+      // Initialization failed — assume defaults
     } finally {
       this.initialized.set(true);
     }
@@ -39,20 +43,15 @@ export class AuthService {
     await firstValueFrom(
       this.http.post('/api/auth/login?useCookies=true', { email, password }),
     );
-    const user = await firstValueFrom(
-      this.http.get<UserInfo>('/api/auth/user-info'),
-    );
-    this.setUser(user);
+    await this.fetchAndSetUser();
   }
 
-  async register(email: string, displayName: string, password: string): Promise<void> {
+  async setup(email: string, displayName: string, password: string): Promise<void> {
     await firstValueFrom(
       this.http.post('/api/auth/register', { email, displayName, password }),
     );
-    const user = await firstValueFrom(
-      this.http.get<UserInfo>('/api/auth/user-info'),
-    );
-    this.setUser(user);
+    await this.fetchAndSetUser();
+    this.needsSetup.set(false);
   }
 
   async logout(): Promise<void> {
@@ -64,7 +63,14 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
-  private setUser(user: UserInfo): void {
+  private async fetchAndSetUser(): Promise<void> {
+    const user = await firstValueFrom(
+      this.http.get<GetUserInfoResponse>('/api/auth/user-info'),
+    );
+    this.setUser(user);
+  }
+
+  private setUser(user: GetUserInfoResponse): void {
     this.isAuthenticated.set(true);
     this.userName.set(user.displayName || user.email);
     this.userEmail.set(user.email);

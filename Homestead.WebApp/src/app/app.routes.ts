@@ -1,19 +1,21 @@
 import { Routes } from '@angular/router';
 import { authGuard } from '@/shared/guards/auth.guard';
 import { adminGuard } from '@/shared/guards/admin.guard';
+import { setupGuard } from '@/shared/guards/setup.guard';
+import { loginGuard } from '@/shared/guards/login.guard';
 
 export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () =>
       import('./shared/components/auth/login/login.component').then((m) => m.LoginComponent),
+    canActivate: [loginGuard],
   },
   {
-    path: 'register',
+    path: 'setup',
     loadComponent: () =>
-      import('./shared/components/auth/register/register.component').then(
-        (m) => m.RegisterComponent,
-      ),
+      import('./shared/components/auth/setup/setup.component').then((m) => m.SetupComponent),
+    canActivate: [setupGuard],
   },
   {
     path: '',

@@ -7,16 +7,13 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ResetPasswordRequest } from '../../models/reset-password-request';
 
-export interface ApiAuthResetPasswordPost$Params {
-      body: ResetPasswordRequest
+export interface Logout$Params {
 }
 
-export function apiAuthResetPasswordPost(http: HttpClient, rootUrl: string, params: ApiAuthResetPasswordPost$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, apiAuthResetPasswordPost.PATH, 'post');
+export function logout(http: HttpClient, rootUrl: string, params?: Logout$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, logout.PATH, 'post');
   if (params) {
-    rb.body(params.body, 'application/json');
   }
 
   return http.request(
@@ -29,4 +26,4 @@ export function apiAuthResetPasswordPost(http: HttpClient, rootUrl: string, para
   );
 }
 
-apiAuthResetPasswordPost.PATH = '/api/auth/resetPassword';
+logout.PATH = '/api/auth/logout';

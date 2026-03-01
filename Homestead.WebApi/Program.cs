@@ -5,6 +5,7 @@ using Homestead.WebApi.Features.Admin;
 using Homestead.WebApi.Features.Identity;
 using Homestead.WebApi.Features.Documents;
 using Homestead.WebApi.Features.Processing;
+using Homestead.WebApi.Features.Status;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
 using Homestead.WebApi.Persistence;
@@ -136,6 +137,7 @@ app.UseAuthorization();
 app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization();
 
 app.MapIdentityEndpoints();
+app.MapStatusEndpoints();
 
 var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();

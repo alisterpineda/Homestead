@@ -7,17 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { InfoRequest } from '../../models/info-request';
-import { InfoResponse } from '../../models/info-response';
+import { GetUserInfoResponse } from '../../models/get-user-info-response';
 
-export interface ApiAuthManageInfoPost$Params {
-      body: InfoRequest
+export interface GetUserInfo$Params {
 }
 
-export function apiAuthManageInfoPost(http: HttpClient, rootUrl: string, params: ApiAuthManageInfoPost$Params, context?: HttpContext): Observable<StrictHttpResponse<InfoResponse>> {
-  const rb = new RequestBuilder(rootUrl, apiAuthManageInfoPost.PATH, 'post');
+export function getUserInfo(http: HttpClient, rootUrl: string, params?: GetUserInfo$Params, context?: HttpContext): Observable<StrictHttpResponse<GetUserInfoResponse>> {
+  const rb = new RequestBuilder(rootUrl, getUserInfo.PATH, 'get');
   if (params) {
-    rb.body(params.body, 'application/json');
   }
 
   return http.request(
@@ -25,9 +22,9 @@ export function apiAuthManageInfoPost(http: HttpClient, rootUrl: string, params:
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<InfoResponse>;
+      return r as StrictHttpResponse<GetUserInfoResponse>;
     })
   );
 }
 
-apiAuthManageInfoPost.PATH = '/api/auth/manage/info';
+getUserInfo.PATH = '/api/auth/user-info';

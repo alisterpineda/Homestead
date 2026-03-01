@@ -1,31 +1,28 @@
 import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCardImports } from '@/shared/components/spartan/card';
-import { HlmSeparator } from '@/shared/components/spartan/separator';
 
 @Component({
-  selector: 'app-register',
+  selector: 'app-setup',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     HlmButton,
     HlmInput,
     HlmLabel,
     HlmCardImports,
-    HlmSeparator,
   ],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-background px-4">
       <div hlmCard class="w-full max-w-sm">
         <div hlmCardHeader class="text-center">
-          <h1 hlmCardTitle>Create an account</h1>
-          <p hlmCardDescription>Enter your details to get started</p>
+          <h1 hlmCardTitle>Welcome to Homestead</h1>
+          <p hlmCardDescription>Create your administrator account to get started</p>
         </div>
 
         <div hlmCardContent>
@@ -104,25 +101,15 @@ import { HlmSeparator } from '@/shared/components/spartan/separator';
             </div>
 
             <button hlmBtn type="submit" class="w-full" [disabled]="submitting()">
-              {{ submitting() ? 'Creating account...' : 'Create account' }}
+              {{ submitting() ? 'Setting up...' : 'Complete setup' }}
             </button>
           </form>
-        </div>
-
-        <div hlmCardContent class="pt-0">
-          <hlm-separator />
-          <p class="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?
-            <a routerLink="/login" class="font-medium text-primary underline-offset-4 hover:underline">
-              Sign in
-            </a>
-          </p>
         </div>
       </div>
     </div>
   `,
 })
-export class RegisterComponent {
+export class SetupComponent {
   private fb = inject(FormBuilder);
   private router = inject(Router);
   private auth = inject(AuthService);
@@ -150,10 +137,10 @@ export class RegisterComponent {
 
     try {
       const { email, displayName, password } = this.form.getRawValue();
-      await this.auth.register(email, displayName, password);
+      await this.auth.setup(email, displayName, password);
       this.router.navigate(['/documents']);
     } catch {
-      this.error.set('Registration failed. The email may already be in use.');
+      this.error.set('Setup failed. Please try again.');
     } finally {
       this.submitting.set(false);
     }

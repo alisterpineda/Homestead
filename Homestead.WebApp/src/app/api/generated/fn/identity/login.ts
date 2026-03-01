@@ -7,14 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ResendConfirmationEmailRequest } from '../../models/resend-confirmation-email-request';
+import { LoginRequest } from '../../models/login-request';
 
-export interface ApiAuthResendConfirmationEmailPost$Params {
-      body: ResendConfirmationEmailRequest
+export interface Login$Params {
+      body: LoginRequest
 }
 
-export function apiAuthResendConfirmationEmailPost(http: HttpClient, rootUrl: string, params: ApiAuthResendConfirmationEmailPost$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, apiAuthResendConfirmationEmailPost.PATH, 'post');
+export function login(http: HttpClient, rootUrl: string, params: Login$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, login.PATH, 'post');
   if (params) {
     rb.body(params.body, 'application/json');
   }
@@ -29,4 +29,4 @@ export function apiAuthResendConfirmationEmailPost(http: HttpClient, rootUrl: st
   );
 }
 
-apiAuthResendConfirmationEmailPost.PATH = '/api/auth/resendConfirmationEmail';
+login.PATH = '/api/auth/login';

@@ -1,24 +1,21 @@
 import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCardImports } from '@/shared/components/spartan/card';
-import { HlmSeparator } from '@/shared/components/spartan/separator';
 
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     HlmButton,
     HlmInput,
     HlmLabel,
     HlmCardImports,
-    HlmSeparator,
   ],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-background px-4">
@@ -74,16 +71,6 @@ import { HlmSeparator } from '@/shared/components/spartan/separator';
               {{ submitting() ? 'Signing in...' : 'Sign in' }}
             </button>
           </form>
-        </div>
-
-        <div hlmCardContent class="pt-0">
-          <hlm-separator />
-          <p class="mt-4 text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <a routerLink="/register" class="font-medium text-primary underline-offset-4 hover:underline">
-              Create one
-            </a>
-          </p>
         </div>
       </div>
     </div>

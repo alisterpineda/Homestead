@@ -7,23 +7,24 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { GetStatusResponse } from '../../models/get-status-response';
 
-export interface ApiAuthLogoutPost$Params {
+export interface GetStatus$Params {
 }
 
-export function apiAuthLogoutPost(http: HttpClient, rootUrl: string, params?: ApiAuthLogoutPost$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, apiAuthLogoutPost.PATH, 'post');
+export function getStatus(http: HttpClient, rootUrl: string, params?: GetStatus$Params, context?: HttpContext): Observable<StrictHttpResponse<GetStatusResponse>> {
+  const rb = new RequestBuilder(rootUrl, getStatus.PATH, 'get');
   if (params) {
   }
 
   return http.request(
-    rb.build({ responseType: 'text', accept: '*/*', context })
+    rb.build({ responseType: 'json', accept: 'application/json', context })
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return (r as HttpResponse<any>).clone({ body: undefined }) as StrictHttpResponse<void>;
+      return r as StrictHttpResponse<GetStatusResponse>;
     })
   );
 }
 
-apiAuthLogoutPost.PATH = '/api/auth/logout';
+getStatus.PATH = '/api/status';

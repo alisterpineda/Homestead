@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,32 +8,49 @@ namespace Homestead.WebApi.Features.Identity.v1.Register;
 
 public class RegisterHandler(
     UserManager<AppUser> userManager,
-    SignInManager<AppUser> signInManager)
+    SignInManager<AppUser> signInManager,
+    AppDbContext db)
     : ICommandHandler<RegisterRequest, RegisterResponse>
 {
     public async Task<RegisterResponse> HandleAsync(RegisterRequest request, CancellationToken ct)
     {
-        var user = new AppUser
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            UserName = request.Email,
-            Email = request.Email,
-            DisplayName = request.DisplayName
-        };
+            await using var transaction = await db.Database
+                .BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
 
-        var result = await userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-        {
-            return new RegisterResponse
+            if (await userManager.Users.AnyAsync(ct))
             {
-                Succeeded = false,
-                Errors = result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description })
+                return new RegisterResponse
+                {
+                    Succeeded = false,
+                    SetupAlreadyComplete = true
+                };
+            }
+
+            var user = new AppUser
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                DisplayName = request.DisplayName
             };
-        }
 
-        if (await userManager.Users.CountAsync(ct) == 1)
+            var result = await userManager.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                return new RegisterResponse
+                {
+                    Succeeded = false,
+                    Errors = result.Errors.ToDictionary(e => e.Code, e => new[] { e.Description })
+                };
+            }
+
             await userManager.AddToRoleAsync(user, "Admin");
+            await transaction.CommitAsync(ct);
 
-        await signInManager.SignInAsync(user, isPersistent: true);
-        return new RegisterResponse { Succeeded = true };
+            await signInManager.SignInAsync(user, isPersistent: true);
+            return new RegisterResponse { Succeeded = true };
+        });
     }
 }

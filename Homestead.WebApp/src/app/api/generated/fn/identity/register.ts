@@ -7,13 +7,16 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { RegisterRequest } from '../../models/register-request';
 
-export interface ApiAuthUserInfoGet$Params {
+export interface Register$Params {
+      body: RegisterRequest
 }
 
-export function apiAuthUserInfoGet(http: HttpClient, rootUrl: string, params?: ApiAuthUserInfoGet$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, apiAuthUserInfoGet.PATH, 'get');
+export function register(http: HttpClient, rootUrl: string, params: Register$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, register.PATH, 'post');
   if (params) {
+    rb.body(params.body, 'application/json');
   }
 
   return http.request(
@@ -26,4 +29,4 @@ export function apiAuthUserInfoGet(http: HttpClient, rootUrl: string, params?: A
   );
 }
 
-apiAuthUserInfoGet.PATH = '/api/auth/user-info';
+register.PATH = '/api/auth/register';

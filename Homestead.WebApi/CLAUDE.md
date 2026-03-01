@@ -20,7 +20,8 @@ Uses ASP.NET Core Identity with cookie-based auth:
 - `AppUser` extends `IdentityUser<Guid>` with custom `DisplayName` and `CreatedAt` properties
 - `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
 - Identity API endpoints mapped at `/api/auth` via `MapIdentityApi<AppUser>()`
-- Custom endpoints: `/api/auth/custom-register` (accepts displayName), `/api/auth/logout`, `/api/auth/user-info`
+- Custom endpoints: `/api/auth/register` (setup only — returns 403 when users exist), `/api/auth/logout`, `/api/auth/user-info`
+- `GET /api/status` (anonymous) returns `{ needsSetup }` — true when zero users exist. Used by frontend to decide setup vs login flow
 - Cookie configured with `HttpOnly`, `SameSite=Strict`, 14-day sliding expiration
 - SPA-friendly: returns 401/403 status codes instead of redirects
 - Protected endpoints use explicit `.RequireAuthorization()` (on modules, hub, and custom auth endpoints)
