@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
@@ -18,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Party> Parties { get; set; }
     public DbSet<DocumentParty> DocumentParties { get; set; }
     public DbSet<ProcessingJob> ProcessingJobs { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

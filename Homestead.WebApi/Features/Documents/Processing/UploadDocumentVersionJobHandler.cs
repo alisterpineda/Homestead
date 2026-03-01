@@ -90,6 +90,9 @@ public class UploadDocumentVersionJobHandler(
         };
 
         db.DocumentVersions.Add(version);
+
+        AuditLogger.LogCreated(db, "DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: payload.DocumentId);
+
         await db.SaveChangesAsync(ct);
 
         await SearchVectorHelper.UpdateSearchVectorAsync(db, payload.DocumentId, ct);

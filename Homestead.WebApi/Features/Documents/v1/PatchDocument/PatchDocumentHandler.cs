@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Parties;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
-public class PatchDocumentHandler(AppDbContext db)
+public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser)
     : ICommandHandler<PatchDocumentCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
@@ -19,6 +20,8 @@ public class PatchDocumentHandler(AppDbContext db)
 
         if (document is null)
             return Results.NotFound();
+
+        var before = DocumentSnapshot.From(document);
 
         // Populate model from current DB state
         var model = new PatchDocumentModel
@@ -79,7 +82,8 @@ public class PatchDocumentHandler(AppDbContext db)
             document.DocumentTags.Add(new DocumentTag
             {
                 DocumentId = document.Id,
-                TagId = tag.Id
+                TagId = tag.Id,
+                Tag = tag
             });
         }
 
@@ -94,6 +98,10 @@ public class PatchDocumentHandler(AppDbContext db)
                 PartyId = partyId
             });
         }
+
+        var after = DocumentSnapshot.From(document);
+        var changes = before.Diff(after);
+        AuditLogger.LogUpdated(db, "Document", document.Id, currentUser.UserId, changes);
 
         await db.SaveChangesAsync(ct);
 

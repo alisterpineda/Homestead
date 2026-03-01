@@ -52,6 +52,14 @@ Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) co
 - **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 
+## Audit Logging
+
+Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints — survives entity deletion.
+
+- **Infrastructure** in `Domains/Auditing/`: `AuditLog`, `AuditAction` enum, polymorphic `FieldChange` (`ScalarFieldChange`/`ArrayFieldChange`), `IAuditSnapshot<TSelf, TSource>` interface
+- **Snapshots** per entity (e.g., `DocumentSnapshot`) implement `IAuditSnapshot` with `From()` and `Diff()`
+- **`AuditLogger`** static helper (`Persistence/`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Same pattern as `SearchVectorHelper`.
+
 ## Conventions
 
 - Minimal APIs (no controllers)

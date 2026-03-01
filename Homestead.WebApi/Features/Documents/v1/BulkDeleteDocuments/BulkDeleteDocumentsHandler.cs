@@ -1,10 +1,11 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
-public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration)
+public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser)
     : ICommandHandler<BulkDeleteDocumentsRequest, BulkDeleteDocumentsResponse>
 {
     public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsRequest request, CancellationToken ct)
@@ -24,6 +25,11 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
             .SelectMany(d => d.Versions)
             .Select(r => r.GetPhysicalPath(mediaPath))
             .ToList();
+
+        foreach (var doc in documents)
+        {
+            AuditLogger.LogDeleted(db, "Document", doc.Id, currentUser.UserId, description: doc.Name);
+        }
 
         db.Documents.RemoveRange(documents);
         await db.SaveChangesAsync(ct);

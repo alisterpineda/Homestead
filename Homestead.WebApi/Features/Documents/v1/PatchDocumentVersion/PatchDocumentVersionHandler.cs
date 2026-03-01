@@ -1,11 +1,13 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
-public class PatchDocumentVersionHandler(AppDbContext db)
+public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser)
     : ICommandHandler<PatchDocumentVersionCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentVersionCommand request, CancellationToken ct)
@@ -16,6 +18,8 @@ public class PatchDocumentVersionHandler(AppDbContext db)
 
         if (version is null)
             return Results.NotFound();
+
+        var before = DocumentVersionSnapshot.From(version);
 
         // Populate model from current DB state
         var model = new PatchDocumentVersionModel
@@ -41,6 +45,11 @@ public class PatchDocumentVersionHandler(AppDbContext db)
         // Update entity from patched model
         version.Label = model.Label;
         version.ExtractedText = model.ExtractedText;
+
+        var after = DocumentVersionSnapshot.From(version);
+        var changes = before.Diff(after);
+        AuditLogger.LogUpdated(db, "DocumentVersion", version.Id, currentUser.UserId, changes,
+            parentEntityId: version.DocumentId);
 
         await db.SaveChangesAsync(ct);
 
