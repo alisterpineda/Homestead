@@ -35,6 +35,35 @@ if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")
     }
 }
 
+// When running outside Aspire (e.g. Docker), map self-hoster-friendly OIDC env vars into .NET config
+var oidcAuthority = Environment.GetEnvironmentVariable("OIDC_AUTHORITY");
+if (!string.IsNullOrEmpty(oidcAuthority))
+{
+    builder.Configuration["Oidc:Authority"] = oidcAuthority;
+    builder.Configuration["Oidc:ClientId"] =
+        Environment.GetEnvironmentVariable("OIDC_CLIENT_ID") ?? "";
+    builder.Configuration["Oidc:ClientSecret"] =
+        Environment.GetEnvironmentVariable("OIDC_CLIENT_SECRET") ?? "";
+    builder.Configuration["Oidc:DisplayName"] =
+        Environment.GetEnvironmentVariable("OIDC_DISPLAY_NAME") ?? "SSO";
+    builder.Configuration["Oidc:RoleClaimType"] =
+        Environment.GetEnvironmentVariable("OIDC_ROLE_CLAIM") ?? "";
+    builder.Configuration["Oidc:AdminClaimValue"] =
+        Environment.GetEnvironmentVariable("OIDC_ADMIN_CLAIM_VALUE") ?? "";
+
+    var disableLocal = Environment.GetEnvironmentVariable("OIDC_DISABLE_LOCAL_LOGIN");
+    if (!string.IsNullOrEmpty(disableLocal))
+        builder.Configuration["Oidc:DisableLocalLogin"] = disableLocal;
+
+    var additionalScopes = Environment.GetEnvironmentVariable("OIDC_ADDITIONAL_SCOPES");
+    if (!string.IsNullOrEmpty(additionalScopes))
+    {
+        var scopes = additionalScopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        for (var i = 0; i < scopes.Length; i++)
+            builder.Configuration[$"Oidc:AdditionalScopes:{i}"] = scopes[i];
+    }
+}
+
 builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,

@@ -29,7 +29,7 @@ public static class AuthenticationExtensions
         builder.Services.ConfigureApplicationCookie(options =>
         {
             options.Cookie.HttpOnly = true;
-            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.Strict;
             // In development the Angular proxy forwards over HTTPS but the browser
             // is on HTTP, so the Secure flag would cause the cookie to be rejected.
             options.Cookie.SecurePolicy = isDev
@@ -54,6 +54,46 @@ public static class AuthenticationExtensions
         builder.Services.AddAuthorization();
 
         builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
+
+        // Conditionally add OIDC authentication
+        var oidcSection = builder.Configuration.GetSection(OidcOptions.SectionName);
+        var oidcOptions = oidcSection.Get<OidcOptions>();
+
+        builder.Services.Configure<OidcOptions>(oidcSection);
+
+        if (oidcOptions?.IsConfigured == true)
+        {
+            builder.Services.AddScoped<OidcUserProvisioner>();
+
+            builder.Services.AddAuthentication()
+                .AddOpenIdConnect(OidcOptions.SchemeName, options =>
+                {
+                    options.Authority = oidcOptions.Authority;
+                    options.ClientId = oidcOptions.ClientId;
+                    options.ClientSecret = oidcOptions.ClientSecret;
+                    options.RequireHttpsMetadata = !isDev;
+                    options.ResponseType = "code";
+                    options.SaveTokens = false;
+                    options.GetClaimsFromUserInfoEndpoint = true;
+                    options.MapInboundClaims = false;
+                    options.Scope.Clear();
+                    options.Scope.Add("openid");
+                    options.Scope.Add("profile");
+                    options.Scope.Add("email");
+                    foreach (var scope in oidcOptions.AdditionalScopes)
+                        options.Scope.Add(scope);
+                    options.CallbackPath = "/signin-oidc";
+                    options.SignedOutCallbackPath = "/signout-callback-oidc";
+                    options.SignInScheme = IdentityConstants.ExternalScheme;
+                    options.Events.OnRedirectToIdentityProviderForSignOut = context =>
+                    {
+                        // Keycloak requires client_id or id_token_hint with post_logout_redirect_uri.
+                        // Since we don't save tokens, send client_id explicitly.
+                        context.ProtocolMessage.ClientId = oidcOptions.ClientId;
+                        return Task.CompletedTask;
+                    };
+                });
+        }
 
         return builder;
     }

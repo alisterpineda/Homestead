@@ -40,6 +40,7 @@ export type { HttpValidationProblemDetails } from './models/http-validation-prob
 export type { IFormFile } from './models/i-form-file';
 export type { JsonPatchDocument } from './models/json-patch-document';
 export type { LoginRequest } from './models/login-request';
+export type { OidcStatusResponse } from './models/oidc-status-response';
 export type { PaginatedResponseOfGetActivityResponse } from './models/paginated-response-of-get-activity-response';
 export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated-response-of-get-documents-response';
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';

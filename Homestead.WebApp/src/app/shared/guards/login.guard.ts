@@ -6,7 +6,7 @@ export const loginGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (auth.needsSetup()) {
+  if (auth.needsSetup() && !auth.oidcEnabled()) {
     return router.createUrlTree(['/setup']);
   }
 

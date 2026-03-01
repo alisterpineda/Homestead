@@ -5,7 +5,7 @@ const target =
 
 module.exports = [
   {
-    context: ["/api", "/openapi"],
+    context: ["/api", "/openapi", "/signin-oidc", "/signout-callback-oidc"],
     target,
     secure: false,
     changeOrigin: true,
