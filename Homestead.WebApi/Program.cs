@@ -53,6 +53,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.AddAppAuthentication();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
+builder.Services.AddScoped<IAuditLogger, AuditLogger>();
+builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddHandlers();
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);

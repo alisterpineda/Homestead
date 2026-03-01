@@ -3,14 +3,14 @@ using Homestead.WebApi.Domains.Auditing;
 
 namespace Homestead.WebApi.Persistence;
 
-public static class AuditLogger
+public class AuditLogger(AppDbContext db) : IAuditLogger
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public static void LogCreated(AppDbContext db, string entityType, Guid entityId, Guid? userId,
+    public void LogCreated(string entityType, Guid entityId, Guid? userId,
         Guid? parentEntityId = null)
     {
         db.AuditLogs.Add(new AuditLog
@@ -25,7 +25,7 @@ public static class AuditLogger
         });
     }
 
-    public static void LogUpdated(AppDbContext db, string entityType, Guid entityId, Guid? userId,
+    public void LogUpdated(string entityType, Guid entityId, Guid? userId,
         List<FieldChange> changes, Guid? parentEntityId = null)
     {
         if (changes.Count == 0)
@@ -38,13 +38,13 @@ public static class AuditLogger
             EntityId = entityId,
             ParentEntityId = parentEntityId,
             Action = AuditAction.Updated,
-            Changes = JsonSerializer.Serialize(changes, JsonOptions),
+            Changes = JsonSerializer.Serialize(changes, _jsonOptions),
             UserId = userId,
             Timestamp = DateTimeOffset.UtcNow
         });
     }
 
-    public static void LogDeleted(AppDbContext db, string entityType, Guid entityId, Guid? userId,
+    public void LogDeleted(string entityType, Guid entityId, Guid? userId,
         string? description = null, Guid? parentEntityId = null)
     {
         string? changes = null;
@@ -54,7 +54,7 @@ public static class AuditLogger
             {
                 new ScalarFieldChange("Description", description, null)
             };
-            changes = JsonSerializer.Serialize(fieldChanges, JsonOptions);
+            changes = JsonSerializer.Serialize(fieldChanges, _jsonOptions);
         }
 
         db.AuditLogs.Add(new AuditLog

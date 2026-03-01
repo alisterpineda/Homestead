@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
-public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser)
+public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
+    IAuditLogger auditLogger)
     : ICommandHandler<BulkDeleteDocumentsRequest, BulkDeleteDocumentsResponse>
 {
     public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsRequest request, CancellationToken ct)
@@ -28,7 +29,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
 
         foreach (var doc in documents)
         {
-            AuditLogger.LogDeleted(db, "Document", doc.Id, currentUser.UserId, description: doc.Name);
+            auditLogger.LogDeleted("Document", doc.Id, currentUser.UserId, description: doc.Name);
         }
 
         db.Documents.RemoveRange(documents);

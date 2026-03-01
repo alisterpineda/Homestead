@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
-public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser)
+public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
     : ICommandHandler<PatchDocumentCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
@@ -101,11 +102,11 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
 
         var after = DocumentSnapshot.From(document);
         var changes = before.Diff(after);
-        AuditLogger.LogUpdated(db, "Document", document.Id, currentUser.UserId, changes);
+        auditLogger.LogUpdated("Document", document.Id, currentUser.UserId, changes);
 
         await db.SaveChangesAsync(ct);
 
-        await SearchVectorHelper.UpdateSearchVectorAsync(db, document.Id, ct);
+        await searchVectorUpdater.UpdateSearchVectorAsync(document.Id, ct);
 
         // Load tags for response
         var tags = await db.DocumentTags

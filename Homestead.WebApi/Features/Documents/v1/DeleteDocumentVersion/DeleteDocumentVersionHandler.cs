@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
-public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser)
+public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
     : ICommandHandler<DeleteDocumentVersionRequest, IResult>
 {
     public async Task<IResult> HandleAsync(DeleteDocumentVersionRequest request, CancellationToken ct)
@@ -35,13 +36,13 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
         if (!string.IsNullOrWhiteSpace(version.Label))
             description += $" ({version.Label})";
 
-        AuditLogger.LogDeleted(db, "DocumentVersion", version.Id, currentUser.UserId,
+        auditLogger.LogDeleted("DocumentVersion", version.Id, currentUser.UserId,
             description: description, parentEntityId: documentId);
 
         db.DocumentVersions.Remove(version);
         await db.SaveChangesAsync(ct);
 
-        await SearchVectorHelper.UpdateSearchVectorAsync(db, documentId, ct);
+        await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
 
         if (File.Exists(physicalPath))
             File.Delete(physicalPath);

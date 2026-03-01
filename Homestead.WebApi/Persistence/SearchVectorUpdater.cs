@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Persistence;
 
-public static class SearchVectorHelper
+public class SearchVectorUpdater(AppDbContext db) : ISearchVectorUpdater
 {
-    public static async Task UpdateSearchVectorAsync(AppDbContext db, Guid documentId, CancellationToken ct)
+    public async Task UpdateSearchVectorAsync(Guid documentId, CancellationToken ct)
     {
         await db.Database.ExecuteSqlAsync(
             $"""

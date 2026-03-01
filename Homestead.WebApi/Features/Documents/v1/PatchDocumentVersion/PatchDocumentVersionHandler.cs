@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
-public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser)
+public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser,
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
     : ICommandHandler<PatchDocumentVersionCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentVersionCommand request, CancellationToken ct)
@@ -48,12 +49,12 @@ public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor c
 
         var after = DocumentVersionSnapshot.From(version);
         var changes = before.Diff(after);
-        AuditLogger.LogUpdated(db, "DocumentVersion", version.Id, currentUser.UserId, changes,
+        auditLogger.LogUpdated("DocumentVersion", version.Id, currentUser.UserId, changes,
             parentEntityId: version.DocumentId);
 
         await db.SaveChangesAsync(ct);
 
-        await SearchVectorHelper.UpdateSearchVectorAsync(db, version.DocumentId, ct);
+        await searchVectorUpdater.UpdateSearchVectorAsync(version.DocumentId, ct);
 
         return Results.Ok(new PatchDocumentVersionResponse
         {

@@ -13,7 +13,9 @@ public class UploadDocumentJobHandler(
     IConfiguration configuration,
     IEnumerable<ITextExtractor> textExtractors,
     ILogger<UploadDocumentJobHandler> logger,
-    IProcessingNotifier notifier) : IJobHandler
+    IProcessingNotifier notifier,
+    IAuditLogger auditLogger,
+    ISearchVectorUpdater searchVectorUpdater) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
 
@@ -92,12 +94,12 @@ public class UploadDocumentJobHandler(
         db.Documents.Add(document);
         db.DocumentVersions.Add(version);
 
-        AuditLogger.LogCreated(db, "Document", documentId, job.CreatedByUserId);
-        AuditLogger.LogCreated(db, "DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: documentId);
+        auditLogger.LogCreated("Document", documentId, job.CreatedByUserId);
+        auditLogger.LogCreated("DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: documentId);
 
         await db.SaveChangesAsync(ct);
 
-        await SearchVectorHelper.UpdateSearchVectorAsync(db, documentId, ct);
+        await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
 
         // Move file to final location
         var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));

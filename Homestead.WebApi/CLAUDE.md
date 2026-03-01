@@ -48,7 +48,7 @@ The WebApi uses vertical slice architecture with CQRS handlers:
 Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) column on the `documents` table, indexed with GIN.
 
 - **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B
-- **`SearchVectorHelper.UpdateSearchVectorAsync()`** in `Persistence/SearchVectorHelper.cs` must be called after any mutation that changes a document's name or its latest version's extracted text
+- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Persistence/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
 - **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 
@@ -58,7 +58,7 @@ Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints 
 
 - **Infrastructure** in `Domains/Auditing/`: `AuditLog`, `AuditAction` enum, polymorphic `FieldChange` (`ScalarFieldChange`/`ArrayFieldChange`), `IAuditSnapshot<TSelf, TSource>` interface
 - **Snapshots** per entity (e.g., `DocumentSnapshot`) implement `IAuditSnapshot` with `From()` and `Diff()`
-- **`AuditLogger`** static helper (`Persistence/`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Same pattern as `SearchVectorHelper`.
+- **`IAuditLogger`** — DI-injected service (`Persistence/AuditLogger.cs`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Same pattern as `ISearchVectorUpdater`.
 
 ## Conventions
 
