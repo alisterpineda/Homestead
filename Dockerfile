@@ -27,14 +27,14 @@ RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/Homestead/browser ./wwwroot/
 
-RUN mkdir -p /app/media && chown -R appuser:appgroup /app/media
+RUN mkdir -p /media && chown -R appuser:appgroup /media
 
 USER appuser
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
-ENV FileStorage__MediaPath=/app/media
+ENV FileStorage__MediaPath=/media
 ENV Ocr__Tesseract__TessDataPath=/usr/share/tessdata
 
 EXPOSE 8080

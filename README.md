@@ -25,7 +25,7 @@ services:
       DB_HOST: postgres
       DB_PASSWORD: changeme
     volumes:
-      - media:/app/media
+      - media:/media
 
   postgres:
     image: postgres:17-alpine
@@ -116,14 +116,14 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 
 | Variable | Default | Description |
 |---|---|---|
-| `FileStorage__MediaPath` | `/app/media` | Path for document storage |
+| `FileStorage__MediaPath` | `/media` | Path for document storage |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
 
 ### Volumes
 
 | Path | Purpose |
 |---|---|
-| `/app/media` | Uploaded documents — **back this up** |
+| `/media` | Uploaded documents — **back this up** |
 
 ### Health Checks
 
