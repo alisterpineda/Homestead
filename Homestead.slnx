@@ -3,4 +3,5 @@
   <Project Path="Homestead.ServiceDefaults/Homestead.ServiceDefaults.csproj" />
   <Project Path="Homestead.WebApi/Homestead.WebApi.csproj" />
   <Project Path="Homestead.WebApi.Tests.Integration/Homestead.WebApi.Tests.Integration.csproj" />
+  <Project Path="Homestead.WebApi.Tests.Unit/Homestead.WebApi.Tests.Unit.csproj" />
 </Solution>

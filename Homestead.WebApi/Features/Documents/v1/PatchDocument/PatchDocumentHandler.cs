@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver)
     : ICommandHandler<PatchDocumentCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
@@ -79,7 +79,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         // Resolve or create each tag path and create associations
         foreach (var tagPath in model.TagPaths)
         {
-            var tag = await ResolveOrCreateTagAsync(tagPath, ct);
+            var tag = await tagPathResolver.ResolveOrCreateAsync(tagPath, ct: ct);
             document.DocumentTags.Add(new DocumentTag
             {
                 DocumentId = document.Id,
@@ -179,36 +179,4 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         });
     }
 
-    private async Task<Tag> ResolveOrCreateTagAsync(string path, CancellationToken ct)
-    {
-        var normalizedPath = path.Trim().ToLowerInvariant().Trim('/');
-        var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        Tag? parent = null;
-        Tag? tag = null;
-
-        for (var i = 0; i < segments.Length; i++)
-        {
-            var currentPath = string.Join('/', segments[..(i + 1)]);
-
-            tag = await db.Tags.FirstOrDefaultAsync(t => t.Path == currentPath, ct);
-
-            if (tag is null)
-            {
-                tag = new Tag
-                {
-                    Id = Guid.NewGuid(),
-                    Name = segments[i],
-                    Path = currentPath,
-                    ParentId = parent?.Id,
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                db.Tags.Add(tag);
-            }
-
-            parent = tag;
-        }
-
-        return tag!;
-    }
 }

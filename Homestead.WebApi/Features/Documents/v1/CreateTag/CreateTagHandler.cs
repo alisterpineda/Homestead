@@ -1,58 +1,20 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateTag;
 
-public class CreateTagHandler(AppDbContext db)
+public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver)
     : ICommandHandler<CreateTagRequest, CreateTagResponse>
 {
     public async Task<CreateTagResponse> HandleAsync(CreateTagRequest request, CancellationToken ct)
     {
-        var normalizedPath = request.Path.Trim().ToLowerInvariant().Trim('/');
-        var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-
-        if (segments.Length == 0)
-            throw new ArgumentException("Tag path cannot be empty.");
-
-        Tag? parent = null;
-        Tag? tag = null;
-
-        for (var i = 0; i < segments.Length; i++)
-        {
-            var currentPath = string.Join('/', segments[..( i + 1)]);
-
-            tag = await db.Tags.FirstOrDefaultAsync(t => t.Path == currentPath, ct);
-
-            var isLeaf = i == segments.Length - 1;
-
-            if (tag is null)
-            {
-                tag = new Tag
-                {
-                    Id = Guid.NewGuid(),
-                    Name = segments[i],
-                    Path = currentPath,
-                    ParentId = parent?.Id,
-                    Color = isLeaf ? request.Color : null,
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                db.Tags.Add(tag);
-            }
-            else if (isLeaf && request.Color is not null)
-            {
-                tag.Color = request.Color;
-            }
-
-            parent = tag;
-        }
+        var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, request.Color, ct);
 
         await db.SaveChangesAsync(ct);
 
         return new CreateTagResponse
         {
-            Id = tag!.Id,
+            Id = tag.Id,
             Name = tag.Name,
             Path = tag.Path,
             ParentId = tag.ParentId,

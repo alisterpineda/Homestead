@@ -6,7 +6,42 @@ on:
   workflow_call:
 
 jobs:
-  test:
+  unit-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Homestead.WebApi.Tests.Unit
+
+      - name: Build
+        run: dotnet build Homestead.WebApi.Tests.Unit --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test
+          --project Homestead.WebApi.Tests.Unit
+          --no-build
+          --results-directory ./TestResults
+          --report-trx --report-trx-filename unit-test-results.trx
+          --coverage --coverage-output-format cobertura
+          --coverage-output coverage.cobertura.xml
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: './TestResults/unit-test-results.trx'
+
+  integration-test:
     runs-on: ubuntu-latest
 
     steps:
