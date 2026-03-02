@@ -33,6 +33,7 @@ USER appuser
 
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 ENV FileStorage__MediaPath=/app/media
 ENV Ocr__Tesseract__TessDataPath=/usr/share/tessdata
 

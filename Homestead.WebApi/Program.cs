@@ -152,6 +152,22 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
+// Production security headers
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
+
 // Serve static frontend assets before auth so they don't require authentication
 app.UseStaticFiles();
 
@@ -185,8 +201,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
-
-app.UseHttpsRedirection();
 
 // SPA fallback for client-side routing
 app.MapFallbackToFile("index.html").AllowAnonymous();
