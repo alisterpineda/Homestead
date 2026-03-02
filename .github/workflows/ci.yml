@@ -41,6 +41,13 @@ jobs:
           name: unit-test-results
           path: './TestResults/unit-test-results.trx'
 
+      - name: Upload Coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: './TestResults/**/coverage.cobertura.xml'
+
   integration-test:
     runs-on: ubuntu-latest
 
@@ -69,11 +76,42 @@ jobs:
           --coverage --coverage-output-format cobertura
           --coverage-output coverage.cobertura.xml
 
-      - name: Generate Coverage Report
+      - name: Upload Test Results
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: './TestResults/test-results.trx'
+
+      - name: Upload Coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-coverage
+          path: './TestResults/**/coverage.cobertura.xml'
+
+  coverage-report:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [unit-test, integration-test]
+
+    steps:
+      - name: Download Unit Test Coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: ./coverage/unit
+
+      - name: Download Integration Test Coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-test-coverage
+          path: ./coverage/integration
+
+      - name: Generate Merged Coverage Report
         uses: danielpalme/ReportGenerator-GitHub-Action@v5
         with:
-          reports: './TestResults/**/*.cobertura.xml'
+          reports: './coverage/**/*.cobertura.xml'
           targetdir: './CoverageReport'
           reporttypes: 'HtmlInline_AzurePipelines;MarkdownSummaryGithub'
 
@@ -83,13 +121,6 @@ jobs:
           if [ -f ./CoverageReport/SummaryGithub.md ]; then
             cat ./CoverageReport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: './TestResults/test-results.trx'
 
       - name: Upload Coverage Report
         if: always()
