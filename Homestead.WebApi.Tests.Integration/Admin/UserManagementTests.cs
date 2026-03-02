@@ -12,10 +12,10 @@ public class UserManagementTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10");
+        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>(CT);
         body!.Items.Should().NotBeEmpty();
     }
 
@@ -24,7 +24,7 @@ public class UserManagementTests : IntegrationTestBase
     {
         var client = await CreateUserClientAsync();
 
-        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10");
+        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -40,10 +40,10 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "New User",
             password = "Password123!",
             isAdmin = false
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadFromJsonAsync<UserItem>();
+        var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
         body!.Email.Should().Be("newuser@test.com");
         body.DisplayName.Should().Be("New User");
         body.IsAdmin.Should().BeFalse();
@@ -60,7 +60,7 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "Bad PW",
             password = "short",
             isAdmin = false
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -76,19 +76,19 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "Original",
             password = "Password123!",
             isAdmin = false
-        });
+        }, CT);
         createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>();
+        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
 
         var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{created!.Id}", new
         {
             email = "updated@test.com",
             displayName = "Updated Name",
             isAdmin = true
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<UserItem>();
+        var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
         body!.DisplayName.Should().Be("Updated Name");
         body.IsAdmin.Should().BeTrue();
     }
@@ -104,11 +104,11 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "Delete Me",
             password = "Password123!",
             isAdmin = false
-        });
+        }, CT);
         createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>();
+        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
 
-        var response = await client.DeleteAsync($"/api/v1/admin/users/{created!.Id}");
+        var response = await client.DeleteAsync($"/api/v1/admin/users/{created!.Id}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
@@ -118,11 +118,11 @@ public class UserManagementTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var usersResponse = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10");
-        var users = await usersResponse.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>();
+        var usersResponse = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
+        var users = await usersResponse.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>(CT);
         var adminUser = users!.Items.First(u => u.IsAdmin);
 
-        var response = await client.DeleteAsync($"/api/v1/admin/users/{adminUser.Id}");
+        var response = await client.DeleteAsync($"/api/v1/admin/users/{adminUser.Id}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -138,8 +138,8 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "Bulk 1",
             password = "Password123!",
             isAdmin = false
-        });
-        var u1 = await r1.Content.ReadFromJsonAsync<UserItem>();
+        }, CT);
+        var u1 = await r1.Content.ReadFromJsonAsync<UserItem>(CT);
 
         var r2 = await client.PostAsJsonAsync("/api/v1/admin/users", new
         {
@@ -147,16 +147,16 @@ public class UserManagementTests : IntegrationTestBase
             displayName = "Bulk 2",
             password = "Password123!",
             isAdmin = false
-        });
-        var u2 = await r2.Content.ReadFromJsonAsync<UserItem>();
+        }, CT);
+        var u2 = await r2.Content.ReadFromJsonAsync<UserItem>(CT);
 
         var response = await client.PostAsJsonAsync("/api/v1/admin/users/bulk-delete", new
         {
             ids = new[] { u1!.Id, u2!.Id }
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>();
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
         body!.DeletedCount.Should().Be(2);
     }
 
@@ -165,7 +165,7 @@ public class UserManagementTests : IntegrationTestBase
     {
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10");
+        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

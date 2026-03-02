@@ -18,7 +18,7 @@ public class LoginTests : IntegrationTestBase
         await SeedUserAsync(email, password);
 
         var client = CreateAnonymousClient();
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -34,7 +34,7 @@ public class LoginTests : IntegrationTestBase
         {
             email,
             password = "WrongPassword!"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -47,7 +47,7 @@ public class LoginTests : IntegrationTestBase
         {
             email = "doesnotexist@test.com",
             password = "Password123!"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

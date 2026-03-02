@@ -16,10 +16,10 @@ public class CommentAndActivityTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync($"/api/v1/documents/{docId}/comments", new
         {
             body = "This is a test comment"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadFromJsonAsync<CommentResult>();
+        var body = await response.Content.ReadFromJsonAsync<CommentResult>(CT);
         body!.Body.Should().Be("This is a test comment");
         body.Id.Should().NotBeEmpty();
         body.CreatedByUserId.Should().NotBeNull();
@@ -33,7 +33,7 @@ public class CommentAndActivityTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync($"/api/v1/documents/{Guid.NewGuid()}/comments", new
         {
             body = "No such document"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -44,10 +44,10 @@ public class CommentAndActivityTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20");
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>(CT);
         body!.Items.Should().NotBeEmpty();
         body.Items.Should().Contain(a => a.Type == "audit_log");
     }
@@ -67,12 +67,12 @@ public class CommentAndActivityTests : IntegrationTestBase
         await client.PostAsJsonAsync($"/api/v1/documents/{docId}/comments", new
         {
             body = "Activity test comment"
-        });
+        }, CT);
 
-        var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20");
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20", CT);
         response.EnsureSuccessStatusCode();
 
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>(CT);
         body!.Items.Should().Contain(a => a.Type == "audit_log");
         body.Items.Should().Contain(a => a.Type == "comment" && a.Body == "Activity test comment");
     }

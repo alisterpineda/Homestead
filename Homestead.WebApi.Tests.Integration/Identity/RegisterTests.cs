@@ -20,14 +20,14 @@ public class RegisterTests : IntegrationTestBase
             email = "first@test.com",
             displayName = "First User",
             password = "Password123!"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var userInfoResponse = await client.GetAsync("/api/auth/user-info");
+        var userInfoResponse = await client.GetAsync("/api/auth/user-info", CT);
         userInfoResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var userInfo = await userInfoResponse.Content.ReadFromJsonAsync<UserInfoResult>();
+        var userInfo = await userInfoResponse.Content.ReadFromJsonAsync<UserInfoResult>(CT);
         userInfo!.Roles.Should().Contain("Admin");
     }
 
@@ -42,7 +42,7 @@ public class RegisterTests : IntegrationTestBase
             email = "second@test.com",
             displayName = "Second User",
             password = "Password123!"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -57,7 +57,7 @@ public class RegisterTests : IntegrationTestBase
             email = "user@test.com",
             displayName = "User",
             password = "short"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -67,10 +67,10 @@ public class RegisterTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.GetAsync("/api/auth/user-info");
+        var response = await client.GetAsync("/api/auth/user-info", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<UserInfoResult>();
+        var body = await response.Content.ReadFromJsonAsync<UserInfoResult>(CT);
         body!.Email.Should().NotBeNullOrEmpty();
         body.DisplayName.Should().NotBeNullOrEmpty();
         body.Roles.Should().Contain("Admin");
@@ -81,7 +81,7 @@ public class RegisterTests : IntegrationTestBase
     {
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/auth/user-info");
+        var response = await client.GetAsync("/api/auth/user-info", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -91,10 +91,10 @@ public class RegisterTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var logoutResponse = await client.PostAsync("/api/auth/logout", null);
+        var logoutResponse = await client.PostAsync("/api/auth/logout", null, CT);
         logoutResponse.EnsureSuccessStatusCode();
 
-        var userInfoResponse = await client.GetAsync("/api/auth/user-info");
+        var userInfoResponse = await client.GetAsync("/api/auth/user-info", CT);
         userInfoResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 

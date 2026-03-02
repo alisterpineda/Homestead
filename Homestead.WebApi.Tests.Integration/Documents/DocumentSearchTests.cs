@@ -14,10 +14,10 @@ public class DocumentSearchTests : IntegrationTestBase
         await UploadAndWaitAsync(client, "UniqueInvoice.pdf");
         await UploadAndWaitAsync(client, "OtherContract.pdf");
 
-        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=UniqueInvoice");
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=UniqueInvoice", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         body!.Items.Should().ContainSingle(d => d.Name == "UniqueInvoice.pdf");
     }
 
@@ -27,10 +27,10 @@ public class DocumentSearchTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         await UploadAndWaitAsync(client, "RealDocument.pdf");
 
-        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=xyznonexistent");
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=xyznonexistent", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         body!.Items.Should().BeEmpty();
     }
 
@@ -40,9 +40,9 @@ public class DocumentSearchTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var tagResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "FilterTag" });
+        var tagResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "FilterTag" }, CT);
         tagResponse.EnsureSuccessStatusCode();
-        var tag = await tagResponse.Content.ReadFromJsonAsync<TagResult>();
+        var tag = await tagResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
         var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
         {
@@ -50,10 +50,10 @@ public class DocumentSearchTests : IntegrationTestBase
         });
         patchResponse.EnsureSuccessStatusCode();
 
-        var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&TagIds={tag!.Id}");
+        var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&TagIds={tag!.Id}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         body!.Items.Should().ContainSingle(d => d.Id == docId);
     }
 
@@ -63,9 +63,9 @@ public class DocumentSearchTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "FilterParty" });
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "FilterParty" }, CT);
         partyResponse.EnsureSuccessStatusCode();
-        var party = await partyResponse.Content.ReadFromJsonAsync<PartyResult>();
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyResult>(CT);
 
         var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
         {
@@ -73,10 +73,10 @@ public class DocumentSearchTests : IntegrationTestBase
         });
         patchResponse.EnsureSuccessStatusCode();
 
-        var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&PartyIds={party.Id}");
+        var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&PartyIds={party.Id}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         body!.Items.Should().ContainSingle(d => d.Id == docId);
     }
 
@@ -88,10 +88,10 @@ public class DocumentSearchTests : IntegrationTestBase
         await UploadAndWaitAsync(client, "Alpha.pdf");
         await UploadAndWaitAsync(client, "Charlie.pdf");
 
-        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&SortBy=Name&SortDir=Asc");
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&SortBy=Name&SortDir=Asc", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         var names = body!.Items.Select(d => d.Name).ToList();
         names.Should().BeInAscendingOrder();
     }
@@ -103,10 +103,10 @@ public class DocumentSearchTests : IntegrationTestBase
         for (var i = 0; i < 5; i++)
             await UploadAndWaitAsync(client, $"Page{i}.pdf");
 
-        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=2&IncludeChildTags=false");
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=2&IncludeChildTags=false", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         body!.Items.Should().HaveCount(2);
         body.TotalCount.Should().Be(5);
     }

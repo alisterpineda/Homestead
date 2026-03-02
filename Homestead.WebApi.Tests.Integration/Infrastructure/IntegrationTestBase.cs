@@ -15,6 +15,8 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     protected HomesteadApiFactory Factory => _fixture.Factory;
 
+    protected static CancellationToken CT => TestContext.Current.CancellationToken;
+
     protected IntegrationTestBase(PostgresFixture fixture)
     {
         _fixture = fixture;

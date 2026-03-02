@@ -12,10 +12,10 @@ public class StatusTests : IntegrationTestBase
     {
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/status");
+        var response = await client.GetAsync("/api/status", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<StatusResult>();
+        var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
         body!.NeedsSetup.Should().BeTrue();
     }
 
@@ -25,10 +25,10 @@ public class StatusTests : IntegrationTestBase
         await CreateAdminClientAsync();
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/status");
+        var response = await client.GetAsync("/api/status", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<StatusResult>();
+        var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
         body!.NeedsSetup.Should().BeFalse();
     }
 
@@ -37,10 +37,10 @@ public class StatusTests : IntegrationTestBase
     {
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/status");
+        var response = await client.GetAsync("/api/status", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<StatusResult>();
+        var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
         body!.Oidc.Should().BeNull();
     }
 

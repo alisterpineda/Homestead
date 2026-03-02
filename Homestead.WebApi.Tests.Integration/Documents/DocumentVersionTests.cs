@@ -18,15 +18,15 @@ public class DocumentVersionTests : IntegrationTestBase
         form.Add(new StringContent("V2"), "label");
         form.Add(new ByteArrayContent(fileBytes), "file", "sample-v2.pdf");
 
-        var response = await client.PostAsync($"/api/v1/documents/{docId}/versions", form);
+        var response = await client.PostAsync($"/api/v1/documents/{docId}/versions", form, CT);
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
-        var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>();
+        var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
         await WaitForJobCompletionAsync(jobBody!.JobId);
 
-        var versionsResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10");
+        var versionsResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
         versionsResponse.EnsureSuccessStatusCode();
-        var versions = await versionsResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>();
+        var versions = await versionsResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         versions!.TotalCount.Should().BeGreaterThanOrEqualTo(2);
     }
 
@@ -36,10 +36,10 @@ public class DocumentVersionTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10");
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         body!.Items.Should().NotBeEmpty();
         body.Items.First().VersionNumber.Should().Be(1);
     }
@@ -50,14 +50,14 @@ public class DocumentVersionTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10");
-        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>();
+        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         var versionId = list!.Items.First().Id;
 
-        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions/{versionId}");
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<VersionDetail>();
+        var body = await response.Content.ReadFromJsonAsync<VersionDetail>(CT);
         body!.Id.Should().Be(versionId);
         body.VersionNumber.Should().Be(1);
     }
@@ -68,8 +68,8 @@ public class DocumentVersionTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10");
-        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>();
+        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         var versionId = list!.Items.First().Id;
 
         var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}/versions/{versionId}", new[]
@@ -78,7 +78,7 @@ public class DocumentVersionTests : IntegrationTestBase
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<VersionDetail>();
+        var body = await response.Content.ReadFromJsonAsync<VersionDetail>(CT);
         body!.Label.Should().Be("Updated Label");
     }
 
@@ -88,11 +88,11 @@ public class DocumentVersionTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10");
-        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>();
+        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         var versionId = list!.Items.First().Id;
 
-        var response = await client.DeleteAsync($"/api/v1/documents/{docId}/versions/{versionId}");
+        var response = await client.DeleteAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -103,10 +103,10 @@ public class DocumentVersionTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        var response = await client.GetAsync($"/api/v1/documents/{docId}/file");
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/file", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var bytes = await response.Content.ReadAsByteArrayAsync(CT);
         bytes.Should().NotBeEmpty();
     }
 

@@ -16,10 +16,10 @@ public class TagTests : IntegrationTestBase
         {
             path = "Legal",
             color = "#FF0000"
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadFromJsonAsync<TagResult>();
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
         body!.Name.Should().Be("legal");
         body.Path.Should().Be("legal");
         body.Color.Should().Be("#FF0000");
@@ -30,13 +30,13 @@ public class TagTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var parentResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Documents" });
+        var parentResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Documents" }, CT);
         parentResponse.EnsureSuccessStatusCode();
-        var parent = await parentResponse.Content.ReadFromJsonAsync<TagResult>();
+        var parent = await parentResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
-        var childResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Documents/Contracts" });
+        var childResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Documents/Contracts" }, CT);
         childResponse.EnsureSuccessStatusCode();
-        var child = await childResponse.Content.ReadFromJsonAsync<TagResult>();
+        var child = await childResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
         child!.Name.Should().Be("contracts");
         child.Path.Should().Be("documents/contracts");
@@ -47,13 +47,13 @@ public class TagTests : IntegrationTestBase
     public async Task GetTags_ReturnsList()
     {
         var client = await CreateAdminClientAsync();
-        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagA" });
-        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagB" });
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagA" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagB" }, CT);
 
-        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false");
+        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>();
+        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
         body!.Should().HaveCountGreaterThanOrEqualTo(2);
     }
 
@@ -61,13 +61,13 @@ public class TagTests : IntegrationTestBase
     public async Task GetTags_SearchFilter_FindsMatch()
     {
         var client = await CreateAdminClientAsync();
-        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UniqueSearchable" });
-        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "OtherTag" });
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UniqueSearchable" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "OtherTag" }, CT);
 
-        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Search=uniquesearchable");
+        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Search=uniquesearchable", CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>();
+        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
         body!.Should().ContainSingle(t => t.Name == "uniquesearchable");
     }
 
@@ -75,9 +75,9 @@ public class TagTests : IntegrationTestBase
     public async Task PatchTag_UpdatesName()
     {
         var client = await CreateAdminClientAsync();
-        var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "OldName" });
+        var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "OldName" }, CT);
         createResponse.EnsureSuccessStatusCode();
-        var tag = await createResponse.Content.ReadFromJsonAsync<TagResult>();
+        var tag = await createResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
         var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{tag!.Id}", new[]
         {
@@ -85,7 +85,7 @@ public class TagTests : IntegrationTestBase
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<TagResult>();
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
         body!.Name.Should().BeOneOf("NewName", "newname");
     }
 
@@ -94,13 +94,13 @@ public class TagTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var parentResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Parent" });
+        var parentResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Parent" }, CT);
         parentResponse.EnsureSuccessStatusCode();
-        var parent = await parentResponse.Content.ReadFromJsonAsync<TagResult>();
+        var parent = await parentResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
-        var childResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Parent/Child" });
+        var childResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Parent/Child" }, CT);
         childResponse.EnsureSuccessStatusCode();
-        var child = await childResponse.Content.ReadFromJsonAsync<TagResult>();
+        var child = await childResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
         var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{parent!.Id}", new[]
         {
@@ -114,15 +114,15 @@ public class TagTests : IntegrationTestBase
     public async Task DeleteTag_Removes()
     {
         var client = await CreateAdminClientAsync();
-        var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Deletable" });
+        var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Deletable" }, CT);
         createResponse.EnsureSuccessStatusCode();
-        var tag = await createResponse.Content.ReadFromJsonAsync<TagResult>();
+        var tag = await createResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
-        var deleteResponse = await client.DeleteAsync($"/api/v1/documents/tags/{tag!.Id}");
+        var deleteResponse = await client.DeleteAsync($"/api/v1/documents/tags/{tag!.Id}", CT);
         deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        var listResponse = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false");
-        var tags = await listResponse.Content.ReadFromJsonAsync<List<TagResult>>();
+        var listResponse = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var tags = await listResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
         tags!.Should().NotContain(t => t.Id == tag.Id);
     }
 
@@ -131,18 +131,18 @@ public class TagTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var r1 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "BulkA" });
-        var t1 = await r1.Content.ReadFromJsonAsync<TagResult>();
-        var r2 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "BulkB" });
-        var t2 = await r2.Content.ReadFromJsonAsync<TagResult>();
+        var r1 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "BulkA" }, CT);
+        var t1 = await r1.Content.ReadFromJsonAsync<TagResult>(CT);
+        var r2 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "BulkB" }, CT);
+        var t2 = await r2.Content.ReadFromJsonAsync<TagResult>(CT);
 
         var response = await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
         {
             ids = new[] { t1!.Id, t2!.Id }
-        });
+        }, CT);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>();
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
         body!.DeletedCount.Should().Be(2);
     }
 
