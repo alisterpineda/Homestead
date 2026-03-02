@@ -22,13 +22,13 @@ public class RegisterTests : IntegrationTestBase
             password = "Password123!"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var userInfoResponse = await client.GetAsync("/api/auth/user-info", CT);
-        userInfoResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, userInfoResponse.StatusCode);
 
         var userInfo = await userInfoResponse.Content.ReadFromJsonAsync<UserInfoResult>(CT);
-        userInfo!.Roles.Should().Contain("Admin");
+        Assert.Contains("Admin", userInfo!.Roles);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class RegisterTests : IntegrationTestBase
             password = "Password123!"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class RegisterTests : IntegrationTestBase
             password = "short"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -69,11 +69,11 @@ public class RegisterTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/auth/user-info", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserInfoResult>(CT);
-        body!.Email.Should().NotBeNullOrEmpty();
-        body.DisplayName.Should().NotBeNullOrEmpty();
-        body.Roles.Should().Contain("Admin");
+        Assert.NotEmpty(body!.Email);
+        Assert.NotEmpty(body.DisplayName);
+        Assert.Contains("Admin", body.Roles);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class RegisterTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/auth/user-info", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class RegisterTests : IntegrationTestBase
         logoutResponse.EnsureSuccessStatusCode();
 
         var userInfoResponse = await client.GetAsync("/api/auth/user-info", CT);
-        userInfoResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.Unauthorized, userInfoResponse.StatusCode);
     }
 
     private record UserInfoResult(Guid Id, string Email, string DisplayName, IList<string> Roles);

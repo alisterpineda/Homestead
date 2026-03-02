@@ -18,11 +18,11 @@ public class TagTests : IntegrationTestBase
             color = "#FF0000"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
-        body!.Name.Should().Be("legal");
-        body.Path.Should().Be("legal");
-        body.Color.Should().Be("#FF0000");
+        Assert.Equal("legal", body!.Name);
+        Assert.Equal("legal", body.Path);
+        Assert.Equal("#FF0000", body.Color);
     }
 
     [Fact]
@@ -38,9 +38,9 @@ public class TagTests : IntegrationTestBase
         childResponse.EnsureSuccessStatusCode();
         var child = await childResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
-        child!.Name.Should().Be("contracts");
-        child.Path.Should().Be("documents/contracts");
-        child.ParentId.Should().Be(parent!.Id);
+        Assert.Equal("contracts", child!.Name);
+        Assert.Equal("documents/contracts", child.Path);
+        Assert.Equal(parent!.Id, child.ParentId);
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public class TagTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        body!.Should().HaveCountGreaterThanOrEqualTo(2);
+        Assert.True(body!.Count >= 2);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class TagTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Search=uniquesearchable", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        body!.Should().ContainSingle(t => t.Name == "uniquesearchable");
+        Assert.Single(body!, t => t.Name == "uniquesearchable");
     }
 
     [Fact]
@@ -84,9 +84,9 @@ public class TagTests : IntegrationTestBase
             new { op = "replace", path = "/name", value = (object)"NewName" }
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
-        body!.Name.Should().BeOneOf("NewName", "newname");
+        Assert.Contains(body!.Name, new[] { "NewName", "newname" });
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class TagTests : IntegrationTestBase
             new { op = "replace", path = "/parentId", value = (object)child!.Id.ToString() }
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -119,11 +119,11 @@ public class TagTests : IntegrationTestBase
         var tag = await createResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
         var deleteResponse = await client.DeleteAsync($"/api/v1/documents/tags/{tag!.Id}", CT);
-        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var listResponse = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await listResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        tags!.Should().NotContain(t => t.Id == tag.Id);
+        Assert.DoesNotContain(tags!, t => t.Id == tag.Id);
     }
 
     [Fact]
@@ -141,9 +141,9 @@ public class TagTests : IntegrationTestBase
             ids = new[] { t1!.Id, t2!.Id }
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
-        body!.DeletedCount.Should().Be(2);
+        Assert.Equal(2, body!.DeletedCount);
     }
 
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color);

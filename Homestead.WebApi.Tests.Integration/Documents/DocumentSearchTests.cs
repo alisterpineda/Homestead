@@ -16,9 +16,9 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=UniqueInvoice", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.Items.Should().ContainSingle(d => d.Name == "UniqueInvoice.pdf");
+        Assert.Single(body!.Items, d => d.Name == "UniqueInvoice.pdf");
     }
 
     [Fact]
@@ -29,9 +29,9 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=xyznonexistent", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.Items.Should().BeEmpty();
+        Assert.Empty(body!.Items);
     }
 
     [Fact]
@@ -52,9 +52,9 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&TagIds={tag!.Id}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.Items.Should().ContainSingle(d => d.Id == docId);
+        Assert.Single(body!.Items, d => d.Id == docId);
     }
 
     [Fact]
@@ -75,9 +75,9 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&PartyIds={party.Id}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.Items.Should().ContainSingle(d => d.Id == docId);
+        Assert.Single(body!.Items, d => d.Id == docId);
     }
 
     [Fact]
@@ -90,10 +90,10 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&SortBy=Name&SortDir=Asc", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
         var names = body!.Items.Select(d => d.Name).ToList();
-        names.Should().BeInAscendingOrder();
+        Assert.Equal(names.OrderBy(n => n, StringComparer.Ordinal).ToList(), names);
     }
 
     [Fact]
@@ -105,10 +105,10 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=2&IncludeChildTags=false", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.Items.Should().HaveCount(2);
-        body.TotalCount.Should().Be(5);
+        Assert.Equal(2, body!.Items.Count);
+        Assert.Equal(5, body.TotalCount);
     }
 
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension);

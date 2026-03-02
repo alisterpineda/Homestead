@@ -18,11 +18,11 @@ public class CommentAndActivityTests : IntegrationTestBase
             body = "This is a test comment"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CommentResult>(CT);
-        body!.Body.Should().Be("This is a test comment");
-        body.Id.Should().NotBeEmpty();
-        body.CreatedByUserId.Should().NotBeNull();
+        Assert.Equal("This is a test comment", body!.Body);
+        Assert.NotEqual(Guid.Empty, body.Id);
+        Assert.NotNull(body.CreatedByUserId);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public class CommentAndActivityTests : IntegrationTestBase
             body = "No such document"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -46,10 +46,10 @@ public class CommentAndActivityTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>(CT);
-        body!.Items.Should().NotBeEmpty();
-        body.Items.Should().Contain(a => a.Type == "audit_log");
+        Assert.NotEmpty(body!.Items);
+        Assert.Contains(body.Items, a => a.Type == "audit_log");
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public class CommentAndActivityTests : IntegrationTestBase
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>(CT);
-        body!.Items.Should().Contain(a => a.Type == "audit_log");
-        body.Items.Should().Contain(a => a.Type == "comment" && a.Body == "Activity test comment");
+        Assert.Contains(body!.Items, a => a.Type == "audit_log");
+        Assert.Contains(body.Items, a => a.Type == "comment" && a.Body == "Activity test comment");
     }
 
     private record CommentResult(Guid Id, string Body, DateTimeOffset CreatedAt, Guid? CreatedByUserId);

@@ -14,9 +14,9 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await UploadDocumentAsync(client);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
-        body!.JobId.Should().NotBeEmpty();
+        Assert.NotEqual(Guid.Empty, body!.JobId);
     }
 
     [Fact]
@@ -26,7 +26,7 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await UploadDocumentAsync(client);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.TotalCount.Should().BeGreaterThanOrEqualTo(2);
-        body.Items.Should().HaveCountGreaterThanOrEqualTo(2);
+        Assert.True(body!.TotalCount >= 2);
+        Assert.True(body.Items.Count >= 2);
     }
 
     [Fact]
@@ -51,10 +51,10 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
-        body!.TotalCount.Should().Be(0);
-        body.Items.Should().BeEmpty();
+        Assert.Equal(0, body!.TotalCount);
+        Assert.Empty(body.Items);
     }
 
     [Fact]
@@ -65,10 +65,10 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{docId}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
-        body!.Id.Should().Be(docId);
-        body.Name.Should().Be("TestDoc.pdf");
+        Assert.Equal(docId, body!.Id);
+        Assert.Equal("TestDoc.pdf", body.Name);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class DocumentCrudTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{Guid.NewGuid()}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public class DocumentCrudTests : IntegrationTestBase
             new { op = "replace", path = "/name", value = (object)"Updated Name" }
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
-        body!.Name.Should().Be("Updated Name");
+        Assert.Equal("Updated Name", body!.Name);
     }
 
     [Fact]
@@ -104,10 +104,10 @@ public class DocumentCrudTests : IntegrationTestBase
         var docId = await UploadAndWaitAsync(client);
 
         var deleteResponse = await client.DeleteAsync($"/api/v1/documents/{docId}", CT);
-        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/v1/documents/{docId}", CT);
-        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
     [Fact]
@@ -122,9 +122,9 @@ public class DocumentCrudTests : IntegrationTestBase
             ids = new[] { docId1, docId2 }
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
-        body!.DeletedCount.Should().Be(2);
+        Assert.Equal(2, body!.DeletedCount);
     }
 
     private async Task<HttpResponseMessage> UploadDocumentAsync(HttpClient client, string name = "sample.pdf")

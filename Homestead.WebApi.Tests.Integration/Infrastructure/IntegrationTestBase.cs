@@ -73,7 +73,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         form.Add(new ByteArrayContent(fileBytes), "file", name);
 
         var response = await client.PostAsync("/api/v1/documents", form);
-        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<JobResponse>();
         return await WaitForJobCompletionAsync(body!.JobId);

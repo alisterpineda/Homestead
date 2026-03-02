@@ -19,7 +19,7 @@ public class DocumentVersionTests : IntegrationTestBase
         form.Add(new ByteArrayContent(fileBytes), "file", "sample-v2.pdf");
 
         var response = await client.PostAsync($"/api/v1/documents/{docId}/versions", form, CT);
-        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
         await WaitForJobCompletionAsync(jobBody!.JobId);
@@ -27,7 +27,7 @@ public class DocumentVersionTests : IntegrationTestBase
         var versionsResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
         versionsResponse.EnsureSuccessStatusCode();
         var versions = await versionsResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
-        versions!.TotalCount.Should().BeGreaterThanOrEqualTo(2);
+        Assert.True(versions!.TotalCount >= 2);
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class DocumentVersionTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
-        body!.Items.Should().NotBeEmpty();
-        body.Items.First().VersionNumber.Should().Be(1);
+        Assert.NotEmpty(body!.Items);
+        Assert.Equal(1, body.Items.First().VersionNumber);
     }
 
     [Fact]
@@ -56,10 +56,10 @@ public class DocumentVersionTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<VersionDetail>(CT);
-        body!.Id.Should().Be(versionId);
-        body.VersionNumber.Should().Be(1);
+        Assert.Equal(versionId, body!.Id);
+        Assert.Equal(1, body.VersionNumber);
     }
 
     [Fact]
@@ -77,9 +77,9 @@ public class DocumentVersionTests : IntegrationTestBase
             new { op = "replace", path = "/label", value = (object)"Updated Label" }
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<VersionDetail>(CT);
-        body!.Label.Should().Be("Updated Label");
+        Assert.Equal("Updated Label", body!.Label);
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class DocumentVersionTests : IntegrationTestBase
 
         var response = await client.DeleteAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -105,9 +105,9 @@ public class DocumentVersionTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/{docId}/file", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var bytes = await response.Content.ReadAsByteArrayAsync(CT);
-        bytes.Should().NotBeEmpty();
+        Assert.NotEmpty(bytes);
     }
 
     private record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);

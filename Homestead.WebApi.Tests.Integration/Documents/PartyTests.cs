@@ -18,11 +18,11 @@ public class PartyTests : IntegrationTestBase
             description = "A test party"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PartyResult>(CT);
-        body!.Name.Should().Be("Acme Corp");
-        body.Description.Should().Be("A test party");
-        body.Id.Should().NotBeEmpty();
+        Assert.Equal("Acme Corp", body!.Name);
+        Assert.Equal("A test party", body.Description);
+        Assert.NotEqual(Guid.Empty, body.Id);
     }
 
     [Fact]
@@ -34,9 +34,9 @@ public class PartyTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/documents/parties?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<PartyListItem>>(CT);
-        body!.Items.Should().HaveCountGreaterThanOrEqualTo(2);
+        Assert.True(body!.Items.Count >= 2);
     }
 
     [Fact]
@@ -47,9 +47,9 @@ public class PartyTests : IntegrationTestBase
 
         var response = await client.GetAsync($"/api/v1/documents/parties/{party.Id}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PartyResult>(CT);
-        body!.Name.Should().Be("Detail Party");
+        Assert.Equal("Detail Party", body!.Name);
     }
 
     [Fact]
@@ -64,10 +64,10 @@ public class PartyTests : IntegrationTestBase
             description = "New description"
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PartyResult>(CT);
-        body!.Name.Should().Be("Updated");
-        body.Description.Should().Be("New description");
+        Assert.Equal("Updated", body!.Name);
+        Assert.Equal("New description", body.Description);
     }
 
     [Fact]
@@ -77,10 +77,10 @@ public class PartyTests : IntegrationTestBase
         var party = await CreatePartyAsync(client, "ToDelete");
 
         var deleteResponse = await client.DeleteAsync($"/api/v1/documents/parties/{party.Id}", CT);
-        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/v1/documents/parties/{party.Id}", CT);
-        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
     [Fact]
@@ -95,9 +95,9 @@ public class PartyTests : IntegrationTestBase
             ids = new[] { party1.Id, party2.Id }
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
-        body!.DeletedCount.Should().Be(2);
+        Assert.Equal(2, body!.DeletedCount);
     }
 
     private async Task<PartyResult> CreatePartyAsync(HttpClient client, string name)

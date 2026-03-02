@@ -14,9 +14,9 @@ public class StatusTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/status", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        body!.NeedsSetup.Should().BeTrue();
+        Assert.True(body!.NeedsSetup);
     }
 
     [Fact]
@@ -27,9 +27,9 @@ public class StatusTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/status", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        body!.NeedsSetup.Should().BeFalse();
+        Assert.False(body!.NeedsSetup);
     }
 
     [Fact]
@@ -39,9 +39,9 @@ public class StatusTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/status", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        body!.Oidc.Should().BeNull();
+        Assert.Null(body!.Oidc);
     }
 
     private record OidcStatus(string DisplayName, bool DisableLocalLogin);

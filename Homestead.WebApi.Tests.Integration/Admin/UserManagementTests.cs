@@ -14,9 +14,9 @@ public class UserManagementTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>(CT);
-        body!.Items.Should().NotBeEmpty();
+        Assert.NotEmpty(body!.Items);
     }
 
     [Fact]
@@ -26,7 +26,7 @@ public class UserManagementTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -42,11 +42,11 @@ public class UserManagementTests : IntegrationTestBase
             isAdmin = false
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
-        body!.Email.Should().Be("newuser@test.com");
-        body.DisplayName.Should().Be("New User");
-        body.IsAdmin.Should().BeFalse();
+        Assert.Equal("newuser@test.com", body!.Email);
+        Assert.Equal("New User", body.DisplayName);
+        Assert.False(body.IsAdmin);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class UserManagementTests : IntegrationTestBase
             isAdmin = false
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -87,10 +87,10 @@ public class UserManagementTests : IntegrationTestBase
             isAdmin = true
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
-        body!.DisplayName.Should().Be("Updated Name");
-        body.IsAdmin.Should().BeTrue();
+        Assert.Equal("Updated Name", body!.DisplayName);
+        Assert.True(body.IsAdmin);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class UserManagementTests : IntegrationTestBase
 
         var response = await client.DeleteAsync($"/api/v1/admin/users/{created!.Id}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class UserManagementTests : IntegrationTestBase
 
         var response = await client.DeleteAsync($"/api/v1/admin/users/{adminUser.Id}", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -155,9 +155,9 @@ public class UserManagementTests : IntegrationTestBase
             ids = new[] { u1!.Id, u2!.Id }
         }, CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
-        body!.DeletedCount.Should().Be(2);
+        Assert.Equal(2, body!.DeletedCount);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public class UserManagementTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private record UserItem(Guid Id, string DisplayName, string? Email, bool IsAdmin, DateTimeOffset CreatedAt);

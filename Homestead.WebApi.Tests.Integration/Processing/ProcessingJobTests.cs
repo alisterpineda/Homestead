@@ -18,17 +18,17 @@ public class ProcessingJobTests : IntegrationTestBase
         form.Add(new ByteArrayContent(fileBytes), "file", "job-test.pdf");
 
         var uploadResponse = await client.PostAsync("/api/v1/documents", form, CT);
-        uploadResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        Assert.Equal(HttpStatusCode.Accepted, uploadResponse.StatusCode);
 
         var jobBody = await uploadResponse.Content.ReadFromJsonAsync<JobResponse>(CT);
         await WaitForJobCompletionAsync(jobBody!.JobId);
 
         var response = await client.GetAsync("/api/v1/processing/jobs?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ProcessingJobItem>>(CT);
-        body!.Items.Should().NotBeEmpty();
-        body.Items.Should().Contain(j => j.Id == jobBody.JobId);
+        Assert.NotEmpty(body!.Items);
+        Assert.Contains(body.Items, j => j.Id == jobBody.JobId);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class ProcessingJobTests : IntegrationTestBase
 
         var response = await client.GetAsync("/api/v1/processing/jobs?Page=1&PageSize=10", CT);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -52,16 +52,16 @@ public class ProcessingJobTests : IntegrationTestBase
         form.Add(new ByteArrayContent(fileBytes), "file", "processing-test.pdf");
 
         var uploadResponse = await client.PostAsync("/api/v1/documents", form, CT);
-        uploadResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        Assert.Equal(HttpStatusCode.Accepted, uploadResponse.StatusCode);
 
         var jobBody = await uploadResponse.Content.ReadFromJsonAsync<JobResponse>(CT);
-        jobBody!.JobId.Should().NotBeEmpty();
+        Assert.NotEqual(Guid.Empty, jobBody!.JobId);
 
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<Homestead.WebApi.Persistence.AppDbContext>();
         var job = await db.ProcessingJobs.FindAsync([jobBody.JobId], CT);
-        job.Should().NotBeNull();
-        job!.Type.Should().Be(Homestead.WebApi.Domains.Processing.ProcessingJobType.UploadDocument);
+        Assert.NotNull(job);
+        Assert.Equal(Homestead.WebApi.Domains.Processing.ProcessingJobType.UploadDocument, job!.Type);
     }
 
     private record ProcessingJobItem(Guid Id, string Type, string Status, Guid? EntityId, string? Error);
