@@ -26,18 +26,19 @@ jobs:
 
       - name: Test
         run: >-
-          dotnet test Homestead.WebApi.Tests.Integration
+          dotnet test
+          --project Homestead.WebApi.Tests.Integration
           --no-build
-          --logger "trx;LogFileName=test-results.trx"
-          --logger GitHubActions
-          --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
+          --report-trx --report-trx-filename test-results.trx
+          --coverage --coverage-output-format cobertura
+          --coverage-output coverage.cobertura.xml
 
       - name: Generate Coverage Report
         if: always()
         uses: danielpalme/ReportGenerator-GitHub-Action@v5
         with:
-          reports: './TestResults/**/coverage.cobertura.xml'
+          reports: './TestResults/**/*.cobertura.xml'
           targetdir: './CoverageReport'
           reporttypes: 'HtmlInline_AzurePipelines;MarkdownSummaryGithub'
 
