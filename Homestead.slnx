@@ -2,4 +2,5 @@
   <Project Path="Homestead.AppHost/Homestead.AppHost.csproj" />
   <Project Path="Homestead.ServiceDefaults/Homestead.ServiceDefaults.csproj" />
   <Project Path="Homestead.WebApi/Homestead.WebApi.csproj" />
+  <Project Path="Homestead.WebApi.Tests.Integration/Homestead.WebApi.Tests.Integration.csproj" />
 </Solution>
