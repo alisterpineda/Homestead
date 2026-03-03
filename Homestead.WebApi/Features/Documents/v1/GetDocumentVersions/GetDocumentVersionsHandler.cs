@@ -1,15 +1,20 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 
-public class GetDocumentVersionsHandler(AppDbContext db)
+public class GetDocumentVersionsHandler(AppDbContext db, IDocumentAccessService accessService)
     : IQueryHandler<GetDocumentVersionsRequest, PaginatedResponse<GetDocumentVersionsResponse>>
 {
     public async Task<PaginatedResponse<GetDocumentVersionsResponse>> HandleAsync(
         GetDocumentVersionsRequest request, CancellationToken ct)
     {
+        var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Read, ct);
+        if (!access.IsAllowed)
+            throw new ForbiddenAccessException();
+
         var query = db.DocumentVersions
             .AsNoTracking()
             .Where(r => r.DocumentId == request.DocumentId);

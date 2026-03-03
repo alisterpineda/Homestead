@@ -65,8 +65,6 @@ export type { GetMyGroups$Params as GetMyGroups$Params } from './fn/documents/ge
 export { getMyGroups as getMyGroups } from './fn/documents/get-my-groups';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
 export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
-export type { RetriggerProcessingJob$Params as RetriggerProcessingJob$Params } from './fn/processing/retrigger-processing-job';
-export { retriggerProcessingJob as retriggerProcessingJob } from './fn/processing/retrigger-processing-job';
 export type { GetUsers$Params as GetUsers$Params } from './fn/admin/get-users';
 export { getUsers as getUsers } from './fn/admin/get-users';
 export type { CreateUser$Params as CreateUser$Params } from './fn/admin/create-user';

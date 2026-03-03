@@ -37,5 +37,6 @@ public class ProcessingJobConfiguration : IEntityTypeConfiguration<ProcessingJob
         builder.HasIndex(j => j.Type);
         builder.HasIndex(j => j.EntityId);
         builder.HasIndex(j => new { j.Status, j.Priority });
+        builder.HasIndex(j => j.CreatedByUserId);
     }
 }

@@ -64,5 +64,29 @@ public class ProcessingJobTests : IntegrationTestBase
         Assert.Equal(Homestead.WebApi.Domains.Processing.ProcessingJobType.UploadDocument, job!.Type);
     }
 
+    [Fact]
+    public async Task GetProcessingJobs_NonAdminUser_SeesOnlyOwnJobs()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var adminDocId = await UploadAndWaitAsync(adminClient, "admin-doc.pdf");
+
+        var userClient = await CreateUserClientAsync();
+        var userDocId = await UploadAndWaitAsync(userClient, "user-doc.pdf");
+
+        // Contributor should only see their own job
+        var response = await userClient.GetAsync("/api/v1/processing/jobs?Page=1&PageSize=100", CT);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ProcessingJobItem>>(CT);
+        Assert.Contains(body!.Items, j => j.EntityId == userDocId);
+        Assert.DoesNotContain(body.Items, j => j.EntityId == adminDocId);
+
+        // Admin should see all jobs
+        var adminResponse = await adminClient.GetAsync("/api/v1/processing/jobs?Page=1&PageSize=100", CT);
+        Assert.Equal(HttpStatusCode.OK, adminResponse.StatusCode);
+        var adminBody = await adminResponse.Content.ReadFromJsonAsync<PaginatedResult<ProcessingJobItem>>(CT);
+        Assert.Contains(adminBody!.Items, j => j.EntityId == adminDocId);
+        Assert.Contains(adminBody.Items, j => j.EntityId == userDocId);
+    }
+
     private record ProcessingJobItem(Guid Id, string Type, string Status, Guid? EntityId, string? Error);
 }

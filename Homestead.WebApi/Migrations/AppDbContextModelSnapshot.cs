@@ -483,6 +483,8 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
                     b.HasIndex("EntityId");
 
                     b.HasIndex("Type");

@@ -110,6 +110,34 @@ public class DocumentVersionTests : IntegrationTestBase
         Assert.NotEmpty(bytes);
     }
 
+    [Fact]
+    public async Task GetVersions_Unauthenticated_Returns401()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(adminClient);
+
+        var client = CreateAnonymousClient();
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetVersion_Unauthenticated_Returns401()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(adminClient);
+
+        var listResponse = await adminClient.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
+        var versionId = list!.Items.First().Id;
+
+        var client = CreateAnonymousClient();
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);
     private record VersionDetail(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
 }

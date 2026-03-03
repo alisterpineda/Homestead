@@ -1,16 +1,21 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Processing.v1.GetProcessingJobs;
 
-public class GetProcessingJobsHandler(AppDbContext db)
+public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
     : IQueryHandler<GetProcessingJobsRequest, PaginatedResponse<GetProcessingJobsResponse>>
 {
     public async Task<PaginatedResponse<GetProcessingJobsResponse>> HandleAsync(
         GetProcessingJobsRequest request, CancellationToken ct)
     {
         var query = db.ProcessingJobs.AsNoTracking();
+
+        if (currentUser.Role != AppRole.Admin)
+            query = query.Where(j => j.CreatedByUserId == currentUser.UserId);
 
         if (request.EntityId is not null)
             query = query.Where(j => j.EntityId == request.EntityId);
