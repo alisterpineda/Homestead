@@ -1,16 +1,29 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetParties;
 
-public class GetPartiesHandler(AppDbContext db)
+public class GetPartiesHandler(AppDbContext db, IDocumentAccessService accessService)
     : IQueryHandler<GetPartiesRequest, PaginatedResponse<GetPartiesResponse>>
 {
     public async Task<PaginatedResponse<GetPartiesResponse>> HandleAsync(
         GetPartiesRequest request, CancellationToken ct)
     {
         var query = db.Parties.AsNoTracking();
+
+        // For non-admins, compute accessible doc IDs once and use for both
+        // the visibility filter and scoped DocumentCount
+        var accessibleDocIds = !accessService.IsAdmin
+            ? accessService.AccessibleDocumentIds()
+            : null;
+
+        if (accessibleDocIds is not null)
+        {
+            query = query.Where(p =>
+                p.DocumentParties.Any(dp => accessibleDocIds.Contains(dp.DocumentId)));
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -32,7 +45,9 @@ public class GetPartiesHandler(AppDbContext db)
                 Name = p.Name,
                 Description = p.Description,
                 CreatedAt = p.CreatedAt,
-                DocumentCount = p.DocumentParties.Count
+                DocumentCount = accessibleDocIds != null
+                    ? p.DocumentParties.Count(dp => accessibleDocIds.Contains(dp.DocumentId))
+                    : p.DocumentParties.Count
             })
             .ToListAsync(ct);
 

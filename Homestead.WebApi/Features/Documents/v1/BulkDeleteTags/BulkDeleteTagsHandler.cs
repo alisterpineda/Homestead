@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 
-public class BulkDeleteTagsHandler(AppDbContext db)
+public class BulkDeleteTagsHandler(AppDbContext db, IDocumentAccessService accessService)
     : ICommandHandler<BulkDeleteTagsRequest, BulkDeleteTagsResponse>
 {
     public async Task<BulkDeleteTagsResponse> HandleAsync(BulkDeleteTagsRequest request, CancellationToken ct)
@@ -17,6 +18,13 @@ public class BulkDeleteTagsHandler(AppDbContext db)
 
         if (tags.Count == 0)
             return new BulkDeleteTagsResponse(0);
+
+        // Block deletion if any requested tags are used on inaccessible documents
+        var relatedDocIds = db.DocumentTags
+            .Where(dt => request.Ids.Contains(dt.TagId))
+            .Select(dt => dt.DocumentId);
+
+        await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
 
         var deleteIds = new HashSet<Guid>(request.Ids);
 

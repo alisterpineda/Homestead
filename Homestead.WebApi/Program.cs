@@ -87,6 +87,8 @@ builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
+builder.Services.AddExceptionHandler<ForbiddenAccessExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddHandlers();
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);
@@ -158,6 +160,8 @@ builder.Services.AddOpenApi("v1", options =>
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+
+app.UseExceptionHandler();
 
 // Production security headers
 if (!app.Environment.IsDevelopment())

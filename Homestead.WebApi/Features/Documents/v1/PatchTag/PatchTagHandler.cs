@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
-public class PatchTagHandler(AppDbContext db)
+public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessService)
     : ICommandHandler<PatchTagCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchTagCommand request, CancellationToken ct)
@@ -15,6 +16,17 @@ public class PatchTagHandler(AppDbContext db)
 
         if (tag is null)
             return Results.NotFound();
+
+        // Block modification if the tag (or its descendants) is used on inaccessible documents
+        var subtreeTagIds = db.Tags
+            .Where(t => t.Id == request.Id || t.Path.StartsWith(tag.Path + "/"))
+            .Select(t => t.Id);
+
+        var relatedDocIds = db.DocumentTags
+            .Where(dt => subtreeTagIds.Contains(dt.TagId))
+            .Select(dt => dt.DocumentId);
+
+        await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
 
         var oldPath = tag.Path;
         var oldName = tag.Name;

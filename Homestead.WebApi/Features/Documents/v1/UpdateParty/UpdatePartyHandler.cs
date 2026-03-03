@@ -1,10 +1,11 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
-public class UpdatePartyHandler(AppDbContext db)
+public class UpdatePartyHandler(AppDbContext db, IDocumentAccessService accessService)
     : ICommandHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyCommand request, CancellationToken ct)
@@ -14,6 +15,13 @@ public class UpdatePartyHandler(AppDbContext db)
 
         if (party is null)
             return null;
+
+        // Block modification if the party is used on inaccessible documents
+        var relatedDocIds = db.DocumentParties
+            .Where(dp => dp.PartyId == request.Id)
+            .Select(dp => dp.DocumentId);
+
+        await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
 
         var name = request.Name.Trim();
 

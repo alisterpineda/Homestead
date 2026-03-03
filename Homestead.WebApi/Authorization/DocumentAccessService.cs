@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
@@ -11,6 +12,8 @@ public class DocumentAccessService(
     ICurrentUserAccessor currentUser,
     AppDbContext db) : IDocumentAccessService
 {
+    public bool IsAdmin => currentUser.Role == AppRole.Admin;
+
     public async Task<DocumentAccessResult> CheckAccessAsync(
         Guid documentId, DocumentOperation operation, CancellationToken ct)
     {
@@ -111,5 +114,23 @@ public class DocumentAccessService(
 
         // Contributor/Viewer: global docs + group-scoped docs where they're a member
         return query.Where(d => d.GroupId == null || userGroupIds.Contains(d.GroupId!.Value));
+    }
+
+    public IQueryable<Guid> AccessibleDocumentIds()
+        => FilterByAccess(db.Documents).Select(d => d.Id);
+
+    public async Task EnsureAllDocumentsAccessibleAsync(
+        IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
+    {
+        if (IsAdmin)
+            return;
+
+        var accessible = AccessibleDocumentIds();
+
+        var hasInaccessible = await relatedDocumentIds
+            .AnyAsync(docId => !accessible.Contains(docId), ct);
+
+        if (hasInaccessible)
+            throw new ForbiddenAccessException();
     }
 }
