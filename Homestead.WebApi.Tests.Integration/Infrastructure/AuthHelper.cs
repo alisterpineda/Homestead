@@ -15,29 +15,30 @@ public static class AuthHelper
         string? displayName = null,
         bool isActive = true)
     {
-        return CreateAuthenticatedClientAsync(factory, isAdmin: true, email, displayName, isActive);
+        return CreateAuthenticatedClientAsync(factory, role: "Admin", email, displayName, isActive);
     }
 
     public static Task<HttpClient> CreateUserClientAsync(
         WebApplicationFactory<Program> factory,
         string? email = null,
         string? displayName = null,
-        bool isActive = true)
+        bool isActive = true,
+        string role = "Contributor")
     {
-        return CreateAuthenticatedClientAsync(factory, isAdmin: false, email, displayName, isActive);
+        return CreateAuthenticatedClientAsync(factory, role: role, email, displayName, isActive);
     }
 
     private static async Task<HttpClient> CreateAuthenticatedClientAsync(
         WebApplicationFactory<Program> factory,
-        bool isAdmin,
+        string role,
         string? email,
         string? displayName,
         bool isActive)
     {
         var counter = Interlocked.Increment(ref _userCounter);
-        var prefix = isAdmin ? "admin" : "user";
+        var prefix = role.ToLowerInvariant();
         email ??= $"{prefix}{counter}@test.com";
-        displayName ??= $"{(isAdmin ? "Admin" : "User")} {counter}";
+        displayName ??= $"{role} {counter}";
         const string password = "TestPassword123!";
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -61,8 +62,7 @@ public static class AuthHelper
         if (!result.Succeeded)
             throw new Exception($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
 
-        if (isAdmin)
-            await userManager.AddToRoleAsync(user, "Admin");
+        await userManager.AddToRoleAsync(user, role);
 
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
         loginResponse.EnsureSuccessStatusCode();

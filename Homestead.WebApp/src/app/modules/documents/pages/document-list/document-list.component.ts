@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal } from '@ng-icons/lucide';
@@ -79,10 +80,12 @@ import { toast } from 'ngx-sonner';
               <h3 hlmEmptyTitle>No documents yet</h3>
               <p hlmEmptyDescription>Upload your first document to get started.</p>
             </div>
-            <app-upload-dialog (uploaded)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              Upload Document
-            </app-upload-dialog>
+            @if (auth.canWrite()) {
+              <app-upload-dialog (uploaded)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Upload Document
+              </app-upload-dialog>
+            }
           </section>
         } @else {
           <div class="relative">
@@ -116,10 +119,12 @@ import { toast } from 'ngx-sonner';
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
                     </button>
                   </div>
-                  <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
-                    <ng-icon hlm name="lucidePlus" size="sm" />
-                    Upload
-                  </app-upload-dialog>
+                  @if (auth.canWrite()) {
+                    <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
+                      <ng-icon hlm name="lucidePlus" size="sm" />
+                      Upload
+                    </app-upload-dialog>
+                  }
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -155,7 +160,7 @@ import { toast } from 'ngx-sonner';
             </div>
 
             <!-- Selection toolbar: absolute overlay -->
-            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection() || !auth.canWrite()" [class.pointer-events-none]="!hasSelection() || !auth.canWrite()">
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
               </span>
@@ -228,6 +233,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class DocumentListComponent implements OnDestroy {
+  auth = inject(AuthService);
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);

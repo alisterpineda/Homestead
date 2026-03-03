@@ -21,15 +21,14 @@ public class CreateUserHandler(UserManager<AppUser> userManager)
         if (!result.Succeeded)
             throw new IdentityValidationException(result.ToErrorDictionary());
 
-        if (request.IsAdmin)
-            await userManager.AddToRoleAsync(user, "Admin");
+        await userManager.AddToRoleAsync(user, request.Role.ToString());
 
         return new UserResponse
         {
             Id = user.Id,
             DisplayName = user.DisplayName,
             Email = user.Email,
-            IsAdmin = request.IsAdmin,
+            Role = request.Role,
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt
         };

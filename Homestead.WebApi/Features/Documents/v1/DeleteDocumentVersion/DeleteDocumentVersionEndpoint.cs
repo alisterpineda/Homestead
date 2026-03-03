@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
 public static class DeleteDocumentVersionEndpoint
@@ -13,6 +15,7 @@ public static class DeleteDocumentVersionEndpoint
         .WithName("DeleteDocumentVersion")
         .Produces(StatusCodes.Status204NoContent)
         .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status404NotFound)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

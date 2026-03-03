@@ -49,8 +49,19 @@ import type { UserResponse } from '@/api/generated/models/user-response';
                 <td hlmTd class="font-medium">{{ user.displayName }}</td>
                 <td hlmTd class="text-muted-foreground">{{ user.email ?? '\u2014' }}</td>
                 <td hlmTd class="hidden md:table-cell">
-                  @if (user.isAdmin) {
-                    <span hlmBadge variant="secondary">Admin</span>
+                  @switch (user.role) {
+                    @case ('Admin') {
+                      <span hlmBadge variant="destructive">Admin</span>
+                    }
+                    @case ('Contributor') {
+                      <span hlmBadge>Contributor</span>
+                    }
+                    @case ('Viewer') {
+                      <span hlmBadge variant="secondary">Viewer</span>
+                    }
+                    @case ('Guest') {
+                      <span hlmBadge variant="outline">Guest</span>
+                    }
                   }
                 </td>
                 <td hlmTd class="hidden md:table-cell">

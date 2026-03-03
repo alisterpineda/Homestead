@@ -41,6 +41,9 @@ public class OidcUserProvisionerTests
             .Returns(IdentityResult.Success);
         _userManager.AddLoginAsync(Arg.Any<AppUser>(), Arg.Any<UserLoginInfo>())
             .Returns(IdentityResult.Success);
+        _userManager.GetRolesAsync(Arg.Any<AppUser>()).Returns(new List<string>());
+        _userManager.AddToRoleAsync(Arg.Any<AppUser>(), Arg.Any<string>())
+            .Returns(IdentityResult.Success);
 
         var principal = CreatePrincipal("first@test.com", "First User");
         var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "first-key", "OIDC")
@@ -66,6 +69,9 @@ public class OidcUserProvisionerTests
         _userManager.CreateAsync(Arg.Any<AppUser>())
             .Returns(IdentityResult.Success);
         _userManager.AddLoginAsync(Arg.Any<AppUser>(), Arg.Any<UserLoginInfo>())
+            .Returns(IdentityResult.Success);
+        _userManager.GetRolesAsync(Arg.Any<AppUser>()).Returns(new List<string>());
+        _userManager.AddToRoleAsync(Arg.Any<AppUser>(), Arg.Any<string>())
             .Returns(IdentityResult.Success);
 
         var principal = CreatePrincipal("newoidc@test.com", "New OIDC User");
@@ -95,6 +101,8 @@ public class OidcUserProvisionerTests
         _userManager.FindByLoginAsync("oidc-provider", "existing-key")
             .Returns(existingUser);
         _userManager.GetRolesAsync(existingUser).Returns(new List<string>());
+        _userManager.AddToRoleAsync(existingUser, Arg.Any<string>())
+            .Returns(IdentityResult.Success);
 
         var principal = CreatePrincipal("existing@test.com", "Existing User");
         var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "existing-key", "OIDC")
@@ -123,6 +131,8 @@ public class OidcUserProvisionerTests
         _userManager.FindByLoginAsync("oidc-provider", "inactive-key")
             .Returns(existingUser);
         _userManager.GetRolesAsync(existingUser).Returns(new List<string>());
+        _userManager.AddToRoleAsync(existingUser, Arg.Any<string>())
+            .Returns(IdentityResult.Success);
 
         var principal = CreatePrincipal("inactive@test.com", "Inactive User");
         var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "inactive-key", "OIDC")
@@ -154,6 +164,8 @@ public class OidcUserProvisionerTests
         _userManager.AddLoginAsync(existingUser, Arg.Any<UserLoginInfo>())
             .Returns(IdentityResult.Success);
         _userManager.GetRolesAsync(existingUser).Returns(new List<string>());
+        _userManager.AddToRoleAsync(existingUser, Arg.Any<string>())
+            .Returns(IdentityResult.Success);
 
         var principal = CreatePrincipal("emailmatch@test.com", "Email Match Updated");
         var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "new-provider-key", "OIDC")
@@ -166,6 +178,61 @@ public class OidcUserProvisionerTests
         Assert.True(user.IsActive);
         Assert.Equal(existingUser.Id, user.Id);
         await _userManager.DidNotReceive().CreateAsync(Arg.Any<AppUser>());
+    }
+
+    [Fact]
+    public async Task NewOidcUser_GetsContributorRole()
+    {
+        _userManager.FindByLoginAsync("oidc-provider", "role-key")
+            .Returns((AppUser?)null);
+        _userManager.FindByEmailAsync("role@test.com")
+            .Returns((AppUser?)null);
+        var existingUsers = new[] { new AppUser { Id = Guid.NewGuid() } };
+        _userManager.Users.Returns(existingUsers.AsAsyncQueryable());
+        _userManager.CreateAsync(Arg.Any<AppUser>())
+            .Returns(IdentityResult.Success);
+        _userManager.AddLoginAsync(Arg.Any<AppUser>(), Arg.Any<UserLoginInfo>())
+            .Returns(IdentityResult.Success);
+        _userManager.GetRolesAsync(Arg.Any<AppUser>()).Returns(new List<string>());
+        _userManager.AddToRoleAsync(Arg.Any<AppUser>(), Arg.Any<string>())
+            .Returns(IdentityResult.Success);
+
+        var principal = CreatePrincipal("role@test.com", "Role Test");
+        var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "role-key", "OIDC")
+        {
+            Principal = principal
+        };
+
+        await _sut.ProvisionOrUpdateAsync(loginInfo);
+
+        await _userManager.Received(1).AddToRoleAsync(Arg.Any<AppUser>(), "Contributor");
+    }
+
+    [Fact]
+    public async Task ExistingOidcUser_WithRole_DoesNotGetDuplicate()
+    {
+        var existingUser = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "hasrole@test.com",
+            Email = "hasrole@test.com",
+            DisplayName = "Has Role",
+            IsActive = true
+        };
+
+        _userManager.FindByLoginAsync("oidc-provider", "hasrole-key")
+            .Returns(existingUser);
+        _userManager.GetRolesAsync(existingUser).Returns(new List<string> { "Contributor" });
+
+        var principal = CreatePrincipal("hasrole@test.com", "Has Role");
+        var loginInfo = new ExternalLoginInfo(principal, "oidc-provider", "hasrole-key", "OIDC")
+        {
+            Principal = principal
+        };
+
+        await _sut.ProvisionOrUpdateAsync(loginInfo);
+
+        await _userManager.DidNotReceive().AddToRoleAsync(existingUser, Arg.Any<string>());
     }
 
     private static ClaimsPrincipal CreatePrincipal(string email, string name)

@@ -6,6 +6,6 @@ internal record PaginatedResult<T>(IReadOnlyList<T> Items, int Page, int PageSiz
 
 internal record BulkDeleteResult(int DeletedCount);
 
-internal record UserItem(Guid Id, string DisplayName, string? Email, bool IsAdmin, bool IsActive, DateTimeOffset CreatedAt);
+internal record UserItem(Guid Id, string DisplayName, string? Email, string Role, bool IsActive, DateTimeOffset CreatedAt);
 
-internal record UserInfoResult(Guid Id, string Email, string DisplayName, IList<string> Roles, bool IsActive);
+internal record UserInfoResult(Guid Id, string Email, string DisplayName, string Role, bool IsActive);

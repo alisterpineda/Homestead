@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
 public static class CreatePartyEndpoint
@@ -10,6 +12,7 @@ public static class CreatePartyEndpoint
             return Results.Created($"/api/v1/documents/parties/{response.Id}", response);
         })
         .WithName("CreateParty")
-        .Produces<CreatePartyResponse>(StatusCodes.Status201Created);
+        .Produces<CreatePartyResponse>(StatusCodes.Status201Created)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

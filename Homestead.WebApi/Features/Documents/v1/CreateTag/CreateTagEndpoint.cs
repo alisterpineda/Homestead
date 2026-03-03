@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents.v1.CreateTag;
 
 public static class CreateTagEndpoint
@@ -10,6 +12,7 @@ public static class CreateTagEndpoint
             return Results.Created($"/api/v1/documents/tags/{response.Id}", response);
         })
         .WithName("CreateTag")
-        .Produces<CreateTagResponse>(StatusCodes.Status201Created);
+        .Produces<CreateTagResponse>(StatusCodes.Status201Created)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

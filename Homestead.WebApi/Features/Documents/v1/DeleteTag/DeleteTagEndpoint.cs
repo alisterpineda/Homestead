@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 
 namespace Homestead.WebApi.Features.Documents.v1.DeleteTag;
@@ -14,6 +15,7 @@ public static class DeleteTagEndpoint
         })
         .WithName("DeleteTag")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status404NotFound)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

@@ -57,24 +57,31 @@ public class OidcUserProvisioner(
             await userManager.UpdateAsync(user);
         }
 
-        await SyncAdminRoleAsync(user, loginInfo.Principal);
+        await SyncRoleAsync(user, loginInfo.Principal);
 
         return user;
     }
 
-    private async Task SyncAdminRoleAsync(AppUser user, ClaimsPrincipal principal)
+    private async Task SyncRoleAsync(AppUser user, ClaimsPrincipal principal)
     {
-        if (string.IsNullOrEmpty(_oidc.RoleClaimType) || string.IsNullOrEmpty(_oidc.AdminClaimValue))
-            return;
+        var currentRoles = await userManager.GetRolesAsync(user);
 
-        var hasAdminClaim = principal.FindAll(_oidc.RoleClaimType)
-            .Any(c => string.Equals(c.Value, _oidc.AdminClaimValue, StringComparison.OrdinalIgnoreCase));
-        var isAdmin = await userManager.IsInRoleAsync(user, "Admin");
+        // Sync Admin role from OIDC claims if configured
+        if (!string.IsNullOrEmpty(_oidc.RoleClaimType) && !string.IsNullOrEmpty(_oidc.AdminClaimValue))
+        {
+            var hasAdminClaim = principal.FindAll(_oidc.RoleClaimType)
+                .Any(c => string.Equals(c.Value, _oidc.AdminClaimValue, StringComparison.OrdinalIgnoreCase));
+            var isAdmin = currentRoles.Contains(nameof(AppRole.Admin));
 
-        if (hasAdminClaim && !isAdmin)
-            await userManager.AddToRoleAsync(user, "Admin");
-        else if (!hasAdminClaim && isAdmin)
-            await userManager.RemoveFromRoleAsync(user, "Admin");
+            if (hasAdminClaim && !isAdmin)
+                await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
+            else if (!hasAdminClaim && isAdmin)
+                await userManager.RemoveFromRoleAsync(user, nameof(AppRole.Admin));
+        }
+
+        // Ensure user has at least one app role (assign default if none)
+        if (!currentRoles.Any(r => AppRoles.All.Contains(r)))
+            await userManager.AddToRoleAsync(user, AppRoles.Default);
     }
 
     private static string BuildDisplayName(ClaimsPrincipal principal)

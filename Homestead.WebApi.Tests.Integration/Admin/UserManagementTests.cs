@@ -39,14 +39,14 @@ public class UserManagementTests : IntegrationTestBase
             email = "newuser@test.com",
             displayName = "New User",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
         Assert.Equal("newuser@test.com", body!.Email);
         Assert.Equal("New User", body.DisplayName);
-        Assert.False(body.IsAdmin);
+        Assert.Equal("Contributor", body.Role);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "badpw@test.com",
             displayName = "Bad PW",
             password = "short",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -75,7 +75,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "update-target@test.com",
             displayName = "Original",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -84,13 +84,13 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "updated@test.com",
             displayName = "Updated Name",
-            isAdmin = true
+            role = "Admin"
         }, CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
         Assert.Equal("Updated Name", body!.DisplayName);
-        Assert.True(body.IsAdmin);
+        Assert.Equal("Admin", body.Role);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "todelete@test.com",
             displayName = "Delete Me",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -120,7 +120,7 @@ public class UserManagementTests : IntegrationTestBase
 
         var usersResponse = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
         var users = await usersResponse.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>(CT);
-        var adminUser = users!.Items.First(u => u.IsAdmin);
+        var adminUser = users!.Items.First(u => u.Role == "Admin");
 
         var response = await client.DeleteAsync($"/api/v1/admin/users/{adminUser.Id}", CT);
 
@@ -137,7 +137,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "bulk1@test.com",
             displayName = "Bulk 1",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         var u1 = await r1.Content.ReadFromJsonAsync<UserItem>(CT);
 
@@ -146,7 +146,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "bulk2@test.com",
             displayName = "Bulk 2",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         var u2 = await r2.Content.ReadFromJsonAsync<UserItem>(CT);
 
@@ -180,7 +180,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "active-check@test.com",
             displayName = "Active Check",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -210,7 +210,7 @@ public class UserManagementTests : IntegrationTestBase
             email = "toggle-active@test.com",
             displayName = "Toggle Active",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -221,7 +221,7 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "toggle-active@test.com",
             displayName = "Toggle Active",
-            isAdmin = false,
+            role = "Contributor",
             isActive = false
         }, CT);
         Assert.Equal(HttpStatusCode.OK, deactivateResponse.StatusCode);
@@ -233,7 +233,7 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "toggle-active@test.com",
             displayName = "Toggle Active",
-            isAdmin = false,
+            role = "Contributor",
             isActive = true
         }, CT);
         Assert.Equal(HttpStatusCode.OK, activateResponse.StatusCode);

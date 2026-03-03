@@ -65,7 +65,7 @@ public class IsActiveTests : IntegrationTestBase
             email = "activate-target@test.com",
             displayName = "Activate Target",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -75,7 +75,7 @@ public class IsActiveTests : IntegrationTestBase
         {
             email = "activate-target@test.com",
             displayName = "Activate Target",
-            isAdmin = false,
+            role = "Contributor",
             isActive = false
         }, CT);
 
@@ -92,7 +92,7 @@ public class IsActiveTests : IntegrationTestBase
         {
             email = "activate-target@test.com",
             displayName = "Activate Target",
-            isAdmin = false,
+            role = "Contributor",
             isActive = true
         }, CT);
         activateResponse.EnsureSuccessStatusCode();
@@ -115,7 +115,7 @@ public class IsActiveTests : IntegrationTestBase
             email = "deactivate-target@test.com",
             displayName = "Deactivate Target",
             password = "Password123!",
-            isAdmin = false
+            role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -125,7 +125,7 @@ public class IsActiveTests : IntegrationTestBase
         {
             email = "deactivate-target@test.com",
             displayName = "Deactivate Target",
-            isAdmin = false,
+            role = "Contributor",
             isActive = false
         }, CT);
         deactivateResponse.EnsureSuccessStatusCode();

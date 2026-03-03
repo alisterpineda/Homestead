@@ -2,6 +2,8 @@ using Asp.Versioning.Builder;
 using Homestead.WebApi.Features.Processing.v1.GetProcessingJobs;
 using Homestead.WebApi.Features.Processing.v1.RetriggerProcessingJob;
 
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Processing;
 
 public static class ProcessingModule
@@ -13,7 +15,7 @@ public static class ProcessingModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Processing")
-            .RequireAuthorization();
+            .RequireAuthorization(AuthPolicies.RequireContributor);
 
         GetProcessingJobsEndpoint.Map(v1);
         RetriggerProcessingJobEndpoint.Map(v1);

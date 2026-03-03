@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocumentVersion;
@@ -21,6 +22,7 @@ public static class CreateDocumentVersionEndpoint
         .Produces<CreateDocumentVersionResponse>(StatusCodes.Status202Accepted)
         .Produces(StatusCodes.Status404NotFound)
         .DisableAntiforgery()
-        .Accepts<IFormFile>("multipart/form-data");
+        .Accepts<IFormFile>("multipart/form-data")
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

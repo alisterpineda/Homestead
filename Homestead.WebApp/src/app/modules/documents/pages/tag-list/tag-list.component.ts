@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '@/shared/services/auth.service';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -66,10 +67,12 @@ import { toast } from 'ngx-sonner';
               <h3 hlmEmptyTitle>No tags yet</h3>
               <p hlmEmptyDescription>Create your first tag to get started.</p>
             </div>
-            <app-create-tag-dialog (created)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              New Tag
-            </app-create-tag-dialog>
+            @if (auth.canWrite()) {
+              <app-create-tag-dialog (created)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                New Tag
+              </app-create-tag-dialog>
+            }
           </section>
         } @else {
           <div class="relative">
@@ -88,16 +91,18 @@ import { toast } from 'ngx-sonner';
                   />
                 </div>
                 <div class="ml-auto flex items-center gap-2">
-                  <app-create-tag-dialog triggerSize="sm" (created)="onRefresh()">
-                    <ng-icon hlm name="lucidePlus" size="sm" />
-                    New Tag
-                  </app-create-tag-dialog>
+                  @if (auth.canWrite()) {
+                    <app-create-tag-dialog triggerSize="sm" (created)="onRefresh()">
+                      <ng-icon hlm name="lucidePlus" size="sm" />
+                      New Tag
+                    </app-create-tag-dialog>
+                  }
                 </div>
               </div>
             </div>
 
             <!-- Selection toolbar -->
-            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection() || !auth.canWrite()" [class.pointer-events-none]="!hasSelection() || !auth.canWrite()">
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} tag{{ selectionCount() > 1 ? 's' : '' }} selected
               </span>
@@ -149,6 +154,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class TagListComponent {
+  auth = inject(AuthService);
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
 

@@ -67,6 +67,27 @@ public static class AuthenticationExtensions
                 policy.AddRequirements(new ActiveUserRequirement());
             });
 
+            options.AddPolicy(AuthPolicies.RequireAdmin, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ActiveUserRequirement());
+                policy.RequireRole(nameof(AppRole.Admin));
+            });
+
+            options.AddPolicy(AuthPolicies.RequireContributor, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ActiveUserRequirement());
+                policy.RequireRole(nameof(AppRole.Admin), nameof(AppRole.Contributor));
+            });
+
+            options.AddPolicy(AuthPolicies.RequireViewer, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ActiveUserRequirement());
+                policy.RequireRole(nameof(AppRole.Admin), nameof(AppRole.Contributor), nameof(AppRole.Viewer));
+            });
+
             options.DefaultPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddRequirements(new ActiveUserRequirement())

@@ -33,7 +33,6 @@ export class AppSwitcherComponent {
   private auth = inject(AuthService);
 
   visibleModules = computed(() => {
-    const roles = this.auth.roles();
-    return modules.filter((m) => !m.requiredRole || roles.includes(m.requiredRole));
+    return modules.filter((m) => !m.requiredRole || this.auth.hasRole(m.requiredRole));
   });
 }

@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
@@ -68,10 +69,12 @@ import { toast } from 'ngx-sonner';
               <h3 hlmEmptyTitle>No parties yet</h3>
               <p hlmEmptyDescription>Create your first party to get started.</p>
             </div>
-            <app-create-party-dialog (created)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              New Party
-            </app-create-party-dialog>
+            @if (auth.canWrite()) {
+              <app-create-party-dialog (created)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                New Party
+              </app-create-party-dialog>
+            }
           </section>
         } @else {
           <div class="relative">
@@ -79,16 +82,18 @@ import { toast } from 'ngx-sonner';
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-4">
                 <div class="ml-auto flex items-center gap-2">
-                  <app-create-party-dialog triggerSize="sm" (created)="onRefresh()">
-                    <ng-icon hlm name="lucidePlus" size="sm" />
-                    New Party
-                  </app-create-party-dialog>
+                  @if (auth.canWrite()) {
+                    <app-create-party-dialog triggerSize="sm" (created)="onRefresh()">
+                      <ng-icon hlm name="lucidePlus" size="sm" />
+                      New Party
+                    </app-create-party-dialog>
+                  }
                 </div>
               </div>
             </div>
 
             <!-- Selection toolbar -->
-            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection()" [class.pointer-events-none]="!hasSelection()">
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection() || !auth.canWrite()" [class.pointer-events-none]="!hasSelection() || !auth.canWrite()">
               <span class="text-sm text-muted-foreground">
                 {{ selectionCount() }} {{ selectionCount() > 1 ? 'parties' : 'party' }} selected
               </span>
@@ -148,6 +153,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class PartyListComponent {
+  auth = inject(AuthService);
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);

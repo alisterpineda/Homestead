@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
@@ -22,6 +23,7 @@ public static class PatchDocumentVersionEndpoint
         .Accepts<JsonPatchDocument<PatchDocumentVersionModel>>("application/json-patch+json")
         .Produces<PatchDocumentVersionResponse>()
         .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status404NotFound)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

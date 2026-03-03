@@ -20,7 +20,7 @@ public class GetUserInfoHandler(UserManager<AppUser> userManager)
             Id = user.Id,
             Email = user.Email!,
             DisplayName = user.DisplayName,
-            Roles = roles,
+            Role = AppRoles.Resolve(roles),
             IsActive = user.IsActive
         };
     }

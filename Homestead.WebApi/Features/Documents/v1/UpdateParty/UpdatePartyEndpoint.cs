@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
 public static class UpdatePartyEndpoint
@@ -18,6 +20,7 @@ public static class UpdatePartyEndpoint
         })
         .WithName("UpdateParty")
         .Produces<UpdatePartyResponse>()
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status404NotFound)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

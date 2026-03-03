@@ -28,7 +28,7 @@ public class RegisterTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, userInfoResponse.StatusCode);
 
         var userInfo = await userInfoResponse.Content.ReadFromJsonAsync<UserInfoResult>(CT);
-        Assert.Contains("Admin", userInfo!.Roles);
+        Assert.Equal("Admin", userInfo!.Role);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class RegisterTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<UserInfoResult>(CT);
         Assert.NotEmpty(body!.Email);
         Assert.NotEmpty(body.DisplayName);
-        Assert.Contains("Admin", body.Roles);
+        Assert.Equal("Admin", body.Role);
     }
 
     [Fact]
@@ -98,5 +98,5 @@ public class RegisterTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, userInfoResponse.StatusCode);
     }
 
-    private record UserInfoResult(Guid Id, string Email, string DisplayName, IList<string> Roles);
+    private record UserInfoResult(Guid Id, string Email, string DisplayName, string Role);
 }

@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
 public static class BulkDeleteDocumentsEndpoint
@@ -14,6 +16,7 @@ public static class BulkDeleteDocumentsEndpoint
         })
         .WithName("BulkDeleteDocuments")
         .Produces<BulkDeleteDocumentsResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces(StatusCodes.Status400BadRequest)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

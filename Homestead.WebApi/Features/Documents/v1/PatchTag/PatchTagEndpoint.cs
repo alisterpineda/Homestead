@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
@@ -22,6 +23,7 @@ public static class PatchTagEndpoint
         .Produces<PatchTagResponse>()
         .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
+        .Produces(StatusCodes.Status409Conflict)
+        .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

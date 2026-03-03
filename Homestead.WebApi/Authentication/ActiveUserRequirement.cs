@@ -11,6 +11,10 @@ public static class AuthPolicies
     public const string AuthenticatedOnly = "AuthenticatedOnly";
     public const string ActiveUser = "ActiveUser";
     public const string AccountInactiveError = "account_inactive";
+
+    public const string RequireAdmin = "RequireAdmin";
+    public const string RequireContributor = "RequireContributor";
+    public const string RequireViewer = "RequireViewer";
 }
 
 public class ActiveUserRequirement : IAuthorizationRequirement;

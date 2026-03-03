@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Features.Admin;
 using Homestead.WebApi.Features.Identity;
 using Homestead.WebApi.Features.Documents;
@@ -178,7 +179,7 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization();
+app.MapHub<ProcessingHub>("/hubs/processing").RequireAuthorization(AuthPolicies.RequireContributor);
 
 app.MapIdentityEndpoints();
 app.MapStatusEndpoints();
@@ -195,8 +196,22 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
     db.Database.Migrate();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-    if (!await roleManager.RoleExistsAsync("Admin"))
-        await roleManager.CreateAsync(new IdentityRole<Guid>("Admin"));
+    foreach (var role in AppRoles.All)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole<Guid>(role));
+    }
+
+    // Assign default role to any user without a role (one-time migration)
+    var usersWithoutRole = await db.Users
+        .Where(u => !db.UserRoles.Any(ur => ur.UserId == u.Id))
+        .ToListAsync();
+    if (usersWithoutRole.Count > 0)
+    {
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        foreach (var user in usersWithoutRole)
+            await userManager.AddToRoleAsync(user, AppRoles.Default);
+    }
 }
 
 // Configure the HTTP request pipeline.

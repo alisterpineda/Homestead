@@ -1,24 +1,29 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, computed, viewChild } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { BrnSelectImports } from '@spartan-ng/brain/select';
+import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createUser } from '@/api/generated/fn/admin/create-user';
+import type { AppRole } from '@/api/generated/models/app-role';
 import { toast } from 'ngx-sonner';
 
 @Component({
   selector: 'app-create-user-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     HlmDialogImports,
     HlmButton,
     HlmInput,
     HlmLabel,
-    HlmCheckboxImports,
+    BrnSelectImports,
+    HlmSelectImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -76,13 +81,19 @@ import { toast } from 'ngx-sonner';
               (input)="confirmPassword.set(asInputValue($event))"
             />
           </div>
-          <div class="flex items-center gap-2">
-            <hlm-checkbox
-              id="create-user-is-admin"
-              [checked]="isAdmin()"
-              (checkedChange)="isAdmin.set($event)"
-            />
-            <label hlmLabel for="create-user-is-admin">Administrator</label>
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Role</label>
+            <brn-select [ngModel]="role()" (ngModelChange)="role.set($event)">
+              <hlm-select-trigger class="w-full">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content>
+                <hlm-option value="Admin">Admin</hlm-option>
+                <hlm-option value="Contributor">Contributor</hlm-option>
+                <hlm-option value="Viewer">Viewer</hlm-option>
+                <hlm-option value="Guest">Guest</hlm-option>
+              </hlm-select-content>
+            </brn-select>
           </div>
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>
@@ -106,7 +117,7 @@ export class CreateUserDialogComponent {
   displayName = signal('');
   password = signal('');
   confirmPassword = signal('');
-  isAdmin = signal(false);
+  role = signal<AppRole>('Contributor');
   creating = signal(false);
   createError = signal('');
 
@@ -131,7 +142,7 @@ export class CreateUserDialogComponent {
       this.displayName.set('');
       this.password.set('');
       this.confirmPassword.set('');
-      this.isAdmin.set(false);
+      this.role.set('Contributor');
       this.creating.set(false);
       this.createError.set('');
     }
@@ -149,7 +160,7 @@ export class CreateUserDialogComponent {
         email: this.email().trim(),
         displayName: this.displayName().trim(),
         password: this.password(),
-        isAdmin: this.isAdmin(),
+        role: this.role(),
       },
     }).subscribe({
       next: () => {

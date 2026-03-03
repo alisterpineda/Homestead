@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,25 +23,50 @@ public class GetUsersHandler(AppDbContext db)
 
         var totalCount = await query.CountAsync(ct);
 
-        var adminRoleId = await db.Roles
-            .Where(r => r.Name == "Admin")
-            .Select(r => r.Id)
-            .FirstOrDefaultAsync(ct);
+        // Build a lookup of roleId -> roleName for app roles
+        var appRoles = await db.Roles
+            .Where(r => AppRoles.All.Contains(r.Name!))
+            .Select(r => new { r.Id, r.Name })
+            .ToListAsync(ct);
+        var roleIdToName = appRoles.ToDictionary(r => r.Id, r => r.Name!);
 
-        var items = await query
+        var users = await query
             .OrderBy(u => u.DisplayName)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(u => new UserResponse
+            .Select(u => new
+            {
+                u.Id,
+                u.DisplayName,
+                u.Email,
+                u.IsActive,
+                u.CreatedAt,
+                RoleIds = db.UserRoles
+                    .Where(ur => ur.UserId == u.Id)
+                    .Select(ur => ur.RoleId)
+                    .ToList()
+            })
+            .ToListAsync(ct);
+
+        var items = users.Select(u =>
+        {
+            var roleNames = u.RoleIds
+                .Where(roleIdToName.ContainsKey)
+                .Select(rid => roleIdToName[rid])
+                .ToList();
+
+            var role = AppRoles.Resolve(roleNames);
+
+            return new UserResponse
             {
                 Id = u.Id,
                 DisplayName = u.DisplayName,
                 Email = u.Email,
-                IsAdmin = db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == adminRoleId),
+                Role = role,
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt
-            })
-            .ToListAsync(ct);
+            };
+        }).ToList();
 
         return new PaginatedResponse<UserResponse>
         {

@@ -65,6 +65,7 @@ import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
+import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from 'ngx-sonner';
@@ -168,25 +169,27 @@ import { toast } from 'ngx-sonner';
             <ng-icon hlm name="lucideDownload" size="sm" />
             Download
           </button>
-          <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
-            <ng-icon hlm name="lucideSave" size="sm" />
-            {{ saving() ? 'Saving...' : 'Save' }}
-          </button>
-          <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
-            <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
-          </button>
-          <ng-template #moreMenu>
-            <hlm-dropdown-menu class="w-48">
-              <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
-                <ng-icon hlm name="lucideFilePlus2" size="sm" />
-                <span>Add Version</span>
-              </button>
-              <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
-                <ng-icon hlm name="lucideTrash2" size="sm" />
-                <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
-              </button>
-            </hlm-dropdown-menu>
-          </ng-template>
+          @if (auth.canWrite()) {
+            <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+              <ng-icon hlm name="lucideSave" size="sm" />
+              {{ saving() ? 'Saving...' : 'Save' }}
+            </button>
+            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
+              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+            </button>
+            <ng-template #moreMenu>
+              <hlm-dropdown-menu class="w-48">
+                <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
+                  <ng-icon hlm name="lucideFilePlus2" size="sm" />
+                  <span>Add Version</span>
+                </button>
+                <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
+                  <ng-icon hlm name="lucideTrash2" size="sm" />
+                  <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
+                </button>
+              </hlm-dropdown-menu>
+            </ng-template>
+          }
         </div>
       </div>
 
@@ -522,6 +525,7 @@ import { toast } from 'ngx-sonner';
   },
 })
 export class DocumentDetailPageComponent implements OnDestroy {
+  auth = inject(AuthService);
   editName = signal('');
   editTags = signal<string[]>([]);
   editParties = signal<PartyOption[]>([]);

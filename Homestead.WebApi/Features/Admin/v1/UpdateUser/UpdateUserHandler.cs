@@ -37,10 +37,15 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db
                     throw new IdentityValidationException(passwordResult.ToErrorDictionary());
             }
 
-            if (request.IsAdmin)
-                await userManager.AddToRoleAsync(user, "Admin");
-            else
-                await userManager.RemoveFromRoleAsync(user, "Admin");
+            var newRole = request.Role.ToString();
+            var currentRoles = await userManager.GetRolesAsync(user);
+            if (!currentRoles.Contains(newRole))
+            {
+                var rolesToRemove = currentRoles.Intersect(AppRoles.All).ToList();
+                if (rolesToRemove.Count > 0)
+                    await userManager.RemoveFromRolesAsync(user, rolesToRemove);
+                await userManager.AddToRoleAsync(user, newRole);
+            }
 
             await transaction.CommitAsync(ct);
 
@@ -49,7 +54,7 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db
                 Id = user.Id,
                 DisplayName = user.DisplayName,
                 Email = user.Email,
-                IsAdmin = request.IsAdmin,
+                Role = request.Role,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt
             };

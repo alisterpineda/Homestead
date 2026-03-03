@@ -8,15 +8,19 @@ import {
   inject,
   effect,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { BrnSelectImports } from '@spartan-ng/brain/select';
+import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateUser } from '@/api/generated/fn/admin/update-user';
 import type { UserResponse } from '@/api/generated/models/user-response';
+import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
@@ -24,11 +28,14 @@ import { toast } from 'ngx-sonner';
   selector: 'app-edit-user-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     HlmSheetImports,
     HlmButton,
     HlmLabel,
     HlmInput,
     HlmCheckboxImports,
+    BrnSelectImports,
+    HlmSelectImports,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -76,13 +83,19 @@ import { toast } from 'ngx-sonner';
               />
             </div>
 
-            <div class="flex items-center gap-2">
-              <hlm-checkbox
-                id="user-is-admin"
-                [checked]="editIsAdmin()"
-                (checkedChange)="editIsAdmin.set($event)"
-              />
-              <label hlmLabel for="user-is-admin">Administrator</label>
+            <div class="space-y-2">
+              <label hlmLabel>Role</label>
+              <brn-select [ngModel]="editRole()" (ngModelChange)="editRole.set($event)">
+                <hlm-select-trigger class="w-full">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content>
+                  <hlm-option value="Admin">Admin</hlm-option>
+                  <hlm-option value="Contributor">Contributor</hlm-option>
+                  <hlm-option value="Viewer">Viewer</hlm-option>
+                  <hlm-option value="Guest">Guest</hlm-option>
+                </hlm-select-content>
+              </brn-select>
             </div>
 
             <div class="flex items-center gap-2">
@@ -121,7 +134,7 @@ export class EditUserSheetComponent {
   editEmail = signal('');
   editDisplayName = signal('');
   editPassword = signal('');
-  editIsAdmin = signal(false);
+  editRole = signal<AppRole>('Contributor');
   editIsActive = signal(true);
   saving = signal(false);
 
@@ -131,7 +144,7 @@ export class EditUserSheetComponent {
     if (this.editEmail() !== (u.email ?? '')) return true;
     if (this.editDisplayName() !== u.displayName) return true;
     if (this.editPassword().length > 0) return true;
-    if (this.editIsAdmin() !== u.isAdmin) return true;
+    if (this.editRole() !== u.role) return true;
     if (this.editIsActive() !== u.isActive) return true;
     return false;
   });
@@ -146,7 +159,7 @@ export class EditUserSheetComponent {
         this.editEmail.set(u.email ?? '');
         this.editDisplayName.set(u.displayName);
         this.editPassword.set('');
-        this.editIsAdmin.set(u.isAdmin);
+        this.editRole.set(u.role);
         this.editIsActive.set(u.isActive);
       }
     });
@@ -174,7 +187,7 @@ export class EditUserSheetComponent {
         email: this.editEmail(),
         displayName: this.editDisplayName(),
         password: this.editPassword() || null,
-        isAdmin: this.editIsAdmin(),
+        role: this.editRole(),
         isActive: this.editIsActive(),
       },
     }).subscribe({

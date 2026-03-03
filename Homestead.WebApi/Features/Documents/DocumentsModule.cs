@@ -25,6 +25,8 @@ using Homestead.WebApi.Features.Documents.v1.GetTags;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 using Homestead.WebApi.Features.Documents.v1.PatchTag;
 
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Documents;
 
 public static class DocumentsModule
@@ -36,7 +38,7 @@ public static class DocumentsModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Documents")
-            .RequireAuthorization();
+            .RequireAuthorization(AuthPolicies.RequireViewer);
 
         BulkDeleteDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);

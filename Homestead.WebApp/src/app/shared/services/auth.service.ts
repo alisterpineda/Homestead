@@ -5,6 +5,10 @@ import { firstValueFrom } from 'rxjs';
 import { GetStatusResponse } from '@/api/generated/models/get-status-response';
 import { GetUserInfoResponse } from '@/api/generated/models/get-user-info-response';
 import { OidcStatusResponse } from '@/api/generated/models/oidc-status-response';
+import type { AppRole } from '@/api/generated/models/app-role';
+
+/** Role hierarchy levels — higher number = more access. */
+const ROLE_LEVEL: Record<string, number> = { Admin: 3, Contributor: 2, Viewer: 1, Guest: 0 };
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -17,8 +21,17 @@ export class AuthService {
   readonly isActive = signal(true);
   readonly userName = signal('');
   readonly userEmail = signal('');
-  readonly roles = signal<string[]>([]);
-  readonly isAdmin = computed(() => this.roles().includes('Admin'));
+  readonly role = signal<AppRole | ''>('');
+  readonly isAdmin = computed(() => this.role() === 'Admin');
+  readonly canWrite = computed(() => this.roleLevel() >= ROLE_LEVEL['Contributor']);
+  readonly canRead = computed(() => this.roleLevel() >= ROLE_LEVEL['Viewer']);
+
+  private roleLevel = computed(() => ROLE_LEVEL[this.role()] ?? -1);
+
+  /** Whether the user's role meets or exceeds the required role. */
+  hasRole(required: string): boolean {
+    return (ROLE_LEVEL[this.role()] ?? -1) >= (ROLE_LEVEL[required] ?? Infinity);
+  }
 
   private readonly oidcStatus = signal<OidcStatusResponse | null>(null);
   readonly oidcEnabled = computed(() => this.oidcStatus() !== null);
@@ -80,7 +93,7 @@ export class AuthService {
     this.isActive.set(true);
     this.userName.set('');
     this.userEmail.set('');
-    this.roles.set([]);
+    this.role.set('');
     this.router.navigate(['/login']);
   }
 
@@ -96,6 +109,6 @@ export class AuthService {
     this.isActive.set(user.isActive);
     this.userName.set(user.displayName || user.email);
     this.userEmail.set(user.email);
-    this.roles.set(user.roles ?? []);
+    this.role.set(user.role);
   }
 }
