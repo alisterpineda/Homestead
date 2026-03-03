@@ -127,6 +127,38 @@ public class DocumentCrudTests : IntegrationTestBase
         Assert.Equal(2, body!.DeletedCount);
     }
 
+    [Fact]
+    public async Task BulkDeleteDocuments_WithInaccessibleDoc_Returns403()
+    {
+        var adminClient = await CreateAdminClientAsync();
+
+        // Create two groups — contributor is a member of one but not the other
+        var accessibleGroupId = await CreateGroupAsync(adminClient, "Accessible Group");
+        var restrictedGroupId = await CreateGroupAsync(adminClient, "Restricted Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId: accessibleGroupId, contributorId, "Editor");
+
+        var accessibleDocId = await UploadAndWaitAsync(contributorClient, "accessible.pdf", accessibleGroupId);
+        var restrictedDocId = await UploadAndWaitAsync(adminClient, "restricted.pdf", restrictedGroupId);
+
+        // Bulk delete both — should fail with 403 because one is inaccessible
+        var response = await contributorClient.PostAsJsonAsync("/api/v1/documents/bulk-delete", new
+        {
+            ids = new[] { accessibleDocId, restrictedDocId }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        // Verify neither document was deleted
+        var checkAccessible = await adminClient.GetAsync($"/api/v1/documents/{accessibleDocId}", CT);
+        Assert.Equal(HttpStatusCode.OK, checkAccessible.StatusCode);
+
+        var checkRestricted = await adminClient.GetAsync($"/api/v1/documents/{restrictedDocId}", CT);
+        Assert.Equal(HttpStatusCode.OK, checkRestricted.StatusCode);
+    }
+
     private async Task<HttpResponseMessage> UploadDocumentAsync(HttpClient client, string name = "sample.pdf")
     {
         var fileBytes = await GetUniquePdfBytesAsync();

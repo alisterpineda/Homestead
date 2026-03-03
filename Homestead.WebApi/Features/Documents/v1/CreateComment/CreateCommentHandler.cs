@@ -22,7 +22,7 @@ public class CreateCommentHandler(
         if (!documentExists)
             throw new NotFoundException("Document not found.");
 
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Read);
+        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Write);
 
         if (string.IsNullOrWhiteSpace(request.Body))
             throw new BadRequestException("Comment body cannot be empty.");

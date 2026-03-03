@@ -333,6 +333,57 @@ public class GroupDocumentAccessTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // --- Comment access checks ---
+
+    [Fact]
+    public async Task ContributorAsGroupViewer_CannotCommentOnGroupDoc()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Comment Viewer Group");
+        var docId = await UploadAndWaitAsync(adminClient, "comment-viewer.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var response = await contributorClient.PostAsJsonAsync(
+            $"/api/v1/documents/{docId}/comments", new { body = "Should be denied" }, CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // --- Delete access checks ---
+
+    [Fact]
+    public async Task NonMember_CannotDeleteGroupDocument()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Delete Restricted Group");
+        var docId = await UploadAndWaitAsync(adminClient, "delete-restricted.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/{docId}", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ContributorAsGroupViewer_CannotDeleteGroupDoc()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Delete Viewer Group");
+        var docId = await UploadAndWaitAsync(adminClient, "delete-viewer.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/{docId}", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // --- Helper methods ---
 
     private async Task UploadVersionAsync(HttpClient client, Guid docId)

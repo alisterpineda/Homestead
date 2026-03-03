@@ -36,7 +36,10 @@ public class DocumentAuthorizationHandler(AppDbContext db, IHttpContextAccessor 
             .FirstOrDefaultAsync(ct);
 
         if (document is null)
+        {
+            context.Fail();
             return;
+        }
 
         // Global document (GroupId is null)
         if (document.GroupId is null)
