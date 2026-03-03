@@ -12,3 +12,4 @@
 *.sln.DotSettings
 .idea/
 .vscode/
+Homestead.E2E/

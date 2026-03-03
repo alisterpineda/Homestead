@@ -1,0 +1,92 @@
+x-homestead-base: &homestead-base
+  image: homestead:e2e
+  pull_policy: never
+  depends_on:
+    postgres:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+    interval: 5s
+    timeout: 5s
+    start_period: 15s
+    retries: 10
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: e2e-test-password
+      POSTGRES_DB: homestead_local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ../Homestead.AppHost/KeycloakRealms:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 10s
+      start_period: 60s
+      retries: 15
+
+  homestead-local:
+    <<: *homestead-base
+    ports: ["3101:8080"]
+    environment:
+      DB_HOST: postgres
+      DB_NAME: homestead_local
+      DB_PASSWORD: e2e-test-password
+
+  homestead-oidc-local:
+    <<: *homestead-base
+    ports: ["3102:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DB_HOST: postgres
+      DB_NAME: homestead_oidc_local
+      DB_PASSWORD: e2e-test-password
+      OIDC_AUTHORITY: http://keycloak:8080/realms/homestead
+      OIDC_CLIENT_ID: homestead-app
+      OIDC_CLIENT_SECRET: homestead-dev-secret
+      OIDC_DISPLAY_NAME: Keycloak
+      OIDC_ROLE_CLAIM: groups
+      OIDC_ADMIN_CLAIM_VALUE: homestead-admin
+
+  homestead-oidc-only:
+    <<: *homestead-base
+    ports: ["3103:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DB_HOST: postgres
+      DB_NAME: homestead_oidc_only
+      DB_PASSWORD: e2e-test-password
+      OIDC_AUTHORITY: http://keycloak:8080/realms/homestead
+      OIDC_CLIENT_ID: homestead-app
+      OIDC_CLIENT_SECRET: homestead-dev-secret
+      OIDC_DISPLAY_NAME: Keycloak
+      OIDC_ROLE_CLAIM: groups
+      OIDC_ADMIN_CLAIM_VALUE: homestead-admin
+      OIDC_DISABLE_LOCAL_LOGIN: "true"
