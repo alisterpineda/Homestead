@@ -7,7 +7,8 @@ public static class CreateGroupEndpoint
         group.MapPost("/", async (CreateGroupRequest request,
             CreateGroupHandler handler, CancellationToken ct) =>
         {
-            return await handler.HandleAsync(request, ct);
+            var response = await handler.HandleAsync(request, ct);
+            return Results.Created($"/api/v1/admin/groups/{response.Id}", response);
         })
         .WithName("CreateGroup")
         .Produces<GroupResponse>(StatusCodes.Status201Created)

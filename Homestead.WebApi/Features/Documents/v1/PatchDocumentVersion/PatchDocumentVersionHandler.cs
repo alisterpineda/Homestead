@@ -10,20 +10,20 @@ namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
 public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentAccessService accessService)
-    : ICommandHandler<PatchDocumentVersionCommand, IResult>
+    : ICommandHandler<PatchDocumentVersionCommand, PatchDocumentVersionResponse>
 {
-    public async Task<IResult> HandleAsync(PatchDocumentVersionCommand request, CancellationToken ct)
+    public async Task<PatchDocumentVersionResponse> HandleAsync(PatchDocumentVersionCommand request, CancellationToken ct)
     {
         var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Write, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
-            return Results.NotFound();
+            throw new NotFoundException("Document version not found.");
 
         var before = DocumentVersionSnapshot.From(version);
 
@@ -39,14 +39,11 @@ public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor c
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            return Results.BadRequest(new
+            throw new BadRequestException(errors.Select(e => new
             {
-                Errors = errors.Select(e => new
-                {
-                    Operation = e.Operation?.ToString(),
-                    e.ErrorMessage
-                })
-            });
+                Operation = e.Operation?.ToString(),
+                e.ErrorMessage
+            }));
 
         // Update entity from patched model
         version.Label = model.Label;
@@ -61,7 +58,7 @@ public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor c
 
         await searchVectorUpdater.UpdateSearchVectorAsync(version.DocumentId, ct);
 
-        return Results.Ok(new PatchDocumentVersionResponse
+        return new PatchDocumentVersionResponse
         {
             Id = version.Id,
             VersionNumber = version.VersionNumber,
@@ -70,6 +67,6 @@ public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor c
             FileSize = version.FileSize,
             FileExtension = version.FileExtension,
             CreatedAt = version.CreatedAt
-        });
+        };
     }
 }

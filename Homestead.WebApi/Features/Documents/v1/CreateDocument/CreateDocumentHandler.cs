@@ -12,20 +12,20 @@ namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentAccessService accessService)
-    : ICommandHandler<CreateDocumentRequest, IResult>
+    : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
-    public async Task<IResult> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
+    public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
     {
         // Validate GroupId if provided
         if (request.GroupId.HasValue)
         {
             var groupExists = await db.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
             if (!groupExists)
-                return Results.BadRequest(new { Error = "Group not found." });
+                throw new BadRequestException("Group not found.");
 
             var canWrite = await accessService.CanWriteToGroupAsync(request.GroupId.Value, ct);
             if (!canWrite)
-                return Results.Forbid();
+                throw new ForbiddenAccessException();
         }
 
         var file = request.File;
@@ -63,6 +63,6 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
             opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);
 
-        return Results.Accepted(null, new CreateDocumentResponse { JobId = jobId });
+        return new CreateDocumentResponse { JobId = jobId };
     }
 }

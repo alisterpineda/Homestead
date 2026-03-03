@@ -8,7 +8,7 @@ public static class UpdateGroupEndpoint
             UpdateGroupHandler handler, CancellationToken ct) =>
         {
             var command = new UpdateGroupCommand { Id = id, Request = request };
-            return await handler.HandleAsync(command, ct);
+            return Results.Ok(await handler.HandleAsync(command, ct));
         })
         .WithName("UpdateGroup")
         .Produces<GroupResponse>()

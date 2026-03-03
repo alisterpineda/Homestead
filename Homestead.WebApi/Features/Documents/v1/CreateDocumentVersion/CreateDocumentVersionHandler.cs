@@ -16,17 +16,17 @@ public class CreateDocumentVersionHandler(
     ICurrentUserAccessor currentUser,
     IJobQueue jobQueue,
     IDocumentAccessService accessService)
-    : ICommandHandler<CreateDocumentVersionRequest, IResult>
+    : ICommandHandler<CreateDocumentVersionRequest, CreateDocumentVersionResponse>
 {
-    public async Task<IResult> HandleAsync(CreateDocumentVersionRequest request, CancellationToken ct)
+    public async Task<CreateDocumentVersionResponse> HandleAsync(CreateDocumentVersionRequest request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
-            return Results.NotFound();
+            throw new NotFoundException("Document not found.");
 
         var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Write, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);
@@ -63,6 +63,6 @@ public class CreateDocumentVersionHandler(
             opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);
 
-        return Results.Accepted(null, new CreateDocumentVersionResponse { JobId = jobId });
+        return new CreateDocumentVersionResponse { JobId = jobId };
     }
 }

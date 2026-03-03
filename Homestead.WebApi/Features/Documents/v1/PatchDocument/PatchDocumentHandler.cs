@@ -12,13 +12,13 @@ namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver,
     IDocumentAccessService accessService)
-    : ICommandHandler<PatchDocumentCommand, IResult>
+    : ICommandHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
-    public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
+    public async Task<PatchDocumentResponse> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
     {
         var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Write, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
@@ -26,7 +26,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
 
         if (document is null)
-            return Results.NotFound();
+            throw new NotFoundException("Document not found.");
 
         var before = DocumentSnapshot.From(document);
 
@@ -47,18 +47,15 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            return Results.BadRequest(new
+            throw new BadRequestException(errors.Select(e => new
             {
-                Errors = errors.Select(e => new
-                {
-                    Operation = e.Operation?.ToString(),
-                    e.ErrorMessage
-                })
-            });
+                Operation = e.Operation?.ToString(),
+                e.ErrorMessage
+            }));
 
         // Validate
         if (string.IsNullOrWhiteSpace(model.Name))
-            return Results.BadRequest(new { Error = "Name is required." });
+            throw new BadRequestException("Name is required.");
 
         // Validate party IDs
         if (model.PartyIds.Count > 0)
@@ -71,7 +68,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             var invalidIds = model.PartyIds.Except(existingPartyIds).ToList();
 
             if (invalidIds.Count > 0)
-                return Results.BadRequest(new { InvalidPartyIds = invalidIds });
+                throw new BadRequestException("One or more party IDs are invalid.");
         }
 
         // Validate GroupId if changed
@@ -79,11 +76,11 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         {
             var groupExists = await db.Groups.AnyAsync(g => g.Id == model.GroupId.Value, ct);
             if (!groupExists)
-                return Results.BadRequest(new { Error = "Group not found." });
+                throw new BadRequestException("Group not found.");
 
             var canWriteToGroup = await accessService.CanWriteToGroupAsync(model.GroupId.Value, ct);
             if (!canWriteToGroup)
-                return Results.Forbid();
+                throw new ForbiddenAccessException();
         }
 
         // Update entity from patched model
@@ -188,7 +185,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             .OrderByDescending(r => r.VersionNumber)
             .FirstAsync(ct);
 
-        return Results.Ok(new PatchDocumentResponse
+        return new PatchDocumentResponse
         {
             Id = document.Id,
             Name = document.Name,
@@ -208,7 +205,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             GroupName = groupName,
             Tags = tags,
             Parties = parties
-        });
+        };
     }
 
 }

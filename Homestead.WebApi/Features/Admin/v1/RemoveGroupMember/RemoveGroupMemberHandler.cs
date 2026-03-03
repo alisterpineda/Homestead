@@ -5,20 +5,20 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.RemoveGroupMember;
 
 public class RemoveGroupMemberHandler(AppDbContext db)
-    : ICommandHandler<RemoveGroupMemberCommand, IResult>
+    : ICommandHandler<RemoveGroupMemberCommand, bool>
 {
-    public async Task<IResult> HandleAsync(RemoveGroupMemberCommand command, CancellationToken ct)
+    public async Task<bool> HandleAsync(RemoveGroupMemberCommand command, CancellationToken ct)
     {
         var member = await db.GroupMembers
             .FirstOrDefaultAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.UserId, ct);
 
         if (member is null)
-            return Results.NotFound();
+            throw new NotFoundException("Group member not found.");
 
         db.GroupMembers.Remove(member);
         await db.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        return true;
     }
 }
 

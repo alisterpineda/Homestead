@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
 public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessService)
-    : IQueryHandler<GetActivityRequest, IResult>
+    : IQueryHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
@@ -23,12 +23,12 @@ public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessSe
         ["ExtractedText"] = "extracted text"
     };
 
-    public async Task<IResult> HandleAsync(
+    public async Task<PaginatedResponse<GetActivityResponse>> HandleAsync(
         GetActivityRequest request, CancellationToken ct)
     {
         var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Read, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         var auditRows = await db.AuditLogs
             .AsNoTracking()
@@ -97,13 +97,13 @@ public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessSe
             .Take(request.PageSize)
             .ToList();
 
-        return Results.Ok(new PaginatedResponse<GetActivityResponse>
+        return new PaginatedResponse<GetActivityResponse>
         {
             Items = paged,
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
-        });
+        };
     }
 
     private static string GenerateSummary(string entityType, AuditAction action, string? changes, string userName)

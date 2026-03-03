@@ -12,20 +12,20 @@ public class CreateCommentHandler(
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger,
     IDocumentAccessService accessService)
-    : ICommandHandler<CreateCommentRequest, IResult>
+    : ICommandHandler<CreateCommentRequest, CreateCommentResponse>
 {
-    public async Task<IResult> HandleAsync(CreateCommentRequest request, CancellationToken ct)
+    public async Task<CreateCommentResponse> HandleAsync(CreateCommentRequest request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
-            return Results.NotFound();
+            throw new NotFoundException("Document not found.");
 
         var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Read, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         if (string.IsNullOrWhiteSpace(request.Body))
-            return Results.BadRequest("Comment body cannot be empty.");
+            throw new BadRequestException("Comment body cannot be empty.");
 
         var userId = currentUser.UserId;
 
@@ -43,14 +43,12 @@ public class CreateCommentHandler(
 
         await db.SaveChangesAsync(ct);
 
-        var response = new CreateCommentResponse
+        return new CreateCommentResponse
         {
             Id = comment.Id,
             Body = comment.Body,
             CreatedAt = comment.CreatedAt,
             CreatedByUserId = comment.CreatedByUserId
         };
-
-        return Results.Created($"/api/v1/documents/{request.DocumentId}/comments/{comment.Id}", response);
     }
 }

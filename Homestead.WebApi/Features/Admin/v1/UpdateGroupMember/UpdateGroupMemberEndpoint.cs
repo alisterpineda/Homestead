@@ -13,7 +13,7 @@ public static class UpdateGroupMemberEndpoint
                 UserId = userId,
                 Request = request
             };
-            return await handler.HandleAsync(command, ct);
+            return Results.Ok(await handler.HandleAsync(command, ct));
         })
         .WithName("UpdateGroupMember")
         .Produces<GroupMemberResponse>()

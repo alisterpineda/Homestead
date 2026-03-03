@@ -16,7 +16,8 @@ public static class CreateDocumentVersionEndpoint
                 Label = label,
                 File = file
             };
-            return await handler.HandleAsync(request, ct);
+            var response = await handler.HandleAsync(request, ct);
+            return Results.Accepted(null, response);
         })
         .WithName("CreateDocumentVersion")
         .Produces<CreateDocumentVersionResponse>(StatusCodes.Status202Accepted)

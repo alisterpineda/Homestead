@@ -9,27 +9,27 @@ namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentAccessService accessService)
-    : ICommandHandler<DeleteDocumentVersionRequest, IResult>
+    : ICommandHandler<DeleteDocumentVersionRequest, bool>
 {
-    public async Task<IResult> HandleAsync(DeleteDocumentVersionRequest request, CancellationToken ct)
+    public async Task<bool> HandleAsync(DeleteDocumentVersionRequest request, CancellationToken ct)
     {
         var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Write, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
-            return Results.NotFound();
+            throw new NotFoundException("Document version not found.");
 
         // Prevent deleting the last version
         var versionCount = await db.DocumentVersions
             .CountAsync(r => r.DocumentId == request.DocumentId, ct);
 
         if (versionCount <= 1)
-            return Results.BadRequest("Cannot delete the last version of a document.");
+            throw new BadRequestException("Cannot delete the last version of a document.");
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
@@ -53,6 +53,6 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
         if (File.Exists(physicalPath))
             File.Delete(physicalPath);
 
-        return Results.NoContent();
+        return true;
     }
 }

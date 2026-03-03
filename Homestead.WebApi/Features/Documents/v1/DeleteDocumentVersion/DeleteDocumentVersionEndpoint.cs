@@ -10,7 +10,8 @@ public static class DeleteDocumentVersionEndpoint
             DeleteDocumentVersionHandler handler, CancellationToken ct) =>
         {
             var request = new DeleteDocumentVersionRequest(documentId, id);
-            return await handler.HandleAsync(request, ct);
+            await handler.HandleAsync(request, ct);
+            return Results.NoContent();
         })
         .WithName("DeleteDocumentVersion")
         .Produces(StatusCodes.Status204NoContent)

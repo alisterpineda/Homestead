@@ -6,15 +6,15 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
 public class GetDocumentHandler(AppDbContext db, IDocumentAccessService accessService)
-    : IQueryHandler<GetDocumentRequest, IResult>
+    : IQueryHandler<GetDocumentRequest, GetDocumentResponse?>
 {
-    public async Task<IResult> HandleAsync(GetDocumentRequest request, CancellationToken ct)
+    public async Task<GetDocumentResponse?> HandleAsync(GetDocumentRequest request, CancellationToken ct)
     {
         var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Read, ct);
         if (!access.IsAllowed)
-            return Results.Forbid();
+            throw new ForbiddenAccessException();
 
-        var response = await db.Documents
+        return await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
             .Select(d => new
@@ -95,7 +95,5 @@ public class GetDocumentHandler(AppDbContext db, IDocumentAccessService accessSe
                 Parties = d.Parties
             })
             .FirstOrDefaultAsync(ct);
-
-        return response is not null ? Results.Ok(response) : Results.NotFound();
     }
 }

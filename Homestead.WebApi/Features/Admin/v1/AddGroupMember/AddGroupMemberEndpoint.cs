@@ -8,7 +8,8 @@ public static class AddGroupMemberEndpoint
             AddGroupMemberHandler handler, CancellationToken ct) =>
         {
             var command = new AddGroupMemberCommand { GroupId = id, Request = request };
-            return await handler.HandleAsync(command, ct);
+            var response = await handler.HandleAsync(command, ct);
+            return Results.Created($"/api/v1/admin/groups/{id}/members/{response.UserId}", response);
         })
         .WithName("AddGroupMember")
         .Produces<GroupMemberResponse>(StatusCodes.Status201Created)

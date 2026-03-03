@@ -17,7 +17,7 @@ public static class PatchDocumentVersionEndpoint
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return await handler.HandleAsync(command, ct);
+            return Results.Ok(await handler.HandleAsync(command, ct));
         })
         .WithName("PatchDocumentVersion")
         .Accepts<JsonPatchDocument<PatchDocumentVersionModel>>("application/json-patch+json")

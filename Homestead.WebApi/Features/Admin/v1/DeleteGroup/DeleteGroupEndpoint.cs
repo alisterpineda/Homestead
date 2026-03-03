@@ -7,7 +7,8 @@ public static class DeleteGroupEndpoint
         group.MapDelete("/{id:guid}", async (Guid id,
             DeleteGroupHandler handler, CancellationToken ct) =>
         {
-            return await handler.HandleAsync(id, ct);
+            await handler.HandleAsync(new DeleteGroupRequest(id), ct);
+            return Results.NoContent();
         })
         .WithName("DeleteGroup")
         .Produces(StatusCodes.Status204NoContent)

@@ -7,18 +7,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.CreateGroup;
 
 public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : ICommandHandler<CreateGroupRequest, IResult>
+    : ICommandHandler<CreateGroupRequest, GroupResponse>
 {
-    public async Task<IResult> HandleAsync(CreateGroupRequest request, CancellationToken ct)
+    public async Task<GroupResponse> HandleAsync(CreateGroupRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-            return Results.BadRequest(new { Error = "Name is required." });
+            throw new BadRequestException("Name is required.");
 
         var nameExists = await db.Groups
             .AnyAsync(g => g.Name == request.Name.Trim(), ct);
 
         if (nameExists)
-            return Results.Conflict(new { Error = "A group with this name already exists." });
+            throw new ConflictException("A group with this name already exists.");
 
         var userId = currentUser.UserId;
 
@@ -50,7 +50,7 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
             ? await db.Users.Where(u => u.Id == userId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)
             : null;
 
-        return Results.Created($"/api/v1/admin/groups/{group.Id}", new GroupResponse
+        return new GroupResponse
         {
             Id = group.Id,
             Name = group.Name,
@@ -59,6 +59,6 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
             CreatedByUserId = group.CreatedByUserId,
             CreatedByUserName = creatorName,
             MemberCount = userId.HasValue ? 1 : 0
-        });
+        };
     }
 }

@@ -7,15 +7,15 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
 public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessService)
-    : ICommandHandler<PatchTagCommand, IResult>
+    : ICommandHandler<PatchTagCommand, PatchTagResponse>
 {
-    public async Task<IResult> HandleAsync(PatchTagCommand request, CancellationToken ct)
+    public async Task<PatchTagResponse> HandleAsync(PatchTagCommand request, CancellationToken ct)
     {
         var tag = await db.Tags
             .FirstOrDefaultAsync(t => t.Id == request.Id, ct);
 
         if (tag is null)
-            return Results.NotFound();
+            throw new NotFoundException("Tag not found.");
 
         // Block modification if the tag (or its descendants) is used on inaccessible documents
         var subtreeTagIds = db.Tags
@@ -45,27 +45,24 @@ public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessServi
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            return Results.BadRequest(new
+            throw new BadRequestException(errors.Select(e => new
             {
-                Errors = errors.Select(e => new
-                {
-                    Operation = e.Operation?.ToString(),
-                    e.ErrorMessage
-                })
-            });
+                Operation = e.Operation?.ToString(),
+                e.ErrorMessage
+            }));
 
         // Validate name
         if (string.IsNullOrWhiteSpace(model.Name))
-            return Results.BadRequest(new { Error = "Tag name cannot be empty." });
+            throw new BadRequestException("Tag name cannot be empty.");
 
         if (model.Name.Contains('/'))
-            return Results.BadRequest(new { Error = "Tag name cannot contain '/' characters." });
+            throw new BadRequestException("Tag name cannot contain '/' characters.");
 
         var normalizedName = model.Name.Trim().ToLowerInvariant();
 
         // Validate parent
         if (model.ParentId == request.Id)
-            return Results.BadRequest(new { Error = "A tag cannot be its own parent." });
+            throw new BadRequestException("A tag cannot be its own parent.");
 
         string? parentPath = null;
         if (model.ParentId is not null)
@@ -74,11 +71,11 @@ public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessServi
                 .FirstOrDefaultAsync(t => t.Id == model.ParentId, ct);
 
             if (parent is null)
-                return Results.BadRequest(new { Error = "Parent tag not found." });
+                throw new BadRequestException("Parent tag not found.");
 
             // Check for circular reference: new parent must not be a descendant of this tag
             if (parent.Path.StartsWith(oldPath + "/") || parent.Path == oldPath)
-                return Results.BadRequest(new { Error = "Cannot move a tag under one of its own descendants." });
+                throw new BadRequestException("Cannot move a tag under one of its own descendants.");
 
             parentPath = parent.Path;
         }
@@ -103,7 +100,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessServi
                 .AnyAsync(t => t.Path == newPath && t.Id != request.Id, ct);
 
             if (conflictExists)
-                return Results.Conflict(new { Error = $"A tag with path '{newPath}' already exists." });
+                throw new ConflictException($"A tag with path '{newPath}' already exists.");
 
             tag.Path = newPath;
 
@@ -120,13 +117,13 @@ public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessServi
 
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new PatchTagResponse
+        return new PatchTagResponse
         {
             Id = tag.Id,
             Name = tag.Name,
             Path = tag.Path,
             ParentId = tag.ParentId,
             Color = tag.Color
-        });
+        };
     }
 }

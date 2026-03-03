@@ -8,7 +8,8 @@ public static class RemoveGroupMemberEndpoint
             RemoveGroupMemberHandler handler, CancellationToken ct) =>
         {
             var command = new RemoveGroupMemberCommand { GroupId = id, UserId = userId };
-            return await handler.HandleAsync(command, ct);
+            await handler.HandleAsync(command, ct);
+            return Results.NoContent();
         })
         .WithName("RemoveGroupMember")
         .Produces(StatusCodes.Status204NoContent)

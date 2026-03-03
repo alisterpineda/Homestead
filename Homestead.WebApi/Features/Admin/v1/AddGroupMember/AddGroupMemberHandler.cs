@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.AddGroupMember;
 
 public class AddGroupMemberHandler(AppDbContext db)
-    : ICommandHandler<AddGroupMemberCommand, IResult>
+    : ICommandHandler<AddGroupMemberCommand, GroupMemberResponse>
 {
-    public async Task<IResult> HandleAsync(AddGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> HandleAsync(AddGroupMemberCommand command, CancellationToken ct)
     {
         var groupExists = await db.Groups.AnyAsync(g => g.Id == command.GroupId, ct);
         if (!groupExists)
-            return Results.NotFound();
+            throw new NotFoundException("Group not found.");
 
         var user = await db.Users
             .AsNoTracking()
@@ -21,16 +21,16 @@ public class AddGroupMemberHandler(AppDbContext db)
             .FirstOrDefaultAsync(ct);
 
         if (user is null)
-            return Results.BadRequest(new { Error = "User not found." });
+            throw new BadRequestException("User not found.");
 
         if (!user.IsActive)
-            return Results.BadRequest(new { Error = "User is not active." });
+            throw new BadRequestException("User is not active.");
 
         var alreadyMember = await db.GroupMembers
             .AnyAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.Request.UserId, ct);
 
         if (alreadyMember)
-            return Results.Conflict(new { Error = "User is already a member of this group." });
+            throw new ConflictException("User is already a member of this group.");
 
         db.GroupMembers.Add(new GroupMember
         {
@@ -41,13 +41,13 @@ public class AddGroupMemberHandler(AppDbContext db)
 
         await db.SaveChangesAsync(ct);
 
-        return Results.Created($"/api/v1/admin/groups/{command.GroupId}/members/{user.Id}", new GroupMemberResponse
+        return new GroupMemberResponse
         {
             UserId = user.Id,
             DisplayName = user.DisplayName,
             Email = user.Email,
             AccessLevel = command.Request.AccessLevel
-        });
+        };
     }
 }
 

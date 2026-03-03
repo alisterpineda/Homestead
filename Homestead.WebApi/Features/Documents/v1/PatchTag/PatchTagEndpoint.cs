@@ -16,7 +16,7 @@ public static class PatchTagEndpoint
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return await handler.HandleAsync(command, ct);
+            return Results.Ok(await handler.HandleAsync(command, ct));
         })
         .WithName("PatchTag")
         .Accepts<JsonPatchDocument<PatchTagModel>>("application/json-patch+json")

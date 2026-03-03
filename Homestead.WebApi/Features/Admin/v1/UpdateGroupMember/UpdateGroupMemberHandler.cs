@@ -5,27 +5,27 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
 
 public class UpdateGroupMemberHandler(AppDbContext db)
-    : ICommandHandler<UpdateGroupMemberCommand, IResult>
+    : ICommandHandler<UpdateGroupMemberCommand, GroupMemberResponse>
 {
-    public async Task<IResult> HandleAsync(UpdateGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> HandleAsync(UpdateGroupMemberCommand command, CancellationToken ct)
     {
         var member = await db.GroupMembers
             .Include(gm => gm.User)
             .FirstOrDefaultAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.UserId, ct);
 
         if (member is null)
-            return Results.NotFound();
+            throw new NotFoundException("Group member not found.");
 
         member.AccessLevel = command.Request.AccessLevel;
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new GroupMemberResponse
+        return new GroupMemberResponse
         {
             UserId = member.UserId,
             DisplayName = member.User.DisplayName,
             Email = member.User.Email,
             AccessLevel = member.AccessLevel
-        });
+        };
     }
 }
 

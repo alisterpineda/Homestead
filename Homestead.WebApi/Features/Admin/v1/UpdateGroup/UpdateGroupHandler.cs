@@ -5,23 +5,23 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroup;
 
 public class UpdateGroupHandler(AppDbContext db)
-    : ICommandHandler<UpdateGroupCommand, IResult>
+    : ICommandHandler<UpdateGroupCommand, GroupResponse>
 {
-    public async Task<IResult> HandleAsync(UpdateGroupCommand command, CancellationToken ct)
+    public async Task<GroupResponse> HandleAsync(UpdateGroupCommand command, CancellationToken ct)
     {
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == command.Id, ct);
         if (group is null)
-            return Results.NotFound();
+            throw new NotFoundException("Group not found.");
 
         var trimmedName = command.Request.Name.Trim();
         if (string.IsNullOrWhiteSpace(trimmedName))
-            return Results.BadRequest(new { Error = "Name is required." });
+            throw new BadRequestException("Name is required.");
 
         var nameConflict = await db.Groups
             .AnyAsync(g => g.Id != command.Id && g.Name == trimmedName, ct);
 
         if (nameConflict)
-            return Results.Conflict(new { Error = "A group with this name already exists." });
+            throw new ConflictException("A group with this name already exists.");
 
         group.Name = trimmedName;
         group.Description = command.Request.Description?.Trim();
@@ -33,7 +33,7 @@ public class UpdateGroupHandler(AppDbContext db)
             ? await db.Users.Where(u => u.Id == group.CreatedByUserId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)
             : null;
 
-        return Results.Ok(new GroupResponse
+        return new GroupResponse
         {
             Id = group.Id,
             Name = group.Name,
@@ -42,7 +42,7 @@ public class UpdateGroupHandler(AppDbContext db)
             CreatedByUserId = group.CreatedByUserId,
             CreatedByUserName = creatorName,
             MemberCount = memberCount
-        });
+        };
     }
 }
 

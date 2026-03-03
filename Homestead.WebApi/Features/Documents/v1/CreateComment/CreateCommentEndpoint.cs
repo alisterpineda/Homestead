@@ -10,7 +10,8 @@ public static class CreateCommentEndpoint
             CreateCommentHandler handler, CancellationToken ct) =>
         {
             var command = request with { DocumentId = documentId };
-            return await handler.HandleAsync(command, ct);
+            var response = await handler.HandleAsync(command, ct);
+            return Results.Created($"/api/v1/documents/{documentId}/comments/{response.Id}", response);
         })
         .WithName("CreateComment")
         .Produces<CreateCommentResponse>(StatusCodes.Status201Created)
