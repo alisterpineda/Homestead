@@ -1,18 +1,17 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
-public class GetDocumentHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetDocumentHandler(AppDbContext db, IAuthorizationService authService, IHttpContextAccessor httpContext)
     : IQueryHandler<GetDocumentRequest, GetDocumentResponse?>
 {
     public async Task<GetDocumentResponse?> HandleAsync(GetDocumentRequest request, CancellationToken ct)
     {
-        var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Read, ct);
-        if (!access.IsAllowed)
-            throw new ForbiddenAccessException();
+        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Read);
 
         return await db.Documents
             .AsNoTracking()

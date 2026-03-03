@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
-public class GetTagsHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetTagsHandler(AppDbContext db, IDocumentQueryService accessService)
     : IQueryHandler<GetTagsRequest, IReadOnlyList<GetTagsResponse>>
 {
     public async Task<IReadOnlyList<GetTagsResponse>> HandleAsync(GetTagsRequest request, CancellationToken ct)

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetParties;
 
-public class GetPartiesHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessService)
     : IQueryHandler<GetPartiesRequest, PaginatedResponse<GetPartiesResponse>>
 {
     public async Task<PaginatedResponse<GetPartiesResponse>> HandleAsync(

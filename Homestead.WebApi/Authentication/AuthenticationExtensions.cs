@@ -55,6 +55,7 @@ public static class AuthenticationExtensions
         });
 
         builder.Services.AddScoped<IAuthorizationHandler, ActiveUserHandler>();
+        builder.Services.AddScoped<IAuthorizationHandler, Authorization.DocumentAuthorizationHandler>();
 
         builder.Services.AddAuthorization(options =>
         {

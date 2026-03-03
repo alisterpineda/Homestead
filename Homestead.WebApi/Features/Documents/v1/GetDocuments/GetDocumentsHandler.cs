@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 
-public class GetDocumentsHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
     : IQueryHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
 {
     public async Task<PaginatedResponse<GetDocumentsResponse>> HandleAsync(

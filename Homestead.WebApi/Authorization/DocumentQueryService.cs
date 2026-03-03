@@ -8,55 +8,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Authorization;
 
-public class DocumentAccessService(
+public class DocumentQueryService(
     ICurrentUserAccessor currentUser,
-    AppDbContext db) : IDocumentAccessService
+    AppDbContext db) : IDocumentQueryService
 {
     public bool IsAdmin => currentUser.Role == AppRole.Admin;
-
-    public async Task<DocumentAccessResult> CheckAccessAsync(
-        Guid documentId, DocumentOperation operation, CancellationToken ct)
-    {
-        var role = currentUser.Role;
-        var userId = currentUser.UserId;
-
-        // Admin always has full access
-        if (role == AppRole.Admin)
-            return new DocumentAccessResult(true, true);
-
-        var document = await db.Documents
-            .AsNoTracking()
-            .Where(d => d.Id == documentId)
-            .Select(d => new { d.GroupId })
-            .FirstOrDefaultAsync(ct);
-
-        if (document is null)
-            return new DocumentAccessResult(false, false);
-
-        // Global document (GroupId is null)
-        if (document.GroupId is null)
-        {
-            return role switch
-            {
-                AppRole.Contributor => new DocumentAccessResult(true, true),
-                AppRole.Viewer => operation == DocumentOperation.Read
-                    ? new DocumentAccessResult(true, false)
-                    : new DocumentAccessResult(false, false),
-                _ => new DocumentAccessResult(false, false) // Guest
-            };
-        }
-
-        // Group-scoped document — check membership
-        var canWrite = await HasGroupWriteAccessAsync(role, userId, document.GroupId.Value, ct);
-
-        if (canWrite is null)
-            return new DocumentAccessResult(false, false);
-
-        if (operation == DocumentOperation.Write && !canWrite.Value)
-            return new DocumentAccessResult(false, false);
-
-        return new DocumentAccessResult(true, canWrite.Value);
-    }
 
     public async Task<bool> CanWriteToGroupAsync(Guid groupId, CancellationToken ct)
     {

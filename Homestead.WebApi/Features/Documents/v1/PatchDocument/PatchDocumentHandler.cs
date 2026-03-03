@@ -4,6 +4,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,14 +12,12 @@ namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver,
-    IDocumentAccessService accessService)
+    IAuthorizationService authService, IHttpContextAccessor httpContext, IDocumentQueryService queryService)
     : ICommandHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
     public async Task<PatchDocumentResponse> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
     {
-        var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Write, ct);
-        if (!access.IsAllowed)
-            throw new ForbiddenAccessException();
+        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Write);
 
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
@@ -78,7 +77,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             if (!groupExists)
                 throw new BadRequestException("Group not found.");
 
-            var canWriteToGroup = await accessService.CanWriteToGroupAsync(model.GroupId.Value, ct);
+            var canWriteToGroup = await queryService.CanWriteToGroupAsync(model.GroupId.Value, ct);
             if (!canWriteToGroup)
                 throw new ForbiddenAccessException();
         }

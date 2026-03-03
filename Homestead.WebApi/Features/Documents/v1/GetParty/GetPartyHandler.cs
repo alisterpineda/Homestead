@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetParty;
 
-public class GetPartyHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetPartyHandler(AppDbContext db, IDocumentQueryService accessService)
     : IQueryHandler<GetPartyRequest, GetPartyResponse?>
 {
     public async Task<GetPartyResponse?> HandleAsync(GetPartyRequest request, CancellationToken ct)

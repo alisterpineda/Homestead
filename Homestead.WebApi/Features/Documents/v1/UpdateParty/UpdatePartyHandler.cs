@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
-public class UpdatePartyHandler(AppDbContext db, IDocumentAccessService accessService)
+public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService)
     : ICommandHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyCommand request, CancellationToken ct)

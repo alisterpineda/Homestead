@@ -4,11 +4,12 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
-public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessService)
+public class GetActivityHandler(AppDbContext db, IAuthorizationService authService, IHttpContextAccessor httpContext)
     : IQueryHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
@@ -26,9 +27,7 @@ public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessSe
     public async Task<PaginatedResponse<GetActivityResponse>> HandleAsync(
         GetActivityRequest request, CancellationToken ct)
     {
-        var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Read, ct);
-        if (!access.IsAllowed)
-            throw new ForbiddenAccessException();
+        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Read);
 
         var auditRows = await db.AuditLogs
             .AsNoTracking()

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
-    AppDbContext db, IDocumentAccessService accessService)
+    AppDbContext db, IDocumentQueryService accessService)
     : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
     public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)

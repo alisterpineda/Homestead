@@ -2,12 +2,13 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
 public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger, IDocumentAccessService accessService)
+    IAuditLogger auditLogger, IAuthorizationService authService, IHttpContextAccessor httpContext)
     : ICommandHandler<BulkDeleteDocumentsRequest, BulkDeleteDocumentsResponse>
 {
     public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsRequest request, CancellationToken ct)
@@ -24,8 +25,8 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
         var authorizedDocs = new List<Domains.Documents.Document>();
         foreach (var doc in documents)
         {
-            var access = await accessService.CheckAccessAsync(doc.Id, DocumentOperation.Write, ct);
-            if (access.IsAllowed)
+            var result = await authService.AuthorizeAsync(httpContext.HttpContext!.User, doc.Id, DocumentOperations.Write);
+            if (result.Succeeded)
                 authorizedDocs.Add(doc);
         }
 

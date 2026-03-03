@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
-public class PatchTagHandler(AppDbContext db, IDocumentAccessService accessService)
+public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService)
     : ICommandHandler<PatchTagCommand, PatchTagResponse>
 {
     public async Task<PatchTagResponse> HandleAsync(PatchTagCommand request, CancellationToken ct)

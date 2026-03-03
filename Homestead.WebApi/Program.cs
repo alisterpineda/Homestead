@@ -84,7 +84,7 @@ builder.AddAppAuthentication();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
-builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
+builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddExceptionHandler<ForbiddenAccessExceptionHandler>();
