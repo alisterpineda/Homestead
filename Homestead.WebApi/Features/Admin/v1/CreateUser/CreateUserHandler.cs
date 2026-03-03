@@ -30,6 +30,7 @@ public class CreateUserHandler(UserManager<AppUser> userManager)
             DisplayName = user.DisplayName,
             Email = user.Email,
             IsAdmin = request.IsAdmin,
+            IsActive = user.IsActive,
             CreatedAt = user.CreatedAt
         };
     }

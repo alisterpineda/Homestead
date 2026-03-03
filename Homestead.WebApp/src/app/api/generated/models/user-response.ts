@@ -6,5 +6,6 @@ export interface UserResponse {
   displayName: string;
   email?: (string | null);
   id: string;
+  isActive: boolean;
   isAdmin: boolean;
 }

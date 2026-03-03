@@ -170,5 +170,75 @@ public class UserManagementTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private record UserItem(Guid Id, string DisplayName, string? Email, bool IsAdmin, DateTimeOffset CreatedAt);
+    [Fact]
+    public async Task CreateUser_ReturnsIsActiveTrue()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/users", new
+        {
+            email = "active-check@test.com",
+            displayName = "Active Check",
+            password = "Password123!",
+            isAdmin = false
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
+        Assert.True(body!.IsActive);
+    }
+
+    [Fact]
+    public async Task GetUsers_ReturnsIsActiveField()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.GetAsync("/api/v1/admin/users?Page=1&PageSize=10", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<UserItem>>(CT);
+        Assert.All(body!.Items, u => Assert.True(u.IsActive));
+    }
+
+    [Fact]
+    public async Task UpdateUser_CanToggleIsActive()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var createResponse = await client.PostAsJsonAsync("/api/v1/admin/users", new
+        {
+            email = "toggle-active@test.com",
+            displayName = "Toggle Active",
+            password = "Password123!",
+            isAdmin = false
+        }, CT);
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
+        Assert.True(created!.IsActive);
+
+        // Deactivate
+        var deactivateResponse = await client.PutAsJsonAsync($"/api/v1/admin/users/{created.Id}", new
+        {
+            email = "toggle-active@test.com",
+            displayName = "Toggle Active",
+            isAdmin = false,
+            isActive = false
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, deactivateResponse.StatusCode);
+        var deactivated = await deactivateResponse.Content.ReadFromJsonAsync<UserItem>(CT);
+        Assert.False(deactivated!.IsActive);
+
+        // Re-activate
+        var activateResponse = await client.PutAsJsonAsync($"/api/v1/admin/users/{created.Id}", new
+        {
+            email = "toggle-active@test.com",
+            displayName = "Toggle Active",
+            isAdmin = false,
+            isActive = true
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, activateResponse.StatusCode);
+        var activated = await activateResponse.Content.ReadFromJsonAsync<UserItem>(CT);
+        Assert.True(activated!.IsActive);
+    }
+
 }

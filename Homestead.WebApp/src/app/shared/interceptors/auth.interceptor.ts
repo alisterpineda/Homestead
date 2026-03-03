@@ -9,6 +9,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     tap({
       error: (err) => {
+        if (err.status === 403 && err.error?.error === 'account_inactive') {
+          router.navigate(['/pending-activation']);
+          return;
+        }
         if (err.status === 401 && !req.url.includes('/api/auth/')) {
           router.navigate(['/login']);
         }

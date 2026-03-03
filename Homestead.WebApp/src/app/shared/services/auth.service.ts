@@ -14,6 +14,7 @@ export class AuthService {
   readonly initialized = signal(false);
   readonly needsSetup = signal(false);
   readonly isAuthenticated = signal(false);
+  readonly isActive = signal(true);
   readonly userName = signal('');
   readonly userEmail = signal('');
   readonly roles = signal<string[]>([]);
@@ -76,6 +77,7 @@ export class AuthService {
 
     await firstValueFrom(this.http.post('/api/auth/logout', {}));
     this.isAuthenticated.set(false);
+    this.isActive.set(true);
     this.userName.set('');
     this.userEmail.set('');
     this.roles.set([]);
@@ -91,6 +93,7 @@ export class AuthService {
 
   private setUser(user: GetUserInfoResponse): void {
     this.isAuthenticated.set(true);
+    this.isActive.set(user.isActive);
     this.userName.set(user.displayName || user.email);
     this.userEmail.set(user.email);
     this.roles.set(user.roles ?? []);

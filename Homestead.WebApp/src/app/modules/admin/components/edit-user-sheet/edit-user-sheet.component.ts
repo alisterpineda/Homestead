@@ -16,7 +16,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateUser } from '@/api/generated/fn/admin/update-user';
-import type { GetUsersResponse } from '@/api/generated/models/get-users-response';
+import type { UserResponse } from '@/api/generated/models/user-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
@@ -85,6 +85,15 @@ import { toast } from 'ngx-sonner';
               <label hlmLabel for="user-is-admin">Administrator</label>
             </div>
 
+            <div class="flex items-center gap-2">
+              <hlm-checkbox
+                id="user-is-active"
+                [checked]="editIsActive()"
+                (checkedChange)="editIsActive.set($event)"
+              />
+              <label hlmLabel for="user-is-active">Active</label>
+            </div>
+
             <div class="space-y-2">
               <label hlmLabel>Created</label>
               <p class="text-sm text-muted-foreground">
@@ -104,7 +113,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class EditUserSheetComponent {
-  user = input<GetUsersResponse | null>(null);
+  user = input<UserResponse | null>(null);
   state = input<BrnDialogState>('closed');
   saved = output<void>();
   closed = output<void>();
@@ -113,6 +122,7 @@ export class EditUserSheetComponent {
   editDisplayName = signal('');
   editPassword = signal('');
   editIsAdmin = signal(false);
+  editIsActive = signal(true);
   saving = signal(false);
 
   hasChanges = computed(() => {
@@ -122,6 +132,7 @@ export class EditUserSheetComponent {
     if (this.editDisplayName() !== u.displayName) return true;
     if (this.editPassword().length > 0) return true;
     if (this.editIsAdmin() !== u.isAdmin) return true;
+    if (this.editIsActive() !== u.isActive) return true;
     return false;
   });
 
@@ -136,6 +147,7 @@ export class EditUserSheetComponent {
         this.editDisplayName.set(u.displayName);
         this.editPassword.set('');
         this.editIsAdmin.set(u.isAdmin);
+        this.editIsActive.set(u.isActive);
       }
     });
   }
@@ -163,6 +175,7 @@ export class EditUserSheetComponent {
         displayName: this.editDisplayName(),
         password: this.editPassword() || null,
         isAdmin: this.editIsAdmin(),
+        isActive: this.editIsActive(),
       },
     }).subscribe({
       next: () => {

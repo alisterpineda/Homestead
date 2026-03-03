@@ -3,7 +3,7 @@ import { DatePipe } from '@angular/common';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import type { GetUsersResponse } from '@/api/generated/models/get-users-response';
+import type { UserResponse } from '@/api/generated/models/user-response';
 
 @Component({
   selector: 'app-user-table',
@@ -26,6 +26,7 @@ import type { GetUsersResponse } from '@/api/generated/models/get-users-response
               <th hlmTh>Display Name</th>
               <th hlmTh>Email</th>
               <th hlmTh class="hidden md:table-cell">Role</th>
+              <th hlmTh class="hidden md:table-cell">Status</th>
               <th hlmTh class="hidden md:table-cell">Created</th>
             </tr>
           </thead>
@@ -52,6 +53,13 @@ import type { GetUsersResponse } from '@/api/generated/models/get-users-response
                     <span hlmBadge variant="secondary">Admin</span>
                   }
                 </td>
+                <td hlmTd class="hidden md:table-cell">
+                  @if (user.isActive) {
+                    <span hlmBadge variant="outline">Active</span>
+                  } @else {
+                    <span hlmBadge variant="secondary" class="opacity-60">Inactive</span>
+                  }
+                </td>
                 <td hlmTd class="hidden text-muted-foreground md:table-cell">
                   {{ user.createdAt | date: 'mediumDate' }}
                 </td>
@@ -64,7 +72,7 @@ import type { GetUsersResponse } from '@/api/generated/models/get-users-response
   `,
 })
 export class UserTableComponent {
-  users = input.required<GetUsersResponse[]>();
+  users = input.required<UserResponse[]>();
   selectedIds = input<Set<string>>(new Set());
   selectionChange = output<Set<string>>();
   userSelect = output<string>();

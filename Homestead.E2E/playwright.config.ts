@@ -50,15 +50,27 @@ export default defineConfig({
       dependencies: ['local-auth-setup'],
     },
     {
+      name: 'local-inactive',
+      testDir: './tests/local-inactive',
+      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
+      dependencies: ['local-auth-setup'],
+    },
+    {
       name: 'oidc-local',
       testDir: './tests/oidc-local',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
     },
     {
+      name: 'oidc-local-setup',
+      testDir: './tests/oidc-local-setup',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
+      dependencies: ['oidc-local'],
+    },
+    {
       name: 'oidc-local-login',
       testDir: './tests/oidc-local-login',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
-      dependencies: ['oidc-local'],
+      dependencies: ['oidc-local-setup'],
     },
     {
       name: 'oidc-only',
@@ -66,10 +78,16 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
     },
     {
+      name: 'oidc-only-setup',
+      testDir: './tests/oidc-only-setup',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
+      dependencies: ['oidc-only'],
+    },
+    {
       name: 'oidc-only-login',
       testDir: './tests/oidc-only-login',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
-      dependencies: ['oidc-only'],
+      dependencies: ['oidc-only-setup'],
     },
   ],
 });

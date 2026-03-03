@@ -15,7 +15,8 @@ public static class UpdateUserEndpoint
                 Email = request.Email,
                 DisplayName = request.DisplayName,
                 Password = request.Password,
-                IsAdmin = request.IsAdmin
+                IsAdmin = request.IsAdmin,
+                IsActive = request.IsActive
             };
 
             try

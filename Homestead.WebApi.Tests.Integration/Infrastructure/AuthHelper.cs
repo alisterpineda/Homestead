@@ -12,24 +12,27 @@ public static class AuthHelper
     public static Task<HttpClient> CreateAdminClientAsync(
         WebApplicationFactory<Program> factory,
         string? email = null,
-        string? displayName = null)
+        string? displayName = null,
+        bool isActive = true)
     {
-        return CreateAuthenticatedClientAsync(factory, isAdmin: true, email, displayName);
+        return CreateAuthenticatedClientAsync(factory, isAdmin: true, email, displayName, isActive);
     }
 
     public static Task<HttpClient> CreateUserClientAsync(
         WebApplicationFactory<Program> factory,
         string? email = null,
-        string? displayName = null)
+        string? displayName = null,
+        bool isActive = true)
     {
-        return CreateAuthenticatedClientAsync(factory, isAdmin: false, email, displayName);
+        return CreateAuthenticatedClientAsync(factory, isAdmin: false, email, displayName, isActive);
     }
 
     private static async Task<HttpClient> CreateAuthenticatedClientAsync(
         WebApplicationFactory<Program> factory,
         bool isAdmin,
         string? email,
-        string? displayName)
+        string? displayName,
+        bool isActive)
     {
         var counter = Interlocked.Increment(ref _userCounter);
         var prefix = isAdmin ? "admin" : "user";
@@ -50,7 +53,8 @@ public static class AuthHelper
             UserName = email,
             Email = email,
             DisplayName = displayName,
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            IsActive = isActive
         };
 
         var result = await userManager.CreateAsync(user, password);

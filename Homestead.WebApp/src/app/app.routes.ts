@@ -3,6 +3,7 @@ import { authGuard } from '@/shared/guards/auth.guard';
 import { adminGuard } from '@/shared/guards/admin.guard';
 import { setupGuard } from '@/shared/guards/setup.guard';
 import { loginGuard } from '@/shared/guards/login.guard';
+import { pendingActivationGuard } from '@/shared/guards/pending-activation.guard';
 
 export const routes: Routes = [
   {
@@ -16,6 +17,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./shared/components/auth/setup/setup.component').then((m) => m.SetupComponent),
     canActivate: [setupGuard],
+  },
+  {
+    path: 'pending-activation',
+    loadComponent: () =>
+      import('./shared/components/auth/pending-activation/pending-activation.component').then(
+        (m) => m.PendingActivationComponent,
+      ),
+    canActivate: [pendingActivationGuard],
   },
   {
     path: '',

@@ -2,6 +2,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
@@ -14,38 +15,44 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db
         if (user is null)
             return null;
 
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        user.Email = request.Email;
-        user.UserName = request.Email;
-        user.DisplayName = request.DisplayName.Trim();
-
-        var result = await userManager.UpdateAsync(user);
-        if (!result.Succeeded)
-            throw new IdentityValidationException(result.ToErrorDictionary());
-
-        if (!string.IsNullOrWhiteSpace(request.Password))
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var passwordResult = await userManager.ResetPasswordAsync(user, token, request.Password);
-            if (!passwordResult.Succeeded)
-                throw new IdentityValidationException(passwordResult.ToErrorDictionary());
-        }
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        if (request.IsAdmin)
-            await userManager.AddToRoleAsync(user, "Admin");
-        else
-            await userManager.RemoveFromRoleAsync(user, "Admin");
+            user.Email = request.Email;
+            user.UserName = request.Email;
+            user.DisplayName = request.DisplayName.Trim();
+            user.IsActive = request.IsActive;
 
-        await transaction.CommitAsync(ct);
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                throw new IdentityValidationException(result.ToErrorDictionary());
 
-        return new UserResponse
-        {
-            Id = user.Id,
-            DisplayName = user.DisplayName,
-            Email = user.Email,
-            IsAdmin = request.IsAdmin,
-            CreatedAt = user.CreatedAt
-        };
+            if (!string.IsNullOrWhiteSpace(request.Password))
+            {
+                var token = await userManager.GeneratePasswordResetTokenAsync(user);
+                var passwordResult = await userManager.ResetPasswordAsync(user, token, request.Password);
+                if (!passwordResult.Succeeded)
+                    throw new IdentityValidationException(passwordResult.ToErrorDictionary());
+            }
+
+            if (request.IsAdmin)
+                await userManager.AddToRoleAsync(user, "Admin");
+            else
+                await userManager.RemoveFromRoleAsync(user, "Admin");
+
+            await transaction.CommitAsync(ct);
+
+            return new UserResponse
+            {
+                Id = user.Id,
+                DisplayName = user.DisplayName,
+                Email = user.Email,
+                IsAdmin = request.IsAdmin,
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt
+            };
+        });
     }
 }

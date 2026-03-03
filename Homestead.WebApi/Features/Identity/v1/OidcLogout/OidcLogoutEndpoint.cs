@@ -18,6 +18,6 @@ public static class OidcLogoutEndpoint
         })
         .WithName("OidcLogout")
         .ExcludeFromDescription()
-        .RequireAuthorization();
+        .RequireAuthorization(AuthPolicies.AuthenticatedOnly);
     }
 }

@@ -13,6 +13,6 @@ public static class GetUsersEndpoint
             return Results.Ok(response);
         })
         .WithName("GetUsers")
-        .Produces<PaginatedResponse<GetUsersResponse>>();
+        .Produces<PaginatedResponse<UserResponse>>();
     }
 }

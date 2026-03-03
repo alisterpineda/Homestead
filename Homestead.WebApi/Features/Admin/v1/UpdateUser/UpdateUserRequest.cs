@@ -6,6 +6,7 @@ public record UpdateUserRequest
     public required string DisplayName { get; init; }
     public string? Password { get; init; }
     public bool IsAdmin { get; init; }
+    public bool IsActive { get; init; }
 }
 
 public record UpdateUserCommand
@@ -15,4 +16,5 @@ public record UpdateUserCommand
     public required string DisplayName { get; init; }
     public string? Password { get; init; }
     public bool IsAdmin { get; init; }
+    public bool IsActive { get; init; }
 }

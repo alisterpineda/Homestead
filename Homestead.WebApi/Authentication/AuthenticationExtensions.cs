@@ -1,5 +1,7 @@
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Authentication;
@@ -22,7 +24,8 @@ public static class AuthenticationExtensions
                 options.Password.RequireNonAlphanumeric = false;
             })
             .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<AppDbContext>();
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddClaimsPrincipalFactory<AppClaimsPrincipalFactory>();
 
         var isDev = builder.Environment.IsDevelopment();
 
@@ -51,7 +54,28 @@ public static class AuthenticationExtensions
             };
         });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddScoped<IAuthorizationHandler, ActiveUserHandler>();
+
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy(AuthPolicies.AuthenticatedOnly, policy =>
+                policy.RequireAuthenticatedUser());
+
+            options.AddPolicy(AuthPolicies.ActiveUser, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ActiveUserRequirement());
+            });
+
+            options.DefaultPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .AddRequirements(new ActiveUserRequirement())
+                .Build();
+        });
+
+        builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler>(sp =>
+            new InactiveUserAuthorizationMiddlewareResultHandler(
+                new AuthorizationMiddlewareResultHandler()));
 
         builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 

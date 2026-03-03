@@ -5,5 +5,6 @@ export interface GetUserInfoResponse {
   displayName: string;
   email: string;
   id: string;
+  isActive: boolean;
   roles: Array<string>;
 }

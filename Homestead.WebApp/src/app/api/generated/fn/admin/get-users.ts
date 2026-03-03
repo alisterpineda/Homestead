@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PaginatedResponseOfGetUsersResponse } from '../../models/paginated-response-of-get-users-response';
+import { PaginatedResponseOfUserResponse } from '../../models/paginated-response-of-user-response';
 
 export interface GetUsers$Params {
   Search?: string;
@@ -15,7 +15,7 @@ export interface GetUsers$Params {
   PageSize: (number | string);
 }
 
-export function getUsers(http: HttpClient, rootUrl: string, params: GetUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetUsersResponse>> {
+export function getUsers(http: HttpClient, rootUrl: string, params: GetUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfUserResponse>> {
   const rb = new RequestBuilder(rootUrl, getUsers.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});
@@ -28,7 +28,7 @@ export function getUsers(http: HttpClient, rootUrl: string, params: GetUsers$Par
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<PaginatedResponseOfGetUsersResponse>;
+      return r as StrictHttpResponse<PaginatedResponseOfUserResponse>;
     })
   );
 }

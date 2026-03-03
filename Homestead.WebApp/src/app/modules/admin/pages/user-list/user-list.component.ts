@@ -19,8 +19,8 @@ import { PaginationComponent } from '@/modules/documents/components/pagination/p
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getUsers } from '@/api/generated/fn/admin/get-users';
 import { bulkDeleteUsers } from '@/api/generated/fn/admin/bulk-delete-users';
-import type { GetUsersResponse } from '@/api/generated/models/get-users-response';
-import type { PaginatedResponseOfGetUsersResponse } from '@/api/generated/models/paginated-response-of-get-users-response';
+import type { UserResponse } from '@/api/generated/models/user-response';
+import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
@@ -190,7 +190,7 @@ export class UserListComponent implements OnDestroy {
   hasSelection = computed(() => this.selectionCount() > 0);
 
   // Sheet state
-  selectedUser = signal<GetUsersResponse | null>(null);
+  selectedUser = signal<UserResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
 
   searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
@@ -226,7 +226,7 @@ export class UserListComponent implements OnDestroy {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetUsersResponse;
+            return r.body as PaginatedResponseOfUserResponse;
           }),
           catchError(() => {
             this.loading.set(false);

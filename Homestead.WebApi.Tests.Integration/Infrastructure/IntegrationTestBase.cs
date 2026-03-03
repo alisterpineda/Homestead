@@ -41,14 +41,14 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return Factory.CreateClient();
     }
 
-    protected async Task<HttpClient> CreateAdminClientAsync()
+    protected async Task<HttpClient> CreateAdminClientAsync(bool isActive = true)
     {
-        return await AuthHelper.CreateAdminClientAsync(Factory);
+        return await AuthHelper.CreateAdminClientAsync(Factory, isActive: isActive);
     }
 
-    protected async Task<HttpClient> CreateUserClientAsync()
+    protected async Task<HttpClient> CreateUserClientAsync(bool isActive = true)
     {
-        return await AuthHelper.CreateUserClientAsync(Factory);
+        return await AuthHelper.CreateUserClientAsync(Factory, isActive: isActive);
     }
 
     protected IServiceScope CreateScope() => Factory.Services.CreateScope();

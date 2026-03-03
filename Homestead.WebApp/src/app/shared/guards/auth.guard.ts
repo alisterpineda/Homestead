@@ -7,6 +7,9 @@ export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   if (auth.isAuthenticated()) {
+    if (!auth.isActive()) {
+      return router.createUrlTree(['/pending-activation']);
+    }
     return true;
   }
 

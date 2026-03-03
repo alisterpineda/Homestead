@@ -4,6 +4,7 @@
 export interface UpdateUserRequest {
   displayName: string;
   email: string;
+  isActive?: boolean;
   isAdmin?: boolean;
   password?: (string | null);
 }

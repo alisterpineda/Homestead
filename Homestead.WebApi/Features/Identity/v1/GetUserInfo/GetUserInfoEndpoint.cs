@@ -18,6 +18,6 @@ public static class GetUserInfoEndpoint
         .WithName("GetUserInfo")
         .Produces<GetUserInfoResponse>()
         .Produces(StatusCodes.Status401Unauthorized)
-        .RequireAuthorization();
+        .RequireAuthorization(AuthPolicies.AuthenticatedOnly);
     }
 }

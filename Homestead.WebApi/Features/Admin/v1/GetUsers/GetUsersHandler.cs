@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.GetUsers;
 
 public class GetUsersHandler(AppDbContext db)
-    : IQueryHandler<GetUsersRequest, PaginatedResponse<GetUsersResponse>>
+    : IQueryHandler<GetUsersRequest, PaginatedResponse<UserResponse>>
 {
-    public async Task<PaginatedResponse<GetUsersResponse>> HandleAsync(
+    public async Task<PaginatedResponse<UserResponse>> HandleAsync(
         GetUsersRequest request, CancellationToken ct)
     {
         var query = db.Users.AsNoTracking();
@@ -31,17 +31,18 @@ public class GetUsersHandler(AppDbContext db)
             .OrderBy(u => u.DisplayName)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(u => new GetUsersResponse
+            .Select(u => new UserResponse
             {
                 Id = u.Id,
                 DisplayName = u.DisplayName,
                 Email = u.Email,
                 IsAdmin = db.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == adminRoleId),
+                IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt
             })
             .ToListAsync(ct);
 
-        return new PaginatedResponse<GetUsersResponse>
+        return new PaginatedResponse<UserResponse>
         {
             Items = items,
             Page = request.Page,

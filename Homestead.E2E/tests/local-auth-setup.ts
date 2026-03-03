@@ -1,5 +1,5 @@
-import { test as setup } from '@playwright/test';
-import { LOCAL_ADMIN, LOCAL_USER, AUTH_STATE } from '../e2e.config';
+import { test as setup, expect } from '@playwright/test';
+import { LOCAL_ADMIN, LOCAL_USER, LOCAL_INACTIVE_USER, AUTH_STATE } from '../e2e.config';
 
 setup('seed admin user and save storageState', async ({ request }) => {
   // Register admin (first user becomes admin)
@@ -29,6 +29,37 @@ setup('seed admin user and save storageState', async ({ request }) => {
     },
   });
 
+  // Create inactive user via admin endpoint, then deactivate
+  const createResponse = await request.post('/api/v1/admin/users', {
+    data: {
+      email: LOCAL_INACTIVE_USER.email,
+      displayName: LOCAL_INACTIVE_USER.displayName,
+      password: LOCAL_INACTIVE_USER.password,
+      isAdmin: false,
+    },
+  });
+  expect(createResponse.ok()).toBeTruthy();
+  const createdUser = await createResponse.json();
+
+  // Deactivate the user
+  const deactivateResponse = await request.put(`/api/v1/admin/users/${createdUser.id}`, {
+    data: {
+      email: LOCAL_INACTIVE_USER.email,
+      displayName: LOCAL_INACTIVE_USER.displayName,
+      isAdmin: false,
+      isActive: false,
+    },
+  });
+  expect(deactivateResponse.ok()).toBeTruthy();
+
+  // Verify the user is actually deactivated
+  const verifyResponse = await request.get('/api/v1/admin/users?Page=1&PageSize=50');
+  const users = await verifyResponse.json();
+  const inactiveUser = users.items.find(
+    (u: { email: string }) => u.email === LOCAL_INACTIVE_USER.email,
+  );
+  expect(inactiveUser.isActive).toBe(false);
+
   // Save admin storageState
   await request.storageState({ path: AUTH_STATE.adminPath });
 });
@@ -44,4 +75,17 @@ setup('save regular user storageState', async ({ request }) => {
 
   // Save user storageState
   await request.storageState({ path: AUTH_STATE.userPath });
+});
+
+setup('save inactive user storageState', async ({ request }) => {
+  // Log in as inactive user (login itself still works, they get a cookie)
+  await request.post('/api/auth/login?useCookies=true', {
+    data: {
+      email: LOCAL_INACTIVE_USER.email,
+      password: LOCAL_INACTIVE_USER.password,
+    },
+  });
+
+  // Save inactive user storageState
+  await request.storageState({ path: AUTH_STATE.inactivePath });
 });

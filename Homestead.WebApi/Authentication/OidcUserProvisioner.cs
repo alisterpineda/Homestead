@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Homestead.WebApi.Domains.Identity;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Authentication;
@@ -27,12 +28,17 @@ public class OidcUserProvisioner(
 
             if (user is null)
             {
+                // Auto-activate the first user to bootstrap the system;
+                // subsequent OIDC users require admin activation.
+                var isFirstUser = !await userManager.Users.AnyAsync();
+
                 user = new AppUser
                 {
                     UserName = email,
                     Email = email,
                     EmailConfirmed = true,
-                    DisplayName = displayName
+                    DisplayName = displayName,
+                    IsActive = isFirstUser
                 };
 
                 var result = await userManager.CreateAsync(user);

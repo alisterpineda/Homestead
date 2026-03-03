@@ -1,3 +1,5 @@
+using Homestead.WebApi.Authentication;
+
 namespace Homestead.WebApi.Features.Identity.v1.Logout;
 
 public static class LogoutEndpoint
@@ -11,6 +13,6 @@ public static class LogoutEndpoint
         })
         .WithName("Logout")
         .Produces(StatusCodes.Status200OK)
-        .RequireAuthorization();
+        .RequireAuthorization(AuthPolicies.AuthenticatedOnly);
     }
 }
