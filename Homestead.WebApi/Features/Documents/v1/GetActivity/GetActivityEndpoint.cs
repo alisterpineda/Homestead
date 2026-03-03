@@ -15,8 +15,7 @@ public static class GetActivityEndpoint
                 Page = pagination.Page,
                 PageSize = pagination.PageSize
             };
-            var response = await handler.HandleAsync(request, ct);
-            return Results.Ok(response);
+            return await handler.HandleAsync(request, ct);
         })
         .WithName("GetDocumentActivity")
         .Produces<PaginatedResponse<GetActivityResponse>>();

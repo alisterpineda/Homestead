@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
@@ -9,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue, AppDbContext db)
+public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
+    AppDbContext db, IDocumentAccessService accessService)
     : ICommandHandler<CreateDocumentRequest, IResult>
 {
     public async Task<IResult> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
@@ -20,6 +22,10 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
             var groupExists = await db.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
             if (!groupExists)
                 return Results.BadRequest(new { Error = "Group not found." });
+
+            var canWrite = await accessService.CanWriteToGroupAsync(request.GroupId.Value, ct);
+            if (!canWrite)
+                return Results.Forbid();
         }
 
         var file = request.File;

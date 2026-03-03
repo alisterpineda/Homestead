@@ -80,6 +80,10 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             var groupExists = await db.Groups.AnyAsync(g => g.Id == model.GroupId.Value, ct);
             if (!groupExists)
                 return Results.BadRequest(new { Error = "Group not found." });
+
+            var canWriteToGroup = await accessService.CanWriteToGroupAsync(model.GroupId.Value, ct);
+            if (!canWriteToGroup)
+                return Results.Forbid();
         }
 
         // Update entity from patched model

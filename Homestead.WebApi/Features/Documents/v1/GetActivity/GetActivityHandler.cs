@@ -1,13 +1,15 @@
 using System.Text.Json;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
-public class GetActivityHandler(AppDbContext db)
-    : IQueryHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
+public class GetActivityHandler(AppDbContext db, IDocumentAccessService accessService)
+    : IQueryHandler<GetActivityRequest, IResult>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
@@ -21,9 +23,13 @@ public class GetActivityHandler(AppDbContext db)
         ["ExtractedText"] = "extracted text"
     };
 
-    public async Task<PaginatedResponse<GetActivityResponse>> HandleAsync(
+    public async Task<IResult> HandleAsync(
         GetActivityRequest request, CancellationToken ct)
     {
+        var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Read, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
+
         var auditRows = await db.AuditLogs
             .AsNoTracking()
             .Where(a =>
@@ -91,13 +97,13 @@ public class GetActivityHandler(AppDbContext db)
             .Take(request.PageSize)
             .ToList();
 
-        return new PaginatedResponse<GetActivityResponse>
+        return Results.Ok(new PaginatedResponse<GetActivityResponse>
         {
             Items = paged,
             Page = request.Page,
             PageSize = request.PageSize,
             TotalCount = totalCount
-        };
+        });
     }
 
     private static string GenerateSummary(string entityType, AuditAction action, string? changes, string userName)

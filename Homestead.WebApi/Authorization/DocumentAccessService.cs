@@ -44,27 +44,47 @@ public class DocumentAccessService(
         }
 
         // Group-scoped document — check membership
-        if (userId is null)
+        var canWrite = await HasGroupWriteAccessAsync(role, userId, document.GroupId.Value, ct);
+
+        if (canWrite is null)
             return new DocumentAccessResult(false, false);
+
+        if (operation == DocumentOperation.Write && !canWrite.Value)
+            return new DocumentAccessResult(false, false);
+
+        return new DocumentAccessResult(true, canWrite.Value);
+    }
+
+    public async Task<bool> CanWriteToGroupAsync(Guid groupId, CancellationToken ct)
+    {
+        var role = currentUser.Role;
+        if (role == AppRole.Admin)
+            return true;
+
+        return await HasGroupWriteAccessAsync(role, currentUser.UserId, groupId, ct) ?? false;
+    }
+
+    /// <summary>
+    /// Returns null if no access (no userId or not a member), otherwise returns whether the user can write.
+    /// </summary>
+    private async Task<bool?> HasGroupWriteAccessAsync(
+        AppRole role, Guid? userId, Guid groupId, CancellationToken ct)
+    {
+        if (userId is null)
+            return null;
 
         var membership = await db.GroupMembers
             .AsNoTracking()
-            .Where(gm => gm.GroupId == document.GroupId && gm.UserId == userId.Value)
+            .Where(gm => gm.GroupId == groupId && gm.UserId == userId.Value)
             .Select(gm => (GroupAccessLevel?)gm.AccessLevel)
             .FirstOrDefaultAsync(ct);
 
         if (membership is null)
-            return new DocumentAccessResult(false, false);
+            return null;
 
-        // Effective access = min(role capability, group access level)
         var roleCanWrite = role is AppRole.Contributor;
         var groupCanWrite = membership is GroupAccessLevel.Owner or GroupAccessLevel.Editor;
-        var canWrite = roleCanWrite && groupCanWrite;
-
-        if (operation == DocumentOperation.Write && !canWrite)
-            return new DocumentAccessResult(false, false);
-
-        return new DocumentAccessResult(true, canWrite);
+        return roleCanWrite && groupCanWrite;
     }
 
     public IQueryable<Document> FilterByAccess(IQueryable<Document> query)

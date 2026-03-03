@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -8,11 +9,15 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
 public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentAccessService accessService)
     : ICommandHandler<PatchDocumentVersionCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentVersionCommand request, CancellationToken ct)
     {
+        var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Write, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
+
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
             .FirstOrDefaultAsync(ct);

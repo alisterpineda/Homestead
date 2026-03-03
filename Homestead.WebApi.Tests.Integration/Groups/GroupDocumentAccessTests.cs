@@ -157,4 +157,205 @@ public class GroupDocumentAccessTests : IntegrationTestBase
         var body = await getResponse.Content.ReadFromJsonAsync<DocumentListItem>(CT);
         Assert.Equal(groupId, body!.GroupId);
     }
+
+    // --- Version operation access checks ---
+
+    [Fact]
+    public async Task ContributorAsGroupViewer_CannotDeleteVersion()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "VersionDelete Viewer Group");
+        var docId = await UploadAndWaitAsync(adminClient, "version-delete.pdf", groupId);
+
+        // Add a second version so deletion is allowed
+        await UploadVersionAsync(adminClient, docId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var versionId = await GetFirstVersionIdAsync(adminClient, docId);
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ContributorAsGroupViewer_CannotPatchVersion()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "VersionPatch Viewer Group");
+        var docId = await UploadAndWaitAsync(adminClient, "version-patch.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var versionId = await GetFirstVersionIdAsync(adminClient, docId);
+        var response = await SendJsonPatchAsync(contributorClient,
+            $"/api/v1/documents/{docId}/versions/{versionId}", new[]
+            {
+                new { op = "replace", path = "/label", value = (object)"Hacked" }
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ContributorAsGroupEditor_CanDeleteVersion()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "VersionDelete Editor Group");
+        var docId = await UploadAndWaitAsync(adminClient, "version-delete-ok.pdf", groupId);
+
+        // Add a second version so deletion is allowed
+        await UploadVersionAsync(adminClient, docId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        // Delete the first version (not the last)
+        var versionId = await GetFirstVersionIdAsync(adminClient, docId);
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    // --- Activity endpoint access checks ---
+
+    [Fact]
+    public async Task NonMember_CannotReadGroupDocActivity()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Activity Restricted Group");
+        var docId = await UploadAndWaitAsync(adminClient, "activity-restricted.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+
+        var response = await contributorClient.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=10", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GroupMember_CanReadGroupDocActivity()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Activity Allowed Group");
+        var docId = await UploadAndWaitAsync(adminClient, "activity-allowed.pdf", groupId);
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var response = await contributorClient.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=10", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // --- Group membership required for create/move ---
+
+    [Fact]
+    public async Task NonMember_CannotCreateDocumentInGroup()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Create Restricted Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+
+        var fileBytes = await GetUniquePdfBytesAsync();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent("blocked-upload.pdf"), "name");
+        form.Add(new ByteArrayContent(fileBytes), "file", "blocked-upload.pdf");
+        form.Add(new StringContent(groupId.ToString()), "groupId");
+
+        var response = await contributorClient.PostAsync("/api/v1/documents", form, CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GroupEditor_CanCreateDocumentInGroup()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Create Allowed Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        var fileBytes = await GetUniquePdfBytesAsync();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent("allowed-upload.pdf"), "name");
+        form.Add(new ByteArrayContent(fileBytes), "file", "allowed-upload.pdf");
+        form.Add(new StringContent(groupId.ToString()), "groupId");
+
+        var response = await contributorClient.PostAsync("/api/v1/documents", form, CT);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NonMember_CannotMoveDocumentToGroup()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Move Restricted Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var docId = await UploadAndWaitAsync(contributorClient, "move-blocked.pdf");
+
+        var response = await SendJsonPatchAsync(contributorClient, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/groupId", value = (object)groupId.ToString() }
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GroupEditor_CanMoveDocumentToGroup()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Move Allowed Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        var docId = await UploadAndWaitAsync(contributorClient, "move-allowed.pdf");
+
+        var response = await SendJsonPatchAsync(contributorClient, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/groupId", value = (object)groupId.ToString() }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // --- Helper methods ---
+
+    private async Task UploadVersionAsync(HttpClient client, Guid docId)
+    {
+        var fileBytes = await GetUniquePdfBytesAsync();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent("V2"), "label");
+        form.Add(new ByteArrayContent(fileBytes), "file", "sample-v2.pdf");
+
+        var response = await client.PostAsync($"/api/v1/documents/{docId}/versions", form, CT);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
+        await WaitForJobCompletionAsync(jobBody!.JobId);
+    }
+
+    private async Task<Guid> GetFirstVersionIdAsync(HttpClient client, Guid docId)
+    {
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
+        return body!.Items.OrderBy(v => v.VersionNumber).First().Id;
+    }
+
+    private record VersionItem(Guid Id, int VersionNumber, string? Label);
 }
