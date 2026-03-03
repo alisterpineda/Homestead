@@ -10,6 +10,8 @@ export interface GetDocumentsResponse {
   documentDate?: (string | null);
   fileExtension: string;
   fileSize: (number | string);
+  groupId?: (string | null);
+  groupName?: (string | null);
   id: string;
   name: string;
   ownerUserId?: (string | null);

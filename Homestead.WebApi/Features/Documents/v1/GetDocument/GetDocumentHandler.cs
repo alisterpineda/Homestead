@@ -1,15 +1,20 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
-public class GetDocumentHandler(AppDbContext db)
-    : IQueryHandler<GetDocumentRequest, GetDocumentResponse?>
+public class GetDocumentHandler(AppDbContext db, IDocumentAccessService accessService)
+    : IQueryHandler<GetDocumentRequest, IResult>
 {
-    public async Task<GetDocumentResponse?> HandleAsync(GetDocumentRequest request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(GetDocumentRequest request, CancellationToken ct)
     {
-        return await db.Documents
+        var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Read, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
+
+        var response = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
             .Select(d => new
@@ -24,6 +29,8 @@ public class GetDocumentHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
+                d.GroupId,
+                GroupName = d.Group != null ? d.Group.Name : null,
                 LatestVersion = d.Versions
                     .OrderByDescending(r => r.VersionNumber)
                     .Select(r => new
@@ -79,6 +86,8 @@ public class GetDocumentHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUserName,
                 OwnerUserId = d.OwnerUserId,
                 OwnerUserName = d.OwnerUserName,
+                GroupId = d.GroupId,
+                GroupName = d.GroupName,
                 ExtractedText = d.LatestVersion.ExtractedText,
                 VersionCount = d.VersionCount,
                 Versions = d.Versions,
@@ -86,5 +95,7 @@ public class GetDocumentHandler(AppDbContext db)
                 Parties = d.Parties
             })
             .FirstOrDefaultAsync(ct);
+
+        return response is not null ? Results.Ok(response) : Results.NotFound();
     }
 }

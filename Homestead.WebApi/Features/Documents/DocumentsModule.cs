@@ -16,6 +16,7 @@ using Homestead.WebApi.Features.Documents.v1.GetDocumentFile;
 using Homestead.WebApi.Features.Documents.v1.GetDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 using Homestead.WebApi.Features.Documents.v1.GetDocuments;
+using Homestead.WebApi.Features.Documents.v1.GetMyGroups;
 using Homestead.WebApi.Features.Documents.v1.GetParties;
 using Homestead.WebApi.Features.Documents.v1.GetParty;
 using Homestead.WebApi.Features.Documents.v1.PatchDocument;
@@ -38,7 +39,7 @@ public static class DocumentsModule
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Documents")
-            .RequireAuthorization(AuthPolicies.RequireViewer);
+            .RequireAuthorization(AuthPolicies.ActiveUser);
 
         BulkDeleteDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
@@ -75,6 +76,9 @@ public static class DocumentsModule
         DeleteTagEndpoint.Map(tags);
         GetTagsEndpoint.Map(tags);
         PatchTagEndpoint.Map(tags);
+
+        var groups = v1.MapGroup("/groups");
+        GetMyGroupsEndpoint.Map(groups);
 
         return app;
     }

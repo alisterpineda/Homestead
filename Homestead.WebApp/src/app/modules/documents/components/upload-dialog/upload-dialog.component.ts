@@ -6,6 +6,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { UploadDropzoneComponent } from '../upload-dropzone/upload-dropzone.component';
+import { GroupSelectComponent } from '../group-select/group-select.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { toast } from 'ngx-sonner';
@@ -19,6 +20,7 @@ import { toast } from 'ngx-sonner';
     HlmInput,
     HlmLabel,
     UploadDropzoneComponent,
+    GroupSelectComponent,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -43,6 +45,10 @@ import { toast } from 'ngx-sonner';
               (input)="name.set(asInputValue($event))"
             />
           </div>
+          <div class="flex flex-col gap-2">
+            <label hlmLabel>Group (optional)</label>
+            <app-group-select [value]="selectedGroupId()" (valueChange)="selectedGroupId.set($event)" placeholder="No group (global)" triggerClass="w-full" />
+          </div>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>File</label>
             <app-upload-dropzone [file]="file()" (fileSelect)="file.set($event)" />
@@ -66,6 +72,7 @@ export class UploadDialogComponent {
   uploaded = output();
 
   name = signal('');
+  selectedGroupId = signal('');
   file = signal<File | null>(null);
   uploading = signal(false);
   uploadError = signal(false);
@@ -82,6 +89,7 @@ export class UploadDialogComponent {
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.name.set('');
+      this.selectedGroupId.set('');
       this.file.set(null);
       this.uploading.set(false);
       this.uploadError.set(false);
@@ -101,6 +109,10 @@ export class UploadDialogComponent {
     const nameVal = this.name();
     if (nameVal) {
       formData.append('name', nameVal);
+    }
+    const groupId = this.selectedGroupId();
+    if (groupId) {
+      formData.append('groupId', groupId);
     }
 
     this.http

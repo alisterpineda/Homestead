@@ -18,6 +18,7 @@ export interface GetDocuments$Params {
   Search?: string;
   SortBy?: DocumentSortBy;
   SortDir?: SortDirection;
+  GroupId?: string;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -31,6 +32,7 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
     rb.query('Search', params.Search, {});
     rb.query('SortBy', params.SortBy, {});
     rb.query('SortDir', params.SortDir, {});
+    rb.query('GroupId', params.GroupId, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

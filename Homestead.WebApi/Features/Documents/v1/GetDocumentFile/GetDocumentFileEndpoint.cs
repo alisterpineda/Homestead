@@ -6,17 +6,12 @@ public static class GetDocumentFileEndpoint
     {
         group.MapGet("/{id:guid}/file", async (Guid id, Guid? versionId, bool? download, GetDocumentFileHandler handler, CancellationToken ct) =>
         {
-            var request = new GetDocumentFileRequest(id, versionId);
-            var response = await handler.HandleAsync(request, ct);
-            if (response is null)
-                return Results.NotFound();
-
-            return download == true
-                ? Results.File(response.PhysicalPath, response.ContentType, response.Name)
-                : Results.File(response.PhysicalPath, response.ContentType);
+            var request = new GetDocumentFileRequest(id, versionId, download);
+            return await handler.HandleAsync(request, ct);
         })
         .WithName("GetDocumentFile")
         .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound);
     }
 }

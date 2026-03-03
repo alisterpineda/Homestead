@@ -1,0 +1,191 @@
+import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideUserPlus } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmDialogImports } from '@/shared/components/spartan/dialog';
+import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmSelectImports } from '@/shared/components/spartan/select';
+import { BrnDialog } from '@spartan-ng/brain/dialog';
+import { BrnSelectImports } from '@spartan-ng/brain/select';
+import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { getUsers } from '@/api/generated/fn/admin/get-users';
+import { addGroupMember } from '@/api/generated/fn/admin/add-group-member';
+import type { UserResponse } from '@/api/generated/models/user-response';
+import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
+import { toast } from 'ngx-sonner';
+
+@Component({
+  selector: 'app-add-member-dialog',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, BrnSelectImports],
+  providers: [provideIcons({ lucideUserPlus })],
+  template: `
+    <hlm-dialog (stateChanged)="onStateChanged($event)">
+      <button hlmBtn size="sm" hlmDialogTrigger>
+        <ng-icon hlm name="lucideUserPlus" size="sm" class="mr-1" />
+        Add Member
+      </button>
+
+      <hlm-dialog-content *hlmDialogPortal="let ctx">
+        <div hlmDialogHeader>
+          <h2 hlmDialogTitle>Add Member</h2>
+          <p hlmDialogDescription>Add a user to this group.</p>
+        </div>
+
+        <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
+          <div class="flex flex-col gap-2">
+            <label hlmLabel for="member-search">Search Users</label>
+            <input hlmInput id="member-search" placeholder="Search by name or email"
+              [value]="userSearch()" (input)="onSearchInput(asInputValue($event))" />
+            @if (loadingUsers()) {
+              <p class="text-xs text-muted-foreground">Loading...</p>
+            }
+            @if (userResults().length > 0) {
+              <div class="max-h-40 overflow-y-auto rounded-md border">
+                @for (user of userResults(); track user.id) {
+                  <button type="button"
+                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                    [class.bg-accent]="selectedUserId() === user.id"
+                    (click)="selectUser(user)">
+                    <span class="font-medium">{{ user.displayName }}</span>
+                    <span class="text-muted-foreground">{{ user.email }}</span>
+                  </button>
+                }
+              </div>
+            }
+            @if (selectedUser(); as u) {
+              <p class="text-sm">Selected: <strong>{{ u.displayName }}</strong> ({{ u.email }})</p>
+            }
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label hlmLabel>Access Level</label>
+            <brn-select [value]="accessLevel()" (valueChange)="accessLevel.set($any($event))">
+              <hlm-select-trigger class="w-full">
+                <hlm-select-value />
+              </hlm-select-trigger>
+              <hlm-select-content>
+                <hlm-option value="Owner">Owner</hlm-option>
+                <hlm-option value="Editor">Editor</hlm-option>
+                <hlm-option value="Viewer">Viewer</hlm-option>
+              </hlm-select-content>
+            </brn-select>
+          </div>
+
+          @if (addError()) {
+            <p class="text-sm text-destructive">{{ addError() }}</p>
+          }
+
+          <div hlmDialogFooter>
+            <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
+            <button hlmBtn type="submit" [disabled]="!canSubmit() || adding()">
+              {{ adding() ? 'Adding...' : 'Add' }}
+            </button>
+          </div>
+        </form>
+      </hlm-dialog-content>
+    </hlm-dialog>
+  `,
+})
+export class AddMemberDialogComponent {
+  groupId = input.required<string>();
+  added = output();
+
+  private http = inject(HttpClient);
+  private apiConfig = inject(ApiConfiguration);
+  private dialog = viewChild(BrnDialog);
+
+  userSearch = signal('');
+  userResults = signal<UserResponse[]>([]);
+  loadingUsers = signal(false);
+  selectedUser = signal<UserResponse | null>(null);
+  selectedUserId = computed(() => this.selectedUser()?.id ?? null);
+  accessLevel = signal<GroupAccessLevel>('Editor');
+  adding = signal(false);
+  addError = signal('');
+
+  canSubmit = computed(() => this.selectedUserId() !== null);
+
+  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  asInputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  onSearchInput(value: string): void {
+    this.userSearch.set(value);
+    if (this.searchTimeout) clearTimeout(this.searchTimeout);
+    if (value.trim().length < 2) {
+      this.userResults.set([]);
+      return;
+    }
+    this.searchTimeout = setTimeout(() => this.searchUsers(value), 300);
+  }
+
+  private searchUsers(search: string): void {
+    this.loadingUsers.set(true);
+    getUsers(this.http, this.apiConfig.rootUrl, {
+      Page: 1,
+      PageSize: 10,
+      Search: search,
+    }).subscribe({
+      next: (r) => {
+        this.loadingUsers.set(false);
+        const body = r.body as { items: UserResponse[] };
+        this.userResults.set(body.items?.filter((u: UserResponse) => u.isActive) ?? []);
+      },
+      error: () => {
+        this.loadingUsers.set(false);
+        this.userResults.set([]);
+      },
+    });
+  }
+
+  selectUser(user: UserResponse): void {
+    this.selectedUser.set(user);
+    this.userResults.set([]);
+    this.userSearch.set(user.displayName);
+  }
+
+  onStateChanged(state: 'open' | 'closed'): void {
+    if (state === 'open') {
+      this.userSearch.set('');
+      this.userResults.set([]);
+      this.selectedUser.set(null);
+      this.accessLevel.set('Editor');
+      this.adding.set(false);
+      this.addError.set('');
+    }
+  }
+
+  handleSubmit(event: Event): void {
+    event.preventDefault();
+    const userId = this.selectedUserId();
+    if (!userId) return;
+
+    this.adding.set(true);
+    this.addError.set('');
+
+    addGroupMember(this.http, this.apiConfig.rootUrl, {
+      id: this.groupId(),
+      body: {
+        userId,
+        accessLevel: this.accessLevel(),
+      },
+    }).subscribe({
+      next: () => {
+        this.adding.set(false);
+        toast.success('Member added.');
+        this.dialog()?.close();
+        this.added.emit();
+      },
+      error: (err: { error?: { error?: string } }) => {
+        this.adding.set(false);
+        this.addError.set(err?.error?.error ?? 'Failed to add member.');
+      },
+    });
+  }
+}

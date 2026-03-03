@@ -1,14 +1,19 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentFile;
 
-public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuration)
-    : IQueryHandler<GetDocumentFileRequest, GetDocumentFileResponse?>
+public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuration, IDocumentAccessService accessService)
+    : IQueryHandler<GetDocumentFileRequest, IResult>
 {
-    public async Task<GetDocumentFileResponse?> HandleAsync(GetDocumentFileRequest request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(GetDocumentFileRequest request, CancellationToken ct)
     {
+        var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Read, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
+
         var documentName = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
@@ -16,7 +21,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
             .FirstOrDefaultAsync(ct);
 
         if (documentName is null)
-            return null;
+            return Results.NotFound();
 
         var versionQuery = db.DocumentVersions
             .AsNoTracking()
@@ -30,7 +35,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         var version = await versionQuery.FirstOrDefaultAsync(ct);
 
         if (version is null)
-            return null;
+            return Results.NotFound();
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
@@ -38,8 +43,10 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         var physicalPath = version.GetPhysicalPath(mediaPath);
 
         if (!File.Exists(physicalPath))
-            return null;
+            return Results.NotFound();
 
-        return new GetDocumentFileResponse(physicalPath, version.ContentType, version.GetDownloadFileName(documentName));
+        return request.Download == true
+            ? Results.File(physicalPath, version.ContentType, version.GetDownloadFileName(documentName))
+            : Results.File(physicalPath, version.ContentType);
     }
 }

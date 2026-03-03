@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Parties;
@@ -9,11 +10,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver)
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver,
+    IDocumentAccessService accessService)
     : ICommandHandler<PatchDocumentCommand, IResult>
 {
     public async Task<IResult> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
     {
+        var access = await accessService.CheckAccessAsync(request.Id, DocumentOperation.Write, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
+
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
@@ -32,7 +38,8 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             ValidFrom = document.ValidFrom,
             ValidUntil = document.ValidUntil,
             TagPaths = document.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
-            PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList()
+            PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList(),
+            GroupId = document.GroupId
         };
 
         // Apply patch operations
@@ -67,11 +74,20 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
                 return Results.BadRequest(new { InvalidPartyIds = invalidIds });
         }
 
+        // Validate GroupId if changed
+        if (model.GroupId.HasValue && model.GroupId != document.GroupId)
+        {
+            var groupExists = await db.Groups.AnyAsync(g => g.Id == model.GroupId.Value, ct);
+            if (!groupExists)
+                return Results.BadRequest(new { Error = "Group not found." });
+        }
+
         // Update entity from patched model
         document.Name = model.Name;
         document.DocumentDate = model.DocumentDate;
         document.ValidFrom = model.ValidFrom;
         document.ValidUntil = model.ValidUntil;
+        document.GroupId = model.GroupId;
 
         // Clear existing tag associations
         document.DocumentTags.Clear();
@@ -151,6 +167,16 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
                 .FirstOrDefaultAsync(ct);
         }
 
+        // Load group info
+        string? groupName = null;
+        if (document.GroupId.HasValue)
+        {
+            groupName = await db.Groups
+                .Where(g => g.Id == document.GroupId)
+                .Select(g => g.Name)
+                .FirstOrDefaultAsync(ct);
+        }
+
         // Load latest version for file fields
         var latestVersion = await db.DocumentVersions
             .AsNoTracking()
@@ -174,6 +200,8 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             CreatedByUserName = createdByUserName,
             OwnerUserId = document.OwnerUserId,
             OwnerUserName = ownerUserName,
+            GroupId = document.GroupId,
+            GroupName = groupName,
             Tags = tags,
             Parties = parties
         });

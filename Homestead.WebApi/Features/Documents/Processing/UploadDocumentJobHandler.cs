@@ -73,7 +73,8 @@ public class UploadDocumentJobHandler(
             Name = documentName,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = job.CreatedByUserId,
-            OwnerUserId = job.CreatedByUserId
+            OwnerUserId = job.CreatedByUserId,
+            GroupId = payload.GroupId
         };
 
         var version = new DocumentVersion

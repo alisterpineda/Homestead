@@ -10,6 +10,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
     public DateOnly? ValidUntil { get; init; }
     public required List<string> TagPaths { get; init; }
     public required List<Guid> PartyIds { get; init; }
+    public Guid? GroupId { get; init; }
 
     public static DocumentSnapshot From(Document source) => new()
     {
@@ -18,7 +19,8 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
         ValidFrom = source.ValidFrom,
         ValidUntil = source.ValidUntil,
         TagPaths = source.DocumentTags.Select(dt => dt.Tag.Path).Order().ToList(),
-        PartyIds = source.DocumentParties.Select(dp => dp.PartyId).Order().ToList()
+        PartyIds = source.DocumentParties.Select(dp => dp.PartyId).Order().ToList(),
+        GroupId = source.GroupId
     };
 
     public List<FieldChange> Diff(DocumentSnapshot other)
@@ -39,6 +41,8 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
             changes.Add(new ArrayFieldChange("PartyIds",
                 PartyIds.Select(p => p.ToString()).ToList(),
                 other.PartyIds.Select(p => p.ToString()).ToList()));
+        if (GroupId != other.GroupId)
+            changes.Add(new ScalarFieldChange("GroupId", GroupId?.ToString(), other.GroupId?.ToString()));
 
         return changes;
     }

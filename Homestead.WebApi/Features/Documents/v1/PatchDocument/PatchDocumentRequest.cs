@@ -10,6 +10,7 @@ public class PatchDocumentModel
     public DateOnly? ValidUntil { get; set; }
     public List<string> TagPaths { get; set; } = [];
     public List<Guid> PartyIds { get; set; } = [];
+    public Guid? GroupId { get; set; }
 }
 
 public record PatchDocumentCommand

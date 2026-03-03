@@ -22,4 +22,7 @@ public record GetDocumentsRequest : PaginatedRequest
 
     [FromQuery(Name = "SortDir")]
     public SortDirection? SortDir { get; init; }
+
+    [FromQuery(Name = "GroupId")]
+    public Guid? GroupId { get; init; }
 }

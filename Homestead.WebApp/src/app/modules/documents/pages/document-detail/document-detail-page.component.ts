@@ -42,6 +42,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
+import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
@@ -94,6 +95,7 @@ import { toast } from 'ngx-sonner';
     HlmInputGroupImports,
     NgScrollbar,
     AddVersionDialogComponent,
+    HlmBadge,
   ],
   providers: [
     provideIcons({
@@ -316,6 +318,14 @@ import { toast } from 'ngx-sonner';
               {{ formatDate(doc.createdAt) }}
             </p>
           </div>
+
+          <!-- Group -->
+          @if (document()?.groupName; as groupName) {
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-muted-foreground">Group:</span>
+              <span hlmBadge variant="outline">{{ groupName }}</span>
+            </div>
+          }
 
           <!-- Version -->
           <hlm-separator />

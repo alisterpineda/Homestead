@@ -16,6 +16,8 @@ public record PatchDocumentResponse
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }
     public string? OwnerUserName { get; init; }
+    public Guid? GroupId { get; init; }
+    public string? GroupName { get; init; }
     public required IReadOnlyList<TagDto> Tags { get; init; }
     public required IReadOnlyList<PartyDto> Parties { get; init; }
 }

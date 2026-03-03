@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using NpgsqlTypes;
@@ -18,6 +19,9 @@ public class Document
     public Guid? OwnerUserId { get; set; }
     public AppUser? CreatedByUser { get; set; }
     public AppUser? OwnerUser { get; set; }
+
+    public Guid? GroupId { get; set; }
+    public Group? Group { get; set; }
 
     public ICollection<DocumentVersion> Versions { get; set; } = [];
     public ICollection<DocumentComment> Comments { get; set; } = [];

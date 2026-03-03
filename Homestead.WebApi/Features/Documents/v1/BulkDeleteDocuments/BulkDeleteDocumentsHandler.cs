@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
 public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger)
+    IAuditLogger auditLogger, IDocumentAccessService accessService)
     : ICommandHandler<BulkDeleteDocumentsRequest, BulkDeleteDocumentsResponse>
 {
     public async Task<BulkDeleteDocumentsResponse> HandleAsync(BulkDeleteDocumentsRequest request, CancellationToken ct)
@@ -19,28 +20,39 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, IConfiguration configur
         if (documents.Count == 0)
             return new BulkDeleteDocumentsResponse(0);
 
+        // Filter to only documents the user has write access to
+        var authorizedDocs = new List<Domains.Documents.Document>();
+        foreach (var doc in documents)
+        {
+            var access = await accessService.CheckAccessAsync(doc.Id, DocumentOperation.Write, ct);
+            if (access.IsAllowed)
+                authorizedDocs.Add(doc);
+        }
+
+        if (authorizedDocs.Count == 0)
+            return new BulkDeleteDocumentsResponse(0);
+
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var physicalPaths = documents
+        var physicalPaths = authorizedDocs
             .SelectMany(d => d.Versions)
             .Select(r => r.GetPhysicalPath(mediaPath))
             .ToList();
 
-        foreach (var doc in documents)
+        foreach (var doc in authorizedDocs)
         {
             auditLogger.LogDeleted("Document", doc.Id, currentUser.UserId, description: doc.Name);
         }
 
-        db.Documents.RemoveRange(documents);
+        db.Documents.RemoveRange(authorizedDocs);
         await db.SaveChangesAsync(ct);
 
         foreach (var path in physicalPaths)
         {
-            if (File.Exists(path))
-                File.Delete(path);
+            File.Delete(path);
         }
 
-        return new BulkDeleteDocumentsResponse(documents.Count);
+        return new BulkDeleteDocumentsResponse(authorizedDocs.Count);
     }
 }

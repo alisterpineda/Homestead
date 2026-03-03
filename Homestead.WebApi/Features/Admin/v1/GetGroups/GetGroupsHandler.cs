@@ -1,0 +1,47 @@
+using Homestead.WebApi.Common;
+using Homestead.WebApi.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Homestead.WebApi.Features.Admin.v1.GetGroups;
+
+public class GetGroupsHandler(AppDbContext db)
+    : IQueryHandler<GetGroupsRequest, PaginatedResponse<GroupResponse>>
+{
+    public async Task<PaginatedResponse<GroupResponse>> HandleAsync(
+        GetGroupsRequest request, CancellationToken ct)
+    {
+        var query = db.Groups.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLower();
+            query = query.Where(g => g.Name.ToLower().Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderBy(g => g.Name)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(g => new GroupResponse
+            {
+                Id = g.Id,
+                Name = g.Name,
+                Description = g.Description,
+                CreatedAt = g.CreatedAt,
+                CreatedByUserId = g.CreatedByUserId,
+                CreatedByUserName = g.CreatedByUser != null ? g.CreatedByUser.DisplayName : null,
+                MemberCount = g.Members.Count
+            })
+            .ToListAsync(ct);
+
+        return new PaginatedResponse<GroupResponse>
+        {
+            Items = items,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalCount = totalCount
+        };
+    }
+}

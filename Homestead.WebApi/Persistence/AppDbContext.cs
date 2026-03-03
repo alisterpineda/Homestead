@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Processing;
@@ -21,6 +22,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DocumentParty> DocumentParties { get; set; }
     public DbSet<ProcessingJob> ProcessingJobs { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Group> Groups { get; set; }
+    public DbSet<GroupMember> GroupMembers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

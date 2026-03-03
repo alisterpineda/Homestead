@@ -16,6 +16,8 @@ public record GetDocumentResponse
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }
     public string? OwnerUserName { get; init; }
+    public Guid? GroupId { get; init; }
+    public string? GroupName { get; init; }
     public string? ExtractedText { get; init; }
     public int VersionCount { get; init; }
     public required IReadOnlyList<GetDocumentVersionDto> Versions { get; init; }

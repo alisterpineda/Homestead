@@ -1,16 +1,22 @@
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 
-public class GetDocumentsHandler(AppDbContext db)
+public class GetDocumentsHandler(AppDbContext db, IDocumentAccessService accessService)
     : IQueryHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
 {
     public async Task<PaginatedResponse<GetDocumentsResponse>> HandleAsync(
         GetDocumentsRequest request, CancellationToken ct)
     {
-        var query = db.Documents.AsNoTracking();
+        var query = accessService.FilterByAccess(db.Documents.AsNoTracking());
+
+        if (request.GroupId.HasValue)
+        {
+            query = query.Where(d => d.GroupId == request.GroupId.Value);
+        }
 
         if (request.PartyIds is { Length: > 0 })
         {
@@ -79,6 +85,8 @@ public class GetDocumentsHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 d.OwnerUserId,
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
+                d.GroupId,
+                GroupName = d.Group != null ? d.Group.Name : null,
                 VersionCount = d.Versions.Count,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
@@ -107,6 +115,8 @@ public class GetDocumentsHandler(AppDbContext db)
                 CreatedByUserName = d.CreatedByUserName,
                 OwnerUserId = d.OwnerUserId,
                 OwnerUserName = d.OwnerUserName,
+                GroupId = d.GroupId,
+                GroupName = d.GroupName,
                 VersionCount = d.VersionCount,
                 Tags = d.Tags,
                 Parties = d.Parties

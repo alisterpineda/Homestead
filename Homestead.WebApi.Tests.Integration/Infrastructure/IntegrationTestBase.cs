@@ -71,12 +71,14 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return result;
     }
 
-    protected async Task<Guid> UploadAndWaitAsync(HttpClient client, string name = "sample.pdf")
+    protected async Task<Guid> UploadAndWaitAsync(HttpClient client, string name = "sample.pdf", Guid? groupId = null)
     {
         var fileBytes = await GetUniquePdfBytesAsync();
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(name), "name");
         form.Add(new ByteArrayContent(fileBytes), "file", name);
+        if (groupId.HasValue)
+            form.Add(new StringContent(groupId.Value.ToString()), "groupId");
 
         var response = await client.PostAsync("/api/v1/documents", form);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -95,6 +97,36 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         request.Content.Headers.ContentType =
             new System.Net.Http.Headers.MediaTypeHeaderValue("application/json-patch+json");
         return await client.SendAsync(request);
+    }
+
+    protected async Task<Guid> CreateGroupAsync(HttpClient adminClient, string name, string? description = null)
+    {
+        var response = await adminClient.PostAsJsonAsync("/api/v1/admin/groups", new
+        {
+            name,
+            description
+        }, CT);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<GroupItem>(CT);
+        return body!.Id;
+    }
+
+    protected async Task AddGroupMemberAsync(HttpClient adminClient, Guid groupId, Guid userId, string accessLevel = "Editor")
+    {
+        var response = await adminClient.PostAsJsonAsync($"/api/v1/admin/groups/{groupId}/members", new
+        {
+            userId,
+            accessLevel
+        }, CT);
+        response.EnsureSuccessStatusCode();
+    }
+
+    protected async Task<Guid> GetUserIdAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/auth/user-info", CT);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<UserInfoResult>(CT);
+        return body!.Id;
     }
 
     protected async Task<Guid> WaitForJobCompletionAsync(Guid jobId, TimeSpan? timeout = null)

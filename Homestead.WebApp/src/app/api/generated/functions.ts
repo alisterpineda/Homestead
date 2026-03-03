@@ -61,6 +61,8 @@ export type { DeleteTag$Params as DeleteTag$Params } from './fn/documents/delete
 export { deleteTag as deleteTag } from './fn/documents/delete-tag';
 export type { PatchTag$Params as PatchTag$Params } from './fn/documents/patch-tag';
 export { patchTag as patchTag } from './fn/documents/patch-tag';
+export type { GetMyGroups$Params as GetMyGroups$Params } from './fn/documents/get-my-groups';
+export { getMyGroups as getMyGroups } from './fn/documents/get-my-groups';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
 export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
 export type { RetriggerProcessingJob$Params as RetriggerProcessingJob$Params } from './fn/processing/retrigger-processing-job';
@@ -75,3 +77,19 @@ export type { DeleteUser$Params as DeleteUser$Params } from './fn/admin/delete-u
 export { deleteUser as deleteUser } from './fn/admin/delete-user';
 export type { BulkDeleteUsers$Params as BulkDeleteUsers$Params } from './fn/admin/bulk-delete-users';
 export { bulkDeleteUsers as bulkDeleteUsers } from './fn/admin/bulk-delete-users';
+export type { GetGroups$Params as GetGroups$Params } from './fn/admin/get-groups';
+export { getGroups as getGroups } from './fn/admin/get-groups';
+export type { CreateGroup$Params as CreateGroup$Params } from './fn/admin/create-group';
+export { createGroup as createGroup } from './fn/admin/create-group';
+export type { GetGroup$Params as GetGroup$Params } from './fn/admin/get-group';
+export { getGroup as getGroup } from './fn/admin/get-group';
+export type { UpdateGroup$Params as UpdateGroup$Params } from './fn/admin/update-group';
+export { updateGroup as updateGroup } from './fn/admin/update-group';
+export type { DeleteGroup$Params as DeleteGroup$Params } from './fn/admin/delete-group';
+export { deleteGroup as deleteGroup } from './fn/admin/delete-group';
+export type { AddGroupMember$Params as AddGroupMember$Params } from './fn/admin/add-group-member';
+export { addGroupMember as addGroupMember } from './fn/admin/add-group-member';
+export type { UpdateGroupMember$Params as UpdateGroupMember$Params } from './fn/admin/update-group-member';
+export { updateGroupMember as updateGroupMember } from './fn/admin/update-group-member';
+export type { RemoveGroupMember$Params as RemoveGroupMember$Params } from './fn/admin/remove-group-member';
+export { removeGroupMember as removeGroupMember } from './fn/admin/remove-group-member';

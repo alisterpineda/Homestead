@@ -84,6 +84,9 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateOnly?>("DocumentDate")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("GroupId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -103,6 +106,8 @@ namespace Homestead.WebApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("GroupId");
 
                     b.HasIndex("OwnerUserId");
 
@@ -257,6 +262,58 @@ namespace Homestead.WebApi.Migrations
                         .IsUnique();
 
                     b.ToTable("tags", "documents");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Groups.Group", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("groups", "auth");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Groups.GroupMember", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AccessLevel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("GroupId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("group_members", "auth");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Identity.AppUser", b =>
@@ -572,12 +629,19 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Homestead.WebApi.Domains.Groups.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "OwnerUser")
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("Group");
 
                     b.Navigation("OwnerUser");
                 });
@@ -638,6 +702,35 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Groups.Group", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Groups.GroupMember", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Groups.Group", "Group")
+                        .WithMany("Members")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Parties.DocumentParty", b =>
@@ -726,6 +819,11 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Children");
 
                     b.Navigation("DocumentTags");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Groups.Group", b =>
+                {
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Parties.Party", b =>

@@ -6,6 +6,9 @@ export const adminSidebar: SidebarGroup[] = [
   },
   {
     label: 'Manage',
-    items: [{ label: 'Users', path: '/admin/users', icon: 'lucideUsers' }],
+    items: [
+      { label: 'Users', path: '/admin/users', icon: 'lucideUsers' },
+      { label: 'Groups', path: '/admin/groups', icon: 'lucideUsers2' },
+    ],
   },
 ];

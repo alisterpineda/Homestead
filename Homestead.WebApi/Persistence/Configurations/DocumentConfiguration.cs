@@ -33,6 +33,13 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(d => d.OwnerUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(d => d.Group)
+            .WithMany()
+            .HasForeignKey(d => d.GroupId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(d => d.GroupId);
+
         builder.Property(d => d.SearchVector)
             .HasColumnType("tsvector");
 

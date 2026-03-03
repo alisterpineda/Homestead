@@ -14,6 +14,8 @@ public record GetDocumentsResponse
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }
     public string? OwnerUserName { get; init; }
+    public Guid? GroupId { get; init; }
+    public string? GroupName { get; init; }
     public int VersionCount { get; init; }
     public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentsPartyDto> Parties { get; init; }

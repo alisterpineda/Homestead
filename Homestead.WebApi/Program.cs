@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Features.Admin;
@@ -83,6 +84,7 @@ builder.AddAppAuthentication();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
+builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddHandlers();

@@ -82,13 +82,17 @@ public class RoleAuthorizationTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Guest_Gets403OnDocumentEndpoints()
+    public async Task Guest_GetsEmptyListOnDocumentEndpoints()
     {
+        // Module policy changed from RequireViewer to ActiveUser.
+        // Guests can access the endpoint but FilterByAccess returns no global docs.
         var client = await CreateGuestClientAsync();
 
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<object>>(CT);
+        Assert.Empty(body!.Items);
     }
 
     // --- Document write access ---

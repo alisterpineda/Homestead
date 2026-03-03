@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
@@ -13,7 +14,8 @@ public class CreateDocumentVersionHandler(
     AppDbContext db,
     IConfiguration configuration,
     ICurrentUserAccessor currentUser,
-    IJobQueue jobQueue)
+    IJobQueue jobQueue,
+    IDocumentAccessService accessService)
     : ICommandHandler<CreateDocumentVersionRequest, IResult>
 {
     public async Task<IResult> HandleAsync(CreateDocumentVersionRequest request, CancellationToken ct)
@@ -21,6 +23,10 @@ public class CreateDocumentVersionHandler(
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
             return Results.NotFound();
+
+        var access = await accessService.CheckAccessAsync(request.DocumentId, DocumentOperation.Write, ct);
+        if (!access.IsAllowed)
+            return Results.Forbid();
 
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);

@@ -3,15 +3,25 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
+using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue)
-    : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
+public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue, AppDbContext db)
+    : ICommandHandler<CreateDocumentRequest, IResult>
 {
-    public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
+    public async Task<IResult> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
     {
+        // Validate GroupId if provided
+        if (request.GroupId.HasValue)
+        {
+            var groupExists = await db.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
+            if (!groupExists)
+                return Results.BadRequest(new { Error = "Group not found." });
+        }
+
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);
         var uploadId = Guid.NewGuid();
@@ -37,7 +47,8 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
             request.Label,
             file.ContentType,
             file.Length,
-            extension);
+            extension,
+            request.GroupId);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.UploadDocument, opts =>
         {
@@ -46,6 +57,6 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
             opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);
 
-        return new CreateDocumentResponse { JobId = jobId };
+        return Results.Accepted(null, new CreateDocumentResponse { JobId = jobId });
     }
 }
