@@ -29,10 +29,13 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.2
     command: start-dev --import-realm
+    ports: ["8888:8080"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: http://localhost:8888
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     volumes:
       - ../Homestead.AppHost/KeycloakRealms:/opt/keycloak/data/import:ro
     healthcheck:
@@ -53,6 +56,7 @@ services:
   homestead-oidc-local:
     <<: *homestead-base
     ports: ["3102:8080"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +67,8 @@ services:
       DB_HOST: postgres
       DB_NAME: homestead_oidc_local
       DB_PASSWORD: e2e-test-password
-      OIDC_AUTHORITY: http://keycloak:8080/realms/homestead
+      OIDC_AUTHORITY: http://localhost:8888/realms/homestead
+      OIDC_METADATA_ADDRESS: http://host.docker.internal:8888/realms/homestead/.well-known/openid-configuration
       OIDC_CLIENT_ID: homestead-app
       OIDC_CLIENT_SECRET: homestead-dev-secret
       OIDC_DISPLAY_NAME: Keycloak
@@ -73,6 +78,7 @@ services:
   homestead-oidc-only:
     <<: *homestead-base
     ports: ["3103:8080"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,7 +89,8 @@ services:
       DB_HOST: postgres
       DB_NAME: homestead_oidc_only
       DB_PASSWORD: e2e-test-password
-      OIDC_AUTHORITY: http://keycloak:8080/realms/homestead
+      OIDC_AUTHORITY: http://localhost:8888/realms/homestead
+      OIDC_METADATA_ADDRESS: http://host.docker.internal:8888/realms/homestead/.well-known/openid-configuration
       OIDC_CLIENT_ID: homestead-app
       OIDC_CLIENT_SECRET: homestead-dev-secret
       OIDC_DISPLAY_NAME: Keycloak

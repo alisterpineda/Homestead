@@ -40,6 +40,9 @@ var oidcAuthority = Environment.GetEnvironmentVariable("OIDC_AUTHORITY");
 if (!string.IsNullOrEmpty(oidcAuthority))
 {
     builder.Configuration["Oidc:Authority"] = oidcAuthority;
+    var oidcMetadata = Environment.GetEnvironmentVariable("OIDC_METADATA_ADDRESS");
+    if (!string.IsNullOrEmpty(oidcMetadata))
+        builder.Configuration["Oidc:MetadataAddress"] = oidcMetadata;
     builder.Configuration["Oidc:ClientId"] =
         Environment.GetEnvironmentVariable("OIDC_CLIENT_ID") ?? "";
     builder.Configuration["Oidc:ClientSecret"] =

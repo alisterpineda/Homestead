@@ -69,6 +69,8 @@ public static class AuthenticationExtensions
                 .AddOpenIdConnect(OidcOptions.SchemeName, options =>
                 {
                     options.Authority = oidcOptions.Authority;
+                    if (!string.IsNullOrEmpty(oidcOptions.MetadataAddress))
+                        options.MetadataAddress = oidcOptions.MetadataAddress;
                     options.ClientId = oidcOptions.ClientId;
                     options.ClientSecret = oidcOptions.ClientSecret;
                     options.RequireHttpsMetadata = !isDev;

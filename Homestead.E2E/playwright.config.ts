@@ -30,16 +30,46 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      name: 'local-auth-setup',
+      testMatch: /local-auth-setup\.ts/,
+      use: { baseURL: 'http://localhost:3101' },
+      dependencies: ['local-only'],
+    },
+    {
+      name: 'local-admin',
+      testDir: './tests/local-admin',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3101' },
+      dependencies: ['local-auth-setup'],
+    },
+    {
+      name: 'local-user',
+      testDir: './tests/local-user',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3101' },
+      dependencies: ['local-auth-setup'],
+    },
+    {
       name: 'oidc-local',
       testDir: './tests/oidc-local',
       use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3102' },
       dependencies: ['setup'],
     },
     {
+      name: 'oidc-local-login',
+      testDir: './tests/oidc-local-login',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3102' },
+      dependencies: ['oidc-local'],
+    },
+    {
       name: 'oidc-only',
       testDir: './tests/oidc-only',
       use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3103' },
       dependencies: ['setup'],
+    },
+    {
+      name: 'oidc-only-login',
+      testDir: './tests/oidc-only-login',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:3103' },
+      dependencies: ['oidc-only'],
     },
   ],
 });
