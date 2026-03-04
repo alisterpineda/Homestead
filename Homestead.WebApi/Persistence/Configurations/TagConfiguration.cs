@@ -34,5 +34,12 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
             .WithMany(t => t.Children)
             .HasForeignKey(t => t.ParentId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(t => t.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(t => t.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(t => t.CreatedByUserId);
     }
 }

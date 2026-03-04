@@ -49,7 +49,7 @@ public class PartyVisibilityTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Contributor_CannotSeePartiesOnOtherGroupDocs()
+    public async Task Contributor_SeesPartiesOnOtherGroupDocs_WithZeroDocCount()
     {
         var adminClient = await CreateAdminClientAsync();
         var groupB = await CreateGroupAsync(adminClient, "PartyVis Other Group");
@@ -63,18 +63,20 @@ public class PartyVisibilityTests : IntegrationTestBase
         var response = await contributorClient.GetAsync("/api/v1/documents/parties?Page=1&PageSize=100", CT);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<PartyListItem>>(CT);
 
-        Assert.DoesNotContain(body!.Items, p => p.Name == "Secret Group Party");
+        var matchedParty = body!.Items.FirstOrDefault(p => p.Name == "Secret Group Party");
+        Assert.NotNull(matchedParty);
+        Assert.Equal(0, matchedParty.DocumentCount);
     }
 
     [Fact]
-    public async Task Guest_SeesPartiesOnMemberGroupDocsOnly()
+    public async Task Guest_SeesAllParties_WithScopedDocCount()
     {
         var adminClient = await CreateAdminClientAsync();
         var groupA = await CreateGroupAsync(adminClient, "PartyVis Guest GroupA");
         var groupB = await CreateGroupAsync(adminClient, "PartyVis Guest GroupB");
 
         var partyA = await CreatePartyAsync(adminClient, "Guest Visible Party");
-        var partyB = await CreatePartyAsync(adminClient, "Guest Hidden Party");
+        var partyB = await CreatePartyAsync(adminClient, "Guest Other Party");
 
         var docA = await UploadAndWaitAsync(adminClient, "guest-party-a.pdf", groupA);
         var docB = await UploadAndWaitAsync(adminClient, "guest-party-b.pdf", groupB);
@@ -88,12 +90,17 @@ public class PartyVisibilityTests : IntegrationTestBase
         var response = await guestClient.GetAsync("/api/v1/documents/parties?Page=1&PageSize=100", CT);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<PartyListItem>>(CT);
 
-        Assert.Contains(body!.Items, p => p.Name == "Guest Visible Party");
-        Assert.DoesNotContain(body.Items, p => p.Name == "Guest Hidden Party");
+        var visibleParty = body!.Items.FirstOrDefault(p => p.Name == "Guest Visible Party");
+        Assert.NotNull(visibleParty);
+        Assert.True(visibleParty.DocumentCount > 0);
+
+        var otherParty = body.Items.FirstOrDefault(p => p.Name == "Guest Other Party");
+        Assert.NotNull(otherParty);
+        Assert.Equal(0, otherParty.DocumentCount);
     }
 
     [Fact]
-    public async Task OrphanedParty_InvisibleToNonAdmin()
+    public async Task OrphanedParty_VisibleToNonAdmin_WithZeroDocCount()
     {
         var adminClient = await CreateAdminClientAsync();
         await CreatePartyAsync(adminClient, "Orphaned Standalone Party");
@@ -103,7 +110,9 @@ public class PartyVisibilityTests : IntegrationTestBase
         var response = await contributorClient.GetAsync("/api/v1/documents/parties?Page=1&PageSize=100", CT);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<PartyListItem>>(CT);
 
-        Assert.DoesNotContain(body!.Items, p => p.Name == "Orphaned Standalone Party");
+        var matchedParty = body!.Items.FirstOrDefault(p => p.Name == "Orphaned Standalone Party");
+        Assert.NotNull(matchedParty);
+        Assert.Equal(0, matchedParty.DocumentCount);
     }
 
     [Fact]
@@ -137,20 +146,20 @@ public class PartyVisibilityTests : IntegrationTestBase
     // --- GetParty visibility ---
 
     [Fact]
-    public async Task GetParty_ReturnsNotFound_ForInaccessibleParty()
+    public async Task GetParty_ReturnsOk_ForAnyParty()
     {
         var adminClient = await CreateAdminClientAsync();
         var groupB = await CreateGroupAsync(adminClient, "PartyVis GetParty Group");
 
-        var party = await CreatePartyAsync(adminClient, "Inaccessible Party");
-        var docB = await UploadAndWaitAsync(adminClient, "inaccessible-party-doc.pdf", groupB);
+        var party = await CreatePartyAsync(adminClient, "Any Party");
+        var docB = await UploadAndWaitAsync(adminClient, "any-party-doc.pdf", groupB);
         await AssignPartiesAsync(adminClient, docB, [party.Id]);
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
         var response = await contributorClient.GetAsync($"/api/v1/documents/parties/{party.Id}", CT);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     // --- Mutation authorization tests ---
@@ -248,6 +257,44 @@ public class PartyVisibilityTests : IntegrationTestBase
         }, CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Contributor_CannotDeleteParty_OnGroupDocWithViewerAccess()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "PartyDel Viewer Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var party = await CreatePartyAsync(adminClient, "Viewer Delete Party");
+        var docId = await UploadAndWaitAsync(adminClient, "party-del-viewer.pdf", groupId);
+        await AssignPartiesAsync(adminClient, docId, [party.Id]);
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/parties/{party.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Contributor_CanDeleteParty_OnGroupDocWithEditorAccess()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "PartyDel Editor Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        var party = await CreatePartyAsync(adminClient, "Editor Delete Party");
+        var docId = await UploadAndWaitAsync(adminClient, "party-del-editor.pdf", groupId);
+        await AssignPartiesAsync(adminClient, docId, [party.Id]);
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/parties/{party.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     // --- Helpers ---

@@ -14,4 +14,10 @@ public interface IDocumentQueryService
     /// are inaccessible to the current user. Admins bypass this check.
     /// </summary>
     Task EnsureAllDocumentsAccessibleAsync(IQueryable<Guid> relatedDocumentIds, CancellationToken ct);
+
+    /// <summary>
+    /// Throws <see cref="Common.ForbiddenAccessException"/> if any of the given document IDs
+    /// are not writable by the current user. Admins bypass this check.
+    /// </summary>
+    Task EnsureAllDocumentsWritableAsync(IQueryable<Guid> relatedDocumentIds, CancellationToken ct);
 }

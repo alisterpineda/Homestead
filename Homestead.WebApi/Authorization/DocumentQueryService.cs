@@ -77,16 +77,44 @@ public class DocumentQueryService(
 
     public async Task EnsureAllDocumentsAccessibleAsync(
         IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
+        => await EnsureAllDocumentsInSetAsync(AccessibleDocumentIds(), relatedDocumentIds, ct);
+
+    public async Task EnsureAllDocumentsWritableAsync(
+        IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
+        => await EnsureAllDocumentsInSetAsync(WritableDocumentIds(), relatedDocumentIds, ct);
+
+    private IQueryable<Guid> WritableDocumentIds()
+    {
+        var role = currentUser.Role;
+        var userId = currentUser.UserId;
+
+        if (role == AppRole.Admin)
+            return db.Documents.Select(d => d.Id);
+
+        if (role != AppRole.Contributor || userId is null)
+            return db.Documents.Where(d => false).Select(d => d.Id);
+
+        // Contributor: global docs + group-scoped docs where user is Owner/Editor
+        var writableGroupIds = db.GroupMembers
+            .Where(gm => gm.UserId == userId.Value
+                && (gm.AccessLevel == GroupAccessLevel.Owner || gm.AccessLevel == GroupAccessLevel.Editor))
+            .Select(gm => gm.GroupId);
+
+        return db.Documents
+            .Where(d => d.GroupId == null || writableGroupIds.Contains(d.GroupId!.Value))
+            .Select(d => d.Id);
+    }
+
+    private async Task EnsureAllDocumentsInSetAsync(
+        IQueryable<Guid> allowedDocIds, IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
     {
         if (IsAdmin)
             return;
 
-        var accessible = AccessibleDocumentIds();
+        var hasDisallowed = await relatedDocumentIds
+            .AnyAsync(docId => !allowedDocIds.Contains(docId), ct);
 
-        var hasInaccessible = await relatedDocumentIds
-            .AnyAsync(docId => !accessible.Contains(docId), ct);
-
-        if (hasInaccessible)
+        if (hasDisallowed)
             throw new ForbiddenAccessException();
     }
 }

@@ -1,10 +1,11 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Persistence;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
-public class CreatePartyHandler(AppDbContext db)
+public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser)
     : ICommandHandler<CreatePartyRequest, CreatePartyResponse>
 {
     public async Task<CreatePartyResponse> HandleAsync(CreatePartyRequest request, CancellationToken ct)
@@ -19,7 +20,8 @@ public class CreatePartyHandler(AppDbContext db)
             Id = Guid.NewGuid(),
             Name = name,
             Description = request.Description?.Trim(),
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedByUserId = currentUser.UserId
         };
 
         db.Parties.Add(party);

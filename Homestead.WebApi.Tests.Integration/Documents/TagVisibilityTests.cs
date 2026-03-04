@@ -64,7 +64,7 @@ public class TagVisibilityTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Contributor_CannotSeeTagsOnOtherGroupDocs()
+    public async Task Contributor_SeesTagsOnOtherGroupDocs()
     {
         var adminClient = await CreateAdminClientAsync();
         var groupB = await CreateGroupAsync(adminClient, "TagVis Other Group");
@@ -77,7 +77,7 @@ public class TagVisibilityTests : IntegrationTestBase
         var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
 
-        Assert.DoesNotContain(tags!, t => t.Path == "secret-project-tag");
+        Assert.Contains(tags!, t => t.Path == "secret-project-tag");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class TagVisibilityTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Guest_SeesTagsOnMemberGroupDocsOnly()
+    public async Task Guest_SeesAllTags()
     {
         var adminClient = await CreateAdminClientAsync();
         var groupA = await CreateGroupAsync(adminClient, "TagVis Guest GroupA");
@@ -105,7 +105,7 @@ public class TagVisibilityTests : IntegrationTestBase
         var docA = await UploadAndWaitAsync(adminClient, "guest-tag-a.pdf", groupA);
         var docB = await UploadAndWaitAsync(adminClient, "guest-tag-b.pdf", groupB);
         await AssignTagsAsync(adminClient, docA, ["guest-visible-tag"]);
-        await AssignTagsAsync(adminClient, docB, ["guest-hidden-tag"]);
+        await AssignTagsAsync(adminClient, docB, ["guest-other-tag"]);
 
         var guestClient = await CreateGuestClientAsync();
         var guestId = await GetUserIdAsync(guestClient);
@@ -115,11 +115,11 @@ public class TagVisibilityTests : IntegrationTestBase
         var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
 
         Assert.Contains(tags!, t => t.Path == "guest-visible-tag");
-        Assert.DoesNotContain(tags!, t => t.Path == "guest-hidden-tag");
+        Assert.Contains(tags!, t => t.Path == "guest-other-tag");
     }
 
     [Fact]
-    public async Task OrphanedTag_InvisibleToNonAdmin()
+    public async Task OrphanedTag_VisibleToNonAdmin()
     {
         var adminClient = await CreateAdminClientAsync();
 
@@ -133,42 +133,7 @@ public class TagVisibilityTests : IntegrationTestBase
         var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
 
-        Assert.DoesNotContain(tags!, t => t.Path == "orphaned-standalone-tag");
-    }
-
-    [Fact]
-    public async Task AncestorTag_ShownWhenDescendantVisible()
-    {
-        var adminClient = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(adminClient, "ancestor-tag-doc.pdf");
-        await AssignTagsAsync(adminClient, docId, ["company/finance/invoices"]);
-
-        var contributorClient = await CreateUserClientAsync(role: "Contributor");
-
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-
-        Assert.Contains(tags!, t => t.Path == "company");
-        Assert.Contains(tags!, t => t.Path == "company/finance");
-        Assert.Contains(tags!, t => t.Path == "company/finance/invoices");
-    }
-
-    [Fact]
-    public async Task AncestorTag_HiddenWhenNoDescendantVisible()
-    {
-        var adminClient = await CreateAdminClientAsync();
-        var groupB = await CreateGroupAsync(adminClient, "TagVis Ancestor Hidden Group");
-
-        var docB = await UploadAndWaitAsync(adminClient, "ancestor-hidden-doc.pdf", groupB);
-        await AssignTagsAsync(adminClient, docB, ["hidden-root/hidden-child"]);
-
-        var contributorClient = await CreateUserClientAsync(role: "Contributor");
-
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-
-        Assert.DoesNotContain(tags!, t => t.Path == "hidden-root");
-        Assert.DoesNotContain(tags!, t => t.Path == "hidden-root/hidden-child");
+        Assert.Contains(tags!, t => t.Path == "orphaned-standalone-tag");
     }
 
     // --- Mutation authorization tests ---
@@ -308,6 +273,50 @@ public class TagVisibilityTests : IntegrationTestBase
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Contributor_CannotDeleteTag_OnGroupDocWithViewerAccess()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "TagDel Viewer Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Viewer");
+
+        var docId = await UploadAndWaitAsync(adminClient, "tag-del-viewer.pdf", groupId);
+        await AssignTagsAsync(adminClient, docId, ["viewer-delete-tag"]);
+
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=viewer-delete-tag&IncludeChildren=false", CT);
+        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var tagId = tags!.First(t => t.Path == "viewer-delete-tag").Id;
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Contributor_CanDeleteTag_OnGroupDocWithEditorAccess()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "TagDel Editor Group");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        var docId = await UploadAndWaitAsync(adminClient, "tag-del-editor.pdf", groupId);
+        await AssignTagsAsync(adminClient, docId, ["editor-delete-tag"]);
+
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=editor-delete-tag&IncludeChildren=false", CT);
+        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var tagId = tags!.First(t => t.Path == "editor-delete-tag").Id;
+
+        var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     // --- Helpers ---

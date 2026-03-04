@@ -198,4 +198,48 @@ public class TagPathResolverTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         await Assert.ThrowsAsync<ArgumentException>(() => _sut.ResolveOrCreateAsync("///", ct: ct));
     }
+
+    [Fact]
+    public async Task CreatedByUserId_SetOnNewTags()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        var tag = await _sut.ResolveOrCreateAsync("finance", createdByUserId: userId, ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(userId, tag.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task CreatedByUserId_NotOverwrittenOnExistingTag()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+
+        await _sut.ResolveOrCreateAsync("finance", createdByUserId: userA, ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var tag = await _sut.ResolveOrCreateAsync("finance", createdByUserId: userB, ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(userA, tag.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task CreatedByUserId_SetOnIntermediateSegments()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await _sut.ResolveOrCreateAsync("legal/contracts", createdByUserId: userId, ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var parent = await _db.Tags.SingleAsync(t => t.Path == "legal", ct);
+        var leaf = await _db.Tags.SingleAsync(t => t.Path == "legal/contracts", ct);
+
+        Assert.Equal(userId, parent.CreatedByUserId);
+        Assert.Equal(userId, leaf.CreatedByUserId);
+    }
 }

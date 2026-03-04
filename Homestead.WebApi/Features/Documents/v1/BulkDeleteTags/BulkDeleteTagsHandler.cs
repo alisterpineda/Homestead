@@ -24,7 +24,7 @@ public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService access
             .Where(dt => request.Ids.Contains(dt.TagId))
             .Select(dt => dt.DocumentId);
 
-        await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
+        await accessService.EnsureAllDocumentsWritableAsync(relatedDocIds, ct);
 
         var deleteIds = new HashSet<Guid>(request.Ids);
 

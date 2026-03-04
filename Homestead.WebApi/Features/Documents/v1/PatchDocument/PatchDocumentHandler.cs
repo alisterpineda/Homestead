@@ -95,7 +95,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         // Resolve or create each tag path and create associations
         foreach (var tagPath in model.TagPaths)
         {
-            var tag = await tagPathResolver.ResolveOrCreateAsync(tagPath, ct: ct);
+            var tag = await tagPathResolver.ResolveOrCreateAsync(tagPath, createdByUserId: currentUser.UserId, ct: ct);
             document.DocumentTags.Add(new DocumentTag
             {
                 DocumentId = document.Id,

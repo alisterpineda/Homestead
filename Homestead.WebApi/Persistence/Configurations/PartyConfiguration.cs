@@ -22,5 +22,12 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
         builder.Property(p => p.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        builder.HasOne(p => p.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(p => p.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(p => p.CreatedByUserId);
     }
 }

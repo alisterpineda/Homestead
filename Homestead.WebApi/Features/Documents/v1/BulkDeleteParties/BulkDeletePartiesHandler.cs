@@ -22,7 +22,7 @@ public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService acc
             .Where(dp => request.Ids.Contains(dp.PartyId))
             .Select(dp => dp.DocumentId);
 
-        await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
+        await accessService.EnsureAllDocumentsWritableAsync(relatedDocIds, ct);
 
         db.Parties.RemoveRange(parties);
         await db.SaveChangesAsync(ct);

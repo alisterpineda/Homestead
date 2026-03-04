@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Persistence;
 
 public class TagPathResolver(AppDbContext db) : ITagPathResolver
 {
-    public async Task<Tag> ResolveOrCreateAsync(string path, string? leafColor = null, CancellationToken ct = default)
+    public async Task<Tag> ResolveOrCreateAsync(string path, string? leafColor = null, Guid? createdByUserId = null, CancellationToken ct = default)
     {
         var normalizedPath = path.Trim().ToLowerInvariant().Trim('/');
         var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -53,7 +53,8 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
                     Path = currentPath,
                     ParentId = parent?.Id,
                     Color = isLeaf ? leafColor : null,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedByUserId = createdByUserId
                 };
                 db.Tags.Add(tag);
                 existingTags[currentPath] = tag;

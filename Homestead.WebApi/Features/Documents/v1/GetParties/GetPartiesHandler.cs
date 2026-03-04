@@ -13,17 +13,10 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
     {
         var query = db.Parties.AsNoTracking();
 
-        // For non-admins, compute accessible doc IDs once and use for both
-        // the visibility filter and scoped DocumentCount
+        // Compute accessible doc IDs for scoped DocumentCount
         var accessibleDocIds = !accessService.IsAdmin
             ? accessService.AccessibleDocumentIds()
             : null;
-
-        if (accessibleDocIds is not null)
-        {
-            query = query.Where(p =>
-                p.DocumentParties.Any(dp => accessibleDocIds.Contains(dp.DocumentId)));
-        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {

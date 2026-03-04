@@ -241,6 +241,9 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -255,6 +258,8 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("character varying(1024)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("ParentId");
 
@@ -422,6 +427,9 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
@@ -432,6 +440,8 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.ToTable("parties", "documents");
                 });
@@ -698,10 +708,17 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Documents.Tag", b =>
                 {
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Homestead.WebApi.Domains.Documents.Tag", "Parent")
                         .WithMany("Children")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("Parent");
                 });
@@ -752,6 +769,16 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Document");
 
                     b.Navigation("Party");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domains.Parties.Party", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
