@@ -18,12 +18,8 @@ public class GetGroupsHandler(AppDbContext db)
             query = query.Where(g => g.Name.ToLower().Contains(search));
         }
 
-        var totalCount = await query.CountAsync(ct);
-
-        var items = await query
+        return await query
             .OrderBy(g => g.Name)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
             .Select(g => new GroupResponse
             {
                 Id = g.Id,
@@ -34,14 +30,6 @@ public class GetGroupsHandler(AppDbContext db)
                 CreatedByUserName = g.CreatedByUser != null ? g.CreatedByUser.DisplayName : null,
                 MemberCount = g.Members.Count
             })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<GroupResponse>
-        {
-            Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(request, ct);
     }
 }

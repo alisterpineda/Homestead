@@ -26,12 +26,8 @@ public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor curr
         if (request.Status is not null)
             query = query.Where(j => j.Status == request.Status);
 
-        var totalCount = await query.CountAsync(ct);
-
-        var items = await query
+        return await query
             .OrderByDescending(j => j.CreatedAt)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
             .Select(j => new GetProcessingJobsResponse
             {
                 Id = j.Id,
@@ -46,14 +42,6 @@ public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor curr
                 CompletedAt = j.CompletedAt,
                 CreatedByUserId = j.CreatedByUserId
             })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<GetProcessingJobsResponse>
-        {
-            Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(request, ct);
     }
 }

@@ -65,11 +65,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                  d.SearchVector.Matches(EF.Functions.WebSearchToTsQuery("english", search))));
         }
 
-        var totalCount = await query.CountAsync(ct);
-
-        var items = await ApplySort(query, request.SortBy, request.SortDir, search)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+        return await ApplySort(query, request.SortBy, request.SortDir, search)
             .Select(d => new
             {
                 d.Id,
@@ -121,15 +117,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 Tags = d.Tags,
                 Parties = d.Parties
             })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<GetDocumentsResponse>
-        {
-            Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(request, ct);
     }
 
     private static IOrderedQueryable<Domains.Documents.Document> ApplySort(

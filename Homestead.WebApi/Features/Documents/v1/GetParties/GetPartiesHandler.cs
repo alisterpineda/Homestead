@@ -26,12 +26,8 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                 (p.Description != null && p.Description.ToLower().Contains(search)));
         }
 
-        var totalCount = await query.CountAsync(ct);
-
-        var items = await query
+        return await query
             .OrderBy(p => p.Name)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
             .Select(p => new GetPartiesResponse
             {
                 Id = p.Id,
@@ -42,14 +38,6 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                     ? p.DocumentParties.Count(dp => accessibleDocIds.Contains(dp.DocumentId))
                     : p.DocumentParties.Count
             })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<GetPartiesResponse>
-        {
-            Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(request, ct);
     }
 }

@@ -14,16 +14,10 @@ public class GetDocumentVersionsHandler(AppDbContext db, IAuthorizationService a
     {
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Read);
 
-        var query = db.DocumentVersions
+        return await db.DocumentVersions
             .AsNoTracking()
-            .Where(r => r.DocumentId == request.DocumentId);
-
-        var totalCount = await query.CountAsync(ct);
-
-        var items = await query
+            .Where(r => r.DocumentId == request.DocumentId)
             .OrderByDescending(r => r.VersionNumber)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
             .Select(r => new GetDocumentVersionsResponse
             {
                 Id = r.Id,
@@ -34,14 +28,6 @@ public class GetDocumentVersionsHandler(AppDbContext db, IAuthorizationService a
                 FileExtension = r.FileExtension,
                 CreatedAt = r.CreatedAt
             })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<GetDocumentVersionsResponse>
-        {
-            Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            TotalCount = totalCount
-        };
+            .ToPaginatedAsync(request, ct);
     }
 }

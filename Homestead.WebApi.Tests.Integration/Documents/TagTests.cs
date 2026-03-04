@@ -146,5 +146,122 @@ public class TagTests : IntegrationTestBase
         Assert.Equal(2, body!.DeletedCount);
     }
 
+    [Fact]
+    public async Task BulkDeleteTag_ReparentsChildrenToGrandparent()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Create A/B/C
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RpA" }, CT);
+        var bResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RpA/RpB" }, CT);
+        var b = await bResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RpA/RpB/RpC" }, CT);
+
+        // Delete B
+        var deleteResp = await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
+        {
+            ids = new[] { b!.Id }
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
+
+        // C should now be re-parented under A with path "rpa/rpc"
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var c = tags!.Single(t => t.Name == "rpc");
+        var a = tags.Single(t => t.Name == "rpa");
+        Assert.Equal(a.Id, c.ParentId);
+        Assert.Equal("rpa/rpc", c.Path);
+    }
+
+    [Fact]
+    public async Task BulkDeleteTag_RootDeletion_ChildrenBecomeRoots()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Create A with children B and C
+        var aResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RootDel" }, CT);
+        var a = await aResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RootDel/ChildB" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RootDel/ChildC" }, CT);
+
+        // Delete root A
+        var deleteResp = await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
+        {
+            ids = new[] { a!.Id }
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
+
+        // B and C should now be roots
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var childB = tags!.Single(t => t.Name == "childb");
+        var childC = tags.Single(t => t.Name == "childc");
+        Assert.Null(childB.ParentId);
+        Assert.Equal("childb", childB.Path);
+        Assert.Null(childC.ParentId);
+        Assert.Equal("childc", childC.Path);
+    }
+
+    [Fact]
+    public async Task BulkDeleteTags_MultipleInHierarchy_ProcessesCorrectly()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Create A/B/C/D
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "MhA" }, CT);
+        var bResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "MhA/MhB" }, CT);
+        var b = await bResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        var cResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "MhA/MhB/MhC" }, CT);
+        var c = await cResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "MhA/MhB/MhC/MhD" }, CT);
+
+        // Delete B and C
+        var deleteResp = await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
+        {
+            ids = new[] { b!.Id, c!.Id }
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
+
+        // D should be re-parented under A
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var d = tags!.Single(t => t.Name == "mhd");
+        var a = tags.Single(t => t.Name == "mha");
+        Assert.Equal(a.Id, d.ParentId);
+        Assert.Equal("mha/mhd", d.Path);
+    }
+
+    [Fact]
+    public async Task BulkDeleteTag_UpdatesAllDescendantPaths()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Create A/B/C, A/B/D, A/B/C/E
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DpA" }, CT);
+        var bResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DpA/DpB" }, CT);
+        var b = await bResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DpA/DpB/DpC" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DpA/DpB/DpD" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DpA/DpB/DpC/DpE" }, CT);
+
+        // Delete B
+        var deleteResp = await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
+        {
+            ids = new[] { b!.Id }
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
+
+        // Verify all paths updated
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var tagC = tags!.Single(t => t.Name == "dpc");
+        var tagD = tags.Single(t => t.Name == "dpd");
+        var tagE = tags.Single(t => t.Name == "dpe");
+
+        Assert.Equal("dpa/dpc", tagC.Path);
+        Assert.Equal("dpa/dpd", tagD.Path);
+        Assert.Equal("dpa/dpc/dpe", tagE.Path);
+    }
+
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color);
 }
