@@ -445,31 +445,31 @@ import { toast } from 'ngx-sonner';
 
       @if (isMobile()) {
         <!-- Mobile: single tabbed layout -->
-        <hlm-tabs tab="preview" class="min-w-0 flex flex-1 flex-col overflow-hidden rounded-md border">
-          <hlm-tabs-list variant="line" class="mx-4 mt-3">
-            <button hlmTabsTrigger="preview">Preview</button>
-            <button hlmTabsTrigger="info">Info</button>
-            <button hlmTabsTrigger="content">Content</button>
-            <button hlmTabsTrigger="metadata">Metadata</button>
-            <button hlmTabsTrigger="activity">Activity</button>
+        <hlm-tabs tab="preview" class="min-w-0 flex flex-1 flex-col overflow-hidden">
+          <hlm-tabs-list class="w-full" aria-label="Document tabs">
+            <button hlmTabsTrigger="preview" class="flex-1">Preview</button>
+            <button hlmTabsTrigger="info" class="flex-1">Info</button>
+            <button hlmTabsTrigger="content" class="flex-1">Content</button>
+            <button hlmTabsTrigger="metadata" class="flex-1">Metadata</button>
+            <button hlmTabsTrigger="activity" class="flex-1">Activity</button>
           </hlm-tabs-list>
-          <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden">
+          <div hlmTabsContent="preview" class="min-h-0 flex-1 overflow-hidden rounded-md border">
             <ng-container [ngTemplateOutlet]="previewContent" />
           </div>
-          <div hlmTabsContent="info" class="relative min-h-0 flex-1">
+          <div hlmTabsContent="info" class="relative min-h-0 flex-1 rounded-md border">
             <div class="absolute inset-0 overflow-y-auto px-4 py-3">
               <ng-container [ngTemplateOutlet]="infoContent" />
             </div>
           </div>
-          <div hlmTabsContent="content" class="min-h-0 min-w-0 flex-1 overflow-hidden px-4 py-3">
+          <div hlmTabsContent="content" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border px-4 py-3">
             <ng-container [ngTemplateOutlet]="textContent" />
           </div>
-          <div hlmTabsContent="metadata" class="relative min-h-0 flex-1">
+          <div hlmTabsContent="metadata" class="relative min-h-0 flex-1 rounded-md border">
             <div class="absolute inset-0 overflow-y-auto px-4 py-3">
               <ng-container [ngTemplateOutlet]="metadataContent" />
             </div>
           </div>
-          <div hlmTabsContent="activity" class="relative min-h-0 flex-1">
+          <div hlmTabsContent="activity" class="relative min-h-0 flex-1 rounded-md border">
             <div class="absolute inset-0 flex flex-col">
               <ng-container [ngTemplateOutlet]="activityContent" />
             </div>
