@@ -24,7 +24,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
   ],
   providers: [provideIcons({ lucideFileText, lucideImage })],
   template: `
-    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
       @for (doc of documents(); track doc.id) {
         <div
           hlmCard
@@ -75,7 +75,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
           <!-- Footer with tags and parties -->
           @if (doc.tags.length > 0 || doc.parties.length > 0) {
             <div hlmCardFooter class="px-3 pb-3 pt-0 flex flex-wrap gap-1">
-              @for (tag of doc.tags | slice:0:3; track tag.id) {
+              @for (tag of doc.tags | slice:0:2; track tag.id) {
                 <app-tag-badge [path]="tag.path" [color]="tag.color" />
               }
               @for (party of doc.parties | slice:0:2; track party.id) {

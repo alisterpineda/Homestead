@@ -69,8 +69,8 @@ public class ImageThumbnailGeneratorTests : IDisposable
 
         using var bitmap = SKBitmap.Decode(outputPath);
         Assert.NotNull(bitmap);
-        Assert.True(bitmap.Width <= 300);
-        Assert.True(bitmap.Height <= 400);
+        Assert.True(bitmap.Width <= ThumbnailHelper.MaxWidth);
+        Assert.True(bitmap.Height <= ThumbnailHelper.MaxHeight);
     }
 
     [Fact]
@@ -84,9 +84,9 @@ public class ImageThumbnailGeneratorTests : IDisposable
     [Fact]
     public void CalculateSize_LargeImage_ScalesDown()
     {
-        var (w, h) = ThumbnailHelper.CalculateSize(600, 800);
-        Assert.True(w <= 300);
-        Assert.True(h <= 400);
+        var (w, h) = ThumbnailHelper.CalculateSize(1200, 1600);
+        Assert.True(w <= ThumbnailHelper.MaxWidth);
+        Assert.True(h <= ThumbnailHelper.MaxHeight);
     }
 
     private string CreateTestPng(int width, int height)

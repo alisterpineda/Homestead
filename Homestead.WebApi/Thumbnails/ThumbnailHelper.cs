@@ -4,8 +4,9 @@ namespace Homestead.WebApi.Thumbnails;
 
 public static class ThumbnailHelper
 {
-    public const int MaxWidth = 300;
-    public const int MaxHeight = 400;
+    public const int MaxWidth = 600;
+    public const int MaxHeight = 800;
+    public const int WebpQuality = 75;
 
     public static bool ResizeAndSaveWebp(SKBitmap source, string outputPath)
     {
@@ -16,7 +17,7 @@ public static class ThumbnailHelper
             return false;
 
         using var image = SKImage.FromBitmap(resized);
-        using var data = image.Encode(SKEncodedImageFormat.Webp, 80);
+        using var data = image.Encode(SKEncodedImageFormat.Webp, WebpQuality);
 
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         using var stream = File.OpenWrite(outputPath);
