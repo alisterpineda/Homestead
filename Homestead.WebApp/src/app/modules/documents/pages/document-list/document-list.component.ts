@@ -22,7 +22,6 @@ import { DocumentCardGridComponent } from '../../components/document-card-grid/d
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
-import { GroupSelectComponent } from '../../components/group-select/group-select.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
@@ -51,7 +50,6 @@ import { toast } from 'ngx-sonner';
     DocumentCardGridComponent,
     PaginationComponent,
     UploadDialogComponent,
-    GroupSelectComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
@@ -193,7 +191,6 @@ import { toast } from 'ngx-sonner';
                   (searchChange)="onTagSearchChange($event)"
                   (includeChildrenChange)="onIncludeChildTagsChange($event)"
                 />
-                <app-group-select [value]="selectedGroupId()" (valueChange)="onGroupFilterChange($event)" />
                 @if (hasActiveFilters()) {
                   <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
                     Reset
@@ -344,12 +341,6 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: false },
   );
 
-  // Group filter
-  selectedGroupId = toSignal(
-    this.route.queryParamMap.pipe(map(p => p.get('groupId') ?? '')),
-    { initialValue: '' },
-  );
-
   // Sort state from query params
   sortBy = toSignal(
     this.route.queryParamMap.pipe(map(p => p.get('sortBy') as DocumentSortBy | null)),
@@ -363,7 +354,6 @@ export class DocumentListComponent implements OnDestroy {
     this.searchTerm().length > 0 ||
     this.selectedPartyIds().length > 0 ||
     this.selectedTagIds().length > 0 ||
-    this.selectedGroupId().length > 0 ||
     this.sortBy() !== null,
   );
 
@@ -464,9 +454,8 @@ export class DocumentListComponent implements OnDestroy {
       toObservable(this.sortBy),
       toObservable(this.sortDir),
       toObservable(this.searchTerm),
-      toObservable(this.selectedGroupId),
     ]).pipe(
-      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir, search, groupId]) => {
+      switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
         return getDocuments(this.http, this.apiConfig.rootUrl, {
@@ -478,7 +467,6 @@ export class DocumentListComponent implements OnDestroy {
           IncludeChildTags: includeChildTags,
           SortBy: sortBy || undefined,
           SortDir: sortDir || undefined,
-          GroupId: groupId || undefined,
         }).pipe(
           map((r) => {
             this.loading.set(false);
@@ -561,13 +549,6 @@ export class DocumentListComponent implements OnDestroy {
     });
   }
 
-  onGroupFilterChange(groupId: string): void {
-    this.router.navigate([], {
-      queryParams: { page: 1, groupId: groupId || null },
-      queryParamsHandling: 'merge',
-    });
-  }
-
   onSortChange(event: { sortBy: DocumentSortBy; sortDir: SortDirection } | null): void {
     this.clearSelection();
     this.router.navigate(['/documents'], {
@@ -591,7 +572,7 @@ export class DocumentListComponent implements OnDestroy {
     this.clearSelection();
     this.searchInput.set('');
     this.router.navigate(['/documents'], {
-      queryParams: { page: 1, search: null, partyIds: null, tagIds: null, includeChildTags: null, groupId: null, sortBy: null, sortDir: null },
+      queryParams: { page: 1, search: null, partyIds: null, tagIds: null, includeChildTags: null, sortBy: null, sortDir: null },
       queryParamsHandling: 'merge',
     });
   }
