@@ -54,7 +54,7 @@ export function defineOidcSetup() {
           data: {
             email: regularUser.email,
             displayName: regularUser.displayName,
-            isAdmin: false,
+            role: 'Contributor',
             isActive: true,
           },
         },

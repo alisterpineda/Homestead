@@ -25,7 +25,7 @@ setup('seed admin user and save storageState', async ({ request }) => {
       email: LOCAL_USER.email,
       displayName: LOCAL_USER.displayName,
       password: LOCAL_USER.password,
-      isAdmin: false,
+      role: 'Contributor',
     },
   });
 
@@ -35,7 +35,7 @@ setup('seed admin user and save storageState', async ({ request }) => {
       email: LOCAL_INACTIVE_USER.email,
       displayName: LOCAL_INACTIVE_USER.displayName,
       password: LOCAL_INACTIVE_USER.password,
-      isAdmin: false,
+      role: 'Contributor',
     },
   });
   expect(createResponse.ok()).toBeTruthy();
@@ -46,7 +46,7 @@ setup('seed admin user and save storageState', async ({ request }) => {
     data: {
       email: LOCAL_INACTIVE_USER.email,
       displayName: LOCAL_INACTIVE_USER.displayName,
-      isAdmin: false,
+      role: 'Contributor',
       isActive: false,
     },
   });
