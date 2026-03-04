@@ -16,6 +16,7 @@ using Homestead.WebApi.Features.Documents.v1.GetDocumentFile;
 using Homestead.WebApi.Features.Documents.v1.GetDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 using Homestead.WebApi.Features.Documents.v1.GetDocuments;
+using Homestead.WebApi.Features.Documents.v1.GetDocumentThumbnail;
 using Homestead.WebApi.Features.Documents.v1.GetMyGroups;
 using Homestead.WebApi.Features.Documents.v1.GetParties;
 using Homestead.WebApi.Features.Documents.v1.GetParty;
@@ -46,6 +47,7 @@ public static class DocumentsModule
         DeleteDocumentEndpoint.Map(v1);
         GetDocumentEndpoint.Map(v1);
         GetDocumentFileEndpoint.Map(v1);
+        GetDocumentThumbnailEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
         PatchDocumentEndpoint.Map(v1);
 

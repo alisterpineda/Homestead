@@ -12,6 +12,7 @@ using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.TextExtraction;
+using Homestead.WebApi.Thumbnails;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -96,6 +97,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHandlers();
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);
+builder.Services.AddThumbnails();
 
 builder.Services.AddApiVersioning(options =>
 {

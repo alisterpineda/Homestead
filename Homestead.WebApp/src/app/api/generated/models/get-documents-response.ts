@@ -12,6 +12,7 @@ export interface GetDocumentsResponse {
   fileSize: (number | string);
   groupId?: (string | null);
   groupName?: (string | null);
+  hasThumbnail?: boolean;
   id: string;
   name: string;
   ownerUserId?: (string | null);

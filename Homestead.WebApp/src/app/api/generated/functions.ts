@@ -25,6 +25,8 @@ export type { PatchDocument$Params as PatchDocument$Params } from './fn/document
 export { patchDocument as patchDocument } from './fn/documents/patch-document';
 export type { GetDocumentFile$Params as GetDocumentFile$Params } from './fn/documents/get-document-file';
 export { getDocumentFile as getDocumentFile } from './fn/documents/get-document-file';
+export type { GetDocumentThumbnail$Params as GetDocumentThumbnail$Params } from './fn/documents/get-document-thumbnail';
+export { getDocumentThumbnail as getDocumentThumbnail } from './fn/documents/get-document-thumbnail';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';
 export { getDocumentVersions as getDocumentVersions } from './fn/documents/get-document-versions';
 export type { CreateDocumentVersion$Params as CreateDocumentVersion$Params } from './fn/documents/create-document-version';

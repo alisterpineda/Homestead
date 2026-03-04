@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Thumbnails;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
@@ -114,6 +115,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 GroupId = d.GroupId,
                 GroupName = d.GroupName,
                 VersionCount = d.VersionCount,
+                HasThumbnail = d.LatestVersion != null && ThumbnailService.CanGenerate(d.LatestVersion.ContentType),
                 Tags = d.Tags,
                 Parties = d.Parties
             })

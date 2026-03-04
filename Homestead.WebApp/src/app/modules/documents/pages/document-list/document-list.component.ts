@@ -18,6 +18,7 @@ import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { FilterPopoverComponent } from '@/shared/components/filter-popover/filter-popover.component';
 import type { FilterOption } from '@/shared/components/filter-popover/filter-popover.component';
 import { DocumentTableComponent, HIDEABLE_COLUMNS } from '../../components/document-table/document-table.component';
+import { DocumentCardGridComponent } from '../../components/document-card-grid/document-card-grid.component';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
@@ -47,6 +48,7 @@ import { toast } from 'ngx-sonner';
     HlmDropdownMenuImports,
     FilterPopoverComponent,
     DocumentTableComponent,
+    DocumentCardGridComponent,
     PaginationComponent,
     UploadDialogComponent,
     GroupSelectComponent,
@@ -99,10 +101,12 @@ import { toast } from 'ngx-sonner';
                   <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
                 </div>
                 <div class="flex items-center gap-2">
+                  @if (viewMode() === 'table') {
                   <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
                     <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
                     Columns
                   </button>
+                  }
                   <ng-template #columnsMenu>
                     <hlm-dropdown-menu class="w-40">
                       @for (col of hideableColumns; track col.id) {
@@ -210,16 +214,25 @@ import { toast } from 'ngx-sonner';
               </button>
             </section>
           } @else {
-            <app-document-table
-              [documents]="result.items"
-              [selectedIds]="selectedDocumentIds()"
-              [sortBy]="sortBy()"
-              [sortDir]="sortDir()"
-              [columnVisibility]="columnVisibility()"
-              (documentSelect)="onDocumentSelect($event)"
-              (selectionChange)="selectedDocumentIds.set($event)"
-              (sortChange)="onSortChange($event)"
-            />
+            @if (viewMode() === 'table') {
+              <app-document-table
+                [documents]="result.items"
+                [selectedIds]="selectedDocumentIds()"
+                [sortBy]="sortBy()"
+                [sortDir]="sortDir()"
+                [columnVisibility]="columnVisibility()"
+                (documentSelect)="onDocumentSelect($event)"
+                (selectionChange)="selectedDocumentIds.set($event)"
+                (sortChange)="onSortChange($event)"
+              />
+            } @else {
+              <app-document-card-grid
+                [documents]="result.items"
+                [selectedIds]="selectedDocumentIds()"
+                (documentSelect)="onDocumentSelect($event)"
+                (selectionChange)="selectedDocumentIds.set($event)"
+              />
+            }
             <app-pagination
               [page]="+result.page"
               [totalPages]="+(result.totalPages ?? 0)"

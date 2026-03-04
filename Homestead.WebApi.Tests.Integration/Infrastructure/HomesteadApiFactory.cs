@@ -10,6 +10,7 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
     private string _mediaPath = null!;
+    private string _cachePath = null!;
 
     public HomesteadApiFactory(string connectionString)
     {
@@ -17,11 +18,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
     }
 
     public string MediaPath => _mediaPath;
+    public string CachePath => _cachePath;
 
     public ValueTask InitializeAsync()
     {
-        _mediaPath = Path.Combine(Path.GetTempPath(), "homestead-tests", Guid.NewGuid().ToString());
+        var basePath = Path.Combine(Path.GetTempPath(), "homestead-tests", Guid.NewGuid().ToString());
+        _mediaPath = Path.Combine(basePath, "media");
+        _cachePath = Path.Combine(basePath, "cache");
         Directory.CreateDirectory(_mediaPath);
+        Directory.CreateDirectory(_cachePath);
         return ValueTask.CompletedTask;
     }
 
@@ -31,6 +36,7 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
         builder.UseSetting("ConnectionStrings:postgresdb", _connectionString);
         builder.UseSetting("FileStorage:MediaPath", _mediaPath);
+        builder.UseSetting("FileStorage:CachePath", _cachePath);
 
         builder.ConfigureServices(services =>
         {
@@ -64,6 +70,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         if (Directory.Exists(_mediaPath))
         {
             try { Directory.Delete(_mediaPath, recursive: true); }
+            catch { /* best effort cleanup */ }
+        }
+
+        if (Directory.Exists(_cachePath))
+        {
+            try { Directory.Delete(_cachePath, recursive: true); }
             catch { /* best effort cleanup */ }
         }
     }

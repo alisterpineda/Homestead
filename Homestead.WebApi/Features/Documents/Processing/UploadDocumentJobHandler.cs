@@ -4,6 +4,7 @@ using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.TextExtraction;
+using Homestead.WebApi.Thumbnails;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Processing;
@@ -15,7 +16,8 @@ public class UploadDocumentJobHandler(
     ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier,
     IAuditLogger auditLogger,
-    ISearchVectorUpdater searchVectorUpdater) : IJobHandler
+    ISearchVectorUpdater searchVectorUpdater,
+    ThumbnailService thumbnailService) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
 
@@ -110,7 +112,7 @@ public class UploadDocumentJobHandler(
         // Update job with entity reference
         job.EntityId = documentId;
 
-        // Send SignalR notification
+        // Send SignalR notification before thumbnail generation so the UI sees the upload as complete immediately
         await notifier.NotifyJobStatusAsync(
             job.Id,
             ProcessingJobStatus.Completed,
@@ -120,5 +122,15 @@ public class UploadDocumentJobHandler(
             error: null,
             job.CreatedByUserId,
             ct);
+
+        // Generate thumbnail (non-critical, runs after notification)
+        try
+        {
+            await thumbnailService.GenerateAsync(finalPath, payload.ContentType, fileHash, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Thumbnail generation failed for upload {UploadId}", payload.UploadId);
+        }
     }
 }

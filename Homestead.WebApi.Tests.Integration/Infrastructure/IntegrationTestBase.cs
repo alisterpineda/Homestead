@@ -32,6 +32,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var documentsDir = Path.Combine(Factory.MediaPath, "documents");
         try { Directory.Delete(documentsDir, recursive: true); } catch (DirectoryNotFoundException) { }
         Directory.CreateDirectory(documentsDir);
+
+        // Clean thumbnail cache
+        var thumbnailsDir = Path.Combine(Factory.CachePath, "thumbnails");
+        try { Directory.Delete(thumbnailsDir, recursive: true); } catch (DirectoryNotFoundException) { }
+        Directory.CreateDirectory(thumbnailsDir);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -69,6 +74,48 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         _cachedPdfBytes.CopyTo(result, 0);
         randomSuffix.CopyTo(result, _cachedPdfBytes.Length);
         return result;
+    }
+
+    protected async Task<Guid> UploadImageAndWaitAsync(HttpClient client, string name = "sample.png")
+    {
+        var imageBytes = await GetUniqueImageBytesAsync();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(name), "name");
+        form.Add(new ByteArrayContent(imageBytes), "file", name);
+
+        var response = await client.PostAsync("/api/v1/documents", form);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JobResponse>();
+        return await WaitForJobCompletionAsync(body!.JobId);
+    }
+
+    protected async Task<Guid> UploadTextAndWaitAsync(HttpClient client, string name = "sample.txt")
+    {
+        var textBytes = System.Text.Encoding.UTF8.GetBytes($"Test content {Guid.NewGuid()}");
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(name), "name");
+        var fileContent = new ByteArrayContent(textBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+        form.Add(fileContent, "file", name);
+
+        var response = await client.PostAsync("/api/v1/documents", form);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JobResponse>();
+        return await WaitForJobCompletionAsync(body!.JobId);
+    }
+
+    protected static Task<byte[]> GetUniqueImageBytesAsync()
+    {
+        // Create a small unique PNG using SkiaSharp
+        using var bitmap = new SkiaSharp.SKBitmap(100, 100);
+        using var canvas = new SkiaSharp.SKCanvas(bitmap);
+        canvas.Clear(new SkiaSharp.SKColor((byte)(Random.Shared.Next(256)), (byte)(Random.Shared.Next(256)), (byte)(Random.Shared.Next(256))));
+
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        return Task.FromResult(data.ToArray());
     }
 
     protected async Task<Guid> UploadAndWaitAsync(HttpClient client, string name = "sample.pdf", Guid? groupId = null)
