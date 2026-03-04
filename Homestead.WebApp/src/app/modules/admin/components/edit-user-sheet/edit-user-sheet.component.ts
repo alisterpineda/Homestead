@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   effect,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -23,6 +24,7 @@ import type { UserResponse } from '@/api/generated/models/user-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
+import { ChangePasswordDialogComponent } from '../change-password-dialog/change-password-dialog.component';
 
 @Component({
   selector: 'app-edit-user-sheet',
@@ -36,6 +38,7 @@ import { toast } from 'ngx-sonner';
     HlmCheckboxImports,
     BrnSelectImports,
     HlmSelectImports,
+    ChangePasswordDialogComponent,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -67,19 +70,6 @@ import { toast } from 'ngx-sonner';
                 class="w-full"
                 [value]="editDisplayName()"
                 (input)="editDisplayName.set(asInputValue($event))"
-              />
-            </div>
-
-            <div class="space-y-2">
-              <label hlmLabel for="user-password">New Password</label>
-              <input
-                hlmInput
-                id="user-password"
-                type="password"
-                class="w-full"
-                placeholder="Leave empty to keep current"
-                [value]="editPassword()"
-                (input)="editPassword.set(asInputValue($event))"
               />
             </div>
 
@@ -116,13 +106,26 @@ import { toast } from 'ngx-sonner';
           </div>
         }
 
-        <hlm-sheet-footer>
-          <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+        <hlm-sheet-footer class="flex flex-col gap-2">
+          @if (user(); as u) {
+            <button hlmBtn variant="outline" class="w-full" (click)="openPasswordDialog()">
+              {{ u.hasPassword ? 'Change Password' : 'Set Password' }}
+            </button>
+          }
+          <button hlmBtn class="w-full" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
       </hlm-sheet-content>
     </hlm-sheet>
+
+    @if (user(); as u) {
+      <app-change-password-dialog
+        [userId]="u.id"
+        [hasPassword]="u.hasPassword"
+        (passwordChanged)="passwordChanged.emit()"
+      />
+    }
   `,
 })
 export class EditUserSheetComponent {
@@ -130,20 +133,21 @@ export class EditUserSheetComponent {
   state = input<BrnDialogState>('closed');
   saved = output<void>();
   closed = output<void>();
+  passwordChanged = output<void>();
 
   editEmail = signal('');
   editDisplayName = signal('');
-  editPassword = signal('');
   editRole = signal<AppRole>('Contributor');
   editIsActive = signal(true);
   saving = signal(false);
+
+  private changePasswordDialog = viewChild(ChangePasswordDialogComponent);
 
   hasChanges = computed(() => {
     const u = this.user();
     if (!u) return false;
     if (this.editEmail() !== (u.email ?? '')) return true;
     if (this.editDisplayName() !== u.displayName) return true;
-    if (this.editPassword().length > 0) return true;
     if (this.editRole() !== u.role) return true;
     if (this.editIsActive() !== u.isActive) return true;
     return false;
@@ -158,7 +162,6 @@ export class EditUserSheetComponent {
       if (u && this.state() === 'open') {
         this.editEmail.set(u.email ?? '');
         this.editDisplayName.set(u.displayName);
-        this.editPassword.set('');
         this.editRole.set(u.role);
         this.editIsActive.set(u.isActive);
       }
@@ -177,6 +180,10 @@ export class EditUserSheetComponent {
     return (event.target as HTMLInputElement).value;
   }
 
+  openPasswordDialog(): void {
+    this.changePasswordDialog()?.open();
+  }
+
   handleSave(): void {
     const u = this.user();
     if (!u) return;
@@ -186,7 +193,6 @@ export class EditUserSheetComponent {
       body: {
         email: this.editEmail(),
         displayName: this.editDisplayName(),
-        password: this.editPassword() || null,
         role: this.editRole(),
         isActive: this.editIsActive(),
       },

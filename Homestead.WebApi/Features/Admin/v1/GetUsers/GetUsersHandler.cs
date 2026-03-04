@@ -41,6 +41,7 @@ public class GetUsersHandler(AppDbContext db)
                 u.Email,
                 u.IsActive,
                 u.CreatedAt,
+                HasPassword = u.PasswordHash != null,
                 RoleIds = db.UserRoles
                     .Where(ur => ur.UserId == u.Id)
                     .Select(ur => ur.RoleId)
@@ -64,6 +65,7 @@ public class GetUsersHandler(AppDbContext db)
                 Email = u.Email,
                 Role = role,
                 IsActive = u.IsActive,
+                HasPassword = u.HasPassword,
                 CreatedAt = u.CreatedAt
             };
         }).ToList();

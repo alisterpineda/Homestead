@@ -11,6 +11,7 @@ export type { BulkDeleteTagsRequest } from './models/bulk-delete-tags-request';
 export type { BulkDeleteTagsResponse } from './models/bulk-delete-tags-response';
 export type { BulkDeleteUsersRequest } from './models/bulk-delete-users-request';
 export type { BulkDeleteUsersResponse } from './models/bulk-delete-users-response';
+export type { ChangeUserPasswordRequest } from './models/change-user-password-request';
 export type { CreateCommentRequest } from './models/create-comment-request';
 export type { CreateCommentResponse } from './models/create-comment-response';
 export type { CreateDocumentResponse } from './models/create-document-response';

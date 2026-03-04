@@ -29,14 +29,6 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
             if (!result.Succeeded)
                 throw new IdentityValidationException(result.ToErrorDictionary());
 
-            if (!string.IsNullOrWhiteSpace(request.Password))
-            {
-                var token = await userManager.GeneratePasswordResetTokenAsync(user);
-                var passwordResult = await userManager.ResetPasswordAsync(user, token, request.Password);
-                if (!passwordResult.Succeeded)
-                    throw new IdentityValidationException(passwordResult.ToErrorDictionary());
-            }
-
             var newRole = request.Role.ToString();
             var currentRoles = await userManager.GetRolesAsync(user);
             if (!currentRoles.Contains(newRole))
@@ -57,6 +49,7 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
                 Email = user.Email,
                 Role = request.Role,
                 IsActive = user.IsActive,
+                HasPassword = await userManager.HasPasswordAsync(user),
                 CreatedAt = user.CreatedAt
             };
         });

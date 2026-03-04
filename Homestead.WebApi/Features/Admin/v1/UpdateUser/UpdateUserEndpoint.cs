@@ -14,7 +14,6 @@ public static class UpdateUserEndpoint
                 Id = id,
                 Email = request.Email,
                 DisplayName = request.DisplayName,
-                Password = request.Password,
                 Role = request.Role,
                 IsActive = request.IsActive
             };

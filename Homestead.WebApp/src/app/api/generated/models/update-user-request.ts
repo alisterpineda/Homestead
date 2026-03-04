@@ -6,6 +6,5 @@ export interface UpdateUserRequest {
   displayName: string;
   email: string;
   isActive?: boolean;
-  password?: (string | null);
   role?: AppRole;
 }

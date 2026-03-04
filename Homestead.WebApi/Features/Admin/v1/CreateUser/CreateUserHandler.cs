@@ -33,6 +33,7 @@ public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
             Email = user.Email,
             Role = request.Role,
             IsActive = user.IsActive,
+            HasPassword = true,
             CreatedAt = user.CreatedAt
         };
     }

@@ -170,6 +170,7 @@ import { toast } from 'ngx-sonner';
       [state]="sheetState()"
       (saved)="onSheetSaved()"
       (closed)="onSheetClosed()"
+      (passwordChanged)="onRefresh()"
     />
   `,
 })

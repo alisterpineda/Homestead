@@ -75,6 +75,8 @@ export type { DeleteUser$Params as DeleteUser$Params } from './fn/admin/delete-u
 export { deleteUser as deleteUser } from './fn/admin/delete-user';
 export type { BulkDeleteUsers$Params as BulkDeleteUsers$Params } from './fn/admin/bulk-delete-users';
 export { bulkDeleteUsers as bulkDeleteUsers } from './fn/admin/bulk-delete-users';
+export type { ChangeUserPassword$Params as ChangeUserPassword$Params } from './fn/admin/change-user-password';
+export { changeUserPassword as changeUserPassword } from './fn/admin/change-user-password';
 export type { GetGroups$Params as GetGroups$Params } from './fn/admin/get-groups';
 export { getGroups as getGroups } from './fn/admin/get-groups';
 export type { CreateGroup$Params as CreateGroup$Params } from './fn/admin/create-group';
