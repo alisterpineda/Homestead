@@ -26,8 +26,9 @@ import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/pa
     HlmTableImports, HlmBadge, PaginationComponent, CreateGroupDialogComponent,
   ],
   providers: [provideIcons({ lucideUsers2, lucideSearch, lucidePlus })],
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div>
+    <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
         <div class="flex justify-center py-16">
           <hlm-spinner />
@@ -47,7 +48,7 @@ import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/pa
       }
 
       @if (!loading() || data()) {
-        <div class="flex items-center gap-2 mb-4">
+        <div class="flex items-center gap-2 mb-4 shrink-0">
           <div class="relative flex-1">
             <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input hlmInput class="pl-9 w-full" placeholder="Search groups..."
@@ -71,32 +72,33 @@ import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/pa
               </div>
             </section>
           } @else {
-            <div class="overflow-hidden rounded-md border">
-              <div hlmTableContainer>
-                <table hlmTable>
-                  <thead hlmTHead>
-                    <tr hlmTr>
-                      <th hlmTh>Name</th>
-                      <th hlmTh class="hidden md:table-cell">Description</th>
-                      <th hlmTh class="w-28 text-center">Members</th>
-                    </tr>
-                  </thead>
-                  <tbody hlmTBody>
-                    @for (group of d.items; track group.id) {
-                      <tr hlmTr tabindex="0" (click)="onGroupClick(group.id)" class="cursor-pointer">
-                        <td hlmTd class="font-medium">{{ group.name }}</td>
-                        <td hlmTd class="hidden md:table-cell text-muted-foreground">{{ group.description ?? '—' }}</td>
-                        <td hlmTd class="text-center">
-                          <span hlmBadge variant="secondary">{{ group.memberCount }}</span>
-                        </td>
+            <div class="min-h-0 flex-1 overflow-y-auto p-px">
+              <div class="overflow-clip rounded-md border">
+                <div hlmTableContainer>
+                  <table hlmTable>
+                    <thead hlmTHead class="sticky top-0 z-10 bg-background">
+                      <tr hlmTr>
+                        <th hlmTh>Name</th>
+                        <th hlmTh class="hidden md:table-cell">Description</th>
+                        <th hlmTh class="w-28 text-center">Members</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody hlmTBody>
+                      @for (group of d.items; track group.id) {
+                        <tr hlmTr tabindex="0" (click)="onGroupClick(group.id)" class="cursor-pointer">
+                          <td hlmTd class="font-medium">{{ group.name }}</td>
+                          <td hlmTd class="hidden md:table-cell text-muted-foreground">{{ group.description ?? '—' }}</td>
+                          <td hlmTd class="text-center">
+                            <span hlmBadge variant="secondary">{{ group.memberCount }}</span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-
-            <div class="mt-4">
+            <div class="shrink-0">
               <app-pagination [page]="+d.page" [pageSize]="+d.pageSize" [totalCount]="+d.totalCount"
                 [totalPages]="+(d.totalPages ?? 1)" (pageChange)="onPageChange($event)" />
             </div>

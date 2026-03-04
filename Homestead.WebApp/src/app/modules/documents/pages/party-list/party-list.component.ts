@@ -39,8 +39,9 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
   ],
   providers: [provideIcons({ lucideUsers, lucidePlus, lucideTrash2 })],
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div>
+    <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
         <div class="flex justify-center py-16">
           <hlm-spinner />
@@ -77,7 +78,7 @@ import { toast } from 'ngx-sonner';
             }
           </section>
         } @else {
-          <div class="relative">
+          <div class="relative shrink-0">
             <!-- Normal toolbar -->
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-4">
@@ -126,20 +127,24 @@ import { toast } from 'ngx-sonner';
             </div>
           </div>
 
-          <app-party-table
-            [parties]="result.items"
-            [selectedIds]="selectedPartyIds()"
-            (partySelect)="onPartySelect($event)"
-            (selectionChange)="selectedPartyIds.set($event)"
-          />
-          <app-pagination
-            [page]="+result.page"
-            [totalPages]="+(result.totalPages ?? 0)"
-            [totalCount]="+result.totalCount"
-            [pageSize]="+result.pageSize"
-            (pageChange)="onPageChange($event)"
-            (pageSizeChange)="onPageSizeChange($event)"
-          />
+          <div class="min-h-0 flex-1 overflow-y-auto p-px">
+            <app-party-table
+              [parties]="result.items"
+              [selectedIds]="selectedPartyIds()"
+              (partySelect)="onPartySelect($event)"
+              (selectionChange)="selectedPartyIds.set($event)"
+            />
+          </div>
+          <div class="shrink-0">
+            <app-pagination
+              [page]="+result.page"
+              [totalPages]="+(result.totalPages ?? 0)"
+              [totalCount]="+result.totalCount"
+              [pageSize]="+result.pageSize"
+              (pageChange)="onPageChange($event)"
+              (pageSizeChange)="onPageSizeChange($event)"
+            />
+          </div>
         }
       }
     </div>

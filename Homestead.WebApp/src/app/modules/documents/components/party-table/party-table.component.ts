@@ -8,10 +8,10 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTableImports, HlmCheckboxImports],
   template: `
-    <div class="overflow-hidden rounded-md border">
+    <div class="overflow-clip rounded-md border">
       <div hlmTableContainer>
         <table hlmTable>
-          <thead hlmTHead>
+          <thead hlmTHead class="sticky top-0 z-10 bg-background">
             <tr hlmTr>
               <th hlmTh class="w-10">
                 <hlm-checkbox

@@ -37,8 +37,9 @@ import { toast } from 'ngx-sonner';
     EditTagSheetComponent,
   ],
   providers: [provideIcons({ lucideTags, lucidePlus, lucideSearch, lucideTrash2, lucideX })],
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div>
+    <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !allTags()) {
         <div class="flex justify-center py-16">
           <hlm-spinner />
@@ -75,7 +76,7 @@ import { toast } from 'ngx-sonner';
             }
           </section>
         } @else {
-          <div class="relative">
+          <div class="relative shrink-0">
             <!-- Normal toolbar -->
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-4">
@@ -134,12 +135,14 @@ import { toast } from 'ngx-sonner';
             </div>
           </div>
 
-          <app-tag-table
-            [tags]="filteredTags()"
-            [selectedIds]="selectedTagIds()"
-            (tagSelect)="onTagSelect($event)"
-            (selectionChange)="selectedTagIds.set($event)"
-          />
+          <div class="min-h-0 flex-1 overflow-y-auto p-px">
+            <app-tag-table
+              [tags]="filteredTags()"
+              [selectedIds]="selectedTagIds()"
+              (tagSelect)="onTagSelect($event)"
+              (selectionChange)="selectedTagIds.set($event)"
+            />
+          </div>
         }
       }
     </div>
