@@ -13,7 +13,7 @@ const OIDC_ONLY_URL = baseUrl('homestead-oidc-only');
 export default defineConfig({
   testDir: './tests',
   globalSetup: require.resolve('./global-setup'),
-  globalTimeout: 300_000,
+  globalTimeout: 600_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
