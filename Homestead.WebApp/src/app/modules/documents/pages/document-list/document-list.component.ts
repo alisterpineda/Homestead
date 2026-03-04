@@ -5,7 +5,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -53,7 +53,7 @@ import { toast } from 'ngx-sonner';
     UploadDialogComponent,
     GroupSelectComponent,
   ],
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideListFilter, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideCirclePlus, lucideSlidersHorizontal })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
   template: `
     <div>
       @if (loading() && !data()) {
@@ -102,7 +102,7 @@ import { toast } from 'ngx-sonner';
                 </div>
                 <div class="flex items-center gap-2">
                   @if (viewMode() === 'table') {
-                  <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="columnsMenu">
+                  <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
                     <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
                     Columns
                   </button>
@@ -117,7 +117,7 @@ import { toast } from 'ngx-sonner';
                       }
                     </hlm-dropdown-menu>
                   </ng-template>
-                  <div hlmButtonGroup aria-label="View mode">
+                  <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
                     <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
                       <ng-icon hlm name="lucideLayoutList" size="sm" />
                     </button>
@@ -125,6 +125,42 @@ import { toast } from 'ngx-sonner';
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
                     </button>
                   </div>
+                  <!-- Mobile: Overflow menu (below sm) -->
+                  <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
+                          [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
+                    <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+                  </button>
+                  <ng-template #overflowMenu>
+                    <hlm-dropdown-menu class="w-44">
+                      <span hlmDropdownMenuLabel>View</span>
+                      <hlm-dropdown-menu-group>
+                        <button hlmDropdownMenuRadio [checked]="viewMode() === 'table'"
+                                (triggered)="setViewMode('table')">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Table
+                        </button>
+                        <button hlmDropdownMenuRadio [checked]="viewMode() === 'grid'"
+                                (triggered)="setViewMode('grid')">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Grid
+                        </button>
+                      </hlm-dropdown-menu-group>
+                      @if (viewMode() === 'table') {
+                        <hlm-dropdown-menu-separator />
+                        <span hlmDropdownMenuLabel>Columns</span>
+                        <hlm-dropdown-menu-group>
+                          @for (col of hideableColumns; track col.id) {
+                            <button hlmDropdownMenuCheckbox
+                                    [checked]="columnVisibility()[col.id] !== false"
+                                    (triggered)="onToggleColumn(col.id)">
+                              <hlm-dropdown-menu-checkbox-indicator />
+                              {{ col.label }}
+                            </button>
+                          }
+                        </hlm-dropdown-menu-group>
+                      }
+                    </hlm-dropdown-menu>
+                  </ng-template>
                   @if (auth.canWrite()) {
                     <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
                       <ng-icon hlm name="lucidePlus" size="sm" />
