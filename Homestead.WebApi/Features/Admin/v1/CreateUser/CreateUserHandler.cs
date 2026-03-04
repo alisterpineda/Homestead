@@ -1,10 +1,11 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateUser;
 
-public class CreateUserHandler(UserManager<AppUser> userManager)
+public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager)
     : ICommandHandler<CreateUserRequest, UserResponse>
 {
     public async Task<UserResponse> HandleAsync(CreateUserRequest request, CancellationToken ct)
@@ -21,7 +22,9 @@ public class CreateUserHandler(UserManager<AppUser> userManager)
         if (!result.Succeeded)
             throw new IdentityValidationException(result.ToErrorDictionary());
 
-        await userManager.AddToRoleAsync(user, request.Role.ToString());
+        var roleName = request.Role.ToString();
+        await userManager.AddToRoleAsync(user, roleName);
+        await roleSourceManager.SetSourceAsync(user.Id, roleName, RoleSource.Local);
 
         return new UserResponse
         {

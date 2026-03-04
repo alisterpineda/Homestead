@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,7 @@ namespace Homestead.WebApi.Authentication;
 
 public class OidcUserProvisioner(
     UserManager<AppUser> userManager,
+    IRoleSourceManager roleSourceManager,
     IOptions<OidcOptions> oidcOptions)
 {
     private readonly OidcOptions _oidc = oidcOptions.Value;
@@ -45,6 +47,13 @@ public class OidcUserProvisioner(
                 if (!result.Succeeded)
                     throw new InvalidOperationException(
                         $"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+
+                // First OIDC user also gets Admin role (same as first local registration)
+                if (isFirstUser)
+                {
+                    await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
+                    await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Local);
+                }
             }
 
             await userManager.AddLoginAsync(user, new UserLoginInfo(
@@ -74,9 +83,17 @@ public class OidcUserProvisioner(
             var isAdmin = currentRoles.Contains(nameof(AppRole.Admin));
 
             if (hasAdminClaim && !isAdmin)
+            {
                 await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
+                await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Oidc);
+            }
             else if (!hasAdminClaim && isAdmin)
-                await userManager.RemoveFromRoleAsync(user, nameof(AppRole.Admin));
+            {
+                // Only revoke Admin if it was granted by OIDC; protect locally-granted roles
+                var source = await roleSourceManager.GetSourceAsync(user.Id, nameof(AppRole.Admin));
+                if (source == RoleSource.Oidc)
+                    await userManager.RemoveFromRoleAsync(user, nameof(AppRole.Admin));
+            }
         }
 
         // Ensure user has at least one app role (assign default if none)

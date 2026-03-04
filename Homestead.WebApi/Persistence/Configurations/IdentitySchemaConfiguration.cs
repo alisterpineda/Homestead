@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domains.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -10,10 +11,17 @@ public class IdentityRoleConfiguration : IEntityTypeConfiguration<IdentityRole<G
         => builder.ToTable("roles", "identity");
 }
 
-public class IdentityUserRoleConfiguration : IEntityTypeConfiguration<IdentityUserRole<Guid>>
+public class AppUserRoleConfiguration : IEntityTypeConfiguration<AppUserRole>
 {
-    public void Configure(EntityTypeBuilder<IdentityUserRole<Guid>> builder)
-        => builder.ToTable("user_roles", "identity");
+    public void Configure(EntityTypeBuilder<AppUserRole> builder)
+    {
+        builder.ToTable("user_roles", "identity");
+
+        builder.Property(r => r.Source)
+            .HasConversion<string>()
+            .HasDefaultValue(RoleSource.Local)
+            .IsRequired();
+    }
 }
 
 public class IdentityUserClaimConfiguration : IEntityTypeConfiguration<IdentityUserClaim<Guid>>

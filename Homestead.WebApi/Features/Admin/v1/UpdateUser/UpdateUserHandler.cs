@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
-public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db)
+public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, AppDbContext db)
     : ICommandHandler<UpdateUserCommand, UserResponse?>
 {
     public async Task<UserResponse?> HandleAsync(UpdateUserCommand request, CancellationToken ct)
@@ -45,6 +45,7 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db
                 if (rolesToRemove.Count > 0)
                     await userManager.RemoveFromRolesAsync(user, rolesToRemove);
                 await userManager.AddToRoleAsync(user, newRole);
+                await roleSourceManager.SetSourceAsync(user.Id, newRole, RoleSource.Local);
             }
 
             await transaction.CommitAsync(ct);
@@ -60,4 +61,5 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, AppDbContext db
             };
         });
     }
+
 }

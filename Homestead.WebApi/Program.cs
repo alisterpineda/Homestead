@@ -87,6 +87,7 @@ builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
+builder.Services.AddScoped<IRoleSourceManager, RoleSourceManager>();
 builder.Services.AddExceptionHandler<ForbiddenAccessExceptionHandler>();
 builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
 builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();

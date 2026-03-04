@@ -9,6 +9,7 @@ namespace Homestead.WebApi.Features.Identity.v1.Register;
 public class RegisterHandler(
     UserManager<AppUser> userManager,
     SignInManager<AppUser> signInManager,
+    IRoleSourceManager roleSourceManager,
     AppDbContext db)
     : ICommandHandler<RegisterRequest, RegisterResponse>
 {
@@ -46,7 +47,8 @@ public class RegisterHandler(
                 };
             }
 
-            await userManager.AddToRoleAsync(user, "Admin");
+            await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
+            await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Local);
             await transaction.CommitAsync(ct);
 
             await signInManager.SignInAsync(user, isPersistent: true);
