@@ -48,13 +48,13 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   imports: [HlmTableImports, FlexRenderDirective],
   template: `
     <div
-      class="overflow-hidden rounded-md border"
+      class="overflow-clip rounded-md border"
       [class.select-none]="isResizing()"
       [style]="columnSizeVars()"
     >
       <div hlmTableContainer>
         <table hlmTable style="table-layout: fixed; width: 100%">
-          <thead hlmTHead>
+          <thead hlmTHead class="sticky top-0 z-10 bg-background">
             @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
               <tr hlmTr>
                 @for (header of headerGroup.headers; track header.id) {

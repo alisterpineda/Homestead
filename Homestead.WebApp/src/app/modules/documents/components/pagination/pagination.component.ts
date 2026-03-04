@@ -10,13 +10,25 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
   imports: [FormsModule, HlmPaginationImports, BrnSelectImports, HlmSelectImports],
   template: `
     @if (totalCount() > 0) {
-      <div class="flex flex-wrap items-center justify-between gap-4 pt-4">
+      <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4">
         <span class="text-sm text-muted-foreground">
           Showing {{ rangeStart() }}\u2013{{ rangeEnd() }} of {{ totalCount() }}
         </span>
 
+        <brn-select [ngModel]="pageSize()" (ngModelChange)="pageSizeChange.emit(+$event)" placeholder="Page size">
+          <hlm-select-trigger class="w-fit">
+            <hlm-select-value />
+          </hlm-select-trigger>
+          <hlm-select-content>
+            <hlm-option [value]="10">10 / page</hlm-option>
+            <hlm-option [value]="20">20 / page</hlm-option>
+            <hlm-option [value]="50">50 / page</hlm-option>
+            <hlm-option [value]="100">100 / page</hlm-option>
+          </hlm-select-content>
+        </brn-select>
+
         @if (totalPages() > 1) {
-          <nav hlmPagination>
+          <nav hlmPagination class="w-full sm:w-auto">
             <ul hlmPaginationContent>
               <li hlmPaginationItem
                   [class.pointer-events-none]="page() <= 1"
@@ -46,18 +58,6 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
             </ul>
           </nav>
         }
-
-        <brn-select [ngModel]="pageSize()" (ngModelChange)="pageSizeChange.emit(+$event)" placeholder="Page size">
-          <hlm-select-trigger class="w-fit">
-            <hlm-select-value />
-          </hlm-select-trigger>
-          <hlm-select-content>
-            <hlm-option [value]="10">10 / page</hlm-option>
-            <hlm-option [value]="20">20 / page</hlm-option>
-            <hlm-option [value]="50">50 / page</hlm-option>
-            <hlm-option [value]="100">100 / page</hlm-option>
-          </hlm-select-content>
-        </brn-select>
       </div>
     }
   `,

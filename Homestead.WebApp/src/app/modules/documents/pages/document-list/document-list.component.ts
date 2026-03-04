@@ -53,9 +53,10 @@ import { toast } from 'ngx-sonner';
     UploadDialogComponent,
     GroupSelectComponent,
   ],
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
   template: `
-    <div>
+    <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
         <div class="flex justify-center py-16">
           <hlm-spinner />
@@ -92,7 +93,7 @@ import { toast } from 'ngx-sonner';
             }
           </section>
         } @else {
-          <div class="relative">
+          <div class="relative shrink-0">
             <!-- Normal toolbar: always rendered to hold layout height -->
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-3">
@@ -250,33 +251,37 @@ import { toast } from 'ngx-sonner';
               </button>
             </section>
           } @else {
-            @if (viewMode() === 'table') {
-              <app-document-table
-                [documents]="result.items"
-                [selectedIds]="selectedDocumentIds()"
-                [sortBy]="sortBy()"
-                [sortDir]="sortDir()"
-                [columnVisibility]="columnVisibility()"
-                (documentSelect)="onDocumentSelect($event)"
-                (selectionChange)="selectedDocumentIds.set($event)"
-                (sortChange)="onSortChange($event)"
+            <div class="min-h-0 flex-1 overflow-y-auto p-px">
+              @if (viewMode() === 'table') {
+                <app-document-table
+                  [documents]="result.items"
+                  [selectedIds]="selectedDocumentIds()"
+                  [sortBy]="sortBy()"
+                  [sortDir]="sortDir()"
+                  [columnVisibility]="columnVisibility()"
+                  (documentSelect)="onDocumentSelect($event)"
+                  (selectionChange)="selectedDocumentIds.set($event)"
+                  (sortChange)="onSortChange($event)"
+                />
+              } @else {
+                <app-document-card-grid
+                  [documents]="result.items"
+                  [selectedIds]="selectedDocumentIds()"
+                  (documentSelect)="onDocumentSelect($event)"
+                  (selectionChange)="selectedDocumentIds.set($event)"
+                />
+              }
+            </div>
+            <div class="shrink-0">
+              <app-pagination
+                [page]="+result.page"
+                [totalPages]="+(result.totalPages ?? 0)"
+                [totalCount]="+result.totalCount"
+                [pageSize]="+result.pageSize"
+                (pageChange)="onPageChange($event)"
+                (pageSizeChange)="onPageSizeChange($event)"
               />
-            } @else {
-              <app-document-card-grid
-                [documents]="result.items"
-                [selectedIds]="selectedDocumentIds()"
-                (documentSelect)="onDocumentSelect($event)"
-                (selectionChange)="selectedDocumentIds.set($event)"
-              />
-            }
-            <app-pagination
-              [page]="+result.page"
-              [totalPages]="+(result.totalPages ?? 0)"
-              [totalCount]="+result.totalCount"
-              [pageSize]="+result.pageSize"
-              (pageChange)="onPageChange($event)"
-              (pageSizeChange)="onPageSizeChange($event)"
-            />
+            </div>
           }
         }
       }

@@ -43,7 +43,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   ],
   providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideLayoutDashboard, lucideTags, lucideEllipsisVertical, lucideCircleUserRound })],
   template: `
-    <div hlmSidebarWrapper>
+    <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
         <!-- Sidebar Header -->
         <div hlmSidebarHeader>
@@ -165,7 +165,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         </div>
       </hlm-sidebar>
 
-      <main hlmSidebarInset class="min-w-0">
+      <main hlmSidebarInset class="min-h-0 min-w-0">
         <!-- Inset Header -->
         <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <button hlmSidebarTrigger></button>
