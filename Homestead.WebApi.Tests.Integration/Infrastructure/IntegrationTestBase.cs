@@ -81,7 +81,9 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var imageBytes = await GetUniqueImageBytesAsync();
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(name), "name");
-        form.Add(new ByteArrayContent(imageBytes), "file", name);
+        var fileContent = new ByteArrayContent(imageBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", name);
 
         var response = await client.PostAsync("/api/v1/documents", form);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -123,7 +125,9 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var fileBytes = await GetUniquePdfBytesAsync();
         var form = new MultipartFormDataContent();
         form.Add(new StringContent(name), "name");
-        form.Add(new ByteArrayContent(fileBytes), "file", name);
+        var fileContent = new ByteArrayContent(fileBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", name);
         if (groupId.HasValue)
             form.Add(new StringContent(groupId.Value.ToString()), "groupId");
 
