@@ -118,10 +118,10 @@ import { toast } from 'ngx-sonner';
                     </hlm-dropdown-menu>
                   </ng-template>
                   <div hlmButtonGroup aria-label="View mode">
-                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('table')" aria-label="Table view">
+                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
                       <ng-icon hlm name="lucideLayoutList" size="sm" />
                     </button>
-                    <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="viewMode.set('grid')" aria-label="Grid view">
+                    <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('grid')" aria-label="Grid view">
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
                     </button>
                   </div>
@@ -257,8 +257,10 @@ export class DocumentListComponent implements OnDestroy {
   private processingHub = inject(ProcessingHubService);
   private hubSub: Subscription;
 
+  private static readonly VIEW_MODE_KEY = 'document-view-mode';
+
   hideableColumns = HIDEABLE_COLUMNS;
-  viewMode = signal<'table' | 'grid'>('table');
+  viewMode = signal<'table' | 'grid'>(this.loadViewMode());
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
@@ -466,6 +468,16 @@ export class DocumentListComponent implements OnDestroy {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
     });
+  }
+
+  setViewMode(mode: 'table' | 'grid'): void {
+    this.viewMode.set(mode);
+    localStorage.setItem(DocumentListComponent.VIEW_MODE_KEY, mode);
+  }
+
+  private loadViewMode(): 'table' | 'grid' {
+    const stored = localStorage.getItem(DocumentListComponent.VIEW_MODE_KEY);
+    return stored === 'table' || stored === 'grid' ? stored : 'grid';
   }
 
   onDocumentSelect(id: string): void {

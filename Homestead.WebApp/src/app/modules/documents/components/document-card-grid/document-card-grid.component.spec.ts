@@ -79,6 +79,39 @@ describe('DocumentCardGridComponent', () => {
     expect(component.hasError(doc.id)).toBe(true);
   });
 
+  it('should toggle selection instead of navigating when in selection mode', () => {
+    const doc = createMockDocument();
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.componentRef.setInput('selectedIds', new Set<string>(['other-id']));
+    fixture.detectChanges();
+
+    let emittedSelect: string | undefined;
+    let emittedSelection: Set<string> | undefined;
+    component.documentSelect.subscribe((id: string) => { emittedSelect = id; });
+    component.selectionChange.subscribe((s: Set<string>) => { emittedSelection = s; });
+
+    component.onCardClick(doc.id);
+
+    expect(emittedSelect).toBeUndefined();
+    expect(emittedSelection).toBeDefined();
+    expect(emittedSelection!.has(doc.id)).toBe(true);
+  });
+
+  it('should deselect when clicking an already-selected card in selection mode', () => {
+    const doc = createMockDocument();
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.componentRef.setInput('selectedIds', new Set<string>([doc.id]));
+    fixture.detectChanges();
+
+    let emittedSelection: Set<string> | undefined;
+    component.selectionChange.subscribe((s: Set<string>) => { emittedSelection = s; });
+
+    component.onCardClick(doc.id);
+
+    expect(emittedSelection).toBeDefined();
+    expect(emittedSelection!.has(doc.id)).toBe(false);
+  });
+
   it('should emit selectionChange when checkbox toggled', () => {
     const doc = createMockDocument();
     fixture.componentRef.setInput('documents', [doc]);

@@ -24,11 +24,11 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
   ],
   providers: [provideIcons({ lucideFileText, lucideImage })],
   template: `
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       @for (doc of documents(); track doc.id) {
         <div
           hlmCard
-          class="cursor-pointer overflow-hidden transition-shadow hover:shadow-md"
+          class="cursor-pointer overflow-hidden transition-shadow hover:shadow-md pt-0 gap-3"
           [class]="isSelected(doc.id) ? 'ring-2 ring-primary' : ''"
           tabindex="0"
           role="button"
@@ -37,10 +37,11 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
           (keydown.enter)="onCardClick(doc.id)"
         >
           <!-- Thumbnail area -->
-          <div class="relative aspect-[3/2] bg-muted flex items-center justify-center overflow-hidden">
+          <div class="relative aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
             <!-- Checkbox overlay -->
             <div class="absolute top-2 left-2 z-10" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
               <hlm-checkbox
+                class="bg-background shadow-sm"
                 [checked]="isSelected(doc.id)"
                 [aria-label]="'Select ' + doc.name"
                 (checkedChange)="onCheckboxChange(doc.id, $event)"
@@ -115,7 +116,11 @@ export class DocumentCardGridComponent {
   }
 
   onCardClick(id: string): void {
-    this.documentSelect.emit(id);
+    if (this.selectedIds().size > 0) {
+      this.onCheckboxChange(id, !this.isSelected(id));
+    } else {
+      this.documentSelect.emit(id);
+    }
   }
 
   onCheckboxChange(id: string, checked: boolean): void {
