@@ -108,6 +108,10 @@ jobs:
         working-directory: Homestead.WebApp
         run: npm run test:ci
 
+      - name: Prefix coverage package names with Homestead.WebApp
+        working-directory: Homestead.WebApp
+        run: sed -i 's/<package name="/<package name="Homestead.WebApp./g' coverage/**/cobertura-coverage.xml
+
       - name: Upload Coverage
         if: always()
         uses: actions/upload-artifact@v4
