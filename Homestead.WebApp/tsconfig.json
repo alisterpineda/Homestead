@@ -115,6 +115,9 @@
       ],
       "@/shared/components/spartan/item": [
         "./src/app/shared/components/spartan/item/src/index.ts"
+      ],
+      "@/shared/components/spartan/calendar": [
+        "./src/app/shared/components/spartan/calendar/src/index.ts"
       ]
     }
   },

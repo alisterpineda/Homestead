@@ -1,6 +1,7 @@
 import { APP_INITIALIZER, ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideNativeDateAdapter } from '@spartan-ng/brain/date-time';
 
 import { routes } from './app.routes';
 import { AuthService } from '@/shared/services/auth.service';
@@ -12,6 +13,7 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
+    provideNativeDateAdapter(),
     {
       provide: APP_INITIALIZER,
       useFactory: (auth: AuthService) => () => auth.initialize(),

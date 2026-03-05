@@ -46,13 +46,14 @@ import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
+import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { NgScrollbar } from 'ngx-scrollbar';
 import { TagInputComponent } from '../../components/tag-input/tag-input.component';
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
 import { AddVersionDialogComponent } from '../../components/add-version-dialog/add-version-dialog.component';
-import { formatBytes } from '@/shared/utils';
+import { formatBytes, parseDate, toIsoDateString, datesEqual } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
 import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-version';
@@ -96,6 +97,7 @@ import { toast } from 'ngx-sonner';
     NgScrollbar,
     AddVersionDialogComponent,
     HlmBadge,
+    DatePickerComponent,
   ],
   providers: [
     provideIcons({
@@ -245,39 +247,21 @@ import { toast } from 'ngx-sonner';
           </hlm-form-field>
 
           <!-- Document Date -->
-          <hlm-form-field>
-            <label hlmLabel for="doc-date">Document Date</label>
-            <input
-              hlmInput
-              type="date"
-              id="doc-date"
-              [value]="editDocumentDate()"
-              (input)="editDocumentDate.set(asInputValue($event))"
-            />
-          </hlm-form-field>
+          <div class="space-y-2">
+            <label hlmLabel>Document Date</label>
+            <app-date-picker [(date)]="editDocumentDate" ariaLabel="Document Date" />
+          </div>
 
           <!-- Valid From / Valid Until -->
-          <div class="grid grid-cols-2 gap-3">
-            <hlm-form-field>
-              <label hlmLabel for="doc-valid-from">Valid From</label>
-              <input
-                hlmInput
-                type="date"
-                id="doc-valid-from"
-                [value]="editValidFrom()"
-                (input)="editValidFrom.set(asInputValue($event))"
-              />
-            </hlm-form-field>
-            <hlm-form-field>
-              <label hlmLabel for="doc-valid-until">Valid Until</label>
-              <input
-                hlmInput
-                type="date"
-                id="doc-valid-until"
-                [value]="editValidUntil()"
-                (input)="editValidUntil.set(asInputValue($event))"
-              />
-            </hlm-form-field>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="space-y-2">
+              <label hlmLabel>Valid From</label>
+              <app-date-picker [(date)]="editValidFrom" ariaLabel="Valid From" />
+            </div>
+            <div class="space-y-2">
+              <label hlmLabel>Valid Until</label>
+              <app-date-picker [(date)]="editValidUntil" ariaLabel="Valid Until" />
+            </div>
           </div>
 
           <!-- Parties -->
@@ -539,9 +523,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editName = signal('');
   editTags = signal<string[]>([]);
   editParties = signal<PartyOption[]>([]);
-  editDocumentDate = signal('');
-  editValidFrom = signal('');
-  editValidUntil = signal('');
+  editDocumentDate = signal<Date | null>(null);
+  editValidFrom = signal<Date | null>(null);
+  editValidUntil = signal<Date | null>(null);
   editVersionLabel = signal('');
   editExtractedText = signal('');
   saving = signal(false);
@@ -598,9 +582,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
       origPartyIds.some((id, i) => id !== currPartyIds[i])
     )
       return true;
-    if (this.editDocumentDate() !== this.toDateInputValue(doc.documentDate)) return true;
-    if (this.editValidFrom() !== this.toDateInputValue(doc.validFrom)) return true;
-    if (this.editValidUntil() !== this.toDateInputValue(doc.validUntil)) return true;
+    if (!datesEqual(this.editDocumentDate(), this.origDocumentDate())) return true;
+    if (!datesEqual(this.editValidFrom(), this.origValidFrom())) return true;
+    if (!datesEqual(this.editValidUntil(), this.origValidUntil())) return true;
     return false;
   });
 
@@ -719,6 +703,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   document = this.documentData;
 
+  private origDocumentDate = computed(() => parseDate(this.document()?.documentDate));
+  private origValidFrom = computed(() => parseDate(this.document()?.validFrom));
+  private origValidUntil = computed(() => parseDate(this.document()?.validUntil));
+
   tagColorMap = computed(() => {
     const doc = this.document();
     if (!doc?.tags) return {};
@@ -736,9 +724,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.editName.set(doc.name);
         this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
         this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
-        this.editDocumentDate.set(this.toDateInputValue(doc.documentDate));
-        this.editValidFrom.set(this.toDateInputValue(doc.validFrom));
-        this.editValidUntil.set(this.toDateInputValue(doc.validUntil));
+        this.editDocumentDate.set(this.origDocumentDate());
+        this.editValidFrom.set(this.origValidFrom());
+        this.editValidUntil.set(this.origValidUntil());
       }
     });
 
@@ -888,10 +876,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
-  toDateInputValue(isoString: string | null | undefined): string {
-    return isoString ? isoString.substring(0, 10) : '';
-  }
-
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
@@ -963,14 +947,14 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (this.editName() !== doc.name) {
       ops.push(replace('/name', this.editName()));
     }
-    if (this.editDocumentDate() !== this.toDateInputValue(doc.documentDate)) {
-      ops.push(replace('/documentDate', this.editDocumentDate() || null));
+    if (!datesEqual(this.editDocumentDate(), this.origDocumentDate())) {
+      ops.push(replace('/documentDate', toIsoDateString(this.editDocumentDate())));
     }
-    if (this.editValidFrom() !== this.toDateInputValue(doc.validFrom)) {
-      ops.push(replace('/validFrom', this.editValidFrom() || null));
+    if (!datesEqual(this.editValidFrom(), this.origValidFrom())) {
+      ops.push(replace('/validFrom', toIsoDateString(this.editValidFrom())));
     }
-    if (this.editValidUntil() !== this.toDateInputValue(doc.validUntil)) {
-      ops.push(replace('/validUntil', this.editValidUntil() || null));
+    if (!datesEqual(this.editValidUntil(), this.origValidUntil())) {
+      ops.push(replace('/validUntil', toIsoDateString(this.editValidUntil())));
     }
 
     const origTags = (doc.tags?.map((t) => t.path) ?? []).slice().sort();
