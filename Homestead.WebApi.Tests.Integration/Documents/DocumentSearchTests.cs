@@ -111,6 +111,60 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.Equal(5, body.TotalCount);
     }
 
+    [Fact]
+    public async Task GetDocuments_PrefixSearch_MatchesStemmedWord()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Consultation Agreement.pdf");
+        await UploadAndWaitAsync(client, "Unrelated Report.pdf");
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=consult", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Consultation Agreement.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_ShortPrefix_MatchesViaILike()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Consultation Agreement.pdf");
+        await UploadAndWaitAsync(client, "Unrelated Report.pdf");
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=consu", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Consultation Agreement.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_MultiWordSearch_MatchesBothTerms()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Tax Invoice 2024.pdf");
+        await UploadAndWaitAsync(client, "Tax Return 2024.pdf");
+        await UploadAndWaitAsync(client, "Sales Invoice 2024.pdf");
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=tax+invoice", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Tax Invoice 2024.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_SpecialCharactersInSearch_DoesNotThrow()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Normal Document.pdf");
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=test%26%26%7C%7C!%27%3A*", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension);
     private record TagResult(Guid Id, string Name, string Path);
     private record PartyResult(Guid Id, string Name);

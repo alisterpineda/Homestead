@@ -50,5 +50,10 @@ public class DocumentVersionConfiguration : IEntityTypeConfiguration<DocumentVer
         builder.HasIndex(r => r.DocumentId);
         builder.HasIndex(r => r.FileHash).IsUnique();
         builder.HasIndex(r => new { r.DocumentId, r.VersionNumber }).IsUnique();
+
+        builder.HasIndex(r => r.ExtractedText)
+            .HasMethod("GIN")
+            .HasOperators("gin_trgm_ops");
+
     }
 }

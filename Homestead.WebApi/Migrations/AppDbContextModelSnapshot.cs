@@ -21,6 +21,7 @@ namespace Homestead.WebApi.Migrations
                 .HasAnnotation("ProductVersion", "10.0.3")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Auditing.AuditLog", b =>
@@ -216,6 +217,11 @@ namespace Homestead.WebApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DocumentId");
+
+                    b.HasIndex("ExtractedText");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ExtractedText"), "GIN");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("ExtractedText"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("FileHash")
                         .IsUnique();

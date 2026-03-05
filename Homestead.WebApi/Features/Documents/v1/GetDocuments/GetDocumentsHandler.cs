@@ -9,6 +9,7 @@ namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
     : IQueryHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
 {
+    private const string TsLanguage = "english";
     public async Task<PaginatedResponse<GetDocumentsResponse>> HandleAsync(
         GetDocumentsRequest request, CancellationToken ct)
     {
@@ -56,17 +57,23 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         }
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+        string? tsQueryString = search is not null ? BuildPrefixTsQuery(search) : null;
 
         if (search is not null)
         {
             var namePattern = $"%{search}%";
+            var hasTsQuery = tsQueryString is not null;
+            var tsq = tsQueryString ?? "";
+
             query = query.Where(d =>
                 EF.Functions.ILike(d.Name, namePattern) ||
-                (d.SearchVector != null &&
-                 d.SearchVector.Matches(EF.Functions.WebSearchToTsQuery("english", search))));
+                d.Versions.Any(v => v.ExtractedText != null
+                    && EF.Functions.ILike(v.ExtractedText, namePattern)) ||
+                (hasTsQuery && d.SearchVector != null &&
+                 d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsq))));
         }
 
-        return await ApplySort(query, request.SortBy, request.SortDir, search)
+        return await ApplySort(query, request.SortBy, request.SortDir, tsQueryString)
             .Select(d => new
             {
                 d.Id,
@@ -122,15 +129,34 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             .ToPaginatedAsync(request, ct);
     }
 
+    private static string SanitizeTsQueryTerm(string term)
+    {
+        var chars = term.Where(c => c != '&' && c != '|' && c != '!' && c != '('
+            && c != ')' && c != ':' && c != '*' && c != '\'' && c != '\\').ToArray();
+        return new string(chars);
+    }
+
+    private static string? BuildPrefixTsQuery(string search)
+    {
+        var terms = search.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(SanitizeTsQueryTerm)
+            .Where(t => t.Length > 0)
+            .Select(t => t + ":*")
+            .ToList();
+
+        return terms.Count > 0 ? string.Join(" & ", terms) : null;
+    }
+
     private static IOrderedQueryable<Domains.Documents.Document> ApplySort(
         IQueryable<Domains.Documents.Document> query, DocumentSortBy? sortBy, SortDirection? sortDir,
-        string? search = null)
+        string? tsQueryString = null)
     {
         // When searching without an explicit sort, order by relevance
-        if (sortBy is null && search is not null)
+        if (sortBy is null && tsQueryString is not null)
         {
+            var tsq = tsQueryString;
             return query.OrderByDescending(d =>
-                d.SearchVector!.RankCoverDensity(EF.Functions.WebSearchToTsQuery("english", search)));
+                d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)));
         }
 
         var effectiveSortBy = sortBy ?? DocumentSortBy.Name;
