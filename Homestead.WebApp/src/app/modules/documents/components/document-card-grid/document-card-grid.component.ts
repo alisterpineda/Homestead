@@ -1,6 +1,7 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, inject, LOCALE_ID } from '@angular/core';
+import { formatDate as ngFormatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucideImage, lucideUsers } from '@ng-icons/lucide';
+import { lucideCalendar, lucideFileText, lucideImage, lucideUsers } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
@@ -21,7 +22,7 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
     HlmBadge,
     TagBadgeComponent,
   ],
-  providers: [provideIcons({ lucideFileText, lucideImage, lucideUsers })],
+  providers: [provideIcons({ lucideCalendar, lucideFileText, lucideImage, lucideUsers })],
   styles: `
     .scrim-overlay {
       background: linear-gradient(in oklch to top,
@@ -107,13 +108,19 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 
           <!-- Bottom metadata overlay -->
           <div class="scrim-overlay absolute bottom-0 inset-x-0 p-3 pt-12">
-            <!-- Detail lines (parties, future fields) above the title — always reserved -->
-            <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
-              @if (doc.parties.length > 0) {
-                <ng-icon hlm name="lucideUsers" size="xs" class="shrink-0 text-white/70" />
-                <p class="text-shadow-scrim text-white/70 text-xs truncate">{{ getPartyNames(doc.parties) }}</p>
-              }
-            </div>
+            <!-- Detail lines above the title -->
+            @if (doc.documentDate) {
+              <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
+                <ng-icon hlm name="lucideCalendar" size="xs" class="shrink-0 text-white/90" />
+                <p class="text-shadow-scrim text-white/90 text-xs truncate">{{ formatDate(doc.documentDate) }}</p>
+              </div>
+            }
+            @if (doc.parties.length > 0) {
+              <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
+                <ng-icon hlm name="lucideUsers" size="xs" class="shrink-0 text-white/90" />
+                <p class="text-shadow-scrim text-white/90 text-xs truncate">{{ getPartyNames(doc.parties) }}</p>
+              </div>
+            }
             <!-- Title always at the bottom -->
             <p class="text-shadow-scrim text-white font-medium truncate text-sm" [title]="doc.name">{{ doc.name }}</p>
           </div>
@@ -124,6 +131,7 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 })
 export class DocumentCardGridComponent {
   private apiConfig = inject(ApiConfiguration);
+  private locale = inject(LOCALE_ID);
 
   documents = input.required<GetDocumentsResponse[]>();
   selectedIds = input<Set<string>>(new Set());
@@ -153,6 +161,10 @@ export class DocumentCardGridComponent {
 
   isImageType(contentType: string): boolean {
     return contentType.startsWith('image/');
+  }
+
+  formatDate(date: string): string {
+    return ngFormatDate(date, 'mediumDate', this.locale);
   }
 
   getPartyNames(parties: { name: string }[]): string {
