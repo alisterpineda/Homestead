@@ -74,8 +74,7 @@ import { toast } from 'ngx-sonner';
       }
 
       @if (data(); as result) {
-        @if (result.items.length === 0 && !hasActiveFilters()) {
-          <section hlmEmpty>
+          <section hlmEmpty [class.hidden]="!showInitialEmpty()">
             <hlm-empty-media variant="icon">
               <ng-icon hlm name="lucideFileText" size="xl" />
             </hlm-empty-media>
@@ -90,8 +89,7 @@ import { toast } from 'ngx-sonner';
               </app-upload-dialog>
             }
           </section>
-        } @else {
-          <div class="relative shrink-0">
+          <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
             <!-- Normal toolbar: always rendered to hold layout height -->
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-3">
@@ -234,8 +232,7 @@ import { toast } from 'ngx-sonner';
             </div>
           </div>
 
-          @if (result.items.length === 0) {
-            <section hlmEmpty>
+          <section hlmEmpty [class.hidden]="!showFilteredEmpty()">
               <hlm-empty-media variant="icon">
                 <ng-icon hlm name="lucideFileText" size="xl" />
               </hlm-empty-media>
@@ -246,9 +243,8 @@ import { toast } from 'ngx-sonner';
               <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
                 Reset filters
               </button>
-            </section>
-          } @else {
-            <div class="min-h-0 flex-1 overflow-y-auto p-px">
+          </section>
+          <div class="min-h-0 flex-1 overflow-y-auto p-px" [class.hidden]="!hasItems()">
               @if (viewMode() === 'table') {
                 <app-document-table
                   [documents]="result.items"
@@ -268,8 +264,8 @@ import { toast } from 'ngx-sonner';
                   (selectionChange)="selectedDocumentIds.set($event)"
                 />
               }
-            </div>
-            <div class="shrink-0">
+          </div>
+          <div class="shrink-0" [class.hidden]="!hasItems()">
               <app-pagination
                 [page]="+result.page"
                 [totalPages]="+(result.totalPages ?? 0)"
@@ -278,9 +274,7 @@ import { toast } from 'ngx-sonner';
                 (pageChange)="onPageChange($event)"
                 (pageSizeChange)="onPageSizeChange($event)"
               />
-            </div>
-          }
-        }
+          </div>
       }
 
     </div>
@@ -356,6 +350,15 @@ export class DocumentListComponent implements OnDestroy {
     this.selectedTagIds().length > 0 ||
     this.sortBy() !== null,
   );
+
+  /** Whether the current data response contains at least one document. */
+  hasItems = computed(() => (this.data()?.items?.length ?? 0) > 0);
+
+  /** Show the "No documents yet" empty state (truly empty, no filters, not loading). */
+  showInitialEmpty = computed(() => !this.hasItems() && !this.hasActiveFilters() && !this.loading());
+
+  /** Show the "No matching documents" empty state (filters active but no results). */
+  showFilteredEmpty = computed(() => !this.hasItems() && this.hasActiveFilters());
 
   partyOptions = toSignal(
     toObservable(this.partyFilterSearch).pipe(
