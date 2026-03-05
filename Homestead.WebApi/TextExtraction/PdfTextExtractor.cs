@@ -1,4 +1,5 @@
 using System.Text;
+using PDFtoImage;
 using UglyToad.PdfPig;
 
 namespace Homestead.WebApi.TextExtraction;
@@ -15,6 +16,8 @@ public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtracto
             using var document = PdfDocument.Open(filePath);
             var sb = new StringBuilder();
 
+            using var pdfStream = File.OpenRead(filePath);
+
             foreach (var page in document.GetPages())
             {
                 ct.ThrowIfCancellationRequested();
@@ -29,21 +32,19 @@ public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtracto
                     continue;
                 }
 
-                // No embedded text on this page — try OCR on page images
-                foreach (var image in page.GetImages())
+                // No embedded text on this page — render as image and OCR
+                pdfStream.Position = 0;
+                using var pngStream = new MemoryStream();
+                Conversion.SavePng(pngStream, pdfStream, (Index)(page.Number - 1), leaveOpen: true);
+                pngStream.Position = 0;
+
+                var ocrText = await tesseract.OcrAsync(pngStream, ct);
+                if (!string.IsNullOrWhiteSpace(ocrText))
                 {
-                    if (!image.TryGetPng(out var pngBytes))
-                        continue;
+                    if (sb.Length > 0)
+                        sb.AppendLine();
 
-                    using var stream = new MemoryStream(pngBytes);
-                    var ocrText = await tesseract.OcrAsync(stream, ct);
-                    if (!string.IsNullOrWhiteSpace(ocrText))
-                    {
-                        if (sb.Length > 0)
-                            sb.AppendLine();
-
-                        sb.Append(ocrText);
-                    }
+                    sb.Append(ocrText);
                 }
             }
 
