@@ -68,7 +68,15 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "coverage": false,
+            "coverageReporters": ["text", "cobertura"],
+            "coverageExclude": [
+              "src/app/shared/components/spartan/**",
+              "src/app/api/generated/**"
+            ]
+          }
         }
       }
     }
