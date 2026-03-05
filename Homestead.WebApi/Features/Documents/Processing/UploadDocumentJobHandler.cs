@@ -98,7 +98,6 @@ public class UploadDocumentJobHandler(
         db.DocumentVersions.Add(version);
 
         auditLogger.LogCreated("Document", documentId, job.CreatedByUserId);
-        auditLogger.LogCreated("DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: documentId);
 
         await db.SaveChangesAsync(ct);
 

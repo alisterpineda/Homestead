@@ -53,6 +53,23 @@ public class CommentAndActivityTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetActivity_NewUpload_OnlyShowsCreatedEntry()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client);
+
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/activity?Page=1&PageSize=20", CT);
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<ActivityItem>>(CT);
+        var auditItems = body!.Items.Where(a => a.Type == "audit_log").ToArray();
+
+        Assert.Single(auditItems);
+        Assert.Contains("created this document", auditItems[0].Summary);
+        Assert.DoesNotContain(auditItems, a => a.Summary!.Contains("added a new version"));
+    }
+
+    [Fact]
     public async Task GetActivity_AfterUpdate_ShowsChanges()
     {
         var client = await CreateAdminClientAsync();
