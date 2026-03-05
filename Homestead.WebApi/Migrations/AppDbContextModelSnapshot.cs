@@ -550,6 +550,36 @@ namespace Homestead.WebApi.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("roles", "identity");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("36dd9cfb-c763-4e7a-b6ad-fb2894387100"),
+                            ConcurrencyStamp = "b026694e-34ae-4a7e-b94e-1b0566351474",
+                            Name = "Admin",
+                            NormalizedName = "ADMIN"
+                        },
+                        new
+                        {
+                            Id = new Guid("470b20ff-ebd9-4704-9412-5d4f7268e0b4"),
+                            ConcurrencyStamp = "a1e03693-1592-4c68-a12c-51e4e6e1bf6e",
+                            Name = "Contributor",
+                            NormalizedName = "CONTRIBUTOR"
+                        },
+                        new
+                        {
+                            Id = new Guid("6cb8bf9d-1af1-442a-b077-d337e83dcae3"),
+                            ConcurrencyStamp = "dc457fa2-09f0-4c65-a7b5-963327cb41a4",
+                            Name = "Viewer",
+                            NormalizedName = "VIEWER"
+                        },
+                        new
+                        {
+                            Id = new Guid("2dfd3ea9-d87c-4772-ac15-58d639c67fe1"),
+                            ConcurrencyStamp = "e5a3a534-6cb0-4e8f-b7a1-3f2c6e9d04a7",
+                            Name = "Guest",
+                            NormalizedName = "GUEST"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

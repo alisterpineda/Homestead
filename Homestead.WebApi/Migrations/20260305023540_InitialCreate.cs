@@ -1,8 +1,11 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
+
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
 namespace Homestead.WebApi.Migrations
 {
@@ -16,13 +19,16 @@ namespace Homestead.WebApi.Migrations
                 name: "identity");
 
             migrationBuilder.EnsureSchema(
+                name: "auditing");
+
+            migrationBuilder.EnsureSchema(
                 name: "documents");
 
             migrationBuilder.EnsureSchema(
-                name: "processing");
+                name: "auth");
 
             migrationBuilder.EnsureSchema(
-                name: "tags");
+                name: "processing");
 
             migrationBuilder.CreateTable(
                 name: "app_users",
@@ -32,6 +38,7 @@ namespace Homestead.WebApi.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     DisplayName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -50,6 +57,25 @@ namespace Homestead.WebApi.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_app_users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "audit_logs",
+                schema: "auditing",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    EntityType = table.Column<string>(type: "text", nullable: false),
+                    EntityId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ParentEntityId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Action = table.Column<string>(type: "text", nullable: false),
+                    Changes = table.Column<string>(type: "jsonb", nullable: true),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Timestamp = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_audit_logs", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -76,21 +102,6 @@ namespace Homestead.WebApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "parties",
-                schema: "documents",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_parties", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "roles",
                 schema: "identity",
                 columns: table => new
@@ -106,61 +117,81 @@ namespace Homestead.WebApi.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "groups",
+                schema: "auth",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_groups", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_groups_app_users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "parties",
+                schema: "documents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_parties", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_parties_app_users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "tags",
-                schema: "tags",
+                schema: "documents",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     Path = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
                     ParentId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                    Color = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_tags", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_tags_tags_ParentId",
-                        column: x => x.ParentId,
-                        principalSchema: "tags",
-                        principalTable: "tags",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "documents",
-                schema: "documents",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    ContentType = table.Column<string>(type: "text", nullable: false),
-                    FileSize = table.Column<long>(type: "bigint", nullable: false),
-                    FilePath = table.Column<string>(type: "text", nullable: false),
-                    FileHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
-                    ExtractedText = table.Column<string>(type: "text", nullable: true),
-                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
-                    OwnerUserId = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_documents", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_documents_app_users_CreatedByUserId",
+                        name: "FK_tags_app_users_CreatedByUserId",
                         column: x => x.CreatedByUserId,
                         principalSchema: "identity",
                         principalTable: "app_users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
-                        name: "FK_documents_app_users_OwnerUserId",
-                        column: x => x.OwnerUserId,
-                        principalSchema: "identity",
-                        principalTable: "app_users",
+                        name: "FK_tags_tags_ParentId",
+                        column: x => x.ParentId,
+                        principalSchema: "documents",
+                        principalTable: "tags",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -259,7 +290,8 @@ namespace Homestead.WebApi.Migrations
                 columns: table => new
                 {
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    RoleId = table.Column<Guid>(type: "uuid", nullable: false)
+                    RoleId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Source = table.Column<string>(type: "text", nullable: false, defaultValue: "Local")
                 },
                 constraints: table =>
                 {
@@ -276,6 +308,107 @@ namespace Homestead.WebApi.Migrations
                         column: x => x.RoleId,
                         principalSchema: "identity",
                         principalTable: "roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "documents",
+                schema: "documents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    DocumentDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: true),
+                    ValidUntil = table.Column<DateOnly>(type: "date", nullable: true),
+                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    OwnerUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    GroupId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_documents", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_documents_app_users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_documents_app_users_OwnerUserId",
+                        column: x => x.OwnerUserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_documents_groups_GroupId",
+                        column: x => x.GroupId,
+                        principalSchema: "auth",
+                        principalTable: "groups",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "group_members",
+                schema: "auth",
+                columns: table => new
+                {
+                    GroupId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AccessLevel = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_group_members", x => new { x.GroupId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_group_members_app_users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_group_members_groups_GroupId",
+                        column: x => x.GroupId,
+                        principalSchema: "auth",
+                        principalTable: "groups",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "document_comments",
+                schema: "documents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Body = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DocumentId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_document_comments", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_document_comments_app_users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalSchema: "identity",
+                        principalTable: "app_users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_document_comments_documents_DocumentId",
+                        column: x => x.DocumentId,
+                        principalSchema: "documents",
+                        principalTable: "documents",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -328,10 +461,51 @@ namespace Homestead.WebApi.Migrations
                     table.ForeignKey(
                         name: "FK_document_tags_tags_TagId",
                         column: x => x.TagId,
-                        principalSchema: "tags",
+                        principalSchema: "documents",
                         principalTable: "tags",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "document_versions",
+                schema: "documents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    VersionNumber = table.Column<int>(type: "integer", nullable: false),
+                    Label = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    ContentType = table.Column<string>(type: "text", nullable: false),
+                    FileSize = table.Column<long>(type: "bigint", nullable: false),
+                    FilePath = table.Column<string>(type: "text", nullable: false),
+                    FileHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    FileExtension = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    ExtractedText = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    DocumentId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_document_versions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_document_versions_documents_DocumentId",
+                        column: x => x.DocumentId,
+                        principalSchema: "documents",
+                        principalTable: "documents",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "roles",
+                columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
+                values: new object[,]
+                {
+                    { new Guid("2dfd3ea9-d87c-4772-ac15-58d639c67fe1"), "e5a3a534-6cb0-4e8f-b7a1-3f2c6e9d04a7", "Guest", "GUEST" },
+                    { new Guid("36dd9cfb-c763-4e7a-b6ad-fb2894387100"), "b026694e-34ae-4a7e-b94e-1b0566351474", "Admin", "ADMIN" },
+                    { new Guid("470b20ff-ebd9-4704-9412-5d4f7268e0b4"), "a1e03693-1592-4c68-a12c-51e4e6e1bf6e", "Contributor", "CONTRIBUTOR" },
+                    { new Guid("6cb8bf9d-1af1-442a-b077-d337e83dcae3"), "dc457fa2-09f0-4c65-a7b5-963327cb41a4", "Viewer", "VIEWER" }
                 });
 
             migrationBuilder.CreateIndex(
@@ -346,6 +520,42 @@ namespace Homestead.WebApi.Migrations
                 table: "app_users",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_audit_logs_EntityType_EntityId",
+                schema: "auditing",
+                table: "audit_logs",
+                columns: new[] { "EntityType", "EntityId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_audit_logs_ParentEntityId",
+                schema: "auditing",
+                table: "audit_logs",
+                column: "ParentEntityId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_audit_logs_Timestamp",
+                schema: "auditing",
+                table: "audit_logs",
+                column: "Timestamp");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_audit_logs_UserId",
+                schema: "auditing",
+                table: "audit_logs",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_document_comments_CreatedByUserId",
+                schema: "documents",
+                table: "document_comments",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_document_comments_DocumentId",
+                schema: "documents",
+                table: "document_comments",
+                column: "DocumentId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_document_parties_DocumentId",
@@ -372,16 +582,74 @@ namespace Homestead.WebApi.Migrations
                 column: "TagId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_document_versions_DocumentId",
+                schema: "documents",
+                table: "document_versions",
+                column: "DocumentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_document_versions_DocumentId_VersionNumber",
+                schema: "documents",
+                table: "document_versions",
+                columns: new[] { "DocumentId", "VersionNumber" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_document_versions_FileHash",
+                schema: "documents",
+                table: "document_versions",
+                column: "FileHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_documents_CreatedByUserId",
                 schema: "documents",
                 table: "documents",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_documents_GroupId",
+                schema: "documents",
+                table: "documents",
+                column: "GroupId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_documents_OwnerUserId",
                 schema: "documents",
                 table: "documents",
                 column: "OwnerUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_documents_SearchVector",
+                schema: "documents",
+                table: "documents",
+                column: "SearchVector")
+                .Annotation("Npgsql:IndexMethod", "GIN");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_group_members_UserId",
+                schema: "auth",
+                table: "group_members",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_groups_CreatedByUserId",
+                schema: "auth",
+                table: "groups",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_groups_Name",
+                schema: "auth",
+                table: "groups",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_jobs_CreatedByUserId",
+                schema: "processing",
+                table: "jobs",
+                column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_jobs_EntityId",
@@ -402,6 +670,12 @@ namespace Homestead.WebApi.Migrations
                 column: "Type");
 
             migrationBuilder.CreateIndex(
+                name: "IX_parties_CreatedByUserId",
+                schema: "documents",
+                table: "parties",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_role_claims_RoleId",
                 schema: "identity",
                 table: "role_claims",
@@ -415,14 +689,20 @@ namespace Homestead.WebApi.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_tags_CreatedByUserId",
+                schema: "documents",
+                table: "tags",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_tags_ParentId",
-                schema: "tags",
+                schema: "documents",
                 table: "tags",
                 column: "ParentId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_tags_Path",
-                schema: "tags",
+                schema: "documents",
                 table: "tags",
                 column: "Path",
                 unique: true);
@@ -450,12 +730,28 @@ namespace Homestead.WebApi.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "audit_logs",
+                schema: "auditing");
+
+            migrationBuilder.DropTable(
+                name: "document_comments",
+                schema: "documents");
+
+            migrationBuilder.DropTable(
                 name: "document_parties",
                 schema: "documents");
 
             migrationBuilder.DropTable(
                 name: "document_tags",
                 schema: "documents");
+
+            migrationBuilder.DropTable(
+                name: "document_versions",
+                schema: "documents");
+
+            migrationBuilder.DropTable(
+                name: "group_members",
+                schema: "auth");
 
             migrationBuilder.DropTable(
                 name: "jobs",
@@ -486,16 +782,20 @@ namespace Homestead.WebApi.Migrations
                 schema: "documents");
 
             migrationBuilder.DropTable(
+                name: "tags",
+                schema: "documents");
+
+            migrationBuilder.DropTable(
                 name: "documents",
                 schema: "documents");
 
             migrationBuilder.DropTable(
-                name: "tags",
-                schema: "tags");
-
-            migrationBuilder.DropTable(
                 name: "roles",
                 schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "groups",
+                schema: "auth");
 
             migrationBuilder.DropTable(
                 name: "app_users",
