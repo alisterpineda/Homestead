@@ -116,11 +116,11 @@ import { toast } from 'ngx-sonner';
                     </hlm-dropdown-menu>
                   </ng-template>
                   <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
-                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
-                      <ng-icon hlm name="lucideTable" size="sm" />
-                    </button>
                     <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('grid')" aria-label="Grid view">
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
+                    </button>
+                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
+                      <ng-icon hlm name="lucideTable" size="sm" />
                     </button>
                   </div>
                   <!-- Mobile: Overflow menu (below sm) -->
@@ -132,15 +132,15 @@ import { toast } from 'ngx-sonner';
                     <hlm-dropdown-menu class="w-44">
                       <span hlmDropdownMenuLabel>View</span>
                       <hlm-dropdown-menu-group>
-                        <button hlmDropdownMenuRadio [checked]="viewMode() === 'table'"
-                                (triggered)="setViewMode('table')">
-                          <hlm-dropdown-menu-radio-indicator />
-                          Table
-                        </button>
                         <button hlmDropdownMenuRadio [checked]="viewMode() === 'grid'"
                                 (triggered)="setViewMode('grid')">
                           <hlm-dropdown-menu-radio-indicator />
                           Grid
+                        </button>
+                        <button hlmDropdownMenuRadio [checked]="viewMode() === 'table'"
+                                (triggered)="setViewMode('table')">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Table
                         </button>
                       </hlm-dropdown-menu-group>
                       @if (viewMode() === 'table') {
