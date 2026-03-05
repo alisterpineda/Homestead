@@ -108,12 +108,37 @@ jobs:
         working-directory: Homestead.WebApp
         run: npm test
 
+  build-image:
+    uses: ./.github/workflows/docker-build.yml
+    secrets: inherit
+
   e2e-test:
+    needs: build-image
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Download amd64 digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digests-linux-amd64
+          path: ${{ runner.temp }}/digests
+
+      - name: Pull and tag E2E image
+        env:
+          REGISTRY_IMAGE: alisterpineda/homestead
+        run: |
+          DIGEST=$(ls ${{ runner.temp }}/digests/)
+          docker pull $REGISTRY_IMAGE@sha256:$DIGEST
+          docker tag $REGISTRY_IMAGE@sha256:$DIGEST homestead:e2e
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -130,6 +155,8 @@ jobs:
 
       - name: Run E2E tests
         working-directory: Homestead.E2E
+        env:
+          SKIP_BUILD: '1'
         run: npm run e2e
 
       - name: Upload Playwright report
