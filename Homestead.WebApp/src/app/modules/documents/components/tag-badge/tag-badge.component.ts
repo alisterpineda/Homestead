@@ -29,11 +29,12 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   `,
   styles: `
     .tag-badge-colored {
-      background-color: color-mix(in oklch, var(--tag-color) 15%, transparent);
+      background-color: color-mix(in oklch, var(--tag-color) 15%, white);
       color: oklch(from var(--tag-color) min(l, 0.5) c h);
     }
 
     :host-context(.dark) .tag-badge-colored {
+      background-color: color-mix(in oklch, var(--tag-color) 15%, black);
       color: oklch(from var(--tag-color) max(l, 0.75) c h);
     }
   `,
