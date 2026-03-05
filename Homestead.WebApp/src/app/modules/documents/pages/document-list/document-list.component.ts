@@ -5,7 +5,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -52,7 +52,7 @@ import { toast } from 'ngx-sonner';
     UploadDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideLayoutList, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -118,7 +118,7 @@ import { toast } from 'ngx-sonner';
                   </ng-template>
                   <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
                     <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
-                      <ng-icon hlm name="lucideLayoutList" size="sm" />
+                      <ng-icon hlm name="lucideTable" size="sm" />
                     </button>
                     <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('grid')" aria-label="Grid view">
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
