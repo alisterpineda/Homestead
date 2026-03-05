@@ -1,9 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -22,6 +22,7 @@ import { DocumentCardGridComponent } from '../../components/document-card-grid/d
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
+import { DocumentListStateService } from '../../services/document-list-state.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
@@ -287,7 +288,9 @@ export class DocumentListComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
+  private listState = inject(DocumentListStateService);
   private hubSub: Subscription;
+  private stateSaveSub: Subscription;
 
   private static readonly VIEW_MODE_KEY = 'document-view-mode';
 
@@ -297,6 +300,8 @@ export class DocumentListComponent implements OnDestroy {
   loading = signal(false);
   error = signal(false);
   deleting = signal(false);
+
+  ready = signal(true);
 
   selectedDocumentIds = signal<Set<string>>(new Set());
   selectionCount = computed(() => this.selectedDocumentIds().size);
@@ -415,6 +420,34 @@ export class DocumentListComponent implements OnDestroy {
   private searchSub: Subscription;
 
   constructor() {
+    // Restore saved column visibility
+    const savedVisibility = this.listState.getSavedColumnVisibility();
+    if (savedVisibility) {
+      this.columnVisibility.set(savedVisibility);
+    }
+
+    // Save query params on every change, and restore saved state when navigating
+    // to /documents without params (e.g. sidebar link) while saved state exists.
+    this.stateSaveSub = this.route.queryParams.subscribe(params => {
+      const hasParams = Object.keys(params).length > 0;
+      if (!hasParams && this.listState.hasParams) {
+        this.ready.set(false);
+        this.router.navigate(['/documents'], {
+          queryParams: this.listState.getSavedParams(),
+          replaceUrl: true,
+        });
+        this.router.events.pipe(
+          filter(e => e instanceof NavigationEnd || e instanceof NavigationCancel || e instanceof NavigationError),
+          take(1),
+        ).subscribe(() => {
+          this.searchInput.set(this.route.snapshot.queryParamMap.get('search') ?? '');
+          this.ready.set(true);
+        });
+      } else if (hasParams) {
+        this.listState.saveParams(params);
+      }
+    });
+
     this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
       this.refreshTrigger.update((v) => v + 1);
     });
@@ -434,6 +467,7 @@ export class DocumentListComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.hubSub.unsubscribe();
     this.searchSub.unsubscribe();
+    this.stateSaveSub.unsubscribe();
   }
 
   private page = toSignal(
@@ -457,7 +491,9 @@ export class DocumentListComponent implements OnDestroy {
       toObservable(this.sortBy),
       toObservable(this.sortDir),
       toObservable(this.searchTerm),
+      toObservable(this.ready),
     ]).pipe(
+      filter(([, , , , , , , , , ready]) => ready),
       switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
@@ -569,6 +605,7 @@ export class DocumentListComponent implements OnDestroy {
       ...prev,
       [id]: prev[id] === false,
     }));
+    this.listState.saveColumnVisibility(this.columnVisibility());
   }
 
   resetFilters(): void {
