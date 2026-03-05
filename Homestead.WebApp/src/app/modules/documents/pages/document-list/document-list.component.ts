@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -49,6 +50,7 @@ import { toast } from 'ngx-sonner';
     FilterPopoverComponent,
     DocumentTableComponent,
     DocumentCardGridComponent,
+    NgTemplateOutlet,
     PaginationComponent,
     UploadDialogComponent,
   ],
@@ -245,7 +247,7 @@ import { toast } from 'ngx-sonner';
                 Reset filters
               </button>
           </section>
-          <div class="min-h-0 flex-1 overflow-y-auto p-px" [class.hidden]="!hasItems()">
+          <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-px" [class.hidden]="!hasItems()">
               @if (viewMode() === 'table') {
                 <app-document-table
                   [documents]="result.items"
@@ -265,16 +267,22 @@ import { toast } from 'ngx-sonner';
                   (selectionChange)="selectedDocumentIds.set($event)"
                 />
               }
+              <ng-template #paginationTpl>
+                <app-pagination
+                  [page]="+result.page"
+                  [totalPages]="+(result.totalPages ?? 0)"
+                  [totalCount]="+result.totalCount"
+                  [pageSize]="+result.pageSize"
+                  (pageChange)="onPageChange($event)"
+                  (pageSizeChange)="onPageSizeChange($event)"
+                />
+              </ng-template>
+              <div class="mt-auto sm:hidden">
+                <ng-container [ngTemplateOutlet]="paginationTpl" />
+              </div>
           </div>
-          <div class="shrink-0" [class.hidden]="!hasItems()">
-              <app-pagination
-                [page]="+result.page"
-                [totalPages]="+(result.totalPages ?? 0)"
-                [totalCount]="+result.totalCount"
-                [pageSize]="+result.pageSize"
-                (pageChange)="onPageChange($event)"
-                (pageSizeChange)="onPageSizeChange($event)"
-              />
+          <div class="shrink-0 max-sm:hidden" [class.hidden]="!hasItems()">
+              <ng-container [ngTemplateOutlet]="paginationTpl" />
           </div>
       }
 
