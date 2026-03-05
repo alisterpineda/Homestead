@@ -4,8 +4,11 @@ import { lucideFileText, lucideImage, lucideUsers } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
+import { HlmBadge } from '@/shared/components/spartan/badge';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
+import type { GetDocumentsTagDto } from '@/api/generated/models/get-documents-tag-dto';
+import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 
 @Component({
   selector: 'app-document-card-grid',
@@ -15,6 +18,8 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     HlmIconImports,
     HlmCardImports,
     HlmCheckbox,
+    HlmBadge,
+    TagBadgeComponent,
   ],
   providers: [provideIcons({ lucideFileText, lucideImage, lucideUsers })],
   styles: `
@@ -28,6 +33,9 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
     }
     .text-shadow-scrim {
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    }
+    .tag-card-badge {
+      filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
     }
   `,
   template: `
@@ -73,6 +81,30 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
             />
           </div>
 
+          <!-- Tag overlay -->
+          @if (doc.tags.length > 0) {
+            <div class="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
+              @for (tag of visibleTags(doc.tags); track tag.id) {
+                <app-tag-badge
+                  class="tag-card-badge max-w-24 truncate pointer-events-auto"
+                  [path]="tag.path"
+                  [color]="tag.color"
+                  [title]="tag.path"
+                />
+              }
+              @if (doc.tags.length > maxVisibleTags) {
+                <span
+                  hlmBadge
+                  variant="secondary"
+                  class="tag-card-badge pointer-events-auto"
+                  [attr.aria-label]="'and ' + (doc.tags.length - maxVisibleTags) + ' more tags'"
+                >
+                  +{{ doc.tags.length - maxVisibleTags }}
+                </span>
+              }
+            </div>
+          }
+
           <!-- Bottom metadata overlay -->
           <div class="scrim-overlay absolute bottom-0 inset-x-0 p-3 pt-12">
             <!-- Detail lines (parties, future fields) above the title — always reserved -->
@@ -99,7 +131,13 @@ export class DocumentCardGridComponent {
   documentSelect = output<string>();
   selectionChange = output<Set<string>>();
 
+  readonly maxVisibleTags = 3;
+
   private thumbnailErrors = signal<Set<string>>(new Set());
+
+  visibleTags(tags: GetDocumentsTagDto[]): GetDocumentsTagDto[] {
+    return tags.slice(0, this.maxVisibleTags);
+  }
 
   isSelected(id: string): boolean {
     return this.selectedIds().has(id);

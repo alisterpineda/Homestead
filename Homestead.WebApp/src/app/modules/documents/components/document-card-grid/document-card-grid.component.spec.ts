@@ -2,6 +2,7 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { DocumentCardGridComponent } from './document-card-grid.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
+import type { GetDocumentsTagDto } from '@/api/generated/models/get-documents-tag-dto';
 
 function createMockDocument(overrides: Partial<GetDocumentsResponse> = {}): GetDocumentsResponse {
   return {
@@ -13,6 +14,16 @@ function createMockDocument(overrides: Partial<GetDocumentsResponse> = {}): GetD
     hasThumbnail: true,
     tags: [],
     parties: [],
+    ...overrides,
+  };
+}
+
+function createMockTag(overrides: Partial<GetDocumentsTagDto> = {}): GetDocumentsTagDto {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Tag',
+    path: 'Category / Tag',
+    color: '#3b82f6',
     ...overrides,
   };
 }
@@ -125,5 +136,51 @@ describe('DocumentCardGridComponent', () => {
 
     expect(emittedSet).toBeDefined();
     expect(emittedSet!.has(doc.id)).toBe(true);
+  });
+
+  it('should render tag badges when document has tags', () => {
+    const tags = [createMockTag({ path: 'Financial / Tax' }), createMockTag({ path: 'Legal' })];
+    const doc = createMockDocument({ tags });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const tagBadges = fixture.nativeElement.querySelectorAll('app-tag-badge');
+    expect(tagBadges.length).toBe(2);
+  });
+
+  it('should not render tag container when document has no tags', () => {
+    const doc = createMockDocument({ tags: [] });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const tagBadges = fixture.nativeElement.querySelectorAll('app-tag-badge');
+    expect(tagBadges.length).toBe(0);
+  });
+
+  it('should show +X badge when tags exceed maxVisibleTags', () => {
+    const tags = Array.from({ length: 5 }, (_, i) => createMockTag({ path: `Tag ${i + 1}` }));
+    const doc = createMockDocument({ tags });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const tagBadges = fixture.nativeElement.querySelectorAll('app-tag-badge');
+    expect(tagBadges.length).toBe(component.maxVisibleTags);
+
+    const overflowBadge = fixture.nativeElement.querySelector('[aria-label="and 2 more tags"]');
+    expect(overflowBadge).toBeTruthy();
+    expect(overflowBadge.textContent.trim()).toBe('+2');
+  });
+
+  it('should not show +X badge when tags equal maxVisibleTags', () => {
+    const tags = Array.from({ length: 3 }, (_, i) => createMockTag({ path: `Tag ${i + 1}` }));
+    const doc = createMockDocument({ tags });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const tagBadges = fixture.nativeElement.querySelectorAll('app-tag-badge');
+    expect(tagBadges.length).toBe(3);
+
+    const overflowBadge = fixture.nativeElement.querySelector('[hlmBadge][aria-label]');
+    expect(overflowBadge).toBeNull();
   });
 });
