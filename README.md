@@ -26,6 +26,7 @@ services:
       DB_PASSWORD: changeme
     volumes:
       - media:/media
+      - cache:/cache
 
   postgres:
     image: postgres:17-alpine
@@ -44,6 +45,7 @@ services:
 
 volumes:
   media:
+  cache:
   pgdata:
 ```
 
@@ -117,6 +119,7 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 | Variable | Default | Description |
 |---|---|---|
 | `FileStorage__MediaPath` | `/media` | Path for document storage |
+| `FileStorage__CachePath` | `/cache` | Path for generated thumbnail cache |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
 
 ### Volumes
@@ -124,6 +127,7 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 | Path | Purpose |
 |---|---|
 | `/media` | Uploaded documents — **back this up** |
+| `/cache` | Generated document thumbnails (can be regenerated on demand) |
 
 ### Health Checks
 
