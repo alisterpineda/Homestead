@@ -108,9 +108,24 @@ jobs:
         working-directory: Homestead.WebApp
         run: npm run test:ci
 
-      - name: Prefix coverage package names with Homestead.WebApp
+      - name: Group frontend coverage under Homestead.WebApp assembly
         working-directory: Homestead.WebApp
-        run: sed -i 's/<package name="/<package name="Homestead.WebApp./g' coverage/**/cobertura-coverage.xml
+        run: |
+          node -e "
+          const fs = require('fs');
+          const file = 'coverage/Homestead/cobertura-coverage.xml';
+          let xml = fs.readFileSync(file, 'utf8');
+          const classes = [];
+          const re = /<package name=\"([^\"]+)\"[^>]*>\s*<classes>([\s\S]*?)<\/classes>\s*<\/package>/g;
+          let m;
+          while ((m = re.exec(xml)) !== null) {
+            classes.push(m[2].replace(/<class name=\"([^\"]+)\"/g, \`<class name=\"\${m[1]}.\$1\"\`));
+          }
+          const merged = '<package name=\"Homestead.WebApp\" line-rate=\"0\" branch-rate=\"0\"><classes>'
+            + classes.join('') + '</classes></package>';
+          xml = xml.replace(/<packages>[\s\S]*<\/packages>/, '<packages>' + merged + '</packages>');
+          fs.writeFileSync(file, xml);
+          "
 
       - name: Upload Coverage
         if: always()
