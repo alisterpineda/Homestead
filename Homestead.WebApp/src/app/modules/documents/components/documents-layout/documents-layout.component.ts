@@ -12,20 +12,22 @@ import { UploadManagerService } from '@/shared/services/upload-manager.service';
   imports: [RouterOutlet, NgIcon, HlmIconImports],
   providers: [provideIcons({ lucideUpload })],
   host: {
-    class: 'flex min-h-0 flex-1 flex-col relative',
-    '(dragenter)': 'onDragEnter($event)',
-    '(dragleave)': 'onDragLeave($event)',
-    '(dragover)': 'onDragOver($event)',
-    '(drop)': 'onDrop($event)',
+    class: 'flex min-h-0 flex-1 flex-col',
+    '(window:dragenter)': 'onDragEnter($event)',
+    '(window:dragleave)': 'onDragLeave($event)',
+    '(window:dragover)': 'onDragOver($event)',
+    '(window:drop)': 'onDrop($event)',
   },
   template: `
     <router-outlet />
     @if (dragActive() && auth.canWrite()) {
-      <div class="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg">
-        <div class="flex flex-col items-center gap-2 text-primary">
-          <ng-icon hlm name="lucideUpload" size="xl" />
-          <p class="text-lg font-medium">Drop files to upload</p>
-          <p class="text-sm text-muted-foreground">Files will be uploaded and processed automatically</p>
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-3">
+        <div class="flex h-full w-full items-center justify-center rounded-lg border-2 border-dashed border-primary">
+          <div class="flex flex-col items-center gap-2 text-primary">
+            <ng-icon hlm name="lucideUpload" size="xl" />
+            <p class="text-lg font-medium">Drop files to upload</p>
+            <p class="text-sm text-muted-foreground">Files will be uploaded and processed automatically</p>
+          </div>
         </div>
       </div>
     }
