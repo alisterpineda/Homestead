@@ -6,7 +6,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUpDown } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -55,7 +55,7 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUpDown })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -103,16 +103,18 @@ import { toast } from 'ngx-sonner';
                 </div>
                 <div class="flex items-center gap-2">
                   <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
-                    <ng-icon hlm name="lucideArrowUpDown" size="sm" />
-                    Sort
+                    <ng-icon hlm [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
+                    {{ sortLabel() }}
                   </button>
                   <ng-template #sortGroup>
                     <span hlmDropdownMenuLabel>Sort by</span>
                     <hlm-dropdown-menu-group>
-                      <button hlmDropdownMenuRadio [checked]="!sortBy()" (triggered)="onSortByChange(null)">
-                        <hlm-dropdown-menu-radio-indicator />
-                        None
-                      </button>
+                      @if (isSearching()) {
+                        <button hlmDropdownMenuRadio [checked]="!sortBy()" (triggered)="onSortByChange(null)">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Relevance
+                        </button>
+                      }
                       @for (opt of sortOptions; track opt.value) {
                         <button hlmDropdownMenuRadio [checked]="sortBy() === opt.value" (triggered)="onSortByChange(opt.value)">
                           <hlm-dropdown-menu-radio-indicator />
@@ -120,20 +122,18 @@ import { toast } from 'ngx-sonner';
                         </button>
                       }
                     </hlm-dropdown-menu-group>
-                    @if (sortBy()) {
-                      <hlm-dropdown-menu-separator />
-                      <span hlmDropdownMenuLabel>Direction</span>
-                      <hlm-dropdown-menu-group>
-                        <button hlmDropdownMenuRadio [checked]="(sortDir() ?? 'Asc') === 'Asc'" (triggered)="onSortDirChange('Asc')">
-                          <hlm-dropdown-menu-radio-indicator />
-                          Ascending
-                        </button>
-                        <button hlmDropdownMenuRadio [checked]="sortDir() === 'Desc'" (triggered)="onSortDirChange('Desc')">
-                          <hlm-dropdown-menu-radio-indicator />
-                          Descending
-                        </button>
-                      </hlm-dropdown-menu-group>
-                    }
+                    <hlm-dropdown-menu-separator />
+                    <span hlmDropdownMenuLabel>Direction</span>
+                    <hlm-dropdown-menu-group>
+                      <button hlmDropdownMenuRadio [checked]="effectiveSortDir() === 'Asc'" (triggered)="onSortDirChange('Asc')">
+                        <hlm-dropdown-menu-radio-indicator />
+                        Ascending
+                      </button>
+                      <button hlmDropdownMenuRadio [checked]="effectiveSortDir() === 'Desc'" (triggered)="onSortDirChange('Desc')">
+                        <hlm-dropdown-menu-radio-indicator />
+                        Descending
+                      </button>
+                    </hlm-dropdown-menu-group>
                   </ng-template>
                   <ng-template #sortMenu>
                     <hlm-dropdown-menu class="w-44">
@@ -348,8 +348,9 @@ export class DocumentListComponent implements OnDestroy {
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
+    { value: 'CreatedAt', label: 'Date Added' },
+    { value: 'DocumentDate', label: 'Document Date' },
     { value: 'Name', label: 'Name' },
-    { value: 'DocumentDate', label: 'Date' },
     { value: 'ContentType', label: 'Content Type' },
     { value: 'FileSize', label: 'File Size' },
   ];
@@ -407,11 +408,35 @@ export class DocumentListComponent implements OnDestroy {
     this.route.queryParamMap.pipe(map(p => p.get('sortDir') as SortDirection | null)),
   );
 
+  isSearching = computed(() => this.searchTerm().length > 0);
+
+  effectiveSortBy = computed(() => {
+    const explicit = this.sortBy();
+    if (explicit) return explicit;
+    return this.isSearching() ? null : 'CreatedAt' as DocumentSortBy;
+  });
+
+  private static readonly DATE_SORT_FIELDS: Set<DocumentSortBy> = new Set(['CreatedAt', 'DocumentDate']);
+
+  effectiveSortDir = computed(() => {
+    const explicit = this.sortDir();
+    if (explicit) return explicit;
+    const sortBy = this.effectiveSortBy();
+    if (!sortBy) return 'Desc' as SortDirection;
+    return DocumentListComponent.DATE_SORT_FIELDS.has(sortBy) ? 'Desc' as SortDirection : 'Asc' as SortDirection;
+  });
+
+  sortLabel = computed(() => {
+    const sortBy = this.effectiveSortBy();
+    if (!sortBy) return 'Relevance';
+    const option = this.sortOptions.find(o => o.value === sortBy);
+    return option?.label ?? sortBy;
+  });
+
   hasActiveFilters = computed(() =>
     this.searchTerm().length > 0 ||
     this.selectedPartyIds().length > 0 ||
-    this.selectedTagIds().length > 0 ||
-    this.sortBy() !== null,
+    this.selectedTagIds().length > 0,
   );
 
   /** Whether the current data response contains at least one document. */
@@ -666,7 +691,8 @@ export class DocumentListComponent implements OnDestroy {
     if (!field) {
       this.onSortChange(null);
     } else {
-      this.onSortChange({ sortBy: field, sortDir: this.sortDir() ?? 'Asc' });
+      const defaultDir: SortDirection = DocumentListComponent.DATE_SORT_FIELDS.has(field) ? 'Desc' : 'Asc';
+      this.onSortChange({ sortBy: field, sortDir: this.sortDir() ?? defaultDir });
     }
   }
 
@@ -689,7 +715,7 @@ export class DocumentListComponent implements OnDestroy {
     this.clearSelection();
     this.searchInput.set('');
     this.router.navigate(['/documents'], {
-      queryParams: { page: 1, search: null, partyIds: null, tagIds: null, includeChildTags: null, sortBy: null, sortDir: null },
+      queryParams: { page: 1, search: null, partyIds: null, tagIds: null, includeChildTags: null },
       queryParamsHandling: 'merge',
     });
   }

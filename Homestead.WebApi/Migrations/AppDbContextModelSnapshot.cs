@@ -106,6 +106,9 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt")
+                        .IsDescending();
+
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("GroupId");

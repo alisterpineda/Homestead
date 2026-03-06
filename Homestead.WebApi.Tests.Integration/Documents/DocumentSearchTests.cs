@@ -165,7 +165,57 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension);
+    [Fact]
+    public async Task GetDocuments_DefaultSort_OrdersByCreatedAtDesc()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "First.pdf");
+        await UploadAndWaitAsync(client, "Second.pdf");
+        await UploadAndWaitAsync(client, "Third.pdf");
+
+        // No SortBy/SortDir params — should default to CreatedAt Desc (newest first)
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        var names = body!.Items.Select(d => d.Name).ToList();
+        Assert.Equal(["Third.pdf", "Second.pdf", "First.pdf"], names);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SortByCreatedAtAsc_OrdersOldestFirst()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "First.pdf");
+        await UploadAndWaitAsync(client, "Second.pdf");
+        await UploadAndWaitAsync(client, "Third.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&SortBy=CreatedAt&SortDir=Asc", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        var names = body!.Items.Select(d => d.Name).ToList();
+        Assert.Equal(["First.pdf", "Second.pdf", "Third.pdf"], names);
+    }
+
+    [Fact]
+    public async Task GetDocuments_Response_IncludesCreatedAt()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Timestamped.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        var doc = Assert.Single(body!.Items);
+        Assert.True(doc.CreatedAt > DateTimeOffset.MinValue);
+    }
+
+    private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
     private record TagResult(Guid Id, string Name, string Path);
     private record PartyResult(Guid Id, string Name);
 }

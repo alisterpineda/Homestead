@@ -5,6 +5,7 @@ import { GetDocumentsPartyDto } from '../models/get-documents-party-dto';
 import { GetDocumentsTagDto } from '../models/get-documents-tag-dto';
 export interface GetDocumentsResponse {
   contentType: string;
+  createdAt?: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
   documentDate?: (string | null);

@@ -46,6 +46,9 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.HasIndex(d => d.SearchVector)
             .HasMethod("GIN");
 
+        builder.HasIndex(d => d.CreatedAt)
+            .IsDescending(true);
+
         builder.HasIndex(d => d.CreatedByUserId);
         builder.HasIndex(d => d.OwnerUserId);
     }

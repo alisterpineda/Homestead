@@ -85,6 +85,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.DocumentDate,
                 d.ValidFrom,
                 d.ValidUntil,
+                d.CreatedAt,
                 d.CreatedByUserId,
                 CreatedByUserName = d.CreatedByUser != null ? d.CreatedByUser.DisplayName : null,
                 d.OwnerUserId,
@@ -115,6 +116,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 DocumentDate = d.DocumentDate,
                 ValidFrom = d.ValidFrom,
                 ValidUntil = d.ValidUntil,
+                CreatedAt = d.CreatedAt,
                 CreatedByUserId = d.CreatedByUserId,
                 CreatedByUserName = d.CreatedByUserName,
                 OwnerUserId = d.OwnerUserId,
@@ -159,8 +161,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)));
         }
 
-        var effectiveSortBy = sortBy ?? DocumentSortBy.Name;
-        var effectiveSortDir = sortDir ?? SortDirection.Asc;
+        var effectiveSortBy = sortBy ?? DocumentSortBy.CreatedAt;
+        var effectiveSortDir = sortDir ?? SortDirection.Desc;
 
         return (effectiveSortBy, effectiveSortDir) switch
         {
@@ -176,7 +178,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.Versions.OrderByDescending(v => v.VersionNumber).Select(v => v.ContentType).FirstOrDefault()),
             (DocumentSortBy.DocumentDate, SortDirection.Asc) => query.OrderBy(d => d.DocumentDate),
             (DocumentSortBy.DocumentDate, SortDirection.Desc) => query.OrderByDescending(d => d.DocumentDate),
-            _ => query.OrderBy(d => d.Name),
+            (DocumentSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(d => d.CreatedAt),
+            (DocumentSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.CreatedAt),
+            _ => query.OrderByDescending(d => d.CreatedAt),
         };
     }
 }

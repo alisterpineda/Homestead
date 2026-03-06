@@ -42,9 +42,9 @@ describe('DocumentListComponent', () => {
   });
 
   describe('sortOptions', () => {
-    it('should expose the four expected sort fields in order', () => {
+    it('should expose the five expected sort fields in order', () => {
       const values = component.sortOptions.map(o => o.value);
-      expect(values).toEqual<DocumentSortBy[]>(['Name', 'DocumentDate', 'ContentType', 'FileSize']);
+      expect(values).toEqual<DocumentSortBy[]>(['CreatedAt', 'DocumentDate', 'Name', 'ContentType', 'FileSize']);
     });
 
     it('should have a label for each sort option', () => {
@@ -55,17 +55,28 @@ describe('DocumentListComponent', () => {
   });
 
   describe('onSortByChange', () => {
-    it('should call onSortChange(null) when field is null', () => {
+    it('should call onSortChange(null) when field is null (Relevance)', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortByChange(null);
       expect(spy).toHaveBeenCalledWith(null);
     });
 
-    it('should default to Asc when no sortDir is active', () => {
-      // sortDir() is null/undefined by default (no query params)
+    it('should default to Asc for non-date fields when no sortDir is active', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortByChange('Name');
       expect(spy).toHaveBeenCalledWith({ sortBy: 'Name', sortDir: 'Asc' });
+    });
+
+    it('should default to Desc for CreatedAt when no sortDir is active', () => {
+      const spy = vi.spyOn(component, 'onSortChange');
+      component.onSortByChange('CreatedAt');
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'CreatedAt', sortDir: 'Desc' });
+    });
+
+    it('should default to Desc for DocumentDate when no sortDir is active', () => {
+      const spy = vi.spyOn(component, 'onSortChange');
+      component.onSortByChange('DocumentDate');
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'DocumentDate', sortDir: 'Desc' });
     });
 
     it('should preserve existing Desc direction when changing field', () => {
@@ -74,12 +85,10 @@ describe('DocumentListComponent', () => {
       component.onSortByChange('FileSize');
       expect(spy).toHaveBeenCalledWith({ sortBy: 'FileSize', sortDir: 'Desc' });
     });
-
   });
 
   describe('onSortDirChange', () => {
     it('should do nothing when no sort field is active', () => {
-      // sortBy() is null by default
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortDirChange('Desc');
       expect(spy).not.toHaveBeenCalled();
@@ -97,6 +106,73 @@ describe('DocumentListComponent', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortDirChange('Asc');
       expect(spy).toHaveBeenCalledWith({ sortBy: 'DocumentDate', sortDir: 'Asc' });
+    });
+  });
+
+  describe('isSearching', () => {
+    it('should be false by default', () => {
+      expect(component.isSearching()).toBe(false);
+    });
+
+    it('should be true when searchTerm has content', () => {
+      (component as any).searchTerm = signal('test query');
+      expect(component.isSearching()).toBe(true);
+    });
+  });
+
+  describe('effectiveSortBy', () => {
+    it('should return CreatedAt when no explicit sort and not searching', () => {
+      expect(component.effectiveSortBy()).toBe('CreatedAt');
+    });
+
+    it('should return null when no explicit sort and searching (relevance)', () => {
+      (component as any).searchTerm = signal('test');
+      expect(component.effectiveSortBy()).toBeNull();
+    });
+
+    it('should return the explicit sort value when one is set', () => {
+      (component as any).sortBy = signal<DocumentSortBy>('Name');
+      expect(component.effectiveSortBy()).toBe('Name');
+    });
+  });
+
+  describe('effectiveSortDir', () => {
+    it('should return Desc when no explicit sort (default for CreatedAt)', () => {
+      expect(component.effectiveSortDir()).toBe('Desc');
+    });
+
+    it('should return the explicit direction when set', () => {
+      (component as any).sortDir = signal('Asc');
+      (component as any).sortBy = signal<DocumentSortBy>('Name');
+      expect(component.effectiveSortDir()).toBe('Asc');
+    });
+  });
+
+  describe('sortLabel', () => {
+    it('should show Date Added by default', () => {
+      expect(component.sortLabel()).toBe('Date Added');
+    });
+
+    it('should show Relevance when searching with no explicit sort', () => {
+      (component as any).searchTerm = signal('test');
+      expect(component.sortLabel()).toBe('Relevance');
+    });
+
+    it('should show explicit sort field name', () => {
+      (component as any).sortBy = signal<DocumentSortBy>('Name');
+      expect(component.sortLabel()).toBe('Name');
+    });
+  });
+
+  describe('hasActiveFilters', () => {
+    it('should not consider sort as an active filter', () => {
+      (component as any).sortBy = signal<DocumentSortBy>('Name');
+      expect(component.hasActiveFilters()).toBe(false);
+    });
+
+    it('should be true when search term is present', () => {
+      (component as any).searchTerm = signal('test');
+      expect(component.hasActiveFilters()).toBe(true);
     });
   });
 });

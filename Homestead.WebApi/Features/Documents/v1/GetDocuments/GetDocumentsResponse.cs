@@ -16,6 +16,7 @@ public record GetDocumentsResponse
     public string? OwnerUserName { get; init; }
     public Guid? GroupId { get; init; }
     public string? GroupName { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
     public int VersionCount { get; init; }
     public bool HasThumbnail { get; init; }
     public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
