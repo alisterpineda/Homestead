@@ -7,7 +7,7 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
 {
     public async Task<Tag> ResolveOrCreateAsync(string path, string? leafColor = null, Guid? createdByUserId = null, CancellationToken ct = default)
     {
-        var normalizedPath = path.Trim().ToLowerInvariant().Trim('/');
+        var normalizedPath = path.Trim().Trim('/');
         var segments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         if (segments.Length == 0)

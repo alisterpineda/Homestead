@@ -46,7 +46,7 @@ public class DocumentSearchTests : IntegrationTestBase
 
         var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
         {
-            new { op = "replace", path = "/tagPaths", value = (object)new[] { "filtertag" } }
+            new { op = "replace", path = "/tagPaths", value = (object)new[] { "FilterTag" } }
         });
         patchResponse.EnsureSuccessStatusCode();
 

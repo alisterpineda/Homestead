@@ -58,7 +58,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         if (model.Name.Contains('/'))
             throw new BadRequestException("Tag name cannot contain '/' characters.");
 
-        var normalizedName = model.Name.Trim().ToLowerInvariant();
+        var normalizedName = model.Name.Trim();
 
         // Validate parent
         if (model.ParentId == request.Id)

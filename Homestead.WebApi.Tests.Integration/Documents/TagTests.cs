@@ -20,8 +20,8 @@ public class TagTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
-        Assert.Equal("legal", body!.Name);
-        Assert.Equal("legal", body.Path);
+        Assert.Equal("Legal", body!.Name);
+        Assert.Equal("Legal", body.Path);
         Assert.Equal("#FF0000", body.Color);
     }
 
@@ -38,8 +38,8 @@ public class TagTests : IntegrationTestBase
         childResponse.EnsureSuccessStatusCode();
         var child = await childResponse.Content.ReadFromJsonAsync<TagResult>(CT);
 
-        Assert.Equal("contracts", child!.Name);
-        Assert.Equal("documents/contracts", child.Path);
+        Assert.Equal("Contracts", child!.Name);
+        Assert.Equal("Documents/Contracts", child.Path);
         Assert.Equal(parent!.Id, child.ParentId);
     }
 
@@ -68,7 +68,7 @@ public class TagTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        Assert.Single(body!, t => t.Name == "uniquesearchable");
+        Assert.Single(body!, t => t.Name == "UniqueSearchable");
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class TagTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
-        Assert.Contains(body!.Name, new[] { "NewName", "newname" });
+        Assert.Equal("NewName", body!.Name);
     }
 
     [Fact]
@@ -167,10 +167,10 @@ public class TagTests : IntegrationTestBase
         // C should now be re-parented under A with path "rpa/rpc"
         var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var c = tags!.Single(t => t.Name == "rpc");
-        var a = tags.Single(t => t.Name == "rpa");
+        var c = tags!.Single(t => t.Name == "RpC");
+        var a = tags.Single(t => t.Name == "RpA");
         Assert.Equal(a.Id, c.ParentId);
-        Assert.Equal("rpa/rpc", c.Path);
+        Assert.Equal("RpA/RpC", c.Path);
     }
 
     [Fact]
@@ -194,12 +194,12 @@ public class TagTests : IntegrationTestBase
         // B and C should now be roots
         var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var childB = tags!.Single(t => t.Name == "childb");
-        var childC = tags.Single(t => t.Name == "childc");
+        var childB = tags!.Single(t => t.Name == "ChildB");
+        var childC = tags.Single(t => t.Name == "ChildC");
         Assert.Null(childB.ParentId);
-        Assert.Equal("childb", childB.Path);
+        Assert.Equal("ChildB", childB.Path);
         Assert.Null(childC.ParentId);
-        Assert.Equal("childc", childC.Path);
+        Assert.Equal("ChildC", childC.Path);
     }
 
     [Fact]
@@ -225,10 +225,10 @@ public class TagTests : IntegrationTestBase
         // D should be re-parented under A
         var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var d = tags!.Single(t => t.Name == "mhd");
-        var a = tags.Single(t => t.Name == "mha");
+        var d = tags!.Single(t => t.Name == "MhD");
+        var a = tags.Single(t => t.Name == "MhA");
         Assert.Equal(a.Id, d.ParentId);
-        Assert.Equal("mha/mhd", d.Path);
+        Assert.Equal("MhA/MhD", d.Path);
     }
 
     [Fact]
@@ -254,13 +254,13 @@ public class TagTests : IntegrationTestBase
         // Verify all paths updated
         var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
         var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagC = tags!.Single(t => t.Name == "dpc");
-        var tagD = tags.Single(t => t.Name == "dpd");
-        var tagE = tags.Single(t => t.Name == "dpe");
+        var tagC = tags!.Single(t => t.Name == "DpC");
+        var tagD = tags.Single(t => t.Name == "DpD");
+        var tagE = tags.Single(t => t.Name == "DpE");
 
-        Assert.Equal("dpa/dpc", tagC.Path);
-        Assert.Equal("dpa/dpd", tagD.Path);
-        Assert.Equal("dpa/dpc/dpe", tagE.Path);
+        Assert.Equal("DpA/DpC", tagC.Path);
+        Assert.Equal("DpA/DpD", tagD.Path);
+        Assert.Equal("DpA/DpC/DpE", tagE.Path);
     }
 
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color);

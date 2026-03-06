@@ -102,15 +102,15 @@ public class TagPathResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task PathNormalization_LowercasesPath()
+    public async Task PathNormalization_PreservesOriginalCasing()
     {
         var ct = TestContext.Current.CancellationToken;
 
         var tag = await _sut.ResolveOrCreateAsync("Legal/Contracts", ct: ct);
         await _db.SaveChangesAsync(ct);
 
-        Assert.Equal("legal/contracts", tag.Path);
-        Assert.Equal("contracts", tag.Name);
+        Assert.Equal("Legal/Contracts", tag.Path);
+        Assert.Equal("Contracts", tag.Name);
     }
 
     [Fact]

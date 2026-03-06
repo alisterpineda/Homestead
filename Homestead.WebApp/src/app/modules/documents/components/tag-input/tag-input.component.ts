@@ -128,7 +128,7 @@ export class TagInputComponent {
   }
 
   addTag(path: string, color?: string | null): void {
-    const normalized = path.trim().toLowerCase();
+    const normalized = path.trim();
     if (normalized && !this.value().includes(normalized)) {
       this.valueChange.emit([...this.value(), normalized]);
       if (color) {

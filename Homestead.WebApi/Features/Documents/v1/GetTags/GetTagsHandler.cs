@@ -13,12 +13,14 @@ public class GetTagsHandler(AppDbContext db)
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var search = request.Search.ToLowerInvariant();
-            query = query.Where(t => t.Name.Contains(search) || t.Path.Contains(search));
+            var searchPattern = $"%{request.Search.Trim()}%";
+            query = query.Where(t =>
+                EF.Functions.ILike(t.Name, searchPattern) ||
+                EF.Functions.ILike(t.Path, searchPattern));
         }
         else if (!string.IsNullOrWhiteSpace(request.ParentPath))
         {
-            var parentPath = request.ParentPath.Trim().ToLowerInvariant().Trim('/');
+            var parentPath = request.ParentPath.Trim().Trim('/');
 
             if (request.IncludeChildren)
             {
