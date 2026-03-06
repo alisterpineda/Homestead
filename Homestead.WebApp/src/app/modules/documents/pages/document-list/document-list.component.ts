@@ -22,7 +22,8 @@ import { DocumentTableComponent, HIDEABLE_COLUMNS } from '../../components/docum
 import { DocumentCardGridComponent } from '../../components/document-card-grid/document-card-grid.component';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
-import { UploadDialogComponent } from '../../components/upload-dialog/upload-dialog.component';
+import { UploadManagerService } from '@/shared/services/upload-manager.service';
+import { handleFileInputChange } from '@/shared/utils';
 import { DocumentListStateService } from '../../services/document-list-state.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
@@ -52,7 +53,6 @@ import { toast } from 'ngx-sonner';
     DocumentCardGridComponent,
     NgTemplateOutlet,
     PaginationComponent,
-    UploadDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUpDown })],
@@ -86,10 +86,11 @@ import { toast } from 'ngx-sonner';
               <p hlmEmptyDescription>Upload your first document to get started.</p>
             </div>
             @if (auth.canWrite()) {
-              <app-upload-dialog (uploaded)="onRefresh()">
+              <input #emptyUploadInput type="file" multiple class="hidden" (change)="onEmptyUploadFiles($event)" />
+              <button hlmBtn (click)="emptyUploadInput.click()">
                 <ng-icon hlm name="lucidePlus" size="sm" />
                 Upload Document
-              </app-upload-dialog>
+              </button>
             }
           </section>
           <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
@@ -209,12 +210,6 @@ import { toast } from 'ngx-sonner';
                       }
                     </hlm-dropdown-menu>
                   </ng-template>
-                  @if (auth.canWrite()) {
-                    <app-upload-dialog triggerSize="sm" (uploaded)="onRefresh()">
-                      <ng-icon hlm name="lucidePlus" size="sm" />
-                      Upload
-                    </app-upload-dialog>
-                  }
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -345,6 +340,7 @@ export class DocumentListComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
   private listState = inject(DocumentListStateService);
+  private uploadManager = inject(UploadManagerService);
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
 
@@ -616,6 +612,10 @@ export class DocumentListComponent implements OnDestroy {
 
   onRefresh(): void {
     this.refreshTrigger.update((v) => v + 1);
+  }
+
+  onEmptyUploadFiles(event: Event): void {
+    handleFileInputChange(event, files => this.uploadManager.addFiles(files));
   }
 
   onPartyFilterChange(ids: string[]): void {

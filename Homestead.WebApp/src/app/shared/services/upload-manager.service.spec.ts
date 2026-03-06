@@ -267,21 +267,33 @@ describe('UploadManagerService', () => {
     });
   });
 
-  describe('clearCompleted', () => {
-    it('should remove only completed items', () => {
-      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+  describe('clearFinished', () => {
+    it('should remove completed and failed items but keep active ones', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf'), createFile('c.pdf')]);
       const requests = httpTesting.match('/api/v1/documents');
 
+      // a -> completed, b -> failed, c -> processing (active)
       requests[0].flush({});
       requests[1].flush(null, { status: 500, statusText: 'Error' });
+      requests[2].flush({ jobId: 'job-c' });
 
-      expect(service.completedCount()).toBe(1);
-      expect(service.failedCount()).toBe(1);
+      expect(service.items().length).toBe(3);
 
-      service.clearCompleted();
+      service.clearFinished();
 
       expect(service.items().length).toBe(1);
-      expect(service.items()[0].status).toBe('failed');
+      expect(service.items()[0].fileName).toBe('c.pdf');
+      expect(service.items()[0].status).toBe('processing');
+    });
+
+    it('should do nothing when there are no finished items', () => {
+      service.addFiles([createFile('a.pdf')]);
+      // a is uploading (active)
+      expect(service.items().length).toBe(1);
+
+      service.clearFinished();
+
+      expect(service.items().length).toBe(1);
     });
   });
 

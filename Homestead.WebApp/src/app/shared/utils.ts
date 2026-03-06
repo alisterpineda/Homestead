@@ -25,6 +25,16 @@ export function toIsoDateString(date: Date | null): string | null {
   return `${y}-${m}-${d}`;
 }
 
+/** Handle a file input change event: pass selected files to a callback and reset the input. */
+export function handleFileInputChange(event: Event, onFiles: (files: File[]) => void): void {
+  const input = event.target as HTMLInputElement;
+  const files = input.files;
+  if (files && files.length > 0) {
+    onFiles(Array.from(files));
+  }
+  input.value = '';
+}
+
 /** Compare two Dates by year/month/day only (ignoring time). */
 export function datesEqual(a: Date | null, b: Date | null): boolean {
   if (a === b) return true;

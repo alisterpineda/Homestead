@@ -95,8 +95,9 @@ export class UploadManagerService {
     this.items.update(prev => prev.filter(i => i.id !== id));
   }
 
-  clearCompleted(): void {
-    this.items.update(prev => prev.filter(i => i.status !== 'completed'));
+  /** Clear completed and failed items, keeping in-progress and queued ones. */
+  clearFinished(): void {
+    this.items.update(prev => prev.filter(i => i.status !== 'completed' && i.status !== 'failed'));
   }
 
   clearAll(): void {

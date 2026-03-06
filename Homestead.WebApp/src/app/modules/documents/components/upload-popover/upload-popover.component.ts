@@ -1,38 +1,49 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideActivity, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw } from '@ng-icons/lucide';
+import { lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
-import { formatBytes } from '@/shared/utils';
+import { formatBytes, handleFileInputChange } from '@/shared/utils';
 
 @Component({
-  selector: 'app-activity-popover',
+  selector: 'app-upload-popover',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton],
-  providers: [provideIcons({ lucideActivity, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw })],
+  providers: [provideIcons({ lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX })],
   template: `
-      <div hlmPopover align="end">
-        <button hlmPopoverTrigger hlmBtn variant="ghost" size="icon-sm" class="relative" aria-label="Upload activity">
-          <ng-icon hlm name="lucideActivity" size="sm" />
-          @if (uploadManager.hasActiveUploads()) {
-            <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
-              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
-            </span>
-          } @else if (uploadManager.failedCount() > 0) {
-            <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
-              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive"></span>
-            </span>
-          }
-        </button>
-        <div hlmPopoverContent *hlmPopoverPortal class="w-80 p-0">
+    <div hlmPopover align="end">
+      <button hlmPopoverTrigger hlmBtn variant="ghost" size="sm" class="relative">
+        <ng-icon hlm name="lucideUpload" size="sm" />
+        Upload
+        @if (uploadManager.hasActiveUploads()) {
+          <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
+          </span>
+        } @else if (uploadManager.failedCount() > 0) {
+          <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive"></span>
+          </span>
+        }
+      </button>
+      <div hlmPopoverContent *hlmPopoverPortal class="w-80 p-0">
+        <input #fileInput type="file" multiple class="hidden" (change)="onFilesSelected($event)" />
+        <div class="px-3 py-3" [class.border-b]="uploadManager.hasItems()" [class.border-border]="uploadManager.hasItems()">
+          <button hlmBtn variant="outline" size="sm" class="w-full" (click)="fileInput.click()">
+            <ng-icon hlm name="lucideUpload" size="sm" />
+            Choose files
+          </button>
+          <p class="mt-1.5 text-center text-xs text-muted-foreground">Or drag and drop files anywhere on the page</p>
+        </div>
+
+        @if (uploadManager.hasItems()) {
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-border px-3 py-2">
             <span class="text-sm font-medium">{{ statusText() }}</span>
-            <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.clearAll()" aria-label="Clear all">
-              <ng-icon hlm name="lucideX" size="xs" />
+            <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.clearFinished()" aria-label="Clear finished">
+              <ng-icon hlm name="lucideListX" size="xs" />
             </button>
           </div>
 
@@ -97,19 +108,12 @@ import { formatBytes } from '@/shared/utils';
             }
           </div>
 
-          <!-- Footer -->
-          @if (uploadManager.completedCount() > 0) {
-            <div class="border-t border-border px-3 py-2">
-              <button hlmBtn variant="ghost" size="sm" class="w-full" (click)="uploadManager.clearCompleted()">
-                Clear completed
-              </button>
-            </div>
-          }
-        </div>
+        }
       </div>
+    </div>
   `,
 })
-export class ActivityPopoverComponent {
+export class UploadPopoverComponent {
   protected uploadManager = inject(UploadManagerService);
   protected formatBytes = formatBytes;
 
@@ -130,4 +134,8 @@ export class ActivityPopoverComponent {
     }
     return `${completed} upload${completed > 1 ? 's' : ''} complete`;
   });
+
+  protected onFilesSelected(event: Event): void {
+    handleFileInputChange(event, files => this.uploadManager.addFiles(files));
+  }
 }

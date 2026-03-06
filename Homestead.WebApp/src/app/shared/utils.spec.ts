@@ -1,4 +1,4 @@
-import { parseDate, toIsoDateString, datesEqual } from './utils';
+import { parseDate, toIsoDateString, datesEqual, handleFileInputChange } from './utils';
 
 describe('parseDate', () => {
   it('should return null for null/undefined/empty', () => {
@@ -59,5 +59,29 @@ describe('datesEqual', () => {
     const a = new Date(2026, 2, 4, 10, 30);
     const b = new Date(2026, 2, 4, 22, 0);
     expect(datesEqual(a, b)).toBe(true);
+  });
+});
+
+describe('handleFileInputChange', () => {
+  it('should call onFiles with selected files and reset input', () => {
+    const file = new File(['content'], 'test.pdf');
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    const onFiles = vi.fn();
+
+    handleFileInputChange({ target: input } as unknown as Event, onFiles);
+
+    expect(onFiles).toHaveBeenCalledWith([file]);
+    expect(input.value).toBe('');
+  });
+
+  it('should not call onFiles when no files selected', () => {
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [], configurable: true });
+    const onFiles = vi.fn();
+
+    handleFileInputChange({ target: input } as unknown as Event, onFiles);
+
+    expect(onFiles).not.toHaveBeenCalled();
   });
 });
