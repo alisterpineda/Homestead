@@ -13,7 +13,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
     <span
       hlmBadge
       class="tag-badge-colored gap-1"
-      [style.--tag-color]="color() ?? '#808080'"
+      [style.--tag-color]="color() ?? '#ffffff'"
     >
       {{ path() }}
       @if (removable()) {
