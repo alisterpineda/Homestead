@@ -6,7 +6,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUpDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -55,7 +55,7 @@ import { toast } from 'ngx-sonner';
     UploadDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUpDown })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -101,6 +101,44 @@ import { toast } from 'ngx-sonner';
                   <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
                 </div>
                 <div class="flex items-center gap-2">
+                  <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
+                    <ng-icon hlm name="lucideArrowUpDown" size="sm" />
+                    Sort
+                  </button>
+                  <ng-template #sortGroup>
+                    <span hlmDropdownMenuLabel>Sort by</span>
+                    <hlm-dropdown-menu-group>
+                      <button hlmDropdownMenuRadio [checked]="!sortBy()" (triggered)="onSortByChange(null)">
+                        <hlm-dropdown-menu-radio-indicator />
+                        None
+                      </button>
+                      @for (opt of sortOptions; track opt.value) {
+                        <button hlmDropdownMenuRadio [checked]="sortBy() === opt.value" (triggered)="onSortByChange(opt.value)">
+                          <hlm-dropdown-menu-radio-indicator />
+                          {{ opt.label }}
+                        </button>
+                      }
+                    </hlm-dropdown-menu-group>
+                    @if (sortBy()) {
+                      <hlm-dropdown-menu-separator />
+                      <span hlmDropdownMenuLabel>Direction</span>
+                      <hlm-dropdown-menu-group>
+                        <button hlmDropdownMenuRadio [checked]="(sortDir() ?? 'Asc') === 'Asc'" (triggered)="onSortDirChange('Asc')">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Ascending
+                        </button>
+                        <button hlmDropdownMenuRadio [checked]="sortDir() === 'Desc'" (triggered)="onSortDirChange('Desc')">
+                          <hlm-dropdown-menu-radio-indicator />
+                          Descending
+                        </button>
+                      </hlm-dropdown-menu-group>
+                    }
+                  </ng-template>
+                  <ng-template #sortMenu>
+                    <hlm-dropdown-menu class="w-44">
+                      <ng-container [ngTemplateOutlet]="sortGroup" />
+                    </hlm-dropdown-menu>
+                  </ng-template>
                   @if (viewMode() === 'table') {
                   <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
                     <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
@@ -145,6 +183,8 @@ import { toast } from 'ngx-sonner';
                           Table
                         </button>
                       </hlm-dropdown-menu-group>
+                      <hlm-dropdown-menu-separator />
+                      <ng-container [ngTemplateOutlet]="sortGroup" />
                       @if (viewMode() === 'table') {
                         <hlm-dropdown-menu-separator />
                         <span hlmDropdownMenuLabel>Columns</span>
@@ -303,6 +343,12 @@ export class DocumentListComponent implements OnDestroy {
   private static readonly VIEW_MODE_KEY = 'document-view-mode';
 
   hideableColumns = HIDEABLE_COLUMNS;
+  readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
+    { value: 'Name', label: 'Name' },
+    { value: 'DocumentDate', label: 'Date' },
+    { value: 'ContentType', label: 'Content Type' },
+    { value: 'FileSize', label: 'File Size' },
+  ];
   viewMode = signal<'table' | 'grid'>(this.loadViewMode());
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -606,6 +652,21 @@ export class DocumentListComponent implements OnDestroy {
       },
       queryParamsHandling: 'merge',
     });
+  }
+
+  onSortByChange(field: DocumentSortBy | null): void {
+    if (!field) {
+      this.onSortChange(null);
+    } else {
+      this.onSortChange({ sortBy: field, sortDir: this.sortDir() ?? 'Asc' });
+    }
+  }
+
+  onSortDirChange(dir: SortDirection): void {
+    const field = this.sortBy();
+    if (field) {
+      this.onSortChange({ sortBy: field, sortDir: dir });
+    }
   }
 
   onToggleColumn(id: string): void {
