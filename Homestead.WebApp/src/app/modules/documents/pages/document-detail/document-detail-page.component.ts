@@ -38,6 +38,7 @@ import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -85,6 +86,7 @@ import { toast } from 'ngx-sonner';
     HlmResizableImports,
     HlmBreadCrumbImports,
     HlmDropdownMenuImports,
+    HlmAlertDialogImports,
     HlmInput,
     HlmFormFieldImports,
     HlmLabel,
@@ -168,18 +170,18 @@ import { toast } from 'ngx-sonner';
 
     @if (document(); as doc) {
       <div class="flex items-center gap-2 mb-4">
+        <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
+          <ng-icon hlm name="lucideDownload" size="sm" />
+          Download
+        </button>
         <div class="ml-auto flex items-center gap-2">
-          <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
-            <ng-icon hlm name="lucideDownload" size="sm" />
-            Download
-          </button>
           @if (auth.canWrite()) {
+            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
+              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+            </button>
             <button hlmBtn size="sm" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
               <ng-icon hlm name="lucideSave" size="sm" />
               {{ saving() ? 'Saving...' : 'Save' }}
-            </button>
-            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
-              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
             </button>
             <ng-template #moreMenu>
               <hlm-dropdown-menu class="w-48">
@@ -187,12 +189,30 @@ import { toast } from 'ngx-sonner';
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
                   <span>Add Version</span>
                 </button>
-                <button hlmDropdownMenuItem variant="destructive" (triggered)="handleDelete()" [disabled]="deleting()">
+                <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
                   <ng-icon hlm name="lucideTrash2" size="sm" />
-                  <span>{{ deleting() ? 'Deleting...' : 'Delete' }}</span>
+                  <span>Delete</span>
                 </button>
               </hlm-dropdown-menu>
             </ng-template>
+
+            <hlm-alert-dialog>
+              <button hlmAlertDialogTrigger class="hidden" #deleteDialogTrigger></button>
+              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                <div hlmAlertDialogHeader>
+                  <h2 hlmAlertDialogTitle>Delete document?</h2>
+                  <p hlmAlertDialogDescription>
+                    This action cannot be undone. This document and all its versions will be permanently deleted.
+                  </p>
+                </div>
+                <div hlmAlertDialogFooter>
+                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                  <button hlmAlertDialogAction variant="destructive" (click)="handleDelete(); ctx.close()" [disabled]="deleting()">
+                    {{ deleting() ? 'Deleting...' : 'Delete' }}
+                  </button>
+                </div>
+              </hlm-alert-dialog-content>
+            </hlm-alert-dialog>
           }
         </div>
       </div>
