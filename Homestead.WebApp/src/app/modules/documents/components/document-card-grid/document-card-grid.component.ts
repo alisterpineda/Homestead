@@ -44,14 +44,18 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
       @for (doc of documents(); track doc.id) {
         <div
           hlmCard
-          class="relative aspect-[3/4] cursor-pointer overflow-hidden p-0 gap-0 transition-shadow hover:shadow-md"
-          [class]="isSelected(doc.id) ? 'ring-2 ring-primary' : ''"
+          class="group relative aspect-[3/4] cursor-pointer overflow-hidden p-0 gap-0 transition-shadow hover:shadow-md"
           tabindex="0"
           role="button"
           [attr.aria-label]="doc.name"
           (click)="onCardClick(doc.id)"
           (keydown.enter)="onCardClick(doc.id)"
         >
+          <!-- Selection border overlay -->
+          @if (isSelected(doc.id)) {
+            <div class="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border-2 border-primary"></div>
+          }
+
           <!-- Full-bleed thumbnail -->
           @if (doc.hasThumbnail && !hasError(doc.id)) {
             <img
@@ -73,9 +77,14 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
           }
 
           <!-- Checkbox overlay -->
-          <div class="absolute top-2 left-2 z-10" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+          <div
+            class="absolute top-0 left-0 z-10 p-2 rounded-br-lg bg-background/80 shadow-sm backdrop-blur-sm transition-opacity duration-150 group-hover:opacity-100"
+            [class.opacity-100]="selectionMode() || isSelected(doc.id)"
+            [class.opacity-0]="!selectionMode() && !isSelected(doc.id)"
+            (click)="$event.stopPropagation()"
+            (keydown.enter)="$event.stopPropagation()"
+          >
             <hlm-checkbox
-              class="bg-background shadow-sm"
               [checked]="isSelected(doc.id)"
               [aria-label]="'Select ' + doc.name"
               (checkedChange)="onCheckboxChange(doc.id, $event)"
@@ -136,6 +145,7 @@ export class DocumentCardGridComponent {
 
   documents = input.required<GetDocumentsResponse[]>();
   selectedIds = input<Set<string>>(new Set());
+  selectionMode = input(false);
 
   documentSelect = output<string>();
   selectionChange = output<Set<string>>();
@@ -173,7 +183,7 @@ export class DocumentCardGridComponent {
   }
 
   onCardClick(id: string): void {
-    if (this.selectedIds().size > 0) {
+    if (this.selectionMode() || this.selectedIds().size > 0) {
       this.onCheckboxChange(id, !this.isSelected(id));
     } else {
       this.documentSelect.emit(id);

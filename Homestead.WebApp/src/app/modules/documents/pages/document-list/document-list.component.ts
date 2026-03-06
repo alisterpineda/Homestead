@@ -6,7 +6,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -55,7 +55,7 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -95,7 +95,7 @@ import { toast } from 'ngx-sonner';
           </section>
           <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
             <!-- Normal toolbar: always rendered to hold layout height -->
-            <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
+            <div [class.opacity-0]="isInSelectionState()" [class.pointer-events-none]="isInSelectionState()" [attr.inert]="isInSelectionState() ? '' : null">
               <div class="flex items-center gap-2 mb-3">
                 <div class="relative flex-1 min-w-0">
                   <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -167,6 +167,12 @@ import { toast } from 'ngx-sonner';
                       <ng-icon hlm name="lucideTable" size="sm" />
                     </button>
                   </div>
+                  @if (auth.canWrite() && viewMode() === 'grid') {
+                    <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" (click)="enterSelectionMode()" aria-label="Enter selection mode">
+                      <ng-icon hlm name="lucideListChecks" size="sm" />
+                      Select
+                    </button>
+                  }
                   <!-- Mobile: Overflow menu (below sm) -->
                   <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
                           [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
@@ -208,6 +214,12 @@ import { toast } from 'ngx-sonner';
                           </hlm-dropdown-menu-sub>
                         </ng-template>
                       }
+                      @if (auth.canWrite() && viewMode() === 'grid') {
+                        <hlm-dropdown-menu-separator />
+                        <button hlmDropdownMenuItem (triggered)="enterSelectionMode()">
+                          Select
+                        </button>
+                      }
                     </hlm-dropdown-menu>
                   </ng-template>
                 </div>
@@ -245,36 +257,45 @@ import { toast } from 'ngx-sonner';
             </div>
 
             <!-- Selection toolbar: absolute overlay -->
-            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!hasSelection() || !auth.canWrite()" [class.pointer-events-none]="!hasSelection() || !auth.canWrite()">
-              <span class="text-sm text-muted-foreground">
-                {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
-              </span>
-              <div class="ml-auto flex items-center gap-2">
-                <button hlmBtn variant="outline" size="sm" (click)="clearSelection()">
-                  Clear selection
-                </button>
-                <hlm-alert-dialog>
-                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
-                    Delete
+            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!isInSelectionState() || !auth.canWrite()" [class.pointer-events-none]="!isInSelectionState() || !auth.canWrite()" [attr.inert]="!isInSelectionState() || !auth.canWrite() ? '' : null">
+              <button hlmBtn variant="ghost" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
+                <ng-icon hlm name="lucideX" size="sm" />
+              </button>
+              @if (hasSelection()) {
+                <span class="text-sm text-muted-foreground">
+                  {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
+                </span>
+                @if (!allPageSelected()) {
+                  <button hlmBtn variant="link" size="sm" (click)="selectAllOnPage()">
+                    Select all
                   </button>
-                  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                    <div hlmAlertDialogHeader>
-                      <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
-                      <p hlmAlertDialogDescription>
-                        This action cannot be undone. The selected document{{ selectionCount() > 1 ? 's' : '' }}
-                        and {{ selectionCount() > 1 ? 'their' : 'its' }} associated files will be permanently deleted.
-                      </p>
-                    </div>
-                    <div hlmAlertDialogFooter>
-                      <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
-                        {{ deleting() ? 'Deleting...' : 'Delete' }}
-                      </button>
-                    </div>
-                  </hlm-alert-dialog-content>
-                </hlm-alert-dialog>
-              </div>
+                }
+                <div class="ml-auto flex items-center gap-2">
+                  <hlm-alert-dialog>
+                    <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
+                      <ng-icon hlm name="lucideTrash2" size="sm" />
+                      Delete
+                    </button>
+                    <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                      <div hlmAlertDialogHeader>
+                        <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
+                        <p hlmAlertDialogDescription>
+                          This action cannot be undone. The selected document{{ selectionCount() > 1 ? 's' : '' }}
+                          and {{ selectionCount() > 1 ? 'their' : 'its' }} associated files will be permanently deleted.
+                        </p>
+                      </div>
+                      <div hlmAlertDialogFooter>
+                        <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                        <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
+                          {{ deleting() ? 'Deleting...' : 'Delete' }}
+                        </button>
+                      </div>
+                    </hlm-alert-dialog-content>
+                  </hlm-alert-dialog>
+                </div>
+              } @else {
+                <span class="text-sm text-muted-foreground">Select items</span>
+              }
             </div>
           </div>
 
@@ -306,6 +327,7 @@ import { toast } from 'ngx-sonner';
                 <app-document-card-grid
                   [documents]="result.items"
                   [selectedIds]="selectedDocumentIds()"
+                  [selectionMode]="isInSelectionState()"
                   (documentSelect)="onDocumentSelect($event)"
                   (selectionChange)="selectedDocumentIds.set($event)"
                 />
@@ -365,6 +387,14 @@ export class DocumentListComponent implements OnDestroy {
   selectedDocumentIds = signal<Set<string>>(new Set());
   selectionCount = computed(() => this.selectedDocumentIds().size);
   hasSelection = computed(() => this.selectionCount() > 0);
+  selectionMode = signal(false);
+  isInSelectionState = computed(() => this.selectionMode() || this.selectionCount() > 0);
+  allPageSelected = computed(() => {
+    const items = this.data()?.items;
+    if (!items || items.length === 0) return true;
+    const selected = this.selectedDocumentIds();
+    return items.every(d => selected.has(d.id));
+  });
 
   // Search
   searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
@@ -720,8 +750,19 @@ export class DocumentListComponent implements OnDestroy {
     });
   }
 
+  enterSelectionMode(): void {
+    this.selectionMode.set(true);
+  }
+
   clearSelection(): void {
     this.selectedDocumentIds.set(new Set());
+    this.selectionMode.set(false);
+  }
+
+  selectAllOnPage(): void {
+    const items = this.data()?.items;
+    if (!items) return;
+    this.selectedDocumentIds.set(new Set(items.map(d => d.id)));
   }
 
   onBulkDelete(ctx: { close: () => void }): void {
