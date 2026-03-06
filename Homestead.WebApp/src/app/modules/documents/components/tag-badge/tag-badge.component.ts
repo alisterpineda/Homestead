@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideX } from '@ng-icons/lucide';
 import { HlmBadge } from '@/shared/components/spartan/badge';
@@ -14,10 +14,10 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
       hlmBadge
       [variant]="color() ? 'default' : 'secondary'"
       [class.tag-badge-colored]="color()"
-      class="gap-1"
+      class="badge-inner gap-1"
       [style.--tag-color]="color()"
     >
-      {{ path() }}
+      <span class="truncate min-w-0">{{ compact() ? compactPath() : path() }}</span>
       @if (removable()) {
         <button
           type="button"
@@ -30,6 +30,16 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
     </span>
   `,
   styles: `
+    :host {
+      display: inline-flex;
+    }
+
+    .badge-inner {
+      max-width: 100%;
+      min-width: 0;
+      flex-shrink: 1;
+    }
+
     .tag-badge-colored {
       background-color: color-mix(in oklch, var(--tag-color) 15%, white);
       color: oklch(from var(--tag-color) min(l, 0.5) c h);
@@ -45,7 +55,14 @@ export class TagBadgeComponent {
   path = input.required<string>();
   color = input<string | null | undefined>(null);
   removable = input(false);
+  compact = input(false);
   removed = output<void>();
+
+  compactPath = computed(() => {
+    const segments = this.path().split('/');
+    if (segments.length <= 2) return this.path();
+    return `${segments[0]}/\u2026/${segments[segments.length - 1]}`;
+  });
 
   onRemove(event: Event): void {
     event.stopPropagation();

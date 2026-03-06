@@ -84,12 +84,13 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 
           <!-- Tag overlay -->
           @if (doc.tags.length > 0) {
-            <div class="absolute top-2 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
+            <div class="absolute top-2 left-10 right-2 z-10 flex flex-col items-end gap-1 pointer-events-none">
               @for (tag of visibleTags(doc.tags); track tag.id) {
                 <app-tag-badge
-                  class="tag-card-badge max-w-24 truncate pointer-events-auto"
+                  class="tag-card-badge max-w-full pointer-events-auto"
                   [path]="tag.path"
                   [color]="tag.color"
+                  [compact]="true"
                   [title]="tag.path"
                 />
               }
