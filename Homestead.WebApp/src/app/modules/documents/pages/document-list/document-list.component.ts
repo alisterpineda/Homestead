@@ -136,7 +136,7 @@ import { toast } from 'ngx-sonner';
                   </ng-template>
                   <ng-template #sortMenu>
                     <hlm-dropdown-menu class="w-44">
-                      <ng-container [ngTemplateOutlet]="sortGroup" />
+                      <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
                     </hlm-dropdown-menu>
                   </ng-template>
                   @if (viewMode() === 'table') {
@@ -145,14 +145,17 @@ import { toast } from 'ngx-sonner';
                     Columns
                   </button>
                   }
+                  <ng-template #columnsContent>
+                    @for (col of hideableColumns; track col.id) {
+                      <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
+                        <hlm-dropdown-menu-checkbox-indicator />
+                        {{ col.label }}
+                      </button>
+                    }
+                  </ng-template>
                   <ng-template #columnsMenu>
                     <hlm-dropdown-menu class="w-40">
-                      @for (col of hideableColumns; track col.id) {
-                        <button hlmDropdownMenuCheckbox [checked]="columnVisibility()[col.id] !== false" (triggered)="onToggleColumn(col.id)">
-                          <hlm-dropdown-menu-checkbox-indicator />
-                          {{ col.label }}
-                        </button>
-                      }
+                      <ng-container [ngTemplateOutlet]="columnsContent" [ngTemplateOutletInjector]="'outlet'" />
                     </hlm-dropdown-menu>
                   </ng-template>
                   <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
@@ -184,20 +187,25 @@ import { toast } from 'ngx-sonner';
                         </button>
                       </hlm-dropdown-menu-group>
                       <hlm-dropdown-menu-separator />
-                      <ng-container [ngTemplateOutlet]="sortGroup" />
+                      <button hlmDropdownMenuItem [hlmDropdownMenuTrigger]="sortSubMenu">
+                        Sort
+                        <hlm-dropdown-menu-item-sub-indicator />
+                      </button>
+                      <ng-template #sortSubMenu>
+                        <hlm-dropdown-menu-sub>
+                          <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
+                        </hlm-dropdown-menu-sub>
+                      </ng-template>
                       @if (viewMode() === 'table') {
-                        <hlm-dropdown-menu-separator />
-                        <span hlmDropdownMenuLabel>Columns</span>
-                        <hlm-dropdown-menu-group>
-                          @for (col of hideableColumns; track col.id) {
-                            <button hlmDropdownMenuCheckbox
-                                    [checked]="columnVisibility()[col.id] !== false"
-                                    (triggered)="onToggleColumn(col.id)">
-                              <hlm-dropdown-menu-checkbox-indicator />
-                              {{ col.label }}
-                            </button>
-                          }
-                        </hlm-dropdown-menu-group>
+                        <button hlmDropdownMenuItem [hlmDropdownMenuTrigger]="columnsSubMenu">
+                          Columns
+                          <hlm-dropdown-menu-item-sub-indicator />
+                        </button>
+                        <ng-template #columnsSubMenu>
+                          <hlm-dropdown-menu-sub>
+                            <ng-container [ngTemplateOutlet]="columnsContent" [ngTemplateOutletInjector]="'outlet'" />
+                          </hlm-dropdown-menu-sub>
+                        </ng-template>
                       }
                     </hlm-dropdown-menu>
                   </ng-template>
