@@ -17,3 +17,5 @@ internal record GroupDetail(Guid Id, string Name, string? Description, IReadOnly
 internal record GroupMemberItem(Guid UserId, string DisplayName, string? Email, string AccessLevel);
 
 internal record DocumentListItem(Guid Id, string Name, Guid? GroupId, string? GroupName);
+
+internal record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);

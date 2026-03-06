@@ -37,6 +37,8 @@ export type { DeleteDocumentVersion$Params as DeleteDocumentVersion$Params } fro
 export { deleteDocumentVersion as deleteDocumentVersion } from './fn/documents/delete-document-version';
 export type { PatchDocumentVersion$Params as PatchDocumentVersion$Params } from './fn/documents/patch-document-version';
 export { patchDocumentVersion as patchDocumentVersion } from './fn/documents/patch-document-version';
+export type { ReprocessDocumentVersion$Params as ReprocessDocumentVersion$Params } from './fn/documents/reprocess-document-version';
+export { reprocessDocumentVersion as reprocessDocumentVersion } from './fn/documents/reprocess-document-version';
 export type { CreateComment$Params as CreateComment$Params } from './fn/documents/create-comment';
 export { createComment as createComment } from './fn/documents/create-comment';
 export type { GetDocumentActivity$Params as GetDocumentActivity$Params } from './fn/documents/get-document-activity';

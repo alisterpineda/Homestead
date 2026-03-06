@@ -138,6 +138,5 @@ public class DocumentVersionTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);
     private record VersionDetail(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
 }

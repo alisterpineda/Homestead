@@ -26,6 +26,7 @@ using Homestead.WebApi.Features.Documents.v1.CreateTag;
 using Homestead.WebApi.Features.Documents.v1.GetTags;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 using Homestead.WebApi.Features.Documents.v1.PatchTag;
+using Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
 
 using Homestead.WebApi.Authentication;
 
@@ -57,6 +58,7 @@ public static class DocumentsModule
         GetDocumentVersionsEndpoint.Map(versions);
         GetDocumentVersionEndpoint.Map(versions);
         PatchDocumentVersionEndpoint.Map(versions);
+        ReprocessDocumentVersionEndpoint.Map(versions);
 
         var comments = v1.MapGroup("/{documentId:guid}/comments");
         CreateCommentEndpoint.Map(comments);

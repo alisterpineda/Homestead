@@ -30,6 +30,7 @@ import {
   lucideMessageSquare,
   lucideHistory,
   lucideSend,
+  lucideRefreshCw,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -61,6 +62,7 @@ import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-ve
 import { patchDocument } from '@/api/generated/fn/documents/patch-document';
 import { patchDocumentVersion } from '@/api/generated/fn/documents/patch-document-version';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
+import { reprocessDocumentVersion } from '@/api/generated/fn/documents/reprocess-document-version';
 import { getDocumentActivity } from '@/api/generated/fn/documents/get-document-activity';
 import { createComment } from '@/api/generated/fn/documents/create-comment';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -114,6 +116,7 @@ import { toast } from 'ngx-sonner';
       lucideMessageSquare,
       lucideHistory,
       lucideSend,
+      lucideRefreshCw,
     }),
   ],
   template: `
@@ -189,6 +192,10 @@ import { toast } from 'ngx-sonner';
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
                   <span>Add Version</span>
                 </button>
+                <button hlmDropdownMenuItem (triggered)="reprocessDialogTrigger.click()" [disabled]="reprocessing()">
+                  <ng-icon hlm name="lucideRefreshCw" size="sm" />
+                  <span>Reprocess OCR</span>
+                </button>
                 <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
                   <ng-icon hlm name="lucideTrash2" size="sm" />
                   <span>Delete</span>
@@ -209,6 +216,24 @@ import { toast } from 'ngx-sonner';
                   <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
                   <button hlmAlertDialogAction variant="destructive" (click)="handleDelete(); ctx.close()" [disabled]="deleting()">
                     {{ deleting() ? 'Deleting...' : 'Delete' }}
+                  </button>
+                </div>
+              </hlm-alert-dialog-content>
+            </hlm-alert-dialog>
+
+            <hlm-alert-dialog>
+              <button hlmAlertDialogTrigger class="hidden" #reprocessDialogTrigger></button>
+              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                <div hlmAlertDialogHeader>
+                  <h2 hlmAlertDialogTitle>Reprocess OCR?</h2>
+                  <p hlmAlertDialogDescription>
+                    This will re-extract text from the current version's file. The existing extracted text will be replaced.
+                  </p>
+                </div>
+                <div hlmAlertDialogFooter>
+                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                  <button hlmAlertDialogAction (click)="handleReprocess(); ctx.close()" [disabled]="reprocessing()">
+                    {{ reprocessing() ? 'Reprocessing...' : 'Reprocess' }}
                   </button>
                 </div>
               </hlm-alert-dialog-content>
@@ -550,6 +575,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editExtractedText = signal('');
   saving = signal(false);
   deleting = signal(false);
+  reprocessing = signal(false);
   loading = signal(false);
   refreshTrigger = signal(0);
   activityItems = signal<GetActivityResponse[]>([]);
@@ -922,6 +948,27 @@ export class DocumentDetailPageComponent implements OnDestroy {
       error: () => {
         this.deleting.set(false);
         toast.error('Failed to delete document.');
+      },
+    });
+  }
+
+  handleReprocess(): void {
+    const docId = this.documentId();
+    const ver = this.activeVersion();
+    if (!docId || !ver) return;
+    this.reprocessing.set(true);
+    reprocessDocumentVersion(this.http, this.apiConfig.rootUrl, {
+      documentId: docId,
+      versionId: ver.id,
+    }).subscribe({
+      next: (r) => {
+        this.reprocessing.set(false);
+        const toastId = toast.loading('Reprocessing OCR...');
+        this.processingHub.trackJob(r.body.jobId, toastId);
+      },
+      error: () => {
+        this.reprocessing.set(false);
+        toast.error('Failed to start OCR reprocessing.');
       },
     });
   }

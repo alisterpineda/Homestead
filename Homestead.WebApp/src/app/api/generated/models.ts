@@ -64,6 +64,7 @@ export type { ProcessingEntityType } from './models/processing-entity-type';
 export type { ProcessingJobStatus } from './models/processing-job-status';
 export type { ProcessingJobType } from './models/processing-job-type';
 export type { RegisterRequest } from './models/register-request';
+export type { ReprocessDocumentVersionResponse } from './models/reprocess-document-version-response';
 export type { SortDirection } from './models/sort-direction';
 export type { TagDto } from './models/tag-dto';
 export type { UpdateGroupMemberRequest } from './models/update-group-member-request';
