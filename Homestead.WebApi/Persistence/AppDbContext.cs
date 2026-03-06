@@ -4,6 +4,7 @@ using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Processing;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -13,8 +14,9 @@ namespace Homestead.WebApi.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid,
         IdentityUserClaim<Guid>, AppUserRole, IdentityUserLogin<Guid>,
-        IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>(options)
+        IdentityRoleClaim<Guid>, IdentityUserToken<Guid>>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
     public DbSet<Document> Documents { get; set; }
     public DbSet<DocumentVersion> DocumentVersions { get; set; }
     public DbSet<DocumentComment> DocumentComments { get; set; }

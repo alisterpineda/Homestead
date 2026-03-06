@@ -2,6 +2,7 @@ using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Authentication;
@@ -10,6 +11,9 @@ public static class AuthenticationExtensions
 {
     public static WebApplicationBuilder AddAppAuthentication(this WebApplicationBuilder builder)
     {
+        builder.Services.AddDataProtection()
+            .PersistKeysToDbContext<AppDbContext>();
+
         builder.Services.AddHttpContextAccessor();
 
         builder.Services
