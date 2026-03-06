@@ -2,10 +2,11 @@ import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import { Subject } from 'rxjs';
 import { toast } from 'ngx-sonner';
+import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 
 export interface JobStatusChangedMessage {
   jobId: string;
-  status: string;
+  status: ProcessingJobStatus;
   entityType: string | null;
   entityId: string | null;
   documentName: string | null;
@@ -16,14 +17,22 @@ export interface JobStatusChangedMessage {
 export class ProcessingHubService {
   private connection: HubConnection | null = null;
   private trackedToasts = new Map<string, string | number>();
+  private managedJobIds = new Set<string>();
 
   private jobCompletedSubject = new Subject<JobStatusChangedMessage>();
   readonly jobCompleted$ = this.jobCompletedSubject.asObservable();
+
+  private jobStatusChangedSubject = new Subject<JobStatusChangedMessage>();
+  readonly jobStatusChanged$ = this.jobStatusChangedSubject.asObservable();
 
   readonly connected = signal(false);
 
   trackJob(jobId: string, toastId: string | number): void {
     this.trackedToasts.set(jobId, toastId);
+  }
+
+  registerManagedJob(jobId: string): void {
+    this.managedJobIds.add(jobId);
   }
 
   async connect(): Promise<void> {
@@ -36,24 +45,35 @@ export class ProcessingHubService {
       .build();
 
     this.connection.on('JobStatusChanged', (message: JobStatusChangedMessage) => {
+      this.jobStatusChangedSubject.next(message);
+
+      const isManaged = this.managedJobIds.has(message.jobId);
       const trackedToastId = this.trackedToasts.get(message.jobId);
 
       if (message.status === 'Completed') {
-        const name = message.documentName ?? 'Document';
-        if (trackedToastId !== undefined) {
-          toast.success(`"${name}" has been processed successfully.`, { id: trackedToastId });
-          this.trackedToasts.delete(message.jobId);
+        if (isManaged) {
+          this.managedJobIds.delete(message.jobId);
         } else {
-          toast.success(`"${name}" has been processed successfully.`);
+          const name = message.documentName ?? 'Document';
+          if (trackedToastId !== undefined) {
+            toast.success(`"${name}" has been processed successfully.`, { id: trackedToastId });
+            this.trackedToasts.delete(message.jobId);
+          } else {
+            toast.success(`"${name}" has been processed successfully.`);
+          }
         }
         this.jobCompletedSubject.next(message);
       } else if (message.status === 'Failed') {
-        const errorMsg = message.error ?? 'An unknown error occurred.';
-        if (trackedToastId !== undefined) {
-          toast.error(`Processing failed: ${errorMsg}`, { id: trackedToastId });
-          this.trackedToasts.delete(message.jobId);
+        if (isManaged) {
+          this.managedJobIds.delete(message.jobId);
         } else {
-          toast.error(`Processing failed: ${errorMsg}`);
+          const errorMsg = message.error ?? 'An unknown error occurred.';
+          if (trackedToastId !== undefined) {
+            toast.error(`Processing failed: ${errorMsg}`, { id: trackedToastId });
+            this.trackedToasts.delete(message.jobId);
+          } else {
+            toast.error(`Processing failed: ${errorMsg}`);
+          }
         }
       }
     });

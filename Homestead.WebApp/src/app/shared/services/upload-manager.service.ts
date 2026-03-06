@@ -1,0 +1,201 @@
+import { Injectable, computed, signal, inject, DestroyRef } from '@angular/core';
+import { HttpClient, HttpRequest, HttpEventType, HttpResponse, HttpErrorResponse } from '@angular/common/http';
+import { Subscription } from 'rxjs';
+import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { ProcessingHubService } from '@/shared/services/processing-hub.service';
+import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
+
+export type UploadItemStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'failed';
+
+export interface UploadItem {
+  id: string;
+  file: File;
+  fileName: string;
+  fileSize: number;
+  status: UploadItemStatus;
+  progress: number;
+  jobId: string | null;
+  documentName: string | null;
+  error: string | null;
+}
+
+const MAX_CONCURRENT = 3;
+
+@Injectable({ providedIn: 'root' })
+export class UploadManagerService {
+  private http = inject(HttpClient);
+  private apiConfig = inject(ApiConfiguration);
+  private processingHub = inject(ProcessingHubService);
+  private destroyRef = inject(DestroyRef);
+
+  readonly items = signal<UploadItem[]>([]);
+  private activeUploads = new Map<string, Subscription>();
+  private idCounter = 0;
+
+  readonly hasItems = computed(() => this.items().length > 0);
+  readonly hasActiveUploads = computed(() =>
+    this.items().some(i => i.status === 'uploading' || i.status === 'queued' || i.status === 'processing'),
+  );
+  readonly completedCount = computed(() => this.items().filter(i => i.status === 'completed').length);
+  readonly failedCount = computed(() => this.items().filter(i => i.status === 'failed').length);
+
+  private hubSub: Subscription;
+
+  constructor() {
+    this.hubSub = this.processingHub.jobStatusChanged$.subscribe(msg => {
+      this.handleJobStatusChanged(msg.jobId, msg.status, msg.documentName, msg.error);
+    });
+    this.destroyRef.onDestroy(() => this.hubSub.unsubscribe());
+
+    if (typeof window !== 'undefined') {
+      const handler = (e: BeforeUnloadEvent) => {
+        if (this.hasActiveUploads()) {
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('beforeunload', handler);
+      this.destroyRef.onDestroy(() => window.removeEventListener('beforeunload', handler));
+    }
+  }
+
+  addFiles(files: File[]): void {
+    const newItems: UploadItem[] = files.map(file => ({
+      id: `upload-${++this.idCounter}`,
+      file,
+      fileName: file.name,
+      fileSize: file.size,
+      status: 'queued' as const,
+      progress: 0,
+      jobId: null,
+      documentName: null,
+      error: null,
+    }));
+
+    this.items.update(prev => [...prev, ...newItems]);
+    this.processQueue();
+  }
+
+  retryItem(id: string): void {
+    this.items.update(prev =>
+      prev.map(item =>
+        item.id === id && item.status === 'failed'
+          ? { ...item, status: 'queued' as const, progress: 0, error: null, jobId: null }
+          : item,
+      ),
+    );
+    this.processQueue();
+  }
+
+  removeItem(id: string): void {
+    const item = this.items().find(i => i.id === id);
+    if (item && this.activeUploads.has(id)) {
+      this.activeUploads.get(id)!.unsubscribe();
+      this.activeUploads.delete(id);
+    }
+    this.items.update(prev => prev.filter(i => i.id !== id));
+  }
+
+  clearCompleted(): void {
+    this.items.update(prev => prev.filter(i => i.status !== 'completed'));
+  }
+
+  clearAll(): void {
+    for (const [id, sub] of this.activeUploads) {
+      sub.unsubscribe();
+    }
+    this.activeUploads.clear();
+    this.items.set([]);
+  }
+
+  private processQueue(): void {
+    const currentItems = this.items();
+    const activeCount = currentItems.filter(i => i.status === 'uploading').length;
+    const slotsAvailable = MAX_CONCURRENT - activeCount;
+
+    if (slotsAvailable <= 0) return;
+
+    const queued = currentItems.filter(i => i.status === 'queued');
+    const toStart = queued.slice(0, slotsAvailable);
+
+    for (const item of toStart) {
+      this.uploadFile(item);
+    }
+  }
+
+  private uploadFile(item: UploadItem): void {
+    this.updateItem(item.id, { status: 'uploading', progress: 0 });
+
+    const formData = new FormData();
+    formData.append('file', item.file);
+
+    const req = new HttpRequest(
+      'POST',
+      `${this.apiConfig.rootUrl}/api/v1/documents`,
+      formData,
+      { reportProgress: true },
+    );
+
+    const sub = this.http.request(req).subscribe({
+      next: event => {
+        if (event.type === HttpEventType.UploadProgress && event.total) {
+          const progress = Math.round((100 * event.loaded) / event.total);
+          this.updateItem(item.id, { progress });
+        } else if (event instanceof HttpResponse) {
+          const body = event.body as { jobId: string } | null;
+          if (body?.jobId) {
+            this.processingHub.registerManagedJob(body.jobId);
+            this.updateItem(item.id, {
+              status: 'processing',
+              progress: 100,
+              jobId: body.jobId,
+            });
+          } else {
+            this.updateItem(item.id, { status: 'completed', progress: 100 });
+
+          }
+          this.activeUploads.delete(item.id);
+          this.processQueue();
+        }
+      },
+      error: (err: HttpErrorResponse) => {
+        const errorMsg = err.status === 0
+          ? 'Network error'
+          : err.error?.message ?? err.statusText ?? 'Upload failed';
+        this.updateItem(item.id, { status: 'failed', error: errorMsg });
+        this.activeUploads.delete(item.id);
+        this.processQueue();
+      },
+    });
+
+    this.activeUploads.set(item.id, sub);
+  }
+
+  private handleJobStatusChanged(
+    jobId: string,
+    status: ProcessingJobStatus,
+    documentName: string | null,
+    error: string | null,
+  ): void {
+    const currentItems = this.items();
+    const item = currentItems.find(i => i.jobId === jobId);
+    if (!item) return;
+
+    if (status === 'Completed') {
+      this.updateItem(item.id, {
+        status: 'completed',
+        documentName: documentName ?? item.fileName,
+      });
+    } else if (status === 'Failed') {
+      this.updateItem(item.id, {
+        status: 'failed',
+        error: error ?? 'Processing failed',
+      });
+    }
+  }
+
+  private updateItem(id: string, changes: Partial<UploadItem>): void {
+    this.items.update(prev =>
+      prev.map(item => (item.id === id ? { ...item, ...changes } : item)),
+    );
+  }
+}

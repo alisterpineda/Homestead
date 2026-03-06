@@ -16,6 +16,7 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { ProfileDialogComponent } from '../../profile/profile.component';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
+import { ActivityPopoverComponent } from '../../activity-popover/activity-popover.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -40,6 +41,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     ProfileDialogComponent,
     AppSwitcherComponent,
     ThemeToggleComponent,
+    ActivityPopoverComponent,
   ],
   providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideEllipsisVertical, lucideCircleUserRound, lucideActivity })],
   template: `
@@ -179,6 +181,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
             @if (headerActions()) {
               <ng-container *ngTemplateOutlet="headerActions()!" />
             }
+            <app-activity-popover />
           </div>
         </header>
 
