@@ -177,6 +177,7 @@ export class GroupListComponent implements OnDestroy {
         this.router.navigate(['/admin/groups'], {
           queryParams: { page: 1, search: value || null },
           queryParamsHandling: 'merge',
+          replaceUrl: true,
         });
       });
   }

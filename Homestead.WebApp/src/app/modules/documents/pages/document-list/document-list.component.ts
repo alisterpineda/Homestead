@@ -577,6 +577,7 @@ export class DocumentListComponent implements OnDestroy {
       this.router.navigate(['/documents'], {
         queryParams: { page: 1, search: value || null },
         queryParamsHandling: 'merge',
+        replaceUrl: true,
       });
     });
   }

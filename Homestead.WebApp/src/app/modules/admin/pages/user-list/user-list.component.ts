@@ -258,6 +258,7 @@ export class UserListComponent implements OnDestroy {
         this.router.navigate(['/admin/users'], {
           queryParams: { page: 1, search: value || null },
           queryParamsHandling: 'merge',
+          replaceUrl: true,
         });
       });
   }
