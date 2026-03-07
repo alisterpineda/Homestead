@@ -19,7 +19,9 @@ public static class ProcessingServiceExtensions
 
         services.AddSingleton(Channel.CreateUnbounded<Guid>());
         services.AddScoped<IJobQueue, JobQueue>();
-        services.AddHostedService<JobProcessorService>();
+        services.AddSingleton<JobProcessorService>();
+        services.AddHostedService(sp => sp.GetRequiredService<JobProcessorService>());
+        services.AddSingleton<IJobProcessorControl>(sp => sp.GetRequiredService<JobProcessorService>());
 
         return services;
     }

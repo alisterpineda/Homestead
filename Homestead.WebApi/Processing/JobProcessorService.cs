@@ -8,9 +8,16 @@ namespace Homestead.WebApi.Processing;
 public class JobProcessorService(
     Channel<Guid> channel,
     IServiceScopeFactory scopeFactory,
-    ILogger<JobProcessorService> logger) : BackgroundService
+    ILogger<JobProcessorService> logger) : BackgroundService, IJobProcessorControl
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+    private readonly SemaphoreSlim _processingGate = new(1, 1);
+
+    public async Task<IAsyncDisposable> PauseAsync(CancellationToken ct = default)
+    {
+        await _processingGate.WaitAsync(ct);
+        return new PauseHandle(_processingGate);
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -67,6 +74,19 @@ public class JobProcessorService(
     }
 
     private async Task TryProcessJobAsync(Guid jobId, CancellationToken ct)
+    {
+        await _processingGate.WaitAsync(ct);
+        try
+        {
+            await ProcessJobCoreAsync(jobId, ct);
+        }
+        finally
+        {
+            _processingGate.Release();
+        }
+    }
+
+    private async Task ProcessJobCoreAsync(Guid jobId, CancellationToken ct)
     {
         try
         {
@@ -134,6 +154,18 @@ public class JobProcessorService(
             {
                 logger.LogError(innerEx, "Failed to mark job {JobId} as failed", jobId);
             }
+        }
+    }
+
+    private sealed class PauseHandle(SemaphoreSlim semaphore) : IAsyncDisposable
+    {
+        private int _disposed;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                semaphore.Release();
+            return ValueTask.CompletedTask;
         }
     }
 }

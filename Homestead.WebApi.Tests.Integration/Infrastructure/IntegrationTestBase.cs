@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -24,9 +25,25 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await using var conn = new NpgsqlConnection(_fixture.ConnectionString);
-        await conn.OpenAsync();
-        await _fixture.Respawner.ResetAsync(conn);
+        var control = Factory.Services.GetRequiredService<IJobProcessorControl>();
+        await using (await control.PauseAsync())
+        {
+            await using var conn = new NpgsqlConnection(_fixture.ConnectionString);
+            await conn.OpenAsync();
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    await _fixture.Respawner.ResetAsync(conn);
+                    break;
+                }
+                catch (PostgresException ex) when (ex.SqlState == "40P01" && attempt < 2)
+                {
+                    await Task.Delay(100);
+                }
+            }
+        }
 
         // Clean stored files to avoid duplicate-content errors across test classes
         var documentsDir = Path.Combine(Factory.MediaPath, "documents");
