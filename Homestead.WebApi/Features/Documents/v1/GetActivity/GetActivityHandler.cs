@@ -122,6 +122,16 @@ public class GetActivityHandler(AppDbContext db, IAuthorizationService authServi
                 _ => $"{userName} deleted a {entityType.ToLowerInvariant()}"
             },
             AuditAction.Updated => GenerateUpdatedSummary(entityType, changes, userName),
+            AuditAction.SoftDeleted => entityType switch
+            {
+                "Document" => $"{userName} moved this document to trash",
+                _ => $"{userName} deleted a {entityType.ToLowerInvariant()}"
+            },
+            AuditAction.Restored => entityType switch
+            {
+                "Document" => $"{userName} restored this document from trash",
+                _ => $"{userName} restored a {entityType.ToLowerInvariant()}"
+            },
             _ => $"{userName} modified this {entityType.ToLowerInvariant()}"
         };
     }

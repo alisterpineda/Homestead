@@ -265,11 +265,17 @@ import { toast } from 'ngx-sonner';
                 <span class="text-sm text-muted-foreground">
                   {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
                 </span>
-                @if (!allPageSelected()) {
-                  <button hlmBtn variant="link" size="sm" (click)="selectAllOnPage()">
-                    Select all
-                  </button>
-                }
+              } @else {
+                <span class="text-sm text-muted-foreground">Select items</span>
+              }
+
+              @if (!allPageSelected()) {
+                <button hlmBtn variant="link" size="sm" (click)="selectAllOnPage()">
+                  Select all
+                </button>
+              }
+
+              @if (hasSelection()) {
                 <div class="ml-auto flex items-center gap-2">
                   <hlm-alert-dialog>
                     <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
@@ -293,8 +299,6 @@ import { toast } from 'ngx-sonner';
                     </hlm-alert-dialog-content>
                   </hlm-alert-dialog>
                 </div>
-              } @else {
-                <span class="text-sm text-muted-foreground">Select items</span>
               }
             </div>
           </div>
