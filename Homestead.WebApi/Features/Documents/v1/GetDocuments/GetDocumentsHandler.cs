@@ -13,7 +13,17 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
     public async Task<PaginatedResponse<GetDocumentsResponse>> HandleAsync(
         GetDocumentsRequest request, CancellationToken ct)
     {
-        var query = accessService.FilterByAccess(db.Documents.AsNoTracking());
+        IQueryable<Domains.Documents.Document> query;
+
+        if (request.Deleted == true)
+        {
+            query = accessService.FilterByAccess(
+                db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.DeletedAt != null));
+        }
+        else
+        {
+            query = accessService.FilterByAccess(db.Documents.AsNoTracking());
+        }
 
         if (request.GroupId.HasValue)
         {
@@ -73,7 +83,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                  d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsq))));
         }
 
-        return await ApplySort(query, request.SortBy, request.SortDir, tsQueryString)
+        var defaultSort = request.Deleted == true ? DocumentSortBy.DeletedAt : (DocumentSortBy?)null;
+
+        return await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, tsQueryString)
             .Select(d => new
             {
                 d.Id,
@@ -92,6 +104,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
                 d.GroupId,
                 GroupName = d.Group != null ? d.Group.Name : null,
+                d.DeletedAt,
+                d.DeletedByUserId,
+                DeletedByUserName = d.DeletedByUser != null ? d.DeletedByUser.DisplayName : null,
                 VersionCount = d.Versions.Count,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
@@ -123,6 +138,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 OwnerUserName = d.OwnerUserName,
                 GroupId = d.GroupId,
                 GroupName = d.GroupName,
+                DeletedAt = d.DeletedAt,
+                DeletedByUserId = d.DeletedByUserId,
+                DeletedByUserName = d.DeletedByUserName,
                 VersionCount = d.VersionCount,
                 HasThumbnail = d.LatestVersion != null && ThumbnailService.CanGenerate(d.LatestVersion.ContentType),
                 Tags = d.Tags,
@@ -180,6 +198,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             (DocumentSortBy.DocumentDate, SortDirection.Desc) => query.OrderByDescending(d => d.DocumentDate),
             (DocumentSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(d => d.CreatedAt),
             (DocumentSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.CreatedAt),
+            (DocumentSortBy.DeletedAt, SortDirection.Asc) => query.OrderBy(d => d.DeletedAt),
+            (DocumentSortBy.DeletedAt, SortDirection.Desc) => query.OrderByDescending(d => d.DeletedAt),
             _ => query.OrderByDescending(d => d.CreatedAt),
         };
     }

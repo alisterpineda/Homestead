@@ -15,6 +15,10 @@ public class Document
     public DateOnly? ValidUntil { get; set; }
     public NpgsqlTsVector? SearchVector { get; set; }
 
+    public DateTimeOffset? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public AppUser? DeletedByUser { get; set; }
+
     public Guid? CreatedByUserId { get; set; }
     public Guid? OwnerUserId { get; set; }
     public AppUser? CreatedByUser { get; set; }

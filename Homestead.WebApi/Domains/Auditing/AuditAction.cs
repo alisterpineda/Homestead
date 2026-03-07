@@ -1,3 +1,3 @@
 namespace Homestead.WebApi.Domains.Auditing;
 
-public enum AuditAction { Created, Updated, Deleted }
+public enum AuditAction { Created, Updated, Deleted, SoftDeleted, Restored }

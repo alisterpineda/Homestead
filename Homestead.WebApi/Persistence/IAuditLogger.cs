@@ -11,4 +11,10 @@ public interface IAuditLogger
 
     void LogDeleted(string entityType, Guid entityId, Guid? userId, string? description = null,
         Guid? parentEntityId = null);
+
+    void LogSoftDeleted(string entityType, Guid entityId, Guid? userId, string? description = null,
+        Guid? parentEntityId = null);
+
+    void LogRestored(string entityType, Guid entityId, Guid? userId, string? description = null,
+        Guid? parentEntityId = null);
 }

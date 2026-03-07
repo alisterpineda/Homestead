@@ -20,4 +20,6 @@ public interface IDocumentQueryService
     /// are not writable by the current user. Admins bypass this check.
     /// </summary>
     Task EnsureAllDocumentsWritableAsync(IQueryable<Guid> relatedDocumentIds, CancellationToken ct);
+
+    IQueryable<Document> FilterByWriteAccess(IQueryable<Document> query);
 }

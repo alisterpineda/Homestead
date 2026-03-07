@@ -83,26 +83,28 @@ public class DocumentQueryService(
         IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
         => await EnsureAllDocumentsInSetAsync(WritableDocumentIds(), relatedDocumentIds, ct);
 
-    private IQueryable<Guid> WritableDocumentIds()
+    public IQueryable<Document> FilterByWriteAccess(IQueryable<Document> query)
     {
         var role = currentUser.Role;
         var userId = currentUser.UserId;
 
         if (role == AppRole.Admin)
-            return db.Documents.Select(d => d.Id);
+            return query;
 
         if (role != AppRole.Contributor || userId is null)
-            return db.Documents.Where(d => false).Select(d => d.Id);
+            return query.Where(d => false);
 
-        // Contributor: global docs + group-scoped docs where user is Owner/Editor
         var writableGroupIds = db.GroupMembers
             .Where(gm => gm.UserId == userId.Value
                 && (gm.AccessLevel == GroupAccessLevel.Owner || gm.AccessLevel == GroupAccessLevel.Editor))
             .Select(gm => gm.GroupId);
 
-        return db.Documents
-            .Where(d => d.GroupId == null || writableGroupIds.Contains(d.GroupId!.Value))
-            .Select(d => d.Id);
+        return query.Where(d => d.GroupId == null || writableGroupIds.Contains(d.GroupId!.Value));
+    }
+
+    private IQueryable<Guid> WritableDocumentIds()
+    {
+        return FilterByWriteAccess(db.Documents).Select(d => d.Id);
     }
 
     private async Task EnsureAllDocumentsInSetAsync(

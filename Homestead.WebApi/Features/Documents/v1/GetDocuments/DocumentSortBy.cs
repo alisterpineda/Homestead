@@ -6,5 +6,6 @@ public enum DocumentSortBy
     FileSize,
     ContentType,
     DocumentDate,
-    CreatedAt
+    CreatedAt,
+    DeletedAt
 }

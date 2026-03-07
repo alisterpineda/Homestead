@@ -82,6 +82,12 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly?>("DocumentDate")
                         .HasColumnType("date");
 
@@ -110,6 +116,10 @@ namespace Homestead.WebApi.Migrations
                         .IsDescending();
 
                     b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DeletedAt");
+
+                    b.HasIndex("DeletedByUserId");
 
                     b.HasIndex("GroupId");
 
@@ -705,6 +715,11 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "DeletedByUser")
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Homestead.WebApi.Domains.Groups.Group", "Group")
                         .WithMany()
                         .HasForeignKey("GroupId")
@@ -716,6 +731,8 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("DeletedByUser");
 
                     b.Navigation("Group");
 

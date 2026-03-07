@@ -43,6 +43,24 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
     public void LogDeleted(string entityType, Guid entityId, Guid? userId,
         string? description = null, Guid? parentEntityId = null)
     {
+        LogAction(AuditAction.Deleted, entityType, entityId, userId, description, parentEntityId);
+    }
+
+    public void LogSoftDeleted(string entityType, Guid entityId, Guid? userId,
+        string? description = null, Guid? parentEntityId = null)
+    {
+        LogAction(AuditAction.SoftDeleted, entityType, entityId, userId, description, parentEntityId);
+    }
+
+    public void LogRestored(string entityType, Guid entityId, Guid? userId,
+        string? description = null, Guid? parentEntityId = null)
+    {
+        LogAction(AuditAction.Restored, entityType, entityId, userId, description, parentEntityId);
+    }
+
+    private void LogAction(AuditAction action, string entityType, Guid entityId, Guid? userId,
+        string? description, Guid? parentEntityId)
+    {
         string? changes = null;
         if (description is not null)
         {
@@ -59,7 +77,7 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             EntityType = entityType,
             EntityId = entityId,
             ParentEntityId = parentEntityId,
-            Action = AuditAction.Deleted,
+            Action = action,
             Changes = changes,
             UserId = userId,
             Timestamp = DateTimeOffset.UtcNow

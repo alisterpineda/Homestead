@@ -23,6 +23,13 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.ValidFrom);
         builder.Property(d => d.ValidUntil);
 
+        builder.HasQueryFilter(d => d.DeletedAt == null);
+
+        builder.HasOne(d => d.DeletedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.DeletedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(d => d.CreatedByUser)
             .WithMany()
             .HasForeignKey(d => d.CreatedByUserId)
@@ -48,6 +55,8 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
 
         builder.HasIndex(d => d.CreatedAt)
             .IsDescending(true);
+
+        builder.HasIndex(d => d.DeletedAt);
 
         builder.HasIndex(d => d.CreatedByUserId);
         builder.HasIndex(d => d.OwnerUserId);

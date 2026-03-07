@@ -25,4 +25,7 @@ public record GetDocumentsRequest : PaginatedRequest
 
     [FromQuery(Name = "GroupId")]
     public Guid? GroupId { get; init; }
+
+    [FromQuery(Name = "Deleted")]
+    public bool? Deleted { get; init; }
 }

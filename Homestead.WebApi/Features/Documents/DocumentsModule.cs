@@ -27,6 +27,9 @@ using Homestead.WebApi.Features.Documents.v1.GetTags;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 using Homestead.WebApi.Features.Documents.v1.PatchTag;
 using Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
+using Homestead.WebApi.Features.Documents.v1.RestoreDocuments;
+using Homestead.WebApi.Features.Documents.v1.PermanentlyDeleteDocuments;
+using Homestead.WebApi.Features.Documents.v1.EmptyTrash;
 
 using Homestead.WebApi.Authentication;
 
@@ -46,11 +49,14 @@ public static class DocumentsModule
         BulkDeleteDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
         DeleteDocumentEndpoint.Map(v1);
+        EmptyTrashEndpoint.Map(v1);
         GetDocumentEndpoint.Map(v1);
         GetDocumentFileEndpoint.Map(v1);
         GetDocumentThumbnailEndpoint.Map(v1);
         GetDocumentsEndpoint.Map(v1);
         PatchDocumentEndpoint.Map(v1);
+        PermanentlyDeleteDocumentsEndpoint.Map(v1);
+        RestoreDocumentsEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);

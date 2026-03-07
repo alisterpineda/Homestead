@@ -17,6 +17,9 @@ public record GetDocumentsResponse
     public Guid? GroupId { get; init; }
     public string? GroupName { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? DeletedAt { get; init; }
+    public Guid? DeletedByUserId { get; init; }
+    public string? DeletedByUserName { get; init; }
     public int VersionCount { get; init; }
     public bool HasThumbnail { get; init; }
     public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
