@@ -11,4 +11,7 @@ export const documentsSidebar: SidebarGroup[] = [
       { label: 'Tags', path: '/documents/tags', icon: 'lucideTags' },
     ],
   },
+  {
+    items: [{ label: 'Trash', path: '/documents/trash', icon: 'lucideTrash2' }],
+  },
 ];

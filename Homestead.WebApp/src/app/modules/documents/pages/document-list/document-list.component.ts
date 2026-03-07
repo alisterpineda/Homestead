@@ -280,8 +280,8 @@ import { toast } from 'ngx-sonner';
                       <div hlmAlertDialogHeader>
                         <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
                         <p hlmAlertDialogDescription>
-                          This action cannot be undone. The selected document{{ selectionCount() > 1 ? 's' : '' }}
-                          and {{ selectionCount() > 1 ? 'their' : 'its' }} associated files will be permanently deleted.
+                          The selected document{{ selectionCount() > 1 ? 's' : '' }}
+                          will be moved to trash. You can restore {{ selectionCount() > 1 ? 'them' : 'it' }} later.
                         </p>
                       </div>
                       <div hlmAlertDialogFooter>
@@ -778,7 +778,7 @@ export class DocumentListComponent implements OnDestroy {
         this.deleting.set(false);
         ctx.close();
         const count = +response.body.deletedCount;
-        toast.success(`${count} document${count > 1 ? 's' : ''} deleted.`);
+        toast.success(`${count} document${count > 1 ? 's' : ''} moved to trash.`);
         this.clearSelection();
         this.onRefresh();
       },

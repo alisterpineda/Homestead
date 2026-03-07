@@ -8,6 +8,9 @@ export interface GetDocumentsResponse {
   createdAt?: string;
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
+  deletedAt?: (string | null);
+  deletedByUserId?: (string | null);
+  deletedByUserName?: (string | null);
   documentDate?: (string | null);
   fileExtension: string;
   fileSize: (number | string);
