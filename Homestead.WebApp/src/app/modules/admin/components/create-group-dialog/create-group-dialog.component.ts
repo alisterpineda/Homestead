@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { NgIcon, provideIcons } from '@ng-icons/core';
+import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
@@ -15,7 +15,7 @@ import { toast } from 'ngx-sonner';
 @Component({
   selector: 'app-create-group-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel],
+  imports: [HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel],
   providers: [provideIcons({ lucidePlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">

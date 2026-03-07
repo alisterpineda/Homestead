@@ -9,7 +9,6 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmTableImports } from '@/shared/components/spartan/table';
-import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
@@ -29,7 +28,7 @@ import { toast } from 'ngx-sonner';
   selector: 'app-group-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmSpinner, HlmButton, HlmTableImports, HlmBadge,
+    NgIcon, HlmIconImports, HlmSpinner, HlmButton, HlmTableImports,
     HlmAlertDialogImports, HlmSelectImports, BrnSelectImports,
     EditGroupSheetComponent, AddMemberDialogComponent,
   ],
