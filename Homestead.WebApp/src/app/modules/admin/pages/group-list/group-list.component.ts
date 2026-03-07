@@ -194,6 +194,7 @@ export class GroupListComponent implements OnDestroy {
     this.router.navigate(['/admin/groups'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

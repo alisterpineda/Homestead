@@ -211,6 +211,7 @@ export class JobListComponent {
     this.router.navigate(['/admin/jobs'], {
       queryParams: { page: 1, status: value || null },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -218,6 +219,7 @@ export class JobListComponent {
     this.router.navigate(['/admin/jobs'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -225,6 +227,7 @@ export class JobListComponent {
     this.router.navigate(['/admin/jobs'], {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

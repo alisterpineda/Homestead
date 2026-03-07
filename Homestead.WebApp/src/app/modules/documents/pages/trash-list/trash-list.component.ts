@@ -327,6 +327,7 @@ export class TrashListComponent {
     this.router.navigate(['/documents/trash'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -335,6 +336,7 @@ export class TrashListComponent {
     this.router.navigate(['/documents/trash'], {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

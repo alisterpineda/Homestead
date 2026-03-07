@@ -220,6 +220,7 @@ export class PartyListComponent {
     this.router.navigate(['/documents/parties'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -227,6 +228,7 @@ export class PartyListComponent {
     this.router.navigate(['/documents/parties'], {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

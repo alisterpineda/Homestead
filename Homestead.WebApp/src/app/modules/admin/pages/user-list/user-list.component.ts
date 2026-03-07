@@ -271,6 +271,7 @@ export class UserListComponent implements OnDestroy {
     this.router.navigate(['/admin/users'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -278,6 +279,7 @@ export class UserListComponent implements OnDestroy {
     this.router.navigate(['/admin/users'], {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

@@ -645,6 +645,7 @@ export class DocumentListComponent implements OnDestroy {
     this.router.navigate(['/documents'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -653,6 +654,7 @@ export class DocumentListComponent implements OnDestroy {
     this.router.navigate(['/documents'], {
       queryParams: { page: 1, pageSize: newSize },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -683,6 +685,7 @@ export class DocumentListComponent implements OnDestroy {
     this.router.navigate(['/documents'], {
       queryParams: { page: 1, partyIds: ids.length > 0 ? ids : null },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -695,6 +698,7 @@ export class DocumentListComponent implements OnDestroy {
     this.router.navigate(['/documents'], {
       queryParams: { page: 1, tagIds: ids.length > 0 ? ids : null },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -707,6 +711,7 @@ export class DocumentListComponent implements OnDestroy {
     this.router.navigate(['/documents'], {
       queryParams: { page: 1, includeChildTags: includeChildren || null },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
@@ -719,6 +724,7 @@ export class DocumentListComponent implements OnDestroy {
         sortDir: event?.sortDir ?? null,
       },
       queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
