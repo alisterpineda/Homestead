@@ -98,7 +98,7 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
                 <app-tag-badge
                   class="tag-card-badge max-w-full pointer-events-auto"
                   [path]="tag.path"
-                  [color]="tag.color"
+                  [color]="tag.effectiveColor"
                   [compact]="true"
                   [title]="tag.path"
                 />

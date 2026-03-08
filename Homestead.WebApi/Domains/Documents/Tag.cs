@@ -9,6 +9,7 @@ public class Tag
     public required string Path { get; set; }
     public Guid? ParentId { get; set; }
     public string? Color { get; set; }
+    public string? EffectiveColor { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public Guid? CreatedByUserId { get; set; }
 

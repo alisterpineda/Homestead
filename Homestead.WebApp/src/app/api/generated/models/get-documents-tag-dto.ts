@@ -3,6 +3,7 @@
 
 export interface GetDocumentsTagDto {
   color?: (string | null);
+  effectiveColor?: (string | null);
   id: string;
   name: string;
   path: string;

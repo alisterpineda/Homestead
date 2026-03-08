@@ -3,6 +3,7 @@
 
 export interface CreateTagResponse {
   color?: (string | null);
+  effectiveColor?: (string | null);
   id: string;
   name: string;
   parentId?: (string | null);

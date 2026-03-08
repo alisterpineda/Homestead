@@ -19,7 +19,8 @@ public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver,
             Name = tag.Name,
             Path = tag.Path,
             ParentId = tag.ParentId,
-            Color = tag.Color
+            Color = tag.Color,
+            EffectiveColor = tag.EffectiveColor
         };
     }
 }

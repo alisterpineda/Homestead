@@ -133,7 +133,8 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
                 Id = dt.Tag.Id,
                 Name = dt.Tag.Name,
                 Path = dt.Tag.Path,
-                Color = dt.Tag.Color
+                Color = dt.Tag.Color,
+                EffectiveColor = dt.Tag.EffectiveColor
             })
             .ToListAsync(ct);
 

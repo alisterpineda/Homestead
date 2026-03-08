@@ -330,5 +330,5 @@ public class TagVisibilityTests : IntegrationTestBase
         response.EnsureSuccessStatusCode();
     }
 
-    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color);
+    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor);
 }

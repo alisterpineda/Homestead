@@ -85,7 +85,7 @@ const NONE_VALUE = '__none__';
 
             <div>
               <span class="text-xs text-muted-foreground mr-2">Preview:</span>
-              <app-tag-badge [path]="previewPath()" [color]="editColor()" />
+              <app-tag-badge [path]="previewPath()" [color]="previewEffectiveColor()" />
             </div>
           </div>
         }
@@ -123,12 +123,22 @@ export class EditTagSheetComponent {
     );
   });
 
+  private selectedParent = computed(() => {
+    const parentId = this.editParentId();
+    if (!parentId) return null;
+    return this.allTags().find(t => t.id === parentId) ?? null;
+  });
+
+  previewEffectiveColor = computed(() => {
+    const ownColor = this.editColor();
+    if (ownColor) return ownColor;
+    return this.selectedParent()?.effectiveColor ?? null;
+  });
+
   previewPath = computed(() => {
     const name = this.editName();
     if (!name.trim()) return '';
-    const parentId = this.editParentId();
-    if (!parentId) return name;
-    const parent = this.allTags().find(t => t.id === parentId);
+    const parent = this.selectedParent();
     return parent ? parent.path + '/' + name : name;
   });
 

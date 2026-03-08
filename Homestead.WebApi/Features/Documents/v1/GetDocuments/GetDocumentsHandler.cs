@@ -113,7 +113,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                     Id = dt.Tag.Id,
                     Name = dt.Tag.Name,
                     Path = dt.Tag.Path,
-                    Color = dt.Tag.Color
+                    Color = dt.Tag.Color,
+                    EffectiveColor = dt.Tag.EffectiveColor
                 }).ToList(),
                 Parties = d.DocumentParties.Select(dp => new GetDocumentsPartyDto
                 {

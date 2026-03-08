@@ -44,8 +44,8 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                 </td>
                 <td hlmTd class="font-medium">{{ tag.name }}</td>
                 <td hlmTd class="w-8">
-                  @if (tag.color) {
-                    <span class="h-3 w-3 rounded-full inline-block" [style.background-color]="tag.color"></span>
+                  @if (tag.effectiveColor) {
+                    <span class="h-3 w-3 rounded-full inline-block" [style.background-color]="tag.effectiveColor"></span>
                   }
                 </td>
                 <td hlmTd class="hidden text-muted-foreground md:table-cell">{{ tag.path }}</td>

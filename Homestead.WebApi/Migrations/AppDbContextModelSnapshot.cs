@@ -263,6 +263,10 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("EffectiveColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)

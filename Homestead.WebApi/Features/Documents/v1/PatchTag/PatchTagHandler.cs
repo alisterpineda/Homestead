@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         var oldPath = tag.Path;
         var oldName = tag.Name;
         var oldParentId = tag.ParentId;
+        var oldEffectiveColor = tag.EffectiveColor;
 
         // Populate model from current DB state
         var model = new PatchTagModel
@@ -65,6 +67,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             throw new BadRequestException("A tag cannot be its own parent.");
 
         string? parentPath = null;
+        string? newParentEffectiveColor = null;
         if (model.ParentId is not null)
         {
             var parent = await db.Tags
@@ -78,6 +81,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
                 throw new BadRequestException("Cannot move a tag under one of its own descendants.");
 
             parentPath = parent.Path;
+            newParentEffectiveColor = parent.EffectiveColor;
         }
 
         // Update entity from patched model
@@ -88,6 +92,11 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         // Recompute path if name or parent changed
         var nameChanged = normalizedName != oldName;
         var parentChanged = model.ParentId != oldParentId;
+
+        tag.EffectiveColor = tag.Color ?? newParentEffectiveColor;
+        var effectiveColorChanged = tag.EffectiveColor != oldEffectiveColor;
+
+        List<Tag>? descendants = null;
 
         if (nameChanged || parentChanged)
         {
@@ -104,8 +113,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
             tag.Path = newPath;
 
-            // Bulk-update all descendant paths
-            var descendants = await db.Tags
+            // Bulk-update all descendant paths (and reuse for color cascade)
+            descendants = await db.Tags
                 .Where(t => t.Path.StartsWith(oldPath + "/"))
                 .ToListAsync(ct);
 
@@ -113,6 +122,15 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             {
                 descendant.Path = newPath + descendant.Path[oldPath.Length..];
             }
+        }
+
+        if (effectiveColorChanged)
+        {
+            descendants ??= await db.Tags
+                .Where(t => t.Path.StartsWith(tag.Path + "/"))
+                .ToListAsync(ct);
+
+            EffectiveColorResolver.Recompute(tag, newParentEffectiveColor, descendants);
         }
 
         await db.SaveChangesAsync(ct);
@@ -123,7 +141,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             Name = tag.Name,
             Path = tag.Path,
             ParentId = tag.ParentId,
-            Color = tag.Color
+            Color = tag.Color,
+            EffectiveColor = tag.EffectiveColor
         };
     }
 }

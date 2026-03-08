@@ -42,17 +42,22 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
             if (existingTags.TryGetValue(currentPath, out tag))
             {
                 if (isLeaf && leafColor is not null)
+                {
                     tag.Color = leafColor;
+                    tag.EffectiveColor = leafColor;
+                }
             }
             else
             {
+                var color = isLeaf ? leafColor : null;
                 tag = new Tag
                 {
                     Id = Guid.NewGuid(),
                     Name = segments[i],
                     Path = currentPath,
                     ParentId = parent?.Id,
-                    Color = isLeaf ? leafColor : null,
+                    Color = color,
+                    EffectiveColor = color ?? parent?.EffectiveColor,
                     CreatedAt = DateTimeOffset.UtcNow,
                     CreatedByUserId = createdByUserId
                 };

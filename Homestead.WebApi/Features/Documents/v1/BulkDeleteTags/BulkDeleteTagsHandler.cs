@@ -49,9 +49,23 @@ public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService access
                 .Where(t => t.ParentId == tag.Id && !deleteIds.Contains(t.Id))
                 .ToList();
 
+            // Resolve the new parent's EffectiveColor for reparented children
+            string? newParentEffectiveColor = null;
+            if (tag.ParentId is not null)
+            {
+                var grandparent = tags.FirstOrDefault(t => t.Id == tag.ParentId)
+                    ?? allDescendants.FirstOrDefault(t => t.Id == tag.ParentId);
+                if (grandparent is not null)
+                    newParentEffectiveColor = grandparent.EffectiveColor;
+                else
+                    newParentEffectiveColor = await db.Tags.Where(t => t.Id == tag.ParentId)
+                        .Select(t => t.EffectiveColor).FirstOrDefaultAsync(ct);
+            }
+
             foreach (var child in children)
             {
                 var oldChildPath = child.Path;
+                var oldChildPathPrefix = oldChildPath + "/";
                 child.ParentId = tag.ParentId;
 
                 if (tag.ParentId is null)
@@ -65,8 +79,17 @@ public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService access
                     child.Path = parentPath + child.Path[tag.Path.Length..];
                 }
 
-                // Update deeper descendants in memory
-                foreach (var desc in allDescendants.Where(d => d.Path.StartsWith(oldChildPath + "/")))
+                // Collect deeper descendants once for both color cascade and path updates
+                var deeperDescendants = allDescendants
+                    .Where(d => d.Path.StartsWith(oldChildPathPrefix))
+                    .ToList();
+
+                // Recompute EffectiveColor for the reparented child and its descendants
+                var colorDescendants = deeperDescendants.Where(d => !deleteIds.Contains(d.Id)).ToList();
+                Domains.Documents.EffectiveColorResolver.Recompute(child, newParentEffectiveColor, colorDescendants);
+
+                // Update deeper descendant paths in memory
+                foreach (var desc in deeperDescendants)
                     desc.Path = child.Path + desc.Path[oldChildPath.Length..];
             }
         }

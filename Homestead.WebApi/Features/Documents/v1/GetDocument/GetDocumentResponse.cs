@@ -42,6 +42,7 @@ public record GetDocumentTagDto
     public required string Name { get; init; }
     public required string Path { get; init; }
     public string? Color { get; init; }
+    public string? EffectiveColor { get; init; }
 }
 
 public record GetDocumentPartyDto

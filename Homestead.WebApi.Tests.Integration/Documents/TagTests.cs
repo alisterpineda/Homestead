@@ -263,5 +263,149 @@ public class TagTests : IntegrationTestBase
         Assert.Equal("DpA/DpC/DpE", tagE.Path);
     }
 
-    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color);
+    [Fact]
+    public async Task CreateTag_WithColor_SetsEffectiveColor()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "EcTest",
+            color = "#3b82f6"
+        }, CT);
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Equal("#3b82f6", body!.Color);
+        Assert.Equal("#3b82f6", body.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task CreateTag_ChildInheritsParentColor()
+    {
+        var client = await CreateAdminClientAsync();
+
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcParent", color = "#3b82f6" }, CT);
+
+        var childResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcParent/EcChild" }, CT);
+        childResp.EnsureSuccessStatusCode();
+        var child = await childResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        Assert.Null(child!.Color);
+        Assert.Equal("#3b82f6", child.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task CreateTag_DeepInheritance()
+    {
+        var client = await CreateAdminClientAsync();
+
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDeep", color = "#3b82f6" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDeep/Mid" }, CT);
+        var leafResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDeep/Mid/Leaf" }, CT);
+        leafResp.EnsureSuccessStatusCode();
+        var leaf = await leafResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        Assert.Null(leaf!.Color);
+        Assert.Equal("#3b82f6", leaf.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task PatchTag_ChangeColor_CascadesToDescendants()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var parentResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcCascade" }, CT);
+        var parent = await parentResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcCascade/Child" }, CT);
+
+        // Set parent color — should cascade to child
+        await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{parent!.Id}", new[]
+        {
+            new { op = "replace", path = "/color", value = (object)"#ef4444" }
+        });
+
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcCascade&IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var child = tags!.Single(t => t.Name == "Child");
+
+        Assert.Equal("#ef4444", child.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task PatchTag_ClearColor_DescendantInheritsGrandparent()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var gpResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcGp", color = "#3b82f6" }, CT);
+        var gp = await gpResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        var pResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcGp/EcMid", color = "#ef4444" }, CT);
+        var p = await pResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcGp/EcMid/EcLeaf" }, CT);
+
+        // Clear mid's color — leaf should now inherit grandparent's color
+        await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{p!.Id}", new[]
+        {
+            new { op = "replace", path = "/color", value = (object?)null! }
+        });
+
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcGp&IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var leaf = tags!.Single(t => t.Name == "EcLeaf");
+        var mid = tags.Single(t => t.Name == "EcMid");
+
+        Assert.Equal("#3b82f6", mid.EffectiveColor);
+        Assert.Equal("#3b82f6", leaf.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task PatchTag_ChangeParent_UpdatesEffectiveColor()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var blueResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcBlue", color = "#3b82f6" }, CT);
+        var blue = await blueResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        var redResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcRed", color = "#ef4444" }, CT);
+        var red = await redResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        // Create child under blue
+        var childResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcBlue/Movable" }, CT);
+        var child = await childResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Equal("#3b82f6", child!.EffectiveColor);
+
+        // Move child under red
+        var patchResp = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{child.Id}", new[]
+        {
+            new { op = "replace", path = "/parentId", value = (object)red!.Id.ToString() }
+        });
+        var updated = await patchResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        Assert.Equal("#ef4444", updated!.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task BulkDeleteTag_Reparent_UpdatesEffectiveColor()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Create grandparent (blue) / parent (red) / child (no color)
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDel", color = "#3b82f6" }, CT);
+        var parentResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDel/EcDelMid", color = "#ef4444" }, CT);
+        var parent = await parentResp.Content.ReadFromJsonAsync<TagResult>(CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "EcDel/EcDelMid/EcDelLeaf" }, CT);
+
+        // Delete mid — leaf reparents to grandparent, should inherit blue
+        await client.PostAsJsonAsync("/api/v1/documents/tags/bulk-delete", new
+        {
+            ids = new[] { parent!.Id }
+        }, CT);
+
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcDel&IncludeChildren=false", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var leaf = tags!.Single(t => t.Name == "EcDelLeaf");
+
+        Assert.Equal("#3b82f6", leaf.EffectiveColor);
+    }
+
+    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor);
 }

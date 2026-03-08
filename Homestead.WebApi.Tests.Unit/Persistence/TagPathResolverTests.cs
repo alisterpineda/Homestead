@@ -146,7 +146,9 @@ public class TagPathResolverTests : IDisposable
 
         var parent = await _db.Tags.SingleAsync(t => t.Path == "legal", ct);
         Assert.Null(parent.Color);
+        Assert.Null(parent.EffectiveColor);
         Assert.Equal("#ff0000", leaf.Color);
+        Assert.Equal("#ff0000", leaf.EffectiveColor);
     }
 
     [Fact]
@@ -161,6 +163,7 @@ public class TagPathResolverTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         Assert.Equal("#00ff00", updated.Color);
+        Assert.Equal("#00ff00", updated.EffectiveColor);
         Assert.Single(_db.Tags);
     }
 
@@ -176,6 +179,81 @@ public class TagPathResolverTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         Assert.Equal("#ff0000", tag.Color);
+        Assert.Equal("#ff0000", tag.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task RootTag_WithColor_EffectiveColorEqualsColor()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tag = await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal("#3b82f6", tag.Color);
+        Assert.Equal("#3b82f6", tag.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task RootTag_WithoutColor_EffectiveColorIsNull()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tag = await _sut.ResolveOrCreateAsync("finance", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Null(tag.Color);
+        Assert.Null(tag.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task ChildTag_InheritsParentColor()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var child = await _sut.ResolveOrCreateAsync("finance/invoices", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Null(child.Color);
+        Assert.Equal("#3b82f6", child.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task DeepInheritance_SkippingIntermediate()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        // Create intermediate and grandchild — neither has own color
+        var grandchild = await _sut.ResolveOrCreateAsync("finance/invoices/2024", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var intermediate = await _db.Tags.SingleAsync(t => t.Path == "finance/invoices", ct);
+
+        Assert.Null(intermediate.Color);
+        Assert.Equal("#3b82f6", intermediate.EffectiveColor);
+        Assert.Null(grandchild.Color);
+        Assert.Equal("#3b82f6", grandchild.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task ChildTag_WithOwnColor_IgnoresParent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var child = await _sut.ResolveOrCreateAsync("finance/invoices", leafColor: "#ef4444", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal("#ef4444", child.Color);
+        Assert.Equal("#ef4444", child.EffectiveColor);
     }
 
     [Fact]

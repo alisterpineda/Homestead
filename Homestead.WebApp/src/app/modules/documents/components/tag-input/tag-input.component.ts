@@ -51,7 +51,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
           @for (suggestion of filteredSuggestions(); track suggestion.id; let i = $index) {
             <button
               type="button"
-              (click)="addTag(suggestion.path, suggestion.color)"
+              (click)="addTag(suggestion.path, suggestion.effectiveColor)"
               [class]="
                 'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer flex items-center gap-2 ' +
                 (i === selectedIndex()
@@ -61,8 +61,8 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                 (i === filteredSuggestions().length - 1 ? ' rounded-b-md' : '')
               "
             >
-              @if (suggestion.color) {
-                <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="suggestion.color"></span>
+              @if (suggestion.effectiveColor) {
+                <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="suggestion.effectiveColor"></span>
               }
               {{ suggestion.path }}
             </button>
@@ -171,7 +171,7 @@ export class TagInputComponent {
       event.preventDefault();
       if (this.showSuggestions() && filtered.length > 0 && filtered[this.selectedIndex()]) {
         const suggestion = filtered[this.selectedIndex()];
-        this.addTag(suggestion.path, suggestion.color);
+        this.addTag(suggestion.path, suggestion.effectiveColor);
       } else if (this.searchText().trim()) {
         this.addTag(this.searchText());
       }

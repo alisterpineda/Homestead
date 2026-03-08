@@ -7,4 +7,5 @@ public record GetTagsResponse
     public required string Path { get; init; }
     public Guid? ParentId { get; init; }
     public string? Color { get; init; }
+    public string? EffectiveColor { get; init; }
 }
