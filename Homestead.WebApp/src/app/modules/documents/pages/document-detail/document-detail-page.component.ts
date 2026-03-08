@@ -14,9 +14,9 @@ import {
 import { Location, NgTemplateOutlet } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
-import { ActivatedRoute, Router } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, forkJoin, Subscription } from 'rxjs';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
@@ -27,6 +27,9 @@ import {
   lucideEllipsisVertical,
   lucideFilePlus2,
   lucideChevronDown,
+  lucideChevronLeft,
+  lucideChevronRight,
+  lucideX,
   lucideMessageSquare,
   lucideHistory,
   lucideSend,
@@ -73,6 +76,7 @@ import type { GetActivityResponse } from '@/api/generated/models/get-activity-re
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
+import { OpenDocumentsService } from '../../services/open-documents.service';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -113,6 +117,9 @@ import { toast } from 'ngx-sonner';
       lucideEllipsisVertical,
       lucideFilePlus2,
       lucideChevronDown,
+      lucideChevronLeft,
+      lucideChevronRight,
+      lucideX,
       lucideMessageSquare,
       lucideHistory,
       lucideSend,
@@ -173,11 +180,20 @@ import { toast } from 'ngx-sonner';
 
     @if (document(); as doc) {
       <div class="flex items-center gap-2 mb-4">
-        <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
-          <ng-icon hlm name="lucideDownload" size="sm" />
-          Download
+        <button hlmBtn size="icon-sm" variant="ghost" (click)="handleClose()" aria-label="Close document">
+          <ng-icon hlm name="lucideX" size="sm" />
+        </button>
+        <button hlmBtn size="icon-sm" variant="outline" (click)="navigatePrev()" [disabled]="!canNavigatePrev()" aria-label="Previous document">
+          <ng-icon hlm name="lucideChevronLeft" size="sm" />
+        </button>
+        <button hlmBtn size="icon-sm" variant="outline" (click)="navigateNext()" [disabled]="!canNavigateNext()" aria-label="Next document">
+          <ng-icon hlm name="lucideChevronRight" size="sm" />
         </button>
         <div class="ml-auto flex items-center gap-2">
+          <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
+            <ng-icon hlm name="lucideDownload" size="sm" />
+            Download
+          </button>
           @if (auth.canWrite()) {
             <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="moreMenu">
               <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
@@ -586,6 +602,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   formatBytes = formatBytes;
 
   private sidebarService = inject(HlmSidebarService);
+  private openDocumentsService = inject(OpenDocumentsService);
   isMobile = this.sidebarService.isMobile;
 
   private http = inject(HttpClient);
@@ -603,6 +620,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.route.paramMap.pipe(map((p) => p.get('id'))),
     { initialValue: null },
   );
+
+  canNavigatePrev = computed(() => {
+    const id = this.documentId();
+    return id ? this.openDocumentsService.getPrevDocumentId(id) !== null : false;
+  });
+
+  canNavigateNext = computed(() => {
+    const id = this.documentId();
+    return id ? this.openDocumentsService.getNextDocumentId(id) !== null : false;
+  });
 
   private versionId = signal<string | null>(this.route.snapshot.paramMap.get('versionId'));
 
@@ -776,6 +803,14 @@ export class DocumentDetailPageComponent implements OnDestroy {
       }
     });
 
+    // Register document as "open" in sidebar
+    effect(() => {
+      const doc = this.document();
+      if (doc) {
+        untracked(() => this.openDocumentsService.addDocument(doc.id, doc.name));
+      }
+    });
+
     effect(() => {
       const ver = this.activeVersion();
       if (ver) {
@@ -852,6 +887,17 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
 
     afterNextRender(() => {
+      const tpl = this.headerTitleRef();
+      if (tpl) {
+        this.pageHeaderService.setTitle(tpl);
+      }
+    });
+
+    // Re-register header title after in-component navigations (NavigationStart clears it)
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      takeUntilDestroyed(),
+    ).subscribe(() => {
       const tpl = this.headerTitleRef();
       if (tpl) {
         this.pageHeaderService.setTitle(tpl);
@@ -942,6 +988,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.deleting.set(true);
     deleteDocument(this.http, this.apiConfig.rootUrl, { id }).subscribe({
       next: () => {
+        this.openDocumentsService.removeDocument(id);
         toast.success('Document deleted.');
         this.router.navigate(['/documents']);
       },
@@ -950,6 +997,24 @@ export class DocumentDetailPageComponent implements OnDestroy {
         toast.error('Failed to delete document.');
       },
     });
+  }
+
+  handleClose(): void {
+    this.router.navigate(['/documents']);
+  }
+
+  navigatePrev(): void {
+    const id = this.documentId();
+    if (!id) return;
+    const prevId = this.openDocumentsService.getPrevDocumentId(id);
+    if (prevId) this.router.navigate(['/documents', prevId]);
+  }
+
+  navigateNext(): void {
+    const id = this.documentId();
+    if (!id) return;
+    const nextId = this.openDocumentsService.getNextDocumentId(id);
+    if (nextId) this.router.navigate(['/documents', nextId]);
   }
 
   handleReprocess(): void {

@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound } from '@ng-icons/lucide';
+import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
@@ -21,6 +21,7 @@ import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { getModuleByPath, modules } from '@/modules/registry';
 import type { SidebarItem } from '@/shared/types/modules';
+import { OpenDocumentsService } from '@/modules/documents/services/open-documents.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 @Component({
@@ -41,7 +42,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound })],
+  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX })],
   template: `
     <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
@@ -89,6 +90,34 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                   </ul>
                 </div>
               </div>
+              @if ($first && showOpenDocuments()) {
+                <div hlmSidebarGroup>
+                  <div hlmSidebarGroupLabel class="justify-between">
+                    <span>Open <span class="text-muted-foreground">({{ openDocumentsService.openDocuments().length }})</span></span>
+                    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors" (click)="clearAllOpenDocuments()">Clear all</button>
+                  </div>
+                  <div hlmSidebarGroupContent>
+                    <ul hlmSidebarMenu>
+                      @for (doc of openDocumentsService.openDocuments(); track doc.id) {
+                        <li hlmSidebarMenuItem class="group/menu-item">
+                          <a
+                            hlmSidebarMenuButton
+                            size="sm"
+                            [routerLink]="'/documents/' + doc.id"
+                            [isActive]="isOpenDocActive(doc.id)"
+                          >
+                            <ng-icon hlm name="lucideFileText" size="sm" />
+                            <span>{{ doc.name }}</span>
+                          </a>
+                          <button hlmSidebarMenuAction [showOnHover]="true" (click)="closeOpenDocument($event, doc.id)" aria-label="Close document">
+                            <ng-icon hlm name="lucideX" />
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              }
             }
           }
         </div>
@@ -196,6 +225,7 @@ export class AppShellComponent {
   private processingHub = inject(ProcessingHubService);
   private sidebarService = inject(HlmSidebarService);
   private pageHeaderService = inject(PageHeaderService);
+  protected openDocumentsService = inject(OpenDocumentsService);
 
   headerActions = this.pageHeaderService.actions;
   headerTitle = this.pageHeaderService.title;
@@ -221,6 +251,7 @@ export class AppShellComponent {
   );
 
   activeModule = computed(() => getModuleByPath(this.url()));
+  showOpenDocuments = computed(() => this.activeModule()?.id === 'documents' && this.openDocumentsService.openDocuments().length > 0);
 
   pageTitle = toSignal(
     this.router.events.pipe(
@@ -273,5 +304,19 @@ export class AppShellComponent {
       );
     }
     return false;
+  }
+
+  isOpenDocActive(docId: string): boolean {
+    const urlPath = this.router.url.split('?')[0];
+    return urlPath === `/documents/${docId}` || urlPath.startsWith(`/documents/${docId}/`);
+  }
+
+  closeOpenDocument(event: Event, docId: string): void {
+    event.stopPropagation();
+    this.openDocumentsService.removeDocument(docId);
+  }
+
+  clearAllOpenDocuments(): void {
+    this.openDocumentsService.clearAll();
   }
 }

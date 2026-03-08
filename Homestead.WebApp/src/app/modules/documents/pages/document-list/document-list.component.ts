@@ -25,6 +25,7 @@ import { PaginationComponent } from '../../components/pagination/pagination.comp
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { handleFileInputChange } from '@/shared/utils';
 import { DocumentListStateService } from '../../services/document-list-state.service';
+import { OpenDocumentsService } from '../../services/open-documents.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
@@ -366,6 +367,7 @@ export class DocumentListComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
   private listState = inject(DocumentListStateService);
+  private openDocumentsService = inject(OpenDocumentsService);
   private uploadManager = inject(UploadManagerService);
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
@@ -669,6 +671,10 @@ export class DocumentListComponent implements OnDestroy {
   }
 
   onDocumentSelect(id: string): void {
+    const items = this.data()?.items;
+    if (items) {
+      this.openDocumentsService.setNavigationList(items.map(d => d.id));
+    }
     this.router.navigate(['/documents', id]);
   }
 
