@@ -315,7 +315,7 @@ import { toast } from 'ngx-sonner';
                 Reset filters
               </button>
           </section>
-          <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-px" [class.hidden]="!hasItems()">
+          <div class="flex min-h-0 flex-1 flex-col sm:overflow-y-auto p-px" [class.hidden]="!hasItems()">
               @if (viewMode() === 'table') {
                 <app-document-table
                   [documents]="result.items"
