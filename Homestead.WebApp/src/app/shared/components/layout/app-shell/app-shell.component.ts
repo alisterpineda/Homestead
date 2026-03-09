@@ -4,7 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX } from '@ng-icons/lucide';
+import { lucideSettings, lucideFileText, lucideFiles, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import {
   HlmSidebarImports,
@@ -42,7 +42,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX })],
+  providers: [provideIcons({ lucideSettings, lucideFileText, lucideFiles, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX })],
   template: `
     <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
@@ -94,7 +94,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                 <div hlmSidebarGroup>
                   <div hlmSidebarGroupLabel class="justify-between">
                     <span>Open <span class="text-muted-foreground">({{ openDocumentsService.openDocuments().length }})</span></span>
-                    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors" (click)="clearAllOpenDocuments()">Clear all</button>
+                    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors" (click)="clearAllOpenDocuments()">Close all</button>
                   </div>
                   <div hlmSidebarGroupContent>
                     <ul hlmSidebarMenu>

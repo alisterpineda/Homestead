@@ -174,7 +174,7 @@ import { toast } from 'ngx-sonner';
       </nav>
     </ng-template>
 
-    @if (loading()) {
+    @if (loading() && !document()) {
       <div class="flex h-full items-center justify-center">
         <hlm-spinner />
       </div>
@@ -832,13 +832,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
       const id = this.documentId();
       const verId = this.versionId();
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      this.refreshTrigger(); // track refresh trigger
+      this.refreshTrigger(); // track refresh trigger (reprocessing, version upload)
 
-      // untracked: revokeCurrentBlobUrl reads fileBlobUrl — must not become a dependency
-      untracked(() => {
-        this.fileSub?.unsubscribe();
-        this.revokeCurrentBlobUrl();
-      });
+      this.fileSub?.unsubscribe();
 
       if (!id) return;
 
@@ -853,7 +849,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           map((blob) => URL.createObjectURL(blob)),
           catchError(() => of(null)),
         )
-        .subscribe((blobUrl) => this.fileBlobUrl.set(blobUrl));
+        .subscribe((blobUrl) => this.swapBlobUrl(blobUrl));
     });
 
     // Load version detail when viewing a specific version
@@ -916,7 +912,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.fileSub?.unsubscribe();
     this.versionDetailSub?.unsubscribe();
-    this.revokeCurrentBlobUrl();
+    this.swapBlobUrl(null);
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
   }
@@ -956,12 +952,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.location.go(path);
   }
 
-  private revokeCurrentBlobUrl(): void {
-    const url = this.fileBlobUrl();
-    if (url) {
-      URL.revokeObjectURL(url);
-      this.fileBlobUrl.set(null);
-    }
+  private swapBlobUrl(newUrl: string | null): void {
+    const oldUrl = this.fileBlobUrl();
+    this.fileBlobUrl.set(newUrl);
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
   }
 
   formatDate(dateStr: string): string {
