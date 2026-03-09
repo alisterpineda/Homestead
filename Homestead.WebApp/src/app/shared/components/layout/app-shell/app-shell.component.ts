@@ -313,10 +313,17 @@ export class AppShellComponent {
 
   closeOpenDocument(event: Event, docId: string): void {
     event.stopPropagation();
+    const isActive = this.isOpenDocActive(docId);
     this.openDocumentsService.removeDocument(docId);
+    if (isActive) {
+      this.router.navigate(['/documents']);
+    }
   }
 
   clearAllOpenDocuments(): void {
     this.openDocumentsService.clearAll();
+    if (this.router.url.split('?')[0].startsWith('/documents/')) {
+      this.router.navigate(['/documents']);
+    }
   }
 }
