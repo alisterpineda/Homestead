@@ -1,15 +1,12 @@
 import { Component, ChangeDetectionStrategy, inject, computed, viewChild } from '@angular/core';
 import { Router, RouterOutlet, NavigationEnd, NavigationStart, ActivatedRoute } from '@angular/router';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSettings, lucideFileText, lucideFiles, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX } from '@ng-icons/lucide';
+import { lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import {
-  HlmSidebarImports,
-  HlmSidebarService,
-} from '@/shared/components/spartan/sidebar';
+import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
 import { HlmAlertDialog, HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -19,18 +16,14 @@ import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/the
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
-import { getModuleByPath, modules } from '@/modules/registry';
-import type { SidebarItem } from '@/shared/types/modules';
-import { OpenDocumentsService } from '@/modules/documents/services/open-documents.service';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { getModuleByPath } from '@/modules/registry';
 
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterOutlet,
-    RouterLink,
-    RouterLinkActive,
+    NgComponentOutlet,
     NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
@@ -42,7 +35,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     AppSwitcherComponent,
     ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideSettings, lucideFileText, lucideFiles, lucideLogOut, lucideUsers, lucideUsers2, lucideLayoutDashboard, lucideTags, lucideTrash2, lucideEllipsisVertical, lucideCircleUserRound, lucideX })],
+  providers: [provideIcons({ lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound })],
   template: `
     <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
@@ -63,62 +56,8 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 
         <!-- Sidebar Content -->
         <div hlmSidebarContent>
-          @if (activeModule()) {
-            @for (group of activeModule()!.sidebar; track group.label ?? $index) {
-              <div hlmSidebarGroup>
-                @if (group.label) {
-                  <div hlmSidebarGroupLabel>{{ group.label }}</div>
-                }
-                <div hlmSidebarGroupContent>
-                  <ul hlmSidebarMenu>
-                    @for (item of group.items; track item.path) {
-                      <li hlmSidebarMenuItem>
-                        <a
-                          hlmSidebarMenuButton
-                          [routerLink]="item.path"
-                          routerLinkActive="true"
-                          [routerLinkActiveOptions]="{ exact: true }"
-                          [isActive]="isItemActive(item)"
-                        >
-                          @if (item.icon) {
-                            <ng-icon hlm [name]="item.icon" size="sm" />
-                          }
-                          <span>{{ item.label }}</span>
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                </div>
-              </div>
-              @if ($first && showOpenDocuments()) {
-                <div hlmSidebarGroup>
-                  <div hlmSidebarGroupLabel class="justify-between">
-                    <span>Open <span class="text-muted-foreground">({{ openDocumentsService.openDocuments().length }})</span></span>
-                    <button class="text-xs text-muted-foreground hover:text-foreground transition-colors" (click)="clearAllOpenDocuments()">Close all</button>
-                  </div>
-                  <div hlmSidebarGroupContent>
-                    <ul hlmSidebarMenu>
-                      @for (doc of openDocumentsService.openDocuments(); track doc.id) {
-                        <li hlmSidebarMenuItem class="group/menu-item">
-                          <a
-                            hlmSidebarMenuButton
-                            size="sm"
-                            [routerLink]="'/documents/' + doc.id"
-                            [isActive]="isOpenDocActive(doc.id)"
-                          >
-                            <ng-icon hlm name="lucideFileText" size="sm" />
-                            <span>{{ doc.name }}</span>
-                          </a>
-                          <button hlmSidebarMenuAction [showOnHover]="true" (click)="closeOpenDocument($event, doc.id)" aria-label="Close document">
-                            <ng-icon hlm name="lucideX" />
-                          </button>
-                        </li>
-                      }
-                    </ul>
-                  </div>
-                </div>
-              }
-            }
+          @if (activeModule()?.sidebarComponent) {
+            <ng-container *ngComponentOutlet="activeModule()!.sidebarComponent" />
           }
         </div>
 
@@ -223,9 +162,7 @@ export class AppShellComponent {
   private router = inject(Router);
   private activatedRoute = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
-  private sidebarService = inject(HlmSidebarService);
   private pageHeaderService = inject(PageHeaderService);
-  protected openDocumentsService = inject(OpenDocumentsService);
 
   headerActions = this.pageHeaderService.actions;
   headerTitle = this.pageHeaderService.title;
@@ -251,7 +188,6 @@ export class AppShellComponent {
   );
 
   activeModule = computed(() => getModuleByPath(this.url()));
-  showOpenDocuments = computed(() => this.activeModule()?.id === 'documents' && this.openDocumentsService.openDocuments().length > 0);
 
   pageTitle = toSignal(
     this.router.events.pipe(
@@ -289,41 +225,5 @@ export class AppShellComponent {
   protected async onLogout(ctx: { close: () => void }): Promise<void> {
     ctx.close();
     await this.auth.logout();
-  }
-
-  isItemActive(item: SidebarItem): boolean {
-    const urlPath = this.router.url.split('?')[0];
-    if (urlPath === item.path) return true;
-    if (urlPath.startsWith(item.path + '/')) {
-      const module = this.activeModule();
-      if (!module) return true;
-      // Check if a more specific sidebar item matches
-      const allItems = module.sidebar.flatMap((g) => g.items);
-      return !allItems.some(
-        (other) => other.path !== item.path && urlPath.startsWith(other.path),
-      );
-    }
-    return false;
-  }
-
-  isOpenDocActive(docId: string): boolean {
-    const urlPath = this.router.url.split('?')[0];
-    return urlPath === `/documents/${docId}` || urlPath.startsWith(`/documents/${docId}/`);
-  }
-
-  closeOpenDocument(event: Event, docId: string): void {
-    event.stopPropagation();
-    const isActive = this.isOpenDocActive(docId);
-    this.openDocumentsService.removeDocument(docId);
-    if (isActive) {
-      this.router.navigate(['/documents']);
-    }
-  }
-
-  clearAllOpenDocuments(): void {
-    this.openDocumentsService.clearAll();
-    if (this.router.url.split('?')[0].startsWith('/documents/')) {
-      this.router.navigate(['/documents']);
-    }
   }
 }

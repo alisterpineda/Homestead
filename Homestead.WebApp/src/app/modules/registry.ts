@@ -1,6 +1,6 @@
 import type { ModuleDefinition } from '@/shared/types/modules';
-import { adminSidebar } from './admin/sidebar';
-import { documentsSidebar } from './documents/sidebar';
+import { AdminSidebarComponent } from './admin/components/admin-sidebar/admin-sidebar.component';
+import { DocumentsSidebarComponent } from './documents/components/documents-sidebar/documents-sidebar.component';
 
 export const modules: ModuleDefinition[] = [
   {
@@ -9,7 +9,7 @@ export const modules: ModuleDefinition[] = [
     labelColor: 'slate',
     icon: 'lucideSettings',
     basePath: '/admin',
-    sidebar: adminSidebar,
+    sidebarComponent: AdminSidebarComponent,
     requiredRole: 'Admin',
   },
   {
@@ -18,7 +18,7 @@ export const modules: ModuleDefinition[] = [
     labelColor: 'indigo',
     icon: 'lucideFileText',
     basePath: '/documents',
-    sidebar: documentsSidebar,
+    sidebarComponent: DocumentsSidebarComponent,
   },
 ];
 

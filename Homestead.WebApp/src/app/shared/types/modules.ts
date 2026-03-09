@@ -1,13 +1,4 @@
-export interface SidebarItem {
-  label: string;
-  path: string;
-  icon?: string;
-}
-
-export interface SidebarGroup {
-  label?: string;
-  items: SidebarItem[];
-}
+import { Type } from '@angular/core';
 
 export interface ModuleDefinition {
   id: string;
@@ -15,6 +6,6 @@ export interface ModuleDefinition {
   labelColor: string;
   icon: string;
   basePath: string;
-  sidebar: SidebarGroup[];
+  sidebarComponent: Type<unknown>;
   requiredRole?: string;
 }
