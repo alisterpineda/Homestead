@@ -44,3 +44,34 @@ When backend endpoints are added or modified, regenerate the frontend API client
    ```
    This runs ng-openapi-gen, which reads the generated spec and outputs Angular services and TypeScript models to `src/app/api/generated/`.
 3. **Update frontend code** to use the new/modified generated services and models.
+
+## Test Projects
+
+| Project | Framework | Description |
+|---|---|---|
+| `Homestead.WebApi.Tests.Unit/` | xUnit v3 + NSubstitute + EF InMemory | Backend unit tests |
+| `Homestead.WebApi.Tests.Integration/` | xUnit v3 + WebApplicationFactory + Testcontainers (PostgreSQL) + Respawn | Backend integration tests (requires Docker) |
+| `Homestead.WebApp/` (ng test) | Angular unit-test builder (Vitest) | Frontend unit tests (`*.spec.ts` files) |
+| `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests across auth configurations (requires Docker) |
+
+### Running Tests
+
+**Backend unit tests:**
+```bash
+dotnet test --project Homestead.WebApi.Tests.Unit/Homestead.WebApi.Tests.Unit.csproj
+```
+
+**Backend integration tests** (requires Docker for Testcontainers):
+```bash
+dotnet test --project Homestead.WebApi.Tests.Integration/Homestead.WebApi.Tests.Integration.csproj
+```
+
+**Frontend unit tests:**
+```bash
+cd Homestead.WebApp && npm test
+```
+
+**E2E tests** (requires Docker — spins up full stack via Testcontainers):
+```bash
+cd Homestead.E2E && npm run e2e
+```
