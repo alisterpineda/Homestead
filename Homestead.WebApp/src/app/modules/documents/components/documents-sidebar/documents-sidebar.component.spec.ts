@@ -39,9 +39,8 @@ describe('DocumentsSidebarComponent', () => {
       getState: vi.fn(() => null),
       clearState: vi.fn(),
       clearAll: vi.fn(),
+      discardChanges: vi.fn(),
       setActiveHasChanges: vi.fn(),
-      hasUnsavedChanges: vi.fn(() => false),
-      hasAnyUnsavedChanges: vi.fn(() => false),
       unsavedDocIds: computed(() => new Set<string>()),
     };
 
@@ -178,8 +177,7 @@ describe('DocumentsSidebarComponent', () => {
       component.onCloseDocument(event, 'doc-1');
 
       expect(event.stopPropagation).toHaveBeenCalled();
-      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-1');
-      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
+      expect(mockEditStateService.discardChanges).toHaveBeenCalledWith('doc-1');
       expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
     });
 
@@ -204,7 +202,12 @@ describe('DocumentsSidebarComponent', () => {
     });
 
     it('should not close directly when document has unsaved changes', async () => {
-      (mockEditStateService.hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      const unsavedIds = signal(new Set(['doc-1']));
+      (mockEditStateService as Record<string, unknown>)['unsavedDocIds'] = computed(() => unsavedIds());
+      // Recreate component to pick up new mock
+      fixture = TestBed.createComponent(DocumentsSidebarComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
       await router.navigateByUrl('/documents');
 
       component.onCloseDocument(new Event('click'), 'doc-1');
@@ -216,18 +219,21 @@ describe('DocumentsSidebarComponent', () => {
 
   describe('confirmCloseDocument', () => {
     it('should close the pending document and clear state', async () => {
+      const unsavedIds = signal(new Set(['doc-1']));
+      (mockEditStateService as Record<string, unknown>)['unsavedDocIds'] = computed(() => unsavedIds());
+      fixture = TestBed.createComponent(DocumentsSidebarComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
       await router.navigateByUrl('/documents/doc-1');
       const navSpy = vi.spyOn(router, 'navigate');
 
       // Simulate the pending close flow
-      (mockEditStateService.hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(true);
       component.onCloseDocument(new Event('click'), 'doc-1');
 
       // Now confirm
       component.confirmCloseDocument();
 
-      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-1');
-      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
+      expect(mockEditStateService.discardChanges).toHaveBeenCalledWith('doc-1');
       expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
       expect(navSpy).toHaveBeenCalledWith(['/documents']);
     });

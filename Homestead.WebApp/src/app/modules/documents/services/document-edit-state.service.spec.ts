@@ -97,7 +97,7 @@ describe('DocumentEditStateService', () => {
     it('should clear active changes tracking', () => {
       service.setActiveHasChanges('doc-1', true);
       service.clearAll();
-      expect(service.hasUnsavedChanges('doc-1')).toBe(false);
+      expect(service.unsavedDocIds().has('doc-1')).toBe(false);
     });
   });
 
@@ -118,42 +118,45 @@ describe('DocumentEditStateService', () => {
     });
   });
 
-  describe('setActiveHasChanges / hasUnsavedChanges', () => {
-    it('should track active changes', () => {
-      service.setActiveHasChanges('doc-1', true);
-      expect(service.hasUnsavedChanges('doc-1')).toBe(true);
-    });
-
-    it('should return false when no active changes', () => {
-      service.setActiveHasChanges('doc-1', false);
-      expect(service.hasUnsavedChanges('doc-1')).toBe(false);
-    });
-
-    it('should return true when stored state exists even if not actively changed', () => {
+  describe('discardChanges', () => {
+    it('should clear both stored state and active tracking', () => {
       service.saveState('doc-1', makeState());
-      service.setActiveHasChanges('doc-1', false);
-      expect(service.hasUnsavedChanges('doc-1')).toBe(true);
+      service.setActiveHasChanges('doc-1', true);
+
+      service.discardChanges('doc-1');
+
+      expect(service.getState('doc-1')).toBeNull();
+      expect(service.unsavedDocIds().has('doc-1')).toBe(false);
     });
 
-    it('should return true when actively changed even if no stored state', () => {
-      service.setActiveHasChanges('doc-1', true);
-      expect(service.hasUnsavedChanges('doc-1')).toBe(true);
+    it('should not affect other documents', () => {
+      service.saveState('doc-1', makeState());
+      service.saveState('doc-2', makeState());
+      service.setActiveHasChanges('doc-2', true);
+
+      service.discardChanges('doc-1');
+
+      expect(service.getState('doc-2')).not.toBeNull();
+      expect(service.unsavedDocIds().has('doc-2')).toBe(true);
     });
   });
 
-  describe('hasAnyUnsavedChanges', () => {
-    it('should return false when no documents have changes', () => {
-      expect(service.hasAnyUnsavedChanges()).toBe(false);
-    });
-
-    it('should return true when any document has active changes', () => {
+  describe('setActiveHasChanges', () => {
+    it('should track active changes in unsavedDocIds', () => {
       service.setActiveHasChanges('doc-1', true);
-      expect(service.hasAnyUnsavedChanges()).toBe(true);
+      expect(service.unsavedDocIds().has('doc-1')).toBe(true);
     });
 
-    it('should return true when any document has stored state', () => {
+    it('should remove from unsavedDocIds when set to false', () => {
+      service.setActiveHasChanges('doc-1', true);
+      service.setActiveHasChanges('doc-1', false);
+      expect(service.unsavedDocIds().has('doc-1')).toBe(false);
+    });
+
+    it('should still show in unsavedDocIds when stored state exists even if active is false', () => {
       service.saveState('doc-1', makeState());
-      expect(service.hasAnyUnsavedChanges()).toBe(true);
+      service.setActiveHasChanges('doc-1', false);
+      expect(service.unsavedDocIds().has('doc-1')).toBe(true);
     });
   });
 

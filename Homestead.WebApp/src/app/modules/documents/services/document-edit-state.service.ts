@@ -27,6 +27,7 @@ export class DocumentEditStateService {
     all[docId] = state;
     this.saveAll(all);
     this.storedDocIds.update((ids) => {
+      if (ids.has(docId)) return ids;
       const next = new Set(ids);
       next.add(docId);
       return next;
@@ -48,10 +49,17 @@ export class DocumentEditStateService {
     delete all[docId];
     this.saveAll(all);
     this.storedDocIds.update((ids) => {
+      if (!ids.has(docId)) return ids;
       const next = new Set(ids);
       next.delete(docId);
       return next;
     });
+  }
+
+  /** Clear stored state and active tracking for a document (convenience for close/delete flows). */
+  discardChanges(docId: string): void {
+    this.clearState(docId);
+    this.setActiveHasChanges(docId, false);
   }
 
   clearAll(): void {
@@ -69,14 +77,6 @@ export class DocumentEditStateService {
       if (prev[docId] === hasChanges) return prev;
       return { ...prev, [docId]: hasChanges };
     });
-  }
-
-  hasUnsavedChanges(docId: string): boolean {
-    return this.activeChanges()[docId] === true || this.storedDocIds().has(docId);
-  }
-
-  hasAnyUnsavedChanges(): boolean {
-    return this.unsavedDocIds().size > 0;
   }
 
   unsavedDocIds = computed(() => {

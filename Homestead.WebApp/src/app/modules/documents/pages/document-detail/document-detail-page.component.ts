@@ -1079,8 +1079,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.deleting.set(true);
     deleteDocument(this.http, this.apiConfig.rootUrl, { id }).subscribe({
       next: () => {
-        this.editStateService.clearState(id);
-        this.editStateService.setActiveHasChanges(id, false);
+        this.editStateService.discardChanges(id);
         this.openDocumentsService.removeDocument(id);
         toast.success('Document deleted.');
         this.router.navigate(['/documents']);
@@ -1095,33 +1094,29 @@ export class DocumentDetailPageComponent implements OnDestroy {
   handleClose(): void {
     const id = this.documentId();
     if (id) {
-      this.editStateService.clearState(id);
-      this.editStateService.setActiveHasChanges(id, false);
+      this.editStateService.discardChanges(id);
       this.openDocumentsService.removeDocument(id);
     }
     this.router.navigate(['/documents']);
   }
 
   navigatePrev(): void {
-    const id = this.documentId();
-    if (!id) return;
-    const prevId = this.openDocumentsService.getPrevDocumentId(id);
-    if (!prevId) return;
-    if (this.hasChanges()) {
-      this.editStateService.saveState(id, this.buildEditState());
-    }
-    this.router.navigate(['/documents', prevId]);
+    this.navigateToSibling((id) => this.openDocumentsService.getPrevDocumentId(id));
   }
 
   navigateNext(): void {
+    this.navigateToSibling((id) => this.openDocumentsService.getNextDocumentId(id));
+  }
+
+  private navigateToSibling(getSiblingId: (id: string) => string | null): void {
     const id = this.documentId();
     if (!id) return;
-    const nextId = this.openDocumentsService.getNextDocumentId(id);
-    if (!nextId) return;
+    const siblingId = getSiblingId(id);
+    if (!siblingId) return;
     if (this.hasChanges()) {
       this.editStateService.saveState(id, this.buildEditState());
     }
-    this.router.navigate(['/documents', nextId]);
+    this.router.navigate(['/documents', siblingId]);
   }
 
   handleReprocess(): void {

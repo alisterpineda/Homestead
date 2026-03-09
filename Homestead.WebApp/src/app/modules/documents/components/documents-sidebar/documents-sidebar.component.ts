@@ -42,7 +42,7 @@ import { DocumentEditStateService } from '../../services/document-edit-state.ser
           <span>Open <span class="text-muted-foreground">({{ openDocumentsService.openDocuments().length }})</span></span>
           <button
             class="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            (click)="editStateService.hasAnyUnsavedChanges() ? closeAllDialogTrigger.click() : clearAllOpenDocuments()"
+            (click)="hasAnyUnsavedChanges() ? closeAllDialogTrigger.click() : clearAllOpenDocuments()"
           >Close all</button>
         </div>
         <div hlmSidebarGroupContent>
@@ -166,6 +166,7 @@ export class DocumentsSidebarComponent {
   private urlPath = computed(() => this.url().split('?')[0]);
 
   protected showOpenDocuments = computed(() => this.openDocumentsService.openDocuments().length > 0);
+  protected hasAnyUnsavedChanges = computed(() => this.editStateService.unsavedDocIds().size > 0);
 
   /** More specific paths (e.g. /documents/parties) take priority over shorter ones (e.g. /documents). */
   private readonly navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash'];
@@ -188,7 +189,7 @@ export class DocumentsSidebarComponent {
 
   onCloseDocument(event: Event, docId: string): void {
     event.stopPropagation();
-    if (this.editStateService.hasUnsavedChanges(docId)) {
+    if (this.editStateService.unsavedDocIds().has(docId)) {
       this.pendingCloseDocId.set(docId);
       this.closeDocDialogTrigger()?.nativeElement.click();
     } else {
@@ -205,8 +206,7 @@ export class DocumentsSidebarComponent {
   }
 
   private doCloseDocument(docId: string): void {
-    this.editStateService.clearState(docId);
-    this.editStateService.setActiveHasChanges(docId, false);
+    this.editStateService.discardChanges(docId);
     const isActive = this.isOpenDocActive(docId);
     this.openDocumentsService.removeDocument(docId);
     if (isActive) {

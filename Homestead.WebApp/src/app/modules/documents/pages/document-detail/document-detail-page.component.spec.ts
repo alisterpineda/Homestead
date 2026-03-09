@@ -53,9 +53,8 @@ describe('DocumentDetailPageComponent', () => {
       getState: vi.fn(() => null),
       clearState: vi.fn(),
       clearAll: vi.fn(),
+      discardChanges: vi.fn(),
       setActiveHasChanges: vi.fn(),
-      hasUnsavedChanges: vi.fn(() => false),
-      hasAnyUnsavedChanges: vi.fn(() => false),
     };
 
     TestBed.configureTestingModule({
@@ -118,14 +117,13 @@ describe('DocumentDetailPageComponent', () => {
       expect(mockOpenDocumentsService.removeDocument).not.toHaveBeenCalled();
     });
 
-    it('should clear edit state on close', () => {
+    it('should discard edit state on close', () => {
       setDocumentId('doc-123');
       fixture.detectChanges();
 
       component.handleClose();
 
-      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-123');
-      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-123', false);
+      expect(mockEditStateService.discardChanges).toHaveBeenCalledWith('doc-123');
     });
   });
 
