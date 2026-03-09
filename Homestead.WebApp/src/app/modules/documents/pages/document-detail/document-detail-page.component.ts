@@ -37,6 +37,7 @@ import {
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
@@ -87,6 +88,7 @@ import { toast } from 'ngx-sonner';
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmButtonGroupImports,
     HlmSpinner,
     HlmTabsImports,
     HlmResizableImports,
@@ -180,15 +182,17 @@ import { toast } from 'ngx-sonner';
 
     @if (document(); as doc) {
       <div class="flex items-center gap-2 mb-4">
-        <button hlmBtn size="icon-sm" variant="ghost" (click)="handleClose()" aria-label="Close document">
-          <ng-icon hlm name="lucideX" size="sm" />
-        </button>
-        <button hlmBtn size="icon-sm" variant="outline" (click)="navigatePrev()" [disabled]="!canNavigatePrev()" aria-label="Previous document">
-          <ng-icon hlm name="lucideChevronLeft" size="sm" />
-        </button>
-        <button hlmBtn size="icon-sm" variant="outline" (click)="navigateNext()" [disabled]="!canNavigateNext()" aria-label="Next document">
-          <ng-icon hlm name="lucideChevronRight" size="sm" />
-        </button>
+        <div hlmButtonGroup aria-label="Document navigation">
+          <button hlmBtn size="icon-sm" variant="outline" (click)="handleClose()" aria-label="Close document">
+            <ng-icon hlm name="lucideX" size="sm" />
+          </button>
+          <button hlmBtn size="icon-sm" variant="outline" (click)="navigatePrev()" [disabled]="!canNavigatePrev()" aria-label="Previous document">
+            <ng-icon hlm name="lucideChevronLeft" size="sm" />
+          </button>
+          <button hlmBtn size="icon-sm" variant="outline" (click)="navigateNext()" [disabled]="!canNavigateNext()" aria-label="Next document">
+            <ng-icon hlm name="lucideChevronRight" size="sm" />
+          </button>
+        </div>
         <div class="ml-auto flex items-center gap-2">
           <button hlmBtn size="sm" variant="outline" (click)="handleDownload()">
             <ng-icon hlm name="lucideDownload" size="sm" />
@@ -1000,6 +1004,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   handleClose(): void {
+    const id = this.documentId();
+    if (id) {
+      this.openDocumentsService.removeDocument(id);
+    }
     this.router.navigate(['/documents']);
   }
 
