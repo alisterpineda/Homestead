@@ -9,6 +9,7 @@ import {
   OnDestroy,
   viewChild,
   afterNextRender,
+  DestroyRef,
   TemplateRef,
 } from '@angular/core';
 import { Location, NgTemplateOutlet } from '@angular/common';
@@ -78,6 +79,7 @@ import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { OpenDocumentsService } from '../../services/open-documents.service';
+import { DocumentEditStateService, type DocumentEditState } from '../../services/document-edit-state.service';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -183,7 +185,7 @@ import { toast } from 'ngx-sonner';
     @if (document(); as doc) {
       <div class="flex items-center gap-2 mb-4">
         <div hlmButtonGroup aria-label="Document navigation">
-          <button hlmBtn size="icon-sm" variant="outline" (click)="handleClose()" aria-label="Close document">
+          <button hlmBtn size="icon-sm" variant="outline" (click)="hasChanges() ? closeDialogTrigger.click() : handleClose()" aria-label="Close document">
             <ng-icon hlm name="lucideX" size="sm" />
           </button>
           <button hlmBtn size="icon-sm" variant="outline" (click)="navigatePrev()" [disabled]="!canNavigatePrev()" aria-label="Previous document">
@@ -261,6 +263,24 @@ import { toast } from 'ngx-sonner';
           }
         </div>
       </div>
+
+      <hlm-alert-dialog>
+        <button hlmAlertDialogTrigger class="hidden" #closeDialogTrigger></button>
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Unsaved changes</h2>
+            <p hlmAlertDialogDescription>
+              You have unsaved changes that will be lost.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction variant="destructive" (click)="handleClose(); ctx.close()">
+              Discard & Close
+            </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
 
       <app-add-version-dialog
         #addVersionDialog
@@ -607,6 +627,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   private sidebarService = inject(HlmSidebarService);
   private openDocumentsService = inject(OpenDocumentsService);
+  private editStateService = inject(DocumentEditStateService);
+  private destroyRef = inject(DestroyRef);
   isMobile = this.sidebarService.isMobile;
 
   private http = inject(HttpClient);
@@ -617,6 +639,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private processingHub = inject(ProcessingHubService);
   private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
+  private pendingSavedState: DocumentEditState | null = null;
 
   private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
 
@@ -795,15 +818,47 @@ export class DocumentDetailPageComponent implements OnDestroy {
   });
 
   constructor() {
+    // Save edit state when documentId changes (component reuse on sidebar navigation)
+    let prevDocId: string | null = null;
+    effect(() => {
+      const id = this.documentId();
+      if (prevDocId && prevDocId !== id) {
+        if (untracked(() => this.hasChanges())) {
+          untracked(() => this.editStateService.saveState(prevDocId!, this.buildEditState()));
+        }
+        untracked(() => this.editStateService.setActiveHasChanges(prevDocId!, false));
+      }
+      prevDocId = id;
+    });
+
     effect(() => {
       const doc = this.document();
       if (doc) {
-        this.editName.set(doc.name);
-        this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
-        this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
-        this.editDocumentDate.set(this.origDocumentDate());
-        this.editValidFrom.set(this.origValidFrom());
-        this.editValidUntil.set(this.origValidUntil());
+        const saved = untracked(() => this.editStateService.getState(doc.id));
+        if (saved) {
+          this.pendingSavedState = saved;
+          this.editName.set(saved.editName);
+          this.editTags.set(saved.editTags);
+          this.editParties.set(saved.editParties);
+          this.editDocumentDate.set(saved.editDocumentDate ? parseDate(saved.editDocumentDate) : null);
+          this.editValidFrom.set(saved.editValidFrom ? parseDate(saved.editValidFrom) : null);
+          this.editValidUntil.set(saved.editValidUntil ? parseDate(saved.editValidUntil) : null);
+          this.editVersionLabel.set(saved.editVersionLabel);
+          this.editExtractedText.set(saved.editExtractedText);
+          untracked(() => this.editStateService.clearState(doc.id));
+        } else {
+          this.pendingSavedState = null;
+          this.editName.set(doc.name);
+          this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
+          this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
+          this.editDocumentDate.set(this.origDocumentDate());
+          this.editValidFrom.set(this.origValidFrom());
+          this.editValidUntil.set(this.origValidUntil());
+          // Set version-level fields atomically to prevent flash in active changes tracking
+          const ver = untracked(() => this.activeVersion());
+          this.editVersionLabel.set(ver?.label ?? '');
+          this.editExtractedText.set(untracked(() => this.displayExtractedText()) ?? '');
+        }
       }
     });
 
@@ -818,13 +873,34 @@ export class DocumentDetailPageComponent implements OnDestroy {
     effect(() => {
       const ver = this.activeVersion();
       if (ver) {
-        this.editVersionLabel.set(ver.label ?? '');
+        if (this.pendingSavedState && this.pendingSavedState.versionId === ver.id) {
+          this.editVersionLabel.set(this.pendingSavedState.editVersionLabel);
+        } else {
+          this.editVersionLabel.set(ver.label ?? '');
+        }
       }
     });
 
     effect(() => {
       const text = this.displayExtractedText();
-      this.editExtractedText.set(text ?? '');
+      if (this.pendingSavedState) {
+        this.editExtractedText.set(this.pendingSavedState.editExtractedText);
+        this.pendingSavedState = null;
+      } else {
+        this.editExtractedText.set(text ?? '');
+      }
+    });
+
+    // Track active changes for sidebar indicator
+    effect(() => {
+      const id = this.documentId();
+      const doc = this.document();
+      const changed = this.hasChanges();
+      // Only track when the loaded document matches the current documentId
+      // to avoid false positives during document transitions
+      if (id && doc?.id === id) {
+        untracked(() => this.editStateService.setActiveHasChanges(id, changed));
+      }
     });
 
     // Load file blob reactively — reads all signals atomically
@@ -891,6 +967,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
       if (tpl) {
         this.pageHeaderService.setTitle(tpl);
       }
+
+      const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+        if (this.hasChanges()) {
+          const id = this.documentId();
+          if (id) this.editStateService.saveState(id, this.buildEditState());
+          e.preventDefault();
+        }
+      };
+      window.addEventListener('beforeunload', beforeUnloadHandler);
+      this.destroyRef.onDestroy(() => window.removeEventListener('beforeunload', beforeUnloadHandler));
     });
 
     // Re-register header title after in-component navigations (NavigationStart clears it)
@@ -910,6 +996,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const id = this.documentId();
+    if (id && this.hasChanges()) {
+      this.editStateService.saveState(id, this.buildEditState());
+    }
+    if (id) {
+      this.editStateService.setActiveHasChanges(id, false);
+    }
     this.fileSub?.unsubscribe();
     this.versionDetailSub?.unsubscribe();
     this.swapBlobUrl(null);
@@ -986,6 +1079,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.deleting.set(true);
     deleteDocument(this.http, this.apiConfig.rootUrl, { id }).subscribe({
       next: () => {
+        this.editStateService.clearState(id);
+        this.editStateService.setActiveHasChanges(id, false);
         this.openDocumentsService.removeDocument(id);
         toast.success('Document deleted.');
         this.router.navigate(['/documents']);
@@ -1000,6 +1095,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
   handleClose(): void {
     const id = this.documentId();
     if (id) {
+      this.editStateService.clearState(id);
+      this.editStateService.setActiveHasChanges(id, false);
       this.openDocumentsService.removeDocument(id);
     }
     this.router.navigate(['/documents']);
@@ -1009,14 +1106,22 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const id = this.documentId();
     if (!id) return;
     const prevId = this.openDocumentsService.getPrevDocumentId(id);
-    if (prevId) this.router.navigate(['/documents', prevId]);
+    if (!prevId) return;
+    if (this.hasChanges()) {
+      this.editStateService.saveState(id, this.buildEditState());
+    }
+    this.router.navigate(['/documents', prevId]);
   }
 
   navigateNext(): void {
     const id = this.documentId();
     if (!id) return;
     const nextId = this.openDocumentsService.getNextDocumentId(id);
-    if (nextId) this.router.navigate(['/documents', nextId]);
+    if (!nextId) return;
+    if (this.hasChanges()) {
+      this.editStateService.saveState(id, this.buildEditState());
+    }
+    this.router.navigate(['/documents', nextId]);
   }
 
   handleReprocess(): void {
@@ -1063,6 +1168,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
     forkJoin([docUpdate$, versionUpdate$]).subscribe({
       next: () => {
         this.saving.set(false);
+        const savedId = this.documentId();
+        if (savedId) this.editStateService.clearState(savedId);
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },
@@ -1120,6 +1227,20 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
 
     return ops;
+  }
+
+  private buildEditState(): DocumentEditState {
+    return {
+      editName: this.editName(),
+      editDocumentDate: toIsoDateString(this.editDocumentDate()),
+      editValidFrom: toIsoDateString(this.editValidFrom()),
+      editValidUntil: toIsoDateString(this.editValidUntil()),
+      editParties: this.editParties(),
+      editTags: this.editTags(),
+      editVersionLabel: this.editVersionLabel(),
+      editExtractedText: this.editExtractedText(),
+      versionId: this.versionId(),
+    };
   }
 
   private loadActivity(): void {

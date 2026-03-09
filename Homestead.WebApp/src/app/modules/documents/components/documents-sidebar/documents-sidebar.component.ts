@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, signal, viewChild, ElementRef } from '@angular/core';
 import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
@@ -6,8 +6,10 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { isNavItemActive } from '@/shared/utils';
 import { OpenDocumentsService } from '../../services/open-documents.service';
+import { DocumentEditStateService } from '../../services/document-edit-state.service';
 
 @Component({
   selector: 'app-documents-sidebar',
@@ -17,6 +19,7 @@ import { OpenDocumentsService } from '../../services/open-documents.service';
     NgIcon,
     HlmIconImports,
     HlmSidebarImports,
+    HlmAlertDialogImports,
   ],
   providers: [provideIcons({ lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX })],
   template: `
@@ -37,7 +40,10 @@ import { OpenDocumentsService } from '../../services/open-documents.service';
       <div hlmSidebarGroup>
         <div hlmSidebarGroupLabel class="justify-between">
           <span>Open <span class="text-muted-foreground">({{ openDocumentsService.openDocuments().length }})</span></span>
-          <button class="text-xs text-muted-foreground hover:text-foreground transition-colors" (click)="clearAllOpenDocuments()">Close all</button>
+          <button
+            class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            (click)="editStateService.hasAnyUnsavedChanges() ? closeAllDialogTrigger.click() : clearAllOpenDocuments()"
+          >Close all</button>
         </div>
         <div hlmSidebarGroupContent>
           <ul hlmSidebarMenu>
@@ -52,7 +58,17 @@ import { OpenDocumentsService } from '../../services/open-documents.service';
                   <ng-icon hlm name="lucideFileText" size="sm" />
                   <span>{{ doc.name }}</span>
                 </a>
-                <button hlmSidebarMenuAction [showOnHover]="true" (click)="closeOpenDocument($event, doc.id)" aria-label="Close document">
+                @if (isDocModified(doc.id)) {
+                  <span hlmSidebarMenuBadge class="!right-7">
+                    <span class="size-1.5 rounded-full bg-primary"></span>
+                  </span>
+                }
+                <button
+                  hlmSidebarMenuAction
+                  [showOnHover]="true"
+                  (click)="onCloseDocument($event, doc.id)"
+                  aria-label="Close document"
+                >
                   <ng-icon hlm name="lucideX" />
                 </button>
               </li>
@@ -60,6 +76,42 @@ import { OpenDocumentsService } from '../../services/open-documents.service';
           </ul>
         </div>
       </div>
+
+      <hlm-alert-dialog>
+        <button hlmAlertDialogTrigger class="hidden" #closeDocDialogTrigger></button>
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Unsaved changes</h2>
+            <p hlmAlertDialogDescription>
+              This document has unsaved changes that will be lost.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction variant="destructive" (click)="confirmCloseDocument(); ctx.close()">
+              Discard & Close
+            </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+
+      <hlm-alert-dialog>
+        <button hlmAlertDialogTrigger class="hidden" #closeAllDialogTrigger></button>
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Unsaved changes</h2>
+            <p hlmAlertDialogDescription>
+              Some open documents have unsaved changes that will be lost.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction variant="destructive" (click)="clearAllOpenDocuments(); ctx.close()">
+              Discard All & Close
+            </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
     }
 
     <div hlmSidebarGroup>
@@ -98,7 +150,10 @@ import { OpenDocumentsService } from '../../services/open-documents.service';
 })
 export class DocumentsSidebarComponent {
   private router = inject(Router);
+  protected editStateService = inject(DocumentEditStateService);
   protected openDocumentsService = inject(OpenDocumentsService);
+
+  private closeDocDialogTrigger = viewChild<ElementRef<HTMLButtonElement>>('closeDocDialogTrigger');
 
   private url = toSignal(
     this.router.events.pipe(
@@ -115,6 +170,9 @@ export class DocumentsSidebarComponent {
   /** More specific paths (e.g. /documents/parties) take priority over shorter ones (e.g. /documents). */
   private readonly navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash'];
 
+  /** Doc ID pending close confirmation. */
+  private pendingCloseDocId = signal<string | null>(null);
+
   isActive(path: string): boolean {
     return isNavItemActive(this.urlPath(), path, this.navPaths);
   }
@@ -124,8 +182,31 @@ export class DocumentsSidebarComponent {
     return url === `/documents/${docId}` || url.startsWith(`/documents/${docId}/`);
   }
 
-  closeOpenDocument(event: Event, docId: string): void {
+  isDocModified(docId: string): boolean {
+    return this.editStateService.unsavedDocIds().has(docId);
+  }
+
+  onCloseDocument(event: Event, docId: string): void {
     event.stopPropagation();
+    if (this.editStateService.hasUnsavedChanges(docId)) {
+      this.pendingCloseDocId.set(docId);
+      this.closeDocDialogTrigger()?.nativeElement.click();
+    } else {
+      this.doCloseDocument(docId);
+    }
+  }
+
+  confirmCloseDocument(): void {
+    const docId = this.pendingCloseDocId();
+    if (docId) {
+      this.doCloseDocument(docId);
+      this.pendingCloseDocId.set(null);
+    }
+  }
+
+  private doCloseDocument(docId: string): void {
+    this.editStateService.clearState(docId);
+    this.editStateService.setActiveHasChanges(docId, false);
     const isActive = this.isOpenDocActive(docId);
     this.openDocumentsService.removeDocument(docId);
     if (isActive) {
@@ -134,6 +215,7 @@ export class DocumentsSidebarComponent {
   }
 
   clearAllOpenDocuments(): void {
+    this.editStateService.clearAll();
     const docs = this.openDocumentsService.openDocuments();
     const isOnOpenDoc = docs.some(doc => this.isOpenDocActive(doc.id));
     this.openDocumentsService.clearAll();

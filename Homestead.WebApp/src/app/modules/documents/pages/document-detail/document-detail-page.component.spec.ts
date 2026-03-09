@@ -7,6 +7,7 @@ import { DocumentDetailPageComponent } from './document-detail-page.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { OpenDocumentsService } from '../../services/open-documents.service';
+import { DocumentEditStateService } from '../../services/document-edit-state.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 
 @Component({ template: '' })
@@ -17,6 +18,7 @@ describe('DocumentDetailPageComponent', () => {
   let component: DocumentDetailPageComponent;
   let router: Router;
   let mockOpenDocumentsService: Partial<OpenDocumentsService>;
+  let mockEditStateService: Partial<DocumentEditStateService>;
   let paramMapSubject: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
   function setDocumentId(id: string | null) {
@@ -31,6 +33,12 @@ describe('DocumentDetailPageComponent', () => {
       removeItem: vi.fn(),
     });
 
+    vi.stubGlobal('sessionStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+
     paramMapSubject = new BehaviorSubject(convertToParamMap({}));
 
     mockOpenDocumentsService = {
@@ -38,6 +46,16 @@ describe('DocumentDetailPageComponent', () => {
       removeDocument: vi.fn(),
       getPrevDocumentId: vi.fn(() => null),
       getNextDocumentId: vi.fn(() => null),
+    };
+
+    mockEditStateService = {
+      saveState: vi.fn(),
+      getState: vi.fn(() => null),
+      clearState: vi.fn(),
+      clearAll: vi.fn(),
+      setActiveHasChanges: vi.fn(),
+      hasUnsavedChanges: vi.fn(() => false),
+      hasAnyUnsavedChanges: vi.fn(() => false),
     };
 
     TestBed.configureTestingModule({
@@ -50,6 +68,7 @@ describe('DocumentDetailPageComponent', () => {
         PageHeaderService,
         { provide: AuthService, useValue: { canWrite: signal(true) } },
         { provide: OpenDocumentsService, useValue: mockOpenDocumentsService },
+        { provide: DocumentEditStateService, useValue: mockEditStateService },
         {
           provide: ProcessingHubService,
           useValue: { jobCompleted$: new Subject() },
@@ -98,6 +117,16 @@ describe('DocumentDetailPageComponent', () => {
       component.handleClose();
       expect(mockOpenDocumentsService.removeDocument).not.toHaveBeenCalled();
     });
+
+    it('should clear edit state on close', () => {
+      setDocumentId('doc-123');
+      fixture.detectChanges();
+
+      component.handleClose();
+
+      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-123');
+      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-123', false);
+    });
   });
 
   describe('navigatePrev', () => {
@@ -129,6 +158,32 @@ describe('DocumentDetailPageComponent', () => {
       const navSpy = vi.spyOn(router, 'navigate');
       component.navigatePrev();
       expect(navSpy).not.toHaveBeenCalled();
+    });
+
+    it('should persist edit state before navigating when hasChanges is true', () => {
+      setDocumentId('doc-2');
+      fixture.detectChanges();
+
+      (mockOpenDocumentsService.getPrevDocumentId as ReturnType<typeof vi.fn>).mockReturnValue('doc-1');
+      Object.defineProperty(component, 'hasChanges', {
+        value: () => true,
+        writable: true,
+      });
+
+      component.navigatePrev();
+
+      expect(mockEditStateService.saveState).toHaveBeenCalledWith('doc-2', expect.any(Object));
+    });
+
+    it('should not persist state when no changes', () => {
+      setDocumentId('doc-2');
+      fixture.detectChanges();
+
+      (mockOpenDocumentsService.getPrevDocumentId as ReturnType<typeof vi.fn>).mockReturnValue('doc-1');
+
+      component.navigatePrev();
+
+      expect(mockEditStateService.saveState).not.toHaveBeenCalled();
     });
   });
 
@@ -162,6 +217,32 @@ describe('DocumentDetailPageComponent', () => {
       component.navigateNext();
       expect(navSpy).not.toHaveBeenCalled();
     });
+
+    it('should persist edit state before navigating when hasChanges is true', () => {
+      setDocumentId('doc-2');
+      fixture.detectChanges();
+
+      (mockOpenDocumentsService.getNextDocumentId as ReturnType<typeof vi.fn>).mockReturnValue('doc-3');
+      Object.defineProperty(component, 'hasChanges', {
+        value: () => true,
+        writable: true,
+      });
+
+      component.navigateNext();
+
+      expect(mockEditStateService.saveState).toHaveBeenCalledWith('doc-2', expect.any(Object));
+    });
+
+    it('should not persist state when no changes', () => {
+      setDocumentId('doc-2');
+      fixture.detectChanges();
+
+      (mockOpenDocumentsService.getNextDocumentId as ReturnType<typeof vi.fn>).mockReturnValue('doc-3');
+
+      component.navigateNext();
+
+      expect(mockEditStateService.saveState).not.toHaveBeenCalled();
+    });
   });
 
   describe('canNavigatePrev / canNavigateNext', () => {
@@ -187,6 +268,43 @@ describe('DocumentDetailPageComponent', () => {
 
       expect(component.canNavigatePrev()).toBe(false);
       expect(component.canNavigateNext()).toBe(false);
+    });
+  });
+
+  describe('ngOnDestroy state persistence', () => {
+    it('should save edit state to service when destroyed with changes', () => {
+      setDocumentId('doc-1');
+      fixture.detectChanges();
+
+      Object.defineProperty(component, 'hasChanges', {
+        value: () => true,
+        writable: true,
+      });
+
+      component.ngOnDestroy();
+
+      expect(mockEditStateService.saveState).toHaveBeenCalledWith('doc-1', expect.any(Object));
+    });
+
+    it('should not save state when destroyed without changes', () => {
+      setDocumentId('doc-1');
+      fixture.detectChanges();
+
+      component.ngOnDestroy();
+
+      expect(mockEditStateService.saveState).not.toHaveBeenCalled();
+    });
+
+    it('should clear active changes tracking on destroy', () => {
+      setDocumentId('doc-1');
+      fixture.detectChanges();
+
+      // Clear any calls from effects
+      (mockEditStateService.setActiveHasChanges as ReturnType<typeof vi.fn>).mockClear();
+
+      component.ngOnDestroy();
+
+      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
     });
   });
 });

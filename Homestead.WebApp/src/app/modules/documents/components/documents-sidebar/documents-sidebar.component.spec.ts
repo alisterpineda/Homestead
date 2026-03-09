@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { Component, signal } from '@angular/core';
+import { Component, signal, computed } from '@angular/core';
 import { DocumentsSidebarComponent } from './documents-sidebar.component';
 import { OpenDocumentsService } from '../../services/open-documents.service';
+import { DocumentEditStateService } from '../../services/document-edit-state.service';
 
 @Component({ template: '' })
 class DummyComponent {}
@@ -12,9 +13,16 @@ describe('DocumentsSidebarComponent', () => {
   let component: DocumentsSidebarComponent;
   let router: Router;
   let mockOpenDocumentsService: Partial<OpenDocumentsService>;
+  let mockEditStateService: Partial<DocumentEditStateService>;
 
   beforeEach(() => {
     vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    });
+
+    vi.stubGlobal('sessionStorage', {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
       removeItem: vi.fn(),
@@ -24,6 +32,17 @@ describe('DocumentsSidebarComponent', () => {
       openDocuments: signal([]),
       removeDocument: vi.fn(),
       clearAll: vi.fn(),
+    };
+
+    mockEditStateService = {
+      saveState: vi.fn(),
+      getState: vi.fn(() => null),
+      clearState: vi.fn(),
+      clearAll: vi.fn(),
+      setActiveHasChanges: vi.fn(),
+      hasUnsavedChanges: vi.fn(() => false),
+      hasAnyUnsavedChanges: vi.fn(() => false),
+      unsavedDocIds: computed(() => new Set<string>()),
     };
 
     TestBed.configureTestingModule({
@@ -37,6 +56,7 @@ describe('DocumentsSidebarComponent', () => {
           { path: 'documents/:id/:tab', component: DummyComponent },
         ]),
         { provide: OpenDocumentsService, useValue: mockOpenDocumentsService },
+        { provide: DocumentEditStateService, useValue: mockEditStateService },
       ],
     });
 
@@ -132,15 +152,34 @@ describe('DocumentsSidebarComponent', () => {
     });
   });
 
-  describe('closeOpenDocument', () => {
-    it('should remove the document', async () => {
+  describe('isDocModified', () => {
+    it('should return true when document has unsaved changes', () => {
+      const unsavedIds = signal(new Set(['doc-1']));
+      (mockEditStateService as Record<string, unknown>)['unsavedDocIds'] = computed(() => unsavedIds());
+      // Recreate component to pick up new mock
+      fixture = TestBed.createComponent(DocumentsSidebarComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      expect(component.isDocModified('doc-1')).toBe(true);
+    });
+
+    it('should return false when document has no unsaved changes', () => {
+      expect(component.isDocModified('doc-1')).toBe(false);
+    });
+  });
+
+  describe('onCloseDocument', () => {
+    it('should close document directly when no unsaved changes', async () => {
       await router.navigateByUrl('/documents');
       const event = new Event('click');
       vi.spyOn(event, 'stopPropagation');
 
-      component.closeOpenDocument(event, 'doc-1');
+      component.onCloseDocument(event, 'doc-1');
 
       expect(event.stopPropagation).toHaveBeenCalled();
+      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-1');
+      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
       expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
     });
 
@@ -148,7 +187,7 @@ describe('DocumentsSidebarComponent', () => {
       await router.navigateByUrl('/documents/doc-1');
       const navSpy = vi.spyOn(router, 'navigate');
 
-      component.closeOpenDocument(new Event('click'), 'doc-1');
+      component.onCloseDocument(new Event('click'), 'doc-1');
 
       expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
       expect(navSpy).toHaveBeenCalledWith(['/documents']);
@@ -158,10 +197,39 @@ describe('DocumentsSidebarComponent', () => {
       await router.navigateByUrl('/documents/doc-2');
       const navSpy = vi.spyOn(router, 'navigate');
 
-      component.closeOpenDocument(new Event('click'), 'doc-1');
+      component.onCloseDocument(new Event('click'), 'doc-1');
 
       expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
       expect(navSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not close directly when document has unsaved changes', async () => {
+      (mockEditStateService.hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      await router.navigateByUrl('/documents');
+
+      component.onCloseDocument(new Event('click'), 'doc-1');
+
+      // Should not close — dialog would open (trigger not available in unit test)
+      expect(mockOpenDocumentsService.removeDocument).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmCloseDocument', () => {
+    it('should close the pending document and clear state', async () => {
+      await router.navigateByUrl('/documents/doc-1');
+      const navSpy = vi.spyOn(router, 'navigate');
+
+      // Simulate the pending close flow
+      (mockEditStateService.hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      component.onCloseDocument(new Event('click'), 'doc-1');
+
+      // Now confirm
+      component.confirmCloseDocument();
+
+      expect(mockEditStateService.clearState).toHaveBeenCalledWith('doc-1');
+      expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
+      expect(mockOpenDocumentsService.removeDocument).toHaveBeenCalledWith('doc-1');
+      expect(navSpy).toHaveBeenCalledWith(['/documents']);
     });
   });
 
@@ -175,6 +243,7 @@ describe('DocumentsSidebarComponent', () => {
 
       component.clearAllOpenDocuments();
 
+      expect(mockEditStateService.clearAll).toHaveBeenCalled();
       expect(mockOpenDocumentsService.clearAll).toHaveBeenCalled();
       expect(navSpy).toHaveBeenCalledWith(['/documents']);
     });
@@ -188,6 +257,7 @@ describe('DocumentsSidebarComponent', () => {
 
       component.clearAllOpenDocuments();
 
+      expect(mockEditStateService.clearAll).toHaveBeenCalled();
       expect(mockOpenDocumentsService.clearAll).toHaveBeenCalled();
       expect(navSpy).not.toHaveBeenCalled();
     });
@@ -201,6 +271,7 @@ describe('DocumentsSidebarComponent', () => {
 
       component.clearAllOpenDocuments();
 
+      expect(mockEditStateService.clearAll).toHaveBeenCalled();
       expect(mockOpenDocumentsService.clearAll).toHaveBeenCalled();
       expect(navSpy).not.toHaveBeenCalled();
     });
