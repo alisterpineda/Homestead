@@ -35,6 +35,21 @@ export function handleFileInputChange(event: Event, onFiles: (files: File[]) => 
   input.value = '';
 }
 
+/**
+ * Determines if a sidebar nav item should be highlighted as active.
+ * Handles sub-route matching with specificity: more specific (longer) sibling
+ * nav paths take priority (e.g. /documents/parties wins over /documents).
+ */
+export function isNavItemActive(url: string, path: string, navPaths: string[]): boolean {
+  if (url === path) return true;
+  if (url.startsWith(path + '/')) {
+    return !navPaths.some(
+      (other) => other.length > path.length && (url === other || url.startsWith(other + '/')),
+    );
+  }
+  return false;
+}
+
 /** Compare two Dates by year/month/day only (ignoring time). */
 export function datesEqual(a: Date | null, b: Date | null): boolean {
   if (a === b) return true;

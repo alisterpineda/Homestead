@@ -6,6 +6,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
+import { isNavItemActive } from '@/shared/utils';
 import { OpenDocumentsService } from '../../services/open-documents.service';
 
 @Component({
@@ -115,15 +116,7 @@ export class DocumentsSidebarComponent {
   private readonly navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash'];
 
   isActive(path: string): boolean {
-    const url = this.urlPath();
-    if (url === path) return true;
-    if (url.startsWith(path + '/')) {
-      // Only yield to a more specific (longer) sibling nav path
-      return !this.navPaths.some(
-        (other) => other.length > path.length && (url === other || url.startsWith(other + '/')),
-      );
-    }
-    return false;
+    return isNavItemActive(this.urlPath(), path, this.navPaths);
   }
 
   isOpenDocActive(docId: string): boolean {

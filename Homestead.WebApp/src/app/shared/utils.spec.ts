@@ -1,4 +1,4 @@
-import { parseDate, toIsoDateString, datesEqual, handleFileInputChange } from './utils';
+import { parseDate, toIsoDateString, datesEqual, handleFileInputChange, isNavItemActive } from './utils';
 
 describe('parseDate', () => {
   it('should return null for null/undefined/empty', () => {
@@ -59,6 +59,29 @@ describe('datesEqual', () => {
     const a = new Date(2026, 2, 4, 10, 30);
     const b = new Date(2026, 2, 4, 22, 0);
     expect(datesEqual(a, b)).toBe(true);
+  });
+});
+
+describe('isNavItemActive', () => {
+  const navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash'];
+
+  it('should return true for exact match', () => {
+    expect(isNavItemActive('/documents', '/documents', navPaths)).toBe(true);
+    expect(isNavItemActive('/documents/parties', '/documents/parties', navPaths)).toBe(true);
+  });
+
+  it('should return true for sub-route when no more-specific sibling matches', () => {
+    expect(isNavItemActive('/documents/abc-123', '/documents', navPaths)).toBe(true);
+  });
+
+  it('should return false for parent when a more-specific sibling matches', () => {
+    expect(isNavItemActive('/documents/parties', '/documents', navPaths)).toBe(false);
+    expect(isNavItemActive('/documents/parties/123', '/documents', navPaths)).toBe(false);
+  });
+
+  it('should return false when url does not match path at all', () => {
+    expect(isNavItemActive('/admin', '/documents', navPaths)).toBe(false);
+    expect(isNavItemActive('/other', '/documents/parties', navPaths)).toBe(false);
   });
 });
 

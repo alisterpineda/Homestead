@@ -6,6 +6,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
+import { isNavItemActive } from '@/shared/utils';
 
 @Component({
   selector: 'app-admin-sidebar',
@@ -74,14 +75,6 @@ export class AdminSidebarComponent {
   private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs'];
 
   isActive(path: string): boolean {
-    const url = this.urlPath();
-    if (url === path) return true;
-    if (url.startsWith(path + '/')) {
-      // Only yield to a more specific (longer) sibling nav path
-      return !this.navPaths.some(
-        (other) => other.length > path.length && (url === other || url.startsWith(other + '/')),
-      );
-    }
-    return false;
+    return isNavItemActive(this.urlPath(), path, this.navPaths);
   }
 }
