@@ -59,7 +59,7 @@ import { DocumentEditStateService } from '../../services/document-edit-state.ser
                   <span>{{ doc.name }}</span>
                 </a>
                 @if (isDocModified(doc.id)) {
-                  <span hlmSidebarMenuBadge class="!right-7">
+                  <span class="absolute top-1 right-1 flex aspect-square w-5 items-center justify-center pointer-events-none group-hover/menu-item:md:hidden group-focus-within/menu-item:hidden">
                     <span class="size-1.5 rounded-full bg-primary"></span>
                   </span>
                 }
