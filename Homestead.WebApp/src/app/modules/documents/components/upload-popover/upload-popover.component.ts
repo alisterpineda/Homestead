@@ -16,7 +16,7 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
     <div hlmPopover align="end">
       <button hlmPopoverTrigger hlmBtn variant="ghost" size="sm" class="relative">
         <ng-icon hlm name="lucideUpload" size="sm" />
-        Upload
+        <span class="hidden sm:inline">Upload</span>
         @if (uploadManager.hasActiveUploads()) {
           <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
