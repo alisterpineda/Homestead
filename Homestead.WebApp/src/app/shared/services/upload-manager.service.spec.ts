@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { toast } from 'ngx-sonner';
 import { UploadManagerService } from './upload-manager.service';
 import { ProcessingHubService } from './processing-hub.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -17,6 +18,10 @@ describe('UploadManagerService', () => {
   let jobStatusChanged$: Subject<JobStatusChangedMessage>;
 
   beforeEach(() => {
+    vi.spyOn(toast, 'message').mockImplementation(() => undefined as never);
+    vi.spyOn(toast, 'success').mockImplementation(() => undefined as never);
+    vi.spyOn(toast, 'warning').mockImplementation(() => undefined as never);
+    vi.spyOn(toast, 'error').mockImplementation(() => undefined as never);
     jobStatusChanged$ = new Subject<JobStatusChangedMessage>();
 
     TestBed.configureTestingModule({
@@ -42,6 +47,7 @@ describe('UploadManagerService', () => {
     service.clearAll();
     // Discard any remaining HTTP requests left by the test
     httpTesting.match(() => true);
+    vi.restoreAllMocks();
   });
 
   /** Flush all pending upload requests with a jobId response */
@@ -304,6 +310,119 @@ describe('UploadManagerService', () => {
 
       expect(service.items().length).toBe(0);
       expect(service.hasItems()).toBe(false);
+    });
+  });
+
+  describe('toast notifications', () => {
+    it('should show info toast when files are added (single file)', () => {
+      service.addFiles([createFile('a.pdf')]);
+
+      expect(toast.message).toHaveBeenCalledWith('Uploading "a.pdf"...');
+    });
+
+    it('should show info toast when files are added (multiple files)', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+
+      expect(toast.message).toHaveBeenCalledWith('Uploading 2 files...');
+    });
+
+    it('should show success toast when batch completes', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+
+      const requests = httpTesting.match('/api/v1/documents');
+      requests[0].flush({});
+      requests[1].flush({});
+
+      expect(toast.success).toHaveBeenCalledWith('2 files uploaded successfully.');
+    });
+
+    it('should show success toast for single file completion', () => {
+      service.addFiles([createFile('a.pdf')]);
+
+      httpTesting.expectOne('/api/v1/documents').flush({});
+
+      expect(toast.success).toHaveBeenCalledWith('1 file uploaded successfully.');
+    });
+
+    it('should show error toast for each failed upload', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+
+      const requests = httpTesting.match('/api/v1/documents');
+      requests[0].flush(null, { status: 500, statusText: 'Internal Server Error' });
+      requests[1].flush({});
+
+      expect(toast.error).toHaveBeenCalledOnce();
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('a.pdf'));
+      expect(toast.warning).toHaveBeenCalledWith('1 file uploaded. 1 failed.');
+    });
+
+    it('should show separate completion toasts for separate batches', () => {
+      service.addFiles([createFile('a.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({});
+
+      expect(toast.success).toHaveBeenCalledOnce();
+      vi.mocked(toast.message).mockClear();
+      vi.mocked(toast.success).mockClear();
+      vi.mocked(toast.error).mockClear();
+
+      service.addFiles([createFile('b.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({});
+
+      expect(toast.success).toHaveBeenCalledOnce();
+    });
+
+    it('should show error toast when processing job fails', () => {
+      service.addFiles([createFile('a.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'OCR failed',
+      });
+
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('a.pdf'));
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('OCR failed'));
+    });
+
+    it('should show success toast when processing job completes (batch done)', () => {
+      service.addFiles([createFile('a.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Completed',
+        entityType: null,
+        entityId: null,
+        documentName: 'My Document',
+        error: null,
+      });
+
+      expect(toast.success).toHaveBeenCalledWith('1 file uploaded successfully.');
+    });
+
+    it('should show error batch toast if all items failed', () => {
+      service.addFiles([createFile('a.pdf')]);
+
+      httpTesting.expectOne('/api/v1/documents').flush(null, { status: 500, statusText: 'Error' });
+
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('a.pdf'));
+      expect(toast.error).toHaveBeenCalledWith('Upload failed.');
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('should show error batch toast with count for multiple failures', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+
+      const requests = httpTesting.match('/api/v1/documents');
+      requests[0].flush(null, { status: 500, statusText: 'Error' });
+      requests[1].flush(null, { status: 500, statusText: 'Error' });
+
+      expect(toast.error).toHaveBeenCalledWith('2 uploads failed.');
+      expect(toast.success).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,7 @@
 import { Injectable, computed, signal, inject, DestroyRef } from '@angular/core';
 import { HttpClient, HttpRequest, HttpEventType, HttpResponse, HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
+import { toast } from 'ngx-sonner';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
@@ -31,6 +32,8 @@ export class UploadManagerService {
   readonly items = signal<UploadItem[]>([]);
   private activeUploads = new Map<string, Subscription>();
   private idCounter = 0;
+  private batchCounter = 0;
+  private batches = new Map<number, Set<string>>();
 
   readonly hasItems = computed(() => this.items().length > 0);
   readonly hasActiveUploads = computed(() =>
@@ -72,6 +75,13 @@ export class UploadManagerService {
     }));
 
     this.items.update(prev => [...prev, ...newItems]);
+
+    const count = files.length;
+    toast.message(count === 1 ? `Uploading "${files[0].name}"...` : `Uploading ${count} files...`);
+
+    const batchId = ++this.batchCounter;
+    this.batches.set(batchId, new Set(newItems.map(i => i.id)));
+
     this.processQueue();
   }
 
@@ -93,6 +103,7 @@ export class UploadManagerService {
       this.activeUploads.delete(id);
     }
     this.items.update(prev => prev.filter(i => i.id !== id));
+    this.checkBatchesComplete();
   }
 
   /** Clear completed and failed items, keeping in-progress and queued ones. */
@@ -105,6 +116,7 @@ export class UploadManagerService {
       sub.unsubscribe();
     }
     this.activeUploads.clear();
+    this.batches.clear();
     this.items.set([]);
   }
 
@@ -152,10 +164,10 @@ export class UploadManagerService {
             });
           } else {
             this.updateItem(item.id, { status: 'completed', progress: 100 });
-
           }
           this.activeUploads.delete(item.id);
           this.processQueue();
+          this.checkBatchesComplete();
         }
       },
       error: (err: HttpErrorResponse) => {
@@ -163,8 +175,10 @@ export class UploadManagerService {
           ? 'Network error'
           : err.error?.message ?? err.statusText ?? 'Upload failed';
         this.updateItem(item.id, { status: 'failed', error: errorMsg });
+        toast.error(`Upload failed for "${item.fileName}": ${errorMsg}`);
         this.activeUploads.delete(item.id);
         this.processQueue();
+        this.checkBatchesComplete();
       },
     });
 
@@ -187,10 +201,35 @@ export class UploadManagerService {
         documentName: documentName ?? item.fileName,
       });
     } else if (status === 'Failed') {
-      this.updateItem(item.id, {
-        status: 'failed',
-        error: error ?? 'Processing failed',
-      });
+      const errorMsg = error ?? 'Processing failed';
+      this.updateItem(item.id, { status: 'failed', error: errorMsg });
+      toast.error(`Processing failed for "${item.fileName}": ${errorMsg}`);
+    }
+
+    this.checkBatchesComplete();
+  }
+
+  private checkBatchesComplete(): void {
+    const currentItems = this.items();
+    for (const [batchId, itemIds] of this.batches) {
+      const batchItems = currentItems.filter(i => itemIds.has(i.id));
+      let completed = 0;
+      let failed = 0;
+      for (const i of batchItems) {
+        if (i.status === 'completed') completed++;
+        else if (i.status === 'failed') failed++;
+      }
+      if (completed + failed < batchItems.length) continue;
+
+      this.batches.delete(batchId);
+
+      if (completed > 0 && failed === 0) {
+        toast.success(completed === 1 ? '1 file uploaded successfully.' : `${completed} files uploaded successfully.`);
+      } else if (completed > 0 && failed > 0) {
+        toast.warning(`${completed} file${completed > 1 ? 's' : ''} uploaded. ${failed} failed.`);
+      } else if (failed > 0) {
+        toast.error(failed === 1 ? 'Upload failed.' : `${failed} uploads failed.`);
+      }
     }
   }
 
