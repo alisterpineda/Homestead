@@ -73,4 +73,20 @@ public class DocumentMetadataService(AppDbContext db, ITagPathResolver tagPathRe
             }
         }
     }
+
+    public void RemoveTags(Document document, List<string> tagPaths)
+    {
+        var pathsToRemove = new HashSet<string>(tagPaths, StringComparer.OrdinalIgnoreCase);
+        var toRemove = document.DocumentTags.Where(dt => pathsToRemove.Contains(dt.Tag.Path)).ToList();
+        foreach (var dt in toRemove)
+            document.DocumentTags.Remove(dt);
+    }
+
+    public void RemoveParties(Document document, List<Guid> partyIds)
+    {
+        var idsToRemove = new HashSet<Guid>(partyIds);
+        var toRemove = document.DocumentParties.Where(dp => idsToRemove.Contains(dp.PartyId)).ToList();
+        foreach (var dp in toRemove)
+            document.DocumentParties.Remove(dp);
+    }
 }

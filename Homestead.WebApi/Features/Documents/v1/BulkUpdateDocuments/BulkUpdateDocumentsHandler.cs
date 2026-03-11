@@ -46,6 +46,18 @@ public class BulkUpdateDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
         {
             var before = DocumentSnapshot.From(document);
 
+            // Apply removals first
+            if (request.RemoveTagPaths is { Count: > 0 })
+            {
+                metadataService.RemoveTags(document, request.RemoveTagPaths);
+            }
+
+            if (request.RemovePartyIds is { Count: > 0 })
+            {
+                metadataService.RemoveParties(document, request.RemovePartyIds);
+            }
+
+            // Then additions
             if (resolvedTags != null)
             {
                 metadataService.AddTags(document, resolvedTags);

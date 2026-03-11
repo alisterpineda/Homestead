@@ -4,5 +4,7 @@
 export interface BulkUpdateDocumentsRequest {
   ids: Array<string>;
   partyIds: (Array<string> | null);
+  removePartyIds: (Array<string> | null);
+  removeTagPaths: (Array<string> | null);
   tagPaths: (Array<string> | null);
 }

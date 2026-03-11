@@ -10,4 +10,6 @@ public interface IDocumentMetadataService
     void AddTags(Document document, List<Tag> tags);
     void SetParties(Document document, List<Guid> partyIds);
     void AddParties(Document document, List<Guid> partyIds);
+    void RemoveTags(Document document, List<string> tagPaths);
+    void RemoveParties(Document document, List<Guid> partyIds);
 }

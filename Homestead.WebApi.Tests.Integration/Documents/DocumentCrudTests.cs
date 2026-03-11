@@ -330,6 +330,154 @@ public class DocumentCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task BulkUpdateDocuments_RemovesTags()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId1 = await UploadAndWaitAsync(client, "RemoveTag1.pdf");
+        var docId2 = await UploadAndWaitAsync(client, "RemoveTag2.pdf");
+
+        // Add tags A and B to both docs
+        await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId1, docId2 },
+            tagPaths = new[] { "tagA", "tagB" },
+        }, CT);
+
+        // Remove tag A
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId1, docId2 },
+            removeTagPaths = new[] { "tagA" },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkUpdateResult>(CT);
+        Assert.Equal(2, body!.UpdatedCount);
+
+        // Verify only tag B remains
+        var doc1 = await client.GetFromJsonAsync<DocumentDetailWithMeta>($"/api/v1/documents/{docId1}", CT);
+        Assert.Single(doc1!.Tags);
+        Assert.Equal("tagB", doc1.Tags[0].Path);
+
+        var doc2 = await client.GetFromJsonAsync<DocumentDetailWithMeta>($"/api/v1/documents/{docId2}", CT);
+        Assert.Single(doc2!.Tags);
+        Assert.Equal("tagB", doc2.Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDocuments_RemovesParties()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "RemoveParty.pdf");
+
+        // Create and add a party
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Remove Me Corp" }, CT);
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyItem>(CT);
+
+        await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            partyIds = new[] { party!.Id },
+        }, CT);
+
+        // Remove the party
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            removePartyIds = new[] { party.Id },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkUpdateResult>(CT);
+        Assert.Equal(1, body!.UpdatedCount);
+
+        var doc = await client.GetFromJsonAsync<DocumentDetailWithMeta>($"/api/v1/documents/{docId}", CT);
+        Assert.Empty(doc!.Parties);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDocuments_AddAndRemoveInSingleCall()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "AddRemoveTag.pdf");
+
+        // Add "oldTag" first
+        await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            tagPaths = new[] { "oldTag" },
+        }, CT);
+
+        // Remove "oldTag" and add "newTag" in a single call
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            tagPaths = new[] { "newTag" },
+            removeTagPaths = new[] { "oldTag" },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkUpdateResult>(CT);
+        Assert.Equal(1, body!.UpdatedCount);
+
+        var doc = await client.GetFromJsonAsync<DocumentDetailWithMeta>($"/api/v1/documents/{docId}", CT);
+        Assert.Single(doc!.Tags);
+        Assert.Equal("newTag", doc.Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDocuments_RemoveNonExistentTag_IsNoOp()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "NoOpRemove.pdf");
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            removeTagPaths = new[] { "nonexistent-tag" },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkUpdateResult>(CT);
+        Assert.Equal(0, body!.UpdatedCount);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDocuments_OverlappingAddAndRemoveTag_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "OverlapTag.pdf");
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            tagPaths = new[] { "conflict-tag" },
+            removeTagPaths = new[] { "conflict-tag" },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDocuments_OverlappingAddAndRemoveParty_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "OverlapParty.pdf");
+
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Overlap Corp" }, CT);
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyItem>(CT);
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-update", new
+        {
+            ids = new[] { docId },
+            partyIds = new[] { party!.Id },
+            removePartyIds = new[] { party.Id },
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task<HttpResponseMessage> UploadDocumentAsync(HttpClient client, string name = "sample.pdf")
     {
         var fileBytes = await GetUniquePdfBytesAsync();

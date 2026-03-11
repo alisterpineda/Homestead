@@ -280,7 +280,7 @@ import { toast } from 'ngx-sonner';
 
               @if (hasSelection()) {
                 <div class="ml-auto flex items-center gap-2">
-                  <app-bulk-update-dialog [selectedIds]="selectedDocumentIds()" (applied)="onBulkUpdateApplied()" />
+                  <app-bulk-update-dialog [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" (applied)="onBulkUpdateApplied()" />
                   <hlm-alert-dialog>
                     <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
                       <ng-icon hlm name="lucideTrash2" size="sm" />
