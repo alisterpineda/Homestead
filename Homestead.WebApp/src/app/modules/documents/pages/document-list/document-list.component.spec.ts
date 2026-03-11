@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { DocumentListComponent } from './document-list.component';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
@@ -173,6 +173,15 @@ describe('DocumentListComponent', () => {
     it('should be true when search term is present', () => {
       (component as any).searchTerm = signal('test');
       expect(component.hasActiveFilters()).toBe(true);
+    });
+  });
+
+  describe('onDocumentSelect', () => {
+    it('should navigate to the document detail page', () => {
+      const router = TestBed.inject(Router);
+      const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+      component.onDocumentSelect('doc-123');
+      expect(spy).toHaveBeenCalledWith(['/documents', 'doc-123']);
     });
   });
 });

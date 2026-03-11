@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
@@ -582,6 +582,13 @@ export class DocumentListComponent implements OnDestroy {
         replaceUrl: true,
       });
     });
+
+    effect(() => {
+      const items = this.data()?.items;
+      if (items) {
+        this.openDocumentsService.setNavigationList(items.map(d => d.id));
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -671,10 +678,6 @@ export class DocumentListComponent implements OnDestroy {
   }
 
   onDocumentSelect(id: string): void {
-    const items = this.data()?.items;
-    if (items) {
-      this.openDocumentsService.setNavigationList(items.map(d => d.id));
-    }
     this.router.navigate(['/documents', id]);
   }
 

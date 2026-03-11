@@ -13,7 +13,9 @@ export class OpenDocumentsService {
   readonly openDocuments = signal<OpenDocument[]>(this.loadFromStorage());
 
   // Transient — not persisted
-  readonly navigationList = signal<string[]>([]);
+  readonly navigationList = signal<string[]>([], {
+    equal: (a, b) => a.length === b.length && a.every((v, i) => v === b[i]),
+  });
 
   addDocument(id: string, name: string): void {
     const before = this.openDocuments();
