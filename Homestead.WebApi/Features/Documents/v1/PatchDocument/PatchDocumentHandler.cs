@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
@@ -11,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, ITagPathResolver tagPathResolver,
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentMetadataService metadataService,
     IAuthorizationService authService, IHttpContextAccessor httpContext, IDocumentQueryService queryService)
     : ICommandHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
@@ -58,18 +57,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             throw new BadRequestException("Name is required.");
 
         // Validate party IDs
-        if (model.PartyIds.Count > 0)
-        {
-            var existingPartyIds = await db.Parties
-                .Where(p => model.PartyIds.Contains(p.Id))
-                .Select(p => p.Id)
-                .ToListAsync(ct);
-
-            var invalidIds = model.PartyIds.Except(existingPartyIds).ToList();
-
-            if (invalidIds.Count > 0)
-                throw new BadRequestException("One or more party IDs are invalid.");
-        }
+        await metadataService.ValidatePartyIdsAsync(model.PartyIds, ct);
 
         // Validate GroupId if changed
         if (model.GroupId.HasValue && model.GroupId != document.GroupId)
@@ -91,32 +79,12 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         document.Notes = model.Notes;
         document.GroupId = model.GroupId;
 
-        // Clear existing tag associations
-        document.DocumentTags.Clear();
+        // Update tags
+        var resolvedTags = await metadataService.ResolveTagPathsAsync(model.TagPaths, ct);
+        metadataService.SetTags(document, resolvedTags);
 
-        // Resolve or create each tag path and create associations
-        foreach (var tagPath in model.TagPaths)
-        {
-            var tag = await tagPathResolver.ResolveOrCreateAsync(tagPath, createdByUserId: currentUser.UserId, ct: ct);
-            document.DocumentTags.Add(new DocumentTag
-            {
-                DocumentId = document.Id,
-                TagId = tag.Id,
-                Tag = tag
-            });
-        }
-
-        // Clear existing party associations and reassign
-        document.DocumentParties.Clear();
-
-        foreach (var partyId in model.PartyIds)
-        {
-            document.DocumentParties.Add(new DocumentParty
-            {
-                DocumentId = document.Id,
-                PartyId = partyId
-            });
-        }
+        // Update parties
+        metadataService.SetParties(document, model.PartyIds);
 
         var after = DocumentSnapshot.From(document);
         var changes = before.Diff(after);

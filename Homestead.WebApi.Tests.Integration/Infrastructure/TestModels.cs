@@ -6,6 +6,8 @@ internal record PaginatedResult<T>(IReadOnlyList<T> Items, int Page, int PageSiz
 
 internal record BulkDeleteResult(int DeletedCount);
 
+internal record BulkUpdateResult(int UpdatedCount);
+
 internal record UserItem(Guid Id, string DisplayName, string? Email, string Role, bool IsActive, bool HasPassword, DateTimeOffset CreatedAt);
 
 internal record UserInfoResult(Guid Id, string Email, string DisplayName, string Role, bool IsActive);

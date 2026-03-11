@@ -6,7 +6,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -25,6 +25,7 @@ import { PaginationComponent } from '../../components/pagination/pagination.comp
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { handleFileInputChange } from '@/shared/utils';
 import { DocumentListStateService } from '../../services/document-list-state.service';
+import { BulkUpdateDialogComponent } from '../../components/bulk-update-dialog/bulk-update-dialog.component';
 import { OpenDocumentsService } from '../../services/open-documents.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
@@ -54,9 +55,10 @@ import { toast } from 'ngx-sonner';
     DocumentCardGridComponent,
     NgTemplateOutlet,
     PaginationComponent,
+    BulkUpdateDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -278,6 +280,7 @@ import { toast } from 'ngx-sonner';
 
               @if (hasSelection()) {
                 <div class="ml-auto flex items-center gap-2">
+                  <app-bulk-update-dialog [selectedIds]="selectedDocumentIds()" (applied)="onBulkUpdateApplied()" />
                   <hlm-alert-dialog>
                     <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
                       <ng-icon hlm name="lucideTrash2" size="sm" />
@@ -783,6 +786,11 @@ export class DocumentListComponent implements OnDestroy {
     const items = this.data()?.items;
     if (!items) return;
     this.selectedDocumentIds.set(new Set(items.map(d => d.id)));
+  }
+
+  onBulkUpdateApplied(): void {
+    this.clearSelection();
+    this.onRefresh();
   }
 
   onBulkDelete(ctx: { close: () => void }): void {
