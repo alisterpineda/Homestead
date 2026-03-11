@@ -111,13 +111,13 @@ import { toast } from 'ngx-sonner';
                     <span hlmDropdownMenuLabel>Sort by</span>
                     <hlm-dropdown-menu-group>
                       @if (isSearching()) {
-                        <button hlmDropdownMenuRadio [checked]="!sortBy()" (triggered)="onSortByChange(null)">
+                        <button hlmDropdownMenuRadio [checked]="!effectiveSortBy()" (triggered)="onSortByChange(null)">
                           <hlm-dropdown-menu-radio-indicator />
                           Relevance
                         </button>
                       }
                       @for (opt of sortOptions; track opt.value) {
-                        <button hlmDropdownMenuRadio [checked]="sortBy() === opt.value" (triggered)="onSortByChange(opt.value)">
+                        <button hlmDropdownMenuRadio [checked]="effectiveSortBy() === opt.value" (triggered)="onSortByChange(opt.value)">
                           <hlm-dropdown-menu-radio-indicator />
                           {{ opt.label }}
                         </button>
@@ -747,7 +747,7 @@ export class DocumentListComponent implements OnDestroy {
   }
 
   onSortDirChange(dir: SortDirection): void {
-    const field = this.sortBy();
+    const field = this.effectiveSortBy();
     if (field) {
       this.onSortChange({ sortBy: field, sortDir: dir });
     }

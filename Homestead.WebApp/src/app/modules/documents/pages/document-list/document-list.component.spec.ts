@@ -88,10 +88,17 @@ describe('DocumentListComponent', () => {
   });
 
   describe('onSortDirChange', () => {
-    it('should do nothing when no sort field is active', () => {
+    it('should do nothing when searching with no explicit sort (relevance)', () => {
+      (component as any).searchTerm = signal('test query');
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortDirChange('Desc');
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('should use default CreatedAt when not searching and no explicit sortBy is set', () => {
+      const spy = vi.spyOn(component, 'onSortChange');
+      component.onSortDirChange('Asc');
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'CreatedAt', sortDir: 'Asc' });
     });
 
     it('should call onSortChange with active field and Desc direction', () => {
