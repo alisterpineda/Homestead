@@ -5,6 +5,7 @@ export interface DocumentEditState {
   editDocumentDate: string | null;
   editValidFrom: string | null;
   editValidUntil: string | null;
+  editNotes: string;
   editParties: Array<{ id: string; name: string }>;
   editTags: string[];
   editVersionLabel: string;

@@ -16,6 +16,7 @@ export interface PatchDocumentResponse {
   groupName?: (string | null);
   id: string;
   name: string;
+  notes?: string;
   ownerUserId?: (string | null);
   ownerUserName?: (string | null);
   parties: Array<PartyDto>;

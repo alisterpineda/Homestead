@@ -69,6 +69,7 @@ public class DocumentCrudTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
         Assert.Equal(docId, body!.Id);
         Assert.Equal("TestDoc.pdf", body.Name);
+        Assert.Equal("", body.Notes);
     }
 
     [Fact]
@@ -95,6 +96,22 @@ public class DocumentCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
         Assert.Equal("Updated Name", body!.Name);
+    }
+
+    [Fact]
+    public async Task PatchDocument_UpdatesNotes()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client);
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/notes", value = (object)"Some important notes" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
+        Assert.Equal("Some important notes", body!.Notes);
     }
 
     [Fact]
@@ -170,5 +187,5 @@ public class DocumentCrudTests : IntegrationTestBase
     }
 
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension);
-    private record DocumentDetail(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
+    private record DocumentDetail(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt, string? Notes = null);
 }

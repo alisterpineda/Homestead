@@ -12,6 +12,7 @@ public record GetDocumentResponse
     public DateOnly? DocumentDate { get; init; }
     public DateOnly? ValidFrom { get; init; }
     public DateOnly? ValidUntil { get; init; }
+    public string Notes { get; init; } = string.Empty;
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }

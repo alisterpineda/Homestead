@@ -36,6 +36,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             DocumentDate = document.DocumentDate,
             ValidFrom = document.ValidFrom,
             ValidUntil = document.ValidUntil,
+            Notes = document.Notes,
             TagPaths = document.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
             PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList(),
             GroupId = document.GroupId
@@ -87,6 +88,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         document.DocumentDate = model.DocumentDate;
         document.ValidFrom = model.ValidFrom;
         document.ValidUntil = model.ValidUntil;
+        document.Notes = model.Notes;
         document.GroupId = model.GroupId;
 
         // Clear existing tag associations
@@ -197,6 +199,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             DocumentDate = document.DocumentDate,
             ValidFrom = document.ValidFrom,
             ValidUntil = document.ValidUntil,
+            Notes = document.Notes,
             CreatedByUserId = document.CreatedByUserId,
             CreatedByUserName = createdByUserName,
             OwnerUserId = document.OwnerUserId,

@@ -8,6 +8,7 @@ public class PatchDocumentModel
     public DateOnly? DocumentDate { get; set; }
     public DateOnly? ValidFrom { get; set; }
     public DateOnly? ValidUntil { get; set; }
+    public string Notes { get; set; } = string.Empty;
     public List<string> TagPaths { get; set; } = [];
     public List<Guid> PartyIds { get; set; } = [];
     public Guid? GroupId { get; set; }

@@ -8,6 +8,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
     public DateOnly? DocumentDate { get; init; }
     public DateOnly? ValidFrom { get; init; }
     public DateOnly? ValidUntil { get; init; }
+    public string Notes { get; init; } = string.Empty;
     public required List<string> TagPaths { get; init; }
     public required List<Guid> PartyIds { get; init; }
     public Guid? GroupId { get; init; }
@@ -18,6 +19,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
         DocumentDate = source.DocumentDate,
         ValidFrom = source.ValidFrom,
         ValidUntil = source.ValidUntil,
+        Notes = source.Notes,
         TagPaths = source.DocumentTags.Select(dt => dt.Tag.Path).Order().ToList(),
         PartyIds = source.DocumentParties.Select(dp => dp.PartyId).Order().ToList(),
         GroupId = source.GroupId
@@ -35,6 +37,8 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
             changes.Add(new ScalarFieldChange("ValidFrom", ValidFrom?.ToString(), other.ValidFrom?.ToString()));
         if (ValidUntil != other.ValidUntil)
             changes.Add(new ScalarFieldChange("ValidUntil", ValidUntil?.ToString(), other.ValidUntil?.ToString()));
+        if (Notes != other.Notes)
+            changes.Add(new ScalarFieldChange("Notes", Notes, other.Notes));
         if (!TagPaths.SequenceEqual(other.TagPaths))
             changes.Add(new ArrayFieldChange("TagPaths", TagPaths, other.TagPaths));
         if (!PartyIds.SequenceEqual(other.PartyIds))

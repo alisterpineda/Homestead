@@ -98,6 +98,10 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
 

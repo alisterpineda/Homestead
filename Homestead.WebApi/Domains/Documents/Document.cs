@@ -13,6 +13,7 @@ public class Document
     public DateOnly? DocumentDate { get; set; }
     public DateOnly? ValidFrom { get; set; }
     public DateOnly? ValidUntil { get; set; }
+    public string Notes { get; set; } = string.Empty;
     public NpgsqlTsVector? SearchVector { get; set; }
 
     public DateTimeOffset? DeletedAt { get; set; }
