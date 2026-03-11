@@ -320,4 +320,135 @@ public class TagPathResolverTests : IDisposable
         Assert.Equal(userId, parent.CreatedByUserId);
         Assert.Equal(userId, leaf.CreatedByUserId);
     }
+
+    // --- Batch (ResolveOrCreateManyAsync) tests ---
+
+    [Fact]
+    public async Task Batch_ResolvesMultiplePaths_SingleQuery()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance", "legal"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal("finance", tags[0].Path);
+        Assert.Equal("legal", tags[1].Path);
+        Assert.Equal(2, _db.Tags.Count());
+    }
+
+    [Fact]
+    public async Task Batch_SharedPrefix_CreatesParentOnce()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance/invoices", "finance/contracts"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal("finance/invoices", tags[0].Path);
+        Assert.Equal("finance/contracts", tags[1].Path);
+        Assert.Equal(3, _db.Tags.Count());
+        Assert.Single(_db.Tags.Where(t => t.Path == "finance"));
+    }
+
+    [Fact]
+    public async Task Batch_ReusesExistingTags()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.ResolveOrCreateAsync("finance", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance/invoices", "finance/contracts"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal(3, _db.Tags.Count());
+    }
+
+    [Fact]
+    public async Task Batch_EmptyList_ReturnsEmpty()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tags = await _sut.ResolveOrCreateManyAsync([], ct: ct);
+
+        Assert.Empty(tags);
+        Assert.Equal(0, _db.Tags.Count());
+    }
+
+    [Fact]
+    public async Task Batch_PreservesCreatedByUserId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance", "legal/contracts"], createdByUserId: userId, ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.All(_db.Tags, t => Assert.Equal(userId, t.CreatedByUserId));
+    }
+
+    [Fact]
+    public async Task Batch_InvalidPath_ThrowsArgumentException()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _sut.ResolveOrCreateManyAsync(["finance", "///"], ct: ct));
+    }
+
+    [Fact]
+    public async Task Batch_DuplicatePaths_ReturnsOneTagPerInput()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance", "finance"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal(tags[0].Id, tags[1].Id);
+        Assert.Single(_db.Tags);
+    }
+
+    [Fact]
+    public async Task Batch_DeepHierarchy_CreatesFullChain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["a/b/c", "a/b/d"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Equal(2, tags.Count);
+        Assert.Equal("a/b/c", tags[0].Path);
+        Assert.Equal("a/b/d", tags[1].Path);
+        Assert.Equal(4, _db.Tags.Count());
+
+        var a = await _db.Tags.SingleAsync(t => t.Path == "a", ct);
+        var ab = await _db.Tags.SingleAsync(t => t.Path == "a/b", ct);
+        var abc = await _db.Tags.SingleAsync(t => t.Path == "a/b/c", ct);
+        var abd = await _db.Tags.SingleAsync(t => t.Path == "a/b/d", ct);
+
+        Assert.Null(a.ParentId);
+        Assert.Equal(a.Id, ab.ParentId);
+        Assert.Equal(ab.Id, abc.ParentId);
+        Assert.Equal(ab.Id, abd.ParentId);
+    }
+
+    [Fact]
+    public async Task Batch_ChangeTrackerTags_AreReused()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Resolve "finance" but do NOT save — it stays in the change tracker
+        await _sut.ResolveOrCreateAsync("finance", ct: ct);
+
+        var tags = await _sut.ResolveOrCreateManyAsync(["finance/invoices"], ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        Assert.Single(tags);
+        Assert.Equal("finance/invoices", tags[0].Path);
+        Assert.Equal(2, _db.Tags.Count());
+    }
 }

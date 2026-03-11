@@ -12,13 +12,7 @@ public class DocumentMetadataService(AppDbContext db, ITagPathResolver tagPathRe
 {
     public async Task<List<Tag>> ResolveTagPathsAsync(List<string> tagPaths, CancellationToken ct)
     {
-        var tags = new List<Tag>();
-        foreach (var tagPath in tagPaths)
-        {
-            var tag = await tagPathResolver.ResolveOrCreateAsync(tagPath, createdByUserId: currentUser.UserId, ct: ct);
-            tags.Add(tag);
-        }
-        return tags;
+        return await tagPathResolver.ResolveOrCreateManyAsync(tagPaths, createdByUserId: currentUser.UserId, ct: ct);
     }
 
     public async Task ValidatePartyIdsAsync(List<Guid> partyIds, CancellationToken ct)
