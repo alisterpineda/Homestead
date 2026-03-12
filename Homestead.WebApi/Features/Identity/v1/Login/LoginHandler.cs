@@ -10,8 +10,8 @@ public class LoginHandler(SignInManager<AppUser> signInManager)
     public async Task<LoginResponse> HandleAsync(LoginRequest request, CancellationToken ct)
     {
         var result = await signInManager.PasswordSignInAsync(
-            request.Email, request.Password, isPersistent: true, lockoutOnFailure: false);
+            request.Email, request.Password, isPersistent: true, lockoutOnFailure: true);
 
-        return new LoginResponse(result.Succeeded);
+        return new LoginResponse(result.Succeeded, result.IsLockedOut);
     }
 }

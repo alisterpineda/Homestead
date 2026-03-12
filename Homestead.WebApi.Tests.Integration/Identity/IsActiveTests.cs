@@ -132,6 +132,4 @@ public class IsActiveTests : IntegrationTestBase
         var body = await deactivateResponse.Content.ReadFromJsonAsync<UserItem>(CT);
         Assert.False(body!.IsActive);
     }
-
-    private record ErrorResponse(string Error);
 }

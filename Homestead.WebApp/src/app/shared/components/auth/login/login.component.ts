@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -132,8 +133,12 @@ export class LoginComponent implements OnInit {
       const { email, password } = this.form.getRawValue();
       await this.auth.login(email, password);
       this.router.navigate(['/documents']);
-    } catch {
-      this.error.set('Invalid email or password.');
+    } catch (e) {
+      if (e instanceof HttpErrorResponse && e.error?.error === 'account_locked') {
+        this.error.set('Too many failed login attempts. Your account has been temporarily locked. Please try again later.');
+      } else {
+        this.error.set('Invalid email or password.');
+      }
     } finally {
       this.submitting.set(false);
     }

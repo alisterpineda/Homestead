@@ -11,6 +11,7 @@ public static class AuthPolicies
     public const string AuthenticatedOnly = "AuthenticatedOnly";
     public const string ActiveUser = "ActiveUser";
     public const string AccountInactiveError = "account_inactive";
+    public const string AccountLockedError = "account_locked";
 
     public const string RequireAdmin = "RequireAdmin";
     public const string RequireContributor = "RequireContributor";

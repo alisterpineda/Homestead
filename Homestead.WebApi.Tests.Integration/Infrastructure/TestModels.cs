@@ -22,3 +22,5 @@ internal record DocumentListItem(Guid Id, string Name, Guid? GroupId, string? Gr
     DateTimeOffset? DeletedAt = null, Guid? DeletedByUserId = null, string? DeletedByUserName = null);
 
 internal record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);
+
+internal record ErrorResponse(string? Error);
