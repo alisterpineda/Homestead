@@ -6,7 +6,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -25,7 +25,8 @@ import { PaginationComponent } from '../../components/pagination/pagination.comp
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { handleFileInputChange } from '@/shared/utils';
 import { DocumentListStateService } from '../../services/document-list-state.service';
-import { BulkUpdateDialogComponent } from '../../components/bulk-update-dialog/bulk-update-dialog.component';
+import { BulkEditTagsPopoverComponent } from '../../components/bulk-edit-tags-popover/bulk-edit-tags-popover.component';
+import { BulkEditPartiesPopoverComponent } from '../../components/bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { OpenDocumentsService } from '../../services/open-documents.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocuments } from '@/api/generated/fn/documents/get-documents';
@@ -55,10 +56,11 @@ import { toast } from 'ngx-sonner';
     DocumentCardGridComponent,
     NgTemplateOutlet,
     PaginationComponent,
-    BulkUpdateDialogComponent,
+    BulkEditTagsPopoverComponent,
+    BulkEditPartiesPopoverComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -278,32 +280,31 @@ import { toast } from 'ngx-sonner';
                 </button>
               }
 
-              @if (hasSelection()) {
-                <div class="ml-auto flex items-center gap-2">
-                  <app-bulk-update-dialog [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" (applied)="onBulkUpdateApplied()" />
-                  <hlm-alert-dialog>
-                    <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
-                      <ng-icon hlm name="lucideTrash2" size="sm" />
-                      Delete
-                    </button>
-                    <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                      <div hlmAlertDialogHeader>
-                        <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
-                        <p hlmAlertDialogDescription>
-                          The selected document{{ selectionCount() > 1 ? 's' : '' }}
-                          will be moved to trash. You can restore {{ selectionCount() > 1 ? 'them' : 'it' }} later.
-                        </p>
-                      </div>
-                      <div hlmAlertDialogFooter>
-                        <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                        <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
-                          {{ deleting() ? 'Deleting...' : 'Delete' }}
-                        </button>
-                      </div>
-                    </hlm-alert-dialog-content>
-                  </hlm-alert-dialog>
-                </div>
-              }
+              <div class="ml-auto flex items-center gap-2">
+                <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+                <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+                <hlm-alert-dialog>
+                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    Delete
+                  </button>
+                  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                    <div hlmAlertDialogHeader>
+                      <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
+                      <p hlmAlertDialogDescription>
+                        The selected document{{ selectionCount() > 1 ? 's' : '' }}
+                        will be moved to trash. You can restore {{ selectionCount() > 1 ? 'them' : 'it' }} later.
+                      </p>
+                    </div>
+                    <div hlmAlertDialogFooter>
+                      <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
+                        {{ deleting() ? 'Deleting...' : 'Delete' }}
+                      </button>
+                    </div>
+                  </hlm-alert-dialog-content>
+                </hlm-alert-dialog>
+              </div>
             </div>
           </div>
 
