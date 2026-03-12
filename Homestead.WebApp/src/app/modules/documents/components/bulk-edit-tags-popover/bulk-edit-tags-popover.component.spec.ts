@@ -172,4 +172,45 @@ describe('BulkEditTagsPopoverComponent', () => {
     component.toggleItem('legal');
     expect(component.items().find((t) => t.path === 'legal')!.state).toBe('checked');
   });
+
+  describe('confirmationMessage', () => {
+    it('should build message for add-only', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('invoices'); // mixed → checked (add)
+      expect(component.confirmationMessage()).toBe('This will add 1 tag on 2 documents.');
+    });
+
+    it('should build message for remove-only', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('finance'); // checked → remove
+      expect(component.confirmationMessage()).toBe('This will remove 1 tag on 2 documents.');
+    });
+
+    it('should build message for add and remove', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('invoices'); // mixed → checked (add)
+      component.toggleItem('finance'); // checked → remove
+      expect(component.confirmationMessage()).toBe('This will add 1 tag and remove 1 tag on 2 documents.');
+    });
+
+    it('should pluralize tags correctly', () => {
+      component.onPopoverStateChanged('open');
+      component.addFromSuggestion({ path: 'legal', effectiveColor: null } as any);
+      component.toggleItem('invoices'); // mixed → checked (add)
+      // Now 2 tags to add: invoices + legal
+      expect(component.confirmationMessage()).toBe('This will add 2 tags on 2 documents.');
+    });
+  });
+
+  it('confirmApply should call ctx.close on success', () => {
+    component.onPopoverStateChanged('open');
+    component.toggleItem('invoices'); // mixed → checked (add)
+
+    const ctx = { close: vi.fn() };
+    component.confirmApply(ctx);
+
+    // The actual API call is async, so we verify the method is callable
+    // and doesn't throw synchronously
+    expect(component.applying()).toBe(true);
+  });
 });

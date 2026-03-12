@@ -21,6 +21,7 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { bulkUpdateDocuments } from '@/api/generated/fn/documents/bulk-update-documents';
 import { getTags } from '@/api/generated/fn/documents/get-tags';
@@ -28,7 +29,7 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import { toast } from 'ngx-sonner';
-import { type TagCheckboxItem, nextState, isChanged } from '../bulk-edit-shared';
+import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } from '../bulk-edit-shared';
 
 @Component({
   selector: 'app-bulk-edit-tags-popover',
@@ -40,6 +41,7 @@ import { type TagCheckboxItem, nextState, isChanged } from '../bulk-edit-shared'
     HlmSeparatorImports,
     HlmInput,
     HlmButton,
+    HlmAlertDialogImports,
     TagBadgeComponent,
   ],
   providers: [provideIcons({ lucideTags, lucideCheck, lucideMinus, lucideX })],
@@ -134,9 +136,23 @@ import { type TagCheckboxItem, nextState, isChanged } from '../bulk-edit-shared'
                 @if (removeCount() > 0) { {{ removeCount() }} to remove }
               </span>
             }
-            <button hlmBtn size="sm" (click)="apply()" [disabled]="!hasChanges() || applying()">
-              {{ applying() ? 'Applying...' : 'Apply' }}
-            </button>
+            <hlm-alert-dialog>
+              <button hlmAlertDialogTrigger hlmBtn size="sm" [disabled]="!hasChanges() || applying()">
+                {{ applying() ? 'Applying...' : 'Apply' }}
+              </button>
+              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                <div hlmAlertDialogHeader>
+                  <h2 hlmAlertDialogTitle>Apply tag changes?</h2>
+                  <p hlmAlertDialogDescription>{{ confirmationMessage() }}</p>
+                </div>
+                <div hlmAlertDialogFooter>
+                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                  <button hlmAlertDialogAction (click)="confirmApply(ctx)" [disabled]="applying()">
+                    {{ applying() ? 'Applying...' : 'Confirm' }}
+                  </button>
+                </div>
+              </hlm-alert-dialog-content>
+            </hlm-alert-dialog>
           </div>
         }
       </div>
@@ -199,6 +215,10 @@ export class BulkEditTagsPopoverComponent {
   addCount = computed(() => this.changeSummary().addCount);
   removeCount = computed(() => this.changeSummary().removeCount);
 
+  confirmationMessage = computed(() =>
+    buildConfirmationMessage(this.addCount(), this.removeCount(), this.selectedIds().size, 'tag', 'tags'),
+  );
+
   constructor() {
     effect(() => {
       this.tagSearchText();
@@ -254,7 +274,7 @@ export class BulkEditTagsPopoverComponent {
     );
   }
 
-  apply(): void {
+  confirmApply(ctx: { close: () => void }): void {
     if (!this.hasChanges()) return;
 
     const tagPathsToAdd = this.items()
@@ -280,6 +300,7 @@ export class BulkEditTagsPopoverComponent {
         this.applying.set(false);
         const count = +response.body.updatedCount;
         toast.success(`Updated ${count} document${count > 1 ? 's' : ''}.`);
+        ctx.close();
         this.popoverState.set('closed');
         this.applied.emit();
       },

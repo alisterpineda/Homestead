@@ -40,3 +40,16 @@ export function isChanged(state: BulkItemState, initial: 'all' | 'some' | 'new')
       return state === 'checked';
   }
 }
+
+export function buildConfirmationMessage(
+  addCount: number,
+  removeCount: number,
+  docCount: number,
+  singular: string,
+  plural: string,
+): string {
+  const parts: string[] = [];
+  if (addCount > 0) parts.push(`add ${addCount} ${addCount > 1 ? plural : singular}`);
+  if (removeCount > 0) parts.push(`remove ${removeCount} ${removeCount > 1 ? plural : singular}`);
+  return `This will ${parts.join(' and ')} on ${docCount} document${docCount > 1 ? 's' : ''}.`;
+}

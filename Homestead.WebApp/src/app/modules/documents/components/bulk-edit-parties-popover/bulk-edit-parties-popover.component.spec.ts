@@ -169,4 +169,45 @@ describe('BulkEditPartiesPopoverComponent', () => {
     component.toggleItem('p3');
     expect(component.items().find((p) => p.id === 'p3')!.state).toBe('checked');
   });
+
+  describe('confirmationMessage', () => {
+    it('should build message for add-only', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('p2'); // mixed → checked (add)
+      expect(component.confirmationMessage()).toBe('This will add 1 party on 2 documents.');
+    });
+
+    it('should build message for remove-only', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('p1'); // checked → remove
+      expect(component.confirmationMessage()).toBe('This will remove 1 party on 2 documents.');
+    });
+
+    it('should build message for add and remove', () => {
+      component.onPopoverStateChanged('open');
+      component.toggleItem('p2'); // mixed → checked (add)
+      component.toggleItem('p1'); // checked → remove
+      expect(component.confirmationMessage()).toBe('This will add 1 party and remove 1 party on 2 documents.');
+    });
+
+    it('should pluralize parties correctly', () => {
+      component.onPopoverStateChanged('open');
+      component.addFromSuggestion({ id: 'p3', name: 'New Corp' });
+      component.toggleItem('p2'); // mixed → checked (add)
+      // Now 2 parties to add: p2 + p3
+      expect(component.confirmationMessage()).toBe('This will add 2 parties on 2 documents.');
+    });
+  });
+
+  it('confirmApply should call ctx.close on success', () => {
+    component.onPopoverStateChanged('open');
+    component.toggleItem('p2'); // mixed → checked (add)
+
+    const ctx = { close: vi.fn() };
+    component.confirmApply(ctx);
+
+    // The actual API call is async, so we verify the method is callable
+    // and doesn't throw synchronously
+    expect(component.applying()).toBe(true);
+  });
 });

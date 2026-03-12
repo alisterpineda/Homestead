@@ -21,6 +21,7 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { bulkUpdateDocuments } from '@/api/generated/fn/documents/bulk-update-documents';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
@@ -29,7 +30,7 @@ import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { toast } from 'ngx-sonner';
-import { type PartyCheckboxItem, nextState, isChanged } from '../bulk-edit-shared';
+import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage } from '../bulk-edit-shared';
 
 const CREATE_PARTY_ID = '__create__';
 
@@ -43,6 +44,7 @@ const CREATE_PARTY_ID = '__create__';
     HlmSeparatorImports,
     HlmInput,
     HlmButton,
+    HlmAlertDialogImports,
     PartyBadgeComponent,
   ],
   providers: [provideIcons({ lucideUsers, lucideCheck, lucideMinus, lucideX })],
@@ -138,9 +140,23 @@ const CREATE_PARTY_ID = '__create__';
                 @if (removeCount() > 0) { {{ removeCount() }} to remove }
               </span>
             }
-            <button hlmBtn size="sm" (click)="apply()" [disabled]="!hasChanges() || applying()">
-              {{ applying() ? 'Applying...' : 'Apply' }}
-            </button>
+            <hlm-alert-dialog>
+              <button hlmAlertDialogTrigger hlmBtn size="sm" [disabled]="!hasChanges() || applying()">
+                {{ applying() ? 'Applying...' : 'Apply' }}
+              </button>
+              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                <div hlmAlertDialogHeader>
+                  <h2 hlmAlertDialogTitle>Apply party changes?</h2>
+                  <p hlmAlertDialogDescription>{{ confirmationMessage() }}</p>
+                </div>
+                <div hlmAlertDialogFooter>
+                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                  <button hlmAlertDialogAction (click)="confirmApply(ctx)" [disabled]="applying()">
+                    {{ applying() ? 'Applying...' : 'Confirm' }}
+                  </button>
+                </div>
+              </hlm-alert-dialog-content>
+            </hlm-alert-dialog>
           </div>
         }
       </div>
@@ -213,6 +229,10 @@ export class BulkEditPartiesPopoverComponent {
   addCount = computed(() => this.changeSummary().addCount);
   removeCount = computed(() => this.changeSummary().removeCount);
 
+  confirmationMessage = computed(() =>
+    buildConfirmationMessage(this.addCount(), this.removeCount(), this.selectedIds().size, 'party', 'parties'),
+  );
+
   constructor() {
     effect(() => {
       this.partySearchText();
@@ -267,7 +287,7 @@ export class BulkEditPartiesPopoverComponent {
     );
   }
 
-  apply(): void {
+  confirmApply(ctx: { close: () => void }): void {
     if (!this.hasChanges()) return;
 
     const partyIdsToAdd = this.items()
@@ -293,6 +313,7 @@ export class BulkEditPartiesPopoverComponent {
         this.applying.set(false);
         const count = +response.body.updatedCount;
         toast.success(`Updated ${count} document${count > 1 ? 's' : ''}.`);
+        ctx.close();
         this.popoverState.set('closed');
         this.applied.emit();
       },

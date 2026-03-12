@@ -262,25 +262,26 @@ import { toast } from 'ngx-sonner';
             </div>
 
             <!-- Selection toolbar: absolute overlay -->
-            <div class="absolute inset-x-0 top-0 flex items-center gap-2 h-8 bg-background" [class.opacity-0]="!isInSelectionState() || !auth.canWrite()" [class.pointer-events-none]="!isInSelectionState() || !auth.canWrite()" [attr.inert]="!isInSelectionState() || !auth.canWrite() ? '' : null">
-              <button hlmBtn variant="ghost" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
-                <ng-icon hlm name="lucideX" size="sm" />
-              </button>
+            <div class="absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-2 gap-y-1 min-h-8 bg-background" [class.opacity-0]="!isInSelectionState() || !auth.canWrite()" [class.pointer-events-none]="!isInSelectionState() || !auth.canWrite()" [attr.inert]="!isInSelectionState() || !auth.canWrite() ? '' : null">
+              <div hlmButtonGroup aria-label="Selection controls">
+                <button hlmBtn variant="outline" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
+                  <ng-icon hlm name="lucideX" size="sm" />
+                </button>
+                @if (!allPageSelected()) {
+                  <button hlmBtn variant="outline" size="sm" (click)="selectAllOnPage()">
+                    Select all
+                  </button>
+                }
+              </div>
               @if (hasSelection()) {
-                <span class="text-sm text-muted-foreground">
+                <span class="whitespace-nowrap text-sm text-muted-foreground">
                   {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
                 </span>
               } @else {
-                <span class="text-sm text-muted-foreground">Select items</span>
+                <span class="whitespace-nowrap text-sm text-muted-foreground">Select items</span>
               }
 
-              @if (!allPageSelected()) {
-                <button hlmBtn variant="link" size="sm" (click)="selectAllOnPage()">
-                  Select all
-                </button>
-              }
-
-              <div class="ml-auto flex items-center gap-2">
+              <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <hlm-alert-dialog>
