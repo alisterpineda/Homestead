@@ -35,7 +35,9 @@ public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtracto
                 // No embedded text on this page — render as image and OCR
                 pdfStream.Position = 0;
                 using var pngStream = new MemoryStream();
+#pragma warning disable CA1416 // PDFtoImage supports all server platforms (Linux, macOS, Windows)
                 Conversion.SavePng(pngStream, pdfStream, (Index)(page.Number - 1), leaveOpen: true);
+#pragma warning restore CA1416
                 pngStream.Position = 0;
 
                 var ocrText = await tesseract.OcrAsync(pngStream, ct);
