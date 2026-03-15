@@ -1,3 +1,5 @@
+export const CREATE_OPTION_ID = '__create__';
+
 export type BulkItemState = 'none' | 'checked' | 'mixed' | 'remove';
 
 export interface TagCheckboxItem {

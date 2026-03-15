@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, debounceTime, of, map } from 'rxjs';
+import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideCheck, lucideMinus, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -30,9 +30,7 @@ import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { toast } from 'ngx-sonner';
-import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage } from '../bulk-edit-shared';
-
-const CREATE_PARTY_ID = '__create__';
+import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage, CREATE_OPTION_ID } from '../bulk-edit-shared';
 
 @Component({
   selector: 'app-bulk-edit-parties-popover',
@@ -84,7 +82,7 @@ const CREATE_PARTY_ID = '__create__';
                     (i === suggestionOptions().length - 1 ? ' rounded-b-md' : '')
                   "
                 >
-                  @if (option.id === createPartyId) {
+                  @if (option.id === createOptionId) {
                     <span class="italic">Create "{{ option.name }}"</span>
                   } @else {
                     {{ option.name }}
@@ -164,7 +162,7 @@ const CREATE_PARTY_ID = '__create__';
   `,
 })
 export class BulkEditPartiesPopoverComponent {
-  protected readonly createPartyId = CREATE_PARTY_ID;
+  protected readonly createOptionId = CREATE_OPTION_ID;
 
   selectedIds = input.required<Set<string>>();
   documents = input.required<GetDocumentsResponse[]>();
@@ -180,6 +178,7 @@ export class BulkEditPartiesPopoverComponent {
   showSuggestions = signal(false);
   selectedIndex = signal(0);
   creatingParty = signal(false);
+  loading = signal(false);
 
   private partyContainer = viewChild<ElementRef<HTMLDivElement>>('partyContainer');
   private partySearchEl = viewChild<ElementRef<HTMLInputElement>>('partySearchEl');
@@ -191,12 +190,22 @@ export class BulkEditPartiesPopoverComponent {
     toObservable(this.partySearchText).pipe(
       debounceTime(200),
       switchMap((text) => {
-        if (!text) return of([]);
+        if (!text) {
+          this.loading.set(false);
+          return of([]);
+        }
         return getParties(this.http, this.apiConfig.rootUrl, {
           Search: text,
           Page: 1,
           PageSize: 10,
-        }).pipe(map((r) => r.body.items as GetPartiesResponse[]));
+        }).pipe(
+          map((r) => r.body.items as GetPartiesResponse[]),
+          tap(() => this.loading.set(false)),
+          catchError(() => {
+            this.loading.set(false);
+            return of([]);
+          }),
+        );
       }),
     ),
     { initialValue: [] as GetPartiesResponse[] },
@@ -207,8 +216,9 @@ export class BulkEditPartiesPopoverComponent {
     const filtered = (this.suggestions() ?? []).filter((s) => !existingIds.has(s.id));
     const options: { id: string; name: string }[] = filtered.map((s) => ({ id: s.id, name: s.name }));
     const text = this.partySearchText().trim();
-    if (text && !filtered.some((s) => s.name.toLowerCase() === text.toLowerCase())) {
-      options.push({ id: CREATE_PARTY_ID, name: text });
+    const lowerText = text.toLowerCase();
+    if (text && !this.loading() && !filtered.some((s) => s.name.toLowerCase() === lowerText)) {
+      options.push({ id: CREATE_OPTION_ID, name: text });
     }
     return options;
   });
@@ -277,6 +287,7 @@ export class BulkEditPartiesPopoverComponent {
     this.partySearchText.set('');
     this.applying.set(false);
     this.showSuggestions.set(false);
+    this.loading.set(false);
   }
 
   toggleItem(id: string): void {
@@ -326,7 +337,9 @@ export class BulkEditPartiesPopoverComponent {
 
   // --- Search ---
   onSearchInput(event: Event): void {
-    this.partySearchText.set((event.target as HTMLInputElement).value);
+    const val = (event.target as HTMLInputElement).value;
+    this.partySearchText.set(val);
+    this.loading.set(!!val.trim());
     this.showSuggestions.set(true);
   }
 
@@ -355,7 +368,7 @@ export class BulkEditPartiesPopoverComponent {
   }
 
   selectOption(option: { id: string; name: string }): void {
-    if (option.id === CREATE_PARTY_ID) {
+    if (option.id === CREATE_OPTION_ID) {
       this.createAndAddParty(option.name);
     } else {
       this.addFromSuggestion(option);

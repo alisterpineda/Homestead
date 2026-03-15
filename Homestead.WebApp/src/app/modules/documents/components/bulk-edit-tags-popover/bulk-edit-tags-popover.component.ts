@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, debounceTime, of, map } from 'rxjs';
+import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucideCheck, lucideMinus, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -68,10 +68,10 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
           />
           @if (showSuggestions() && suggestionOptions().length > 0) {
             <div class="absolute left-2 right-2 z-50 mt-1 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
-              @for (suggestion of suggestionOptions(); track suggestion.path; let i = $index) {
+              @for (option of suggestionOptions(); track option.path; let i = $index) {
                 <button
                   type="button"
-                  (click)="addFromSuggestion(suggestion)"
+                  (click)="selectOption(option)"
                   [class]="
                     'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer flex items-center gap-2 ' +
                     (i === selectedIndex()
@@ -81,10 +81,14 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
                     (i === suggestionOptions().length - 1 ? ' rounded-b-md' : '')
                   "
                 >
-                  @if (suggestion.effectiveColor) {
-                    <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="suggestion.effectiveColor"></span>
+                  @if (option.type === 'create') {
+                    <span class="italic">Create "{{ option.path }}"</span>
+                  } @else {
+                    @if (option.effectiveColor) {
+                      <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="option.effectiveColor"></span>
+                    }
+                    {{ option.path }}
                   }
-                  {{ suggestion.path }}
                 </button>
               }
             </div>
@@ -173,6 +177,7 @@ export class BulkEditTagsPopoverComponent {
   tagSearchText = signal('');
   showSuggestions = signal(false);
   selectedIndex = signal(0);
+  loading = signal(false);
 
   private tagContainer = viewChild<ElementRef<HTMLDivElement>>('tagContainer');
   private tagSearchEl = viewChild<ElementRef<HTMLInputElement>>('tagSearchEl');
@@ -184,11 +189,21 @@ export class BulkEditTagsPopoverComponent {
     toObservable(this.tagSearchText).pipe(
       debounceTime(200),
       switchMap((text) => {
-        if (!text) return of([]);
+        if (!text) {
+          this.loading.set(false);
+          return of([]);
+        }
         return getTags(this.http, this.apiConfig.rootUrl, {
           Search: text,
           IncludeChildren: false,
-        }).pipe(map((r) => r.body as GetTagsResponse[]));
+        }).pipe(
+          map((r) => r.body as GetTagsResponse[]),
+          tap(() => this.loading.set(false)),
+          catchError(() => {
+            this.loading.set(false);
+            return of([]);
+          }),
+        );
       }),
     ),
     { initialValue: [] as GetTagsResponse[] },
@@ -196,7 +211,22 @@ export class BulkEditTagsPopoverComponent {
 
   suggestionOptions = computed(() => {
     const existing = new Set(this.items().map((t) => t.path.toLowerCase()));
-    return (this.suggestions() ?? []).filter((s) => !existing.has(s.path.toLowerCase()));
+    const filtered = (this.suggestions() ?? []).filter((s) => !existing.has(s.path.toLowerCase()));
+    const options: { type: 'existing' | 'create'; path: string; effectiveColor: string | null }[] =
+      filtered.map((s) => ({ type: 'existing' as const, path: s.path, effectiveColor: s.effectiveColor ?? null }));
+
+    const text = this.tagSearchText().trim();
+    const lowerText = text.toLowerCase();
+    if (
+      text &&
+      !this.loading() &&
+      !filtered.some((s) => s.path.toLowerCase() === lowerText) &&
+      !existing.has(lowerText)
+    ) {
+      options.push({ type: 'create', path: text, effectiveColor: null });
+    }
+
+    return options;
   });
 
   private changeSummary = computed(() => {
@@ -264,6 +294,7 @@ export class BulkEditTagsPopoverComponent {
     this.tagSearchText.set('');
     this.applying.set(false);
     this.showSuggestions.set(false);
+    this.loading.set(false);
   }
 
   toggleItem(path: string): void {
@@ -313,7 +344,9 @@ export class BulkEditTagsPopoverComponent {
 
   // --- Search ---
   onSearchInput(event: Event): void {
-    this.tagSearchText.set((event.target as HTMLInputElement).value);
+    const val = (event.target as HTMLInputElement).value;
+    this.tagSearchText.set(val);
+    this.loading.set(!!val.trim());
     this.showSuggestions.set(true);
   }
 
@@ -328,7 +361,7 @@ export class BulkEditTagsPopoverComponent {
     if (event.key === 'Enter') {
       event.preventDefault();
       if (this.showSuggestions() && options.length > 0 && options[this.selectedIndex()]) {
-        this.addFromSuggestion(options[this.selectedIndex()]);
+        this.selectOption(options[this.selectedIndex()]);
       }
     } else if (event.key === 'ArrowDown' && this.showSuggestions()) {
       event.preventDefault();
@@ -341,7 +374,26 @@ export class BulkEditTagsPopoverComponent {
     }
   }
 
-  addFromSuggestion(suggestion: GetTagsResponse): void {
+  selectOption(option: { type: 'existing' | 'create'; path: string; effectiveColor: string | null }): void {
+    if (option.type === 'create') {
+      this.items.update((items) => [
+        ...items,
+        {
+          path: option.path,
+          color: null,
+          initial: 'new' as const,
+          state: 'checked' as const,
+        },
+      ]);
+      this.tagSearchText.set('');
+      this.showSuggestions.set(false);
+      this.tagSearchEl()?.nativeElement.focus();
+    } else {
+      this.addFromSuggestion({ path: option.path, effectiveColor: option.effectiveColor });
+    }
+  }
+
+  addFromSuggestion(suggestion: Pick<GetTagsResponse, 'path' | 'effectiveColor'>): void {
     const existingIndex = this.items().findIndex(
       (t) => t.path.toLowerCase() === suggestion.path.toLowerCase(),
     );

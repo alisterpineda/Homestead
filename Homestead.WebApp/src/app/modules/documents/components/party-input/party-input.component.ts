@@ -9,15 +9,17 @@ import {
   viewChild,
   ElementRef,
   effect,
+  untracked,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, debounceTime, of, map } from 'rxjs';
+import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getParties } from '@/api/generated/fn/documents/get-parties';
 import { createParty } from '@/api/generated/fn/documents/create-party';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
+import { CREATE_OPTION_ID } from '../bulk-edit-shared';
 
 export interface PartyOption {
   id: string;
@@ -67,7 +69,7 @@ export interface PartyOption {
                 (i === allOptions().length - 1 ? ' rounded-b-md' : '')
               "
             >
-              @if (option.id === '__create__') {
+              @if (option.id === createOptionId) {
                 <span class="italic">Create "{{ option.name }}"</span>
               } @else {
                 {{ option.name }}
@@ -80,6 +82,8 @@ export interface PartyOption {
   `,
 })
 export class PartyInputComponent {
+  protected readonly createOptionId = CREATE_OPTION_ID;
+
   value = input.required<PartyOption[]>();
   valueChange = output<PartyOption[]>();
 
@@ -87,6 +91,7 @@ export class PartyInputComponent {
   showSuggestions = signal(false);
   selectedIndex = signal(0);
   creating = signal(false);
+  loading = signal(false);
 
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
@@ -98,13 +103,21 @@ export class PartyInputComponent {
     toObservable(this.searchText).pipe(
       debounceTime(200),
       switchMap((text) => {
-        if (!text) return of([]);
+        if (!text) {
+          this.loading.set(false);
+          return of([]);
+        }
         return getParties(this.http, this.apiConfig.rootUrl, {
           Search: text,
           Page: 1,
           PageSize: 10,
         }).pipe(
           map((r) => r.body.items as GetPartiesResponse[]),
+          tap(() => this.loading.set(false)),
+          catchError(() => {
+            this.loading.set(false);
+            return of([]);
+          }),
         );
       }),
     ),
@@ -121,8 +134,9 @@ export class PartyInputComponent {
     const text = this.searchText().trim();
     const options: PartyOption[] = filtered.map((s) => ({ id: s.id, name: s.name }));
 
-    if (text && !filtered.some((s) => s.name.toLowerCase() === text.toLowerCase())) {
-      options.push({ id: '__create__', name: text });
+    const lowerText = text.toLowerCase();
+    if (text && !this.loading() && !filtered.some((s) => s.name.toLowerCase() === lowerText)) {
+      options.push({ id: CREATE_OPTION_ID, name: text });
     }
 
     return options;
@@ -131,12 +145,12 @@ export class PartyInputComponent {
   constructor() {
     effect(() => {
       this.searchText();
-      this.selectedIndex.set(0);
+      if (untracked(this.selectedIndex) !== 0) this.selectedIndex.set(0);
     });
   }
 
   selectOption(option: PartyOption): void {
-    if (option.id === '__create__') {
+    if (option.id === CREATE_OPTION_ID) {
       this.createAndAdd(option.name);
     } else {
       this.addParty(option);
@@ -175,6 +189,7 @@ export class PartyInputComponent {
   onSearchInput(event: Event): void {
     const val = (event.target as HTMLInputElement).value;
     this.searchText.set(val);
+    this.loading.set(!!val.trim());
     this.showSuggestions.set(true);
   }
 

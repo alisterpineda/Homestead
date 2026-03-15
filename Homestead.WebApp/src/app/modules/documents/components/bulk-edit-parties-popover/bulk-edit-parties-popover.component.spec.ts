@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Component, signal } from '@angular/core';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover.component';
+import { CREATE_OPTION_ID } from '../bulk-edit-shared';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 
 function makeDoc(id: string, parties: { id: string; name: string }[] = []): GetDocumentsResponse {
@@ -209,5 +210,29 @@ describe('BulkEditPartiesPopoverComponent', () => {
     // The actual API call is async, so we verify the method is callable
     // and doesn't throw synchronously
     expect(component.applying()).toBe(true);
+  });
+
+  describe('loading signal', () => {
+    it('loading starts false after open', () => {
+      component.onPopoverStateChanged('open');
+      expect(component.loading()).toBe(false);
+    });
+
+    it('Create option hidden while loading', () => {
+      component.onPopoverStateChanged('open');
+      component.onSearchInput({ target: { value: 'New Corp' } } as unknown as Event);
+      expect(component.loading()).toBe(true);
+      expect(component.suggestionOptions().some((o) => o.id === CREATE_OPTION_ID)).toBe(false);
+    });
+
+    it('loading resets on re-open', () => {
+      component.onPopoverStateChanged('open');
+      component.onSearchInput({ target: { value: 'test' } } as unknown as Event);
+      expect(component.loading()).toBe(true);
+
+      // Re-open
+      component.onPopoverStateChanged('open');
+      expect(component.loading()).toBe(false);
+    });
   });
 });

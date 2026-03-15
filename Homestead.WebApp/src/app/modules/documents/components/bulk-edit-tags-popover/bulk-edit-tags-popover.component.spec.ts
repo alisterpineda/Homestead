@@ -213,4 +213,39 @@ describe('BulkEditTagsPopoverComponent', () => {
     // and doesn't throw synchronously
     expect(component.applying()).toBe(true);
   });
+
+  describe('loading signal', () => {
+    it('loading starts false after open', () => {
+      component.onPopoverStateChanged('open');
+      expect(component.loading()).toBe(false);
+    });
+
+    it('Create option hidden while loading', () => {
+      component.onPopoverStateChanged('open');
+      component.onSearchInput({ target: { value: 'newTag' } } as unknown as Event);
+      expect(component.loading()).toBe(true);
+      expect(component.suggestionOptions().some((o) => o.type === 'create')).toBe(false);
+    });
+
+    it('loading resets on re-open', () => {
+      component.onPopoverStateChanged('open');
+      component.onSearchInput({ target: { value: 'test' } } as unknown as Event);
+      expect(component.loading()).toBe(true);
+
+      // Re-open
+      component.onPopoverStateChanged('open');
+      expect(component.loading()).toBe(false);
+    });
+
+    it('selectOption with Create adds new item to items list', () => {
+      component.onPopoverStateChanged('open');
+
+      component.selectOption({ type: 'create', path: 'brand-new', effectiveColor: null });
+
+      const newItem = component.items().find((t) => t.path === 'brand-new');
+      expect(newItem).toBeDefined();
+      expect(newItem!.initial).toBe('new');
+      expect(newItem!.state).toBe('checked');
+    });
+  });
 });

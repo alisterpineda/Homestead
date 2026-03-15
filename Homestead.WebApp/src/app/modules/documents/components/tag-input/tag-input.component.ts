@@ -9,14 +9,16 @@ import {
   viewChild,
   ElementRef,
   effect,
+  untracked,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, debounceTime, of, map } from 'rxjs';
+import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getTags } from '@/api/generated/fn/documents/get-tags';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
+import { CREATE_OPTION_ID } from '../bulk-edit-shared';
 
 @Component({
   selector: 'app-tag-input',
@@ -44,27 +46,31 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
         />
       </div>
 
-      @if (showSuggestions() && filteredSuggestions().length > 0) {
+      @if (showSuggestions() && allOptions().length > 0) {
         <div
           class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg"
         >
-          @for (suggestion of filteredSuggestions(); track suggestion.id; let i = $index) {
+          @for (option of allOptions(); track option.id; let i = $index) {
             <button
               type="button"
-              (click)="addTag(suggestion.path, suggestion.effectiveColor)"
+              (click)="addTag(option.path, option.effectiveColor)"
               [class]="
                 'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer flex items-center gap-2 ' +
                 (i === selectedIndex()
                   ? 'bg-accent text-accent-foreground'
                   : 'text-foreground hover:bg-accent') +
                 (i === 0 ? ' rounded-t-md' : '') +
-                (i === filteredSuggestions().length - 1 ? ' rounded-b-md' : '')
+                (i === allOptions().length - 1 ? ' rounded-b-md' : '')
               "
             >
-              @if (suggestion.effectiveColor) {
-                <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="suggestion.effectiveColor"></span>
+              @if (option.id === createOptionId) {
+                <span class="italic">Create "{{ option.path }}"</span>
+              } @else {
+                @if (option.effectiveColor) {
+                  <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="option.effectiveColor"></span>
+                }
+                {{ option.path }}
               }
-              {{ suggestion.path }}
             </button>
           }
         </div>
@@ -73,6 +79,8 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
   `,
 })
 export class TagInputComponent {
+  protected readonly createOptionId = CREATE_OPTION_ID;
+
   value = input.required<string[]>();
   initialColorMap = input<Record<string, string>>({});
   valueChange = output<string[]>();
@@ -80,6 +88,7 @@ export class TagInputComponent {
   searchText = signal('');
   showSuggestions = signal(false);
   selectedIndex = signal(0);
+  loading = signal(false);
   private addedColorMap = signal<Map<string, string>>(new Map());
 
   colorMap = computed(() => {
@@ -105,25 +114,51 @@ export class TagInputComponent {
     toObservable(this.searchText).pipe(
       debounceTime(200),
       switchMap((text) => {
-        if (!text) return of([]);
+        if (!text) {
+          this.loading.set(false);
+          return of([]);
+        }
         return getTags(this.http, this.apiConfig.rootUrl, {
           Search: text,
           IncludeChildren: false,
-        }).pipe(map((r) => r.body as GetTagsResponse[]));
+        }).pipe(
+          map((r) => r.body as GetTagsResponse[]),
+          tap(() => this.loading.set(false)),
+          catchError(() => {
+            this.loading.set(false);
+            return of([]);
+          }),
+        );
       }),
     ),
     { initialValue: [] as GetTagsResponse[] },
   );
 
   filteredSuggestions = computed(() => {
-    const current = this.value();
-    return (this.suggestions() ?? []).filter((s) => !current.includes(s.path));
+    const current = new Set(this.value());
+    return (this.suggestions() ?? []).filter((s) => !current.has(s.path));
+  });
+
+  allOptions = computed(() => {
+    const filtered = this.filteredSuggestions();
+    const text = this.searchText().trim();
+
+    const lowerText = text.toLowerCase();
+    if (
+      text &&
+      !this.loading() &&
+      !filtered.some((s) => s.path.toLowerCase() === lowerText)
+    ) {
+      return [...filtered, { id: CREATE_OPTION_ID, path: text, effectiveColor: null as string | null }];
+    }
+
+    return filtered;
   });
 
   constructor() {
     effect(() => {
       this.searchText();
-      this.selectedIndex.set(0);
+      if (untracked(this.selectedIndex) !== 0) this.selectedIndex.set(0);
     });
   }
 
@@ -156,6 +191,7 @@ export class TagInputComponent {
   onSearchInput(event: Event): void {
     const val = (event.target as HTMLInputElement).value;
     this.searchText.set(val);
+    this.loading.set(!!val.trim());
     this.showSuggestions.set(true);
   }
 
@@ -166,20 +202,18 @@ export class TagInputComponent {
   }
 
   onKeyDown(event: KeyboardEvent): void {
-    const filtered = this.filteredSuggestions();
+    const options = this.allOptions();
     if (event.key === 'Enter') {
       event.preventDefault();
-      if (this.showSuggestions() && filtered.length > 0 && filtered[this.selectedIndex()]) {
-        const suggestion = filtered[this.selectedIndex()];
-        this.addTag(suggestion.path, suggestion.effectiveColor);
-      } else if (this.searchText().trim()) {
-        this.addTag(this.searchText());
+      if (this.showSuggestions() && options.length > 0 && options[this.selectedIndex()]) {
+        const opt = options[this.selectedIndex()];
+        this.addTag(opt.path, opt.effectiveColor);
       }
     } else if (event.key === 'Backspace' && this.searchText() === '' && this.value().length > 0) {
       this.removeTag(this.value()[this.value().length - 1]);
     } else if (event.key === 'ArrowDown' && this.showSuggestions()) {
       event.preventDefault();
-      this.selectedIndex.update((i) => (i < filtered.length - 1 ? i + 1 : i));
+      this.selectedIndex.update((i) => (i < options.length - 1 ? i + 1 : i));
     } else if (event.key === 'ArrowUp' && this.showSuggestions()) {
       event.preventDefault();
       this.selectedIndex.update((i) => (i > 0 ? i - 1 : 0));
