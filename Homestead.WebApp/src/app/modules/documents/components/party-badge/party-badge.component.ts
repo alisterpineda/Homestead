@@ -9,9 +9,15 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmBadge],
   providers: [provideIcons({ lucideX })],
+  styles: `
+    :host {
+      display: inline-flex;
+      min-width: 0;
+    }
+  `,
   template: `
-    <span hlmBadge variant="secondary" class="gap-1">
-      {{ name() }}
+    <span hlmBadge variant="secondary" class="gap-1 max-w-full min-w-0">
+      <span class="truncate">{{ name() }}</span>
       @if (removable()) {
         <button
           type="button"

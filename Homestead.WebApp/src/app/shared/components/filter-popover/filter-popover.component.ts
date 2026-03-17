@@ -74,7 +74,7 @@ export interface FilterOption {
           } @else {
             @for (option of filteredOptions(); track option.id) {
               <button
-                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
                 (click)="toggleOption(option.id)"
               >
                 <hlm-checkbox
@@ -82,7 +82,7 @@ export interface FilterOption {
                   [checked]="isSelected(option.id)"
                   aria-hidden="true"
                 />
-                <span>{{ option.label }}</span>
+                <span class="truncate">{{ option.label }}</span>
               </button>
             }
           }

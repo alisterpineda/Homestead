@@ -82,12 +82,12 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
                   "
                 >
                   @if (option.type === 'create') {
-                    <span class="italic">Create "{{ option.path }}"</span>
+                    <span class="italic truncate min-w-0">Create "{{ option.path }}"</span>
                   } @else {
                     @if (option.effectiveColor) {
                       <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="option.effectiveColor"></span>
                     }
-                    {{ option.path }}
+                    <span class="truncate min-w-0">{{ option.path }}</span>
                   }
                 </button>
               }
@@ -102,7 +102,7 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
             @for (item of items(); track item.path) {
               <button
                 type="button"
-                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
                 (click)="toggleItem(item.path)"
               >
                 @switch (item.state) {

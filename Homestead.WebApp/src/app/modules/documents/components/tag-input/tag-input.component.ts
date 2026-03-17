@@ -64,12 +64,12 @@ import { CREATE_OPTION_ID } from '../bulk-edit-shared';
               "
             >
               @if (option.id === createOptionId) {
-                <span class="italic">Create "{{ option.path }}"</span>
+                <span class="italic truncate min-w-0">Create "{{ option.path }}"</span>
               } @else {
                 @if (option.effectiveColor) {
                   <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="option.effectiveColor"></span>
                 }
-                {{ option.path }}
+                <span class="truncate min-w-0">{{ option.path }}</span>
               }
             </button>
           }

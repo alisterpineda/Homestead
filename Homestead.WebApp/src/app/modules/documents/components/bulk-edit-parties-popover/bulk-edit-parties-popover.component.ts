@@ -74,7 +74,7 @@ import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage,
                   type="button"
                   (click)="selectOption(option)"
                   [class]="
-                    'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer ' +
+                    'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer truncate ' +
                     (i === selectedIndex()
                       ? 'bg-accent text-accent-foreground'
                       : 'text-foreground hover:bg-accent') +
@@ -100,7 +100,7 @@ import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage,
             @for (item of items(); track item.id) {
               <button
                 type="button"
-                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
                 (click)="toggleItem(item.id)"
               >
                 @switch (item.state) {

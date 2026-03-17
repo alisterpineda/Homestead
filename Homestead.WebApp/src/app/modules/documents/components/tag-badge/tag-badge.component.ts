@@ -32,6 +32,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   styles: `
     :host {
       display: inline-flex;
+      min-width: 0;
     }
 
     .badge-inner {
