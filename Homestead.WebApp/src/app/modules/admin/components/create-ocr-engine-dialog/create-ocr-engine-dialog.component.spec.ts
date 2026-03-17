@@ -20,9 +20,9 @@ describe('CreateOcrEngineDialogComponent', () => {
     expect(fixture.componentInstance.name()).toBe('');
   });
 
-  it('should have Eng as the default language', () => {
+  it('should have ["Eng"] as the default languages', () => {
     const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
-    expect(fixture.componentInstance.language()).toBe('Eng');
+    expect(fixture.componentInstance.selectedLanguages()).toEqual(['Eng']);
   });
 
   it('should not be creating initially', () => {
@@ -52,19 +52,26 @@ describe('CreateOcrEngineDialogComponent', () => {
     expect(fixture.componentInstance.canSubmit()).toBe(false);
   });
 
+  it('should not be submittable with empty languages', () => {
+    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    fixture.componentInstance.name.set('My Engine');
+    fixture.componentInstance.selectedLanguages.set([]);
+    expect(fixture.componentInstance.canSubmit()).toBe(false);
+  });
+
   it('should reset state when dialog opens', () => {
     const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
     const component = fixture.componentInstance;
 
     component.name.set('Some Engine');
-    component.language.set('Fra');
+    component.selectedLanguages.set(['Fra']);
     component.creating.set(true);
     component.createError.set('Something failed');
 
     component.onStateChanged('open');
 
     expect(component.name()).toBe('');
-    expect(component.language()).toBe('Eng');
+    expect(component.selectedLanguages()).toEqual(['Eng']);
     expect(component.creating()).toBe(false);
     expect(component.createError()).toBe('');
   });

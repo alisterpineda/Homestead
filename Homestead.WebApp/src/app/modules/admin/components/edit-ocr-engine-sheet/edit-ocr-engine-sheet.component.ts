@@ -8,7 +8,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
+import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateOcrEngine } from '@/api/generated/fn/admin/update-ocr-engine';
 import type { OcrEngineResponse } from '@/api/generated/models/ocr-engine-response';
@@ -49,11 +49,11 @@ import { toast } from 'ngx-sonner';
 
             @if (e.engineType === 'Tesseract') {
               <div class="flex flex-col gap-2">
-                <label hlmLabel>Language</label>
+                <label hlmLabel>Languages</label>
                 @if (e.isBuiltIn) {
-                  <p class="text-sm text-muted-foreground">{{ getLanguageLabel(e.configuration) }}</p>
+                  <p class="text-sm text-muted-foreground">{{ getLanguagesLabel(e.configuration) }}</p>
                 } @else {
-                  <brn-select [ngModel]="editLanguage()" (ngModelChange)="onLanguageChange($event)">
+                  <brn-select [multiple]="true" [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)">
                     <hlm-select-trigger class="w-full">
                       <hlm-select-value />
                     </hlm-select-trigger>
@@ -100,7 +100,7 @@ export class EditOcrEngineSheetComponent {
 
   languages = TESSERACT_LANGUAGES;
   editName = signal('');
-  editLanguage = signal('Eng');
+  editLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
   editConfiguration = signal<string | null>(null);
   saving = signal(false);
 
@@ -121,8 +121,8 @@ export class EditOcrEngineSheetComponent {
         if (e.configuration) {
           try {
             const parsed = JSON.parse(e.configuration);
-            if (parsed.language) {
-              this.editLanguage.set(parsed.language);
+            if (Array.isArray(parsed.languages)) {
+              this.editLanguages.set(parsed.languages);
             }
           } catch {
             // ignore
@@ -136,20 +136,22 @@ export class EditOcrEngineSheetComponent {
     return (event.target as HTMLInputElement).value;
   }
 
-  getLanguageLabel(configuration: string | null | undefined): string {
+  getLanguagesLabel(configuration: string | null | undefined): string {
     if (!configuration) return 'English';
     try {
       const parsed = JSON.parse(configuration);
-      const lang = this.languages.find(l => l.value === parsed.language);
-      return lang?.label ?? parsed.language ?? 'English';
+      if (!Array.isArray(parsed.languages) || parsed.languages.length === 0) return 'English';
+      return parsed.languages
+        .map((v: string) => this.languages.find(l => l.value === v)?.label ?? v)
+        .join(', ');
     } catch {
       return 'Unknown';
     }
   }
 
-  onLanguageChange(value: string): void {
-    this.editLanguage.set(value);
-    this.editConfiguration.set(JSON.stringify({ language: value }));
+  onLanguagesChange(values: string[]): void {
+    this.editLanguages.set(values);
+    this.editConfiguration.set(JSON.stringify({ languages: values }));
   }
 
   handleSave(): void {

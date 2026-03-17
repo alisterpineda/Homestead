@@ -4,5 +4,5 @@ namespace Homestead.WebApi.TextExtraction.Configurations;
 
 public record TesseractEngineConfig
 {
-    public TesseractLanguage Language { get; init; } = TesseractLanguage.Eng;
+    public List<TesseractLanguage> Languages { get; init; } = [TesseractLanguage.Eng];
 }

@@ -17,7 +17,7 @@ public class OcrEngineCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<OcrEngineItem>>(CT);
         Assert.True(body!.TotalCount >= 1);
-        Assert.Contains(body.Items, e => e.Name == "Tesseract (English)" && e.IsBuiltIn);
+        Assert.Contains(body.Items, e => e.Name == "Tesseract (Default)" && e.IsBuiltIn);
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public class OcrEngineCrudTests : IntegrationTestBase
         {
             name = "Tesseract French",
             engineType = "Tesseract",
-            configuration = "{\"language\":\"Fra\"}"
+            configuration = "{\"languages\":[\"Fra\"]}"
         }, CT);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -48,7 +48,7 @@ public class OcrEngineCrudTests : IntegrationTestBase
         var response = await client.PutAsJsonAsync($"/api/v1/admin/ocr-engines/{engineId}", new
         {
             name = "Updated Name",
-            configuration = "{\"language\":\"Eng\"}"
+            configuration = "{\"languages\":[\"Eng\"]}"
         }, CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -87,7 +87,7 @@ public class OcrEngineCrudTests : IntegrationTestBase
         var response = await client.PutAsJsonAsync($"/api/v1/admin/ocr-engines/{builtInId}", new
         {
             name = "Hacked Name",
-            configuration = "{\"language\":\"Eng\"}"
+            configuration = "{\"languages\":[\"Eng\"]}"
         }, CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -119,7 +119,7 @@ public class OcrEngineCrudTests : IntegrationTestBase
         {
             name = "Unique Engine",
             engineType = "Tesseract",
-            configuration = "{\"language\":\"Eng\"}"
+            configuration = "{\"languages\":[\"Eng\"]}"
         }, CT);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -135,13 +135,60 @@ public class OcrEngineCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Admin_CanCreateOcrEngine_WithMultipleLanguages()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines", new
+        {
+            name = "Tesseract Multi",
+            engineType = "Tesseract",
+            configuration = "{\"languages\":[\"Eng\",\"Fra\"]}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<OcrEngineItem>(CT);
+        Assert.Equal("{\"languages\":[\"Eng\",\"Fra\"]}", body!.Configuration);
+    }
+
+    [Fact]
+    public async Task CreateEmptyLanguages_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines", new
+        {
+            name = "Empty Langs",
+            engineType = "Tesseract",
+            configuration = "{\"languages\":[]}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateDuplicateLanguages_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines", new
+        {
+            name = "Dup Langs",
+            engineType = "Tesseract",
+            configuration = "{\"languages\":[\"Eng\",\"Eng\"]}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task<Guid> CreateOcrEngineAsync(HttpClient client, string name, string? configuration = null)
     {
         var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines", new
         {
             name,
             engineType = "Tesseract",
-            configuration = configuration ?? "{\"language\":\"Eng\"}"
+            configuration = configuration ?? "{\"languages\":[\"Eng\"]}"
         }, CT);
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<OcrEngineItem>(CT);

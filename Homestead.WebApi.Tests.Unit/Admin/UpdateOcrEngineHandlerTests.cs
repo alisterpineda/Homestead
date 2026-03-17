@@ -83,14 +83,14 @@ public class UpdateOcrEngineHandlerTests : IDisposable
             Request = new UpdateOcrEngineRequest
             {
                 Name = "Updated Name",
-                Configuration = """{"language":"Deu"}"""
+                Configuration = """{"languages":["Deu"]}"""
             }
         };
 
         var response = await _sut.HandleAsync(command, CancellationToken.None);
 
         Assert.Equal("Updated Name", response.Name);
-        Assert.Equal("""{"language":"Deu"}""", response.Configuration);
+        Assert.Equal("""{"languages":["Deu"]}""", response.Configuration);
         Assert.False(response.IsBuiltIn);
         Assert.NotNull(response.UpdatedAt);
 

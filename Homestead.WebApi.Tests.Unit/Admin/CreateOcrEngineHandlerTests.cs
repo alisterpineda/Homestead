@@ -70,7 +70,7 @@ public class CreateOcrEngineHandlerTests : IDisposable
     {
         var request = new CreateOcrEngineRequest
         {
-            Name = "Tesseract (English)",
+            Name = "Tesseract (Default)",
             EngineType = OcrEngineType.Tesseract
         };
 
@@ -99,7 +99,7 @@ public class CreateOcrEngineHandlerTests : IDisposable
         {
             Name = "My Tesseract",
             EngineType = OcrEngineType.Tesseract,
-            Configuration = """{"language":"Fra"}"""
+            Configuration = """{"languages":["Fra"]}"""
         };
 
         var response = await _sut.HandleAsync(request, CancellationToken.None);
@@ -107,10 +107,54 @@ public class CreateOcrEngineHandlerTests : IDisposable
         Assert.Equal("My Tesseract", response.Name);
         Assert.Equal(OcrEngineType.Tesseract, response.EngineType);
         Assert.False(response.IsBuiltIn);
-        Assert.Equal("""{"language":"Fra"}""", response.Configuration);
+        Assert.Equal("""{"languages":["Fra"]}""", response.Configuration);
 
         var saved = await _db.OcrEngines.FirstOrDefaultAsync(e => e.Id == response.Id);
         Assert.NotNull(saved);
         Assert.Equal("My Tesseract", saved.Name);
+    }
+
+    [Fact]
+    public async Task HandleAsync_EmptyLanguagesArray_ThrowsBadRequest()
+    {
+        var request = new CreateOcrEngineRequest
+        {
+            Name = "Empty Languages",
+            EngineType = OcrEngineType.Tesseract,
+            Configuration = """{"languages":[]}"""
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateLanguages_ThrowsBadRequest()
+    {
+        var request = new CreateOcrEngineRequest
+        {
+            Name = "Duplicate Languages",
+            EngineType = OcrEngineType.Tesseract,
+            Configuration = """{"languages":["Eng","Eng"]}"""
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_MultipleLanguages_CreatesEngine()
+    {
+        var request = new CreateOcrEngineRequest
+        {
+            Name = "Multi-Language",
+            EngineType = OcrEngineType.Tesseract,
+            Configuration = """{"languages":["Eng","Fra","Deu"]}"""
+        };
+
+        var response = await _sut.HandleAsync(request, CancellationToken.None);
+
+        Assert.Equal("Multi-Language", response.Name);
+        Assert.Equal("""{"languages":["Eng","Fra","Deu"]}""", response.Configuration);
     }
 }

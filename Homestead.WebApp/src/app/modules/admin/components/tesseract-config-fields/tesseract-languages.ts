@@ -20,3 +20,5 @@ export const TESSERACT_LANGUAGES = [
   { value: 'Dan', label: 'Danish' },
   { value: 'Nor', label: 'Norwegian' },
 ] as const;
+
+export const DEFAULT_TESSERACT_LANGUAGES: string[] = ['Eng'];

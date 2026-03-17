@@ -42,8 +42,8 @@ describe('EditOcrEngineSheetComponent', () => {
     expect(component.editName()).toBe('');
   });
 
-  it('should have Eng as default editLanguage', () => {
-    expect(component.editLanguage()).toBe('Eng');
+  it('should have ["Eng"] as default editLanguages', () => {
+    expect(component.editLanguages()).toEqual(['Eng']);
   });
 
   it('should have null editConfiguration initially', () => {
@@ -68,35 +68,51 @@ describe('EditOcrEngineSheetComponent', () => {
     expect(component.asInputValue(event)).toBe('new name');
   });
 
-  describe('getLanguageLabel', () => {
+  describe('getLanguagesLabel', () => {
     it('should return English for null configuration', () => {
-      expect(component.getLanguageLabel(null)).toBe('English');
+      expect(component.getLanguagesLabel(null)).toBe('English');
     });
 
     it('should return English for undefined configuration', () => {
-      expect(component.getLanguageLabel(undefined)).toBe('English');
+      expect(component.getLanguagesLabel(undefined)).toBe('English');
     });
 
-    it('should return the correct label for a known language', () => {
-      const config = JSON.stringify({ language: 'Fra' });
-      expect(component.getLanguageLabel(config)).toBe('French');
+    it('should return the correct label for a single known language', () => {
+      const config = JSON.stringify({ languages: ['Deu'] });
+      expect(component.getLanguagesLabel(config)).toBe('German');
+    });
+
+    it('should return comma-separated labels for multiple languages', () => {
+      const config = JSON.stringify({ languages: ['Eng', 'Fra'] });
+      expect(component.getLanguagesLabel(config)).toBe('English, French');
     });
 
     it('should return the raw language value for an unknown language', () => {
-      const config = JSON.stringify({ language: 'Xyz' });
-      expect(component.getLanguageLabel(config)).toBe('Xyz');
+      const config = JSON.stringify({ languages: ['Xyz'] });
+      expect(component.getLanguagesLabel(config)).toBe('Xyz');
     });
 
     it('should return Unknown for invalid JSON', () => {
-      expect(component.getLanguageLabel('not-json')).toBe('Unknown');
+      expect(component.getLanguagesLabel('not-json')).toBe('Unknown');
+    });
+
+    it('should return English for empty languages array', () => {
+      const config = JSON.stringify({ languages: [] });
+      expect(component.getLanguagesLabel(config)).toBe('English');
     });
   });
 
-  describe('onLanguageChange', () => {
-    it('should update editLanguage and editConfiguration', () => {
-      component.onLanguageChange('Fra');
-      expect(component.editLanguage()).toBe('Fra');
-      expect(component.editConfiguration()).toBe(JSON.stringify({ language: 'Fra' }));
+  describe('onLanguagesChange', () => {
+    it('should update editLanguages and editConfiguration', () => {
+      component.onLanguagesChange(['Fra']);
+      expect(component.editLanguages()).toEqual(['Fra']);
+      expect(component.editConfiguration()).toBe(JSON.stringify({ languages: ['Fra'] }));
+    });
+
+    it('should handle multiple languages', () => {
+      component.onLanguagesChange(['Eng', 'Fra']);
+      expect(component.editLanguages()).toEqual(['Eng', 'Fra']);
+      expect(component.editConfiguration()).toBe(JSON.stringify({ languages: ['Eng', 'Fra'] }));
     });
   });
 

@@ -7,7 +7,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
+import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createOcrEngine } from '@/api/generated/fn/admin/create-ocr-engine';
 import { toast } from 'ngx-sonner';
@@ -39,8 +39,8 @@ import { toast } from 'ngx-sonner';
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel>Language</label>
-            <brn-select [ngModel]="language()" (ngModelChange)="language.set($event)">
+            <label hlmLabel>Languages</label>
+            <brn-select [multiple]="true" [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
@@ -76,16 +76,16 @@ export class CreateOcrEngineDialogComponent {
 
   languages = TESSERACT_LANGUAGES;
   name = signal('');
-  language = signal('Eng');
+  selectedLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
   creating = signal(false);
   createError = signal('');
 
-  canSubmit = computed(() => this.name().trim().length > 0);
+  canSubmit = computed(() => this.name().trim().length > 0 && this.selectedLanguages().length > 0);
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.name.set('');
-      this.language.set('Eng');
+      this.selectedLanguages.set([...DEFAULT_TESSERACT_LANGUAGES]);
       this.creating.set(false);
       this.createError.set('');
     }
@@ -105,7 +105,7 @@ export class CreateOcrEngineDialogComponent {
       body: {
         name: this.name().trim(),
         engineType: 'Tesseract',
-        configuration: JSON.stringify({ language: this.language() }),
+        configuration: JSON.stringify({ languages: this.selectedLanguages() }),
       },
     }).subscribe({
       next: () => {
