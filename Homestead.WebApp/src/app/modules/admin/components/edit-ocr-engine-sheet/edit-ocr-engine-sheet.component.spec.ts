@@ -54,14 +54,6 @@ describe('EditOcrEngineSheetComponent', () => {
     expect(component.saving()).toBe(false);
   });
 
-  it('should not be deleting initially', () => {
-    expect(component.deleting()).toBe(false);
-  });
-
-  it('should not be confirming delete initially', () => {
-    expect(component.confirmingDelete()).toBe(false);
-  });
-
   it('should have no changes when engine is null', () => {
     expect(component.hasChanges()).toBe(false);
   });
@@ -109,10 +101,11 @@ describe('EditOcrEngineSheetComponent', () => {
   });
 
   describe('onStateChanged', () => {
-    it('should reset confirmingDelete when closed', () => {
-      component.confirmingDelete.set(true);
+    it('should emit closed on state change to closed', () => {
+      const spy = vi.fn();
+      component.closed.subscribe(spy);
       component.onStateChanged('closed');
-      expect(component.confirmingDelete()).toBe(false);
+      expect(spy).toHaveBeenCalled();
     });
   });
 });

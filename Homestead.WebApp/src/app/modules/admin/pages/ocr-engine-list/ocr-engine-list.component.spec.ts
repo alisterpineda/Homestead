@@ -115,23 +115,39 @@ describe('OcrEngineListComponent', () => {
     expect(component.refreshTrigger()).toBe(prevTrigger + 1);
   });
 
-  it('should close sheet and refresh on onEngineDeleted', () => {
-    const engine: OcrEngineResponse = {
-      id: 'abc-123',
-      name: 'Test Engine',
-      engineType: 'Tesseract',
-      isBuiltIn: false,
-      createdAt: '2026-01-01T00:00:00Z',
-      configuration: null,
-    };
+  it('should initialise with empty selection', () => {
+    expect(component.selectedIds().size).toBe(0);
+    expect(component.selectionCount()).toBe(0);
+    expect(component.hasSelection()).toBe(false);
+  });
 
-    component.onEngineClick(engine);
-    const prevTrigger = component.refreshTrigger();
+  it('should toggle selection for an engine', () => {
+    component.toggleSelection('id-1', true);
+    expect(component.selectedIds().has('id-1')).toBe(true);
+    expect(component.selectionCount()).toBe(1);
 
-    component.onEngineDeleted();
-    expect(component.sheetState()).toBe('closed');
-    expect(component.selectedEngine()).toBeNull();
-    expect(component.refreshTrigger()).toBe(prevTrigger + 1);
+    component.toggleSelection('id-1', false);
+    expect(component.selectedIds().has('id-1')).toBe(false);
+    expect(component.selectionCount()).toBe(0);
+  });
+
+  it('should clear all selections', () => {
+    component.toggleSelection('id-1', true);
+    component.toggleSelection('id-2', true);
+    expect(component.selectionCount()).toBe(2);
+
+    component.clearSelection();
+    expect(component.selectionCount()).toBe(0);
+  });
+
+  it('should report hasSelection correctly', () => {
+    expect(component.hasSelection()).toBe(false);
+    component.toggleSelection('id-1', true);
+    expect(component.hasSelection()).toBe(true);
+  });
+
+  it('should initialise deleting as false', () => {
+    expect(component.deleting()).toBe(false);
   });
 
   it('should extract input value from event via asInputValue', () => {

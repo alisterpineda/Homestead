@@ -11,7 +11,6 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateOcrEngine } from '@/api/generated/fn/admin/update-ocr-engine';
-import { deleteOcrEngine } from '@/api/generated/fn/admin/delete-ocr-engine';
 import type { OcrEngineResponse } from '@/api/generated/models/ocr-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
@@ -80,20 +79,9 @@ import { toast } from 'ngx-sonner';
         <hlm-sheet-footer>
           @if (engine(); as e) {
             @if (!e.isBuiltIn) {
-              @if (confirmingDelete()) {
-                <p class="text-sm text-destructive text-center">This action cannot be undone.</p>
-                <div class="flex gap-2">
-                  <button hlmBtn variant="secondary" class="flex-1" (click)="confirmingDelete.set(false)">Cancel</button>
-                  <button hlmBtn variant="destructive" class="flex-1" (click)="handleDelete()" [disabled]="deleting()">
-                    {{ deleting() ? 'Deleting...' : 'Confirm Delete' }}
-                  </button>
-                </div>
-              } @else {
-                <button hlmBtn variant="destructive" class="w-full" (click)="confirmingDelete.set(true)">Delete</button>
-                <button hlmBtn class="w-full" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
-                  {{ saving() ? 'Saving...' : 'Save' }}
-                </button>
-              }
+              <button hlmBtn class="w-full" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+                {{ saving() ? 'Saving...' : 'Save' }}
+              </button>
             }
           }
         </hlm-sheet-footer>
@@ -105,7 +93,6 @@ export class EditOcrEngineSheetComponent {
   engine = input<OcrEngineResponse | null>(null);
   state = input<BrnDialogState>('closed');
   saved = output<void>();
-  deleted = output<void>();
   closed = output<void>();
 
   private http = inject(HttpClient);
@@ -116,8 +103,6 @@ export class EditOcrEngineSheetComponent {
   editLanguage = signal('Eng');
   editConfiguration = signal<string | null>(null);
   saving = signal(false);
-  deleting = signal(false);
-  confirmingDelete = signal(false);
 
   hasChanges = computed(() => {
     const e = this.engine();
@@ -133,7 +118,6 @@ export class EditOcrEngineSheetComponent {
       if (e && this.state() === 'open') {
         this.editName.set(e.name);
         this.editConfiguration.set(e.configuration ?? null);
-        // Parse language from configuration
         if (e.configuration) {
           try {
             const parsed = JSON.parse(e.configuration);
@@ -192,28 +176,8 @@ export class EditOcrEngineSheetComponent {
     });
   }
 
-  handleDelete(): void {
-    const e = this.engine();
-    if (!e || e.isBuiltIn) return;
-    this.deleting.set(true);
-
-    deleteOcrEngine(this.http, this.apiConfig.rootUrl, { id: e.id }).subscribe({
-      next: () => {
-        this.deleting.set(false);
-        this.confirmingDelete.set(false);
-        toast.success('OCR engine deleted.');
-        this.deleted.emit();
-      },
-      error: (err: { error?: { error?: string } }) => {
-        this.deleting.set(false);
-        toast.error(err?.error?.error ?? 'Failed to delete OCR engine.');
-      },
-    });
-  }
-
   onStateChanged(state: BrnDialogState): void {
     if (state === 'closed') {
-      this.confirmingDelete.set(false);
       this.closed.emit();
     }
   }

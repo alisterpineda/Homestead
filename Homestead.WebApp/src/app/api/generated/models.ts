@@ -5,6 +5,8 @@ export type { AddGroupMemberRequest } from './models/add-group-member-request';
 export type { AppRole } from './models/app-role';
 export type { BulkDeleteDocumentsRequest } from './models/bulk-delete-documents-request';
 export type { BulkDeleteDocumentsResponse } from './models/bulk-delete-documents-response';
+export type { BulkDeleteOcrEnginesRequest } from './models/bulk-delete-ocr-engines-request';
+export type { BulkDeleteOcrEnginesResponse } from './models/bulk-delete-ocr-engines-response';
 export type { BulkDeletePartiesRequest } from './models/bulk-delete-parties-request';
 export type { BulkDeletePartiesResponse } from './models/bulk-delete-parties-response';
 export type { BulkDeleteTagsRequest } from './models/bulk-delete-tags-request';

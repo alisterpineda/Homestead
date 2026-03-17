@@ -115,5 +115,5 @@ export type { CreateOcrEngine$Params as CreateOcrEngine$Params } from './fn/admi
 export { createOcrEngine as createOcrEngine } from './fn/admin/create-ocr-engine';
 export type { UpdateOcrEngine$Params as UpdateOcrEngine$Params } from './fn/admin/update-ocr-engine';
 export { updateOcrEngine as updateOcrEngine } from './fn/admin/update-ocr-engine';
-export type { DeleteOcrEngine$Params as DeleteOcrEngine$Params } from './fn/admin/delete-ocr-engine';
-export { deleteOcrEngine as deleteOcrEngine } from './fn/admin/delete-ocr-engine';
+export type { BulkDeleteOcrEngines$Params as BulkDeleteOcrEngines$Params } from './fn/admin/bulk-delete-ocr-engines';
+export { bulkDeleteOcrEngines as bulkDeleteOcrEngines } from './fn/admin/bulk-delete-ocr-engines';

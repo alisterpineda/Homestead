@@ -57,18 +57,25 @@ public class OcrEngineCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Admin_CanDeleteOcrEngine()
+    public async Task Admin_CanBulkDeleteOcrEngines()
     {
         var client = await CreateAdminClientAsync();
-        var engineId = await CreateOcrEngineAsync(client, "Delete Me");
+        var id1 = await CreateOcrEngineAsync(client, "Bulk Delete 1");
+        var id2 = await CreateOcrEngineAsync(client, "Bulk Delete 2");
 
-        var response = await client.DeleteAsync($"/api/v1/admin/ocr-engines/{engineId}", CT);
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines/bulk-delete", new
+        {
+            ids = new[] { id1, id2 }
+        }, CT);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
+        Assert.Equal(2, body!.DeletedCount);
 
         var listResponse = await client.GetAsync("/api/v1/admin/ocr-engines?Page=1&PageSize=50", CT);
-        var body = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<OcrEngineItem>>(CT);
-        Assert.DoesNotContain(body!.Items, e => e.Id == engineId);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<OcrEngineItem>>(CT);
+        Assert.DoesNotContain(list!.Items, e => e.Id == id1);
+        Assert.DoesNotContain(list.Items, e => e.Id == id2);
     }
 
     [Fact]
@@ -87,14 +94,19 @@ public class OcrEngineCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CannotDeleteBuiltIn()
+    public async Task BulkDelete_IgnoresBuiltIn()
     {
         var client = await CreateAdminClientAsync();
         var builtInId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-        var response = await client.DeleteAsync($"/api/v1/admin/ocr-engines/{builtInId}", CT);
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ocr-engines/bulk-delete", new
+        {
+            ids = new[] { builtInId }
+        }, CT);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
+        Assert.Equal(0, body!.DeletedCount);
     }
 
     [Fact]
