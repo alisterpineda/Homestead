@@ -3,7 +3,7 @@ namespace Homestead.WebApi.Common;
 public record PaginatedRequest
 {
     private int _page = 1;
-    private int _pageSize = 10;
+    private int _pageSize = 50;
 
     public int Page
     {

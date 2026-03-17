@@ -130,8 +130,8 @@ export class GroupListComponent implements OnDestroy {
   );
 
   private pageSize = toSignal(
-    this.route.queryParamMap.pipe(map(params => +(params.get('pageSize') ?? 10))),
-    { initialValue: 10 },
+    this.route.queryParamMap.pipe(map(params => +(params.get('pageSize') ?? 50))),
+    { initialValue: 50 },
   );
 
   data = toSignal(
