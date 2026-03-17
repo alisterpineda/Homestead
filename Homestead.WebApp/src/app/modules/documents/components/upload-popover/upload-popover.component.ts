@@ -17,15 +17,26 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
       <button hlmPopoverTrigger hlmBtn variant="ghost" size="sm" class="relative">
         <ng-icon hlm name="lucideUpload" size="sm" />
         <span class="hidden sm:inline">Upload</span>
-        @if (uploadManager.hasActiveUploads()) {
-          <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
-            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
-          </span>
-        } @else if (uploadManager.failedCount() > 0) {
-          <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
-            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive"></span>
-          </span>
+        @switch (triggerBadge()) {
+          @case ('active') {
+            <span class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+              <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary"></span>
+            </span>
+            <span class="sr-only">Uploads in progress</span>
+          }
+          @case ('completed') {
+            <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-600 dark:bg-green-400"></span>
+            <span class="sr-only">All uploads completed</span>
+          }
+          @case ('mixed') {
+            <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-amber-500 dark:bg-amber-400"></span>
+            <span class="sr-only">Some uploads failed</span>
+          }
+          @case ('failed') {
+            <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive"></span>
+            <span class="sr-only">All uploads failed</span>
+          }
         }
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-80 p-0">
@@ -116,6 +127,16 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
 export class UploadPopoverComponent {
   protected uploadManager = inject(UploadManagerService);
   protected formatBytes = formatBytes;
+
+  protected triggerBadge = computed(() => {
+    if (this.uploadManager.hasActiveUploads()) return 'active' as const;
+    const completed = this.uploadManager.completedCount();
+    const failed = this.uploadManager.failedCount();
+    if (completed > 0 && failed === 0) return 'completed' as const;
+    if (completed > 0 && failed > 0) return 'mixed' as const;
+    if (failed > 0) return 'failed' as const;
+    return null;
+  });
 
   protected statusText = computed(() => {
     const items = this.uploadManager.items();

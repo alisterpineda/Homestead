@@ -113,6 +113,149 @@ describe('UploadPopoverComponent', () => {
     });
   });
 
+  describe('triggerBadge', () => {
+    it('should return null when no items', () => {
+      expect(component['triggerBadge']()).toBeNull();
+    });
+
+    it('should return "active" when uploads are in progress', () => {
+      mockItems.set([createItem({ status: 'uploading' })]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('active');
+    });
+
+    it('should return "active" when queued items exist', () => {
+      mockItems.set([createItem({ status: 'queued' })]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('active');
+    });
+
+    it('should return "active" over other states when uploads are active', () => {
+      mockItems.set([
+        createItem({ id: '1', status: 'uploading' }),
+        createItem({ id: '2', status: 'completed' }),
+        createItem({ id: '3', status: 'failed', error: 'err' }),
+      ]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('active');
+    });
+
+    it('should return "completed" when all finished uploads succeeded', () => {
+      mockItems.set([
+        createItem({ id: '1', status: 'completed' }),
+        createItem({ id: '2', status: 'completed' }),
+      ]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('completed');
+    });
+
+    it('should return "mixed" when there are both completed and failed', () => {
+      mockItems.set([
+        createItem({ id: '1', status: 'completed' }),
+        createItem({ id: '2', status: 'failed', error: 'err' }),
+      ]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('mixed');
+    });
+
+    it('should return "failed" when all finished uploads failed', () => {
+      mockItems.set([
+        createItem({ id: '1', status: 'failed', error: 'err' }),
+        createItem({ id: '2', status: 'failed', error: 'err' }),
+      ]);
+      fixture.detectChanges();
+
+      expect(component['triggerBadge']()).toBe('failed');
+    });
+
+    it('should return null after clearing finished items', () => {
+      mockItems.set([createItem({ status: 'completed' })]);
+      fixture.detectChanges();
+      expect(component['triggerBadge']()).toBe('completed');
+
+      mockItems.set([]);
+      fixture.detectChanges();
+      expect(component['triggerBadge']()).toBeNull();
+    });
+  });
+
+  describe('trigger badge DOM', () => {
+    function getTriggerButton(): HTMLElement {
+      return fixture.nativeElement.querySelector('button');
+    }
+
+    function getBadgeDot(): HTMLElement | null {
+      return getTriggerButton().querySelector('span.rounded-full');
+    }
+
+    function getScreenReaderText(): string | null {
+      const sr = getTriggerButton().querySelector('.sr-only');
+      return sr?.textContent?.trim() ?? null;
+    }
+
+    it('should show no badge dot when no items', () => {
+      expect(getBadgeDot()).toBeNull();
+      expect(getScreenReaderText()).toBeNull();
+    });
+
+    it('should show pinging primary dot when active', () => {
+      mockItems.set([createItem({ status: 'uploading' })]);
+      fixture.detectChanges();
+
+      const container = getTriggerButton().querySelector('.animate-ping');
+      expect(container).toBeTruthy();
+      expect(getScreenReaderText()).toBe('Uploads in progress');
+    });
+
+    it('should show green dot when all completed', () => {
+      mockItems.set([createItem({ status: 'completed' })]);
+      fixture.detectChanges();
+
+      const dot = getBadgeDot();
+      expect(dot).toBeTruthy();
+      expect(dot!.classList.contains('bg-green-600')).toBe(true);
+      expect(getScreenReaderText()).toBe('All uploads completed');
+    });
+
+    it('should show amber dot when mixed', () => {
+      mockItems.set([
+        createItem({ id: '1', status: 'completed' }),
+        createItem({ id: '2', status: 'failed', error: 'err' }),
+      ]);
+      fixture.detectChanges();
+
+      const dot = getBadgeDot();
+      expect(dot).toBeTruthy();
+      expect(dot!.classList.contains('bg-amber-500')).toBe(true);
+      expect(getScreenReaderText()).toBe('Some uploads failed');
+    });
+
+    it('should show destructive dot when all failed', () => {
+      mockItems.set([createItem({ status: 'failed', error: 'err' })]);
+      fixture.detectChanges();
+
+      const dot = getBadgeDot();
+      expect(dot).toBeTruthy();
+      expect(dot!.classList.contains('bg-destructive')).toBe(true);
+      expect(getScreenReaderText()).toBe('All uploads failed');
+    });
+
+    it('should remove badge dot after items are cleared', () => {
+      mockItems.set([createItem({ status: 'completed' })]);
+      fixture.detectChanges();
+      expect(getBadgeDot()).toBeTruthy();
+
+      mockItems.set([]);
+      fixture.detectChanges();
+      expect(getBadgeDot()).toBeNull();
+    });
+  });
+
   describe('onFilesSelected', () => {
     it('should call addFiles and reset the input', () => {
       const file = new File(['content'], 'doc.pdf', { type: 'application/pdf' });
