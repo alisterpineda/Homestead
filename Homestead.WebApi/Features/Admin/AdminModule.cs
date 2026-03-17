@@ -13,6 +13,10 @@ using Homestead.WebApi.Features.Admin.v1.GetUsers;
 using Homestead.WebApi.Features.Admin.v1.RemoveGroupMember;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroup;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
+using Homestead.WebApi.Features.Admin.v1.OcrEngines.CreateOcrEngine;
+using Homestead.WebApi.Features.Admin.v1.OcrEngines.DeleteOcrEngine;
+using Homestead.WebApi.Features.Admin.v1.OcrEngines.GetOcrEngines;
+using Homestead.WebApi.Features.Admin.v1.OcrEngines.UpdateOcrEngine;
 using Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
 namespace Homestead.WebApi.Features.Admin;
@@ -49,6 +53,17 @@ public static class AdminModule
         AddGroupMemberEndpoint.Map(groups);
         UpdateGroupMemberEndpoint.Map(groups);
         RemoveGroupMemberEndpoint.Map(groups);
+
+        var ocrEngines = app.MapGroup("/api/v{version:apiVersion}/admin/ocr-engines")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetOcrEnginesEndpoint.Map(ocrEngines);
+        CreateOcrEngineEndpoint.Map(ocrEngines);
+        UpdateOcrEngineEndpoint.Map(ocrEngines);
+        DeleteOcrEngineEndpoint.Map(ocrEngines);
 
         return app;
     }

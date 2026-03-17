@@ -22,7 +22,14 @@ WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng fontconfig
+RUN apk add --no-cache tesseract-ocr fontconfig \
+    tesseract-ocr-data-eng tesseract-ocr-data-fra tesseract-ocr-data-deu \
+    tesseract-ocr-data-spa tesseract-ocr-data-ita tesseract-ocr-data-por \
+    tesseract-ocr-data-nld tesseract-ocr-data-rus tesseract-ocr-data-chi_sim \
+    tesseract-ocr-data-jpn tesseract-ocr-data-kor tesseract-ocr-data-ara \
+    tesseract-ocr-data-hin tesseract-ocr-data-pol tesseract-ocr-data-tur \
+    tesseract-ocr-data-vie tesseract-ocr-data-tha tesseract-ocr-data-swe \
+    tesseract-ocr-data-dan tesseract-ocr-data-nor
 
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/Homestead/browser ./wwwroot/

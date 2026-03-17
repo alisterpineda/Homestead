@@ -4,6 +4,7 @@ using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Domains.Processing;
+using Homestead.WebApi.Domains.Settings;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -28,6 +29,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
+    public DbSet<OcrEngine> OcrEngines { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

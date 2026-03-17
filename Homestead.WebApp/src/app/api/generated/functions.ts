@@ -109,3 +109,11 @@ export type { UpdateGroupMember$Params as UpdateGroupMember$Params } from './fn/
 export { updateGroupMember as updateGroupMember } from './fn/admin/update-group-member';
 export type { RemoveGroupMember$Params as RemoveGroupMember$Params } from './fn/admin/remove-group-member';
 export { removeGroupMember as removeGroupMember } from './fn/admin/remove-group-member';
+export type { GetOcrEngines$Params as GetOcrEngines$Params } from './fn/admin/get-ocr-engines';
+export { getOcrEngines as getOcrEngines } from './fn/admin/get-ocr-engines';
+export type { CreateOcrEngine$Params as CreateOcrEngine$Params } from './fn/admin/create-ocr-engine';
+export { createOcrEngine as createOcrEngine } from './fn/admin/create-ocr-engine';
+export type { UpdateOcrEngine$Params as UpdateOcrEngine$Params } from './fn/admin/update-ocr-engine';
+export { updateOcrEngine as updateOcrEngine } from './fn/admin/update-ocr-engine';
+export type { DeleteOcrEngine$Params as DeleteOcrEngine$Params } from './fn/admin/delete-ocr-engine';
+export { deleteOcrEngine as deleteOcrEngine } from './fn/admin/delete-ocr-engine';

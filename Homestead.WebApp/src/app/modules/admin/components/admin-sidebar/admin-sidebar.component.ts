@@ -3,7 +3,7 @@ import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity } from '@ng-icons/lucide';
+import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideScanText } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { isNavItemActive } from '@/shared/utils';
@@ -17,7 +17,7 @@ import { isNavItemActive } from '@/shared/utils';
     HlmIconImports,
     HlmSidebarImports,
   ],
-  providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity })],
+  providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideScanText })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupContent>
@@ -54,6 +54,12 @@ import { isNavItemActive } from '@/shared/utils';
               <span>Jobs</span>
             </a>
           </li>
+          <li hlmSidebarMenuItem>
+            <a hlmSidebarMenuButton routerLink="/admin/ocr" [isActive]="isActive('/admin/ocr')">
+              <ng-icon hlm name="lucideScanText" size="sm" />
+              <span>OCR Engines</span>
+            </a>
+          </li>
         </ul>
       </div>
     </div>
@@ -72,7 +78,7 @@ export class AdminSidebarComponent {
 
   private urlPath = computed(() => this.url().split('?')[0]);
 
-  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs'];
+  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs', '/admin/ocr'];
 
   isActive(path: string): boolean {
     return isNavItemActive(this.urlPath(), path, this.navPaths);
