@@ -8,12 +8,14 @@ import {
   inject,
   effect,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormControl, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -32,11 +34,13 @@ const NONE_VALUE = '__none__';
   selector: 'app-edit-tag-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ReactiveFormsModule,
     FormsModule,
     HlmSheetImports,
     HlmButton,
     HlmLabel,
     HlmInput,
+    HlmFormFieldImports,
     BrnSelectImports,
     HlmSelectImports,
     ColorPickerComponent,
@@ -52,16 +56,25 @@ const NONE_VALUE = '__none__';
 
         @if (tag(); as t) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-            <div class="space-y-2">
+            <hlm-form-field>
               <label hlmLabel for="tag-name">Name</label>
               <input
                 hlmInput
                 id="tag-name"
                 class="w-full"
-                [value]="editName()"
-                (input)="editName.set(asInputValue($event))"
+                [formControl]="nameControl"
               />
-            </div>
+              <hlm-hint>Cannot contain '/' characters.</hlm-hint>
+              <hlm-error>
+                @if (nameControl.hasError('required')) {
+                  Tag name is required.
+                } @else if (nameControl.hasError('pattern')) {
+                  Tag name cannot contain '/' characters.
+                } @else if (nameControl.hasError('maxlength')) {
+                  Tag name must be 256 characters or fewer.
+                }
+              </hlm-error>
+            </hlm-form-field>
 
             <div class="space-y-2">
               <label hlmLabel>Parent</label>
@@ -91,7 +104,7 @@ const NONE_VALUE = '__none__';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || !isValid() || saving()">
+          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || nameControl.invalid || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -106,7 +119,11 @@ export class EditTagSheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  editName = signal('');
+  nameControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.pattern(/^[^/]*$/), Validators.maxLength(256)],
+  });
+  editName = toSignal(this.nameControl.valueChanges, { initialValue: '' });
   editParentId = signal<string | null>(null);
   editColor = signal<string | null>(null);
   saving = signal(false);
@@ -151,11 +168,6 @@ export class EditTagSheetComponent {
     return false;
   });
 
-  isValid = computed(() => {
-    const name = this.editName();
-    return name.trim().length > 0 && !name.includes('/');
-  });
-
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
 
@@ -163,15 +175,13 @@ export class EditTagSheetComponent {
     effect(() => {
       const t = this.tag();
       if (t && this.state() === 'open') {
-        this.editName.set(t.name);
+        this.nameControl.setValue(t.name);
+        this.nameControl.markAsPristine();
+        this.nameControl.markAsUntouched();
         this.editParentId.set(t.parentId ?? null);
         this.editColor.set(t.color ?? null);
       }
     });
-  }
-
-  asInputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   onParentChange(value: string): void {

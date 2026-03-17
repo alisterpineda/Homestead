@@ -1,10 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
+import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createParty } from '@/api/generated/fn/documents/create-party';
 import { toast } from 'ngx-sonner';
@@ -13,10 +16,12 @@ import { toast } from 'ngx-sonner';
   selector: 'app-create-party-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ReactiveFormsModule,
     HlmDialogImports,
     HlmButton,
     HlmInput,
     HlmLabel,
+    HlmFormFieldImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -31,16 +36,22 @@ import { toast } from 'ngx-sonner';
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
-          <div class="flex flex-col gap-1.5">
+          <hlm-form-field>
             <label hlmLabel for="create-party-name">Name</label>
             <input
               hlmInput
               id="create-party-name"
               placeholder="Enter a name for this party"
-              [value]="name()"
-              (input)="name.set(asInputValue($event))"
+              [formControl]="nameControl"
             />
-          </div>
+            <hlm-error>
+              @if (nameControl.hasError('required')) {
+                Party name is required.
+              } @else if (nameControl.hasError('maxlength')) {
+                Party name must be 256 characters or fewer.
+              }
+            </hlm-error>
+          </hlm-form-field>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="create-party-desc">Description (optional)</label>
             <input
@@ -56,7 +67,7 @@ import { toast } from 'ngx-sonner';
           }
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
-            <button hlmBtn type="submit" [disabled]="!name().trim() || creating()">
+            <button hlmBtn type="submit" [disabled]="nameControl.invalid || creating()">
               {{ creating() ? 'Creating...' : 'Create' }}
             </button>
           </div>
@@ -69,7 +80,11 @@ export class CreatePartyDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
   created = output();
 
-  name = signal('');
+  nameControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.maxLength(256)],
+  });
+  name = toSignal(this.nameControl.valueChanges, { initialValue: '' });
   description = signal('');
   creating = signal(false);
   createError = signal(false);
@@ -84,7 +99,9 @@ export class CreatePartyDialogComponent {
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.name.set('');
+      this.nameControl.setValue('');
+      this.nameControl.markAsPristine();
+      this.nameControl.markAsUntouched();
       this.description.set('');
       this.creating.set(false);
       this.createError.set(false);

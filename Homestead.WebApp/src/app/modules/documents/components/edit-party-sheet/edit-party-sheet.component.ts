@@ -8,12 +8,15 @@ import {
   inject,
   effect,
 } from '@angular/core';
+import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
+import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateParty } from '@/api/generated/fn/documents/update-party';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
@@ -24,11 +27,13 @@ import { toast } from 'ngx-sonner';
   selector: 'app-edit-party-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ReactiveFormsModule,
     HlmSheetImports,
     HlmButton,
     HlmLabel,
     HlmInput,
     HlmTextareaImports,
+    HlmFormFieldImports,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)" (closed)="onClosed()">
@@ -40,16 +45,22 @@ import { toast } from 'ngx-sonner';
 
         @if (party(); as p) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-            <div class="space-y-2">
+            <hlm-form-field>
               <label hlmLabel for="party-name">Name</label>
               <input
                 hlmInput
                 id="party-name"
                 class="w-full"
-                [value]="editName()"
-                (input)="editName.set(asInputValue($event))"
+                [formControl]="nameControl"
               />
-            </div>
+              <hlm-error>
+                @if (nameControl.hasError('required')) {
+                  Party name is required.
+                } @else if (nameControl.hasError('maxlength')) {
+                  Party name must be 256 characters or fewer.
+                }
+              </hlm-error>
+            </hlm-form-field>
 
             <div class="space-y-2">
               <label hlmLabel for="party-desc">Description</label>
@@ -73,7 +84,7 @@ import { toast } from 'ngx-sonner';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || saving()">
+          <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || nameControl.invalid || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -87,7 +98,11 @@ export class EditPartySheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  editName = signal('');
+  nameControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.maxLength(256)],
+  });
+  editName = toSignal(this.nameControl.valueChanges, { initialValue: '' });
   editDescription = signal('');
   saving = signal(false);
 
@@ -106,7 +121,9 @@ export class EditPartySheetComponent {
     effect(() => {
       const p = this.party();
       if (p && this.state() === 'open') {
-        this.editName.set(p.name);
+        this.nameControl.setValue(p.name);
+        this.nameControl.markAsPristine();
+        this.nameControl.markAsUntouched();
         this.editDescription.set(p.description ?? '');
       }
     });

@@ -1,10 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
+import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createTag } from '@/api/generated/fn/documents/create-tag';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
@@ -14,10 +17,12 @@ import { toast } from 'ngx-sonner';
   selector: 'app-create-tag-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ReactiveFormsModule,
     HlmDialogImports,
     HlmButton,
     HlmInput,
     HlmLabel,
+    HlmFormFieldImports,
     ColorPickerComponent,
   ],
   template: `
@@ -33,16 +38,16 @@ import { toast } from 'ngx-sonner';
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
-          <div class="flex flex-col gap-1.5">
+          <hlm-form-field>
             <label hlmLabel for="create-tag-path">Path</label>
             <input
               hlmInput
               id="create-tag-path"
               placeholder="e.g., finance/invoices"
-              [value]="path()"
-              (input)="path.set(asInputValue($event))"
+              [formControl]="pathControl"
             />
-          </div>
+            <hlm-error>Tag path is required.</hlm-error>
+          </hlm-form-field>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Color</label>
             <app-color-picker [color]="selectedColor()" (colorChange)="selectedColor.set($event)" />
@@ -52,7 +57,7 @@ import { toast } from 'ngx-sonner';
           }
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
-            <button hlmBtn type="submit" [disabled]="!path().trim() || creating()">
+            <button hlmBtn type="submit" [disabled]="pathControl.invalid || creating()">
               {{ creating() ? 'Creating...' : 'Create' }}
             </button>
           </div>
@@ -65,7 +70,11 @@ export class CreateTagDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
   created = output();
 
-  path = signal('');
+  pathControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required],
+  });
+  path = toSignal(this.pathControl.valueChanges, { initialValue: '' });
   selectedColor = signal<string | null>(null);
   creating = signal(false);
   createError = signal(false);
@@ -74,13 +83,11 @@ export class CreateTagDialogComponent {
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
 
-  asInputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
-  }
-
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.path.set('');
+      this.pathControl.setValue('');
+      this.pathControl.markAsPristine();
+      this.pathControl.markAsUntouched();
       this.selectedColor.set(null);
       this.creating.set(false);
       this.createError.set(false);
