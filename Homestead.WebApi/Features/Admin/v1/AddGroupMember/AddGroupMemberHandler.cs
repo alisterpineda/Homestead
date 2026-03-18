@@ -1,11 +1,13 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.AddGroupMember;
 
-public class AddGroupMemberHandler(AppDbContext db)
+public class AddGroupMemberHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
     : ICommandHandler<AddGroupMemberCommand, GroupMemberResponse>
 {
     public async Task<GroupMemberResponse> HandleAsync(AddGroupMemberCommand command, CancellationToken ct)
@@ -38,6 +40,11 @@ public class AddGroupMemberHandler(AppDbContext db)
             UserId = command.Request.UserId,
             AccessLevel = command.Request.AccessLevel
         });
+
+        auditLogger.LogUpdated("Group", command.GroupId, currentUser.UserId,
+        [
+            new ScalarFieldChange("MemberAdded", null, $"{user.DisplayName} as {command.Request.AccessLevel}")
+        ]);
 
         await db.SaveChangesAsync(ct);
 

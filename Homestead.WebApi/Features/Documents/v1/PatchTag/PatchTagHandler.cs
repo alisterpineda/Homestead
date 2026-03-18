@@ -1,5 +1,7 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
@@ -7,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
-public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService)
+public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
     : ICommandHandler<PatchTagCommand, PatchTagResponse>
 {
     public async Task<PatchTagResponse> HandleAsync(PatchTagCommand request, CancellationToken ct)
@@ -17,6 +19,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
         if (tag is null)
             throw new NotFoundException("Tag not found.");
+
+        var before = TagSnapshot.From(tag);
 
         // Block modification if the tag (or its descendants) is used on inaccessible documents
         var subtreeTagIds = db.Tags
@@ -132,6 +136,10 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
             EffectiveColorResolver.Recompute(tag, newParentEffectiveColor, descendants);
         }
+
+        var after = TagSnapshot.From(tag);
+        var changes = before.Diff(after);
+        auditLogger.LogUpdated("Tag", tag.Id, currentUser.UserId, changes);
 
         await db.SaveChangesAsync(ct);
 

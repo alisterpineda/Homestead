@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
@@ -5,7 +6,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateUser;
 
-public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager)
+public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, ICurrentUserAccessor currentUser, IAuditLogger auditLogger, AppDbContext db)
     : ICommandHandler<CreateUserRequest, UserResponse>
 {
     public async Task<UserResponse> HandleAsync(CreateUserRequest request, CancellationToken ct)
@@ -25,6 +26,9 @@ public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
         var roleName = request.Role.ToString();
         await userManager.AddToRoleAsync(user, roleName);
         await roleSourceManager.SetSourceAsync(user.Id, roleName, RoleSource.Local);
+
+        auditLogger.LogCreated("AppUser", user.Id, currentUser.UserId);
+        await db.SaveChangesAsync(ct);
 
         return new UserResponse
         {

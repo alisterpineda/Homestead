@@ -1,11 +1,13 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
-public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService)
+public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
     : ICommandHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyCommand request, CancellationToken ct)
@@ -28,8 +30,14 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Party name cannot be empty.");
 
+        var before = PartySnapshot.From(party);
+
         party.Name = name;
         party.Description = request.Description?.Trim();
+
+        var after = PartySnapshot.From(party);
+        var changes = before.Diff(after);
+        auditLogger.LogUpdated("Party", party.Id, currentUser.UserId, changes);
 
         await db.SaveChangesAsync(ct);
 

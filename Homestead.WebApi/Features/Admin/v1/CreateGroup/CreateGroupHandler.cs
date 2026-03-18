@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateGroup;
 
-public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser)
+public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
     : ICommandHandler<CreateGroupRequest, GroupResponse>
 {
     public async Task<GroupResponse> HandleAsync(CreateGroupRequest request, CancellationToken ct)
@@ -32,6 +32,7 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Groups.Add(group);
+        auditLogger.LogCreated("Group", group.Id, currentUser.UserId);
 
         // Auto-add creator as Owner
         if (userId.HasValue)

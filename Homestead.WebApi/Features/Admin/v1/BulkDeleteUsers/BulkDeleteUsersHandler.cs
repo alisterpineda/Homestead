@@ -10,7 +10,8 @@ namespace Homestead.WebApi.Features.Admin.v1.BulkDeleteUsers;
 public class BulkDeleteUsersHandler(
     UserManager<AppUser> userManager,
     AppDbContext db,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser,
+    IAuditLogger auditLogger)
     : ICommandHandler<BulkDeleteUsersRequest, BulkDeleteUsersResponse>
 {
     public async Task<BulkDeleteUsersResponse> HandleAsync(BulkDeleteUsersRequest request, CancellationToken ct)
@@ -26,6 +27,11 @@ public class BulkDeleteUsersHandler(
 
         if (users.Count == 0)
             return new BulkDeleteUsersResponse(0);
+
+        foreach (var user in users)
+            auditLogger.LogDeleted("AppUser", user.Id, currentUser.UserId, description: user.DisplayName);
+
+        await db.SaveChangesAsync(ct);
 
         foreach (var user in users)
             await userManager.DeleteAsync(user);

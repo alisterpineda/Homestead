@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Settings;
 
-namespace Homestead.WebApi.Domains.Settings;
+namespace Homestead.WebApi.Domains.Auditing.Snapshots;
 
 public record OcrEngineSnapshot : IAuditSnapshot<OcrEngineSnapshot, OcrEngine>
 {

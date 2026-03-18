@@ -5,7 +5,7 @@ using Homestead.WebApi.Persistence;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
-public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser)
+public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
     : ICommandHandler<CreatePartyRequest, CreatePartyResponse>
 {
     public async Task<CreatePartyResponse> HandleAsync(CreatePartyRequest request, CancellationToken ct)
@@ -25,6 +25,7 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Parties.Add(party);
+        auditLogger.LogCreated("Party", party.Id, currentUser.UserId);
         await db.SaveChangesAsync(ct);
 
         return new CreatePartyResponse

@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;

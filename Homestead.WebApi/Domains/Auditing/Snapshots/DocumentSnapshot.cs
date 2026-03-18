@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Documents;
 
-namespace Homestead.WebApi.Domains.Documents;
+namespace Homestead.WebApi.Domains.Auditing.Snapshots;
 
 public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
 {
