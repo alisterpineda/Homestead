@@ -17,6 +17,10 @@ using Homestead.WebApi.Features.Admin.v1.OcrEngines.BulkDeleteOcrEngines;
 using Homestead.WebApi.Features.Admin.v1.OcrEngines.CreateOcrEngine;
 using Homestead.WebApi.Features.Admin.v1.OcrEngines.GetOcrEngines;
 using Homestead.WebApi.Features.Admin.v1.OcrEngines.UpdateOcrEngine;
+using Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings;
+using Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings;
+using Homestead.WebApi.Features.Admin.v1.Settings.UpdateDocumentSettings;
+using Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings;
 using Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
 namespace Homestead.WebApi.Features.Admin;
@@ -64,6 +68,17 @@ public static class AdminModule
         CreateOcrEngineEndpoint.Map(ocrEngines);
         UpdateOcrEngineEndpoint.Map(ocrEngines);
         BulkDeleteOcrEnginesEndpoint.Map(ocrEngines);
+
+        var settings = app.MapGroup("/api/v{version:apiVersion}/admin/settings")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetDocumentSettingsEndpoint.Map(settings);
+        UpdateDocumentSettingsEndpoint.Map(settings);
+        GetSystemSettingsEndpoint.Map(settings);
+        UpdateSystemSettingsEndpoint.Map(settings);
 
         return app;
     }

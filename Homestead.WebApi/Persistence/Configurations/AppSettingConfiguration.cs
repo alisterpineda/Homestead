@@ -1,0 +1,27 @@
+using Homestead.WebApi.Domains.Settings;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Homestead.WebApi.Persistence.Configurations;
+
+public class AppSettingConfiguration : IEntityTypeConfiguration<AppSetting>
+{
+    public void Configure(EntityTypeBuilder<AppSetting> builder)
+    {
+        builder.ToTable("app_settings", "settings");
+
+        builder.HasKey(e => e.Module);
+
+        builder.Property(e => e.Module)
+            .IsRequired()
+            .HasMaxLength(256);
+
+        builder.Property(e => e.Value)
+            .IsRequired()
+            .HasColumnType("jsonb");
+
+        builder.Property(e => e.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+    }
+}

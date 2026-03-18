@@ -32,7 +32,7 @@ public class PostgresFixture : IAsyncLifetime
         Respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public", "identity", "auditing", "documents", "auth"],
+            SchemasToInclude = ["public", "identity", "auditing", "documents", "auth", "settings"],
             TablesToIgnore = [
                 new Respawn.Graph.Table("identity", "roles"),
                 new Respawn.Graph.Table("public", "__EFMigrationsHistory")

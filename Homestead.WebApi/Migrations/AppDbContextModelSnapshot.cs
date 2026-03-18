@@ -552,6 +552,32 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("jobs", "processing");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domains.Settings.AppSetting", b =>
+                {
+                    b.Property<string>("Module")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Module");
+
+                    b.ToTable("app_settings", "settings");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domains.Settings.OcrEngine", b =>
                 {
                     b.Property<Guid>("Id")

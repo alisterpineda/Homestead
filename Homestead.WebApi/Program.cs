@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Configuration;
 using Homestead.WebApi.Features.Admin;
 using Homestead.WebApi.Features.Identity;
 using Homestead.WebApi.Features.Documents;
@@ -72,6 +73,22 @@ if (!string.IsNullOrEmpty(oidcAuthority))
 
 builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
 
+// Database-backed configuration provider
+var dbConfigSource = new DbConfigurationSource();
+builder.Configuration.Sources.Add(dbConfigSource);
+
+builder.Services.Configure<SystemSettings>(
+    builder.Configuration.GetSection("AppSettings:Modules:System"));
+builder.Services.Configure<DocumentSettings>(
+    builder.Configuration.GetSection("AppSettings:Modules:Documents"));
+
+builder.Services.AddSingleton(dbConfigSource);
+builder.Services.AddSingleton<IAppSettingsConfigurationProvider>(sp =>
+{
+    var source = sp.GetRequiredService<DbConfigurationSource>();
+    return source.Provider ?? throw new InvalidOperationException("DbConfigurationProvider not initialized");
+});
+
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -96,6 +113,10 @@ builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
 builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddHandlers();
+builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings.GetDocumentSettingsHandler>();
+builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings.GetSystemSettingsHandler>();
+builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.UpdateDocumentSettings.UpdateDocumentSettingsHandler>();
+builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings.UpdateSystemSettingsHandler>();
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddThumbnails();
@@ -166,6 +187,8 @@ builder.Services.AddOpenApi("v1", options =>
 
 var app = builder.Build();
 
+dbConfigSource.ServiceProvider = app.Services;
+
 app.MapDefaultEndpoints();
 
 app.UseExceptionHandler();
@@ -207,6 +230,7 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    dbConfigSource.Provider?.Reload();
 }
 
 // Configure the HTTP request pipeline.
