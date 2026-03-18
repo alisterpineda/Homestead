@@ -30,6 +30,7 @@ public class DocumentAuthorizationHandler(AppDbContext db, IHttpContextAccessor 
         var userId = CurrentUserAccessor.ParseUserId(context.User);
 
         var document = await db.Documents
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(d => d.Id == documentId)
             .Select(d => new { d.GroupId })

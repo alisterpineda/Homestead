@@ -249,6 +249,43 @@ public class TrashTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NotFound, commentResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task GetDocumentFile_SoftDeletedDoc_ReturnsFile()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "TrashFile.pdf");
+
+        await client.DeleteAsync($"/api/v1/documents/{docId}", CT);
+
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/file", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bytes = await response.Content.ReadAsByteArrayAsync(CT);
+        Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public async Task GetDocumentFile_SoftDeletedDoc_ContributorWithAccess_ReturnsFile()
+    {
+        var adminClient = await CreateAdminClientAsync();
+
+        var groupId = await CreateGroupAsync(adminClient, "TrashFileGroup");
+
+        var contributorClient = await CreateUserClientAsync(role: "Contributor");
+        var contributorId = await GetUserIdAsync(contributorClient);
+        await AddGroupMemberAsync(adminClient, groupId, contributorId, "Editor");
+
+        var docId = await UploadAndWaitAsync(contributorClient, "trash-file-contributor.pdf", groupId);
+
+        await contributorClient.DeleteAsync($"/api/v1/documents/{docId}", CT);
+
+        var response = await contributorClient.GetAsync($"/api/v1/documents/{docId}/file", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bytes = await response.Content.ReadAsByteArrayAsync(CT);
+        Assert.NotEmpty(bytes);
+    }
+
     private record EmptyTrashResult(int DeletedCount);
     private record RestoreResult(int RestoredCount);
 }

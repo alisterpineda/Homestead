@@ -15,6 +15,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Read);
 
         var documentName = await db.Documents
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
             .Select(d => d.Name)
