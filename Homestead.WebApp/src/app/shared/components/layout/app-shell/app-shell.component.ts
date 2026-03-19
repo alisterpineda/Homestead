@@ -4,15 +4,15 @@ import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound } from '@ng-icons/lucide';
+import { lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound, lucideSunMoon } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
 import { HlmAlertDialog, HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { ProfileDialogComponent } from '../../profile/profile.component';
+import { ThemeDialogComponent } from '../../theme/theme-dialog/theme-dialog.component';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
-import { ThemeToggleComponent } from '@/shared/components/theme/theme-toggle/theme-toggle.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -32,10 +32,10 @@ import { getModuleByPath } from '@/modules/registry';
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ProfileDialogComponent,
+    ThemeDialogComponent,
     AppSwitcherComponent,
-    ThemeToggleComponent,
   ],
-  providers: [provideIcons({ lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound })],
+  providers: [provideIcons({ lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound, lucideSunMoon })],
   template: `
     <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
@@ -48,9 +48,6 @@ import { getModuleByPath } from '@/modules/registry';
                 {{ activeModule()!.label }}
               </span>
             }
-            <div class="ml-auto">
-              <app-theme-toggle />
-            </div>
           </div>
         </div>
 
@@ -101,6 +98,10 @@ import { getModuleByPath } from '@/modules/registry';
                       <ng-icon hlm name="lucideCircleUserRound" size="sm" />
                       Profile
                     </button>
+                    <button hlmDropdownMenuItem class="gap-2" (triggered)="themeDialog.open()">
+                      <ng-icon hlm name="lucideSunMoon" size="sm" />
+                      Theme
+                    </button>
                   </hlm-dropdown-menu-group>
                   <hlm-dropdown-menu-separator />
                   <hlm-dropdown-menu-group>
@@ -115,6 +116,7 @@ import { getModuleByPath } from '@/modules/registry';
           </ul>
 
           <app-profile-dialog #profileDialog />
+          <app-theme-dialog #themeDialog />
 
           <hlm-alert-dialog>
             <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">

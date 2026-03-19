@@ -118,6 +118,9 @@
       ],
       "@/shared/components/spartan/calendar": [
         "./src/app/shared/components/spartan/calendar/src/index.ts"
+      ],
+      "@/shared/components/spartan/radio-group": [
+        "./src/app/shared/components/spartan/radio-group/src/index.ts"
       ]
     }
   },

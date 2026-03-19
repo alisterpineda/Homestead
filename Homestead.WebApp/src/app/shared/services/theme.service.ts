@@ -38,13 +38,6 @@ export class ThemeService {
     this.mode.set(mode);
   }
 
-  cycleTheme(): void {
-    const modes: ThemeMode[] = ['light', 'dark', 'system'];
-    const currentIndex = modes.indexOf(this.mode());
-    const next = modes[(currentIndex + 1) % modes.length];
-    this.setMode(next);
-  }
-
   private loadMode(): ThemeMode {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === 'light' || stored === 'dark' || stored === 'system') {
