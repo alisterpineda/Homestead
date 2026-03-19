@@ -108,7 +108,7 @@ public class SettingsCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateSystemSettings_ReturnsOk()
+    public async Task PatchSystemSettings_ReturnsOk()
     {
         var client = await CreateAdminClientAsync();
 

@@ -2,10 +2,10 @@ namespace Homestead.WebApi.Domains.Settings;
 
 public class AppSetting
 {
-    public const string SystemModule = "System";
-    public const string DocumentsModule = "Documents";
+    public const string SystemModule = "system";
+    public const string DocumentsModule = "documents";
 
-    public required string Module { get; set; }
+    public required string Key { get; set; }
     public required string Value { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }

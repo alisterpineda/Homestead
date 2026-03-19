@@ -10,9 +10,9 @@ public class AppSettingConfiguration : IEntityTypeConfiguration<AppSetting>
     {
         builder.ToTable("app_settings", "settings");
 
-        builder.HasKey(e => e.Module);
+        builder.HasKey(e => e.Key);
 
-        builder.Property(e => e.Module)
+        builder.Property(e => e.Key)
             .IsRequired()
             .HasMaxLength(256);
 

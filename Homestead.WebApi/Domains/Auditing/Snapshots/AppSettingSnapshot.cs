@@ -23,6 +23,6 @@ public record AppSettingSnapshot : IAuditSnapshot<AppSettingSnapshot, AppSetting
         return changes;
     }
 
-    public static Guid ModuleToGuid(string module) =>
-        new(MD5.HashData(Encoding.UTF8.GetBytes(module)));
+    public static Guid KeyToGuid(string key) =>
+        new(MD5.HashData(Encoding.UTF8.GetBytes(key)));
 }

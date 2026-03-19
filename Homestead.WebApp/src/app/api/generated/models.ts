@@ -67,6 +67,7 @@ export type { PaginatedResponseOfUserResponse } from './models/paginated-respons
 export type { PartyDto } from './models/party-dto';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';
+export type { PatchSystemSettingsRequest } from './models/patch-system-settings-request';
 export type { PatchTagResponse } from './models/patch-tag-response';
 export type { PermanentlyDeleteDocumentsRequest } from './models/permanently-delete-documents-request';
 export type { PermanentlyDeleteDocumentsResponse } from './models/permanently-delete-documents-response';
@@ -88,7 +89,6 @@ export type { UpdateGroupMemberRequest } from './models/update-group-member-requ
 export type { UpdateGroupRequest } from './models/update-group-request';
 export type { UpdatePartyRequest } from './models/update-party-request';
 export type { UpdatePartyResponse } from './models/update-party-response';
-export type { UpdateSystemSettingsRequest } from './models/update-system-settings-request';
 export type { UpdateTextExtractionEngineRequest } from './models/update-text-extraction-engine-request';
 export type { UpdateUserRequest } from './models/update-user-request';
 export type { UserResponse } from './models/user-response';

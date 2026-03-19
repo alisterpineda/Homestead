@@ -1,23 +1,17 @@
-using Homestead.WebApi.Configuration;
+using System.Text.Json;
+using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.TextExtraction;
-using Microsoft.Extensions.Options;
-using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.TextExtraction;
 
 public class TextExtractionEngineResolverTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IOptionsMonitor<DocumentSettings> _options;
-    private readonly DocumentSettings _settings;
 
     public TextExtractionEngineResolverTests()
     {
         _db = TestAppDbContext.Create();
-        _settings = new DocumentSettings();
-        _options = Substitute.For<IOptionsMonitor<DocumentSettings>>();
-        _options.CurrentValue.Returns(_settings);
     }
 
     public void Dispose()
@@ -26,7 +20,18 @@ public class TextExtractionEngineResolverTests : IDisposable
     }
 
     private TextExtractionEngineResolver CreateResolver()
-        => new(_db, _options);
+        => new(_db);
+
+    private async Task SetDefaultEngineId(Guid? engineId)
+    {
+        var settings = new { defaultTextExtractionEngineId = engineId };
+        _db.AppSettings.Add(new AppSetting
+        {
+            Key = AppSetting.DocumentsModule,
+            Value = JsonSerializer.Serialize(settings, FieldChange.JsonOptions)
+        });
+        await _db.SaveChangesAsync();
+    }
 
     [Fact]
     public async Task ResolveAsync_NullEngineId_NullDefault_ReturnsBuiltInDefault()
@@ -42,7 +47,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     [Fact]
     public async Task ResolveAsync_NullEngineId_DefaultIsBuiltInId_ReturnsBuiltInDefault()
     {
-        _settings.DefaultTextExtractionEngineId = BuiltInTextExtractionEngines.TesseractDefaultId;
+        await SetDefaultEngineId(BuiltInTextExtractionEngines.TesseractDefaultId);
         var resolver = CreateResolver();
 
         var result = await resolver.ResolveAsync(null, CancellationToken.None);
@@ -66,7 +71,7 @@ public class TextExtractionEngineResolverTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        _settings.DefaultTextExtractionEngineId = engineId;
+        await SetDefaultEngineId(engineId);
         var resolver = CreateResolver();
 
         var result = await resolver.ResolveAsync(null, CancellationToken.None);
@@ -123,7 +128,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     [Fact]
     public async Task ResolveAsync_DefaultSetToDeletedEngine_FallsBackToBuiltInDefault()
     {
-        _settings.DefaultTextExtractionEngineId = Guid.NewGuid(); // non-existent
+        await SetDefaultEngineId(Guid.NewGuid()); // non-existent engine
         var resolver = CreateResolver();
 
         var result = await resolver.ResolveAsync(null, CancellationToken.None);

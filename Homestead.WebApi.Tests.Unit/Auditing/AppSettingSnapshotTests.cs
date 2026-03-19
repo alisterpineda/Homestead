@@ -11,7 +11,7 @@ public class AppSettingSnapshotTests
     {
         var setting = new AppSetting
         {
-            Module = "Documents",
+            Key = "documents",
             Value = """{"maxUploadSizeMb":200}"""
         };
 
@@ -46,19 +46,19 @@ public class AppSettingSnapshotTests
     }
 
     [Fact]
-    public void ModuleToGuid_ReturnsDeterministicGuid()
+    public void KeyToGuid_ReturnsDeterministicGuid()
     {
-        var guid1 = AppSettingSnapshot.ModuleToGuid("Documents");
-        var guid2 = AppSettingSnapshot.ModuleToGuid("Documents");
+        var guid1 = AppSettingSnapshot.KeyToGuid("documents");
+        var guid2 = AppSettingSnapshot.KeyToGuid("documents");
 
         Assert.Equal(guid1, guid2);
     }
 
     [Fact]
-    public void ModuleToGuid_DifferentModules_ReturnDifferentGuids()
+    public void KeyToGuid_DifferentKeys_ReturnDifferentGuids()
     {
-        var documentsGuid = AppSettingSnapshot.ModuleToGuid("Documents");
-        var systemGuid = AppSettingSnapshot.ModuleToGuid("System");
+        var documentsGuid = AppSettingSnapshot.KeyToGuid("documents");
+        var systemGuid = AppSettingSnapshot.KeyToGuid("system");
 
         Assert.NotEqual(documentsGuid, systemGuid);
     }

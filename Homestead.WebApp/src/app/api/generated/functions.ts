@@ -125,5 +125,5 @@ export type { PatchDocumentSettings$Params as PatchDocumentSettings$Params } fro
 export { patchDocumentSettings as patchDocumentSettings } from './fn/admin/patch-document-settings';
 export type { GetSystemSettings$Params as GetSystemSettings$Params } from './fn/admin/get-system-settings';
 export { getSystemSettings as getSystemSettings } from './fn/admin/get-system-settings';
-export type { UpdateSystemSettings$Params as UpdateSystemSettings$Params } from './fn/admin/update-system-settings';
-export { updateSystemSettings as updateSystemSettings } from './fn/admin/update-system-settings';
+export type { PatchSystemSettings$Params as PatchSystemSettings$Params } from './fn/admin/patch-system-settings';
+export { patchSystemSettings as patchSystemSettings } from './fn/admin/patch-system-settings';

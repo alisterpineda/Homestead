@@ -20,7 +20,7 @@ using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtract
 using Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings;
 using Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings;
 using Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings;
-using Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings;
+using Homestead.WebApi.Features.Admin.v1.Settings.PatchSystemSettings;
 using Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
 namespace Homestead.WebApi.Features.Admin;
@@ -78,7 +78,7 @@ public static class AdminModule
         GetDocumentSettingsEndpoint.Map(settings);
         PatchDocumentSettingsEndpoint.Map(settings);
         GetSystemSettingsEndpoint.Map(settings);
-        UpdateSystemSettingsEndpoint.Map(settings);
+        PatchSystemSettingsEndpoint.Map(settings);
 
         return app;
     }

@@ -554,7 +554,7 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domains.Settings.AppSetting", b =>
                 {
-                    b.Property<string>("Module")
+                    b.Property<string>("Key")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -573,7 +573,7 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb");
 
-                    b.HasKey("Module");
+                    b.HasKey("Key");
 
                     b.ToTable("app_settings", "settings");
                 });

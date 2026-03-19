@@ -7,20 +7,19 @@ using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings;
+namespace Homestead.WebApi.Features.Admin.v1.Settings.PatchSystemSettings;
 
-public class UpdateSystemSettingsHandler(
+public class PatchSystemSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger,
-    IAppSettingsConfigurationProvider reloader)
+    IAuditLogger auditLogger)
 {
     public async Task<SystemSettingsResponse> HandleAsync(
-        UpdateSystemSettingsRequest request, CancellationToken ct)
+        PatchSystemSettingsRequest request, CancellationToken ct)
     {
         _ = request; // Placeholder — will apply properties as SystemSettings grows
 
-        var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.SystemModule, ct);
+        var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
 
         var settings = entity is not null
             ? JsonSerializer.Deserialize<SystemSettings>(entity.Value, FieldChange.JsonOptions) ?? new SystemSettings()
@@ -34,13 +33,13 @@ public class UpdateSystemSettingsHandler(
         {
             entity = new AppSetting
             {
-                Module = AppSetting.SystemModule,
+                Key = AppSetting.SystemModule,
                 Value = newValue,
                 UpdatedByUserId = currentUser.UserId
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.ModuleToGuid(AppSetting.SystemModule), currentUser.UserId);
+            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule), currentUser.UserId);
         }
         else
         {
@@ -52,12 +51,11 @@ public class UpdateSystemSettingsHandler(
             var changes = before!.Diff(after);
 
             if (changes.Count > 0)
-                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.ModuleToGuid(AppSetting.SystemModule),
+                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule),
                     currentUser.UserId, changes);
         }
 
         await db.SaveChangesAsync(ct);
-        reloader.Reload();
 
         return new SystemSettingsResponse();
     }

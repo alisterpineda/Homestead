@@ -18,7 +18,6 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
-    private readonly IAppSettingsConfigurationProvider _reloader;
     private readonly PatchDocumentSettingsHandler _sut;
 
     public PatchDocumentSettingsHandlerTests()
@@ -27,8 +26,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _reloader = Substitute.For<IAppSettingsConfigurationProvider>();
-        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _auditLogger, _reloader);
+        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _auditLogger);
     }
 
     public void Dispose()
@@ -80,7 +78,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         Assert.Equal(200, response.MaxUploadSizeMb);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.DocumentsModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
         Assert.NotNull(saved);
         Assert.Contains("200", saved.Value);
     }
@@ -94,7 +92,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
-            AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule),
+            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
             Arg.Any<Guid?>());
     }
 
@@ -103,7 +101,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     {
         _db.AppSettings.Add(new AppSetting
         {
-            Module = AppSetting.DocumentsModule,
+            Key = AppSetting.DocumentsModule,
             Value = """{"maxUploadSizeMb":100}"""
         });
         await _db.SaveChangesAsync();
@@ -114,7 +112,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         Assert.Equal(500, response.MaxUploadSizeMb);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.DocumentsModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
         Assert.NotNull(saved);
         Assert.Contains("500", saved.Value);
         Assert.NotNull(saved.UpdatedAt);
@@ -125,7 +123,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     {
         _db.AppSettings.Add(new AppSetting
         {
-            Module = AppSetting.DocumentsModule,
+            Key = AppSetting.DocumentsModule,
             Value = """{"maxUploadSizeMb":100}"""
         });
         await _db.SaveChangesAsync();
@@ -136,7 +134,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         _auditLogger.Received(1).LogUpdated(
             "AppSetting",
-            AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule),
+            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
             Arg.Any<Guid?>(),
             Arg.Is<List<FieldChange>>(c => c.Count > 0));
     }
@@ -150,16 +148,6 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var response = await _sut.HandleAsync(command, CancellationToken.None);
 
         Assert.Equal(100, response.MaxUploadSizeMb);
-    }
-
-    [Fact]
-    public async Task HandleAsync_CallsReload()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
-
-        await _sut.HandleAsync(command, CancellationToken.None);
-
-        _reloader.Received(1).Reload();
     }
 
     [Fact]
@@ -187,7 +175,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     {
         _db.AppSettings.Add(new AppSetting
         {
-            Module = AppSetting.DocumentsModule,
+            Key = AppSetting.DocumentsModule,
             Value = """{"maxUploadSizeMb":100}"""
         });
         await _db.SaveChangesAsync();
@@ -251,7 +239,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     {
         _db.AppSettings.Add(new AppSetting
         {
-            Module = AppSetting.DocumentsModule,
+            Key = AppSetting.DocumentsModule,
             Value = $$$"""{"maxUploadSizeMb":100,"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
         await _db.SaveChangesAsync();

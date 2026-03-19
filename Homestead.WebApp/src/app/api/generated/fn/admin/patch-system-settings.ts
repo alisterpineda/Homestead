@@ -7,15 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { PatchSystemSettingsRequest } from '../../models/patch-system-settings-request';
 import { SystemSettingsResponse } from '../../models/system-settings-response';
-import { UpdateSystemSettingsRequest } from '../../models/update-system-settings-request';
 
-export interface UpdateSystemSettings$Params {
-      body: UpdateSystemSettingsRequest
+export interface PatchSystemSettings$Params {
+      body: PatchSystemSettingsRequest
 }
 
-export function updateSystemSettings(http: HttpClient, rootUrl: string, params: UpdateSystemSettings$Params, context?: HttpContext): Observable<StrictHttpResponse<SystemSettingsResponse>> {
-  const rb = new RequestBuilder(rootUrl, updateSystemSettings.PATH, 'patch');
+export function patchSystemSettings(http: HttpClient, rootUrl: string, params: PatchSystemSettings$Params, context?: HttpContext): Observable<StrictHttpResponse<SystemSettingsResponse>> {
+  const rb = new RequestBuilder(rootUrl, patchSystemSettings.PATH, 'patch');
   if (params) {
     rb.body(params.body, 'application/json');
   }
@@ -30,4 +30,4 @@ export function updateSystemSettings(http: HttpClient, rootUrl: string, params: 
   );
 }
 
-updateSystemSettings.PATH = '/api/v1/admin/settings/system';
+patchSystemSettings.PATH = '/api/v1/admin/settings/system';

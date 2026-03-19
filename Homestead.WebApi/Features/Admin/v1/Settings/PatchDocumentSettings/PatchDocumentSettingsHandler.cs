@@ -14,13 +14,12 @@ namespace Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings;
 public class PatchDocumentSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger,
-    IAppSettingsConfigurationProvider reloader)
+    IAuditLogger auditLogger)
 {
     public async Task<DocumentSettingsResponse> HandleAsync(
         PatchDocumentSettingsCommand command, CancellationToken ct)
     {
-        var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.DocumentsModule, ct);
+        var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
 
         var settings = entity is not null
             ? JsonSerializer.Deserialize<DocumentSettings>(entity.Value, FieldChange.JsonOptions) ?? new DocumentSettings()
@@ -54,13 +53,13 @@ public class PatchDocumentSettingsHandler(
         {
             entity = new AppSetting
             {
-                Module = AppSetting.DocumentsModule,
+                Key = AppSetting.DocumentsModule,
                 Value = newValue,
                 UpdatedByUserId = currentUser.UserId
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule), currentUser.UserId);
+            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule), currentUser.UserId);
         }
         else
         {
@@ -72,12 +71,11 @@ public class PatchDocumentSettingsHandler(
             var changes = before!.Diff(after);
 
             if (changes.Count > 0)
-                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule),
+                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
                     currentUser.UserId, changes);
         }
 
         await db.SaveChangesAsync(ct);
-        reloader.Reload();
 
         return new DocumentSettingsResponse
         {
