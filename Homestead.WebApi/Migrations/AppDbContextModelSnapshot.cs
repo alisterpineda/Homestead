@@ -578,7 +578,7 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("app_settings", "settings");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domains.Settings.OcrEngine", b =>
+            modelBuilder.Entity("Homestead.WebApi.Domains.Settings.TextExtractionEngine", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -614,7 +614,7 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("ocr_engines", "settings");
+                    b.ToTable("text_extraction_engines", "settings");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
@@ -950,7 +950,7 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("CreatedByUser");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domains.Settings.OcrEngine", b =>
+            modelBuilder.Entity("Homestead.WebApi.Domains.Settings.TextExtractionEngine", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domains.Identity.AppUser", "CreatedByUser")
                         .WithMany()

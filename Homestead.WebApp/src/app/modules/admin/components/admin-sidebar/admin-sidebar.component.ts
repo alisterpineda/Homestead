@@ -57,7 +57,7 @@ import { isNavItemActive } from '@/shared/utils';
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/admin/ocr" [isActive]="isActive('/admin/ocr')">
               <ng-icon hlm name="lucideScanText" size="sm" />
-              <span>OCR Engines</span>
+              <span>Text Extraction</span>
             </a>
           </li>
         </ul>

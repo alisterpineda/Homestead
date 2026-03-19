@@ -10,7 +10,8 @@ public class GetDocumentSettingsHandler(IOptionsMonitor<DocumentSettings> option
         var settings = options.CurrentValue;
         return new DocumentSettingsResponse
         {
-            MaxUploadSizeMb = settings.MaxUploadSizeMb
+            MaxUploadSizeMb = settings.MaxUploadSizeMb,
+            DefaultTextExtractionEngineId = settings.DefaultTextExtractionEngineId
         };
     }
 }

@@ -13,13 +13,13 @@ using Homestead.WebApi.Features.Admin.v1.GetUsers;
 using Homestead.WebApi.Features.Admin.v1.RemoveGroupMember;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroup;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
-using Homestead.WebApi.Features.Admin.v1.OcrEngines.BulkDeleteOcrEngines;
-using Homestead.WebApi.Features.Admin.v1.OcrEngines.CreateOcrEngine;
-using Homestead.WebApi.Features.Admin.v1.OcrEngines.GetOcrEngines;
-using Homestead.WebApi.Features.Admin.v1.OcrEngines.UpdateOcrEngine;
+using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
+using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.CreateTextExtractionEngine;
+using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.GetTextExtractionEngines;
+using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
 using Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings;
 using Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings;
-using Homestead.WebApi.Features.Admin.v1.Settings.UpdateDocumentSettings;
+using Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings;
 using Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings;
 using Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
@@ -58,16 +58,16 @@ public static class AdminModule
         UpdateGroupMemberEndpoint.Map(groups);
         RemoveGroupMemberEndpoint.Map(groups);
 
-        var ocrEngines = app.MapGroup("/api/v{version:apiVersion}/admin/ocr-engines")
+        var textExtractionEngines = app.MapGroup("/api/v{version:apiVersion}/admin/text-extraction-engines")
             .HasApiVersion(1, 0)
             .WithGroupName("v1")
             .WithTags("Admin")
             .RequireAuthorization(AuthPolicies.RequireAdmin);
 
-        GetOcrEnginesEndpoint.Map(ocrEngines);
-        CreateOcrEngineEndpoint.Map(ocrEngines);
-        UpdateOcrEngineEndpoint.Map(ocrEngines);
-        BulkDeleteOcrEnginesEndpoint.Map(ocrEngines);
+        GetTextExtractionEnginesEndpoint.Map(textExtractionEngines);
+        CreateTextExtractionEngineEndpoint.Map(textExtractionEngines);
+        UpdateTextExtractionEngineEndpoint.Map(textExtractionEngines);
+        BulkDeleteTextExtractionEnginesEndpoint.Map(textExtractionEngines);
 
         var settings = app.MapGroup("/api/v{version:apiVersion}/admin/settings")
             .HasApiVersion(1, 0)
@@ -76,7 +76,7 @@ public static class AdminModule
             .RequireAuthorization(AuthPolicies.RequireAdmin);
 
         GetDocumentSettingsEndpoint.Map(settings);
-        UpdateDocumentSettingsEndpoint.Map(settings);
+        PatchDocumentSettingsEndpoint.Map(settings);
         GetSystemSettingsEndpoint.Map(settings);
         UpdateSystemSettingsEndpoint.Map(settings);
 

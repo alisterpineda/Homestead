@@ -10,8 +10,8 @@ import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { updateOcrEngine } from '@/api/generated/fn/admin/update-ocr-engine';
-import type { OcrEngineResponse } from '@/api/generated/models/ocr-engine-response';
+import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text-extraction-engine';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
@@ -26,7 +26,7 @@ import { toast } from 'ngx-sonner';
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
         <hlm-sheet-header>
-          <h3 hlmSheetTitle>{{ engine()?.isBuiltIn ? 'View' : 'Edit' }} OCR Engine</h3>
+          <h3 hlmSheetTitle>{{ engine()?.isBuiltIn ? 'View' : 'Edit' }} Engine</h3>
           <p hlmSheetDescription>{{ engine()?.isBuiltIn ? 'Built-in engine details.' : 'Update engine configuration.' }}</p>
         </hlm-sheet-header>
 
@@ -90,7 +90,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class EditOcrEngineSheetComponent {
-  engine = input<OcrEngineResponse | null>(null);
+  engine = input<TextExtractionEngineResponse | null>(null);
   state = input<BrnDialogState>('closed');
   saved = output<void>();
   closed = output<void>();
@@ -159,7 +159,7 @@ export class EditOcrEngineSheetComponent {
     if (!e || e.isBuiltIn) return;
     this.saving.set(true);
 
-    updateOcrEngine(this.http, this.apiConfig.rootUrl, {
+    updateTextExtractionEngine(this.http, this.apiConfig.rootUrl, {
       id: e.id,
       body: {
         name: this.editName().trim(),
@@ -168,7 +168,7 @@ export class EditOcrEngineSheetComponent {
     }).subscribe({
       next: () => {
         this.saving.set(false);
-        toast.success('OCR engine updated.');
+        toast.success('Engine updated.');
         this.saved.emit();
       },
       error: (err: { error?: { error?: string } }) => {

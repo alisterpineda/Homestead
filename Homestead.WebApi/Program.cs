@@ -115,7 +115,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHandlers();
 builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings.GetDocumentSettingsHandler>();
 builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings.GetSystemSettingsHandler>();
-builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.UpdateDocumentSettings.UpdateDocumentSettingsHandler>();
+builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings.PatchDocumentSettingsHandler>();
 builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.UpdateSystemSettings.UpdateSystemSettingsHandler>();
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);

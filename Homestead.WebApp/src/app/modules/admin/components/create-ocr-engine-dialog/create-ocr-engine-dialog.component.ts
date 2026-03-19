@@ -9,7 +9,7 @@ import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createOcrEngine } from '@/api/generated/fn/admin/create-ocr-engine';
+import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -27,8 +27,8 @@ import { toast } from 'ngx-sonner';
 
       <hlm-dialog-content *hlmDialogPortal="let ctx">
         <div hlmDialogHeader>
-          <h2 hlmDialogTitle>Create OCR Engine</h2>
-          <p hlmDialogDescription>Add a new OCR engine configuration.</p>
+          <h2 hlmDialogTitle>Create Text Extraction Engine</h2>
+          <p hlmDialogDescription>Add a new text extraction engine configuration.</p>
         </div>
 
         <div class="flex flex-col gap-4">
@@ -101,7 +101,7 @@ export class CreateOcrEngineDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    createOcrEngine(this.http, this.apiConfig.rootUrl, {
+    createTextExtractionEngine(this.http, this.apiConfig.rootUrl, {
       body: {
         name: this.name().trim(),
         engineType: 'Tesseract',
@@ -110,13 +110,13 @@ export class CreateOcrEngineDialogComponent {
     }).subscribe({
       next: () => {
         this.creating.set(false);
-        toast.success('OCR engine created.');
+        toast.success('Text extraction engine created.');
         ctx.close();
         this.created.emit();
       },
       error: (err: { error?: { error?: string } }) => {
         this.creating.set(false);
-        this.createError.set(err?.error?.error ?? 'Failed to create OCR engine.');
+        this.createError.set(err?.error?.error ?? 'Failed to create engine.');
       },
     });
   }

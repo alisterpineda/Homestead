@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OcrEngineListComponent } from './ocr-engine-list.component';
-import type { OcrEngineResponse } from '@/api/generated/models/ocr-engine-response';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 
 describe('OcrEngineListComponent', () => {
   let fixture: ComponentFixture<OcrEngineListComponent>;
@@ -63,7 +63,7 @@ describe('OcrEngineListComponent', () => {
   });
 
   it('should open the sheet when an engine is clicked', () => {
-    const engine: OcrEngineResponse = {
+    const engine: TextExtractionEngineResponse = {
       id: 'abc-123',
       name: 'Test Engine',
       engineType: 'Tesseract',
@@ -79,7 +79,7 @@ describe('OcrEngineListComponent', () => {
   });
 
   it('should close the sheet and clear selected engine on onSheetClosed', () => {
-    const engine: OcrEngineResponse = {
+    const engine: TextExtractionEngineResponse = {
       id: 'abc-123',
       name: 'Test Engine',
       engineType: 'Tesseract',
@@ -97,7 +97,7 @@ describe('OcrEngineListComponent', () => {
   });
 
   it('should close sheet and refresh on onEngineSaved', () => {
-    const engine: OcrEngineResponse = {
+    const engine: TextExtractionEngineResponse = {
       id: 'abc-123',
       name: 'Test Engine',
       engineType: 'Tesseract',

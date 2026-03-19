@@ -25,8 +25,8 @@ internal record VersionItem(Guid Id, int VersionNumber, string? Label, string Co
 
 internal record ErrorResponse(string? Error);
 
-internal record OcrEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
+internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
 
-internal record DocumentSettingsItem(int MaxUploadSizeMb);
+internal record DocumentSettingsItem(int MaxUploadSizeMb, Guid? DefaultTextExtractionEngineId = null);
 
 internal record SystemSettingsItem();

@@ -8,6 +8,8 @@ public static class TextExtractionServiceExtensions
         services.AddSingleton<TesseractRunner>();
         services.AddSingleton<ITextExtractor, TesseractTextExtractor>();
         services.AddSingleton<ITextExtractor, PdfTextExtractor>();
+        services.AddScoped<ITextExtractionEngineResolver, TextExtractionEngineResolver>();
+        services.AddScoped<TextExtractionHelper>();
 
         return services;
     }

@@ -1,3 +1,5 @@
+using Homestead.WebApi.TextExtraction.Configurations;
+
 namespace Homestead.WebApi.TextExtraction;
 
 public class TesseractTextExtractor(TesseractRunner tesseract) : ITextExtractor
@@ -14,9 +16,10 @@ public class TesseractTextExtractor(TesseractRunner tesseract) : ITextExtractor
     public bool CanExtract(string contentType)
         => SupportedContentTypes.Contains(contentType);
 
-    public async Task<string?> ExtractTextAsync(string filePath, CancellationToken ct)
+    public async Task<string?> ExtractTextAsync(string filePath, TextExtractionContext context, CancellationToken ct)
     {
+        var language = TesseractLanguageResolver.Resolve(context);
         await using var fileStream = File.OpenRead(filePath);
-        return await tesseract.OcrAsync(fileStream, ct);
+        return await tesseract.OcrAsync(fileStream, language, ct);
     }
 }

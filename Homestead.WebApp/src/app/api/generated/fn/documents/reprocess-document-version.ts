@@ -7,11 +7,13 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { ReprocessDocumentVersionBody } from '../../models/reprocess-document-version-body';
 import { ReprocessDocumentVersionResponse } from '../../models/reprocess-document-version-response';
 
 export interface ReprocessDocumentVersion$Params {
   documentId: string;
   versionId: string;
+      body?: (null | ReprocessDocumentVersionBody)
 }
 
 export function reprocessDocumentVersion(http: HttpClient, rootUrl: string, params: ReprocessDocumentVersion$Params, context?: HttpContext): Observable<StrictHttpResponse<ReprocessDocumentVersionResponse>> {
@@ -19,6 +21,7 @@ export function reprocessDocumentVersion(http: HttpClient, rootUrl: string, para
   if (params) {
     rb.path('documentId', params.documentId, {});
     rb.path('versionId', params.versionId, {});
+    rb.body(params.body, 'application/json');
   }
 
   return http.request(

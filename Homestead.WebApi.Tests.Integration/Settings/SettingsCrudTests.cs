@@ -17,17 +17,18 @@ public class SettingsCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
         Assert.Equal(100, body!.MaxUploadSizeMb);
+        Assert.Null(body.DefaultTextExtractionEngineId);
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_CreatesRowAndReturnsUpdatedValue()
+    public async Task PatchDocumentSettings_CreatesRowAndReturnsUpdatedValue()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 200
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)200 }
+        });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
@@ -35,14 +36,14 @@ public class SettingsCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_PersistsAcrossRequests()
+    public async Task PatchDocumentSettings_PersistsAcrossRequests()
     {
         var client = await CreateAdminClientAsync();
 
-        await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 300
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)300 }
+        });
 
         var getResponse = await client.GetAsync("/api/v1/admin/settings/documents", CT);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -51,19 +52,19 @@ public class SettingsCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_SubsequentUpdate_ModifiesExistingRow()
+    public async Task PatchDocumentSettings_SubsequentUpdate_ModifiesExistingRow()
     {
         var client = await CreateAdminClientAsync();
 
-        await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 200
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)200 }
+        });
 
-        var response = await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 500
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)500 }
+        });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
@@ -71,27 +72,27 @@ public class SettingsCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_InvalidMaxUploadSize_Returns400()
+    public async Task PatchDocumentSettings_InvalidMaxUploadSize_Returns400()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 0
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)0 }
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_ExceedsMax_Returns400()
+    public async Task PatchDocumentSettings_ExceedsMax_Returns400()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.PatchAsJsonAsync("/api/v1/admin/settings/documents", new
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
         {
-            maxUploadSizeMb = 10001
-        }, CT);
+            new { op = "replace", path = "/maxUploadSizeMb", value = (object)10001 }
+        });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -138,15 +139,67 @@ public class SettingsCrudTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateDocumentSettings_NullField_KeepsDefault()
+    public async Task PatchDocumentSettings_EmptyPatch_KeepsDefaults()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.PatchAsJsonAsync("/api/v1/admin/settings/documents",
-            new { }, CT);
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents",
+            Array.Empty<object>());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
         Assert.Equal(100, body!.MaxUploadSizeMb);
+    }
+
+    [Fact]
+    public async Task PatchDocumentSettings_SetDefaultEngineToBuiltIn_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var builtInId = "00000000-0000-0000-0000-000000000001";
+
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)builtInId }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
+        Assert.Equal(Guid.Parse(builtInId), body!.DefaultTextExtractionEngineId);
+    }
+
+    [Fact]
+    public async Task PatchDocumentSettings_SetDefaultEngineToNonExistent_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)Guid.NewGuid().ToString() }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchDocumentSettings_SetAndClearDefaultEngine_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var builtInId = "00000000-0000-0000-0000-000000000001";
+
+        // Set
+        await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)builtInId }
+        });
+
+        // Clear
+        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new object[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object?)null! }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
+        Assert.Null(body!.DefaultTextExtractionEngineId);
     }
 }

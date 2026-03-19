@@ -20,10 +20,11 @@ import { PaginationComponent } from '@/modules/documents/components/pagination/p
 import { CreateOcrEngineDialogComponent } from '../../components/create-ocr-engine-dialog/create-ocr-engine-dialog.component';
 import { EditOcrEngineSheetComponent } from '../../components/edit-ocr-engine-sheet/edit-ocr-engine-sheet.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getOcrEngines } from '@/api/generated/fn/admin/get-ocr-engines';
-import { bulkDeleteOcrEngines } from '@/api/generated/fn/admin/bulk-delete-ocr-engines';
-import type { PaginatedResponseOfOcrEngineResponse } from '@/api/generated/models/paginated-response-of-ocr-engine-response';
-import type { OcrEngineResponse } from '@/api/generated/models/ocr-engine-response';
+import { getTextExtractionEngines } from '@/api/generated/fn/admin/get-text-extraction-engines';
+import { bulkDeleteTextExtractionEngines } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
+import type { PaginatedResponseOfTextExtractionEngineResponse } from '@/api/generated/models/paginated-response-of-text-extraction-engine-response';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
+import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
@@ -51,7 +52,7 @@ import { toast } from 'ngx-sonner';
             <ng-icon hlm name="lucideScanText" size="xl" />
           </hlm-empty-media>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load OCR engines</h3>
+            <h3 hlmEmptyTitle>Failed to load text extraction engines</h3>
             <p hlmEmptyDescription>There was an error loading the engine list. Please try again.</p>
           </div>
         </section>
@@ -65,7 +66,7 @@ import { toast } from 'ngx-sonner';
                 <ng-icon hlm name="lucideScanText" size="xl" />
               </hlm-empty-media>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No OCR engines found</h3>
+                <h3 hlmEmptyTitle>No text extraction engines found</h3>
                 <p hlmEmptyDescription>Add an engine configuration to get started.</p>
               </div>
               <app-create-ocr-engine-dialog (created)="onRefresh()">
@@ -209,7 +210,7 @@ export class OcrEngineListComponent implements OnDestroy {
   error = signal(false);
   deleting = signal(false);
 
-  selectedEngine = signal<OcrEngineResponse | null>(null);
+  selectedEngine = signal<TextExtractionEngineResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
 
   // Multi-selection
@@ -220,18 +221,18 @@ export class OcrEngineListComponent implements OnDestroy {
   // Checkbox state for select-all
   private selectableItems = computed(() => {
     const d = this.data();
-    return d?.items.filter(e => !e.isBuiltIn) ?? [];
+    return d?.items.filter((e: TextExtractionEngineResponse) => !e.isBuiltIn) ?? [];
   });
 
   allSelected = computed(() => {
     const selectable = this.selectableItems();
-    return selectable.length > 0 && selectable.every(e => this.selectedIds().has(e.id));
+    return selectable.length > 0 && selectable.every((e: TextExtractionEngineResponse) => this.selectedIds().has(e.id));
   });
 
   indeterminate = computed(() => {
     const selectable = this.selectableItems();
     const selected = this.selectedIds();
-    const count = selectable.filter(e => selected.has(e.id)).length;
+    const count = selectable.filter((e: TextExtractionEngineResponse) => selected.has(e.id)).length;
     return count > 0 && count < selectable.length;
   });
 
@@ -261,14 +262,14 @@ export class OcrEngineListComponent implements OnDestroy {
       switchMap(([page, pageSize, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getOcrEngines(this.http, this.apiConfig.rootUrl, {
+        return getTextExtractionEngines(this.http, this.apiConfig.rootUrl, {
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
         }).pipe(
           map(r => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfOcrEngineResponse;
+            return r.body as PaginatedResponseOfTextExtractionEngineResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -342,13 +343,13 @@ export class OcrEngineListComponent implements OnDestroy {
     if (ids.length === 0) return;
     this.deleting.set(true);
 
-    bulkDeleteOcrEngines(this.http, this.apiConfig.rootUrl, {
+    bulkDeleteTextExtractionEngines(this.http, this.apiConfig.rootUrl, {
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +(response.body as { deletedCount: number | string }).deletedCount;
+        const count = +(response.body as BulkDeleteTextExtractionEnginesResponse).deletedCount;
         toast.success(`${count} ${count > 1 ? 'engines' : 'engine'} deleted.`);
         this.clearSelection();
         this.onRefresh();
@@ -368,7 +369,7 @@ export class OcrEngineListComponent implements OnDestroy {
     });
   }
 
-  onEngineClick(engine: OcrEngineResponse): void {
+  onEngineClick(engine: TextExtractionEngineResponse): void {
     this.selectedEngine.set(engine);
     this.sheetState.set('open');
   }

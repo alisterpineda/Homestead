@@ -1,0 +1,9 @@
+using Homestead.WebApi.Configuration;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
+
+namespace Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings;
+
+public record PatchDocumentSettingsCommand
+{
+    public required JsonPatchDocument<DocumentSettings> PatchDocument { get; init; }
+}

@@ -1,0 +1,266 @@
+using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
+using Homestead.WebApi.Configuration;
+using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
+using Homestead.WebApi.Domains.Settings;
+using Homestead.WebApi.Features.Admin.v1.Settings;
+using Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings;
+using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
+using Microsoft.EntityFrameworkCore;
+using NSubstitute;
+
+namespace Homestead.WebApi.Tests.Unit.Admin;
+
+public class PatchDocumentSettingsHandlerTests : IDisposable
+{
+    private readonly TestAppDbContext _db;
+    private readonly ICurrentUserAccessor _currentUser;
+    private readonly IAuditLogger _auditLogger;
+    private readonly IAppSettingsConfigurationProvider _reloader;
+    private readonly PatchDocumentSettingsHandler _sut;
+
+    public PatchDocumentSettingsHandlerTests()
+    {
+        _db = TestAppDbContext.Create();
+        _currentUser = Substitute.For<ICurrentUserAccessor>();
+        _currentUser.UserId.Returns(Guid.NewGuid());
+        _auditLogger = Substitute.For<IAuditLogger>();
+        _reloader = Substitute.For<IAppSettingsConfigurationProvider>();
+        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _auditLogger, _reloader);
+    }
+
+    public void Dispose()
+    {
+        _db.Dispose();
+    }
+
+    private static PatchDocumentSettingsCommand CreatePatchCommand(
+        Action<JsonPatchDocument<DocumentSettings>> configure)
+    {
+        var patchDoc = new JsonPatchDocument<DocumentSettings>();
+        configure(patchDoc);
+        return new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
+    }
+
+    [Fact]
+    public async Task HandleAsync_ZeroMaxUploadSize_ThrowsBadRequest()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 0));
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_NegativeMaxUploadSize_ThrowsBadRequest()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, -1));
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExceedsMaxUploadSize_ThrowsBadRequest()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 10001));
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoExistingRow_CreatesNewSetting()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(200, response.MaxUploadSizeMb);
+
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.DocumentsModule);
+        Assert.NotNull(saved);
+        Assert.Contains("200", saved.Value);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoExistingRow_LogsCreated()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
+
+        await _sut.HandleAsync(command, CancellationToken.None);
+
+        _auditLogger.Received(1).LogCreated(
+            "AppSetting",
+            AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule),
+            Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExistingRow_UpdatesValue()
+    {
+        _db.AppSettings.Add(new AppSetting
+        {
+            Module = AppSetting.DocumentsModule,
+            Value = """{"maxUploadSizeMb":100}"""
+        });
+        await _db.SaveChangesAsync();
+
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 500));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(500, response.MaxUploadSizeMb);
+
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Module == AppSetting.DocumentsModule);
+        Assert.NotNull(saved);
+        Assert.Contains("500", saved.Value);
+        Assert.NotNull(saved.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExistingRow_LogsUpdated()
+    {
+        _db.AppSettings.Add(new AppSetting
+        {
+            Module = AppSetting.DocumentsModule,
+            Value = """{"maxUploadSizeMb":100}"""
+        });
+        await _db.SaveChangesAsync();
+
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 500));
+
+        await _sut.HandleAsync(command, CancellationToken.None);
+
+        _auditLogger.Received(1).LogUpdated(
+            "AppSetting",
+            AppSettingSnapshot.ModuleToGuid(AppSetting.DocumentsModule),
+            Arg.Any<Guid?>(),
+            Arg.Is<List<FieldChange>>(c => c.Count > 0));
+    }
+
+    [Fact]
+    public async Task HandleAsync_EmptyPatch_UsesDefaults()
+    {
+        var patchDoc = new JsonPatchDocument<DocumentSettings>();
+        var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(100, response.MaxUploadSizeMb);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CallsReload()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
+
+        await _sut.HandleAsync(command, CancellationToken.None);
+
+        _reloader.Received(1).Reload();
+    }
+
+    [Fact]
+    public async Task HandleAsync_BoundaryValue1_Succeeds()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 1));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(1, response.MaxUploadSizeMb);
+    }
+
+    [Fact]
+    public async Task HandleAsync_BoundaryValue10000_Succeeds()
+    {
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 10000));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(10000, response.MaxUploadSizeMb);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoChange_DoesNotLogUpdated()
+    {
+        _db.AppSettings.Add(new AppSetting
+        {
+            Module = AppSetting.DocumentsModule,
+            Value = """{"maxUploadSizeMb":100}"""
+        });
+        await _db.SaveChangesAsync();
+
+        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 100));
+
+        await _sut.HandleAsync(command, CancellationToken.None);
+
+        _auditLogger.DidNotReceive().LogUpdated(
+            Arg.Any<string>(),
+            Arg.Any<Guid>(),
+            Arg.Any<Guid?>(),
+            Arg.Any<List<FieldChange>>(),
+            Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_SetDefaultEngineToBuiltIn_Succeeds()
+    {
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SetDefaultEngineToNonExistent_ThrowsBadRequest()
+    {
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, Guid.NewGuid()));
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_SetDefaultEngineToDbEngine_Succeeds()
+    {
+        var engineId = Guid.NewGuid();
+        _db.TextExtractionEngines.Add(new TextExtractionEngine
+        {
+            Id = engineId,
+            Name = "Custom Engine",
+            EngineType = TextExtractionEngineType.Tesseract,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, engineId));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal(engineId, response.DefaultTextExtractionEngineId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClearDefaultEngine_Succeeds()
+    {
+        _db.AppSettings.Add(new AppSetting
+        {
+            Module = AppSetting.DocumentsModule,
+            Value = $$$"""{"maxUploadSizeMb":100,"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+        });
+        await _db.SaveChangesAsync();
+
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
+
+        var response = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Null(response.DefaultTextExtractionEngineId);
+    }
+}

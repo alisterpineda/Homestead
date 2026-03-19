@@ -20,6 +20,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     private readonly IProcessingNotifier _notifier;
     private readonly IAuditLogger _auditLogger;
     private readonly ISearchVectorUpdater _searchVectorUpdater;
+    private readonly ITextExtractionEngineResolver _engineResolver;
     private readonly ReprocessDocumentVersionJobHandler _handler;
 
     public ReprocessDocumentVersionJobHandlerTests()
@@ -34,6 +35,11 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _notifier = Substitute.For<IProcessingNotifier>();
         _auditLogger = Substitute.For<IAuditLogger>();
         _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
+        _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
+        _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(new TextExtractionContext(
+                Homestead.WebApi.Domains.Settings.TextExtractionEngineType.Tesseract,
+                Homestead.WebApi.Domains.Settings.BuiltInTextExtractionEngines.TesseractDefaultConfiguration));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -43,10 +49,12 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
             .Build();
 
         var logger = Substitute.For<ILogger<ReprocessDocumentVersionJobHandler>>();
+        var textExtractionHelper = new TextExtractionHelper(
+            new[] { _textExtractor }, _engineResolver);
 
         _handler = new ReprocessDocumentVersionJobHandler(
-            _db, config, new[] { _textExtractor }, logger,
-            _notifier, _auditLogger, _searchVectorUpdater);
+            _db, config, logger,
+            _notifier, _auditLogger, _searchVectorUpdater, textExtractionHelper);
     }
 
     public void Dispose()
@@ -94,9 +102,9 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         return (doc, version);
     }
 
-    private ProcessingJob CreateJob(Guid documentId, Guid versionId)
+    private ProcessingJob CreateJob(Guid documentId, Guid versionId, Guid? textExtractionEngineId = null)
     {
-        var payload = new ReprocessDocumentVersionPayload(documentId, versionId);
+        var payload = new ReprocessDocumentVersionPayload(documentId, versionId, textExtractionEngineId);
         return new ProcessingJob
         {
             Id = Guid.NewGuid(),
@@ -115,7 +123,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("old text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns("new extracted text");
 
         await _handler.HandleAsync(job, ct);
@@ -131,7 +139,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("old text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns("new text");
 
         await _handler.HandleAsync(job, ct);
@@ -151,7 +159,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("same text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns("same text");
 
         await _handler.HandleAsync(job, ct);
@@ -168,7 +176,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion();
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns("text");
 
         await _handler.HandleAsync(job, ct);
@@ -183,7 +191,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion();
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns("text");
 
         await _handler.HandleAsync(job, ct);
@@ -216,7 +224,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("existing text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractor.ExtractTextAsync(Arg.Any<string>(), ct)
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
             .Returns<string?>(x => throw new Exception("OCR failed"));
 
         await _handler.HandleAsync(job, ct);
@@ -224,5 +232,53 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         // ExtractedText should be set to null (extraction returned null due to catch)
         var updated = _db.DocumentVersions.First(v => v.Id == version.Id);
         Assert.Null(updated.ExtractedText);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CallsEngineResolverWithPayloadEngineId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion("old text");
+        var engineId = Guid.NewGuid();
+        var job = CreateJob(doc.Id, version.Id, textExtractionEngineId: engineId);
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("new text");
+
+        await _handler.HandleAsync(job, ct);
+
+        await _engineResolver.Received(1).ResolveAsync(engineId, ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CallsEngineResolverWithNull_WhenNoEngineIdInPayload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion("old text");
+        var job = CreateJob(doc.Id, version.Id, textExtractionEngineId: null);
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("new text");
+
+        await _handler.HandleAsync(job, ct);
+
+        await _engineResolver.Received(1).ResolveAsync(null, ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoExtractor_SkipsTextExtractionAndResolver()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion("old text");
+
+        // Change content type to something without an extractor
+        version.ContentType = "text/plain";
+        await _db.SaveChangesAsync(ct);
+
+        var job = CreateJob(doc.Id, version.Id);
+
+        await _handler.HandleAsync(job, ct);
+
+        await _engineResolver.DidNotReceive().ResolveAsync(Arg.Any<Guid?>(), ct);
     }
 }

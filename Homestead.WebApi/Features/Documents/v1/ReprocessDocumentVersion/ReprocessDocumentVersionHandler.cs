@@ -33,7 +33,7 @@ public class ReprocessDocumentVersionHandler(
 
         var userId = currentUser.UserId;
 
-        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId);
+        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId, request.TextExtractionEngineId);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.ReprocessDocumentVersion, opts =>
         {

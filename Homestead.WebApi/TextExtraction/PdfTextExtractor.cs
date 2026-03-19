@@ -1,4 +1,5 @@
 using System.Text;
+using Homestead.WebApi.TextExtraction.Configurations;
 using PDFtoImage;
 using UglyToad.PdfPig;
 
@@ -9,10 +10,12 @@ public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtracto
     public bool CanExtract(string contentType)
         => contentType is "application/pdf";
 
-    public async Task<string?> ExtractTextAsync(string filePath, CancellationToken ct)
+    public async Task<string?> ExtractTextAsync(string filePath, TextExtractionContext context, CancellationToken ct)
     {
         try
         {
+            var language = TesseractLanguageResolver.Resolve(context);
+
             using var document = PdfDocument.Open(filePath);
             var sb = new StringBuilder();
 
@@ -40,7 +43,7 @@ public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtracto
 #pragma warning restore CA1416
                 pngStream.Position = 0;
 
-                var ocrText = await tesseract.OcrAsync(pngStream, ct);
+                var ocrText = await tesseract.OcrAsync(pngStream, language, ct);
                 if (!string.IsNullOrWhiteSpace(ocrText))
                 {
                     if (sb.Length > 0)

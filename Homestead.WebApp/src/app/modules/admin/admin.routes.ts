@@ -12,5 +12,5 @@ export const ADMIN_ROUTES: Routes = [
   { path: 'groups', component: GroupListComponent, data: { title: 'Groups' } },
   { path: 'groups/:id', component: GroupDetailPageComponent, data: { title: 'Group' } },
   { path: 'jobs', component: JobListComponent, data: { title: 'Jobs' } },
-  { path: 'ocr', component: OcrEngineListComponent, data: { title: 'OCR Engines' } },
+  { path: 'ocr', component: OcrEngineListComponent, data: { title: 'Text Extraction Engines' } },
 ];

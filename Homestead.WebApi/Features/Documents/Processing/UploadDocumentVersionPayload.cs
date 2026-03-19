@@ -7,4 +7,5 @@ public record UploadDocumentVersionPayload(
     string? Label,
     string ContentType,
     long FileSize,
-    string FileExtension);
+    string FileExtension,
+    Guid? TextExtractionEngineId = null);

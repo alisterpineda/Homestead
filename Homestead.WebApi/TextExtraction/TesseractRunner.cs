@@ -6,18 +6,17 @@ namespace Homestead.WebApi.TextExtraction;
 public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<TesseractRunner> logger)
 {
     private readonly string _tessDataPath = options.Value.TessDataPath;
-    private readonly string _language = options.Value.Language;
 
-    public async Task<string?> OcrAsync(Stream imageStream, CancellationToken ct)
+    public async Task<string?> OcrAsync(Stream imageStream, string language, CancellationToken ct)
     {
         logger.LogDebug("Running tesseract OCR with tessdata={TessDataPath}, lang={Language}",
-            _tessDataPath, _language);
+            _tessDataPath, language);
 
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
             FileName = "tesseract",
-            ArgumentList = { "stdin", "stdout", "-l", _language, "--tessdata-dir", _tessDataPath },
+            ArgumentList = { "stdin", "stdout", "-l", language, "--tessdata-dir", _tessDataPath },
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
