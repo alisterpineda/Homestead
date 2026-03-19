@@ -12,33 +12,33 @@ public class AppSettingSnapshotTests
         var setting = new AppSetting
         {
             Key = "documents",
-            Value = """{"maxUploadSizeMb":200}"""
+            Value = """{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000001"}"""
         };
 
         var snapshot = AppSettingSnapshot.From(setting);
 
-        Assert.Equal("""{"maxUploadSizeMb":200}""", snapshot.Value);
+        Assert.Equal("""{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000001"}""", snapshot.Value);
     }
 
     [Fact]
     public void Diff_DetectsValueChange()
     {
-        var before = new AppSettingSnapshot { Value = """{"maxUploadSizeMb":100}""" };
-        var after = new AppSettingSnapshot { Value = """{"maxUploadSizeMb":200}""" };
+        var before = new AppSettingSnapshot { Value = """{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000002"}""" };
+        var after = new AppSettingSnapshot { Value = """{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000001"}""" };
 
         var changes = before.Diff(after);
 
         var change = Assert.Single(changes);
         var scalar = Assert.IsType<ScalarFieldChange>(change);
         Assert.Equal("Value", scalar.Field);
-        Assert.Equal("""{"maxUploadSizeMb":100}""", scalar.OldValue);
-        Assert.Equal("""{"maxUploadSizeMb":200}""", scalar.NewValue);
+        Assert.Equal("""{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000002"}""", scalar.OldValue);
+        Assert.Equal("""{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000001"}""", scalar.NewValue);
     }
 
     [Fact]
     public void Diff_ReturnsEmpty_WhenIdentical()
     {
-        var snapshot = new AppSettingSnapshot { Value = """{"maxUploadSizeMb":100}""" };
+        var snapshot = new AppSettingSnapshot { Value = """{"defaultTextExtractionEngineId":"00000000-0000-0000-0000-000000000002"}""" };
 
         var changes = snapshot.Diff(snapshot);
 

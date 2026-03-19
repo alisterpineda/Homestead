@@ -43,50 +43,25 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ZeroMaxUploadSize_ThrowsBadRequest()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 0));
-
-        await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task HandleAsync_NegativeMaxUploadSize_ThrowsBadRequest()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, -1));
-
-        await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task HandleAsync_ExceedsMaxUploadSize_ThrowsBadRequest()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 10001));
-
-        await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
-    }
-
-    [Fact]
     public async Task HandleAsync_NoExistingRow_CreatesNewSetting()
     {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
         var response = await _sut.HandleAsync(command, CancellationToken.None);
 
-        Assert.Equal(200, response.MaxUploadSizeMb);
+        Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
         Assert.NotNull(saved);
-        Assert.Contains("200", saved.Value);
+        Assert.Contains(BuiltInTextExtractionEngines.TesseractDefaultId.ToString(), saved.Value);
     }
 
     [Fact]
     public async Task HandleAsync_NoExistingRow_LogsCreated()
     {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 200));
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
@@ -102,19 +77,19 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = """{"maxUploadSizeMb":100}"""
+            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
         await _db.SaveChangesAsync();
 
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 500));
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
         var response = await _sut.HandleAsync(command, CancellationToken.None);
 
-        Assert.Equal(500, response.MaxUploadSizeMb);
+        Assert.Null(response.DefaultTextExtractionEngineId);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
         Assert.NotNull(saved);
-        Assert.Contains("500", saved.Value);
         Assert.NotNull(saved.UpdatedAt);
     }
 
@@ -124,11 +99,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = """{"maxUploadSizeMb":100}"""
+            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
         await _db.SaveChangesAsync();
 
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 500));
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
@@ -147,27 +123,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         var response = await _sut.HandleAsync(command, CancellationToken.None);
 
-        Assert.Equal(100, response.MaxUploadSizeMb);
-    }
-
-    [Fact]
-    public async Task HandleAsync_BoundaryValue1_Succeeds()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 1));
-
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
-
-        Assert.Equal(1, response.MaxUploadSizeMb);
-    }
-
-    [Fact]
-    public async Task HandleAsync_BoundaryValue10000_Succeeds()
-    {
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 10000));
-
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
-
-        Assert.Equal(10000, response.MaxUploadSizeMb);
+        Assert.Null(response.DefaultTextExtractionEngineId);
     }
 
     [Fact]
@@ -176,11 +132,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = """{"maxUploadSizeMb":100}"""
+            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
         await _db.SaveChangesAsync();
 
-        var command = CreatePatchCommand(p => p.Replace(m => m.MaxUploadSizeMb, 100));
+        var command = CreatePatchCommand(p =>
+            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
@@ -240,7 +197,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = $$$"""{"maxUploadSizeMb":100,"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
         await _db.SaveChangesAsync();
 

@@ -21,7 +21,6 @@ public class GetDocumentSettingsHandler(AppDbContext db)
 
         return new DocumentSettingsResponse
         {
-            MaxUploadSizeMb = settings.MaxUploadSizeMb,
             DefaultTextExtractionEngineId = settings.DefaultTextExtractionEngineId
         };
     }

@@ -3,5 +3,4 @@
 
 export interface DocumentSettingsResponse {
   defaultTextExtractionEngineId?: (string | null);
-  maxUploadSizeMb: (number | string);
 }

@@ -39,9 +39,6 @@ public class PatchDocumentSettingsHandler(
             }));
 
         // Validate
-        if (settings.MaxUploadSizeMb is <= 0 or > 10000)
-            throw new BadRequestException("MaxUploadSizeMb must be between 1 and 10000.");
-
         if (settings.DefaultTextExtractionEngineId is { } engineId)
         {
             await TextExtractionEngineValidator.ValidateEngineExistsAsync(db, engineId, ct);
@@ -79,7 +76,6 @@ public class PatchDocumentSettingsHandler(
 
         return new DocumentSettingsResponse
         {
-            MaxUploadSizeMb = settings.MaxUploadSizeMb,
             DefaultTextExtractionEngineId = settings.DefaultTextExtractionEngineId
         };
     }

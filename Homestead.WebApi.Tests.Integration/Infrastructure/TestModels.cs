@@ -27,7 +27,7 @@ internal record ErrorResponse(string? Error);
 
 internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
 
-internal record DocumentSettingsItem(int MaxUploadSizeMb, Guid? DefaultTextExtractionEngineId = null);
+internal record DocumentSettingsItem(Guid? DefaultTextExtractionEngineId = null);
 
 internal record SystemSettingsItem();
 
