@@ -102,6 +102,12 @@ import { toast } from 'ngx-sonner';
             <!-- Normal toolbar: always rendered to hold layout height -->
             <div [class.opacity-0]="isInSelectionState()" [class.pointer-events-none]="isInSelectionState()" [attr.inert]="isInSelectionState() ? '' : null">
               <div class="flex items-center gap-2 mb-3">
+                @if (auth.canWrite() && viewMode() === 'grid') {
+                  <button hlmBtn variant="outline" size="sm" (click)="enterSelectionMode()" aria-label="Enter selection mode">
+                    <ng-icon hlm name="lucideListChecks" size="sm" />
+                    <span class="hidden sm:inline">Select</span>
+                  </button>
+                }
                 <div class="relative flex-1 min-w-0">
                   <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
@@ -172,12 +178,6 @@ import { toast } from 'ngx-sonner';
                       <ng-icon hlm name="lucideTable" size="sm" />
                     </button>
                   </div>
-                  @if (auth.canWrite() && viewMode() === 'grid') {
-                    <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" (click)="enterSelectionMode()" aria-label="Enter selection mode">
-                      <ng-icon hlm name="lucideListChecks" size="sm" />
-                      Select
-                    </button>
-                  }
                   <!-- Mobile: Overflow menu (below sm) -->
                   <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
                           [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
@@ -218,12 +218,6 @@ import { toast } from 'ngx-sonner';
                             <ng-container [ngTemplateOutlet]="columnsContent" [ngTemplateOutletInjector]="'outlet'" />
                           </hlm-dropdown-menu-sub>
                         </ng-template>
-                      }
-                      @if (auth.canWrite() && viewMode() === 'grid') {
-                        <hlm-dropdown-menu-separator />
-                        <button hlmDropdownMenuItem (triggered)="enterSelectionMode()">
-                          Select
-                        </button>
                       }
                     </hlm-dropdown-menu>
                   </ng-template>
