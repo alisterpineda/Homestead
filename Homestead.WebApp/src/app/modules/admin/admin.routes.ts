@@ -5,6 +5,7 @@ import { GroupListComponent } from './pages/group-list/group-list.component';
 import { GroupDetailPageComponent } from './pages/group-detail/group-detail-page.component';
 import { JobListComponent } from './pages/job-list/job-list.component';
 import { TextExtractionEngineListComponent } from './pages/text-extraction-engine-list/text-extraction-engine-list.component';
+import { DocumentSettingsComponent } from './pages/document-settings/document-settings.component';
 
 export const ADMIN_ROUTES: Routes = [
   { path: '', component: AdminIndexComponent, data: { title: 'Admin' } },
@@ -13,4 +14,5 @@ export const ADMIN_ROUTES: Routes = [
   { path: 'groups/:id', component: GroupDetailPageComponent, data: { title: 'Group' } },
   { path: 'jobs', component: JobListComponent, data: { title: 'Jobs' } },
   { path: 'text-extraction', component: TextExtractionEngineListComponent, data: { title: 'Text Extraction Engines' } },
+  { path: 'settings/documents', component: DocumentSettingsComponent, data: { title: 'Document Settings' } },
 ];

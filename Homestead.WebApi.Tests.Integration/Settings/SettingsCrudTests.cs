@@ -202,4 +202,54 @@ public class SettingsCrudTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
         Assert.Null(body!.DefaultTextExtractionEngineId);
     }
+
+    [Fact]
+    public async Task PatchDocumentSettings_DefaultEngineDeleted_GetStillReturnsStaleId_ClearSucceeds()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // 1. Create a custom engine
+        var createResponse = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name = "Stale Engine Test",
+            engineType = "Tesseract",
+            configuration = "{\"languages\":[\"Eng\"]}"
+        }, CT);
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<TextExtractionEngineItem>(CT);
+        var engineId = created!.Id;
+
+        // 2. Set it as default
+        var patchResponse = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)engineId.ToString() }
+        });
+        Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+
+        // 3. Delete the engine
+        var deleteResponse = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines/bulk-delete", new
+        {
+            ids = new[] { engineId }
+        }, CT);
+        deleteResponse.EnsureSuccessStatusCode();
+
+        // 4. GET still returns the stale engine ID
+        var getResponse = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var settings = await getResponse.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
+        Assert.Equal(engineId, settings!.DefaultTextExtractionEngineId);
+
+        // 5. Clear the stale reference
+        var clearResponse = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new object[]
+        {
+            new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object?)null! }
+        });
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+
+        // 6. Verify it's cleared
+        var verifyResponse = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
+        var verified = await verifyResponse.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
+        Assert.Null(verified!.DefaultTextExtractionEngineId);
+    }
 }
