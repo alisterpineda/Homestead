@@ -16,18 +16,22 @@ import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from './sort-header-button';
 import { TableHeadSelection, TableRowSelection } from './selection-column';
-import { TagsCell, PartiesCell, FileSizeCell } from './table-cells';
+import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, DocumentDateCell } from './table-cells';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, DocumentSortBy> = {
   name: 'Name',
   contentType: 'ContentType',
   fileSize: 'FileSize',
+  createdAt: 'CreatedAt',
+  documentDate: 'DocumentDate',
 };
 
 const SORT_KEY_TO_COLUMN_ID: Record<string, string> = {
   Name: 'name',
   ContentType: 'contentType',
   FileSize: 'fileSize',
+  CreatedAt: 'createdAt',
+  DocumentDate: 'documentDate',
 };
 
 export interface HideableColumn {
@@ -40,7 +44,14 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'tags', label: 'Tags' },
   { id: 'contentType', label: 'Content Type' },
   { id: 'fileSize', label: 'File Size' },
+  { id: 'createdAt', label: 'Date Added' },
+  { id: 'documentDate', label: 'Document Date' },
 ];
+
+export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  createdAt: false,
+  documentDate: false,
+};
 
 @Component({
   selector: 'app-document-table',
@@ -187,6 +198,22 @@ export class DocumentTableComponent {
       size: 100,
       minSize: 60,
     },
+    {
+      accessorKey: 'createdAt',
+      id: 'createdAt',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Date Added' } }),
+      cell: () => flexRenderComponent(DateAddedCell),
+      size: 140,
+      minSize: 100,
+    },
+    {
+      accessorKey: 'documentDate',
+      id: 'documentDate',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Document Date' } }),
+      cell: () => flexRenderComponent(DocumentDateCell),
+      size: 140,
+      minSize: 100,
+    },
   ];
 
   protected readonly table = createAngularTable<GetDocumentsResponse>(() => ({
@@ -264,6 +291,8 @@ export class DocumentTableComponent {
     fileSize: 'text-right overflow-hidden',
     name: 'overflow-hidden',
     tags: 'overflow-hidden',
+    createdAt: 'overflow-hidden',
+    documentDate: 'overflow-hidden',
   };
 
   getThClass(columnId: string): string {

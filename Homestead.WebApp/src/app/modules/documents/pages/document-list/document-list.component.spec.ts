@@ -3,6 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { DocumentListComponent } from './document-list.component';
+import { DEFAULT_COLUMN_VISIBILITY } from '../../components/document-table/document-table.component';
+import { DocumentListStateService } from '../../services/document-list-state.service';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 
 describe('DocumentListComponent', () => {
@@ -189,6 +191,52 @@ describe('DocumentListComponent', () => {
       const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
       component.onDocumentSelect('doc-123');
       expect(spy).toHaveBeenCalledWith(['/documents', 'doc-123']);
+    });
+  });
+
+  describe('columnVisibility', () => {
+    it('should default createdAt and documentDate to hidden', () => {
+      expect(component.columnVisibility()).toEqual(expect.objectContaining({
+        createdAt: false,
+        documentDate: false,
+      }));
+    });
+
+    it('should merge defaults underneath saved state', () => {
+      const listState = TestBed.inject(DocumentListStateService);
+      listState.saveColumnVisibility({ parties: false });
+
+      // Re-create the component so the constructor runs with saved state
+      const newFixture = TestBed.createComponent(DocumentListComponent);
+      const newComponent = newFixture.componentInstance;
+      const vis = newComponent.columnVisibility();
+
+      expect(vis).toEqual(expect.objectContaining({
+        parties: false,
+        createdAt: false,
+        documentDate: false,
+      }));
+    });
+
+    it('should let saved state override defaults for date columns', () => {
+      const listState = TestBed.inject(DocumentListStateService);
+      listState.saveColumnVisibility({ createdAt: true, documentDate: true });
+
+      const newFixture = TestBed.createComponent(DocumentListComponent);
+      const newComponent = newFixture.componentInstance;
+      const vis = newComponent.columnVisibility();
+
+      expect(vis['createdAt']).toBe(true);
+      expect(vis['documentDate']).toBe(true);
+    });
+
+    it('should toggle a column and save visibility state', () => {
+      const listState = TestBed.inject(DocumentListStateService);
+      const saveSpy = vi.spyOn(listState, 'saveColumnVisibility');
+
+      component.onToggleColumn('createdAt');
+      expect(component.columnVisibility()['createdAt']).toBe(true);
+      expect(saveSpy).toHaveBeenCalled();
     });
   });
 });

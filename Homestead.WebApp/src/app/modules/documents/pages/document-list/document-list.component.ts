@@ -18,7 +18,7 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { FilterPopoverComponent } from '@/shared/components/filter-popover/filter-popover.component';
 import type { FilterOption } from '@/shared/components/filter-popover/filter-popover.component';
-import { DocumentTableComponent, HIDEABLE_COLUMNS } from '../../components/document-table/document-table.component';
+import { DocumentTableComponent, HIDEABLE_COLUMNS, DEFAULT_COLUMN_VISIBILITY } from '../../components/document-table/document-table.component';
 import { DocumentCardGridComponent } from '../../components/document-card-grid/document-card-grid.component';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
@@ -409,7 +409,7 @@ export class DocumentListComponent implements OnDestroy {
   );
 
   // Column visibility (TanStack VisibilityState: { [columnId]: boolean })
-  columnVisibility = signal<VisibilityState>({});
+  columnVisibility = signal<VisibilityState>({ ...DEFAULT_COLUMN_VISIBILITY });
 
   // Party filter
   partyFilterSearch = signal('');
@@ -538,10 +538,10 @@ export class DocumentListComponent implements OnDestroy {
   private searchSub: Subscription;
 
   constructor() {
-    // Restore saved column visibility
+    // Restore saved column visibility (merge defaults underneath so new columns default to hidden)
     const savedVisibility = this.listState.getSavedColumnVisibility();
     if (savedVisibility) {
-      this.columnVisibility.set(savedVisibility);
+      this.columnVisibility.set({ ...DEFAULT_COLUMN_VISIBILITY, ...savedVisibility });
     }
 
     // Save query params on every change, and restore saved state when navigating
