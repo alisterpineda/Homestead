@@ -55,7 +55,7 @@ import { isNavItemActive } from '@/shared/utils';
             </a>
           </li>
           <li hlmSidebarMenuItem>
-            <a hlmSidebarMenuButton routerLink="/admin/ocr" [isActive]="isActive('/admin/ocr')">
+            <a hlmSidebarMenuButton routerLink="/admin/text-extraction" [isActive]="isActive('/admin/text-extraction')">
               <ng-icon hlm name="lucideScanText" size="sm" />
               <span>Text Extraction</span>
             </a>
@@ -78,7 +78,7 @@ export class AdminSidebarComponent {
 
   private urlPath = computed(() => this.url().split('?')[0]);
 
-  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs', '/admin/ocr'];
+  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs', '/admin/text-extraction'];
 
   isActive(path: string): boolean {
     return isNavItemActive(this.urlPath(), path, this.navPaths);

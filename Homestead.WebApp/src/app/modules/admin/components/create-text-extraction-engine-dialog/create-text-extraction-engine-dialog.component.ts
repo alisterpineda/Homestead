@@ -13,7 +13,7 @@ import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text
 import { toast } from 'ngx-sonner';
 
 @Component({
-  selector: 'app-create-ocr-engine-dialog',
+  selector: 'app-create-text-extraction-engine-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel,
@@ -67,7 +67,7 @@ import { toast } from 'ngx-sonner';
     </hlm-dialog>
   `,
 })
-export class CreateOcrEngineDialogComponent {
+export class CreateTextExtractionEngineDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon'>('default');
   created = output();
 

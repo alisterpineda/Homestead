@@ -16,7 +16,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
 @Component({
-  selector: 'app-edit-ocr-engine-sheet',
+  selector: 'app-edit-text-extraction-engine-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, HlmSheetImports, HlmButton, HlmInput, HlmLabel, HlmBadge,
@@ -89,7 +89,7 @@ import { toast } from 'ngx-sonner';
     </hlm-sheet>
   `,
 })
-export class EditOcrEngineSheetComponent {
+export class EditTextExtractionEngineSheetComponent {
   engine = input<TextExtractionEngineResponse | null>(null);
   state = input<BrnDialogState>('closed');
   saved = output<void>();

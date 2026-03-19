@@ -2,12 +2,12 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OcrEngineListComponent } from './ocr-engine-list.component';
+import { TextExtractionEngineListComponent } from './text-extraction-engine-list.component';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 
-describe('OcrEngineListComponent', () => {
-  let fixture: ComponentFixture<OcrEngineListComponent>;
-  let component: OcrEngineListComponent;
+describe('TextExtractionEngineListComponent', () => {
+  let fixture: ComponentFixture<TextExtractionEngineListComponent>;
+  let component: TextExtractionEngineListComponent;
 
   beforeEach(() => {
     vi.stubGlobal('localStorage', {
@@ -20,7 +20,7 @@ describe('OcrEngineListComponent', () => {
       providers: [provideHttpClient(), provideRouter([])],
     });
 
-    fixture = TestBed.createComponent(OcrEngineListComponent);
+    fixture = TestBed.createComponent(TextExtractionEngineListComponent);
     component = fixture.componentInstance;
   });
 

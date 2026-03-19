@@ -1,11 +1,11 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EditOcrEngineSheetComponent } from './edit-ocr-engine-sheet.component';
+import { EditTextExtractionEngineSheetComponent } from './edit-text-extraction-engine-sheet.component';
 
-describe('EditOcrEngineSheetComponent', () => {
-  let fixture: ComponentFixture<EditOcrEngineSheetComponent>;
-  let component: EditOcrEngineSheetComponent;
+describe('EditTextExtractionEngineSheetComponent', () => {
+  let fixture: ComponentFixture<EditTextExtractionEngineSheetComponent>;
+  let component: EditTextExtractionEngineSheetComponent;
 
   beforeEach(() => {
     vi.stubGlobal('localStorage', {
@@ -18,7 +18,7 @@ describe('EditOcrEngineSheetComponent', () => {
       providers: [provideHttpClient()],
     });
 
-    fixture = TestBed.createComponent(EditOcrEngineSheetComponent);
+    fixture = TestBed.createComponent(EditTextExtractionEngineSheetComponent);
     component = fixture.componentInstance;
   });
 

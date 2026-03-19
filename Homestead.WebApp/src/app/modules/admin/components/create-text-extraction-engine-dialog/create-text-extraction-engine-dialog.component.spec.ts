@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CreateOcrEngineDialogComponent } from './create-ocr-engine-dialog.component';
+import { CreateTextExtractionEngineDialogComponent } from './create-text-extraction-engine-dialog.component';
 
-describe('CreateOcrEngineDialogComponent', () => {
+describe('CreateTextExtractionEngineDialogComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient()],
@@ -11,56 +11,56 @@ describe('CreateOcrEngineDialogComponent', () => {
   });
 
   it('should create', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance).toBeTruthy();
   });
 
   it('should have empty name initially', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.name()).toBe('');
   });
 
   it('should have ["Eng"] as the default languages', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.selectedLanguages()).toEqual(['Eng']);
   });
 
   it('should not be creating initially', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.creating()).toBe(false);
   });
 
   it('should have empty createError initially', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.createError()).toBe('');
   });
 
   it('should not be submittable with empty name', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.canSubmit()).toBe(false);
   });
 
   it('should be submittable with non-empty name', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     fixture.componentInstance.name.set('My OCR Engine');
     expect(fixture.componentInstance.canSubmit()).toBe(true);
   });
 
   it('should not be submittable with whitespace-only name', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     fixture.componentInstance.name.set('   ');
     expect(fixture.componentInstance.canSubmit()).toBe(false);
   });
 
   it('should not be submittable with empty languages', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     fixture.componentInstance.name.set('My Engine');
     fixture.componentInstance.selectedLanguages.set([]);
     expect(fixture.componentInstance.canSubmit()).toBe(false);
   });
 
   it('should reset state when dialog opens', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     const component = fixture.componentInstance;
 
     component.name.set('Some Engine');
@@ -77,7 +77,7 @@ describe('CreateOcrEngineDialogComponent', () => {
   });
 
   it('should not reset state when dialog closes', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     const component = fixture.componentInstance;
 
     component.name.set('Some Engine');
@@ -86,13 +86,13 @@ describe('CreateOcrEngineDialogComponent', () => {
   });
 
   it('should extract input value from event via asInputValue', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     const event = { target: { value: 'test value' } } as unknown as Event;
     expect(fixture.componentInstance.asInputValue(event)).toBe('test value');
   });
 
   it('should have a languages list', () => {
-    const fixture = TestBed.createComponent(CreateOcrEngineDialogComponent);
+    const fixture = TestBed.createComponent(CreateTextExtractionEngineDialogComponent);
     expect(fixture.componentInstance.languages).toBeDefined();
     expect(fixture.componentInstance.languages.length).toBeGreaterThan(0);
   });

@@ -17,8 +17,8 @@ import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
-import { CreateOcrEngineDialogComponent } from '../../components/create-ocr-engine-dialog/create-ocr-engine-dialog.component';
-import { EditOcrEngineSheetComponent } from '../../components/edit-ocr-engine-sheet/edit-ocr-engine-sheet.component';
+import { CreateTextExtractionEngineDialogComponent } from '../../components/create-text-extraction-engine-dialog/create-text-extraction-engine-dialog.component';
+import { EditTextExtractionEngineSheetComponent } from '../../components/edit-text-extraction-engine-sheet/edit-text-extraction-engine-sheet.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getTextExtractionEngines } from '@/api/generated/fn/admin/get-text-extraction-engines';
 import { bulkDeleteTextExtractionEngines } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
@@ -29,12 +29,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
 
 @Component({
-  selector: 'app-ocr-engine-list',
+  selector: 'app-text-extraction-engine-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe, NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, HlmInput,
     HlmButton, HlmTableImports, HlmBadge, HlmCheckboxImports, HlmAlertDialogImports,
-    PaginationComponent, CreateOcrEngineDialogComponent, EditOcrEngineSheetComponent,
+    PaginationComponent, CreateTextExtractionEngineDialogComponent, EditTextExtractionEngineSheetComponent,
   ],
   providers: [provideIcons({ lucideScanText, lucideSearch, lucidePlus, lucideTrash2 })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -69,10 +69,10 @@ import { toast } from 'ngx-sonner';
                 <h3 hlmEmptyTitle>No text extraction engines found</h3>
                 <p hlmEmptyDescription>Add an engine configuration to get started.</p>
               </div>
-              <app-create-ocr-engine-dialog (created)="onRefresh()">
+              <app-create-text-extraction-engine-dialog (created)="onRefresh()">
                 <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
                 Add Engine
-              </app-create-ocr-engine-dialog>
+              </app-create-text-extraction-engine-dialog>
             </section>
           } @else {
             <div class="relative shrink-0">
@@ -84,10 +84,10 @@ import { toast } from 'ngx-sonner';
                     <input hlmInput class="pl-9 w-full" placeholder="Search engines..."
                       [value]="searchInput()" (input)="searchInput.set(asInputValue($event))" />
                   </div>
-                  <app-create-ocr-engine-dialog triggerSize="sm" (created)="onRefresh()">
+                  <app-create-text-extraction-engine-dialog triggerSize="sm" (created)="onRefresh()">
                     <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
                     Add Engine
-                  </app-create-ocr-engine-dialog>
+                  </app-create-text-extraction-engine-dialog>
                 </div>
               </div>
 
@@ -192,14 +192,14 @@ import { toast } from 'ngx-sonner';
       }
     </div>
 
-    <app-edit-ocr-engine-sheet
+    <app-edit-text-extraction-engine-sheet
       [engine]="selectedEngine()"
       [state]="sheetState()"
       (saved)="onEngineSaved()"
       (closed)="onSheetClosed()" />
   `,
 })
-export class OcrEngineListComponent implements OnDestroy {
+export class TextExtractionEngineListComponent implements OnDestroy {
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
@@ -292,7 +292,7 @@ export class OcrEngineListComponent implements OnDestroy {
         filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
       )
       .subscribe(value => {
-        this.router.navigate(['/admin/ocr'], {
+        this.router.navigate(['/admin/text-extraction'], {
           queryParams: { page: 1, search: value || null },
           queryParamsHandling: 'merge',
           replaceUrl: true,
@@ -362,7 +362,7 @@ export class OcrEngineListComponent implements OnDestroy {
   }
 
   onPageChange(newPage: number): void {
-    this.router.navigate(['/admin/ocr'], {
+    this.router.navigate(['/admin/text-extraction'], {
       queryParams: { page: newPage },
       queryParamsHandling: 'merge',
       replaceUrl: true,
