@@ -60,6 +60,7 @@ import { TagInputComponent } from '../../components/tag-input/tag-input.componen
 import { PartyInputComponent } from '../../components/party-input/party-input.component';
 import type { PartyOption } from '../../components/party-input/party-input.component';
 import { AddVersionDialogComponent } from '../../components/add-version-dialog/add-version-dialog.component';
+import { ReprocessDialogComponent } from '../../components/reprocess-dialog/reprocess-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual } from '@/shared/utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getDocument } from '@/api/generated/fn/documents/get-document';
@@ -67,7 +68,6 @@ import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-ve
 import { patchDocument } from '@/api/generated/fn/documents/patch-document';
 import { patchDocumentVersion } from '@/api/generated/fn/documents/patch-document-version';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
-import { reprocessDocumentVersion } from '@/api/generated/fn/documents/reprocess-document-version';
 import { getDocumentActivity } from '@/api/generated/fn/documents/get-document-activity';
 import { createComment } from '@/api/generated/fn/documents/create-comment';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -108,6 +108,7 @@ import { toast } from 'ngx-sonner';
     HlmInputGroupImports,
     NgScrollbar,
     AddVersionDialogComponent,
+    ReprocessDialogComponent,
     HlmBadge,
     DatePickerComponent,
   ],
@@ -214,9 +215,9 @@ import { toast } from 'ngx-sonner';
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
                   <span>Add Version</span>
                 </button>
-                <button hlmDropdownMenuItem (triggered)="reprocessDialogTrigger.click()" [disabled]="reprocessing()">
+                <button hlmDropdownMenuItem (triggered)="reprocessDialog.open()">
                   <ng-icon hlm name="lucideRefreshCw" size="sm" />
-                  <span>Reprocess OCR</span>
+                  <span>Reprocess Text</span>
                 </button>
                 <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
                   <ng-icon hlm name="lucideTrash2" size="sm" />
@@ -243,23 +244,12 @@ import { toast } from 'ngx-sonner';
               </hlm-alert-dialog-content>
             </hlm-alert-dialog>
 
-            <hlm-alert-dialog>
-              <button hlmAlertDialogTrigger class="hidden" #reprocessDialogTrigger></button>
-              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                <div hlmAlertDialogHeader>
-                  <h2 hlmAlertDialogTitle>Reprocess OCR?</h2>
-                  <p hlmAlertDialogDescription>
-                    This will re-extract text from the current version's file. The existing extracted text will be replaced.
-                  </p>
-                </div>
-                <div hlmAlertDialogFooter>
-                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                  <button hlmAlertDialogAction (click)="handleReprocess(); ctx.close()" [disabled]="reprocessing()">
-                    {{ reprocessing() ? 'Reprocessing...' : 'Reprocess' }}
-                  </button>
-                </div>
-              </hlm-alert-dialog-content>
-            </hlm-alert-dialog>
+            <app-reprocess-dialog
+              #reprocessDialog
+              [documentId]="doc.id"
+              [versionId]="activeVersion()!.id"
+              (reprocessStarted)="onReprocessStarted($event)"
+            />
           }
         </div>
       </div>
@@ -629,7 +619,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editExtractedText = signal('');
   saving = signal(false);
   deleting = signal(false);
-  reprocessing = signal(false);
   loading = signal(false);
   refreshTrigger = signal(0);
   activityItems = signal<GetActivityResponse[]>([]);
@@ -1137,25 +1126,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.router.navigate(['/documents', siblingId]);
   }
 
-  handleReprocess(): void {
-    const docId = this.documentId();
-    const ver = this.activeVersion();
-    if (!docId || !ver) return;
-    this.reprocessing.set(true);
-    reprocessDocumentVersion(this.http, this.apiConfig.rootUrl, {
-      documentId: docId,
-      versionId: ver.id,
-    }).subscribe({
-      next: (r) => {
-        this.reprocessing.set(false);
-        const toastId = toast.loading('Reprocessing OCR...');
-        this.processingHub.trackJob(r.body.jobId, toastId);
-      },
-      error: () => {
-        this.reprocessing.set(false);
-        toast.error('Failed to start OCR reprocessing.');
-      },
-    });
+  onReprocessStarted(jobId: string): void {
+    const toastId = toast.loading('Reprocessing text extraction...');
+    this.processingHub.trackJob(jobId, toastId);
   }
 
   handleSave(): void {

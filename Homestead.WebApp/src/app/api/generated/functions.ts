@@ -39,6 +39,8 @@ export type { BulkRestoreDocuments$Params as BulkRestoreDocuments$Params } from 
 export { bulkRestoreDocuments as bulkRestoreDocuments } from './fn/documents/bulk-restore-documents';
 export type { RestoreDocument$Params as RestoreDocument$Params } from './fn/documents/restore-document';
 export { restoreDocument as restoreDocument } from './fn/documents/restore-document';
+export type { GetTextExtractionEngineSummaries$Params as GetTextExtractionEngineSummaries$Params } from './fn/documents/get-text-extraction-engine-summaries';
+export { getTextExtractionEngineSummaries as getTextExtractionEngineSummaries } from './fn/documents/get-text-extraction-engine-summaries';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';
 export { getDocumentVersions as getDocumentVersions } from './fn/documents/get-document-versions';
 export type { CreateDocumentVersion$Params as CreateDocumentVersion$Params } from './fn/documents/create-document-version';

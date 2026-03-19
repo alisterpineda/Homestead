@@ -45,12 +45,7 @@ public class PatchDocumentSettingsHandler(
 
         if (settings.DefaultTextExtractionEngineId is { } engineId)
         {
-            if (engineId != BuiltInTextExtractionEngines.TesseractDefaultId)
-            {
-                var engineExists = await db.TextExtractionEngines.AnyAsync(e => e.Id == engineId, ct);
-                if (!engineExists)
-                    throw new BadRequestException("Text extraction engine not found.");
-            }
+            await TextExtractionEngineValidator.ValidateEngineExistsAsync(db, engineId, ct);
         }
 
         var newValue = JsonSerializer.Serialize(settings, FieldChange.JsonOptions);

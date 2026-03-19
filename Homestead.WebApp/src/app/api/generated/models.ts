@@ -82,6 +82,7 @@ export type { SortDirection } from './models/sort-direction';
 export type { SystemSettingsResponse } from './models/system-settings-response';
 export type { TagDto } from './models/tag-dto';
 export type { TextExtractionEngineResponse } from './models/text-extraction-engine-response';
+export type { TextExtractionEngineSummary } from './models/text-extraction-engine-summary';
 export type { TextExtractionEngineType } from './models/text-extraction-engine-type';
 export type { UpdateGroupMemberRequest } from './models/update-group-member-request';
 export type { UpdateGroupRequest } from './models/update-group-request';

@@ -136,4 +136,23 @@ public class ReprocessDocumentVersionTests : IntegrationTestBase
 
         await WaitForJobCompletionAsync(jobBody.JobId);
     }
+
+    [Fact]
+    public async Task ReprocessVersion_WithNonExistentEngineId_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client);
+
+        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        listResponse.EnsureSuccessStatusCode();
+        var versions = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
+        var versionId = versions!.Items.First().Id;
+
+        var fakeEngineId = Guid.NewGuid();
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/documents/{docId}/versions/{versionId}/reprocess",
+            new { textExtractionEngineId = fakeEngineId }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

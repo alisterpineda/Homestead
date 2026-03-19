@@ -31,6 +31,7 @@ using Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
 using Homestead.WebApi.Features.Documents.v1.RestoreDocuments;
 using Homestead.WebApi.Features.Documents.v1.PermanentlyDeleteDocuments;
 using Homestead.WebApi.Features.Documents.v1.EmptyTrash;
+using Homestead.WebApi.Features.Documents.v1.GetTextExtractionEngineSummaries;
 
 using Homestead.WebApi.Authentication;
 
@@ -59,6 +60,8 @@ public static class DocumentsModule
         PatchDocumentEndpoint.Map(v1);
         PermanentlyDeleteDocumentsEndpoint.Map(v1);
         RestoreDocumentsEndpoint.Map(v1);
+
+        GetTextExtractionEngineSummariesEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);

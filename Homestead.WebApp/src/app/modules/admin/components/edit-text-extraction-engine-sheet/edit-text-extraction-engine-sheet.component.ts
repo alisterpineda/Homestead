@@ -57,10 +57,12 @@ import { toast } from 'ngx-sonner';
                     <hlm-select-trigger class="w-full">
                       <hlm-select-value />
                     </hlm-select-trigger>
-                    <hlm-select-content>
+                    <hlm-select-content class="max-h-60">
+                      <hlm-select-scroll-up />
                       @for (lang of languages; track lang.value) {
                         <hlm-option [value]="lang.value">{{ lang.label }}</hlm-option>
                       }
+                      <hlm-select-scroll-down />
                     </hlm-select-content>
                   </brn-select>
                 }

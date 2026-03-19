@@ -30,3 +30,5 @@ internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType
 internal record DocumentSettingsItem(int MaxUploadSizeMb, Guid? DefaultTextExtractionEngineId = null);
 
 internal record SystemSettingsItem();
+
+internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
