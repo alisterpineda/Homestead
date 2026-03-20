@@ -6,7 +6,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 
-export type UploadItemStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'failed';
+export type UploadItemStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'failed' | 'duplicate';
 
 export interface UploadItem {
   id: string;
@@ -18,6 +18,8 @@ export interface UploadItem {
   jobId: string | null;
   documentName: string | null;
   error: string | null;
+  duplicateDocumentId: string | null;
+  duplicateDocumentName: string | null;
 }
 
 const MAX_CONCURRENT = 3;
@@ -41,12 +43,13 @@ export class UploadManagerService {
   );
   readonly completedCount = computed(() => this.items().filter(i => i.status === 'completed').length);
   readonly failedCount = computed(() => this.items().filter(i => i.status === 'failed').length);
+  readonly duplicateCount = computed(() => this.items().filter(i => i.status === 'duplicate').length);
 
   private hubSub: Subscription;
 
   constructor() {
     this.hubSub = this.processingHub.jobStatusChanged$.subscribe(msg => {
-      this.handleJobStatusChanged(msg.jobId, msg.status, msg.documentName, msg.error);
+      this.handleJobStatusChanged(msg.jobId, msg.status, msg.documentName, msg.error, msg.errorCode, msg.errorData);
     });
     this.destroyRef.onDestroy(() => this.hubSub.unsubscribe());
 
@@ -72,6 +75,8 @@ export class UploadManagerService {
       jobId: null,
       documentName: null,
       error: null,
+      duplicateDocumentId: null,
+      duplicateDocumentName: null,
     }));
 
     this.items.update(prev => [...prev, ...newItems]);
@@ -106,9 +111,9 @@ export class UploadManagerService {
     this.checkBatchesComplete();
   }
 
-  /** Clear completed and failed items, keeping in-progress and queued ones. */
+  /** Clear completed, failed, and duplicate items, keeping in-progress and queued ones. */
   clearFinished(): void {
-    this.items.update(prev => prev.filter(i => i.status !== 'completed' && i.status !== 'failed'));
+    this.items.update(prev => prev.filter(i => i.status !== 'completed' && i.status !== 'failed' && i.status !== 'duplicate'));
   }
 
   clearAll(): void {
@@ -190,6 +195,8 @@ export class UploadManagerService {
     status: ProcessingJobStatus,
     documentName: string | null,
     error: string | null,
+    errorCode: string | null,
+    errorData: Record<string, string> | null,
   ): void {
     const currentItems = this.items();
     const item = currentItems.find(i => i.jobId === jobId);
@@ -201,9 +208,18 @@ export class UploadManagerService {
         documentName: documentName ?? item.fileName,
       });
     } else if (status === 'Failed') {
-      const errorMsg = error ?? 'Processing failed';
-      this.updateItem(item.id, { status: 'failed', error: errorMsg });
-      toast.error(`Processing failed for "${item.fileName}": ${errorMsg}`);
+      if (errorCode === 'duplicate_content' && errorData) {
+        this.updateItem(item.id, {
+          status: 'duplicate',
+          duplicateDocumentId: errorData['documentId'] ?? null,
+          duplicateDocumentName: errorData['documentName'] ?? null,
+        });
+        toast.info(`"${item.fileName}" already exists as "${errorData['documentName'] ?? 'unknown'}".`);
+      } else {
+        const errorMsg = error ?? 'Processing failed';
+        this.updateItem(item.id, { status: 'failed', error: errorMsg });
+        toast.error(`Processing failed for "${item.fileName}": ${errorMsg}`);
+      }
     }
 
     this.checkBatchesComplete();
@@ -215,14 +231,17 @@ export class UploadManagerService {
       const batchItems = currentItems.filter(i => itemIds.has(i.id));
       let completed = 0;
       let failed = 0;
+      let duplicates = 0;
       for (const i of batchItems) {
         if (i.status === 'completed') completed++;
         else if (i.status === 'failed') failed++;
+        else if (i.status === 'duplicate') duplicates++;
       }
-      if (completed + failed < batchItems.length) continue;
+      if (completed + failed + duplicates < batchItems.length) continue;
 
       this.batches.delete(batchId);
 
+      // Duplicates already have their own info toast — only summarize actual successes and failures
       if (completed > 0 && failed === 0) {
         toast.success(completed === 1 ? '1 file uploaded successfully.' : `${completed} files uploaded successfully.`);
       } else if (completed > 0 && failed > 0) {

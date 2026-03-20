@@ -276,4 +276,44 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         Assert.NotNull(version);
         Assert.Null(version.ExtractedText);
     }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateHash_ThrowsDuplicateDocumentException()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var (job1, _) = CreateVersionUploadJob(doc.Id);
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("text");
+
+        await _handler.HandleAsync(job1, ct);
+
+        // Create a second version upload with same file content (same hash)
+        var existingVersion = await _db.DocumentVersions.FirstAsync(ct);
+        var uploadId2 = Guid.NewGuid();
+        var stagingPath2 = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId2}.pdf");
+        var finalPath = Path.Combine(_mediaPath, existingVersion.FilePath);
+        File.Copy(finalPath, stagingPath2);
+
+        var payload2 = new UploadDocumentVersionPayload(
+            uploadId2, doc.Id, "dupe-version.pdf", "v-dupe",
+            "application/pdf", 2048, ".pdf");
+        var job2 = new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.UploadDocumentVersion,
+            Status = ProcessingJobStatus.InProgress,
+            Payload = System.Text.Json.JsonSerializer.Serialize(payload2),
+            CreatedByUserId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
+            () => _handler.HandleAsync(job2, ct));
+
+        Assert.Equal(doc.Id, ex.ExistingDocumentId);
+        Assert.Equal(doc.Name, ex.ExistingDocumentName);
+        Assert.Equal("duplicate_content", ex.ErrorCode);
+    }
 }

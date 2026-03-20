@@ -262,8 +262,13 @@ public class UploadDocumentJobHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
             () => _handler.HandleAsync(job2, ct));
+
+        var existingDoc = await _db.Documents.FirstAsync(ct);
+        Assert.Equal(existingDoc.Id, ex.ExistingDocumentId);
+        Assert.Equal(existingDoc.Name, ex.ExistingDocumentName);
+        Assert.Equal("duplicate_content", ex.ErrorCode);
     }
 
     [Fact]

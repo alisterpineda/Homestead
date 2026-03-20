@@ -224,4 +224,52 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
         throw new TimeoutException($"Processing job {jobId} did not complete within timeout");
     }
+
+    protected async Task<ProcessingJob> WaitForJobFailureAsync(Guid jobId, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var job = await db.ProcessingJobs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(j => j.Id == jobId);
+
+            if (job is not null)
+            {
+                if (job.Status == ProcessingJobStatus.Failed)
+                    return job;
+
+                if (job.Status == ProcessingJobStatus.Completed)
+                    throw new Exception($"Processing job {jobId} completed unexpectedly (expected failure)");
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException($"Processing job {jobId} did not fail within timeout");
+    }
+
+    protected static async Task<byte[]> GetFixedPdfBytes()
+    {
+        _cachedPdfBytes ??= await File.ReadAllBytesAsync(
+            Path.Combine(AppContext.BaseDirectory, "TestData", "sample.pdf"));
+
+        return _cachedPdfBytes;
+    }
+
+    protected async Task<HttpResponseMessage> UploadFixedPdfAsync(HttpClient client, string name = "sample.pdf")
+    {
+        var fileBytes = await GetFixedPdfBytes();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(name), "name");
+        var fileContent = new ByteArrayContent(fileBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", name);
+
+        return await client.PostAsync("/api/v1/documents", form);
+    }
 }

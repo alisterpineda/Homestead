@@ -15,6 +15,8 @@ function createItem(overrides: Partial<UploadItem> = {}): UploadItem {
     jobId: null,
     documentName: null,
     error: null,
+    duplicateDocumentId: null,
+    duplicateDocumentName: null,
     ...overrides,
   };
 }
@@ -34,6 +36,7 @@ describe('UploadPopoverComponent', () => {
       hasActiveUploads: computed(() => mockItems().some(i => i.status === 'uploading' || i.status === 'queued' || i.status === 'processing')),
       completedCount: computed(() => mockItems().filter(i => i.status === 'completed').length),
       failedCount: computed(() => mockItems().filter(i => i.status === 'failed').length),
+      duplicateCount: computed(() => mockItems().filter(i => i.status === 'duplicate').length),
       addFiles: vi.fn(),
       clearFinished: vi.fn(),
       retryItem: vi.fn(),

@@ -14,7 +14,9 @@ public class ProcessingNotifier(
         string? documentName,
         string? error,
         Guid? userId,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? errorCode = null,
+        Dictionary<string, string>? errorData = null)
     {
         if (!userId.HasValue)
             return;
@@ -25,7 +27,9 @@ public class ProcessingNotifier(
             entityType?.ToString(),
             entityId,
             documentName,
-            error);
+            error,
+            errorCode,
+            errorData);
 
         await hubContext.Clients.User(userId.Value.ToString()).JobStatusChanged(message);
     }

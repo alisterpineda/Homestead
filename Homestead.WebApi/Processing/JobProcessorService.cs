@@ -142,12 +142,21 @@ public class JobProcessorService(
                     failedJob.CompletedAt = DateTimeOffset.UtcNow;
                     await errorDb.SaveChangesAsync(ct);
 
+                    string? errorCode = null;
+                    Dictionary<string, string>? errorData = null;
+                    if (ex is IStructuredJobError structured)
+                    {
+                        errorCode = structured.ErrorCode;
+                        errorData = structured.ErrorData;
+                    }
+
                     var notifier = errorScope.ServiceProvider.GetRequiredService<IProcessingNotifier>();
                     await notifier.NotifyJobStatusAsync(
                         failedJob.Id, ProcessingJobStatus.Failed,
                         failedJob.EntityType, failedJob.EntityId,
                         documentName: null, error: ex.Message,
-                        failedJob.CreatedByUserId, ct);
+                        failedJob.CreatedByUserId, ct,
+                        errorCode: errorCode, errorData: errorData);
                 }
             }
             catch (Exception innerEx)

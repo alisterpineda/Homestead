@@ -13,4 +13,6 @@ public record JobStatusChangedMessage(
     string? EntityType,
     Guid? EntityId,
     string? DocumentName,
-    string? Error);
+    string? Error,
+    string? ErrorCode,
+    Dictionary<string, string>? ErrorData);

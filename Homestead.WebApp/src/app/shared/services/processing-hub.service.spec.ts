@@ -72,6 +72,8 @@ describe('ProcessingHubService', () => {
       entityId: null,
       documentName: 'Test Doc',
       error: null,
+      errorCode: null,
+      errorData: null,
       ...overrides,
     };
   }

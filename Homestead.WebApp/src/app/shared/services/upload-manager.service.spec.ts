@@ -22,6 +22,7 @@ describe('UploadManagerService', () => {
     vi.spyOn(toast, 'success').mockImplementation(() => undefined as never);
     vi.spyOn(toast, 'warning').mockImplementation(() => undefined as never);
     vi.spyOn(toast, 'error').mockImplementation(() => undefined as never);
+    vi.spyOn(toast, 'info').mockImplementation(() => undefined as never);
     jobStatusChanged$ = new Subject<JobStatusChangedMessage>();
 
     TestBed.configureTestingModule({
@@ -195,6 +196,8 @@ describe('UploadManagerService', () => {
         entityId: null,
         documentName: 'My Document',
         error: null,
+        errorCode: null,
+        errorData: null,
       });
 
       const item = service.items()[0];
@@ -213,6 +216,8 @@ describe('UploadManagerService', () => {
         entityId: null,
         documentName: null,
         error: 'OCR failed',
+        errorCode: null,
+        errorData: null,
       });
 
       const item = service.items()[0];
@@ -231,6 +236,8 @@ describe('UploadManagerService', () => {
         entityId: null,
         documentName: null,
         error: null,
+        errorCode: null,
+        errorData: null,
       });
 
       expect(service.items()[0].status).toBe('processing');
@@ -382,6 +389,8 @@ describe('UploadManagerService', () => {
         entityId: null,
         documentName: null,
         error: 'OCR failed',
+        errorCode: null,
+        errorData: null,
       });
 
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('a.pdf'));
@@ -399,6 +408,8 @@ describe('UploadManagerService', () => {
         entityId: null,
         documentName: 'My Document',
         error: null,
+        errorCode: null,
+        errorData: null,
       });
 
       expect(toast.success).toHaveBeenCalledWith('1 file uploaded successfully.');
@@ -446,6 +457,125 @@ describe('UploadManagerService', () => {
       httpTesting.expectOne('/api/v1/documents').flush({});
 
       expect(service.hasActiveUploads()).toBe(false);
+    });
+  });
+
+  describe('duplicate handling', () => {
+    it('should mark item as duplicate when job fails with errorCode duplicate_content', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Existing Doc' },
+      });
+
+      const item = service.items()[0];
+      expect(item.status).toBe('duplicate');
+      expect(item.duplicateDocumentId).toBe('doc-123');
+      expect(item.duplicateDocumentName).toBe('Existing Doc');
+    });
+
+    it('should show info toast for duplicate, not error toast', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Existing Doc' },
+      });
+
+      expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('Existing Doc'));
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('clearFinished should also clear duplicate items', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+      const requests = httpTesting.match('/api/v1/documents');
+      requests[0].flush({ jobId: 'job-1' });
+      requests[1].flush({ jobId: 'job-2' });
+
+      // Mark first as duplicate
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'duplicate',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-1', documentName: 'Doc' },
+      });
+
+      // Mark second as completed
+      jobStatusChanged$.next({
+        jobId: 'job-2',
+        status: 'Completed',
+        entityType: null,
+        entityId: null,
+        documentName: 'Doc 2',
+        error: null,
+        errorCode: null,
+        errorData: null,
+      });
+
+      expect(service.items().length).toBe(2);
+
+      service.clearFinished();
+
+      expect(service.items().length).toBe(0);
+    });
+
+    it('duplicates should not trigger a batch success toast', () => {
+      service.addFiles([createFile('a.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'duplicate',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-1', documentName: 'Doc' },
+      });
+
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('duplicateCount computed signal returns correct count', () => {
+      service.addFiles([createFile('a.pdf'), createFile('b.pdf')]);
+      const requests = httpTesting.match('/api/v1/documents');
+      requests[0].flush({ jobId: 'job-1' });
+      requests[1].flush({ jobId: 'job-2' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'duplicate',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-1', documentName: 'Doc' },
+      });
+
+      expect(service.duplicateCount()).toBe(1);
+      expect(service.failedCount()).toBe(0);
     });
   });
 });

@@ -11,6 +11,8 @@ export interface JobStatusChangedMessage {
   entityId: string | null;
   documentName: string | null;
   error: string | null;
+  errorCode: string | null;
+  errorData: Record<string, string> | null;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -12,5 +12,7 @@ public interface IProcessingNotifier
         string? documentName,
         string? error,
         Guid? userId,
-        CancellationToken ct);
+        CancellationToken ct,
+        string? errorCode = null,
+        Dictionary<string, string>? errorData = null);
 }

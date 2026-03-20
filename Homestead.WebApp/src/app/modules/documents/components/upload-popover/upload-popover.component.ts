@@ -1,17 +1,18 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX } from '@ng-icons/lucide';
+import { lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX, lucideInfo } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { RouterLink } from '@angular/router';
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { formatBytes, handleFileInputChange } from '@/shared/utils';
 
 @Component({
   selector: 'app-upload-popover',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton],
-  providers: [provideIcons({ lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX })],
+  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmButton, RouterLink],
+  providers: [provideIcons({ lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX, lucideInfo })],
   template: `
     <div hlmPopover align="end">
       <button hlmPopoverTrigger hlmBtn variant="ghost" size="sm" class="relative">
@@ -80,6 +81,9 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                     @case ('failed') {
                       <ng-icon hlm name="lucideAlertCircle" size="sm" class="text-destructive" />
                     }
+                    @case ('duplicate') {
+                      <ng-icon hlm name="lucideInfo" size="sm" class="text-blue-600 dark:text-blue-400" />
+                    }
                   }
                 </div>
 
@@ -99,6 +103,15 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                     <p class="text-xs text-muted-foreground">{{ item.documentName ?? item.fileName }}</p>
                   } @else if (item.status === 'failed') {
                     <p class="text-xs text-destructive">{{ item.error }}</p>
+                  } @else if (item.status === 'duplicate') {
+                    <p class="text-xs text-muted-foreground">
+                      Already exists as
+                      @if (item.duplicateDocumentId) {
+                        <a [routerLink]="['/documents', item.duplicateDocumentId]" class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ item.duplicateDocumentName ?? 'unknown' }}</a>
+                      } @else {
+                        <span class="font-medium">{{ item.duplicateDocumentName ?? 'unknown' }}</span>
+                      }
+                    </p>
                   }
                 </div>
 
@@ -109,7 +122,7 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                       <ng-icon hlm name="lucideRotateCw" size="xs" />
                     </button>
                   }
-                  @if (item.status === 'completed' || item.status === 'failed') {
+                  @if (item.status === 'completed' || item.status === 'failed' || item.status === 'duplicate') {
                     <button hlmBtn variant="ghost" size="icon-sm" (click)="uploadManager.removeItem(item.id)" aria-label="Remove">
                       <ng-icon hlm name="lucideX" size="xs" />
                     </button>
@@ -128,9 +141,11 @@ export class UploadPopoverComponent {
   protected uploadManager = inject(UploadManagerService);
   protected formatBytes = formatBytes;
 
+  private doneCount = computed(() => this.uploadManager.completedCount() + this.uploadManager.duplicateCount());
+
   protected triggerBadge = computed(() => {
     if (this.uploadManager.hasActiveUploads()) return 'active' as const;
-    const completed = this.uploadManager.completedCount();
+    const completed = this.doneCount();
     const failed = this.uploadManager.failedCount();
     if (completed > 0 && failed === 0) return 'completed' as const;
     if (completed > 0 && failed > 0) return 'mixed' as const;
@@ -142,7 +157,7 @@ export class UploadPopoverComponent {
     const items = this.uploadManager.items();
     const active = items.filter(i => i.status === 'uploading' || i.status === 'queued' || i.status === 'processing');
     const failed = this.uploadManager.failedCount();
-    const completed = this.uploadManager.completedCount();
+    const completed = this.doneCount();
 
     if (active.length > 0) {
       return `Uploading ${active.length} file${active.length > 1 ? 's' : ''}...`;
