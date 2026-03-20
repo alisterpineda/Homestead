@@ -26,8 +26,7 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                 (p.Description != null && p.Description.ToLower().Contains(search)));
         }
 
-        return await query
-            .OrderBy(p => p.Name)
+        return await ApplySort(query, request.SortBy, request.SortDir, accessibleDocIds)
             .Select(p => new GetPartiesResponse
             {
                 Id = p.Id,
@@ -39,5 +38,28 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                     : p.DocumentParties.Count
             })
             .ToPaginatedAsync(request, ct);
+    }
+
+    private static IOrderedQueryable<Domains.Parties.Party> ApplySort(
+        IQueryable<Domains.Parties.Party> query, PartySortBy? sortBy, SortDirection? sortDir,
+        IQueryable<Guid>? accessibleDocIds)
+    {
+        var effectiveSortBy = sortBy ?? PartySortBy.Name;
+        var effectiveSortDir = sortDir ?? SortDirection.Asc;
+
+        return (effectiveSortBy, effectiveSortDir) switch
+        {
+            (PartySortBy.Name, SortDirection.Asc) => query.OrderBy(p => p.Name),
+            (PartySortBy.Name, SortDirection.Desc) => query.OrderByDescending(p => p.Name),
+            (PartySortBy.DocumentCount, SortDirection.Asc) => accessibleDocIds != null
+                ? query.OrderBy(p => p.DocumentParties.Count(dp => accessibleDocIds.Contains(dp.DocumentId)))
+                : query.OrderBy(p => p.DocumentParties.Count),
+            (PartySortBy.DocumentCount, SortDirection.Desc) => accessibleDocIds != null
+                ? query.OrderByDescending(p => p.DocumentParties.Count(dp => accessibleDocIds.Contains(dp.DocumentId)))
+                : query.OrderByDescending(p => p.DocumentParties.Count),
+            (PartySortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(p => p.CreatedAt),
+            (PartySortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(p => p.CreatedAt),
+            _ => query.OrderBy(p => p.Name),
+        };
     }
 }

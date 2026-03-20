@@ -17,6 +17,7 @@ import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from './sort-header-button';
 import { TableHeadSelection, TableRowSelection } from './selection-column';
 import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, DocumentDateCell } from './table-cells';
+import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, DocumentSortBy> = {
   name: 'Name',
@@ -337,6 +338,3 @@ export class DocumentTableComponent {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

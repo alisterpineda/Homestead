@@ -8,9 +8,13 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 import { PaginatedResponseOfGetPartiesResponse } from '../../models/paginated-response-of-get-parties-response';
+import { PartySortBy } from '../../models/party-sort-by';
+import { SortDirection } from '../../models/sort-direction';
 
 export interface GetParties$Params {
   Search?: string;
+  SortBy?: PartySortBy;
+  SortDir?: SortDirection;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -19,6 +23,8 @@ export function getParties(http: HttpClient, rootUrl: string, params: GetParties
   const rb = new RequestBuilder(rootUrl, getParties.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});
+    rb.query('SortBy', params.SortBy, {});
+    rb.query('SortDir', params.SortDir, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

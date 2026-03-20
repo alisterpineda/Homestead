@@ -50,6 +50,11 @@ export function isNavItemActive(url: string, path: string, navPaths: string[]): 
   return false;
 }
 
+/** Escape HTML special characters to prevent XSS when rendering via innerHTML. */
+export function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /** Compare two Dates by year/month/day only (ignoring time). */
 export function datesEqual(a: Date | null, b: Date | null): boolean {
   if (a === b) return true;

@@ -65,6 +65,7 @@ export type { PaginatedResponseOfGroupResponse } from './models/paginated-respon
 export type { PaginatedResponseOfTextExtractionEngineResponse } from './models/paginated-response-of-text-extraction-engine-response';
 export type { PaginatedResponseOfUserResponse } from './models/paginated-response-of-user-response';
 export type { PartyDto } from './models/party-dto';
+export type { PartySortBy } from './models/party-sort-by';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';
 export type { PatchSystemSettingsRequest } from './models/patch-system-settings-request';

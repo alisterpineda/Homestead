@@ -1,52 +1,115 @@
-import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, effect, signal, computed, untracked } from '@angular/core';
 import { HlmTableImports } from '@/shared/components/spartan/table';
-import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import {
+  type ColumnDef,
+  type SortingState,
+  type RowSelectionState,
+  type VisibilityState,
+  createAngularTable,
+  flexRenderComponent,
+  FlexRenderDirective,
+  getCoreRowModel,
+  getSortedRowModel,
+} from '@tanstack/angular-table';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
+import type { PartySortBy } from '@/api/generated/models/party-sort-by';
+import type { SortDirection } from '@/api/generated/models/sort-direction';
+import { SortHeaderButton } from '../document-table/sort-header-button';
+import { TableHeadSelection, TableRowSelection } from '../document-table/selection-column';
+import type { HideableColumn } from '../document-table/document-table.component';
+import { PartyDateAddedCell } from './table-cells';
+import { escapeHtml } from '@/shared/utils';
+
+const COLUMN_ID_TO_SORT_KEY: Record<string, PartySortBy> = {
+  name: 'Name',
+  documentCount: 'DocumentCount',
+  createdAt: 'CreatedAt',
+};
+
+const SORT_KEY_TO_COLUMN_ID: Record<string, string> = {
+  Name: 'name',
+  DocumentCount: 'documentCount',
+  CreatedAt: 'createdAt',
+};
+
+export const HIDEABLE_COLUMNS: HideableColumn[] = [
+  { id: 'description', label: 'Description' },
+  { id: 'createdAt', label: 'Date Added' },
+];
+
+export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  createdAt: false,
+};
 
 @Component({
   selector: 'app-party-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTableImports, HlmCheckboxImports],
+  imports: [HlmTableImports, FlexRenderDirective],
   template: `
-    <div class="overflow-clip rounded-md border">
+    <div
+      class="overflow-clip rounded-md border"
+      [class.select-none]="isResizing()"
+      [style]="columnSizeVars()"
+    >
       <div hlmTableContainer>
-        <table hlmTable>
+        <table hlmTable style="table-layout: fixed; width: 100%">
           <thead hlmTHead class="sticky top-0 z-10 bg-background">
-            <tr hlmTr>
-              <th hlmTh class="w-10">
-                <hlm-checkbox
-                  [checked]="allSelected()"
-                  [indeterminate]="indeterminate()"
-                  (checkedChange)="toggleAll($event)"
-                  aria-label="Select all parties"
-                />
-              </th>
-              <th hlmTh>Name</th>
-              <th hlmTh class="hidden md:table-cell">Description</th>
-              <th hlmTh class="text-right">Documents</th>
-            </tr>
+            @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
+              <tr hlmTr>
+                @for (header of headerGroup.headers; track header.id) {
+                  <th
+                    hlmTh
+                    class="group/resize relative"
+                    [class]="getThClass(header.column.id)"
+                    [style.width]="'var(--header-' + header.id + '-size)'"
+                    [attr.colSpan]="header.colSpan"
+                  >
+                    @if (!header.isPlaceholder) {
+                      <ng-container
+                        *flexRender="header.column.columnDef.header; props: header.getContext(); let headerText"
+                      >
+                        <div [innerHTML]="headerText"></div>
+                      </ng-container>
+                    }
+                    @if (header.column.getCanResize()) {
+                      <div
+                        class="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none touch-none
+                               opacity-0 group-hover/resize:opacity-100 bg-border"
+                        [class.!opacity-100]="header.column.getIsResizing()"
+                        [class.!bg-primary]="header.column.getIsResizing()"
+                        (mousedown)="header.getResizeHandler()($event)"
+                        (touchstart)="header.getResizeHandler()($event)"
+                      ></div>
+                    }
+                  </th>
+                }
+              </tr>
+            }
           </thead>
           <tbody hlmTBody>
-            @for (party of parties(); track party.id) {
+            @for (row of table.getRowModel().rows; track row.id) {
               <tr
                 hlmTr
                 tabindex="0"
-                (click)="partySelect.emit(party.id)"
-                (keydown.enter)="partySelect.emit(party.id)"
+                (click)="partySelect.emit(row.original.id)"
+                (keydown.enter)="partySelect.emit(row.original.id)"
                 class="cursor-pointer"
+                [attr.data-state]="row.getIsSelected() ? 'selected' : undefined"
               >
-                <td hlmTd class="w-10" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
-                  <hlm-checkbox
-                    [checked]="isSelected(party.id)"
-                    (checkedChange)="toggleSelection(party.id, $event)"
-                    [aria-label]="'Select ' + party.name"
-                  />
-                </td>
-                <td hlmTd class="font-medium">{{ party.name }}</td>
-                <td hlmTd class="hidden text-muted-foreground md:table-cell">
-                  <span class="line-clamp-1">{{ party.description || '\u2014' }}</span>
-                </td>
-                <td hlmTd class="text-right text-muted-foreground">{{ party.documentCount }}</td>
+                @for (cell of row.getVisibleCells(); track cell.id) {
+                  <td
+                    hlmTd
+                    [class]="getTdClass(cell.column.id)"
+                    [style.width]="'var(--col-' + cell.column.id + '-size)'"
+                    [attr.data-click-passthrough]="cell.column.id === 'select' ? '' : null"
+                    (click)="cell.column.id === 'select' ? $event.stopPropagation() : null"
+                    (keydown.enter)="cell.column.id === 'select' ? $event.stopPropagation() : null"
+                  >
+                    <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
+                      <div [innerHTML]="cellText"></div>
+                    </ng-container>
+                  </td>
+                }
               </tr>
             }
           </tbody>
@@ -57,43 +120,178 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
 })
 export class PartyTableComponent {
   parties = input.required<GetPartiesResponse[]>();
-  selectedIds = input<Set<string>>(new Set());
-  selectionChange = output<Set<string>>();
+  sortBy = input<PartySortBy | null | undefined>(null);
+  sortDir = input<SortDirection | null | undefined>(null);
+  columnVisibility = input<VisibilityState>({});
+  selectedIds = input<Set<string>>();
+
   partySelect = output<string>();
+  sortChange = output<{ sortBy: PartySortBy; sortDir: SortDirection } | null>();
+  selectionChange = output<Set<string>>();
 
-  allSelected = computed(() => {
-    const parties = this.parties();
-    const selected = this.selectedIds();
-    return parties.length > 0 && parties.every((p) => selected.has(p.id));
+  private readonly _sorting = signal<SortingState>([]);
+  private readonly _rowSelection = signal<RowSelectionState>({});
+  private readonly _columnVisibility = signal<VisibilityState>({});
+
+  private readonly _columns: ColumnDef<GetPartiesResponse>[] = [
+    {
+      id: 'select',
+      header: () => flexRenderComponent(TableHeadSelection),
+      cell: () => flexRenderComponent(TableRowSelection),
+      enableSorting: false,
+      enableHiding: false,
+      enableResizing: false,
+      size: 48,
+      minSize: 48,
+      maxSize: 48,
+    },
+    {
+      accessorKey: 'name',
+      id: 'name',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
+      cell: (info) => `<span class="font-medium">${escapeHtml(info.getValue<string>())}</span>`,
+      enableHiding: false,
+      size: 300,
+      minSize: 120,
+    },
+    {
+      accessorKey: 'description',
+      id: 'description',
+      header: 'Description',
+      enableSorting: false,
+      cell: (info) => {
+        const val = info.getValue<string | null>();
+        return `<span class="text-muted-foreground line-clamp-1">${val ? escapeHtml(val) : '\u2014'}</span>`;
+      },
+      size: 300,
+      minSize: 100,
+    },
+    {
+      accessorKey: 'documentCount',
+      id: 'documentCount',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Documents' } }),
+      cell: (info) => `<span class="text-muted-foreground">${info.getValue<number>()}</span>`,
+      size: 120,
+      minSize: 60,
+    },
+    {
+      accessorKey: 'createdAt',
+      id: 'createdAt',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Date Added' } }),
+      cell: () => flexRenderComponent(PartyDateAddedCell),
+      size: 140,
+      minSize: 100,
+    },
+  ];
+
+  protected readonly table = createAngularTable<GetPartiesResponse>(() => ({
+    data: this.parties(),
+    columns: this._columns,
+    getRowId: (row) => row.id,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
+    columnResizeDirection: 'ltr',
+    onSortingChange: (updater) => {
+      const newSorting = updater instanceof Function ? updater(this._sorting()) : updater;
+      this._sorting.set(newSorting);
+      if (newSorting.length > 0) {
+        const sort = newSorting[0];
+        const sortKey = COLUMN_ID_TO_SORT_KEY[sort.id];
+        if (sortKey) {
+          this.sortChange.emit({ sortBy: sortKey, sortDir: sort.desc ? 'Desc' : 'Asc' });
+        }
+      } else {
+        this.sortChange.emit(null);
+      }
+    },
+    onRowSelectionChange: (updater) => {
+      const newSelection = updater instanceof Function ? updater(this._rowSelection()) : updater;
+      this._rowSelection.set(newSelection);
+      this.selectionChange.emit(new Set(Object.keys(newSelection).filter(k => newSelection[k])));
+    },
+    onColumnVisibilityChange: (updater) => {
+      const newVis = updater instanceof Function ? updater(this._columnVisibility()) : updater;
+      this._columnVisibility.set(newVis);
+    },
+    state: {
+      sorting: this._sorting(),
+      rowSelection: this._rowSelection(),
+      columnVisibility: this._columnVisibility(),
+    },
+  }));
+
+  protected readonly columnSizeVars = computed(() => {
+    const sizing = this.table.getState().columnSizing;
+    const sizingInfo = this.table.getState().columnSizingInfo;
+    void sizing;
+    void sizingInfo;
+
+    const headers = untracked(() => this.table.getFlatHeaders());
+    const vars: Record<string, string> = {};
+    for (const header of headers) {
+      vars[`--header-${header.id}-size`] = `${header.getSize()}px`;
+      vars[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`;
+    }
+    return vars;
   });
 
-  indeterminate = computed(() => {
-    const parties = this.parties();
-    const selected = this.selectedIds();
-    const count = parties.filter((p) => selected.has(p.id)).length;
-    return count > 0 && count < parties.length;
-  });
+  protected readonly isResizing = computed(
+    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+  );
 
-  isSelected(id: string): boolean {
-    return this.selectedIds().has(id);
+  private readonly TH_CLASSES: Record<string, string> = {
+    select: '',
+    documentCount: 'text-right',
+  };
+
+  private readonly TD_CLASSES: Record<string, string> = {
+    select: '',
+    name: 'overflow-hidden',
+    description: 'overflow-hidden',
+    documentCount: 'text-right overflow-hidden',
+    createdAt: 'overflow-hidden',
+  };
+
+  getThClass(columnId: string): string {
+    return this.TH_CLASSES[columnId] ?? '';
   }
 
-  toggleSelection(id: string, checked: boolean): void {
-    const next = new Set(this.selectedIds());
-    if (checked) {
-      next.add(id);
-    } else {
-      next.delete(id);
-    }
-    this.selectionChange.emit(next);
+  getTdClass(columnId: string): string {
+    return this.TD_CLASSES[columnId] ?? '';
   }
 
-  toggleAll(checked: boolean): void {
-    if (checked) {
-      const next = new Set(this.parties().map((p) => p.id));
-      this.selectionChange.emit(next);
-    } else {
-      this.selectionChange.emit(new Set());
-    }
+  constructor() {
+    effect(() => {
+      const sortBy = this.sortBy();
+      const sortDir = this.sortDir();
+      if (!sortBy) {
+        this._sorting.set([]);
+      } else {
+        const colId = SORT_KEY_TO_COLUMN_ID[sortBy];
+        if (colId) {
+          this._sorting.set([{ id: colId, desc: sortDir === 'Desc' }]);
+        }
+      }
+    });
+
+    effect(() => {
+      this._columnVisibility.set(this.columnVisibility());
+    });
+
+    effect(() => {
+      const ids = this.selectedIds();
+      if (ids) {
+        const selection: RowSelectionState = {};
+        ids.forEach(id => { selection[id] = true; });
+        this._rowSelection.set(selection);
+      } else {
+        this._rowSelection.set({});
+      }
+    });
   }
 }
+
