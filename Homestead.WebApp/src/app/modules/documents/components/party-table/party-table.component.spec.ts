@@ -127,7 +127,7 @@ describe('PartyTableComponent', () => {
     component.sortChange.subscribe(val => (emitted = val));
 
     // Simulate TanStack sorting change via the onSortingChange callback
-    const tableOptions = component['table'].options();
+    const tableOptions = component['table'].options;
     const onSortingChange = tableOptions.onSortingChange!;
     (onSortingChange as (updater: unknown) => void)(() => [{ id: 'name', desc: false }]);
 
@@ -141,7 +141,7 @@ describe('PartyTableComponent', () => {
     let emitted: { sortBy: string; sortDir: string } | null | undefined;
     component.sortChange.subscribe(val => (emitted = val));
 
-    const tableOptions = component['table'].options();
+    const tableOptions = component['table'].options;
     const onSortingChange = tableOptions.onSortingChange!;
     (onSortingChange as (updater: unknown) => void)(() => []);
 
@@ -157,7 +157,7 @@ describe('PartyTableComponent', () => {
     let emitted: Set<string> | undefined;
     component.selectionChange.subscribe(val => (emitted = val));
 
-    const tableOptions = component['table'].options();
+    const tableOptions = component['table'].options;
     const onRowSelectionChange = tableOptions.onRowSelectionChange!;
     (onRowSelectionChange as (updater: unknown) => void)(() => ({ p1: true }));
 

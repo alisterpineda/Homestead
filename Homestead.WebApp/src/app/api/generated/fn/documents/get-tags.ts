@@ -7,20 +7,30 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { GetTagsResponse } from '../../models/get-tags-response';
+import { PaginatedResponseOfGetTagsResponse } from '../../models/paginated-response-of-get-tags-response';
+import { SortDirection } from '../../models/sort-direction';
+import { TagSortBy } from '../../models/tag-sort-by';
 
 export interface GetTags$Params {
   ParentPath?: string;
   IncludeChildren: boolean;
   Search?: string;
+  SortBy?: TagSortBy;
+  SortDir?: SortDirection;
+  Page: (number | string);
+  PageSize: (number | string);
 }
 
-export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Params, context?: HttpContext): Observable<StrictHttpResponse<Array<GetTagsResponse>>> {
+export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetTagsResponse>> {
   const rb = new RequestBuilder(rootUrl, getTags.PATH, 'get');
   if (params) {
     rb.query('ParentPath', params.ParentPath, {});
     rb.query('IncludeChildren', params.IncludeChildren, {});
     rb.query('Search', params.Search, {});
+    rb.query('SortBy', params.SortBy, {});
+    rb.query('SortDir', params.SortDir, {});
+    rb.query('Page', params.Page, {});
+    rb.query('PageSize', params.PageSize, {});
   }
 
   return http.request(
@@ -28,7 +38,7 @@ export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Param
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<Array<GetTagsResponse>>;
+      return r as StrictHttpResponse<PaginatedResponseOfGetTagsResponse>;
     })
   );
 }

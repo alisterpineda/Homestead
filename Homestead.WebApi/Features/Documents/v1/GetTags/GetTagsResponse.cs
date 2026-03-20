@@ -9,4 +9,6 @@ public record GetTagsResponse
     public string? Color { get; init; }
     public string? EffectiveColor { get; init; }
     public string? Description { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public required int DocumentCount { get; init; }
 }

@@ -59,7 +59,7 @@ describe('TagInputComponent', () => {
 
     vi.advanceTimersByTime(200);
     const req = httpTesting.expectOne((r) => r.url.includes('/api/v1/documents/tags'));
-    req.flush([]);
+    req.flush({ items: [], page: 1, pageSize: 50, totalCount: 0 });
     fixture.detectChanges();
 
     expect(component.loading()).toBe(false);
@@ -73,7 +73,7 @@ describe('TagInputComponent', () => {
 
     vi.advanceTimersByTime(200);
     const req = httpTesting.expectOne((r) => r.url.includes('/api/v1/documents/tags'));
-    req.flush([{ id: 't1', name: 'finance', path: 'finance', effectiveColor: null }]);
+    req.flush({ items: [{ id: 't1', name: 'finance', path: 'finance', effectiveColor: null }], page: 1, pageSize: 50, totalCount: 1 });
     fixture.detectChanges();
 
     expect(component.loading()).toBe(false);
@@ -85,7 +85,7 @@ describe('TagInputComponent', () => {
 
     vi.advanceTimersByTime(200);
     const req = httpTesting.expectOne((r) => r.url.includes('/api/v1/documents/tags'));
-    req.flush([]);
+    req.flush({ items: [], page: 1, pageSize: 50, totalCount: 0 });
 
     component.addTag('newTag');
     expect(fixture.componentInstance.tags()).toContain('newTag');
@@ -96,7 +96,7 @@ describe('TagInputComponent', () => {
 
     vi.advanceTimersByTime(200);
     const req = httpTesting.expectOne((r) => r.url.includes('/api/v1/documents/tags'));
-    req.flush([{ id: 't1', name: 'finance', path: 'finance', effectiveColor: '#ff0000' }]);
+    req.flush({ items: [{ id: 't1', name: 'finance', path: 'finance', effectiveColor: '#ff0000' }], page: 1, pageSize: 50, totalCount: 1 });
     fixture.detectChanges();
 
     component.addTag('finance', '#ff0000');

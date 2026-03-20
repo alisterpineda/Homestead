@@ -61,6 +61,7 @@ export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
+export type { PaginatedResponseOfGetTagsResponse } from './models/paginated-response-of-get-tags-response';
 export type { PaginatedResponseOfGroupResponse } from './models/paginated-response-of-group-response';
 export type { PaginatedResponseOfTextExtractionEngineResponse } from './models/paginated-response-of-text-extraction-engine-response';
 export type { PaginatedResponseOfUserResponse } from './models/paginated-response-of-user-response';
@@ -83,6 +84,7 @@ export type { RestoreDocumentsResponse } from './models/restore-documents-respon
 export type { SortDirection } from './models/sort-direction';
 export type { SystemSettingsResponse } from './models/system-settings-response';
 export type { TagDto } from './models/tag-dto';
+export type { TagSortBy } from './models/tag-sort-by';
 export type { TextExtractionEngineResponse } from './models/text-extraction-engine-response';
 export type { TextExtractionEngineSummary } from './models/text-extraction-engine-summary';
 export type { TextExtractionEngineType } from './models/text-extraction-engine-type';

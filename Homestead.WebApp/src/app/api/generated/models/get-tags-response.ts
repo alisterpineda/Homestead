@@ -3,7 +3,9 @@
 
 export interface GetTagsResponse {
   color?: (string | null);
+  createdAt: string;
   description?: (string | null);
+  documentCount: (number | string);
   effectiveColor?: (string | null);
   id: string;
   name: string;

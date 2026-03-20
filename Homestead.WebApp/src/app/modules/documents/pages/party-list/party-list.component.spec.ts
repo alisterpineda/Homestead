@@ -198,10 +198,10 @@ describe('PartyListComponent', () => {
       expect(saveSpy).toHaveBeenCalled();
     });
 
-    it('should toggle description column off and on', () => {
+    it('should toggle description column off when it starts visible', () => {
       // description is visible by default (not in DEFAULT_COLUMN_VISIBILITY)
       component.onToggleColumn('description');
-      expect(component.columnVisibility()['description']).toBe(true);
+      expect(component.columnVisibility()['description']).toBe(false);
     });
   });
 

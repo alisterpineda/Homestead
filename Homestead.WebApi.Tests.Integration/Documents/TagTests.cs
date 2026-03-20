@@ -50,11 +50,11 @@ public class TagTests : IntegrationTestBase
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagA" }, CT);
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TagB" }, CT);
 
-        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
+        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=10", CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        Assert.True(body!.Count >= 2);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        Assert.True(body!.Items.Count >= 2);
     }
 
     [Fact]
@@ -64,11 +64,124 @@ public class TagTests : IntegrationTestBase
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UniqueSearchable" }, CT);
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "OtherTag" }, CT);
 
-        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Search=uniquesearchable", CT);
+        var response = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Search=uniquesearchable&Page=1&PageSize=10", CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        Assert.Single(body!, t => t.Name == "UniqueSearchable");
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        Assert.Single(body!.Items, t => t.Name == "UniqueSearchable");
+    }
+
+    [Fact]
+    public async Task GetTags_SortByNameAsc_ReturnsSorted()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SortC" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SortA" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SortB" }, CT);
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&SortBy=Name&SortDir=Asc&Search=Sort", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal(names.OrderBy(n => n), names);
+    }
+
+    [Fact]
+    public async Task GetTags_SortByNameDesc_ReturnsSorted()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SdC" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SdA" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SdB" }, CT);
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&SortBy=Name&SortDir=Desc&Search=Sd", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal(names.OrderByDescending(n => n), names);
+    }
+
+    [Fact]
+    public async Task GetTags_SortByCreatedAtDesc_ReturnsSorted()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcFirst" }, CT);
+        await Task.Delay(50);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcSecond" }, CT);
+        await Task.Delay(50);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcThird" }, CT);
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&SortBy=CreatedAt&SortDir=Desc&Search=Tc", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal("TcThird", names[0]);
+        Assert.Equal("TcSecond", names[1]);
+        Assert.Equal("TcFirst", names[2]);
+    }
+
+    [Fact]
+    public async Task GetTags_DefaultSort_IsByNameAsc()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DsZulu" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DsAlpha" }, CT);
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&Search=Ds", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal(names.OrderBy(n => n), names);
+    }
+
+    [Fact]
+    public async Task GetTags_SortByDocumentCountDesc_ReturnsMostDocsFirst()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DcMany" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DcOne" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "DcNone" }, CT);
+
+        // Assign 2 documents to DcMany
+        var doc1 = await UploadAndWaitAsync(client, "tag-sort-1.pdf");
+        var doc2 = await UploadAndWaitAsync(client, "tag-sort-2.pdf");
+        await AssignTagAsync(client, doc1, "DcMany");
+        await AssignTagAsync(client, doc2, "DcMany");
+
+        // Assign 1 document to DcOne
+        await AssignTagAsync(client, doc1, "DcOne");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents/tags?Page=1&PageSize=10&SortBy=DocumentCount&SortDir=Desc&Search=Dc", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var items = body!.Items;
+        Assert.Equal("DcMany", items[0].Name);
+        Assert.Equal("DcNone", items[^1].Name);
+    }
+
+    [Fact]
+    public async Task GetTags_SearchWithSort_FiltersAndSorts()
+    {
+        var client = await CreateAdminClientAsync();
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SwZeta" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "SwAlpha" }, CT);
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "Other" }, CT);
+
+        var response = await client.GetAsync(
+            "/api/v1/documents/tags?Page=1&PageSize=10&Search=Sw&SortBy=Name&SortDir=Asc", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal(2, names.Count);
+        Assert.Equal("SwAlpha", names[0]);
+        Assert.Equal("SwZeta", names[1]);
     }
 
     [Fact]
@@ -121,9 +234,9 @@ public class TagTests : IntegrationTestBase
         var deleteResponse = await client.DeleteAsync($"/api/v1/documents/tags/{tag!.Id}", CT);
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var listResponse = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await listResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        Assert.DoesNotContain(tags!, t => t.Id == tag.Id);
+        var listResponse = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        Assert.DoesNotContain(tags!.Items, t => t.Id == tag.Id);
     }
 
     [Fact]
@@ -165,10 +278,10 @@ public class TagTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
 
         // C should now be re-parented under A with path "rpa/rpc"
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var c = tags!.Single(t => t.Name == "RpC");
-        var a = tags.Single(t => t.Name == "RpA");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var c = tags!.Items.Single(t => t.Name == "RpC");
+        var a = tags.Items.Single(t => t.Name == "RpA");
         Assert.Equal(a.Id, c.ParentId);
         Assert.Equal("RpA/RpC", c.Path);
     }
@@ -192,10 +305,10 @@ public class TagTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
 
         // B and C should now be roots
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var childB = tags!.Single(t => t.Name == "ChildB");
-        var childC = tags.Single(t => t.Name == "ChildC");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var childB = tags!.Items.Single(t => t.Name == "ChildB");
+        var childC = tags.Items.Single(t => t.Name == "ChildC");
         Assert.Null(childB.ParentId);
         Assert.Equal("ChildB", childB.Path);
         Assert.Null(childC.ParentId);
@@ -223,10 +336,10 @@ public class TagTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
 
         // D should be re-parented under A
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var d = tags!.Single(t => t.Name == "MhD");
-        var a = tags.Single(t => t.Name == "MhA");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var d = tags!.Items.Single(t => t.Name == "MhD");
+        var a = tags.Items.Single(t => t.Name == "MhA");
         Assert.Equal(a.Id, d.ParentId);
         Assert.Equal("MhA/MhD", d.Path);
     }
@@ -252,11 +365,11 @@ public class TagTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, deleteResp.StatusCode);
 
         // Verify all paths updated
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagC = tags!.Single(t => t.Name == "DpC");
-        var tagD = tags.Single(t => t.Name == "DpD");
-        var tagE = tags.Single(t => t.Name == "DpE");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagC = tags!.Items.Single(t => t.Name == "DpC");
+        var tagD = tags.Items.Single(t => t.Name == "DpD");
+        var tagE = tags.Items.Single(t => t.Name == "DpE");
 
         Assert.Equal("DpA/DpC", tagC.Path);
         Assert.Equal("DpA/DpD", tagD.Path);
@@ -325,9 +438,9 @@ public class TagTests : IntegrationTestBase
             new { op = "replace", path = "/color", value = (object)"#ef4444" }
         });
 
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcCascade&IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var child = tags!.Single(t => t.Name == "Child");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcCascade&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var child = tags!.Items.Single(t => t.Name == "Child");
 
         Assert.Equal("#ef4444", child.EffectiveColor);
     }
@@ -349,10 +462,10 @@ public class TagTests : IntegrationTestBase
             new { op = "replace", path = "/color", value = (object?)null! }
         });
 
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcGp&IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var leaf = tags!.Single(t => t.Name == "EcLeaf");
-        var mid = tags.Single(t => t.Name == "EcMid");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcGp&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var leaf = tags!.Items.Single(t => t.Name == "EcLeaf");
+        var mid = tags.Items.Single(t => t.Name == "EcMid");
 
         Assert.Equal("#3b82f6", mid.EffectiveColor);
         Assert.Equal("#3b82f6", leaf.EffectiveColor);
@@ -400,9 +513,9 @@ public class TagTests : IntegrationTestBase
             ids = new[] { parent!.Id }
         }, CT);
 
-        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcDel&IncludeChildren=false", CT);
-        var tags = await tagsResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var leaf = tags!.Single(t => t.Name == "EcDelLeaf");
+        var tagsResp = await client.GetAsync("/api/v1/documents/tags?Search=EcDel&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await tagsResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var leaf = tags!.Items.Single(t => t.Name == "EcDelLeaf");
 
         Assert.Equal("#3b82f6", leaf.EffectiveColor);
     }
@@ -449,10 +562,10 @@ public class TagTests : IntegrationTestBase
             description = "visible in list"
         }, CT);
 
-        var response = await client.GetAsync("/api/v1/documents/tags?Search=DescGetTag&IncludeChildren=false", CT);
+        var response = await client.GetAsync("/api/v1/documents/tags?Search=DescGetTag&IncludeChildren=false&Page=1&PageSize=50", CT);
         response.EnsureSuccessStatusCode();
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tag = tags!.Single(t => t.Name == "DescGetTag");
+        var tags = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tag = tags!.Items.Single(t => t.Name == "DescGetTag");
         Assert.Equal("visible in list", tag.Description);
     }
 
@@ -502,10 +615,29 @@ public class TagTests : IntegrationTestBase
         Assert.Null(body!.Description);
 
         // Verify persisted
-        var getResp = await client.GetAsync("/api/v1/documents/tags?Search=ClearDescTag&IncludeChildren=false", CT);
-        var tags = await getResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        Assert.Null(tags!.Single(t => t.Name == "ClearDescTag").Description);
+        var getResp = await client.GetAsync("/api/v1/documents/tags?Search=ClearDescTag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var tags = await getResp.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        Assert.Null(tags!.Items.Single(t => t.Name == "ClearDescTag").Description);
+    }
+
+    private async Task AssignTagAsync(HttpClient client, Guid docId, string tagPath)
+    {
+        // Get current tag paths on the document
+        var getResponse = await client.GetAsync($"/api/v1/documents/{docId}", CT);
+        getResponse.EnsureSuccessStatusCode();
+        var doc = await getResponse.Content.ReadFromJsonAsync<DocumentDetail>(CT);
+        var currentPaths = doc!.Tags.Select(t => t.Path).ToList();
+        currentPaths.Add(tagPath);
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/tagPaths", value = (object)currentPaths.Distinct().ToArray() }
+        });
+        patchResponse.EnsureSuccessStatusCode();
     }
 
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description);
+    private record TagListItem(Guid Id, string Name, string Path, string? Description, int DocumentCount);
+    private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailTag> Tags);
+    private record DocumentDetailTag(Guid Id, string Name, string Path);
 }

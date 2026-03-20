@@ -518,10 +518,12 @@ export class DocumentListComponent implements OnDestroy {
         return getTags(this.http, this.apiConfig.rootUrl, {
           Search: search || undefined,
           IncludeChildren: false,
+          Page: 1,
+          PageSize: 50,
         }).pipe(
           map(r => {
             this.tagOptionsLoading.set(false);
-            const items = r.body ?? [];
+            const items = r.body?.items ?? [];
             return items.map(t => ({ id: t.id, label: t.path } as FilterOption));
           }),
           catchError(() => {

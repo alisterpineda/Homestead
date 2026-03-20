@@ -121,8 +121,10 @@ export class TagInputComponent {
         return getTags(this.http, this.apiConfig.rootUrl, {
           Search: text,
           IncludeChildren: false,
+          Page: 1,
+          PageSize: 50,
         }).pipe(
-          map((r) => r.body as GetTagsResponse[]),
+          map((r) => r.body.items as GetTagsResponse[]),
           tap(() => this.loading.set(false)),
           catchError(() => {
             this.loading.set(false);

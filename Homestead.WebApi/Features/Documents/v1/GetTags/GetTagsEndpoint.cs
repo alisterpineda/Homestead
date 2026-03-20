@@ -1,3 +1,5 @@
+using Homestead.WebApi.Common;
+
 namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public static class GetTagsEndpoint
@@ -11,6 +13,6 @@ public static class GetTagsEndpoint
             return Results.Ok(response);
         })
         .WithName("GetTags")
-        .Produces<IReadOnlyList<GetTagsResponse>>();
+        .Produces<PaginatedResponse<GetTagsResponse>>();
     }
 }

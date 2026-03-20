@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
-    : IQueryHandler<GetTagsRequest, IReadOnlyList<GetTagsResponse>>
+    : IQueryHandler<GetTagsRequest, PaginatedResponse<GetTagsResponse>>
 {
-    public async Task<IReadOnlyList<GetTagsResponse>> HandleAsync(GetTagsRequest request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetTagsResponse>> HandleAsync(GetTagsRequest request, CancellationToken ct)
     {
         var query = db.Tags.AsNoTracking();
 
@@ -39,8 +39,7 @@ public class GetTagsHandler(AppDbContext db)
         }
         // No params: return all tags
 
-        return await query
-            .OrderBy(t => t.Path)
+        return await ApplySort(query, request.SortBy, request.SortDir)
             .Select(t => new GetTagsResponse
             {
                 Id = t.Id,
@@ -49,8 +48,30 @@ public class GetTagsHandler(AppDbContext db)
                 ParentId = t.ParentId,
                 Color = t.Color,
                 EffectiveColor = t.EffectiveColor,
-                Description = t.Description
+                Description = t.Description,
+                CreatedAt = t.CreatedAt,
+                DocumentCount = t.DocumentTags.Count
             })
-            .ToListAsync(ct);
+            .ToPaginatedAsync(request, ct);
+    }
+
+    private static IOrderedQueryable<Domains.Documents.Tag> ApplySort(
+        IQueryable<Domains.Documents.Tag> query, TagSortBy? sortBy, SortDirection? sortDir)
+    {
+        var effectiveSortBy = sortBy ?? TagSortBy.Name;
+        var effectiveSortDir = sortDir ?? SortDirection.Asc;
+
+        return (effectiveSortBy, effectiveSortDir) switch
+        {
+            (TagSortBy.Name, SortDirection.Asc) => query.OrderBy(t => t.Name),
+            (TagSortBy.Name, SortDirection.Desc) => query.OrderByDescending(t => t.Name),
+            (TagSortBy.Path, SortDirection.Asc) => query.OrderBy(t => t.Path),
+            (TagSortBy.Path, SortDirection.Desc) => query.OrderByDescending(t => t.Path),
+            (TagSortBy.DocumentCount, SortDirection.Asc) => query.OrderBy(t => t.DocumentTags.Count),
+            (TagSortBy.DocumentCount, SortDirection.Desc) => query.OrderByDescending(t => t.DocumentTags.Count),
+            (TagSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(t => t.CreatedAt),
+            (TagSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.CreatedAt),
+            _ => query.OrderBy(t => t.Name),
+        };
     }
 }
