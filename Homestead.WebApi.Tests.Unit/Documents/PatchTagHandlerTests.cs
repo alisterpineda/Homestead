@@ -64,4 +64,40 @@ public class PatchTagHandlerTests : IDisposable
         _auditLogger.Received(1).LogUpdated("Tag", tag.Id, Arg.Any<Guid?>(),
             Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
     }
+
+    [Fact]
+    public async Task HandleAsync_WithDescriptionChange_UpdatesDescription()
+    {
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Old" };
+        _db.Tags.Add(tag);
+        await _db.SaveChangesAsync();
+
+        var patch = new JsonPatchDocument<PatchTagModel>();
+        patch.Replace(m => m.Description, "New description");
+
+        var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
+
+        var result = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Equal("New description", result.Description);
+        _auditLogger.Received(1).LogUpdated("Tag", tag.Id, Arg.Any<Guid?>(),
+            Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClearDescription_SetsNull()
+    {
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Existing" };
+        _db.Tags.Add(tag);
+        await _db.SaveChangesAsync();
+
+        var patch = new JsonPatchDocument<PatchTagModel>();
+        patch.Replace(m => m.Description, null);
+
+        var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
+
+        var result = await _sut.HandleAsync(command, CancellationToken.None);
+
+        Assert.Null(result.Description);
+    }
 }

@@ -62,7 +62,8 @@ public class GetDocumentHandler(AppDbContext db, IAuthorizationService authServi
                     Name = dt.Tag.Name,
                     Path = dt.Tag.Path,
                     Color = dt.Tag.Color,
-                    EffectiveColor = dt.Tag.EffectiveColor
+                    EffectiveColor = dt.Tag.EffectiveColor,
+                    Description = dt.Tag.Description
                 }).ToList(),
                 Parties = d.DocumentParties.Select(dp => new GetDocumentPartyDto
                 {

@@ -39,6 +39,29 @@ describe('CreateTagDialogComponent', () => {
     });
   });
 
+  describe('descriptionControl validators', () => {
+    it('should be valid when empty', () => {
+      component.descriptionControl.setValue('');
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+
+    it('should be valid with text', () => {
+      component.descriptionControl.setValue('A tag description');
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+
+    it('should be invalid when exceeding 512 characters', () => {
+      component.descriptionControl.setValue('a'.repeat(513));
+      expect(component.descriptionControl.hasError('maxlength')).toBe(true);
+      expect(component.descriptionControl.invalid).toBe(true);
+    });
+
+    it('should be valid at exactly 512 characters', () => {
+      component.descriptionControl.setValue('a'.repeat(512));
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+  });
+
   describe('toSignal bridge', () => {
     it('path signal reflects FormControl value changes', () => {
       component.pathControl.setValue('finance/invoices');
@@ -57,6 +80,18 @@ describe('CreateTagDialogComponent', () => {
       expect(component.pathControl.value).toBe('');
       expect(component.pathControl.pristine).toBe(true);
       expect(component.pathControl.untouched).toBe(true);
+    });
+
+    it('should reset descriptionControl on open', () => {
+      component.descriptionControl.setValue('some description');
+      component.descriptionControl.markAsDirty();
+      component.descriptionControl.markAsTouched();
+
+      component.onStateChanged('open');
+
+      expect(component.descriptionControl.value).toBe('');
+      expect(component.descriptionControl.pristine).toBe(true);
+      expect(component.descriptionControl.untouched).toBe(true);
     });
 
     it('should reset other signals on open', () => {

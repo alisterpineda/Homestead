@@ -91,6 +91,18 @@ const NONE_VALUE = '__none__';
               </brn-select>
             </div>
 
+            <hlm-form-field>
+              <label hlmLabel for="tag-description">Description</label>
+              <textarea
+                hlmInput
+                id="tag-description"
+                class="w-full"
+                [formControl]="descriptionControl"
+                rows="3"
+              ></textarea>
+              <hlm-error>Description must be 512 characters or fewer.</hlm-error>
+            </hlm-form-field>
+
             <div class="space-y-2">
               <label hlmLabel>Color</label>
               <app-color-picker [color]="editColor()" (colorChange)="editColor.set($event)" />
@@ -104,7 +116,7 @@ const NONE_VALUE = '__none__';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || nameControl.invalid || saving()">
+          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || nameControl.invalid || descriptionControl.invalid || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -123,7 +135,12 @@ export class EditTagSheetComponent {
     nonNullable: true,
     validators: [Validators.required, Validators.pattern(/^[^/]*$/), Validators.maxLength(256)],
   });
+  descriptionControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.maxLength(512)],
+  });
   editName = toSignal(this.nameControl.valueChanges, { initialValue: '' });
+  editDescription = toSignal(this.descriptionControl.valueChanges, { initialValue: '' });
   editParentId = signal<string | null>(null);
   editColor = signal<string | null>(null);
   saving = signal(false);
@@ -163,6 +180,7 @@ export class EditTagSheetComponent {
     const t = this.tag();
     if (!t) return false;
     if (this.editName() !== t.name) return true;
+    if (this.editDescription() !== (t.description ?? '')) return true;
     if (this.editParentId() !== (t.parentId ?? null)) return true;
     if (this.editColor() !== (t.color ?? null)) return true;
     return false;
@@ -178,6 +196,9 @@ export class EditTagSheetComponent {
         this.nameControl.setValue(t.name);
         this.nameControl.markAsPristine();
         this.nameControl.markAsUntouched();
+        this.descriptionControl.setValue(t.description ?? '');
+        this.descriptionControl.markAsPristine();
+        this.descriptionControl.markAsUntouched();
         this.editParentId.set(t.parentId ?? null);
         this.editColor.set(t.color ?? null);
       }
@@ -195,6 +216,7 @@ export class EditTagSheetComponent {
 
     const ops: JsonPatchDocument = [];
     if (this.editName() !== t.name) ops.push(replace('/name', this.editName()));
+    if (this.editDescription() !== (t.description ?? '')) ops.push(replace('/description', this.editDescription() || null));
     if (this.editParentId() !== (t.parentId ?? null)) ops.push(replace('/parentId', this.editParentId()));
     if (this.editColor() !== (t.color ?? null)) ops.push(replace('/color', this.editColor()));
 

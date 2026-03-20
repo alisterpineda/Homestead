@@ -407,5 +407,105 @@ public class TagTests : IntegrationTestBase
         Assert.Equal("#3b82f6", leaf.EffectiveColor);
     }
 
-    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor);
+    [Fact]
+    public async Task CreateTag_WithDescription_ReturnsDescription()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "DescTag",
+            description = "A tag for testing descriptions"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Equal("A tag for testing descriptions", body!.Description);
+    }
+
+    [Fact]
+    public async Task CreateTag_WithoutDescription_ReturnsNullDescription()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "NoDescTag"
+        }, CT);
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Null(body!.Description);
+    }
+
+    [Fact]
+    public async Task GetTags_IncludesDescription()
+    {
+        var client = await CreateAdminClientAsync();
+
+        await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "DescGetTag",
+            description = "visible in list"
+        }, CT);
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Search=DescGetTag&IncludeChildren=false", CT);
+        response.EnsureSuccessStatusCode();
+        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var tag = tags!.Single(t => t.Name == "DescGetTag");
+        Assert.Equal("visible in list", tag.Description);
+    }
+
+    [Fact]
+    public async Task PatchTag_UpdatesDescription()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "PatchDescTag",
+            description = "original"
+        }, CT);
+        createResp.EnsureSuccessStatusCode();
+        var tag = await createResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{tag!.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object)"updated description" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Equal("updated description", body!.Description);
+    }
+
+    [Fact]
+    public async Task PatchTag_ClearDescription_SetsNull()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/documents/tags", new
+        {
+            path = "ClearDescTag",
+            description = "will be cleared"
+        }, CT);
+        createResp.EnsureSuccessStatusCode();
+        var tag = await createResp.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{tag!.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object?)null! }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Null(body!.Description);
+
+        // Verify persisted
+        var getResp = await client.GetAsync("/api/v1/documents/tags?Search=ClearDescTag&IncludeChildren=false", CT);
+        var tags = await getResp.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        Assert.Null(tags!.Single(t => t.Name == "ClearDescTag").Description);
+    }
+
+    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description);
 }

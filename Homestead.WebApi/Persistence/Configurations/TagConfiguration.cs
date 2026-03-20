@@ -29,6 +29,9 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
         builder.Property(t => t.EffectiveColor)
             .HasMaxLength(7);
 
+        builder.Property(t => t.Description)
+            .HasMaxLength(512);
+
         builder.Property(t => t.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

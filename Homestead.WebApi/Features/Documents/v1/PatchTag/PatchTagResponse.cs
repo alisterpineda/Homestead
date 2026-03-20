@@ -8,4 +8,5 @@ public record PatchTagResponse
     public Guid? ParentId { get; init; }
     public string? Color { get; init; }
     public string? EffectiveColor { get; init; }
+    public string? Description { get; init; }
 }

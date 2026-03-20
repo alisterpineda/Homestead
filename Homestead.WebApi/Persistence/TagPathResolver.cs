@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Persistence;
 
 public class TagPathResolver(AppDbContext db) : ITagPathResolver
 {
-    public async Task<Tag> ResolveOrCreateAsync(string path, string? leafColor = null, Guid? createdByUserId = null, CancellationToken ct = default)
+    public async Task<Tag> ResolveOrCreateAsync(string path, string? leafColor = null, string? leafDescription = null, Guid? createdByUserId = null, CancellationToken ct = default)
     {
         var (segments, candidatePaths) = NormalizeAndBuildCandidatePaths(path);
 
@@ -30,6 +30,8 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
                     tag.Color = leafColor;
                     tag.EffectiveColor = leafColor;
                 }
+                if (isLeaf && leafDescription is not null)
+                    tag.Description = leafDescription;
             }
             else
             {
@@ -42,6 +44,7 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
                     ParentId = parent?.Id,
                     Color = color,
                     EffectiveColor = color ?? parent?.EffectiveColor,
+                    Description = isLeaf ? leafDescription : null,
                     CreatedAt = DateTimeOffset.UtcNow,
                     CreatedByUserId = createdByUserId
                 };

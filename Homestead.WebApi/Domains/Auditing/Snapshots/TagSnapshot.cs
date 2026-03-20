@@ -8,13 +8,15 @@ public record TagSnapshot : IAuditSnapshot<TagSnapshot, Tag>
     public required string Path { get; init; }
     public Guid? ParentId { get; init; }
     public string? Color { get; init; }
+    public string? Description { get; init; }
 
     public static TagSnapshot From(Tag source) => new()
     {
         Name = source.Name,
         Path = source.Path,
         ParentId = source.ParentId,
-        Color = source.Color
+        Color = source.Color,
+        Description = source.Description
     };
 
     public List<FieldChange> Diff(TagSnapshot other)
@@ -29,6 +31,8 @@ public record TagSnapshot : IAuditSnapshot<TagSnapshot, Tag>
             changes.Add(new ScalarFieldChange("ParentId", ParentId?.ToString(), other.ParentId?.ToString()));
         if (Color != other.Color)
             changes.Add(new ScalarFieldChange("Color", Color, other.Color));
+        if (Description != other.Description)
+            changes.Add(new ScalarFieldChange("Description", Description, other.Description));
 
         return changes;
     }

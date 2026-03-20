@@ -22,6 +22,7 @@ function makeTag(overrides: Partial<GetTagsResponse> = {}): GetTagsResponse {
     parentId: 'tag-parent',
     color: null,
     effectiveColor: null,
+    description: null,
     ...overrides,
   };
 }
@@ -98,9 +99,65 @@ describe('EditTagSheetComponent', () => {
     });
   });
 
+  describe('descriptionControl validators', () => {
+    it('should be valid when empty', () => {
+      component.descriptionControl.setValue('');
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+
+    it('should be valid with text', () => {
+      component.descriptionControl.setValue('A useful description');
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+
+    it('should be invalid when exceeding 512 characters', () => {
+      component.descriptionControl.setValue('a'.repeat(513));
+      expect(component.descriptionControl.hasError('maxlength')).toBe(true);
+      expect(component.descriptionControl.invalid).toBe(true);
+    });
+
+    it('should be valid at exactly 512 characters', () => {
+      component.descriptionControl.setValue('a'.repeat(512));
+      expect(component.descriptionControl.valid).toBe(true);
+    });
+  });
+
+  describe('state reset on open', () => {
+    it('should populate nameControl from tag input and mark pristine/untouched', () => {
+      const tag = makeTag({ name: 'invoices' });
+      fixture.componentRef.setInput('tag', tag);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      expect(component.nameControl.value).toBe('invoices');
+      expect(component.nameControl.pristine).toBe(true);
+      expect(component.nameControl.untouched).toBe(true);
+    });
+
+    it('should populate descriptionControl from tag input', () => {
+      const tag = makeTag({ description: 'Some desc' });
+      fixture.componentRef.setInput('tag', tag);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      expect(component.descriptionControl.value).toBe('Some desc');
+      expect(component.descriptionControl.pristine).toBe(true);
+      expect(component.descriptionControl.untouched).toBe(true);
+    });
+
+    it('should set descriptionControl to empty string when tag has null description', () => {
+      const tag = makeTag({ description: null });
+      fixture.componentRef.setInput('tag', tag);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      expect(component.descriptionControl.value).toBe('');
+    });
+  });
+
   describe('hasChanges', () => {
     beforeEach(() => {
-      const tag = makeTag({ name: 'invoices', parentId: 'tag-parent', color: null });
+      const tag = makeTag({ name: 'invoices', parentId: 'tag-parent', color: null, description: null });
       fixture.componentRef.setInput('tag', tag);
       fixture.componentRef.setInput('state', 'open');
       fixture.detectChanges();
@@ -123,6 +180,16 @@ describe('EditTagSheetComponent', () => {
     it('should be true when color changes', () => {
       component.editColor.set('#ff0000');
       expect(component.hasChanges()).toBe(true);
+    });
+
+    it('should be true when description changes', () => {
+      component.descriptionControl.setValue('new description');
+      expect(component.hasChanges()).toBe(true);
+    });
+
+    it('should be false when description set to empty matches null tag description', () => {
+      component.descriptionControl.setValue('');
+      expect(component.hasChanges()).toBe(false);
     });
   });
 });

@@ -9,7 +9,7 @@ public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver,
 {
     public async Task<CreateTagResponse> HandleAsync(CreateTagRequest request, CancellationToken ct)
     {
-        var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, createdByUserId: currentUser.UserId, ct: ct);
+        var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 
         auditLogger.LogCreated("Tag", tag.Id, currentUser.UserId);
 
@@ -22,7 +22,8 @@ public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver,
             Path = tag.Path,
             ParentId = tag.ParentId,
             Color = tag.Color,
-            EffectiveColor = tag.EffectiveColor
+            EffectiveColor = tag.EffectiveColor,
+            Description = tag.Description
         };
     }
 }

@@ -3,6 +3,7 @@
 
 export interface PatchTagResponse {
   color?: (string | null);
+  description?: (string | null);
   effectiveColor?: (string | null);
   id: string;
   name: string;

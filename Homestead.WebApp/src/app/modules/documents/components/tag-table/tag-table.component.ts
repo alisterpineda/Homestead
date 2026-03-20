@@ -24,6 +24,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
               <th hlmTh>Name</th>
               <th hlmTh class="w-8"></th>
               <th hlmTh class="hidden md:table-cell">Path</th>
+              <th hlmTh class="hidden md:table-cell">Description</th>
             </tr>
           </thead>
           <tbody hlmTBody>
@@ -49,6 +50,7 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
                   }
                 </td>
                 <td hlmTd class="hidden text-muted-foreground md:table-cell">{{ tag.path }}</td>
+                <td hlmTd class="hidden text-muted-foreground md:table-cell">{{ tag.description }}</td>
               </tr>
             }
           </tbody>

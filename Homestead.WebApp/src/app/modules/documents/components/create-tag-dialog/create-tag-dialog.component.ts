@@ -48,6 +48,17 @@ import { toast } from 'ngx-sonner';
             />
             <hlm-error>Tag path is required.</hlm-error>
           </hlm-form-field>
+          <hlm-form-field>
+            <label hlmLabel for="create-tag-description">Description</label>
+            <textarea
+              hlmInput
+              id="create-tag-description"
+              placeholder="Optional description"
+              [formControl]="descriptionControl"
+              rows="2"
+            ></textarea>
+            <hlm-error>Description must be 512 characters or fewer.</hlm-error>
+          </hlm-form-field>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Color</label>
             <app-color-picker [color]="selectedColor()" (colorChange)="selectedColor.set($event)" />
@@ -57,7 +68,7 @@ import { toast } from 'ngx-sonner';
           }
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
-            <button hlmBtn type="submit" [disabled]="pathControl.invalid || creating()">
+            <button hlmBtn type="submit" [disabled]="pathControl.invalid || descriptionControl.invalid || creating()">
               {{ creating() ? 'Creating...' : 'Create' }}
             </button>
           </div>
@@ -74,6 +85,10 @@ export class CreateTagDialogComponent {
     nonNullable: true,
     validators: [Validators.required],
   });
+  descriptionControl = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.maxLength(512)],
+  });
   path = toSignal(this.pathControl.valueChanges, { initialValue: '' });
   selectedColor = signal<string | null>(null);
   creating = signal(false);
@@ -88,6 +103,9 @@ export class CreateTagDialogComponent {
       this.pathControl.setValue('');
       this.pathControl.markAsPristine();
       this.pathControl.markAsUntouched();
+      this.descriptionControl.setValue('');
+      this.descriptionControl.markAsPristine();
+      this.descriptionControl.markAsUntouched();
       this.selectedColor.set(null);
       this.creating.set(false);
       this.createError.set(false);
@@ -102,8 +120,10 @@ export class CreateTagDialogComponent {
     this.creating.set(true);
     this.createError.set(false);
 
+    const descVal = this.descriptionControl.value.trim() || null;
+
     createTag(this.http, this.apiConfig.rootUrl, {
-      body: { path: pathVal, color: this.selectedColor() },
+      body: { path: pathVal, color: this.selectedColor(), description: descVal },
     }).subscribe({
       next: () => {
         this.creating.set(false);

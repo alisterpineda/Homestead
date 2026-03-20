@@ -48,7 +48,8 @@ public class GetTagsHandler(AppDbContext db)
                 Path = t.Path,
                 ParentId = t.ParentId,
                 Color = t.Color,
-                EffectiveColor = t.EffectiveColor
+                EffectiveColor = t.EffectiveColor,
+                Description = t.Description
             })
             .ToListAsync(ct);
     }

@@ -43,7 +43,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         {
             Name = tag.Name,
             ParentId = tag.ParentId,
-            Color = tag.Color
+            Color = tag.Color,
+            Description = tag.Description
         };
 
         // Apply patch operations
@@ -92,6 +93,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         tag.Name = normalizedName;
         tag.ParentId = model.ParentId;
         tag.Color = model.Color;
+        tag.Description = model.Description;
 
         // Recompute path if name or parent changed
         var nameChanged = normalizedName != oldName;
@@ -150,7 +152,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             Path = tag.Path,
             ParentId = tag.ParentId,
             Color = tag.Color,
-            EffectiveColor = tag.EffectiveColor
+            EffectiveColor = tag.EffectiveColor,
+            Description = tag.Description
         };
     }
 }

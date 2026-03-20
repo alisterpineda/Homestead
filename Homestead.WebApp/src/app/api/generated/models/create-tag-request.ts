@@ -3,5 +3,6 @@
 
 export interface CreateTagRequest {
   color?: (string | null);
+  description?: (string | null);
   path: string;
 }
