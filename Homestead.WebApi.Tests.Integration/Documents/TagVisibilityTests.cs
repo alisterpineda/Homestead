@@ -22,11 +22,11 @@ public class TagVisibilityTests : IntegrationTestBase
         await AssignTagsAsync(adminClient, docA, ["admin-vis/alpha"]);
         await AssignTagsAsync(adminClient, docB, ["admin-vis/beta"]);
 
-        var response = await adminClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await adminClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "admin-vis/alpha");
-        Assert.Contains(tags!, t => t.Path == "admin-vis/beta");
+        Assert.Contains(result!.Items, t => t.Path == "admin-vis/alpha");
+        Assert.Contains(result!.Items, t => t.Path == "admin-vis/beta");
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "global-tag-vis");
+        Assert.Contains(result!.Items, t => t.Path == "global-tag-vis");
     }
 
     [Fact]
@@ -57,10 +57,10 @@ public class TagVisibilityTests : IntegrationTestBase
         var docId = await UploadAndWaitAsync(adminClient, "contrib-group-tag.pdf", groupId);
         await AssignTagsAsync(adminClient, docId, ["own-group-tag"]);
 
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "own-group-tag");
+        Assert.Contains(result!.Items, t => t.Path == "own-group-tag");
     }
 
     [Fact]
@@ -74,10 +74,10 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "secret-project-tag");
+        Assert.Contains(result!.Items, t => t.Path == "secret-project-tag");
     }
 
     [Fact]
@@ -89,10 +89,10 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var viewerClient = await CreateViewerClientAsync();
 
-        var response = await viewerClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await viewerClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "viewer-visible-tag");
+        Assert.Contains(result!.Items, t => t.Path == "viewer-visible-tag");
     }
 
     [Fact]
@@ -111,11 +111,11 @@ public class TagVisibilityTests : IntegrationTestBase
         var guestId = await GetUserIdAsync(guestClient);
         await AddGroupMemberAsync(adminClient, groupA, guestId, "Viewer");
 
-        var response = await guestClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await guestClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "guest-visible-tag");
-        Assert.Contains(tags!, t => t.Path == "guest-other-tag");
+        Assert.Contains(result!.Items, t => t.Path == "guest-visible-tag");
+        Assert.Contains(result!.Items, t => t.Path == "guest-other-tag");
     }
 
     [Fact]
@@ -130,10 +130,10 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false", CT);
-        var tags = await response.Content.ReadFromJsonAsync<List<TagResult>>(CT);
+        var response = await contributorClient.GetAsync("/api/v1/documents/tags?IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await response.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
 
-        Assert.Contains(tags!, t => t.Path == "orphaned-standalone-tag");
+        Assert.Contains(result!.Items, t => t.Path == "orphaned-standalone-tag");
     }
 
     // --- Mutation authorization tests ---
@@ -148,9 +148,9 @@ public class TagVisibilityTests : IntegrationTestBase
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
         // Find the tag ID
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=renameable-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "renameable-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=renameable-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "renameable-tag").Id;
 
         var response = await SendJsonPatchAsync(contributorClient, $"/api/v1/documents/tags/{tagId}", new[]
         {
@@ -174,9 +174,9 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=shared-rename-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "shared-rename-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=shared-rename-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "shared-rename-tag").Id;
 
         var response = await SendJsonPatchAsync(contributorClient, $"/api/v1/documents/tags/{tagId}", new[]
         {
@@ -202,9 +202,9 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=parent-mut&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var parentTagId = tags!.First(t => t.Path == "parent-mut").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=parent-mut&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var parentTagId = result!.Items.First(t => t.Path == "parent-mut").Id;
 
         var response = await SendJsonPatchAsync(contributorClient, $"/api/v1/documents/tags/{parentTagId}", new[]
         {
@@ -223,9 +223,9 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=deleteable-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "deleteable-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=deleteable-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "deleteable-tag").Id;
 
         var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
 
@@ -245,9 +245,9 @@ public class TagVisibilityTests : IntegrationTestBase
 
         var contributorClient = await CreateUserClientAsync(role: "Contributor");
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=shared-delete-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "shared-delete-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=shared-delete-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "shared-delete-tag").Id;
 
         var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
 
@@ -263,9 +263,9 @@ public class TagVisibilityTests : IntegrationTestBase
         var groupDoc = await UploadAndWaitAsync(adminClient, "admin-modify-tag.pdf", groupB);
         await AssignTagsAsync(adminClient, groupDoc, ["admin-bypass-tag"]);
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=admin-bypass-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "admin-bypass-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=admin-bypass-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "admin-bypass-tag").Id;
 
         var response = await SendJsonPatchAsync(adminClient, $"/api/v1/documents/tags/{tagId}", new[]
         {
@@ -288,9 +288,9 @@ public class TagVisibilityTests : IntegrationTestBase
         var docId = await UploadAndWaitAsync(adminClient, "tag-del-viewer.pdf", groupId);
         await AssignTagsAsync(adminClient, docId, ["viewer-delete-tag"]);
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=viewer-delete-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "viewer-delete-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=viewer-delete-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "viewer-delete-tag").Id;
 
         var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
 
@@ -310,9 +310,9 @@ public class TagVisibilityTests : IntegrationTestBase
         var docId = await UploadAndWaitAsync(adminClient, "tag-del-editor.pdf", groupId);
         await AssignTagsAsync(adminClient, docId, ["editor-delete-tag"]);
 
-        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=editor-delete-tag&IncludeChildren=false", CT);
-        var tags = await tagsResponse.Content.ReadFromJsonAsync<List<TagResult>>(CT);
-        var tagId = tags!.First(t => t.Path == "editor-delete-tag").Id;
+        var tagsResponse = await adminClient.GetAsync("/api/v1/documents/tags?Search=editor-delete-tag&IncludeChildren=false&Page=1&PageSize=50", CT);
+        var result = await tagsResponse.Content.ReadFromJsonAsync<PaginatedResult<TagResult>>(CT);
+        var tagId = result!.Items.First(t => t.Path == "editor-delete-tag").Id;
 
         var response = await contributorClient.DeleteAsync($"/api/v1/documents/tags/{tagId}", CT);
 

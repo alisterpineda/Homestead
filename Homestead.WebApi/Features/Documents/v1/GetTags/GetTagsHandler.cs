@@ -22,7 +22,7 @@ public class GetTagsHandler(AppDbContext db)
         {
             var parentPath = request.ParentPath.Trim().Trim('/');
 
-            if (request.IncludeChildren)
+            if (request.IncludeChildren == true)
             {
                 query = query.Where(t => t.Path.StartsWith(parentPath + "/"));
             }
