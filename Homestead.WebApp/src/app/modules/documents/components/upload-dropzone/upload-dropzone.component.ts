@@ -66,6 +66,7 @@ export class UploadDropzoneComponent {
 
   onDragOver(event: DragEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.dragOver.set(true);
   }
 
@@ -76,6 +77,7 @@ export class UploadDropzoneComponent {
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.dragOver.set(false);
     const dropped = event.dataTransfer?.files[0];
     if (dropped) this.fileSelect.emit(dropped);

@@ -49,10 +49,11 @@ describe('DocumentsLayoutComponent', () => {
   });
 
   describe('drag and drop', () => {
-    function createDragEvent(type: string, hasFiles = true): DragEvent {
+    function createDragEvent(type: string, hasFiles = true, files: File[] = []): DragEvent {
+      const fileList = Object.assign([...files], { item: (i: number) => files[i] ?? null });
       const event = new Event(type, { bubbles: true }) as DragEvent;
       Object.defineProperty(event, 'dataTransfer', {
-        value: { types: hasFiles ? ['Files'] : [], files: [] },
+        value: { types: hasFiles ? ['Files'] : [], files: fileList },
       });
       Object.defineProperty(event, 'preventDefault', { value: vi.fn() });
       return event;
@@ -88,14 +89,8 @@ describe('DocumentsLayoutComponent', () => {
 
     it('should upload files on drop', () => {
       const file = new File(['content'], 'test.pdf');
-      const event = new Event('drop', { bubbles: true }) as DragEvent;
-      const fileList = Object.assign([file], { item: (i: number) => [file][i] ?? null });
-      Object.defineProperty(event, 'dataTransfer', {
-        value: { types: ['Files'], files: fileList },
-      });
-      Object.defineProperty(event, 'preventDefault', { value: vi.fn() });
 
-      component.onDrop(event);
+      component.onDrop(createDragEvent('drop', true, [file]));
 
       expect(component['dragActive']()).toBe(false);
       expect(mockUploadManager.addFiles).toHaveBeenCalledWith([file]);
@@ -108,6 +103,49 @@ describe('DocumentsLayoutComponent', () => {
       component.onDrop(event);
 
       expect(mockUploadManager.addFiles).not.toHaveBeenCalled();
+    });
+
+    describe('when a dialog is open', () => {
+      let overlayContainer: HTMLDivElement;
+
+      beforeEach(() => {
+        overlayContainer = document.createElement('div');
+        overlayContainer.className = 'cdk-overlay-container';
+        const dialog = document.createElement('div');
+        dialog.setAttribute('role', 'dialog');
+        overlayContainer.appendChild(dialog);
+        document.body.appendChild(overlayContainer);
+      });
+
+      afterEach(() => {
+        overlayContainer.remove();
+      });
+
+      it('should not activate drag overlay when a dialog is open', () => {
+        component.onDragEnter(createDragEvent('dragenter'));
+        expect(component['dragActive']()).toBe(false);
+      });
+
+      it('should not upload files on drop when a dialog is open', () => {
+        const file = new File(['content'], 'test.pdf');
+
+        component.onDrop(createDragEvent('drop', true, [file]));
+
+        expect(mockUploadManager.addFiles).not.toHaveBeenCalled();
+        expect(component['dragActive']()).toBe(false);
+      });
+
+      it('should reset drag state on drop even when dialog is open', () => {
+        // Activate drag before dialog exists
+        overlayContainer.remove();
+        component.onDragEnter(createDragEvent('dragenter'));
+        expect(component['dragActive']()).toBe(true);
+
+        // Re-add dialog overlay
+        document.body.appendChild(overlayContainer);
+        component.onDrop(createDragEvent('drop'));
+        expect(component['dragActive']()).toBe(false);
+      });
     });
   });
 

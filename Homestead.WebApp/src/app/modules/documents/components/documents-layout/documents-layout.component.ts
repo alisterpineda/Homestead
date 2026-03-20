@@ -77,6 +77,7 @@ export class DocumentsLayoutComponent implements OnDestroy {
     event.preventDefault();
     if (!this.auth.canWrite()) return;
     if (!event.dataTransfer?.types.includes('Files')) return;
+    if (this.isDialogOpen()) return;
     this.dragCounter++;
     this.dragActive.set(true);
   }
@@ -100,10 +101,17 @@ export class DocumentsLayoutComponent implements OnDestroy {
     this.dragActive.set(false);
 
     if (!this.auth.canWrite()) return;
+    if (this.isDialogOpen()) return;
 
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
       this.uploadManager.addFiles(Array.from(files));
     }
+  }
+
+  private isDialogOpen(): boolean {
+    return document.querySelector(
+      '.cdk-overlay-container [role="dialog"], .cdk-overlay-container [role="alertdialog"]'
+    ) !== null;
   }
 }
