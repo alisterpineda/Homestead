@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,12 +5,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Processing;
 
 public class JobProcessorService(
-    Channel<Guid> channel,
     IServiceScopeFactory scopeFactory,
-    ILogger<JobProcessorService> logger) : BackgroundService, IJobProcessorControl
+    ILogger<JobProcessorService> logger) : BackgroundService, IJobProcessorControl, IJobSignal
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan JobTimeout = TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _processingGate = new(1, 1);
+    private readonly SemaphoreSlim _signal = new(0);
+
+    public void Signal()
+    {
+        _signal.Release();
+    }
 
     public async Task<IAsyncDisposable> PauseAsync(CancellationToken ct = default)
     {
@@ -21,64 +26,75 @@ public class JobProcessorService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var channelTask = ProcessChannelAsync(stoppingToken);
-        var pollingTask = PollForJobsAsync(stoppingToken);
+        await RecoverOrphanedJobsAsync(stoppingToken);
 
-        await Task.WhenAll(channelTask, pollingTask);
-    }
-
-    private async Task ProcessChannelAsync(CancellationToken ct)
-    {
-        await foreach (var jobId in channel.Reader.ReadAllAsync(ct))
-        {
-            await TryProcessJobAsync(jobId, ct);
-        }
-    }
-
-    private async Task PollForJobsAsync(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(PollInterval, ct);
-                await ClaimAndProcessPendingJobsAsync(ct);
+                await WaitForSignalOrTimeoutAsync(stoppingToken);
+                await DrainPendingJobsAsync(stoppingToken);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error during job polling");
+                logger.LogError(ex, "Error in job processing loop");
             }
         }
     }
 
-    private async Task ClaimAndProcessPendingJobsAsync(CancellationToken ct)
+    private async Task WaitForSignalOrTimeoutAsync(CancellationToken ct)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await _signal.WaitAsync(PollInterval, ct);
 
-        var pendingJobIds = await db.ProcessingJobs
-            .Where(j => j.Status == ProcessingJobStatus.Pending)
-            .OrderByDescending(j => j.Priority)
-            .ThenBy(j => j.CreatedAt)
-            .Select(j => j.Id)
-            .ToListAsync(ct);
-
-        foreach (var jobId in pendingJobIds)
+        // Drain extra accumulated signals to prevent redundant empty DB queries
+        while (_signal.Wait(TimeSpan.Zero))
         {
-            await TryProcessJobAsync(jobId, ct);
         }
     }
 
-    private async Task TryProcessJobAsync(Guid jobId, CancellationToken ct)
+    private async Task DrainPendingJobsAsync(CancellationToken ct)
+    {
+        while (await TryProcessNextJobAsync(ct))
+        {
+        }
+    }
+
+    private async Task RecoverOrphanedJobsAsync(CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var recovered = await db.ProcessingJobs
+                .Where(j => j.Status == ProcessingJobStatus.InProgress)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(j => j.Status, ProcessingJobStatus.Pending)
+                    .SetProperty(j => j.StartedAt, (DateTimeOffset?)null), ct);
+
+            if (recovered > 0)
+                logger.LogWarning("Recovered {Count} orphaned jobs at startup", recovered);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to recover orphaned jobs at startup");
+        }
+    }
+
+    /// <summary>
+    /// Finds the highest-priority pending job, claims it, and processes it.
+    /// Returns true if a job was found (regardless of success), false if the queue is empty.
+    /// </summary>
+    private async Task<bool> TryProcessNextJobAsync(CancellationToken ct)
     {
         await _processingGate.WaitAsync(ct);
         try
         {
-            await ProcessJobCoreAsync(jobId, ct);
+            return await ProcessNextJobCoreAsync(ct);
         }
         finally
         {
@@ -86,15 +102,27 @@ public class JobProcessorService(
         }
     }
 
-    private async Task ProcessJobCoreAsync(Guid jobId, CancellationToken ct)
+    private async Task<bool> ProcessNextJobCoreAsync(CancellationToken ct)
     {
+        Guid jobId = default;
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var handlers = scope.ServiceProvider.GetRequiredService<IEnumerable<IJobHandler>>();
 
-            // Atomic claim: only update if still Pending
+            // Find and atomically claim the highest-priority pending job
+            var nextJobId = await db.ProcessingJobs
+                .Where(j => j.Status == ProcessingJobStatus.Pending)
+                .OrderByDescending(j => j.Priority)
+                .ThenBy(j => j.CreatedAt)
+                .Select(j => (Guid?)j.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (nextJobId is null)
+                return false;
+
+            jobId = nextJobId.Value;
+
             var claimed = await db.ProcessingJobs
                 .Where(j => j.Id == jobId && j.Status == ProcessingJobStatus.Pending)
                 .ExecuteUpdateAsync(s => s
@@ -102,9 +130,10 @@ public class JobProcessorService(
                     .SetProperty(j => j.StartedAt, DateTimeOffset.UtcNow), ct);
 
             if (claimed == 0)
-                return; // Already claimed by channel or poller
+                return true; // Job was claimed by another path; keep draining
 
             var job = await db.ProcessingJobs.FirstAsync(j => j.Id == jobId, ct);
+            var handlers = scope.ServiceProvider.GetRequiredService<IEnumerable<IJobHandler>>();
 
             var handler = handlers.FirstOrDefault(h => h.Type == job.Type);
             if (handler is null)
@@ -114,16 +143,27 @@ public class JobProcessorService(
                 job.Error = $"No handler registered for job type '{job.Type}'";
                 job.CompletedAt = DateTimeOffset.UtcNow;
                 await db.SaveChangesAsync(ct);
-                return;
+                return true;
             }
 
-            await handler.HandleAsync(job, ct);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(JobTimeout);
+
+            try
+            {
+                await handler.HandleAsync(job, timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Job {jobId} timed out after {JobTimeout.TotalMinutes} minutes");
+            }
 
             job.Status = ProcessingJobStatus.Completed;
             job.CompletedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(ct);
 
             logger.LogInformation("Job {JobId} ({JobType}) completed successfully", job.Id, job.Type);
+            return true;
         }
         catch (Exception ex)
         {
@@ -163,6 +203,8 @@ public class JobProcessorService(
             {
                 logger.LogError(innerEx, "Failed to mark job {JobId} as failed", jobId);
             }
+
+            return true;
         }
     }
 

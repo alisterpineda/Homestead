@@ -1,10 +1,9 @@
-using System.Threading.Channels;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;
 
 namespace Homestead.WebApi.Processing;
 
-public class JobQueue(AppDbContext db, Channel<Guid> channel) : IJobQueue
+public class JobQueue(AppDbContext db, IJobSignal signal) : IJobQueue
 {
     public async Task<Guid> EnqueueAsync(ProcessingJobType type, Action<EnqueueJobRequest>? configure = null,
         CancellationToken ct = default)
@@ -28,7 +27,7 @@ public class JobQueue(AppDbContext db, Channel<Guid> channel) : IJobQueue
         db.ProcessingJobs.Add(job);
         await db.SaveChangesAsync(ct);
 
-        await channel.Writer.WriteAsync(job.Id, ct);
+        signal.Signal();
 
         return job.Id;
     }

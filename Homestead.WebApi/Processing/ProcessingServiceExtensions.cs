@@ -1,5 +1,3 @@
-using System.Threading.Channels;
-
 namespace Homestead.WebApi.Processing;
 
 public static class ProcessingServiceExtensions
@@ -17,11 +15,11 @@ public static class ProcessingServiceExtensions
             services.AddScoped(typeof(IJobHandler), type);
         }
 
-        services.AddSingleton(Channel.CreateUnbounded<Guid>());
         services.AddScoped<IJobQueue, JobQueue>();
         services.AddSingleton<JobProcessorService>();
         services.AddHostedService(sp => sp.GetRequiredService<JobProcessorService>());
         services.AddSingleton<IJobProcessorControl>(sp => sp.GetRequiredService<JobProcessorService>());
+        services.AddSingleton<IJobSignal>(sp => sp.GetRequiredService<JobProcessorService>());
 
         return services;
     }
