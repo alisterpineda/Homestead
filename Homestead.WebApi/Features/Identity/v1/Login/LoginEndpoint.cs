@@ -10,6 +10,10 @@ public static class LoginEndpoint
         {
             var response = await handler.HandleAsync(request, ct);
 
+            if (response.IsInactive)
+                return Results.Json(new { error = AuthPolicies.AccountInactiveError },
+                    statusCode: StatusCodes.Status401Unauthorized);
+
             if (response.IsLockedOut)
                 return Results.Json(new { error = AuthPolicies.AccountLockedError }, statusCode: StatusCodes.Status401Unauthorized);
 

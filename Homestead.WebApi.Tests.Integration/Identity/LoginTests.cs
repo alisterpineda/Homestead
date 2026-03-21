@@ -111,7 +111,37 @@ public class LoginTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private async Task SeedUserAsync(string email, string password)
+    [Fact]
+    public async Task Login_InactiveUser_Returns401WithAccountInactive()
+    {
+        const string email = "inactive@test.com";
+        const string password = "Password123!";
+        await SeedUserAsync(email, password, isActive: false);
+
+        var client = CreateAnonymousClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, CT);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
+        Assert.Equal("account_inactive", body?.Error);
+    }
+
+    [Fact]
+    public async Task Login_InactiveUser_WrongPassword_Returns401WithAccountInactive()
+    {
+        const string email = "inactive-wrong@test.com";
+        const string password = "Password123!";
+        await SeedUserAsync(email, password, isActive: false);
+
+        var client = CreateAnonymousClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword!" }, CT);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
+        Assert.Equal("account_inactive", body?.Error);
+    }
+
+    private async Task SeedUserAsync(string email, string password, bool isActive = true)
     {
         using var scope = Factory.Services.CreateScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
@@ -120,7 +150,8 @@ public class LoginTests : IntegrationTestBase
             UserName = email,
             Email = email,
             DisplayName = "Test User",
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            IsActive = isActive
         };
         var result = await userManager.CreateAsync(user, password);
         Assert.True(result.Succeeded);

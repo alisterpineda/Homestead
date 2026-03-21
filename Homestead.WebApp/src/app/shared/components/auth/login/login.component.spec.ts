@@ -45,6 +45,22 @@ describe('LoginComponent', () => {
     );
   });
 
+  it('should display inactive error when API returns account_inactive', async () => {
+    const comp = component as any;
+    comp.form.setValue({ email: 'test@test.com', password: 'password' });
+
+    const submitPromise = comp.onSubmit();
+
+    const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
+    req.flush({ error: 'account_inactive' }, { status: 401, statusText: 'Unauthorized' });
+
+    await submitPromise;
+
+    expect(comp.error()).toBe(
+      'Your account is inactive. Please contact an administrator.',
+    );
+  });
+
   it('should display generic error for other 401 responses', async () => {
     const comp = component as any;
     comp.form.setValue({ email: 'test@test.com', password: 'wrong' });

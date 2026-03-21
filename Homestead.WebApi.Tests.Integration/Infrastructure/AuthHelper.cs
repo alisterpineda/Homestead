@@ -64,8 +64,18 @@ public static class AuthHelper
 
         await userManager.AddToRoleAsync(user, role);
 
-        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
-        loginResponse.EnsureSuccessStatusCode();
+        if (isActive)
+        {
+            var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+            loginResponse.EnsureSuccessStatusCode();
+        }
+        else
+        {
+            // Inactive users can't login via the endpoint, so use the force-login test endpoint
+            // which bypasses the IsActive check by calling SignInManager.SignInAsync directly
+            var loginResponse = await client.GetAsync($"/test/force-login?email={Uri.EscapeDataString(email)}");
+            loginResponse.EnsureSuccessStatusCode();
+        }
 
         return client;
     }

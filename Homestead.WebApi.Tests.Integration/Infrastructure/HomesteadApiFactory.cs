@@ -40,6 +40,9 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Register test-only force-login endpoint for inactive user authentication
+            services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
+
             // Remove ALL Aspire/EF Core DbContext-related registrations to avoid lifetime conflicts.
             // Aspire's AddNpgsqlDbContext registers pooling services (singleton IDbContextPool)
             // that conflict with a plain AddDbContext (scoped DbContextOptions).

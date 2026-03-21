@@ -8,6 +8,8 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 
+const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrator.';
+
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -115,6 +117,8 @@ export class LoginComponent implements OnInit {
     const errorParam = this.route.snapshot.queryParamMap.get('error');
     if (errorParam === 'oidc-failed') {
       this.error.set('Single sign-on failed. Please try again.');
+    } else if (errorParam === 'account-inactive') {
+      this.error.set(INACTIVE_ERROR);
     }
   }
 
@@ -134,8 +138,15 @@ export class LoginComponent implements OnInit {
       await this.auth.login(email, password);
       this.router.navigate(['/documents']);
     } catch (e) {
-      if (e instanceof HttpErrorResponse && e.error?.error === 'account_locked') {
-        this.error.set('Too many failed login attempts. Your account has been temporarily locked. Please try again later.');
+      if (e instanceof HttpErrorResponse) {
+        const code = e.error?.error;
+        if (code === 'account_locked') {
+          this.error.set('Too many failed login attempts. Your account has been temporarily locked. Please try again later.');
+        } else if (code === 'account_inactive') {
+          this.error.set(INACTIVE_ERROR);
+        } else {
+          this.error.set('Invalid email or password.');
+        }
       } else {
         this.error.set('Invalid email or password.');
       }

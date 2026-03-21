@@ -20,11 +20,14 @@ public static class OidcCallbackEndpoint
                 return Results.Redirect("/login?error=oidc-failed");
 
             var user = await provisioner.ProvisionOrUpdateAsync(info);
-            await signInManager.SignInAsync(user, isPersistent: true);
 
-            // Clear the external cookie
+            // Always clean up the external cookie, even when sign-in is blocked
             await signInManager.Context.SignOutAsync(IdentityConstants.ExternalScheme);
 
+            if (!user.IsActive)
+                return Results.Redirect("/login?error=account-inactive");
+
+            await signInManager.SignInAsync(user, isPersistent: true);
             var redirect = OidcLoginEndpoint.IsSafeReturnUrl(returnUrl) ? returnUrl! : "/";
             return Results.Redirect(redirect);
         })
