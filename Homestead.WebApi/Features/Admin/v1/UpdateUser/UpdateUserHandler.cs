@@ -13,6 +13,15 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
 {
     public async Task<UserResponse?> HandleAsync(UpdateUserCommand request, CancellationToken ct)
     {
+        if (currentUser.UserId is { } currentId && request.Id == currentId)
+        {
+            if (!request.IsActive)
+                throw new BadRequestException("Cannot deactivate your own account.");
+
+            if (request.Role != AppRole.Admin)
+                throw new BadRequestException("Cannot demote your own admin role.");
+        }
+
         var user = await userManager.FindByIdAsync(request.Id.ToString());
         if (user is null)
             return null;

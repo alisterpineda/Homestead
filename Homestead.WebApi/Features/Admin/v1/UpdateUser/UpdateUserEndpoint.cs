@@ -31,6 +31,7 @@ public static class UpdateUserEndpoint
         .WithName("UpdateUser")
         .Produces<UserResponse>()
         .Produces(StatusCodes.Status404NotFound)
-        .ProducesValidationProblem();
+        .ProducesValidationProblem()
+        .Produces(StatusCodes.Status400BadRequest);
     }
 }

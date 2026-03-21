@@ -359,4 +359,57 @@ public class UserManagementTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task UpdateUser_SelfDeactivate_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var userId = await GetUserIdAsync(client);
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{userId}", new
+        {
+            email = "admin@test.com",
+            displayName = "Admin",
+            role = "Admin",
+            isActive = false
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateUser_SelfDemoteRole_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var userId = await GetUserIdAsync(client);
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{userId}", new
+        {
+            email = "admin@test.com",
+            displayName = "Admin",
+            role = "Contributor",
+            isActive = true
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateUser_SelfUpdateSafeFields_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var userId = await GetUserIdAsync(client);
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{userId}", new
+        {
+            email = "admin@test.com",
+            displayName = "Updated Admin Name",
+            role = "Admin",
+            isActive = true
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
+        Assert.Equal("Updated Admin Name", body!.DisplayName);
+    }
+
 }
