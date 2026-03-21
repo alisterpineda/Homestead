@@ -30,7 +30,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
         <ng-icon hlm size="sm" name="lucideChevronDown" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-auto p-0" align="start">
-        <hlm-calendar calendarClass="border-0" [date]="date() ?? undefined" (dateChange)="onDateSelected($event)" />
+        <hlm-calendar captionLayout="dropdown" calendarClass="border-0" [date]="date() ?? undefined" (dateChange)="onDateSelected($event)" />
         <div class="border-t p-1">
           <button hlmBtn variant="ghost" size="sm" class="w-full" [disabled]="!date()" (click)="clearDate()">
             Clear
