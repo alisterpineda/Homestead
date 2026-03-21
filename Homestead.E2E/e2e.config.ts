@@ -24,5 +24,4 @@ export const KEYCLOAK_URL_PATTERN = /.*localhost:8888.*/;
 export const AUTH_STATE = {
   adminPath: '.auth/admin.json',
   userPath: '.auth/user.json',
-  inactivePath: '.auth/inactive.json',
 };

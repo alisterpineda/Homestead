@@ -25,8 +25,8 @@ export function defineOidcSetup() {
       const userKeycloakLogin = new KeycloakLoginPage(userPage);
       await userKeycloakLogin.login(KEYCLOAK_USER.email, KEYCLOAK_USER.password);
 
-      // Regular user should land on pending-activation
-      await userPage.waitForURL('**/pending-activation');
+      // Regular user should be redirected back to login with error
+      await userPage.waitForURL('**/login?error=account-inactive');
       await userContext.close();
 
       // 3. Admin activates the regular user via API

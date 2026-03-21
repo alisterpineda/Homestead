@@ -2,34 +2,23 @@ import { test, expect } from '../../fixtures/app.fixture';
 import { LOCAL_INACTIVE_USER, LOCAL_ADMIN } from '../../e2e.config';
 
 test.describe('Inactive user flow', () => {
-  test('inactive user sees pending activation page after login', async ({ page, loginPage }) => {
+  test('inactive user sees error message on login', async ({ page, loginPage }) => {
     await loginPage.goto();
     await loginPage.login(LOCAL_INACTIVE_USER.email, LOCAL_INACTIVE_USER.password);
 
-    await page.waitForURL('**/pending-activation');
-    await expect(page.getByRole('heading', { name: 'Account Pending' })).toBeVisible();
-    await expect(page.getByText('pending activation')).toBeVisible();
+    // URL stays on /login — no session is created
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByRole('alert')).toContainText(
+      'Your account is inactive. Please contact an administrator.',
+    );
   });
 
-  test('inactive user cannot navigate to documents', async ({ page, loginPage }) => {
+  test('inactive user is not authenticated after failed login', async ({ page, loginPage }) => {
     await loginPage.goto();
     await loginPage.login(LOCAL_INACTIVE_USER.email, LOCAL_INACTIVE_USER.password);
 
-    await page.waitForURL('**/pending-activation');
-
-    // Try navigating to documents directly
+    // Attempt to navigate to a protected route
     await page.goto('/documents');
-    await page.waitForURL('**/pending-activation');
-    await expect(page.getByRole('heading', { name: 'Account Pending' })).toBeVisible();
-  });
-
-  test('inactive user can sign out', async ({ page, loginPage }) => {
-    await loginPage.goto();
-    await loginPage.login(LOCAL_INACTIVE_USER.email, LOCAL_INACTIVE_USER.password);
-
-    await page.waitForURL('**/pending-activation');
-
-    await page.getByRole('button', { name: 'Sign out' }).click();
     await page.waitForURL('**/login');
   });
 
@@ -54,7 +43,7 @@ test.describe('Inactive user flow', () => {
       data: {
         email: LOCAL_INACTIVE_USER.email,
         displayName: LOCAL_INACTIVE_USER.displayName,
-        isAdmin: false,
+        role: 'Contributor',
         isActive: true,
       },
     });

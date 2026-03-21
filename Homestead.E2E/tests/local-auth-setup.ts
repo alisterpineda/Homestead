@@ -76,16 +76,3 @@ setup('save regular user storageState', async ({ request }) => {
   // Save user storageState
   await request.storageState({ path: AUTH_STATE.userPath });
 });
-
-setup('save inactive user storageState', async ({ request }) => {
-  // Log in as inactive user (login itself still works, they get a cookie)
-  await request.post('/api/auth/login?useCookies=true', {
-    data: {
-      email: LOCAL_INACTIVE_USER.email,
-      password: LOCAL_INACTIVE_USER.password,
-    },
-  });
-
-  // Save inactive user storageState
-  await request.storageState({ path: AUTH_STATE.inactivePath });
-});
