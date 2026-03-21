@@ -6,8 +6,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
 {
     public required string Name { get; init; }
     public DateOnly? DocumentDate { get; init; }
-    public DateOnly? ValidFrom { get; init; }
-    public DateOnly? ValidUntil { get; init; }
+    public DateOnly? ExpiryDate { get; init; }
     public string Notes { get; init; } = string.Empty;
     public required List<string> TagPaths { get; init; }
     public required List<Guid> PartyIds { get; init; }
@@ -17,8 +16,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
     {
         Name = source.Name,
         DocumentDate = source.DocumentDate,
-        ValidFrom = source.ValidFrom,
-        ValidUntil = source.ValidUntil,
+        ExpiryDate = source.ExpiryDate,
         Notes = source.Notes,
         TagPaths = source.DocumentTags.Select(dt => dt.Tag.Path).Order().ToList(),
         PartyIds = source.DocumentParties.Select(dp => dp.PartyId).Order().ToList(),
@@ -33,10 +31,8 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
             changes.Add(new ScalarFieldChange("Name", Name, other.Name));
         if (DocumentDate != other.DocumentDate)
             changes.Add(new ScalarFieldChange("DocumentDate", DocumentDate?.ToString(), other.DocumentDate?.ToString()));
-        if (ValidFrom != other.ValidFrom)
-            changes.Add(new ScalarFieldChange("ValidFrom", ValidFrom?.ToString(), other.ValidFrom?.ToString()));
-        if (ValidUntil != other.ValidUntil)
-            changes.Add(new ScalarFieldChange("ValidUntil", ValidUntil?.ToString(), other.ValidUntil?.ToString()));
+        if (ExpiryDate != other.ExpiryDate)
+            changes.Add(new ScalarFieldChange("ExpiryDate", ExpiryDate?.ToString(), other.ExpiryDate?.ToString()));
         if (Notes != other.Notes)
             changes.Add(new ScalarFieldChange("Notes", Notes, other.Notes));
         if (!TagPaths.SequenceEqual(other.TagPaths))

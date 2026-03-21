@@ -34,8 +34,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         {
             Name = document.Name,
             DocumentDate = document.DocumentDate,
-            ValidFrom = document.ValidFrom,
-            ValidUntil = document.ValidUntil,
+            ExpiryDate = document.ExpiryDate,
             Notes = document.Notes,
             TagPaths = document.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
             PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList(),
@@ -75,8 +74,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
         // Update entity from patched model
         document.Name = model.Name;
         document.DocumentDate = model.DocumentDate;
-        document.ValidFrom = model.ValidFrom;
-        document.ValidUntil = model.ValidUntil;
+        document.ExpiryDate = model.ExpiryDate;
         document.Notes = model.Notes;
         document.GroupId = model.GroupId;
 
@@ -166,8 +164,7 @@ public class PatchDocumentHandler(AppDbContext db, ICurrentUserAccessor currentU
             FileExtension = latestVersion.FileExtension,
             CreatedAt = document.CreatedAt,
             DocumentDate = document.DocumentDate,
-            ValidFrom = document.ValidFrom,
-            ValidUntil = document.ValidUntil,
+            ExpiryDate = document.ExpiryDate,
             Notes = document.Notes,
             CreatedByUserId = document.CreatedByUserId,
             CreatedByUserName = createdByUserName,

@@ -11,8 +11,7 @@ public class Document
     public required string Name { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateOnly? DocumentDate { get; set; }
-    public DateOnly? ValidFrom { get; set; }
-    public DateOnly? ValidUntil { get; set; }
+    public DateOnly? ExpiryDate { get; set; }
     public string Notes { get; set; } = string.Empty;
     public NpgsqlTsVector? SearchVector { get; set; }
 

@@ -339,16 +339,10 @@ import { toast } from 'ngx-sonner';
             <app-date-picker [(date)]="editDocumentDate" ariaLabel="Document Date" />
           </div>
 
-          <!-- Valid From / Valid Until -->
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div class="space-y-2">
-              <label hlmLabel>Valid From</label>
-              <app-date-picker [(date)]="editValidFrom" ariaLabel="Valid From" />
-            </div>
-            <div class="space-y-2">
-              <label hlmLabel>Valid Until</label>
-              <app-date-picker [(date)]="editValidUntil" ariaLabel="Valid Until" />
-            </div>
+          <!-- Expiry Date -->
+          <div class="space-y-2">
+            <label hlmLabel>Expiry Date</label>
+            <app-date-picker [(date)]="editExpiryDate" ariaLabel="Expiry Date" />
           </div>
 
           <!-- Notes -->
@@ -612,8 +606,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editTags = signal<string[]>([]);
   editParties = signal<PartyOption[]>([]);
   editDocumentDate = signal<Date | null>(null);
-  editValidFrom = signal<Date | null>(null);
-  editValidUntil = signal<Date | null>(null);
+  editExpiryDate = signal<Date | null>(null);
   editNotes = signal('');
   editVersionLabel = signal('');
   editExtractedText = signal('');
@@ -686,8 +679,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     )
       return true;
     if (!datesEqual(this.editDocumentDate(), this.origDocumentDate())) return true;
-    if (!datesEqual(this.editValidFrom(), this.origValidFrom())) return true;
-    if (!datesEqual(this.editValidUntil(), this.origValidUntil())) return true;
+    if (!datesEqual(this.editExpiryDate(), this.origExpiryDate())) return true;
     if (this.editNotes() !== this.origNotes()) return true;
     return false;
   });
@@ -808,8 +800,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   document = this.documentData;
 
   private origDocumentDate = computed(() => parseDate(this.document()?.documentDate));
-  private origValidFrom = computed(() => parseDate(this.document()?.validFrom));
-  private origValidUntil = computed(() => parseDate(this.document()?.validUntil));
+  private origExpiryDate = computed(() => parseDate(this.document()?.expiryDate));
   private origNotes = computed(() => this.document()?.notes ?? '');
 
   tagColorMap = computed(() => {
@@ -846,8 +837,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editTags.set(saved.editTags);
           this.editParties.set(saved.editParties);
           this.editDocumentDate.set(saved.editDocumentDate ? parseDate(saved.editDocumentDate) : null);
-          this.editValidFrom.set(saved.editValidFrom ? parseDate(saved.editValidFrom) : null);
-          this.editValidUntil.set(saved.editValidUntil ? parseDate(saved.editValidUntil) : null);
+          this.editExpiryDate.set(saved.editExpiryDate ? parseDate(saved.editExpiryDate) : null);
           this.editNotes.set(saved.editNotes ?? '');
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
@@ -858,8 +848,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
           this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
           this.editDocumentDate.set(this.origDocumentDate());
-          this.editValidFrom.set(this.origValidFrom());
-          this.editValidUntil.set(this.origValidUntil());
+          this.editExpiryDate.set(this.origExpiryDate());
           this.editNotes.set(this.origNotes());
           // Set version-level fields atomically to prevent flash in active changes tracking
           const ver = untracked(() => this.activeVersion());
@@ -1177,11 +1166,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (!datesEqual(this.editDocumentDate(), this.origDocumentDate())) {
       ops.push(replace('/documentDate', toIsoDateString(this.editDocumentDate())));
     }
-    if (!datesEqual(this.editValidFrom(), this.origValidFrom())) {
-      ops.push(replace('/validFrom', toIsoDateString(this.editValidFrom())));
-    }
-    if (!datesEqual(this.editValidUntil(), this.origValidUntil())) {
-      ops.push(replace('/validUntil', toIsoDateString(this.editValidUntil())));
+    if (!datesEqual(this.editExpiryDate(), this.origExpiryDate())) {
+      ops.push(replace('/expiryDate', toIsoDateString(this.editExpiryDate())));
     }
     if (this.editNotes() !== this.origNotes()) {
       ops.push(replace('/notes', this.editNotes()));
@@ -1222,8 +1208,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return {
       editName: this.editName(),
       editDocumentDate: toIsoDateString(this.editDocumentDate()),
-      editValidFrom: toIsoDateString(this.editValidFrom()),
-      editValidUntil: toIsoDateString(this.editValidUntil()),
+      editExpiryDate: toIsoDateString(this.editExpiryDate()),
       editNotes: this.editNotes(),
       editParties: this.editParties(),
       editTags: this.editTags(),

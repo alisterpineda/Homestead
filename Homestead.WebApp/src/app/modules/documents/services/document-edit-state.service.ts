@@ -3,8 +3,7 @@ import { Injectable, signal, computed } from '@angular/core';
 export interface DocumentEditState {
   editName: string;
   editDocumentDate: string | null;
-  editValidFrom: string | null;
-  editValidUntil: string | null;
+  editExpiryDate: string | null;
   editNotes: string;
   editParties: Array<{ id: string; name: string }>;
   editTags: string[];

@@ -9,6 +9,7 @@ export interface PatchDocumentResponse {
   createdByUserId?: (string | null);
   createdByUserName?: (string | null);
   documentDate?: (string | null);
+  expiryDate?: (string | null);
   fileExtension: string;
   fileHash: string;
   fileSize: (number | string);
@@ -21,6 +22,4 @@ export interface PatchDocumentResponse {
   ownerUserName?: (string | null);
   parties: Array<PartyDto>;
   tags: Array<TagDto>;
-  validFrom?: (string | null);
-  validUntil?: (string | null);
 }

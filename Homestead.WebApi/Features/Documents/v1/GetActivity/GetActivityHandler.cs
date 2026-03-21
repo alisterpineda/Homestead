@@ -18,6 +18,7 @@ public class GetActivityHandler(AppDbContext db, IAuthorizationService authServi
         ["DocumentDate"] = "document date",
         ["ValidFrom"] = "valid from",
         ["ValidUntil"] = "valid until",
+        ["ExpiryDate"] = "expiry date",
         ["TagPaths"] = "tags",
         ["PartyIds"] = "parties",
         ["Label"] = "label",

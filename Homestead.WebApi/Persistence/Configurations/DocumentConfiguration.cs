@@ -20,8 +20,7 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.Property(d => d.DocumentDate);
-        builder.Property(d => d.ValidFrom);
-        builder.Property(d => d.ValidUntil);
+        builder.Property(d => d.ExpiryDate);
         builder.Property(d => d.Notes);
 
         builder.HasQueryFilter(d => d.DeletedAt == null);

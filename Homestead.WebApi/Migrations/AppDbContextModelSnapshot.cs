@@ -91,6 +91,9 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateOnly?>("DocumentDate")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("uuid");
 
@@ -107,12 +110,6 @@ namespace Homestead.WebApi.Migrations
 
                     b.Property<NpgsqlTsVector>("SearchVector")
                         .HasColumnType("tsvector");
-
-                    b.Property<DateOnly?>("ValidFrom")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("ValidUntil")
-                        .HasColumnType("date");
 
                     b.HasKey("Id");
 

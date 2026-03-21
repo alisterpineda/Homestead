@@ -5,8 +5,7 @@ function makeState(overrides?: Partial<DocumentEditState>): DocumentEditState {
   return {
     editName: 'Test Doc',
     editDocumentDate: '2024-01-15',
-    editValidFrom: null,
-    editValidUntil: null,
+    editExpiryDate: null,
     editNotes: '',
     editParties: [{ id: 'p1', name: 'Party 1' }],
     editTags: ['tag/a', 'tag/b'],

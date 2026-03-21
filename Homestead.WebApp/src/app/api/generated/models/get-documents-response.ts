@@ -12,6 +12,7 @@ export interface GetDocumentsResponse {
   deletedByUserId?: (string | null);
   deletedByUserName?: (string | null);
   documentDate?: (string | null);
+  expiryDate?: (string | null);
   fileExtension: string;
   fileSize: (number | string);
   groupId?: (string | null);
@@ -23,7 +24,5 @@ export interface GetDocumentsResponse {
   ownerUserName?: (string | null);
   parties: Array<GetDocumentsPartyDto>;
   tags: Array<GetDocumentsTagDto>;
-  validFrom?: (string | null);
-  validUntil?: (string | null);
   versionCount?: (number | string);
 }
