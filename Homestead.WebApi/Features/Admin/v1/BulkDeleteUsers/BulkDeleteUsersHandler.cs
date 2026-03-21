@@ -28,13 +28,22 @@ public class BulkDeleteUsersHandler(
         if (users.Count == 0)
             return new BulkDeleteUsersResponse(0);
 
-        foreach (var user in users)
-            auditLogger.LogDeleted("AppUser", user.Id, currentUser.UserId, description: user.DisplayName);
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        await db.SaveChangesAsync(ct);
+            foreach (var user in users)
+            {
+                auditLogger.LogDeleted("AppUser", user.Id, currentUser.UserId, description: user.DisplayName);
 
-        foreach (var user in users)
-            await userManager.DeleteAsync(user);
+                var result = await userManager.DeleteAsync(user);
+                if (!result.Succeeded)
+                    throw new IdentityValidationException(result.ToErrorDictionary());
+            }
+
+            await transaction.CommitAsync(ct);
+        });
 
         return new BulkDeleteUsersResponse(users.Count);
     }
