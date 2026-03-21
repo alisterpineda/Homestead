@@ -6,6 +6,9 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 @Component({
   selector: 'app-tag-name-cell',
   template: `
+    @if (parentPrefix) {
+      <span class="text-muted-foreground">{{ parentPrefix }} / </span>
+    }
     <span class="font-medium">{{ context.row.original.name }}</span>
     @if (context.row.original.effectiveColor) {
       <span class="ml-2 inline-block h-3 w-3 rounded-full" [style.background-color]="context.row.original.effectiveColor"></span>
@@ -14,6 +17,14 @@ import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 })
 export class TagNameCell {
   protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+
+  get parentPrefix(): string {
+    const path = this.context.row.original.path;
+    const name = this.context.row.original.name;
+    if (!path || path === name) return '';
+    const prefixRaw = path.substring(0, path.length - name.length - 1);
+    return prefixRaw.replace(/\//g, ' / ');
+  }
 }
 
 @Component({

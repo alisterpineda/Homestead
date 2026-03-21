@@ -33,12 +33,12 @@ describe('TagTableComponent exports', () => {
       expect(DEFAULT_COLUMN_VISIBILITY['createdAt']).toBe(false);
     });
 
-    it('should only contain createdAt', () => {
-      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY)).toEqual(['createdAt']);
+    it('should contain path and createdAt', () => {
+      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY).sort()).toEqual(['createdAt', 'path']);
     });
 
-    it('should not hide path by default', () => {
-      expect(DEFAULT_COLUMN_VISIBILITY['path']).toBeUndefined();
+    it('should hide path by default', () => {
+      expect(DEFAULT_COLUMN_VISIBILITY['path']).toBe(false);
     });
 
     it('should not hide description by default', () => {

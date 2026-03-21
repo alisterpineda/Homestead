@@ -37,6 +37,7 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
 ];
 
 export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
+  path: false,
   createdAt: false,
 };
 
@@ -150,8 +151,8 @@ export class TagTableComponent {
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
       cell: () => flexRenderComponent(TagNameCell),
       enableHiding: false,
-      size: 300,
-      minSize: 120,
+      size: 400,
+      minSize: 150,
     },
     {
       accessorKey: 'path',

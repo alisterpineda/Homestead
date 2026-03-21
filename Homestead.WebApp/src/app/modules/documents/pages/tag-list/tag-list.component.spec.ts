@@ -170,14 +170,15 @@ describe('TagListComponent', () => {
   });
 
   describe('columnVisibility', () => {
-    it('should default createdAt to hidden', () => {
+    it('should default path and createdAt to hidden', () => {
       expect(component.columnVisibility()).toEqual(expect.objectContaining({
+        path: false,
         createdAt: false,
       }));
     });
 
-    it('should not hide path by default', () => {
-      expect(component.columnVisibility()['path']).toBeUndefined();
+    it('should hide path by default', () => {
+      expect(component.columnVisibility()['path']).toBe(false);
     });
 
     it('should not hide description by default', () => {
