@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
@@ -315,5 +316,48 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         Assert.Equal(doc.Id, ex.ExistingDocumentId);
         Assert.Equal(doc.Name, ex.ExistingDocumentName);
         Assert.Equal("duplicate_content", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_StagingFileCleanedUpOnAnyFailure()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var (job, stagingPath) = CreateVersionUploadJob(doc.Id);
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("text");
+
+        _searchVectorUpdater.UpdateSearchVectorAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new Exception("Search vector update failed")));
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(job, ct));
+
+        Assert.False(File.Exists(stagingPath));
+    }
+
+    [Fact]
+    public async Task HandleAsync_IdempotentFileMove_WhenFinalPathExists()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var (job, stagingPath) = CreateVersionUploadJob(doc.Id);
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("text");
+
+        // Compute hash and pre-create the final file to simulate a previous failed attempt
+        var content = await File.ReadAllBytesAsync(stagingPath, ct);
+        var hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        var finalPath = Path.Combine(_mediaPath, DocumentVersion.GetFilePath(hash, ".pdf"));
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
+        File.Copy(stagingPath, finalPath);
+
+        await _handler.HandleAsync(job, ct);
+
+        Assert.False(File.Exists(stagingPath));
+        Assert.True(File.Exists(finalPath));
+        var version = await _db.DocumentVersions.FirstOrDefaultAsync(ct);
+        Assert.NotNull(version);
     }
 }

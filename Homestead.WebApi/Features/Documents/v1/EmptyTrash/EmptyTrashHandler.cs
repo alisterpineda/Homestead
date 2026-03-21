@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.EmptyTrash;
 
 public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
-    ICurrentUserAccessor currentUser, IAuditLogger auditLogger, IDocumentQueryService accessService)
+    ICurrentUserAccessor currentUser, IAuditLogger auditLogger, IDocumentQueryService accessService,
+    ILogger<EmptyTrashHandler> logger)
     : ICommandHandler<EmptyTrashRequest, EmptyTrashResponse>
 {
     public async Task<EmptyTrashResponse> HandleAsync(EmptyTrashRequest request, CancellationToken ct)
@@ -22,7 +23,7 @@ public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
             return new EmptyTrashResponse(0);
 
         var count = await DocumentPermanentDeleter.ExecuteAsync(
-            documents, db, configuration, currentUser, auditLogger, ct);
+            documents, db, configuration, currentUser, auditLogger, logger, ct);
 
         return new EmptyTrashResponse(count);
     }

@@ -8,7 +8,7 @@ internal static class DocumentPermanentDeleter
 {
     public static async Task<int> ExecuteAsync(
         List<Document> documents, AppDbContext db, IConfiguration configuration,
-        ICurrentUserAccessor currentUser, IAuditLogger auditLogger, CancellationToken ct)
+        ICurrentUserAccessor currentUser, IAuditLogger auditLogger, ILogger logger, CancellationToken ct)
     {
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
@@ -28,7 +28,14 @@ internal static class DocumentPermanentDeleter
 
         foreach (var path in physicalPaths)
         {
-            File.Delete(path);
+            try
+            {
+                File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete file {Path}", path);
+            }
         }
 
         return documents.Count;

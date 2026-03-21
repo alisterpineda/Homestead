@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
@@ -318,5 +319,46 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         var doc = await _db.Documents.FirstAsync(ct);
         Assert.Equal("my-report", doc.Name);
+    }
+
+    [Fact]
+    public async Task HandleAsync_StagingFileCleanedUpOnAnyFailure()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, stagingPath) = CreateUploadJob();
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("text");
+
+        _searchVectorUpdater.UpdateSearchVectorAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new Exception("Search vector update failed")));
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(job, ct));
+
+        Assert.False(File.Exists(stagingPath));
+    }
+
+    [Fact]
+    public async Task HandleAsync_IdempotentFileMove_WhenFinalPathExists()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, stagingPath) = CreateUploadJob();
+
+        _textExtractor.ExtractTextAsync(Arg.Any<string>(), Arg.Any<TextExtractionContext>(), ct)
+            .Returns("text");
+
+        // Compute hash and pre-create the final file to simulate a previous failed attempt
+        var content = await File.ReadAllBytesAsync(stagingPath, ct);
+        var hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+        var finalPath = Path.Combine(_mediaPath, DocumentVersion.GetFilePath(hash, ".pdf"));
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
+        File.Copy(stagingPath, finalPath);
+
+        await _handler.HandleAsync(job, ct);
+
+        Assert.False(File.Exists(stagingPath));
+        Assert.True(File.Exists(finalPath));
+        var doc = await _db.Documents.FirstOrDefaultAsync(ct);
+        Assert.NotNull(doc);
     }
 }

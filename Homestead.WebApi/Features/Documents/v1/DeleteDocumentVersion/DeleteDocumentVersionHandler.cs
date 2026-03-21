@@ -10,7 +10,8 @@ namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
-    IAuthorizationService authService, IHttpContextAccessor httpContext)
+    IAuthorizationService authService, IHttpContextAccessor httpContext,
+    ILogger<DeleteDocumentVersionHandler> logger)
     : ICommandHandler<DeleteDocumentVersionRequest, bool>
 {
     public async Task<bool> HandleAsync(DeleteDocumentVersionRequest request, CancellationToken ct)
@@ -50,8 +51,14 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
 
         await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
 
-        if (File.Exists(physicalPath))
+        try
+        {
             File.Delete(physicalPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete file {Path}", physicalPath);
+        }
 
         return true;
     }

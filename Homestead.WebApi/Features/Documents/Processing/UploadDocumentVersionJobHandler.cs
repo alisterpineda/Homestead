@@ -39,93 +39,116 @@ public class UploadDocumentVersionJobHandler(
 
         var stagingPath = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot, $"{payload.UploadId}{payload.FileExtension}");
 
-        if (!File.Exists(stagingPath))
-            throw new FileNotFoundException($"Staged file not found: {stagingPath}");
-
-        // Text extraction
-        var extractedText = await textExtractionHelper.ExtractTextSafeAsync(
-            stagingPath, payload.ContentType, payload.TextExtractionEngineId, logger, ct);
-
-        // Compute SHA256 hash
-        string fileHash;
-        await using (var stream = File.OpenRead(stagingPath))
-        {
-            var hashBytes = await SHA256.HashDataAsync(stream, ct);
-            fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-        }
-
-        // Duplicate check against all versions globally (IgnoreQueryFilters so trashed documents'
-        // versions are still detected — matching the unique index IX_document_versions_FileHash)
-        var existingDocument = await db.DocumentVersions
-            .IgnoreQueryFilters()
-            .Where(v => v.FileHash == fileHash)
-            .Select(v => new { v.Document.Id, v.Document.Name })
-            .FirstOrDefaultAsync(ct);
-
-        if (existingDocument is not null)
-        {
-            File.Delete(stagingPath);
-            throw new DuplicateDocumentException(
-                "A document with the same content already exists.",
-                existingDocument.Id,
-                existingDocument.Name);
-        }
-
-        // Compute next version number
-        var maxVersionNumber = await db.DocumentVersions
-            .Where(r => r.DocumentId == payload.DocumentId)
-            .MaxAsync(r => (int?)r.VersionNumber, ct) ?? 0;
-
-        var version = new DocumentVersion
-        {
-            Id = Guid.NewGuid(),
-            VersionNumber = maxVersionNumber + 1,
-            Label = payload.Label,
-            ContentType = payload.ContentType,
-            FileSize = payload.FileSize,
-            FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),
-            FileHash = fileHash,
-            FileExtension = payload.FileExtension,
-            CreatedAt = DateTimeOffset.UtcNow,
-            DocumentId = payload.DocumentId,
-            ExtractedText = extractedText
-        };
-
-        db.DocumentVersions.Add(version);
-
-        auditLogger.LogCreated("DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: payload.DocumentId);
-
-        await db.SaveChangesAsync(ct);
-
-        await searchVectorUpdater.UpdateSearchVectorAsync(payload.DocumentId, ct);
-
-        // Move file to final location
-        var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
-        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
-        File.Move(stagingPath, finalPath);
-
-        // Update job with entity reference (parent document)
-        job.EntityId = payload.DocumentId;
-
-        // Send SignalR notification before thumbnail generation so the UI sees the upload as complete immediately
-        await notifier.NotifyJobStatusAsync(
-            job.Id,
-            ProcessingJobStatus.Completed,
-            ProcessingEntityType.Document,
-            payload.DocumentId,
-            document.Name,
-            error: null,
-            job.CreatedByUserId,
-            ct);
-
-        // Generate thumbnail (non-critical, runs after notification)
         try
         {
-            await thumbnailService.GenerateAsync(finalPath, payload.ContentType, fileHash, ct);
+            if (!File.Exists(stagingPath))
+                throw new FileNotFoundException($"Staged file not found: {stagingPath}");
+
+            // Text extraction
+            var extractedText = await textExtractionHelper.ExtractTextSafeAsync(
+                stagingPath, payload.ContentType, payload.TextExtractionEngineId, logger, ct);
+
+            // Compute SHA256 hash
+            string fileHash;
+            await using (var stream = File.OpenRead(stagingPath))
+            {
+                var hashBytes = await SHA256.HashDataAsync(stream, ct);
+                fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+            }
+
+            // Duplicate check against all versions globally (IgnoreQueryFilters so trashed documents'
+            // versions are still detected — matching the unique index IX_document_versions_FileHash)
+            var existingDocument = await db.DocumentVersions
+                .IgnoreQueryFilters()
+                .Where(v => v.FileHash == fileHash)
+                .Select(v => new { v.Document.Id, v.Document.Name })
+                .FirstOrDefaultAsync(ct);
+
+            if (existingDocument is not null)
+            {
+                throw new DuplicateDocumentException(
+                    "A document with the same content already exists.",
+                    existingDocument.Id,
+                    existingDocument.Name);
+            }
+
+            // Compute next version number
+            var maxVersionNumber = await db.DocumentVersions
+                .Where(r => r.DocumentId == payload.DocumentId)
+                .MaxAsync(r => (int?)r.VersionNumber, ct) ?? 0;
+
+            var version = new DocumentVersion
+            {
+                Id = Guid.NewGuid(),
+                VersionNumber = maxVersionNumber + 1,
+                Label = payload.Label,
+                ContentType = payload.ContentType,
+                FileSize = payload.FileSize,
+                FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),
+                FileHash = fileHash,
+                FileExtension = payload.FileExtension,
+                CreatedAt = DateTimeOffset.UtcNow,
+                DocumentId = payload.DocumentId,
+                ExtractedText = extractedText
+            };
+
+            // Move file to final location FIRST (Copy+Delete for cross-filesystem safety)
+            var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
+            Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
+            var filePlaced = false;
+            if (!File.Exists(finalPath))
+            {
+                File.Copy(stagingPath, finalPath, overwrite: false);
+                File.Delete(stagingPath);
+                filePlaced = true;
+            }
+
+            // Then commit DB
+            db.DocumentVersions.Add(version);
+
+            auditLogger.LogCreated("DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: payload.DocumentId);
+
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch
+            {
+                // Compensation: remove the file we just placed
+                if (filePlaced)
+                    try { File.Delete(finalPath); } catch { }
+                throw;
+            }
+
+            await searchVectorUpdater.UpdateSearchVectorAsync(payload.DocumentId, ct);
+
+            // Update job with entity reference (parent document)
+            job.EntityId = payload.DocumentId;
+
+            // Send SignalR notification before thumbnail generation so the UI sees the upload as complete immediately
+            await notifier.NotifyJobStatusAsync(
+                job.Id,
+                ProcessingJobStatus.Completed,
+                ProcessingEntityType.Document,
+                payload.DocumentId,
+                document.Name,
+                error: null,
+                job.CreatedByUserId,
+                ct);
+
+            // Generate thumbnail (non-critical, runs after notification)
+            try
+            {
+                await thumbnailService.GenerateAsync(finalPath, payload.ContentType, fileHash, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Thumbnail generation failed for upload {UploadId}", payload.UploadId);
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            logger.LogWarning(ex, "Thumbnail generation failed for upload {UploadId}", payload.UploadId);
+            try { File.Delete(stagingPath); } catch { }
         }
     }
 }
