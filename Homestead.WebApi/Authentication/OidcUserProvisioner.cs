@@ -10,7 +10,8 @@ namespace Homestead.WebApi.Authentication;
 public class OidcUserProvisioner(
     UserManager<AppUser> userManager,
     IRoleSourceManager roleSourceManager,
-    IOptions<OidcOptions> oidcOptions)
+    IOptions<OidcOptions> oidcOptions,
+    AppDbContext db)
 {
     private readonly OidcOptions _oidc = oidcOptions.Value;
 
@@ -67,6 +68,7 @@ public class OidcUserProvisioner(
         }
 
         await SyncRoleAsync(user, loginInfo.Principal);
+        await db.SaveChangesAsync();
 
         return user;
     }

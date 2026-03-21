@@ -41,7 +41,7 @@ public class OidcUserProvisionerTests : IDisposable
             ClientSecret = "client-secret"
         });
 
-        _sut = new OidcUserProvisioner(_userManager, _roleSourceManager, oidcOptions);
+        _sut = new OidcUserProvisioner(_userManager, _roleSourceManager, oidcOptions, _db);
 
         var oidcOptionsWithRoleClaim = Options.Create(new OidcOptions
         {
@@ -52,7 +52,7 @@ public class OidcUserProvisionerTests : IDisposable
             AdminClaimValue = "admin"
         });
 
-        _sutWithRoleClaim = new OidcUserProvisioner(_userManager, _roleSourceManager, oidcOptionsWithRoleClaim);
+        _sutWithRoleClaim = new OidcUserProvisioner(_userManager, _roleSourceManager, oidcOptionsWithRoleClaim, _db);
     }
 
     public void Dispose()

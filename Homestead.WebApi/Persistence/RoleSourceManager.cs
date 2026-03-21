@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domains.Identity;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Persistence;
@@ -18,7 +17,6 @@ public class RoleSourceManager(AppDbContext db) : IRoleSourceManager
         if (userRole is null) return;
 
         userRole.Source = source;
-        await db.SaveChangesAsync();
     }
 
     private Task<AppUserRole?> FindUserRoleAsync(Guid userId, string roleName)

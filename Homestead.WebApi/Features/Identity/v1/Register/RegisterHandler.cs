@@ -49,6 +49,7 @@ public class RegisterHandler(
 
             await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
             await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Local);
+            await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
             await signInManager.SignInAsync(user, isPersistent: true);
