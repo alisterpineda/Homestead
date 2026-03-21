@@ -63,7 +63,7 @@ import { toast } from 'ngx-sonner';
             />
           </div>
           @if (createError()) {
-            <p class="text-sm text-destructive">Failed to create party. Please try again.</p>
+            <p class="text-sm text-destructive">{{ createError() }}</p>
           }
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
@@ -87,7 +87,7 @@ export class CreatePartyDialogComponent {
   name = toSignal(this.nameControl.valueChanges, { initialValue: '' });
   description = signal('');
   creating = signal(false);
-  createError = signal(false);
+  createError = signal('');
 
   private dialog = viewChild(BrnDialog);
   private http = inject(HttpClient);
@@ -104,7 +104,7 @@ export class CreatePartyDialogComponent {
       this.nameControl.markAsUntouched();
       this.description.set('');
       this.creating.set(false);
-      this.createError.set(false);
+      this.createError.set('');
     }
   }
 
@@ -114,7 +114,7 @@ export class CreatePartyDialogComponent {
     if (!nameVal) return;
 
     this.creating.set(true);
-    this.createError.set(false);
+    this.createError.set('');
 
     createParty(this.http, this.apiConfig.rootUrl, {
       body: { name: nameVal, description: this.description().trim() || null },
@@ -125,10 +125,9 @@ export class CreatePartyDialogComponent {
         this.dialog()?.close();
         this.created.emit();
       },
-      error: () => {
+      error: (err: { error?: { error?: string } }) => {
         this.creating.set(false);
-        this.createError.set(true);
-        toast.error('Failed to create party. Please try again.');
+        this.createError.set(err?.error?.error ?? 'Failed to create party.');
       },
     });
   }

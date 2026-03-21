@@ -16,6 +16,9 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
             .IsRequired()
             .HasMaxLength(256);
 
+        builder.HasIndex(p => p.Name)
+            .IsUnique();
+
         builder.Property(p => p.Description)
             .HasMaxLength(1024);
 

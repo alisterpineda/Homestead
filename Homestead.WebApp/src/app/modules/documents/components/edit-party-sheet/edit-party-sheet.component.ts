@@ -154,9 +154,9 @@ export class EditPartySheetComponent {
         toast.success('Party updated.');
         this.saved.emit();
       },
-      error: () => {
+      error: (err: { error?: { error?: string } }) => {
         this.saving.set(false);
-        toast.error('Failed to save changes.');
+        toast.error(err?.error?.error ?? 'Failed to save changes.');
       },
     });
   }

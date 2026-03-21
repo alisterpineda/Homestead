@@ -18,17 +18,21 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
         if (party is null)
             return null;
 
+        var name = request.Name.Trim();
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new BadRequestException("Name is required.");
+
+        var nameConflict = await db.Parties.AnyAsync(p => p.Id != request.Id && p.Name == name, ct);
+        if (nameConflict)
+            throw new ConflictException("A party with this name already exists.");
+
         // Block modification if the party is used on inaccessible documents
         var relatedDocIds = db.DocumentParties
             .Where(dp => dp.PartyId == request.Id)
             .Select(dp => dp.DocumentId);
 
         await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
-
-        var name = request.Name.Trim();
-
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Party name cannot be empty.");
 
         var before = PartySnapshot.From(party);
 

@@ -68,13 +68,13 @@ describe('CreatePartyDialogComponent', () => {
     it('should reset other signals on open', () => {
       component.description.set('some desc');
       component.creating.set(true);
-      component.createError.set(true);
+      component.createError.set('some error');
 
       component.onStateChanged('open');
 
       expect(component.description()).toBe('');
       expect(component.creating()).toBe(false);
-      expect(component.createError()).toBe(false);
+      expect(component.createError()).toBe('');
     });
   });
 

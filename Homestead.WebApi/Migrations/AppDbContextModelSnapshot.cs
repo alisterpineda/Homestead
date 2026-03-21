@@ -495,6 +495,9 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("parties", "documents");
                 });
 

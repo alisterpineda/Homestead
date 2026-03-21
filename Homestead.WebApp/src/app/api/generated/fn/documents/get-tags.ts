@@ -13,7 +13,7 @@ import { TagSortBy } from '../../models/tag-sort-by';
 
 export interface GetTags$Params {
   ParentPath?: string;
-  IncludeChildren: boolean;
+  IncludeChildren?: boolean;
   Search?: string;
   SortBy?: TagSortBy;
   SortDir?: SortDirection;

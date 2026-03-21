@@ -2,6 +2,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
@@ -13,7 +14,11 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
         var name = request.Name.Trim();
 
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Party name cannot be empty.");
+            throw new BadRequestException("Name is required.");
+
+        var nameExists = await db.Parties.AnyAsync(p => p.Name == name, ct);
+        if (nameExists)
+            throw new ConflictException("A party with this name already exists.");
 
         var party = new Party
         {

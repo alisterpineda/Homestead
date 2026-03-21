@@ -26,6 +26,35 @@ public class PartyTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateParty_DuplicateName_Returns409()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreatePartyAsync(client, "Unique Party");
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/parties", new
+        {
+            name = "Unique Party"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateParty_DuplicateName_Returns409()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreatePartyAsync(client, "Party A");
+        var partyB = await CreatePartyAsync(client, "Party B");
+
+        var response = await client.PutAsJsonAsync($"/api/v1/documents/parties/{partyB.Id}", new
+        {
+            name = "Party A"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetParties_ReturnsList()
     {
         var client = await CreateAdminClientAsync();
