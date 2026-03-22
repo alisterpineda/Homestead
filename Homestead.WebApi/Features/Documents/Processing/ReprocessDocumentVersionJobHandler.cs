@@ -49,7 +49,7 @@ public class ReprocessDocumentVersionJobHandler(
 
         if (changes.Count > 0)
         {
-            auditLogger.LogUpdated("DocumentVersion", version.Id, job.CreatedByUserId, changes,
+            auditLogger.ForUser(job.CreatedByUserId).LogUpdated("DocumentVersion", version.Id, changes,
                 parentEntityId: version.DocumentId);
         }
 

@@ -30,6 +30,6 @@ public class CreatePartyHandlerTests : IDisposable
 
         var response = await _sut.HandleAsync(request, CancellationToken.None);
 
-        _auditLogger.Received(1).LogCreated("Party", response.Id, Arg.Any<Guid?>(), Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogCreated("Party", response.Id, Arg.Any<Guid?>());
     }
 }

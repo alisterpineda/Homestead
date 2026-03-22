@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Domains.Identity;
@@ -11,17 +10,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class RemoveGroupMemberHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly RemoveGroupMemberHandler _sut;
 
     public RemoveGroupMemberHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new RemoveGroupMemberHandler(_db, _currentUser, _auditLogger);
+        _sut = new RemoveGroupMemberHandler(_db, _auditLogger);
     }
 
     public void Dispose() => _db.Dispose();
@@ -53,7 +49,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Group", groupId, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberRemoved"),
             Arg.Any<Guid?>());
     }

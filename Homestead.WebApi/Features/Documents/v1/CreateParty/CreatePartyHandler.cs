@@ -30,7 +30,7 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Parties.Add(party);
-        auditLogger.LogCreated("Party", party.Id, currentUser.UserId);
+        auditLogger.LogCreated("Party", party.Id);
         await db.SaveChangesAsync(ct);
 
         return new CreatePartyResponse

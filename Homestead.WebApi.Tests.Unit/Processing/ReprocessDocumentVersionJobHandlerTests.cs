@@ -37,6 +37,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         _notifier = Substitute.For<IProcessingNotifier>();
         _auditLogger = Substitute.For<IAuditLogger>();
+        _auditLogger.ForUser(Arg.Any<Guid?>()).Returns(_auditLogger);
         _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
         _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
         _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
@@ -150,10 +151,10 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
+        _auditLogger.Received(1).ForUser(job.CreatedByUserId);
         _auditLogger.Received(1).LogUpdated(
             "DocumentVersion",
             version.Id,
-            job.CreatedByUserId,
             Arg.Is<List<FieldChange>>(c => c.Count > 0),
             parentEntityId: doc.Id);
     }
@@ -171,7 +172,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         await _handler.HandleAsync(job, ct);
 
         _auditLogger.DidNotReceive().LogUpdated(
-            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
+            Arg.Any<string>(), Arg.Any<Guid>(),
             Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
     }
 

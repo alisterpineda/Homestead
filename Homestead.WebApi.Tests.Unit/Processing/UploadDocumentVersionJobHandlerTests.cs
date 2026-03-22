@@ -41,6 +41,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         _notifier = Substitute.For<IProcessingNotifier>();
         _auditLogger = Substitute.For<IAuditLogger>();
+        _auditLogger.ForUser(Arg.Any<Guid?>()).Returns(_auditLogger);
         _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
         _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
         _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
@@ -215,8 +216,9 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
+        _auditLogger.Received(1).ForUser(job.CreatedByUserId);
         _auditLogger.Received(1).LogCreated(
-            "DocumentVersion", Arg.Any<Guid>(), job.CreatedByUserId, parentEntityId: doc.Id);
+            "DocumentVersion", Arg.Any<Guid>(), parentEntityId: doc.Id);
     }
 
     [Fact]

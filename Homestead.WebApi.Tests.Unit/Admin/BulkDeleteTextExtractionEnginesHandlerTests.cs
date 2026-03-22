@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 using Homestead.WebApi.Persistence;
@@ -10,17 +9,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly BulkDeleteTextExtractionEnginesHandler _sut;
 
     public BulkDeleteTextExtractionEnginesHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new BulkDeleteTextExtractionEnginesHandler(_db, _currentUser, _auditLogger);
+        _sut = new BulkDeleteTextExtractionEnginesHandler(_db, _auditLogger);
     }
 
     public void Dispose()
@@ -98,7 +94,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
 
         await _sut.HandleAsync(new BulkDeleteTextExtractionEnginesRequest([id1, id2]), CancellationToken.None);
 
-        _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id1, Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
-        _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id2, Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id1, Arg.Any<string?>(), Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id2, Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 }

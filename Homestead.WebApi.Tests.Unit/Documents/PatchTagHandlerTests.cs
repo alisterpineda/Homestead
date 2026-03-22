@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Documents;
@@ -13,7 +12,6 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class PatchTagHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly PatchTagHandler _sut;
 
@@ -21,10 +19,8 @@ public class PatchTagHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new PatchTagHandler(_db, accessService, _currentUser, _auditLogger);
+        _sut = new PatchTagHandler(_db, accessService, _auditLogger);
     }
 
     public void Dispose() => _db.Dispose();
@@ -43,7 +39,7 @@ public class PatchTagHandlerTests : IDisposable
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 
@@ -61,7 +57,7 @@ public class PatchTagHandlerTests : IDisposable
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
             Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
     }
 
@@ -80,7 +76,7 @@ public class PatchTagHandlerTests : IDisposable
         var result = await _sut.HandleAsync(command, CancellationToken.None);
 
         Assert.Equal("New description", result.Description);
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 

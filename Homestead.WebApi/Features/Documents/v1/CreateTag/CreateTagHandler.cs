@@ -11,7 +11,7 @@ public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver,
     {
         var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 
-        auditLogger.LogCreated("Tag", tag.Id, currentUser.UserId);
+        auditLogger.LogCreated("Tag", tag.Id);
 
         await db.SaveChangesAsync(ct);
 

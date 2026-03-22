@@ -39,7 +39,7 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
         };
 
         db.TextExtractionEngines.Add(engine);
-        auditLogger.LogCreated("TextExtractionEngine", engine.Id, userId);
+        auditLogger.LogCreated("TextExtractionEngine", engine.Id);
         await db.SaveChangesAsync(ct);
 
         var creatorName = userId.HasValue

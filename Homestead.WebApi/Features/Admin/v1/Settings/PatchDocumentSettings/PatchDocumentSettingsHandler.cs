@@ -56,7 +56,7 @@ public class PatchDocumentSettingsHandler(
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule), currentUser.UserId);
+            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
         }
         else
         {
@@ -69,7 +69,7 @@ public class PatchDocumentSettingsHandler(
 
             if (changes.Count > 0)
                 auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
-                    currentUser.UserId, changes);
+                    changes);
         }
 
         await db.SaveChangesAsync(ct);

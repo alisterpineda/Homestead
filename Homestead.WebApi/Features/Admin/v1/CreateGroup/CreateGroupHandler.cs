@@ -32,7 +32,7 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Groups.Add(group);
-        auditLogger.LogCreated("Group", group.Id, currentUser.UserId);
+        auditLogger.LogCreated("Group", group.Id);
 
         // Auto-add creator as Owner
         if (userId.HasValue)

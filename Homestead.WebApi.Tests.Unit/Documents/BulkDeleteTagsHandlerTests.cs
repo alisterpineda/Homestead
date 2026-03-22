@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
@@ -10,7 +9,6 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class BulkDeleteTagsHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly BulkDeleteTagsHandler _sut;
 
@@ -18,10 +16,8 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new BulkDeleteTagsHandler(_db, accessService, _currentUser, _auditLogger);
+        _sut = new BulkDeleteTagsHandler(_db, accessService, _auditLogger);
     }
 
     public void Dispose() => _db.Dispose();
@@ -39,8 +35,8 @@ public class BulkDeleteTagsHandlerTests : IDisposable
 
         await _sut.HandleAsync(new BulkDeleteTagsRequest([id1, id2]), CancellationToken.None);
 
-        _auditLogger.Received(1).LogDeleted("Tag", id1, Arg.Any<Guid?>(), "Tag A", Arg.Any<Guid?>());
-        _auditLogger.Received(1).LogDeleted("Tag", id2, Arg.Any<Guid?>(), "Tag B", Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogDeleted("Tag", id1, "Tag A", Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogDeleted("Tag", id2, "Tag B", Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -48,6 +44,6 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     {
         await _sut.HandleAsync(new BulkDeleteTagsRequest([Guid.NewGuid()]), CancellationToken.None);
 
-        _auditLogger.DidNotReceive().LogDeleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        _auditLogger.DidNotReceive().LogDeleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 }

@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Persistence;
@@ -6,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
 
-public class UpdateGroupMemberHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     : ICommandHandler<UpdateGroupMemberCommand, GroupMemberResponse>
 {
     public async Task<GroupMemberResponse> HandleAsync(UpdateGroupMemberCommand command, CancellationToken ct)
@@ -23,7 +22,7 @@ public class UpdateGroupMemberHandler(AppDbContext db, ICurrentUserAccessor curr
 
         if (oldAccessLevel != command.Request.AccessLevel)
         {
-            auditLogger.LogUpdated("Group", command.GroupId, currentUser.UserId,
+            auditLogger.LogUpdated("Group", command.GroupId,
             [
                 new ScalarFieldChange("MemberAccessLevel",
                     $"{member.User.DisplayName} as {oldAccessLevel}",

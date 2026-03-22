@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
@@ -10,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
-public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor currentUser,
+public class PatchDocumentVersionHandler(AppDbContext db,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
     IAuthorizationService authService, IHttpContextAccessor httpContext)
     : ICommandHandler<PatchDocumentVersionCommand, PatchDocumentVersionResponse>
@@ -52,7 +51,7 @@ public class PatchDocumentVersionHandler(AppDbContext db, ICurrentUserAccessor c
 
         var after = DocumentVersionSnapshot.From(version);
         var changes = before.Diff(after);
-        auditLogger.LogUpdated("DocumentVersion", version.Id, currentUser.UserId, changes,
+        auditLogger.LogUpdated("DocumentVersion", version.Id, changes,
             parentEntityId: version.DocumentId);
 
         await db.SaveChangesAsync(ct);

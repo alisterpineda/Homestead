@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
@@ -11,17 +10,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class UpdateTextExtractionEngineHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly UpdateTextExtractionEngineHandler _sut;
 
     public UpdateTextExtractionEngineHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new UpdateTextExtractionEngineHandler(_db, _currentUser, _auditLogger);
+        _sut = new UpdateTextExtractionEngineHandler(_db, _auditLogger);
     }
 
     public void Dispose()

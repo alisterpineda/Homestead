@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Identity;
@@ -7,7 +6,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Features.Admin.v1.ChangeUserPassword;
 
-public class ChangeUserPasswordHandler(UserManager<AppUser> userManager, ICurrentUserAccessor currentUser, IAuditLogger auditLogger, AppDbContext db)
+public class ChangeUserPasswordHandler(UserManager<AppUser> userManager, IAuditLogger auditLogger, AppDbContext db)
     : ICommandHandler<ChangeUserPasswordCommand, bool>
 {
     public async Task<bool> HandleAsync(ChangeUserPasswordCommand request, CancellationToken ct)
@@ -21,7 +20,7 @@ public class ChangeUserPasswordHandler(UserManager<AppUser> userManager, ICurren
         if (!result.Succeeded)
             throw new IdentityValidationException(result.ToErrorDictionary());
 
-        auditLogger.LogUpdated("AppUser", user.Id, currentUser.UserId,
+        auditLogger.LogUpdated("AppUser", user.Id,
         [
             new ScalarFieldChange("Password", "***", "***")
         ]);

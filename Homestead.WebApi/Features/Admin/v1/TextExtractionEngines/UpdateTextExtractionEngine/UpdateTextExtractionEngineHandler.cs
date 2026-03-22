@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Settings;
@@ -7,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
 
-public class UpdateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditLogger auditLogger)
     : ICommandHandler<UpdateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
     public async Task<TextExtractionEngineResponse> HandleAsync(UpdateTextExtractionEngineCommand command, CancellationToken ct)
@@ -46,7 +45,7 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
         var changes = before.Diff(after);
 
         if (changes.Count > 0)
-            auditLogger.LogUpdated("TextExtractionEngine", engine.Id, currentUser.UserId, changes);
+            auditLogger.LogUpdated("TextExtractionEngine", engine.Id, changes);
 
         await db.SaveChangesAsync(ct);
 

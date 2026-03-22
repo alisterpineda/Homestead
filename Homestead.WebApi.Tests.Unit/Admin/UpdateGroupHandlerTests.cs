@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroup;
@@ -10,17 +9,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class UpdateGroupHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditLogger _auditLogger;
     private readonly UpdateGroupHandler _sut;
 
     public UpdateGroupHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _currentUser.UserId.Returns(Guid.NewGuid());
         _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new UpdateGroupHandler(_db, _currentUser, _auditLogger);
+        _sut = new UpdateGroupHandler(_db, _auditLogger);
     }
 
     public void Dispose() => _db.Dispose();
@@ -46,7 +42,7 @@ public class UpdateGroupHandlerTests : IDisposable
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Group", group.Id, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Group", group.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 
@@ -71,7 +67,7 @@ public class UpdateGroupHandlerTests : IDisposable
 
         await _sut.HandleAsync(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Group", group.Id, Arg.Any<Guid?>(),
+        _auditLogger.Received(1).LogUpdated("Group", group.Id,
             Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
     }
 }

@@ -50,8 +50,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
-            AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule),
-            Arg.Any<Guid?>());
+            AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
     }
 
     [Fact]

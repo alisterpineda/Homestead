@@ -67,8 +67,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
-            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
-            Arg.Any<Guid?>());
+            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
     }
 
     [Fact]
@@ -111,7 +110,6 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _auditLogger.Received(1).LogUpdated(
             "AppSetting",
             AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
-            Arg.Any<Guid?>(),
             Arg.Is<List<FieldChange>>(c => c.Count > 0));
     }
 
@@ -144,7 +142,6 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _auditLogger.DidNotReceive().LogUpdated(
             Arg.Any<string>(),
             Arg.Any<Guid>(),
-            Arg.Any<Guid?>(),
             Arg.Any<List<FieldChange>>(),
             Arg.Any<Guid?>());
     }

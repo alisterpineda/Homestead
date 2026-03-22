@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
-public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration, ICurrentUserAccessor currentUser,
+public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
     IAuthorizationService authService, IHttpContextAccessor httpContext,
     ILogger<DeleteDocumentVersionHandler> logger)
@@ -43,7 +42,7 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
         if (!string.IsNullOrWhiteSpace(version.Label))
             description += $" ({version.Label})";
 
-        auditLogger.LogDeleted("DocumentVersion", version.Id, currentUser.UserId,
+        auditLogger.LogDeleted("DocumentVersion", version.Id,
             description: description, parentEntityId: documentId);
 
         db.DocumentVersions.Remove(version);

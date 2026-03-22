@@ -35,7 +35,7 @@ public class BulkDeleteUsersHandler(
 
             foreach (var user in users)
             {
-                auditLogger.LogDeleted("AppUser", user.Id, currentUser.UserId, description: user.DisplayName);
+                auditLogger.LogDeleted("AppUser", user.Id, description: user.DisplayName);
 
                 var result = await userManager.DeleteAsync(user);
                 if (!result.Succeeded)

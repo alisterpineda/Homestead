@@ -106,7 +106,7 @@ public class UploadDocumentVersionJobHandler(
             // Then commit DB
             db.DocumentVersions.Add(version);
 
-            auditLogger.LogCreated("DocumentVersion", version.Id, job.CreatedByUserId, parentEntityId: payload.DocumentId);
+            auditLogger.ForUser(job.CreatedByUserId).LogCreated("DocumentVersion", version.Id, parentEntityId: payload.DocumentId);
 
             try
             {

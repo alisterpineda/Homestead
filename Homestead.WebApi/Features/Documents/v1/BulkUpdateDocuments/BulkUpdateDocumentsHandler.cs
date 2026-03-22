@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
 
-public class BulkUpdateDocumentsHandler(AppDbContext db, ICurrentUserAccessor currentUser,
+public class BulkUpdateDocumentsHandler(AppDbContext db,
     IAuditLogger auditLogger, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService)
     : ICommandHandler<BulkUpdateDocumentsRequest, BulkUpdateDocumentsResponse>
@@ -74,7 +73,7 @@ public class BulkUpdateDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
 
             if (changes.Count > 0)
             {
-                auditLogger.LogUpdated("Document", document.Id, currentUser.UserId, changes);
+                auditLogger.LogUpdated("Document", document.Id, changes);
                 updatedCount++;
             }
         }

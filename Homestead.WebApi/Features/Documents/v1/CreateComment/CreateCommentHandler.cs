@@ -39,7 +39,7 @@ public class CreateCommentHandler(
 
         db.DocumentComments.Add(comment);
 
-        auditLogger.LogCreated("DocumentComment", comment.Id, userId, parentEntityId: request.DocumentId);
+        auditLogger.LogCreated("DocumentComment", comment.Id, parentEntityId: request.DocumentId);
 
         await db.SaveChangesAsync(ct);
 

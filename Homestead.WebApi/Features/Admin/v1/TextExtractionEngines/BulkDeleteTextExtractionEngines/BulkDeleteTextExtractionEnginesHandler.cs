@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Persistence;
@@ -6,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 
-public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, IAuditLogger auditLogger)
     : ICommandHandler<BulkDeleteTextExtractionEnginesRequest, BulkDeleteTextExtractionEnginesResponse>
 {
     public async Task<BulkDeleteTextExtractionEnginesResponse> HandleAsync(BulkDeleteTextExtractionEnginesRequest request, CancellationToken ct)
@@ -25,9 +24,8 @@ public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, ICurrentUse
         if (engines.Count == 0)
             return new BulkDeleteTextExtractionEnginesResponse(0);
 
-        var userId = currentUser.UserId;
         foreach (var engine in engines)
-            auditLogger.LogDeleted("TextExtractionEngine", engine.Id, userId);
+            auditLogger.LogDeleted("TextExtractionEngine", engine.Id);
 
         db.TextExtractionEngines.RemoveRange(engines);
         await db.SaveChangesAsync(ct);

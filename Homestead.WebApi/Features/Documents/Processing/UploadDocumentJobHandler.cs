@@ -108,7 +108,7 @@ public class UploadDocumentJobHandler(
             db.Documents.Add(document);
             db.DocumentVersions.Add(version);
 
-            auditLogger.LogCreated("Document", documentId, job.CreatedByUserId);
+            auditLogger.ForUser(job.CreatedByUserId).LogCreated("Document", documentId);
 
             try
             {

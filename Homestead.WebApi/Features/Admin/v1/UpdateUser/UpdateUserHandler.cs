@@ -56,7 +56,7 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
 
             var after = AppUserSnapshot.From(user, request.Role.ToString());
             var changes = before.Diff(after);
-            auditLogger.LogUpdated("AppUser", user.Id, currentUser.UserId, changes);
+            auditLogger.LogUpdated("AppUser", user.Id, changes);
             await db.SaveChangesAsync(ct);
 
             await transaction.CommitAsync(ct);

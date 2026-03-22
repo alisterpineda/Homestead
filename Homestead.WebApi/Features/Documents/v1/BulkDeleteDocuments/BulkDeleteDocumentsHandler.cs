@@ -31,7 +31,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
         {
             doc.DeletedAt = now;
             doc.DeletedByUserId = currentUser.UserId;
-            auditLogger.LogSoftDeleted("Document", doc.Id, currentUser.UserId, description: doc.Name);
+            auditLogger.LogSoftDeleted("Document", doc.Id, description: doc.Name);
         }
 
         await db.SaveChangesAsync(ct);

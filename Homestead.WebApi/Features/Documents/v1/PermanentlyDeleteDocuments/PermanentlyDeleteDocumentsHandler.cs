@@ -1,4 +1,3 @@
-using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
@@ -7,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PermanentlyDeleteDocuments;
 
 public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration,
-    ICurrentUserAccessor currentUser, IAuditLogger auditLogger, IDocumentQueryService accessService,
+    IAuditLogger auditLogger, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
     : ICommandHandler<PermanentlyDeleteDocumentsRequest, PermanentlyDeleteDocumentsResponse>
 {
@@ -26,7 +25,7 @@ public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration c
             return new PermanentlyDeleteDocumentsResponse(0);
 
         var count = await DocumentPermanentDeleter.ExecuteAsync(
-            documents, db, configuration, currentUser, auditLogger, logger, ct);
+            documents, db, configuration, auditLogger, logger, ct);
 
         return new PermanentlyDeleteDocumentsResponse(count);
     }

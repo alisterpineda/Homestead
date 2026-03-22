@@ -1,33 +1,49 @@
 using System.Text.Json;
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domains.Auditing;
 
 namespace Homestead.WebApi.Persistence;
 
-public class AuditLogger(AppDbContext db) : IAuditLogger
+public class AuditLogger : IAuditLogger
 {
+    private readonly AppDbContext _db;
+    private readonly Func<Guid?> _resolveUserId;
 
-    public void LogCreated(string entityType, Guid entityId, Guid? userId,
-        Guid? parentEntityId = null)
+    public AuditLogger(AppDbContext db, ICurrentUserAccessor currentUser)
     {
-        db.AuditLogs.Add(new AuditLog
+        _db = db;
+        _resolveUserId = () => currentUser.UserId;
+    }
+
+    private AuditLogger(AppDbContext db, Guid? userId)
+    {
+        _db = db;
+        _resolveUserId = () => userId;
+    }
+
+    public IAuditLogger ForUser(Guid? userId) => new AuditLogger(_db, userId);
+
+    public void LogCreated(string entityType, Guid entityId, Guid? parentEntityId = null)
+    {
+        _db.AuditLogs.Add(new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityType = entityType,
             EntityId = entityId,
             ParentEntityId = parentEntityId,
             Action = AuditAction.Created,
-            UserId = userId,
+            UserId = _resolveUserId(),
             Timestamp = DateTimeOffset.UtcNow
         });
     }
 
-    public void LogUpdated(string entityType, Guid entityId, Guid? userId,
-        List<FieldChange> changes, Guid? parentEntityId = null)
+    public void LogUpdated(string entityType, Guid entityId, List<FieldChange> changes,
+        Guid? parentEntityId = null)
     {
         if (changes.Count == 0)
             return;
 
-        db.AuditLogs.Add(new AuditLog
+        _db.AuditLogs.Add(new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityType = entityType,
@@ -35,30 +51,30 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             ParentEntityId = parentEntityId,
             Action = AuditAction.Updated,
             Changes = JsonSerializer.Serialize(changes, FieldChange.JsonOptions),
-            UserId = userId,
+            UserId = _resolveUserId(),
             Timestamp = DateTimeOffset.UtcNow
         });
     }
 
-    public void LogDeleted(string entityType, Guid entityId, Guid? userId,
-        string? description = null, Guid? parentEntityId = null)
+    public void LogDeleted(string entityType, Guid entityId, string? description = null,
+        Guid? parentEntityId = null)
     {
-        LogAction(AuditAction.Deleted, entityType, entityId, userId, description, parentEntityId);
+        LogAction(AuditAction.Deleted, entityType, entityId, description, parentEntityId);
     }
 
-    public void LogSoftDeleted(string entityType, Guid entityId, Guid? userId,
-        string? description = null, Guid? parentEntityId = null)
+    public void LogSoftDeleted(string entityType, Guid entityId, string? description = null,
+        Guid? parentEntityId = null)
     {
-        LogAction(AuditAction.SoftDeleted, entityType, entityId, userId, description, parentEntityId);
+        LogAction(AuditAction.SoftDeleted, entityType, entityId, description, parentEntityId);
     }
 
-    public void LogRestored(string entityType, Guid entityId, Guid? userId,
-        string? description = null, Guid? parentEntityId = null)
+    public void LogRestored(string entityType, Guid entityId, string? description = null,
+        Guid? parentEntityId = null)
     {
-        LogAction(AuditAction.Restored, entityType, entityId, userId, description, parentEntityId);
+        LogAction(AuditAction.Restored, entityType, entityId, description, parentEntityId);
     }
 
-    private void LogAction(AuditAction action, string entityType, Guid entityId, Guid? userId,
+    private void LogAction(AuditAction action, string entityType, Guid entityId,
         string? description, Guid? parentEntityId)
     {
         string? changes = null;
@@ -71,7 +87,7 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             changes = JsonSerializer.Serialize(fieldChanges, FieldChange.JsonOptions);
         }
 
-        db.AuditLogs.Add(new AuditLog
+        _db.AuditLogs.Add(new AuditLog
         {
             Id = Guid.NewGuid(),
             EntityType = entityType,
@@ -79,7 +95,7 @@ public class AuditLogger(AppDbContext db) : IAuditLogger
             ParentEntityId = parentEntityId,
             Action = action,
             Changes = changes,
-            UserId = userId,
+            UserId = _resolveUserId(),
             Timestamp = DateTimeOffset.UtcNow
         });
     }

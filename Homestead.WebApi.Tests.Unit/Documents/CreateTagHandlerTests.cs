@@ -37,7 +37,7 @@ public class CreateTagHandlerTests : IDisposable
 
         await _sut.HandleAsync(new CreateTagRequest("Test"), CancellationToken.None);
 
-        _auditLogger.Received(1).LogCreated("Tag", tagId, Arg.Any<Guid?>(), Arg.Any<Guid?>());
+        _auditLogger.Received(1).LogCreated("Tag", tagId, Arg.Any<Guid?>());
     }
 
     [Fact]

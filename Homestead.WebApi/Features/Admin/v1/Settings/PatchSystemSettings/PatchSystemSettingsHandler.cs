@@ -39,7 +39,7 @@ public class PatchSystemSettingsHandler(
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule), currentUser.UserId);
+            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
         }
         else
         {
@@ -52,7 +52,7 @@ public class PatchSystemSettingsHandler(
 
             if (changes.Count > 0)
                 auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule),
-                    currentUser.UserId, changes);
+                    changes);
         }
 
         await db.SaveChangesAsync(ct);
