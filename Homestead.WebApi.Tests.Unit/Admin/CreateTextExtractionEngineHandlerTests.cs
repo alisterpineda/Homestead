@@ -157,4 +157,81 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         Assert.Equal("Multi-Language", response.Name);
         Assert.Equal("""{"languages":["Eng","Fra","Deu"]}""", response.Configuration);
     }
+
+    [Fact]
+    public async Task HandleAsync_AzureDocumentIntelligence_ValidConfig_CreatesEngine()
+    {
+        var request = new CreateTextExtractionEngineRequest
+        {
+            Name = "Azure DI Engine",
+            EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
+            Configuration = """{"endpoint":"https://test.cognitiveservices.azure.com","apiKey":"key123"}"""
+        };
+
+        var response = await _sut.HandleAsync(request, CancellationToken.None);
+
+        Assert.Equal("Azure DI Engine", response.Name);
+        Assert.Equal(TextExtractionEngineType.AzureDocumentIntelligence, response.EngineType);
+        Assert.False(response.IsBuiltIn);
+
+        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == response.Id);
+        Assert.NotNull(saved);
+        Assert.Equal(TextExtractionEngineType.AzureDocumentIntelligence, saved.EngineType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AzureDocumentIntelligence_NullConfig_ThrowsBadRequest()
+    {
+        var request = new CreateTextExtractionEngineRequest
+        {
+            Name = "Azure No Config",
+            EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
+            Configuration = null
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_AzureDocumentIntelligence_MissingEndpoint_ThrowsBadRequest()
+    {
+        var request = new CreateTextExtractionEngineRequest
+        {
+            Name = "Azure Missing Endpoint",
+            EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
+            Configuration = """{"apiKey":"key123"}"""
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_AzureDocumentIntelligence_MissingApiKey_ThrowsBadRequest()
+    {
+        var request = new CreateTextExtractionEngineRequest
+        {
+            Name = "Azure Missing ApiKey",
+            EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
+            Configuration = """{"endpoint":"https://test.cognitiveservices.azure.com"}"""
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task HandleAsync_AzureDocumentIntelligence_InvalidJson_ThrowsBadRequest()
+    {
+        var request = new CreateTextExtractionEngineRequest
+        {
+            Name = "Azure Bad JSON",
+            EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
+            Configuration = "not-valid-json"
+        };
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _sut.HandleAsync(request, CancellationToken.None));
+    }
 }

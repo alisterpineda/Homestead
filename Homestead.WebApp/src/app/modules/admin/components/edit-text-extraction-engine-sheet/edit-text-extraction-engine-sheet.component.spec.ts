@@ -46,6 +46,11 @@ describe('EditTextExtractionEngineSheetComponent', () => {
     expect(component.editLanguages()).toEqual(['Eng']);
   });
 
+  it('should have empty editEndpoint and editApiKey initially', () => {
+    expect(component.editEndpoint()).toBe('');
+    expect(component.editApiKey()).toBe('');
+  });
+
   it('should have null editConfiguration initially', () => {
     expect(component.editConfiguration()).toBeNull();
   });
@@ -66,6 +71,20 @@ describe('EditTextExtractionEngineSheetComponent', () => {
   it('should extract input value from event via asInputValue', () => {
     const event = { target: { value: 'new name' } } as unknown as Event;
     expect(component.asInputValue(event)).toBe('new name');
+  });
+
+  describe('getEngineTypeLabel', () => {
+    it('should return Tesseract for Tesseract', () => {
+      expect(component.getEngineTypeLabel('Tesseract')).toBe('Tesseract');
+    });
+
+    it('should return friendly label for AzureDocumentIntelligence', () => {
+      expect(component.getEngineTypeLabel('AzureDocumentIntelligence')).toBe('Azure Document Intelligence');
+    });
+
+    it('should return raw value for unknown type', () => {
+      expect(component.getEngineTypeLabel('UnknownType')).toBe('UnknownType');
+    });
   });
 
   describe('getLanguagesLabel', () => {
@@ -113,6 +132,26 @@ describe('EditTextExtractionEngineSheetComponent', () => {
       component.onLanguagesChange(['Eng', 'Fra']);
       expect(component.editLanguages()).toEqual(['Eng', 'Fra']);
       expect(component.editConfiguration()).toBe(JSON.stringify({ languages: ['Eng', 'Fra'] }));
+    });
+  });
+
+  describe('Azure DI field changes', () => {
+    it('onEndpointChange should update editEndpoint and editConfiguration', () => {
+      component.editApiKey.set('key123');
+      component.onEndpointChange('https://test.cognitiveservices.azure.com');
+      expect(component.editEndpoint()).toBe('https://test.cognitiveservices.azure.com');
+      expect(component.editConfiguration()).toBe(
+        JSON.stringify({ endpoint: 'https://test.cognitiveservices.azure.com', apiKey: 'key123' })
+      );
+    });
+
+    it('onApiKeyChange should update editApiKey and editConfiguration', () => {
+      component.editEndpoint.set('https://test.cognitiveservices.azure.com');
+      component.onApiKeyChange('newkey');
+      expect(component.editApiKey()).toBe('newkey');
+      expect(component.editConfiguration()).toBe(
+        JSON.stringify({ endpoint: 'https://test.cognitiveservices.azure.com', apiKey: 'newkey' })
+      );
     });
   });
 

@@ -1,21 +1,23 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Homestead.WebApi.TextExtraction;
 
 public class TextExtractionHelper(
-    IEnumerable<ITextExtractor> textExtractors,
+    IServiceProvider serviceProvider,
     ITextExtractionEngineResolver engineResolver)
 {
     public async Task<string?> ExtractTextSafeAsync(
         string filePath, string contentType, Guid? engineId,
         ILogger logger, CancellationToken ct)
     {
-        var extractor = textExtractors.FirstOrDefault(e => e.CanExtract(contentType));
-        if (extractor is null)
-            return null;
-
         try
         {
-            var engineContext = await engineResolver.ResolveAsync(engineId, ct);
-            return await extractor.ExtractTextAsync(filePath, engineContext, ct);
+            var context = await engineResolver.ResolveAsync(engineId, ct);
+            var engine = serviceProvider.GetKeyedService<ITextExtractionEngine>(context.EngineType);
+            if (engine is null)
+                return null;
+
+            return await engine.ExtractTextAsync(filePath, contentType, context.Configuration, ct);
         }
         catch (Exception ex)
         {

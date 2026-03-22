@@ -5,16 +5,41 @@ using UglyToad.PdfPig;
 
 namespace Homestead.WebApi.TextExtraction;
 
-public class PdfTextExtractor(TesseractRunner tesseract, ILogger<PdfTextExtractor> logger) : ITextExtractor
+public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<TesseractTextExtractionEngine> logger)
+    : ITextExtractionEngine
 {
-    public bool CanExtract(string contentType)
-        => contentType is "application/pdf";
+    private static readonly HashSet<string> SupportedImageTypes =
+    [
+        "image/png",
+        "image/jpeg",
+        "image/tiff",
+        "image/bmp",
+        "image/gif"
+    ];
 
-    public async Task<string?> ExtractTextAsync(string filePath, TextExtractionContext context, CancellationToken ct)
+    public async Task<string?> ExtractTextAsync(string filePath, string contentType, string? configuration, CancellationToken ct)
+    {
+        if (SupportedImageTypes.Contains(contentType))
+            return await ExtractFromImageAsync(filePath, configuration, ct);
+
+        if (contentType is "application/pdf")
+            return await ExtractFromPdfAsync(filePath, configuration, ct);
+
+        return null;
+    }
+
+    private async Task<string?> ExtractFromImageAsync(string filePath, string? configuration, CancellationToken ct)
+    {
+        var language = TesseractLanguageResolver.Resolve(configuration);
+        await using var fileStream = File.OpenRead(filePath);
+        return await tesseract.OcrAsync(fileStream, language, ct);
+    }
+
+    private async Task<string?> ExtractFromPdfAsync(string filePath, string? configuration, CancellationToken ct)
     {
         try
         {
-            var language = TesseractLanguageResolver.Resolve(context);
+            var language = TesseractLanguageResolver.Resolve(configuration);
 
             using var document = PdfDocument.Open(filePath);
             var sb = new StringBuilder();

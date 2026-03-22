@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.TextExtraction.Configurations;
@@ -9,15 +8,17 @@ public static class TextExtractionEngineConfigValidator
 {
     public static void Validate(TextExtractionEngineType engineType, string? configuration)
     {
-        if (string.IsNullOrWhiteSpace(configuration))
-            return;
-
         switch (engineType)
         {
             case TextExtractionEngineType.Tesseract:
-                if (!TesseractEngineConfig.TryParse(configuration, out var config))
+                if (string.IsNullOrWhiteSpace(configuration))
+                    return;
+                if (!TesseractEngineConfig.TryParse(configuration, out var tesseractConfig))
                     throw new BadRequestException("Invalid configuration JSON for the specified engine type.");
-                ValidateTesseractConfig(config);
+                ValidateTesseractConfig(tesseractConfig);
+                break;
+            case TextExtractionEngineType.AzureDocumentIntelligence:
+                ValidateAzureDocumentIntelligenceConfig(configuration);
                 break;
             default:
                 throw new BadRequestException($"Unsupported engine type: {engineType}");
@@ -34,5 +35,20 @@ public static class TextExtractionEngineConfigValidator
 
         if (new HashSet<TesseractLanguage>(config.Languages).Count != config.Languages.Count)
             throw new BadRequestException("Duplicate languages are not allowed.");
+    }
+
+    private static void ValidateAzureDocumentIntelligenceConfig(string? configuration)
+    {
+        if (string.IsNullOrWhiteSpace(configuration))
+            throw new BadRequestException("Configuration is required for Azure Document Intelligence engines.");
+
+        if (!AzureDocumentIntelligenceEngineConfig.TryParse(configuration, out var config))
+            throw new BadRequestException("Invalid configuration JSON for the specified engine type.");
+
+        if (string.IsNullOrWhiteSpace(config!.Endpoint))
+            throw new BadRequestException("Endpoint is required.");
+
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+            throw new BadRequestException("API Key is required.");
     }
 }

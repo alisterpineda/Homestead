@@ -26,6 +26,7 @@ import type { PaginatedResponseOfTextExtractionEngineResponse } from '@/api/gene
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -170,7 +171,7 @@ import { toast } from 'ngx-sonner';
                               }
                             </td>
                             <td hlmTd>
-                              <span hlmBadge variant="secondary">{{ engine.engineType }}</span>
+                              <span hlmBadge variant="secondary">{{ getEngineTypeLabel(engine.engineType) }}</span>
                             </td>
                             <td hlmTd class="hidden md:table-cell text-muted-foreground">
                               {{ engine.isBuiltIn ? '—' : (engine.createdAt | date: 'mediumDate') }}
@@ -302,6 +303,10 @@ export class TextExtractionEngineListComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.searchSub.unsubscribe();
+  }
+
+  getEngineTypeLabel(engineType: string): string {
+    return ENGINE_TYPE_LABELS[engineType] ?? engineType;
   }
 
   asInputValue(event: Event): string {

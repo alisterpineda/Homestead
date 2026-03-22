@@ -13,6 +13,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text-extraction-engine';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -44,7 +45,7 @@ import { toast } from 'ngx-sonner';
 
             <div class="flex flex-col gap-2">
               <label hlmLabel>Engine Type</label>
-              <p><span hlmBadge variant="secondary">{{ e.engineType }}</span></p>
+              <p><span hlmBadge variant="secondary">{{ getEngineTypeLabel(e.engineType) }}</span></p>
             </div>
 
             @if (e.engineType === 'Tesseract') {
@@ -65,6 +66,29 @@ import { toast } from 'ngx-sonner';
                       <hlm-select-scroll-down />
                     </hlm-select-content>
                   </brn-select>
+                }
+              </div>
+            }
+
+            @if (e.engineType === 'AzureDocumentIntelligence') {
+              <div class="flex flex-col gap-2">
+                <label hlmLabel for="edit-azure-endpoint">Endpoint</label>
+                @if (e.isBuiltIn) {
+                  <p class="text-sm text-muted-foreground">{{ editEndpoint() }}</p>
+                } @else {
+                  <input hlmInput id="edit-azure-endpoint"
+                    placeholder="https://your-resource.cognitiveservices.azure.com"
+                    [value]="editEndpoint()" (input)="onEndpointChange(asInputValue($event))" />
+                }
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <label hlmLabel for="edit-azure-api-key">API Key</label>
+                @if (e.isBuiltIn) {
+                  <p class="text-sm text-muted-foreground">********</p>
+                } @else {
+                  <input hlmInput id="edit-azure-api-key" type="password" placeholder="API Key"
+                    [value]="editApiKey()" (input)="onApiKeyChange(asInputValue($event))" />
                 }
               </div>
             }
@@ -103,6 +127,8 @@ export class EditTextExtractionEngineSheetComponent {
   languages = TESSERACT_LANGUAGES;
   editName = signal('');
   editLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
+  editEndpoint = signal('');
+  editApiKey = signal('');
   editConfiguration = signal<string | null>(null);
   saving = signal(false);
 
@@ -120,12 +146,21 @@ export class EditTextExtractionEngineSheetComponent {
       if (e && this.state() === 'open') {
         this.editName.set(e.name);
         this.editConfiguration.set(e.configuration ?? null);
-        if (e.configuration) {
+        if (e.engineType === 'Tesseract' && e.configuration) {
           try {
             const parsed = JSON.parse(e.configuration);
             if (Array.isArray(parsed.languages)) {
               this.editLanguages.set(parsed.languages);
             }
+          } catch {
+            // ignore
+          }
+        }
+        if (e.engineType === 'AzureDocumentIntelligence' && e.configuration) {
+          try {
+            const parsed = JSON.parse(e.configuration);
+            this.editEndpoint.set(parsed.endpoint ?? '');
+            this.editApiKey.set(parsed.apiKey ?? '');
           } catch {
             // ignore
           }
@@ -136,6 +171,10 @@ export class EditTextExtractionEngineSheetComponent {
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
+  }
+
+  getEngineTypeLabel(engineType: string): string {
+    return ENGINE_TYPE_LABELS[engineType] ?? engineType;
   }
 
   getLanguagesLabel(configuration: string | null | undefined): string {
@@ -154,6 +193,23 @@ export class EditTextExtractionEngineSheetComponent {
   onLanguagesChange(values: string[]): void {
     this.editLanguages.set(values);
     this.editConfiguration.set(JSON.stringify({ languages: values }));
+  }
+
+  onEndpointChange(value: string): void {
+    this.editEndpoint.set(value);
+    this.rebuildAzureConfig();
+  }
+
+  onApiKeyChange(value: string): void {
+    this.editApiKey.set(value);
+    this.rebuildAzureConfig();
+  }
+
+  private rebuildAzureConfig(): void {
+    this.editConfiguration.set(JSON.stringify({
+      endpoint: this.editEndpoint(),
+      apiKey: this.editApiKey(),
+    }));
   }
 
   handleSave(): void {

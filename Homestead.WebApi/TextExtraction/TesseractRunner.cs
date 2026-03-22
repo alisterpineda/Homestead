@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.TextExtraction;
 
-public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<TesseractRunner> logger)
+public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<TesseractRunner> logger) : ITesseractRunner
 {
     private readonly string _tessDataPath = options.Value.TessDataPath;
 

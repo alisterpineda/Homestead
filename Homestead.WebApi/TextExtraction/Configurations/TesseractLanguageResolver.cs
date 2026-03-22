@@ -6,9 +6,9 @@ public static class TesseractLanguageResolver
 {
     private static readonly string DefaultLanguage = TesseractLanguage.Eng.ToString().ToLowerInvariant();
 
-    public static string Resolve(TextExtractionContext context)
+    public static string Resolve(string? configuration)
     {
-        if (!TesseractEngineConfig.TryParse(context.Configuration, out var config))
+        if (!TesseractEngineConfig.TryParse(configuration, out var config))
             return DefaultLanguage;
 
         if (config!.Languages is { Count: > 0 })

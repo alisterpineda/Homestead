@@ -10,6 +10,8 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
+import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
+import { ENGINE_TYPE_OPTIONS } from '../../constants/engine-type-labels';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -39,20 +41,50 @@ import { toast } from 'ngx-sonner';
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel>Languages</label>
-            <brn-select [multiple]="true" [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
+            <label hlmLabel>Engine Type</label>
+            <brn-select [ngModel]="selectedEngineType()" (ngModelChange)="selectedEngineType.set($event)">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
-              <hlm-select-content class="max-h-60">
-                <hlm-select-scroll-up />
-                @for (lang of languages; track lang.value) {
-                  <hlm-option [value]="lang.value">{{ lang.label }}</hlm-option>
+              <hlm-select-content>
+                @for (type of engineTypeOptions; track type.value) {
+                  <hlm-option [value]="type.value">{{ type.label }}</hlm-option>
                 }
-                <hlm-select-scroll-down />
               </hlm-select-content>
             </brn-select>
           </div>
+
+          @if (selectedEngineType() === 'Tesseract') {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel>Languages</label>
+              <brn-select [multiple]="true" [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
+                <hlm-select-trigger class="w-full">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content class="max-h-60">
+                  <hlm-select-scroll-up />
+                  @for (lang of languages; track lang.value) {
+                    <hlm-option [value]="lang.value">{{ lang.label }}</hlm-option>
+                  }
+                  <hlm-select-scroll-down />
+                </hlm-select-content>
+              </brn-select>
+            </div>
+          }
+
+          @if (selectedEngineType() === 'AzureDocumentIntelligence') {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="azure-endpoint">Endpoint</label>
+              <input hlmInput id="azure-endpoint" placeholder="https://your-resource.cognitiveservices.azure.com"
+                [value]="endpoint()" (input)="endpoint.set(asInputValue($event))" />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="azure-api-key">API Key</label>
+              <input hlmInput id="azure-api-key" type="password" placeholder="API Key"
+                [value]="apiKey()" (input)="apiKey.set(asInputValue($event))" />
+            </div>
+          }
 
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>
@@ -76,18 +108,34 @@ export class CreateTextExtractionEngineDialogComponent {
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
 
+  engineTypeOptions = ENGINE_TYPE_OPTIONS;
   languages = TESSERACT_LANGUAGES;
   name = signal('');
+  selectedEngineType = signal<TextExtractionEngineType>('Tesseract');
   selectedLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
+  endpoint = signal('');
+  apiKey = signal('');
   creating = signal(false);
   createError = signal('');
 
-  canSubmit = computed(() => this.name().trim().length > 0 && this.selectedLanguages().length > 0);
+  canSubmit = computed(() => {
+    if (this.name().trim().length === 0) return false;
+    if (this.selectedEngineType() === 'Tesseract') {
+      return this.selectedLanguages().length > 0;
+    }
+    if (this.selectedEngineType() === 'AzureDocumentIntelligence') {
+      return this.endpoint().trim().length > 0 && this.apiKey().trim().length > 0;
+    }
+    return false;
+  });
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.name.set('');
+      this.selectedEngineType.set('Tesseract');
       this.selectedLanguages.set([...DEFAULT_TESSERACT_LANGUAGES]);
+      this.endpoint.set('');
+      this.apiKey.set('');
       this.creating.set(false);
       this.createError.set('');
     }
@@ -103,11 +151,22 @@ export class CreateTextExtractionEngineDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
+    const engineType = this.selectedEngineType();
+    let configuration: string;
+    if (engineType === 'AzureDocumentIntelligence') {
+      configuration = JSON.stringify({
+        endpoint: this.endpoint().trim(),
+        apiKey: this.apiKey().trim(),
+      });
+    } else {
+      configuration = JSON.stringify({ languages: this.selectedLanguages() });
+    }
+
     createTextExtractionEngine(this.http, this.apiConfig.rootUrl, {
       body: {
         name: this.name().trim(),
-        engineType: 'Tesseract',
-        configuration: JSON.stringify({ languages: this.selectedLanguages() }),
+        engineType,
+        configuration,
       },
     }).subscribe({
       next: () => {

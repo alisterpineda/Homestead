@@ -182,6 +182,99 @@ public class TextExtractionEngineCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Admin_CanCreateAzureDocumentIntelligenceEngine()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name = "Azure DI Engine",
+            engineType = "AzureDocumentIntelligence",
+            configuration = "{\"endpoint\":\"https://test.cognitiveservices.azure.com\",\"apiKey\":\"key123\"}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TextExtractionEngineItem>(CT);
+        Assert.Equal("Azure DI Engine", body!.Name);
+        Assert.Equal("AzureDocumentIntelligence", body.EngineType);
+        Assert.False(body.IsBuiltIn);
+    }
+
+    [Fact]
+    public async Task Admin_CanUpdateAzureDocumentIntelligenceEngine()
+    {
+        var client = await CreateAdminClientAsync();
+        var engineId = await CreateAzureDocumentIntelligenceEngineAsync(client, "Azure Update Me");
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/text-extraction-engines/{engineId}", new
+        {
+            name = "Azure Updated",
+            configuration = "{\"endpoint\":\"https://updated.cognitiveservices.azure.com\",\"apiKey\":\"newkey\"}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TextExtractionEngineItem>(CT);
+        Assert.Equal("Azure Updated", body!.Name);
+    }
+
+    [Fact]
+    public async Task CreateAzureDocumentIntelligence_MissingEndpoint_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name = "Azure No Endpoint",
+            engineType = "AzureDocumentIntelligence",
+            configuration = "{\"apiKey\":\"key123\"}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateAzureDocumentIntelligence_MissingApiKey_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name = "Azure No Key",
+            engineType = "AzureDocumentIntelligence",
+            configuration = "{\"endpoint\":\"https://test.cognitiveservices.azure.com\"}"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateAzureDocumentIntelligence_NullConfig_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name = "Azure Null Config",
+            engineType = "AzureDocumentIntelligence",
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Admin_ListIncludesAzureDocumentIntelligenceEngine()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreateAzureDocumentIntelligenceEngineAsync(client, "Azure In List");
+
+        var response = await client.GetAsync("/api/v1/admin/text-extraction-engines?Page=1&PageSize=50", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TextExtractionEngineItem>>(CT);
+        Assert.Contains(body!.Items, e => e.Name == "Azure In List" && e.EngineType == "AzureDocumentIntelligence");
+    }
+
     private async Task<Guid> CreateTextExtractionEngineAsync(HttpClient client, string name, string? configuration = null)
     {
         var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
@@ -189,6 +282,19 @@ public class TextExtractionEngineCrudTests : IntegrationTestBase
             name,
             engineType = "Tesseract",
             configuration = configuration ?? "{\"languages\":[\"Eng\"]}"
+        }, CT);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<TextExtractionEngineItem>(CT);
+        return body!.Id;
+    }
+
+    private async Task<Guid> CreateAzureDocumentIntelligenceEngineAsync(HttpClient client, string name)
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/admin/text-extraction-engines", new
+        {
+            name,
+            engineType = "AzureDocumentIntelligence",
+            configuration = "{\"endpoint\":\"https://test.cognitiveservices.azure.com\",\"apiKey\":\"key123\"}"
         }, CT);
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<TextExtractionEngineItem>(CT);

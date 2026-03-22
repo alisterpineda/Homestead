@@ -158,4 +158,18 @@ describe('TextExtractionEngineListComponent', () => {
   it('should have empty searchTerm initially', () => {
     expect(component.searchTerm()).toBe('');
   });
+
+  describe('getEngineTypeLabel', () => {
+    it('should return Tesseract for Tesseract', () => {
+      expect(component.getEngineTypeLabel('Tesseract')).toBe('Tesseract');
+    });
+
+    it('should return friendly label for AzureDocumentIntelligence', () => {
+      expect(component.getEngineTypeLabel('AzureDocumentIntelligence')).toBe('Azure Document Intelligence');
+    });
+
+    it('should return raw value for unknown type', () => {
+      expect(component.getEngineTypeLabel('SomeOtherType')).toBe('SomeOtherType');
+    });
+  });
 });
