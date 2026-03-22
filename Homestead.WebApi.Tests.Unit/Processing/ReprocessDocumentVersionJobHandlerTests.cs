@@ -5,7 +5,7 @@ using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using Homestead.WebApi.TextExtraction;
+using Homestead.WebApi.Features.Documents.TextExtraction;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

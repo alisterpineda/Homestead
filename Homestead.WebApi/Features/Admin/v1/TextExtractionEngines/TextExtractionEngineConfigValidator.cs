@@ -1,6 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.TextExtraction.Configurations;
+using Homestead.WebApi.Features.Documents.TextExtraction.Configurations;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines;
 

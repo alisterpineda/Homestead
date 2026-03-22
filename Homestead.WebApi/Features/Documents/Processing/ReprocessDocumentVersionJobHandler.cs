@@ -3,7 +3,7 @@ using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using Homestead.WebApi.TextExtraction;
+using Homestead.WebApi.Features.Documents.TextExtraction;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Processing;

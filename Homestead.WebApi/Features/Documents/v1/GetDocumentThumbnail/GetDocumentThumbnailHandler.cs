@@ -1,7 +1,7 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
-using Homestead.WebApi.Thumbnails;
+using Homestead.WebApi.Features.Documents.Thumbnails;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
