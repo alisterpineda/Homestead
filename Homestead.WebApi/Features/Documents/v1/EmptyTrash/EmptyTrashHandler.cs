@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Features.Documents.v1.EmptyTrash;
 public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, IDocumentQueryService accessService,
     ILogger<EmptyTrashHandler> logger)
-    : ICommandHandler<EmptyTrashRequest, EmptyTrashResponse>
+    : IRequestHandler<EmptyTrashRequest, EmptyTrashResponse>
 {
-    public async Task<EmptyTrashResponse> HandleAsync(EmptyTrashRequest request, CancellationToken ct)
+    public async Task<EmptyTrashResponse> Handle(EmptyTrashRequest request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Include(d => d.Versions)

@@ -18,11 +18,11 @@ public class GetTagsHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_DefaultSort_OrdersByNameAsc()
+    public async Task Handle_DefaultSort_OrdersByNameAsc()
     {
         await SeedTagsAsync("Charlie", "Alpha", "Bravo");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10 },
             CancellationToken.None);
 
@@ -31,11 +31,11 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByNameDesc_OrdersDescending()
+    public async Task Handle_SortByNameDesc_OrdersDescending()
     {
         await SeedTagsAsync("Alpha", "Bravo", "Charlie");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Name, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -44,14 +44,14 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByPathAsc_OrdersByPath()
+    public async Task Handle_SortByPathAsc_OrdersByPath()
     {
         _db.Tags.Add(new Tag { Name = "C", Path = "Z/C" });
         _db.Tags.Add(new Tag { Name = "A", Path = "A" });
         _db.Tags.Add(new Tag { Name = "B", Path = "M/B" });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
@@ -60,14 +60,14 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByPathDesc_OrdersDescending()
+    public async Task Handle_SortByPathDesc_OrdersDescending()
     {
         _db.Tags.Add(new Tag { Name = "A", Path = "A" });
         _db.Tags.Add(new Tag { Name = "B", Path = "M/B" });
         _db.Tags.Add(new Tag { Name = "C", Path = "Z/C" });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -76,7 +76,7 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByCreatedAtAsc_OrdersOldestFirst()
+    public async Task Handle_SortByCreatedAtAsc_OrdersOldestFirst()
     {
         var now = DateTimeOffset.UtcNow;
         _db.Tags.Add(new Tag { Name = "Third", Path = "Third", CreatedAt = now.AddHours(2) });
@@ -84,7 +84,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
@@ -93,7 +93,7 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByCreatedAtDesc_OrdersNewestFirst()
+    public async Task Handle_SortByCreatedAtDesc_OrdersNewestFirst()
     {
         var now = DateTimeOffset.UtcNow;
         _db.Tags.Add(new Tag { Name = "First", Path = "First", CreatedAt = now });
@@ -101,7 +101,7 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -110,7 +110,7 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
+    public async Task Handle_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
     {
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
@@ -131,7 +131,7 @@ public class GetTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -141,7 +141,7 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
+    public async Task Handle_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
     {
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
@@ -158,7 +158,7 @@ public class GetTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
@@ -168,11 +168,11 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NullSortBy_DefaultsToNameAsc()
+    public async Task Handle_NullSortBy_DefaultsToNameAsc()
     {
         await SeedTagsAsync("Zulu", "Alpha");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetTagsRequest { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             CancellationToken.None);
 

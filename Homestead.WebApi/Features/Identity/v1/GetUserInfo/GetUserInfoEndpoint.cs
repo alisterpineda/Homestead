@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Identity.v1.GetUserInfo;
 
@@ -6,13 +7,13 @@ public static class GetUserInfoEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/user-info", async (ICurrentUserAccessor currentUser, GetUserInfoHandler handler, CancellationToken ct) =>
+        group.MapGet("/user-info", async (ICurrentUserAccessor currentUser, ISender sender, CancellationToken ct) =>
         {
             var userId = currentUser.UserId;
             if (userId is null)
                 return Results.Unauthorized();
 
-            var response = await handler.HandleAsync(new GetUserInfoRequest(userId.Value), ct);
+            var response = await sender.Send(new GetUserInfoRequest(userId.Value), ct);
             return response is not null ? Results.Ok(response) : Results.Unauthorized();
         })
         .WithName("GetUserInfo")

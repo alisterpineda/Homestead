@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,9 +8,9 @@ namespace Homestead.WebApi.Features.Documents.v1.RestoreDocuments;
 
 public class RestoreDocumentsHandler(AppDbContext db,
     IAuditLogger auditLogger, IDocumentQueryService accessService)
-    : ICommandHandler<RestoreDocumentsRequest, RestoreDocumentsResponse>
+    : IRequestHandler<RestoreDocumentsRequest, RestoreDocumentsResponse>
 {
-    public async Task<RestoreDocumentsResponse> HandleAsync(RestoreDocumentsRequest request, CancellationToken ct)
+    public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsRequest request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Where(d => d.DeletedAt != null && request.Ids.Contains(d.Id));

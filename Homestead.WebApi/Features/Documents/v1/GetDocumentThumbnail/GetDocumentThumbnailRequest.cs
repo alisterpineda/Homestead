@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentThumbnail;
 
-public record GetDocumentThumbnailRequest(Guid Id, Guid? VersionId);
+public record GetDocumentThumbnailRequest(Guid Id, Guid? VersionId) : IRequest<IResult>;

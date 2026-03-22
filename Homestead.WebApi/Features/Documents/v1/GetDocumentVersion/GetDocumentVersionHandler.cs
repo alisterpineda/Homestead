@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentVersion;
 
 public class GetDocumentVersionHandler(AppDbContext db, IAuthorizationService authService, IHttpContextAccessor httpContext)
-    : IQueryHandler<GetDocumentVersionRequest, GetDocumentVersionResponse?>
+    : IRequestHandler<GetDocumentVersionRequest, GetDocumentVersionResponse?>
 {
-    public async Task<GetDocumentVersionResponse?> HandleAsync(GetDocumentVersionRequest request, CancellationToken ct)
+    public async Task<GetDocumentVersionResponse?> Handle(GetDocumentVersionRequest request, CancellationToken ct)
     {
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Read);
 

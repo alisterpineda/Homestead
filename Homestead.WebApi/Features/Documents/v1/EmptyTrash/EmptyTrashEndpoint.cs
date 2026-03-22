@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.EmptyTrash;
 
@@ -6,9 +7,9 @@ public static class EmptyTrashEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/empty-trash", async (EmptyTrashHandler handler, CancellationToken ct) =>
+        group.MapPost("/empty-trash", async (ISender sender, CancellationToken ct) =>
         {
-            var response = await handler.HandleAsync(new EmptyTrashRequest(), ct);
+            var response = await sender.Send(new EmptyTrashRequest(), ct);
             return Results.Ok(response);
         })
         .WithName("EmptyTrash")

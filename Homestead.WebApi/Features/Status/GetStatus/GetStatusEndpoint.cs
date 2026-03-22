@@ -1,12 +1,14 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Status.GetStatus;
 
 public static class GetStatusEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("", async (GetStatusHandler handler, CancellationToken ct) =>
+        group.MapGet("", async (ISender sender, CancellationToken ct) =>
         {
-            var response = await handler.HandleAsync(new GetStatusRequest(), ct);
+            var response = await sender.Send(new GetStatusRequest(), ct);
             return Results.Ok(response);
         })
         .WithName("GetStatus")

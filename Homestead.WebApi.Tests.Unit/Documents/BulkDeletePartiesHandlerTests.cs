@@ -23,7 +23,7 @@ public class BulkDeletePartiesHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsDeletedAuditPerParty()
+    public async Task Handle_LogsDeletedAuditPerParty()
     {
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -33,16 +33,16 @@ public class BulkDeletePartiesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        await _sut.HandleAsync(new BulkDeletePartiesRequest([id1, id2]), CancellationToken.None);
+        await _sut.Handle(new BulkDeletePartiesRequest([id1, id2]), CancellationToken.None);
 
         _auditLogger.Received(1).LogDeleted("Party", id1, "Party A", Arg.Any<Guid?>());
         _auditLogger.Received(1).LogDeleted("Party", id2, "Party B", Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_NoParties_DoesNotLogAudit()
+    public async Task Handle_NoParties_DoesNotLogAudit()
     {
-        await _sut.HandleAsync(new BulkDeletePartiesRequest([Guid.NewGuid()]), CancellationToken.None);
+        await _sut.Handle(new BulkDeletePartiesRequest([Guid.NewGuid()]), CancellationToken.None);
 
         _auditLogger.DidNotReceive().LogDeleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }

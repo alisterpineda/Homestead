@@ -2,14 +2,15 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.AddGroupMember;
 
 public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
-    : ICommandHandler<AddGroupMemberCommand, GroupMemberResponse>
+    : IRequestHandler<AddGroupMemberCommand, GroupMemberResponse>
 {
-    public async Task<GroupMemberResponse> HandleAsync(AddGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> Handle(AddGroupMemberCommand command, CancellationToken ct)
     {
         var groupExists = await db.Groups.AnyAsync(g => g.Id == command.GroupId, ct);
         if (!groupExists)
@@ -57,7 +58,7 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record AddGroupMemberCommand
+public record AddGroupMemberCommand : IRequest<GroupMemberResponse>
 {
     public Guid GroupId { get; init; }
     public required AddGroupMemberRequest Request { get; init; }

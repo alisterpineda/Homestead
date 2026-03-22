@@ -1,6 +1,8 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
 
-public class ReprocessDocumentVersionRequest
+public class ReprocessDocumentVersionRequest : IRequest<ReprocessDocumentVersionResponse>
 {
     public Guid DocumentId { get; set; }
     public Guid VersionId { get; set; }

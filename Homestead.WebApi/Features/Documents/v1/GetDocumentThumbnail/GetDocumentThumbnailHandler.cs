@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Features.Documents.Thumbnails;
 using Microsoft.AspNetCore.Authorization;
@@ -13,9 +13,9 @@ public class GetDocumentThumbnailHandler(
     IAuthorizationService authService,
     IHttpContextAccessor httpContext,
     ThumbnailService thumbnailService)
-    : IQueryHandler<GetDocumentThumbnailRequest, IResult>
+    : IRequestHandler<GetDocumentThumbnailRequest, IResult>
 {
-    public async Task<IResult> HandleAsync(GetDocumentThumbnailRequest request, CancellationToken ct)
+    public async Task<IResult> Handle(GetDocumentThumbnailRequest request, CancellationToken ct)
     {
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Read);
 

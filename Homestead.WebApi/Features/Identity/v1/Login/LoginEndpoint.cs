@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Identity.v1.Login;
 
@@ -6,9 +7,9 @@ public static class LoginEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/login", async (LoginRequest request, LoginHandler handler, CancellationToken ct) =>
+        group.MapPost("/login", async (LoginRequest request, ISender sender, CancellationToken ct) =>
         {
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
 
             if (response.IsInactive)
                 return Results.Json(new { error = AuthPolicies.AccountInactiveError },

@@ -2,14 +2,15 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
 
 public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditLogger auditLogger)
-    : ICommandHandler<UpdateTextExtractionEngineCommand, TextExtractionEngineResponse>
+    : IRequestHandler<UpdateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
-    public async Task<TextExtractionEngineResponse> HandleAsync(UpdateTextExtractionEngineCommand command, CancellationToken ct)
+    public async Task<TextExtractionEngineResponse> Handle(UpdateTextExtractionEngineCommand command, CancellationToken ct)
     {
         if (command.Id == BuiltInTextExtractionEngines.TesseractDefaultId)
             throw new BadRequestException("Cannot modify a built-in engine.");
@@ -64,7 +65,7 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditLogger aud
     }
 }
 
-public record UpdateTextExtractionEngineCommand
+public record UpdateTextExtractionEngineCommand : IRequest<TextExtractionEngineResponse>
 {
     public Guid Id { get; init; }
     public required UpdateTextExtractionEngineRequest Request { get; init; }

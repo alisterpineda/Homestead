@@ -24,11 +24,11 @@ public class CreateGroupHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsCreatedAudit()
+    public async Task Handle_LogsCreatedAudit()
     {
         var request = new CreateGroupRequest { Name = "Engineering" };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         _auditLogger.Received(1).LogCreated("Group", response.Id, Arg.Any<Guid?>());
     }

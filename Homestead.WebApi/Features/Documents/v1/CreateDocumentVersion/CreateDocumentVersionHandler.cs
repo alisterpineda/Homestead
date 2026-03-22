@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
@@ -18,9 +19,9 @@ public class CreateDocumentVersionHandler(
     IJobQueue jobQueue,
     IAuthorizationService authService,
     IHttpContextAccessor httpContext)
-    : ICommandHandler<CreateDocumentVersionRequest, CreateDocumentVersionResponse>
+    : IRequestHandler<CreateDocumentVersionRequest, CreateDocumentVersionResponse>
 {
-    public async Task<CreateDocumentVersionResponse> HandleAsync(CreateDocumentVersionRequest request, CancellationToken ct)
+    public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionRequest request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

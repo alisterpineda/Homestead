@@ -70,7 +70,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NullEngineId_Succeeds()
+    public async Task Handle_NullEngineId_Succeeds()
     {
         var request = new ReprocessDocumentVersionRequest
         {
@@ -79,13 +79,13 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = null,
         };
 
-        var result = await _sut.HandleAsync(request, CancellationToken.None);
+        var result = await _sut.Handle(request, CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
 
     [Fact]
-    public async Task HandleAsync_BuiltInEngineId_Succeeds()
+    public async Task Handle_BuiltInEngineId_Succeeds()
     {
         var request = new ReprocessDocumentVersionRequest
         {
@@ -94,13 +94,13 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = BuiltInTextExtractionEngines.TesseractDefaultId,
         };
 
-        var result = await _sut.HandleAsync(request, CancellationToken.None);
+        var result = await _sut.Handle(request, CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
 
     [Fact]
-    public async Task HandleAsync_ValidDbEngineId_Succeeds()
+    public async Task Handle_ValidDbEngineId_Succeeds()
     {
         var engineId = Guid.NewGuid();
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -119,13 +119,13 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = engineId,
         };
 
-        var result = await _sut.HandleAsync(request, CancellationToken.None);
+        var result = await _sut.Handle(request, CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
 
     [Fact]
-    public async Task HandleAsync_NonExistentEngineId_ThrowsBadRequest()
+    public async Task Handle_NonExistentEngineId_ThrowsBadRequest()
     {
         var request = new ReprocessDocumentVersionRequest
         {
@@ -135,13 +135,13 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         var ex = await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
 
         Assert.Contains("does not exist", ex.Message);
     }
 
     [Fact]
-    public async Task HandleAsync_NonExistentDocument_ThrowsNotFound()
+    public async Task Handle_NonExistentDocument_ThrowsNotFound()
     {
         var request = new ReprocessDocumentVersionRequest
         {
@@ -150,11 +150,11 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_NonExistentVersion_ThrowsNotFound()
+    public async Task Handle_NonExistentVersion_ThrowsNotFound()
     {
         var request = new ReprocessDocumentVersionRequest
         {
@@ -163,6 +163,6 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 }

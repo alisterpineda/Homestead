@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -7,9 +8,9 @@ using Microsoft.AspNetCore.Identity;
 namespace Homestead.WebApi.Features.Admin.v1.ChangeUserPassword;
 
 public class ChangeUserPasswordHandler(UserManager<AppUser> userManager, IAuditLogger auditLogger, AppDbContext db)
-    : ICommandHandler<ChangeUserPasswordCommand, bool>
+    : IRequestHandler<ChangeUserPasswordCommand, bool>
 {
-    public async Task<bool> HandleAsync(ChangeUserPasswordCommand request, CancellationToken ct)
+    public async Task<bool> Handle(ChangeUserPasswordCommand request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(request.Id.ToString());
         if (user is null)

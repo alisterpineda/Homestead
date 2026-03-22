@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocumentVersion;
@@ -8,7 +9,7 @@ public static class CreateDocumentVersionEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/", async (Guid documentId, [FromForm] string? label,
-            IFormFile file, CreateDocumentVersionHandler handler, CancellationToken ct) =>
+            IFormFile file, ISender sender, CancellationToken ct) =>
         {
             var request = new CreateDocumentVersionRequest
             {
@@ -16,7 +17,7 @@ public static class CreateDocumentVersionEndpoint
                 Label = label,
                 File = file
             };
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
             return Results.Accepted(null, response);
         })
         .WithName("CreateDocumentVersion")

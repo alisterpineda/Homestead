@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
@@ -7,7 +8,7 @@ public static class UpdateUserEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest request,
-            UpdateUserHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = new UpdateUserCommand
             {
@@ -20,7 +21,7 @@ public static class UpdateUserEndpoint
 
             try
             {
-                var response = await handler.HandleAsync(command, ct);
+                var response = await sender.Send(command, ct);
                 return response is not null ? Results.Ok(response) : Results.NotFound();
             }
             catch (IdentityValidationException ex)

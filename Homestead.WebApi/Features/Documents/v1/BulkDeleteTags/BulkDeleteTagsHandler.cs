@@ -1,14 +1,14 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 
 public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
-    : ICommandHandler<BulkDeleteTagsRequest, BulkDeleteTagsResponse>
+    : IRequestHandler<BulkDeleteTagsRequest, BulkDeleteTagsResponse>
 {
-    public async Task<BulkDeleteTagsResponse> HandleAsync(BulkDeleteTagsRequest request, CancellationToken ct)
+    public async Task<BulkDeleteTagsResponse> Handle(BulkDeleteTagsRequest request, CancellationToken ct)
     {
         var tags = await db.Tags
             .Where(t => request.Ids.Contains(t.Id))

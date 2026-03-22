@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -14,9 +15,9 @@ public class CreateCommentHandler(
     IAuditLogger auditLogger,
     IAuthorizationService authService,
     IHttpContextAccessor httpContext)
-    : ICommandHandler<CreateCommentRequest, CreateCommentResponse>
+    : IRequestHandler<CreateCommentRequest, CreateCommentResponse>
 {
-    public async Task<CreateCommentResponse> HandleAsync(CreateCommentRequest request, CancellationToken ct)
+    public async Task<CreateCommentResponse> Handle(CreateCommentRequest request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

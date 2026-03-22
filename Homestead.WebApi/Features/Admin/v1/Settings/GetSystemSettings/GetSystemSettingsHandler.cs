@@ -1,9 +1,12 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings;
 
 public class GetSystemSettingsHandler
+    : IRequestHandler<GetSystemSettingsRequest, SystemSettingsResponse>
 {
-    public SystemSettingsResponse Handle()
+    public Task<SystemSettingsResponse> Handle(GetSystemSettingsRequest request, CancellationToken ct)
     {
-        return new SystemSettingsResponse();
+        return Task.FromResult(new SystemSettingsResponse());
     }
 }

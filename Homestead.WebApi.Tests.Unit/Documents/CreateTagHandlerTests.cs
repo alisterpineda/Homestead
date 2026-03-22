@@ -27,7 +27,7 @@ public class CreateTagHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsCreatedAudit()
+    public async Task Handle_LogsCreatedAudit()
     {
         var tagId = Guid.NewGuid();
         var tag = new Tag { Id = tagId, Name = "Test", Path = "Test" };
@@ -35,34 +35,34 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        await _sut.HandleAsync(new CreateTagRequest("Test"), CancellationToken.None);
+        await _sut.Handle(new CreateTagRequest("Test"), CancellationToken.None);
 
         _auditLogger.Received(1).LogCreated("Tag", tagId, Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_PassesDescriptionToResolver()
+    public async Task Handle_PassesDescriptionToResolver()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "My desc" };
 
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.HandleAsync(new CreateTagRequest("Test", Description: "My desc"), CancellationToken.None);
+        var result = await _sut.Handle(new CreateTagRequest("Test", Description: "My desc"), CancellationToken.None);
 
         await _tagPathResolver.Received(1).ResolveOrCreateAsync("Test", leafColor: null, leafDescription: "My desc", createdByUserId: Arg.Any<Guid?>(), ct: Arg.Any<CancellationToken>());
         Assert.Equal("My desc", result.Description);
     }
 
     [Fact]
-    public async Task HandleAsync_WithNullDescription_ReturnsNullDescription()
+    public async Task Handle_WithNullDescription_ReturnsNullDescription()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test" };
 
         _tagPathResolver.ResolveOrCreateAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(tag);
 
-        var result = await _sut.HandleAsync(new CreateTagRequest("Test"), CancellationToken.None);
+        var result = await _sut.Handle(new CreateTagRequest("Test"), CancellationToken.None);
 
         Assert.Null(result.Description);
     }

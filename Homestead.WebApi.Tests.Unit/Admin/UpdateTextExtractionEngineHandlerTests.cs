@@ -26,7 +26,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_BuiltInId_ThrowsBadRequest()
+    public async Task Handle_BuiltInId_ThrowsBadRequest()
     {
         var command = new UpdateTextExtractionEngineCommand
         {
@@ -38,13 +38,13 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
         };
 
         var ex = await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
+            () => _sut.Handle(command, CancellationToken.None));
 
         Assert.Equal("Cannot modify a built-in engine.", ex.Message);
     }
 
     [Fact]
-    public async Task HandleAsync_NotFound_ThrowsNotFound()
+    public async Task Handle_NotFound_ThrowsNotFound()
     {
         var command = new UpdateTextExtractionEngineCommand
         {
@@ -56,11 +56,11 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<NotFoundException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
+            () => _sut.Handle(command, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_ValidRequest_UpdatesEngine()
+    public async Task Handle_ValidRequest_UpdatesEngine()
     {
         var engineId = Guid.NewGuid();
         var engine = new TextExtractionEngine
@@ -83,7 +83,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
             }
         };
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal("Updated Name", response.Name);
         Assert.Equal("""{"languages":["Deu"]}""", response.Configuration);

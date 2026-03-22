@@ -20,15 +20,15 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_EmptyDb_ReturnsEmptyList()
+    public async Task Handle_EmptyDb_ReturnsEmptyList()
     {
-        var result = await _sut.HandleAsync(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public async Task HandleAsync_WithDbEngines_ReturnsAll()
+    public async Task Handle_WithDbEngines_ReturnsAll()
     {
         _db.TextExtractionEngines.Add(new TextExtractionEngine
         {
@@ -39,22 +39,22 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal("Custom Engine", result[0].Name);
     }
 
     [Fact]
-    public async Task HandleAsync_DoesNotIncludeBuiltInEngine()
+    public async Task Handle_DoesNotIncludeBuiltInEngine()
     {
-        var result = await _sut.HandleAsync(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
 
         Assert.DoesNotContain(result, e => e.Id == BuiltInTextExtractionEngines.TesseractDefaultId);
     }
 
     [Fact]
-    public async Task HandleAsync_ReturnsSortedByName()
+    public async Task Handle_ReturnsSortedByName()
     {
         _db.TextExtractionEngines.AddRange(
             new TextExtractionEngine
@@ -73,7 +73,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
             });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Equal("Alpha Engine", result[0].Name);
@@ -81,7 +81,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ReturnsOnlyIdAndName()
+    public async Task Handle_ReturnsOnlyIdAndName()
     {
         var engineId = Guid.NewGuid();
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -94,7 +94,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal(engineId, result[0].Id);

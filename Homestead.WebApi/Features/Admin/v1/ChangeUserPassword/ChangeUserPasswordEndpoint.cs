@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.ChangeUserPassword;
 
@@ -7,7 +8,7 @@ public static class ChangeUserPasswordEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPut("/{id:guid}/password", async (Guid id, ChangeUserPasswordRequest request,
-            ChangeUserPasswordHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = new ChangeUserPasswordCommand
             {
@@ -17,7 +18,7 @@ public static class ChangeUserPasswordEndpoint
 
             try
             {
-                var found = await handler.HandleAsync(command, ct);
+                var found = await sender.Send(command, ct);
                 return found ? Results.NoContent() : Results.NotFound();
             }
             catch (IdentityValidationException ex)

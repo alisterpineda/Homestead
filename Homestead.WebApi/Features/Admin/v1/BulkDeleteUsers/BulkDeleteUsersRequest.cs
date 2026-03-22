@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Admin.v1.BulkDeleteUsers;
 
-public record BulkDeleteUsersRequest(List<Guid> Ids);
+public record BulkDeleteUsersRequest(List<Guid> Ids) : IRequest<BulkDeleteUsersResponse>;

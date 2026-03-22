@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
 public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
-    : ICommandHandler<UpdatePartyCommand, UpdatePartyResponse?>
+    : IRequestHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
-    public async Task<UpdatePartyResponse?> HandleAsync(UpdatePartyCommand request, CancellationToken ct)
+    public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
     {
         var party = await db.Parties
             .FirstOrDefaultAsync(p => p.Id == request.Id, ct);

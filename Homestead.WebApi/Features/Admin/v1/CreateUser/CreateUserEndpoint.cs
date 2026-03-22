@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateUser;
 
@@ -6,11 +7,11 @@ public static class CreateUserEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (CreateUserRequest request, CreateUserHandler handler, CancellationToken ct) =>
+        group.MapPost("/", async (CreateUserRequest request, ISender sender, CancellationToken ct) =>
         {
             try
             {
-                var response = await handler.HandleAsync(request, ct);
+                var response = await sender.Send(request, ct);
                 return Results.Created($"/api/v1/admin/users/{response.Id}", response);
             }
             catch (IdentityValidationException ex)

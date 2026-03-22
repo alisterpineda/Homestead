@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
 
@@ -8,7 +9,7 @@ public static class ReprocessDocumentVersionEndpoint
     {
         group.MapPost("/{versionId:guid}/reprocess", async (Guid documentId, Guid versionId,
             ReprocessDocumentVersionBody? body,
-            ReprocessDocumentVersionHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var request = new ReprocessDocumentVersionRequest
             {
@@ -16,7 +17,7 @@ public static class ReprocessDocumentVersionEndpoint
                 VersionId = versionId,
                 TextExtractionEngineId = body?.TextExtractionEngineId
             };
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
             return Results.Accepted(null, response);
         })
         .WithName("ReprocessDocumentVersion")

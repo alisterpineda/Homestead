@@ -1,4 +1,4 @@
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -11,9 +11,9 @@ public class RegisterHandler(
     SignInManager<AppUser> signInManager,
     IRoleSourceManager roleSourceManager,
     AppDbContext db)
-    : ICommandHandler<RegisterRequest, RegisterResponse>
+    : IRequestHandler<RegisterRequest, RegisterResponse>
 {
-    public async Task<RegisterResponse> HandleAsync(RegisterRequest request, CancellationToken ct)
+    public async Task<RegisterResponse> Handle(RegisterRequest request, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>

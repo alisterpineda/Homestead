@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
@@ -10,7 +11,7 @@ public class PatchTagModel
     public string? Description { get; set; }
 }
 
-public record PatchTagCommand
+public record PatchTagCommand : IRequest<PatchTagResponse>
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchTagModel> PatchDocument { get; init; }

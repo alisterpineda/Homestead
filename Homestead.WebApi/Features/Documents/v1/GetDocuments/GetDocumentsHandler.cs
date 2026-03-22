@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Features.Documents.Thumbnails;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IQueryHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
+    : IRequestHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
 {
     private const string TsLanguage = "english";
-    public async Task<PaginatedResponse<GetDocumentsResponse>> HandleAsync(
+    public async Task<PaginatedResponse<GetDocumentsResponse>> Handle(
         GetDocumentsRequest request, CancellationToken ct)
     {
         IQueryable<Domains.Documents.Document> query;

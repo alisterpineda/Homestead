@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentVersion;
 
-public record GetDocumentVersionRequest(Guid DocumentId, Guid Id);
+public record GetDocumentVersionRequest(Guid DocumentId, Guid Id) : IRequest<GetDocumentVersionResponse?>;

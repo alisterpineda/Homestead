@@ -31,22 +31,22 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NoExistingRow_CreatesNewSetting()
+    public async Task Handle_NoExistingRow_CreatesNewSetting()
     {
         var request = new PatchSystemSettingsRequest();
 
-        await _sut.HandleAsync(request, CancellationToken.None);
+        await _sut.Handle(request, CancellationToken.None);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
         Assert.NotNull(saved);
     }
 
     [Fact]
-    public async Task HandleAsync_NoExistingRow_LogsCreated()
+    public async Task Handle_NoExistingRow_LogsCreated()
     {
         var request = new PatchSystemSettingsRequest();
 
-        await _sut.HandleAsync(request, CancellationToken.None);
+        await _sut.Handle(request, CancellationToken.None);
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
@@ -54,7 +54,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ExistingRow_UpdatesEntity()
+    public async Task Handle_ExistingRow_UpdatesEntity()
     {
         _db.AppSettings.Add(new AppSetting
         {
@@ -65,7 +65,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         var request = new PatchSystemSettingsRequest();
 
-        await _sut.HandleAsync(request, CancellationToken.None);
+        await _sut.Handle(request, CancellationToken.None);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
         Assert.NotNull(saved);

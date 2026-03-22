@@ -22,7 +22,7 @@ public class UpdateGroupHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_WithChanges_LogsUpdatedAudit()
+    public async Task Handle_WithChanges_LogsUpdatedAudit()
     {
         var group = new Group
         {
@@ -40,14 +40,14 @@ public class UpdateGroupHandlerTests : IDisposable
             Request = new UpdateGroupRequest { Name = "New Name", Description = "New desc" }
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Group", group.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_LogsEmptyChanges()
     {
         var group = new Group
         {
@@ -65,7 +65,7 @@ public class UpdateGroupHandlerTests : IDisposable
             Request = new UpdateGroupRequest { Name = "Same", Description = "Same desc" }
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Group", group.Id,
             Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());

@@ -23,7 +23,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_AccessLevelChanged_LogsUpdatedAudit()
+    public async Task Handle_AccessLevelChanged_LogsUpdatedAudit()
     {
         var groupId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -52,7 +52,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberAccessLevel"),
@@ -60,7 +60,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_AccessLevelUnchanged_DoesNotLogAudit()
+    public async Task Handle_AccessLevelUnchanged_DoesNotLogAudit()
     {
         var groupId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -89,7 +89,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.DidNotReceive().LogUpdated(Arg.Any<string>(), Arg.Any<Guid>(),
             Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());

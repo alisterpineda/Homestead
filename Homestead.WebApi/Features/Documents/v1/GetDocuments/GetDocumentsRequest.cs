@@ -1,9 +1,10 @@
 using Homestead.WebApi.Common;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 
-public record GetDocumentsRequest : PaginatedRequest
+public record GetDocumentsRequest : PaginatedRequest, IRequest<PaginatedResponse<GetDocumentsResponse>>
 {
     [FromQuery(Name = "PartyIds")]
     public Guid[]? PartyIds { get; init; }

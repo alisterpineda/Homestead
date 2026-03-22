@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
-public record DeleteDocumentVersionRequest(Guid DocumentId, Guid Id);
+public record DeleteDocumentVersionRequest(Guid DocumentId, Guid Id) : IRequest<bool>;

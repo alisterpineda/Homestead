@@ -20,11 +20,11 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_EmptyDb_ReturnsBuiltInOnly()
+    public async Task Handle_EmptyDb_ReturnsBuiltInOnly()
     {
         var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Single(response.Items);
         Assert.True(response.Items[0].IsBuiltIn);
@@ -32,7 +32,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_WithDbEngines_BuiltInFirst()
+    public async Task Handle_WithDbEngines_BuiltInFirst()
     {
         _db.TextExtractionEngines.Add(new TextExtractionEngine
         {
@@ -45,7 +45,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
 
         var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal(2, response.TotalCount);
         Assert.Equal(2, response.Items.Count);
@@ -54,7 +54,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SearchMatchesDbOnly_ExcludesBuiltIn()
+    public async Task Handle_SearchMatchesDbOnly_ExcludesBuiltIn()
     {
         _db.TextExtractionEngines.Add(new TextExtractionEngine
         {
@@ -67,7 +67,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
 
         var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50, Search = "Custom" };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Single(response.Items);
         Assert.False(response.Items[0].IsBuiltIn);
@@ -76,7 +76,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_PaginationCorrect()
+    public async Task Handle_PaginationCorrect()
     {
         for (var i = 0; i < 3; i++)
         {
@@ -92,7 +92,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
 
         var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         // 3 db engines + 1 built-in
         Assert.Equal(4, response.TotalCount);

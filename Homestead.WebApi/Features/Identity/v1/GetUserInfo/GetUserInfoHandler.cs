@@ -1,13 +1,13 @@
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Features.Identity.v1.GetUserInfo;
 
 public class GetUserInfoHandler(UserManager<AppUser> userManager)
-    : IQueryHandler<GetUserInfoRequest, GetUserInfoResponse?>
+    : IRequestHandler<GetUserInfoRequest, GetUserInfoResponse?>
 {
-    public async Task<GetUserInfoResponse?> HandleAsync(GetUserInfoRequest request, CancellationToken ct)
+    public async Task<GetUserInfoResponse?> Handle(GetUserInfoRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(request.UserId.ToString());
         if (user is null)

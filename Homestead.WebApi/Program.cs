@@ -95,11 +95,11 @@ builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
 builder.Services.AddExceptionHandler<BadRequestExceptionHandler>();
 builder.Services.AddExceptionHandler<ConflictExceptionHandler>();
 builder.Services.AddProblemDetails();
-builder.Services.AddHandlers();
-builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings.GetDocumentSettingsHandler>();
-builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings.GetSystemSettingsHandler>();
-builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.PatchDocumentSettings.PatchDocumentSettingsHandler>();
-builder.Services.AddScoped<Homestead.WebApi.Features.Admin.v1.Settings.PatchSystemSettings.PatchSystemSettingsHandler>();
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblyContaining<Program>();
+    cfg.Lifetime = ServiceLifetime.Scoped;
+});
 builder.Services.AddProcessing();
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddThumbnails();

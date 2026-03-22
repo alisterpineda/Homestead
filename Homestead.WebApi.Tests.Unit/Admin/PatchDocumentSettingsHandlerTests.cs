@@ -43,12 +43,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NoExistingRow_CreatesNewSetting()
+    public async Task Handle_NoExistingRow_CreatesNewSetting()
     {
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
 
@@ -58,12 +58,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NoExistingRow_LogsCreated()
+    public async Task Handle_NoExistingRow_LogsCreated()
     {
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
@@ -71,7 +71,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ExistingRow_UpdatesValue()
+    public async Task Handle_ExistingRow_UpdatesValue()
     {
         _db.AppSettings.Add(new AppSetting
         {
@@ -83,7 +83,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
 
@@ -93,7 +93,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ExistingRow_LogsUpdated()
+    public async Task Handle_ExistingRow_LogsUpdated()
     {
         _db.AppSettings.Add(new AppSetting
         {
@@ -105,7 +105,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated(
             "AppSetting",
@@ -114,18 +114,18 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_EmptyPatch_UsesDefaults()
+    public async Task Handle_EmptyPatch_UsesDefaults()
     {
         var patchDoc = new JsonPatchDocument<DocumentSettings>();
         var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
     }
 
     [Fact]
-    public async Task HandleAsync_NoChange_DoesNotLogUpdated()
+    public async Task Handle_NoChange_DoesNotLogUpdated()
     {
         _db.AppSettings.Add(new AppSetting
         {
@@ -137,7 +137,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.DidNotReceive().LogUpdated(
             Arg.Any<string>(),
@@ -147,28 +147,28 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SetDefaultEngineToBuiltIn_Succeeds()
+    public async Task Handle_SetDefaultEngineToBuiltIn_Succeeds()
     {
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
     }
 
     [Fact]
-    public async Task HandleAsync_SetDefaultEngineToNonExistent_ThrowsBadRequest()
+    public async Task Handle_SetDefaultEngineToNonExistent_ThrowsBadRequest()
     {
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, Guid.NewGuid()));
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(command, CancellationToken.None));
+            () => _sut.Handle(command, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_SetDefaultEngineToDbEngine_Succeeds()
+    public async Task Handle_SetDefaultEngineToDbEngine_Succeeds()
     {
         var engineId = Guid.NewGuid();
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -183,13 +183,13 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, engineId));
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal(engineId, response.DefaultTextExtractionEngineId);
     }
 
     [Fact]
-    public async Task HandleAsync_ClearDefaultEngine_Succeeds()
+    public async Task Handle_ClearDefaultEngine_Succeeds()
     {
         _db.AppSettings.Add(new AppSetting
         {
@@ -201,7 +201,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        var response = await _sut.HandleAsync(command, CancellationToken.None);
+        var response = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
     }

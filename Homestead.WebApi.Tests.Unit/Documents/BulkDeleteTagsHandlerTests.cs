@@ -23,7 +23,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsDeletedAuditPerTag()
+    public async Task Handle_LogsDeletedAuditPerTag()
     {
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -33,16 +33,16 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        await _sut.HandleAsync(new BulkDeleteTagsRequest([id1, id2]), CancellationToken.None);
+        await _sut.Handle(new BulkDeleteTagsRequest([id1, id2]), CancellationToken.None);
 
         _auditLogger.Received(1).LogDeleted("Tag", id1, "Tag A", Arg.Any<Guid?>());
         _auditLogger.Received(1).LogDeleted("Tag", id2, "Tag B", Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_NoTags_DoesNotLogAudit()
+    public async Task Handle_NoTags_DoesNotLogAudit()
     {
-        await _sut.HandleAsync(new BulkDeleteTagsRequest([Guid.NewGuid()]), CancellationToken.None);
+        await _sut.Handle(new BulkDeleteTagsRequest([Guid.NewGuid()]), CancellationToken.None);
 
         _auditLogger.DidNotReceive().LogDeleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }

@@ -1,8 +1,9 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.GetUsers;
 
-public record GetUsersRequest : PaginatedRequest
+public record GetUsersRequest : PaginatedRequest, IRequest<PaginatedResponse<UserResponse>>
 {
     public string? Search { get; init; }
 }

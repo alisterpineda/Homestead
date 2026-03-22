@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +9,9 @@ namespace Homestead.WebApi.Features.Documents.v1.PermanentlyDeleteDocuments;
 public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
-    : ICommandHandler<PermanentlyDeleteDocumentsRequest, PermanentlyDeleteDocumentsResponse>
+    : IRequestHandler<PermanentlyDeleteDocumentsRequest, PermanentlyDeleteDocumentsResponse>
 {
-    public async Task<PermanentlyDeleteDocumentsResponse> HandleAsync(PermanentlyDeleteDocumentsRequest request, CancellationToken ct)
+    public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsRequest request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Include(d => d.Versions)

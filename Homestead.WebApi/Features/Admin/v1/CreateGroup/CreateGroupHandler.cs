@@ -1,15 +1,16 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Groups;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateGroup;
 
 public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : ICommandHandler<CreateGroupRequest, GroupResponse>
+    : IRequestHandler<CreateGroupRequest, GroupResponse>
 {
-    public async Task<GroupResponse> HandleAsync(CreateGroupRequest request, CancellationToken ct)
+    public async Task<GroupResponse> Handle(CreateGroupRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             throw new BadRequestException("Name is required.");

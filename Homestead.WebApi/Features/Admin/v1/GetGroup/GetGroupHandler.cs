@@ -1,13 +1,13 @@
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.GetGroup;
 
 public class GetGroupHandler(AppDbContext db)
-    : IQueryHandler<GetGroupRequest, GroupDetailResponse?>
+    : IRequestHandler<GetGroupRequest, GroupDetailResponse?>
 {
-    public async Task<GroupDetailResponse?> HandleAsync(GetGroupRequest request, CancellationToken ct)
+    public async Task<GroupDetailResponse?> Handle(GetGroupRequest request, CancellationToken ct)
     {
         return await db.Groups
             .AsNoTracking()

@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -9,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
 
 public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
-    : ICommandHandler<PatchTagCommand, PatchTagResponse>
+    : IRequestHandler<PatchTagCommand, PatchTagResponse>
 {
-    public async Task<PatchTagResponse> HandleAsync(PatchTagCommand request, CancellationToken ct)
+    public async Task<PatchTagResponse> Handle(PatchTagCommand request, CancellationToken ct)
     {
         var tag = await db.Tags
             .FirstOrDefaultAsync(t => t.Id == request.Id, ct);

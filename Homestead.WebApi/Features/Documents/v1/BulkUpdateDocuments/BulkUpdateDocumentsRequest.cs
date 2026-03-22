@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
 
 public record BulkUpdateDocumentsRequest(
@@ -5,4 +7,4 @@ public record BulkUpdateDocumentsRequest(
     List<string>? TagPaths,
     List<Guid>? PartyIds,
     List<string>? RemoveTagPaths,
-    List<Guid>? RemovePartyIds);
+    List<Guid>? RemovePartyIds) : IRequest<BulkUpdateDocumentsResponse>;

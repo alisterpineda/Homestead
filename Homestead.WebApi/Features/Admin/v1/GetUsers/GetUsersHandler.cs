@@ -1,14 +1,15 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.GetUsers;
 
 public class GetUsersHandler(AppDbContext db)
-    : IQueryHandler<GetUsersRequest, PaginatedResponse<UserResponse>>
+    : IRequestHandler<GetUsersRequest, PaginatedResponse<UserResponse>>
 {
-    public async Task<PaginatedResponse<UserResponse>> HandleAsync(
+    public async Task<PaginatedResponse<UserResponse>> Handle(
         GetUsersRequest request, CancellationToken ct)
     {
         var query = db.Users.AsNoTracking();

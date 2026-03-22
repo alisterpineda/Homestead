@@ -1,14 +1,15 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.GetTextExtractionEngines;
 
 public class GetTextExtractionEnginesHandler(AppDbContext db)
-    : IQueryHandler<GetTextExtractionEnginesRequest, PaginatedResponse<TextExtractionEngineResponse>>
+    : IRequestHandler<GetTextExtractionEnginesRequest, PaginatedResponse<TextExtractionEngineResponse>>
 {
-    public async Task<PaginatedResponse<TextExtractionEngineResponse>> HandleAsync(
+    public async Task<PaginatedResponse<TextExtractionEngineResponse>> Handle(
         GetTextExtractionEnginesRequest request, CancellationToken ct)
     {
         var builtIn = TextExtractionEngineResponse.TesseractDefault;

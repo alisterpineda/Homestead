@@ -5,6 +5,7 @@ using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.Settings.PatchSystemSettings;
@@ -13,8 +14,9 @@ public class PatchSystemSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger)
+    : IRequestHandler<PatchSystemSettingsRequest, SystemSettingsResponse>
 {
-    public async Task<SystemSettingsResponse> HandleAsync(
+    public async Task<SystemSettingsResponse> Handle(
         PatchSystemSettingsRequest request, CancellationToken ct)
     {
         _ = request; // Placeholder — will apply properties as SystemSettings grows

@@ -38,21 +38,25 @@ Opt-in external authentication via any OpenID Connect provider. When OIDC config
 - `OidcUserProvisioner` auto-provisions users from OIDC claims, links by email, syncs Admin role from a configurable claim
 - Uses `IdentityConstants.ExternalScheme` for the OIDC sign-in, then signs into the application cookie in the callback
 
-## Architecture: Vertical Slice + CQRS
+## Architecture: Vertical Slice + CQRS (MediatR)
 
-The WebApi uses vertical slice architecture with CQRS handlers:
+The WebApi uses vertical slice architecture with MediatR for CQRS handler dispatch:
 
 - **Features/{Domain}/v{n}/{Operation}/**: Each operation has four files: `Endpoint.cs`, `Handler.cs`, `Request.cs`, `Response.cs`
-- **Handlers** implement `ICommandHandler<TReq, TRes>` or `IQueryHandler<TReq, TRes>` (defined in `Common/`) and are auto-registered via assembly scanning in `ServiceCollectionExtensions.AddHandlers()`
+- **Request types** implement `IRequest<TResponse>` from MediatR
+- **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
+- **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers. They inject `ISender` from MediatR and dispatch requests via `sender.Send(request, ct)`
 - **Modules** (e.g., `DocumentsModule.cs`) register versioned route groups on `IVersionedEndpointRouteBuilder`
-- **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers
 - **API versioning** is URL-based: `/api/v{version:apiVersion}/documents`
 - **Persistence**: EF Core with PostgreSQL. Migrations auto-run on startup in `Program.cs`
 
 ### Adding a New Endpoint
 
 1. Create four files under `Features/{Domain}/v1/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Request.cs`, `Response.cs`
-2. Register the endpoint in the domain's module class (e.g., `DocumentsModule.cs`)
+2. The request record should implement `IRequest<TResponse>` from MediatR
+3. The handler class should implement `IRequestHandler<TRequest, TResponse>` from MediatR with a `Handle` method
+4. The endpoint should inject `ISender` and call `sender.Send(request, ct)`
+5. Register the endpoint in the domain's module class (e.g., `DocumentsModule.cs`)
 
 ## Full-Text Search
 
@@ -76,4 +80,4 @@ Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints 
 - Minimal APIs (no controllers)
 - Scalar for API docs (at `/scalar/v1` in dev)
 - EF Core with PostgreSQL; migrations auto-run on startup
-- Handler registration via assembly scanning (`AddHandlers()`)
+- MediatR for CQRS handler dispatch; handlers auto-registered via `AddMediatR()` assembly scanning

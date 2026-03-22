@@ -23,7 +23,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsUpdatedAuditWithMemberRemoved()
+    public async Task Handle_LogsUpdatedAuditWithMemberRemoved()
     {
         var groupId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -47,7 +47,7 @@ public class RemoveGroupMemberHandlerTests : IDisposable
 
         var command = new RemoveGroupMemberCommand { GroupId = groupId, UserId = userId };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberRemoved"),

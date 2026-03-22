@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
-public record GetDocumentRequest(Guid Id);
+public record GetDocumentRequest(Guid Id) : IRequest<GetDocumentResponse?>;

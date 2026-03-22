@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
@@ -9,7 +10,7 @@ public static class PatchDocumentVersionEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid documentId, Guid id,
             JsonPatchDocument<PatchDocumentVersionModel> patchDoc,
-            PatchDocumentVersionHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = new PatchDocumentVersionCommand
             {
@@ -17,7 +18,7 @@ public static class PatchDocumentVersionEndpoint
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await handler.HandleAsync(command, ct));
+            return Results.Ok(await sender.Send(command, ct));
         })
         .WithName("PatchDocumentVersion")
         .Accepts<JsonPatchDocument<PatchDocumentVersionModel>>("application/json-patch+json")

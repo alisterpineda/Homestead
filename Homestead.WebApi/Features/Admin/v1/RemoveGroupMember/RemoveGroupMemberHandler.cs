@@ -1,14 +1,15 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.RemoveGroupMember;
 
 public class RemoveGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
-    : ICommandHandler<RemoveGroupMemberCommand, bool>
+    : IRequestHandler<RemoveGroupMemberCommand, bool>
 {
-    public async Task<bool> HandleAsync(RemoveGroupMemberCommand command, CancellationToken ct)
+    public async Task<bool> Handle(RemoveGroupMemberCommand command, CancellationToken ct)
     {
         var member = await db.GroupMembers
             .Include(gm => gm.User)
@@ -29,7 +30,7 @@ public class RemoveGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record RemoveGroupMemberCommand
+public record RemoveGroupMemberCommand : IRequest<bool>
 {
     public Guid GroupId { get; init; }
     public Guid UserId { get; init; }

@@ -23,7 +23,7 @@ public class AddGroupMemberHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsUpdatedAuditWithMemberAdded()
+    public async Task Handle_LogsUpdatedAuditWithMemberAdded()
     {
         var groupId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -45,7 +45,7 @@ public class AddGroupMemberHandlerTests : IDisposable
             Request = new AddGroupMemberRequest { UserId = userId, AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberAdded"),

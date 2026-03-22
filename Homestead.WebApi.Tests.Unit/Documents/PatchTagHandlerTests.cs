@@ -26,7 +26,7 @@ public class PatchTagHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_WithNameChange_LogsUpdatedAudit()
+    public async Task Handle_WithNameChange_LogsUpdatedAudit()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Old", Path = "Old" };
         _db.Tags.Add(tag);
@@ -37,14 +37,14 @@ public class PatchTagHandlerTests : IDisposable
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_LogsEmptyChanges()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Same", Path = "Same" };
         _db.Tags.Add(tag);
@@ -55,14 +55,14 @@ public class PatchTagHandlerTests : IDisposable
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
             Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_WithDescriptionChange_UpdatesDescription()
+    public async Task Handle_WithDescriptionChange_UpdatesDescription()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Old" };
         _db.Tags.Add(tag);
@@ -73,7 +73,7 @@ public class PatchTagHandlerTests : IDisposable
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        var result = await _sut.HandleAsync(command, CancellationToken.None);
+        var result = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal("New description", result.Description);
         _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
@@ -81,7 +81,7 @@ public class PatchTagHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_ClearDescription_SetsNull()
+    public async Task Handle_ClearDescription_SetsNull()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Existing" };
         _db.Tags.Add(tag);
@@ -92,7 +92,7 @@ public class PatchTagHandlerTests : IDisposable
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        var result = await _sut.HandleAsync(command, CancellationToken.None);
+        var result = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Null(result.Description);
     }

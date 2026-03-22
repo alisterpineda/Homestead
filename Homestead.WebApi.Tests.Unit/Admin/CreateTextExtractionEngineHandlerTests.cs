@@ -30,7 +30,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_EmptyName_ThrowsBadRequest()
+    public async Task Handle_EmptyName_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -39,11 +39,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_DuplicateDbName_ThrowsConflict()
+    public async Task Handle_DuplicateDbName_ThrowsConflict()
     {
         var existing = new TextExtractionEngine
         {
@@ -62,11 +62,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<ConflictException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_DuplicateBuiltInName_ThrowsConflict()
+    public async Task Handle_DuplicateBuiltInName_ThrowsConflict()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -75,11 +75,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<ConflictException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_InvalidConfigJson_ThrowsBadRequest()
+    public async Task Handle_InvalidConfigJson_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -89,11 +89,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_ValidRequest_CreatesEngine()
+    public async Task Handle_ValidRequest_CreatesEngine()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -102,7 +102,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":["Fra"]}"""
         };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal("My Tesseract", response.Name);
         Assert.Equal(TextExtractionEngineType.Tesseract, response.EngineType);
@@ -115,7 +115,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_EmptyLanguagesArray_ThrowsBadRequest()
+    public async Task Handle_EmptyLanguagesArray_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -125,11 +125,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_DuplicateLanguages_ThrowsBadRequest()
+    public async Task Handle_DuplicateLanguages_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -139,11 +139,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_MultipleLanguages_CreatesEngine()
+    public async Task Handle_MultipleLanguages_CreatesEngine()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -152,14 +152,14 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":["Eng","Fra","Deu"]}"""
         };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal("Multi-Language", response.Name);
         Assert.Equal("""{"languages":["Eng","Fra","Deu"]}""", response.Configuration);
     }
 
     [Fact]
-    public async Task HandleAsync_AzureDocumentIntelligence_ValidConfig_CreatesEngine()
+    public async Task Handle_AzureDocumentIntelligence_ValidConfig_CreatesEngine()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -168,7 +168,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"endpoint":"https://test.cognitiveservices.azure.com","apiKey":"key123"}"""
         };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal("Azure DI Engine", response.Name);
         Assert.Equal(TextExtractionEngineType.AzureDocumentIntelligence, response.EngineType);
@@ -180,7 +180,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_AzureDocumentIntelligence_NullConfig_ThrowsBadRequest()
+    public async Task Handle_AzureDocumentIntelligence_NullConfig_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -190,11 +190,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_AzureDocumentIntelligence_MissingEndpoint_ThrowsBadRequest()
+    public async Task Handle_AzureDocumentIntelligence_MissingEndpoint_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -204,11 +204,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_AzureDocumentIntelligence_MissingApiKey_ThrowsBadRequest()
+    public async Task Handle_AzureDocumentIntelligence_MissingApiKey_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -218,11 +218,11 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 
     [Fact]
-    public async Task HandleAsync_AzureDocumentIntelligence_InvalidJson_ThrowsBadRequest()
+    public async Task Handle_AzureDocumentIntelligence_InvalidJson_ThrowsBadRequest()
     {
         var request = new CreateTextExtractionEngineRequest
         {
@@ -232,6 +232,6 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.HandleAsync(request, CancellationToken.None));
+            () => _sut.Handle(request, CancellationToken.None));
     }
 }

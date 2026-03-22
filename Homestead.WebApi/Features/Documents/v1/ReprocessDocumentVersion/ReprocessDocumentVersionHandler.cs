@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Features.Documents.Processing;
@@ -17,9 +18,9 @@ public class ReprocessDocumentVersionHandler(
     IJobQueue jobQueue,
     IAuthorizationService authService,
     IHttpContextAccessor httpContext)
-    : ICommandHandler<ReprocessDocumentVersionRequest, ReprocessDocumentVersionResponse>
+    : IRequestHandler<ReprocessDocumentVersionRequest, ReprocessDocumentVersionResponse>
 {
-    public async Task<ReprocessDocumentVersionResponse> HandleAsync(ReprocessDocumentVersionRequest request, CancellationToken ct)
+    public async Task<ReprocessDocumentVersionResponse> Handle(ReprocessDocumentVersionRequest request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

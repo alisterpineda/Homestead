@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchTag;
@@ -9,14 +10,14 @@ public static class PatchTagEndpoint
     {
         group.MapPatch("/{id:guid}", async (Guid id,
             JsonPatchDocument<PatchTagModel> patchDoc,
-            PatchTagHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = new PatchTagCommand
             {
                 Id = id,
                 PatchDocument = patchDoc
             };
-            return Results.Ok(await handler.HandleAsync(command, ct));
+            return Results.Ok(await sender.Send(command, ct));
         })
         .WithName("PatchTag")
         .Accepts<JsonPatchDocument<PatchTagModel>>("application/json-patch+json")

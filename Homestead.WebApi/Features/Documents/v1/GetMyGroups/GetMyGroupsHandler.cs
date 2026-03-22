@@ -1,14 +1,14 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetMyGroups;
 
 public class GetMyGroupsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : IQueryHandler<GetMyGroupsRequest, IReadOnlyList<GetMyGroupsResponse>>
+    : IRequestHandler<GetMyGroupsRequest, IReadOnlyList<GetMyGroupsResponse>>
 {
-    public async Task<IReadOnlyList<GetMyGroupsResponse>> HandleAsync(
+    public async Task<IReadOnlyList<GetMyGroupsResponse>> Handle(
         GetMyGroupsRequest request, CancellationToken ct)
     {
         var userId = currentUser.UserId;

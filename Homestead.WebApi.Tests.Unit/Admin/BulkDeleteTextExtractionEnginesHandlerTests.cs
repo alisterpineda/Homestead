@@ -25,27 +25,27 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_BuiltInIdOnly_ReturnsZero()
+    public async Task Handle_BuiltInIdOnly_ReturnsZero()
     {
         var request = new BulkDeleteTextExtractionEnginesRequest([BuiltInTextExtractionEngines.TesseractDefaultId]);
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal(0, response.DeletedCount);
     }
 
     [Fact]
-    public async Task HandleAsync_NonExistentIds_ReturnsZero()
+    public async Task Handle_NonExistentIds_ReturnsZero()
     {
         var request = new BulkDeleteTextExtractionEnginesRequest([Guid.NewGuid(), Guid.NewGuid()]);
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal(0, response.DeletedCount);
     }
 
     [Fact]
-    public async Task HandleAsync_ValidIds_DeletesEngines()
+    public async Task Handle_ValidIds_DeletesEngines()
     {
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -57,14 +57,14 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
 
         var request = new BulkDeleteTextExtractionEnginesRequest([id1, id2]);
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal(2, response.DeletedCount);
         Assert.Empty(await _db.TextExtractionEngines.ToListAsync());
     }
 
     [Fact]
-    public async Task HandleAsync_MixedIds_SkipsBuiltInAndDeletesRest()
+    public async Task Handle_MixedIds_SkipsBuiltInAndDeletesRest()
     {
         var id = Guid.NewGuid();
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -75,14 +75,14 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
 
         var request = new BulkDeleteTextExtractionEnginesRequest([BuiltInTextExtractionEngines.TesseractDefaultId, id]);
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         Assert.Equal(1, response.DeletedCount);
         Assert.Null(await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == id));
     }
 
     [Fact]
-    public async Task HandleAsync_LogsAuditForEachDeletedEngine()
+    public async Task Handle_LogsAuditForEachDeletedEngine()
     {
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -92,7 +92,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        await _sut.HandleAsync(new BulkDeleteTextExtractionEnginesRequest([id1, id2]), CancellationToken.None);
+        await _sut.Handle(new BulkDeleteTextExtractionEnginesRequest([id1, id2]), CancellationToken.None);
 
         _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id1, Arg.Any<string?>(), Arg.Any<Guid?>());
         _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id2, Arg.Any<string?>(), Arg.Any<Guid?>());

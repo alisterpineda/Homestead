@@ -1,9 +1,10 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Processing;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Processing.v1.GetProcessingJobs;
 
-public record GetProcessingJobsRequest : PaginatedRequest
+public record GetProcessingJobsRequest : PaginatedRequest, IRequest<PaginatedResponse<GetProcessingJobsResponse>>
 {
     public Guid? EntityId { get; init; }
     public ProcessingEntityType? EntityType { get; init; }

@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -9,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.UpdateUser;
 
 public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : ICommandHandler<UpdateUserCommand, UserResponse?>
+    : IRequestHandler<UpdateUserCommand, UserResponse?>
 {
-    public async Task<UserResponse?> HandleAsync(UpdateUserCommand request, CancellationToken ct)
+    public async Task<UserResponse?> Handle(UpdateUserCommand request, CancellationToken ct)
     {
         if (currentUser.UserId is { } currentId && request.Id == currentId)
         {

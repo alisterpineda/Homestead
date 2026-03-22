@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
@@ -13,7 +14,7 @@ public class PatchDocumentModel
     public Guid? GroupId { get; set; }
 }
 
-public record PatchDocumentCommand
+public record PatchDocumentCommand : IRequest<PatchDocumentResponse>
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchDocumentModel> PatchDocument { get; init; }

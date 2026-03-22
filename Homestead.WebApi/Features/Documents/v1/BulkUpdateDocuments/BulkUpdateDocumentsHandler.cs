@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -10,9 +10,9 @@ namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
 public class BulkUpdateDocumentsHandler(AppDbContext db,
     IAuditLogger auditLogger, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService)
-    : ICommandHandler<BulkUpdateDocumentsRequest, BulkUpdateDocumentsResponse>
+    : IRequestHandler<BulkUpdateDocumentsRequest, BulkUpdateDocumentsResponse>
 {
-    public async Task<BulkUpdateDocumentsResponse> HandleAsync(BulkUpdateDocumentsRequest request, CancellationToken ct)
+    public async Task<BulkUpdateDocumentsResponse> Handle(BulkUpdateDocumentsRequest request, CancellationToken ct)
     {
         var documents = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)

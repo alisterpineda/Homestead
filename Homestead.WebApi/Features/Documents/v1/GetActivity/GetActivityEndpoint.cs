@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
@@ -7,7 +8,7 @@ public static class GetActivityEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/", async (Guid documentId, [AsParameters] PaginatedRequest pagination,
-            GetActivityHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var request = new GetActivityRequest
             {
@@ -15,7 +16,7 @@ public static class GetActivityEndpoint
                 Page = pagination.Page,
                 PageSize = pagination.PageSize
             };
-            return Results.Ok(await handler.HandleAsync(request, ct));
+            return Results.Ok(await sender.Send(request, ct));
         })
         .WithName("GetDocumentActivity")
         .Produces<PaginatedResponse<GetActivityResponse>>();

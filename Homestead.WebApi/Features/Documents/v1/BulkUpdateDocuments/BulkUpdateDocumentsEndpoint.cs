@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
 
@@ -6,7 +7,7 @@ public static class BulkUpdateDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-update", async (BulkUpdateDocumentsRequest request, BulkUpdateDocumentsHandler handler, CancellationToken ct) =>
+        group.MapPost("/bulk-update", async (BulkUpdateDocumentsRequest request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one document ID must be provided.");
@@ -23,7 +24,7 @@ public static class BulkUpdateDocumentsEndpoint
                 return Results.BadRequest("Parties cannot be both added and removed in the same request.");
             }
 
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
             return Results.Ok(response);
         })
         .WithName("BulkUpdateDocuments")

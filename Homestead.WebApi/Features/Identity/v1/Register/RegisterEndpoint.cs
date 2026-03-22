@@ -1,12 +1,14 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Identity.v1.Register;
 
 public static class RegisterEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/register", async (RegisterRequest request, RegisterHandler handler, CancellationToken ct) =>
+        group.MapPost("/register", async (RegisterRequest request, ISender sender, CancellationToken ct) =>
         {
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
             if (response.SetupAlreadyComplete)
                 return Results.Forbid();
             return response.Succeeded

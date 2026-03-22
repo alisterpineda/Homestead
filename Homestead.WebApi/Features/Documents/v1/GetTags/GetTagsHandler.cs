@@ -1,13 +1,14 @@
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
-    : IQueryHandler<GetTagsRequest, PaginatedResponse<GetTagsResponse>>
+    : IRequestHandler<GetTagsRequest, PaginatedResponse<GetTagsResponse>>
 {
-    public async Task<PaginatedResponse<GetTagsResponse>> HandleAsync(GetTagsRequest request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetTagsResponse>> Handle(GetTagsRequest request, CancellationToken ct)
     {
         var query = db.Tags.AsNoTracking();
 

@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Identity;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,9 +13,9 @@ public class BulkDeleteUsersHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger)
-    : ICommandHandler<BulkDeleteUsersRequest, BulkDeleteUsersResponse>
+    : IRequestHandler<BulkDeleteUsersRequest, BulkDeleteUsersResponse>
 {
-    public async Task<BulkDeleteUsersResponse> HandleAsync(BulkDeleteUsersRequest request, CancellationToken ct)
+    public async Task<BulkDeleteUsersResponse> Handle(BulkDeleteUsersRequest request, CancellationToken ct)
     {
         if (currentUser.UserId is { } currentId && request.Ids.Contains(currentId))
         {

@@ -1,14 +1,15 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroup;
 
 public class UpdateGroupHandler(AppDbContext db, IAuditLogger auditLogger)
-    : ICommandHandler<UpdateGroupCommand, GroupResponse>
+    : IRequestHandler<UpdateGroupCommand, GroupResponse>
 {
-    public async Task<GroupResponse> HandleAsync(UpdateGroupCommand command, CancellationToken ct)
+    public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
     {
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == command.Id, ct);
         if (group is null)
@@ -53,7 +54,7 @@ public class UpdateGroupHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record UpdateGroupCommand
+public record UpdateGroupCommand : IRequest<GroupResponse>
 {
     public Guid Id { get; init; }
     public required UpdateGroupRequest Request { get; init; }

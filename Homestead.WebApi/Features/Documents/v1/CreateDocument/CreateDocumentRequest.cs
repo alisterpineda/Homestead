@@ -1,6 +1,8 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
-public class CreateDocumentRequest
+public class CreateDocumentRequest : IRequest<CreateDocumentResponse>
 {
     public string? Name { get; set; }
     public string? Label { get; set; }

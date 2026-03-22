@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -12,9 +13,9 @@ namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 public class PatchDocumentHandler(AppDbContext db,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentMetadataService metadataService,
     IAuthorizationService authService, IHttpContextAccessor httpContext, IDocumentQueryService queryService)
-    : ICommandHandler<PatchDocumentCommand, PatchDocumentResponse>
+    : IRequestHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
-    public async Task<PatchDocumentResponse> HandleAsync(PatchDocumentCommand request, CancellationToken ct)
+    public async Task<PatchDocumentResponse> Handle(PatchDocumentCommand request, CancellationToken ct)
     {
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Write);
 

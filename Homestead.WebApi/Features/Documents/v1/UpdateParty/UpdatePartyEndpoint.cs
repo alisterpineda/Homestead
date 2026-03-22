@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
@@ -7,7 +8,7 @@ public static class UpdatePartyEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPut("/{id:guid}", async (Guid id, UpdatePartyRequest request,
-            UpdatePartyHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = new UpdatePartyCommand
             {
@@ -15,7 +16,7 @@ public static class UpdatePartyEndpoint
                 Name = request.Name,
                 Description = request.Description
             };
-            var response = await handler.HandleAsync(command, ct);
+            var response = await sender.Send(command, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("UpdateParty")

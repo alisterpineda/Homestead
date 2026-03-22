@@ -1,14 +1,15 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
 
 public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
-    : ICommandHandler<UpdateGroupMemberCommand, GroupMemberResponse>
+    : IRequestHandler<UpdateGroupMemberCommand, GroupMemberResponse>
 {
-    public async Task<GroupMemberResponse> HandleAsync(UpdateGroupMemberCommand command, CancellationToken ct)
+    public async Task<GroupMemberResponse> Handle(UpdateGroupMemberCommand command, CancellationToken ct)
     {
         var member = await db.GroupMembers
             .Include(gm => gm.User)
@@ -42,7 +43,7 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record UpdateGroupMemberCommand
+public record UpdateGroupMemberCommand : IRequest<GroupMemberResponse>
 {
     public Guid GroupId { get; init; }
     public Guid UserId { get; init; }

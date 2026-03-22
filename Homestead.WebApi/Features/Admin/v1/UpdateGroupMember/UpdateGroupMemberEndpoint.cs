@@ -1,3 +1,5 @@
+using MediatR;
+
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroupMember;
 
 public static class UpdateGroupMemberEndpoint
@@ -5,7 +7,7 @@ public static class UpdateGroupMemberEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPut("/{id:guid}/members/{userId:guid}", async (Guid id, Guid userId,
-            UpdateGroupMemberRequest request, UpdateGroupMemberHandler handler, CancellationToken ct) =>
+            UpdateGroupMemberRequest request, ISender sender, CancellationToken ct) =>
         {
             var command = new UpdateGroupMemberCommand
             {
@@ -13,7 +15,7 @@ public static class UpdateGroupMemberEndpoint
                 UserId = userId,
                 Request = request
             };
-            return Results.Ok(await handler.HandleAsync(command, ct));
+            return Results.Ok(await sender.Send(command, ct));
         })
         .WithName("UpdateGroupMember")
         .Produces<GroupMemberResponse>()

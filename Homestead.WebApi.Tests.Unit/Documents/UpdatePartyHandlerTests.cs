@@ -24,7 +24,7 @@ public class UpdatePartyHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_WithChanges_LogsUpdatedAudit()
+    public async Task Handle_WithChanges_LogsUpdatedAudit()
     {
         var party = new Party
         {
@@ -43,14 +43,14 @@ public class UpdatePartyHandlerTests : IDisposable
             Description = "New desc"
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         _auditLogger.Received(1).LogUpdated("Party", party.Id,
             Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task HandleAsync_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_LogsEmptyChanges()
     {
         var party = new Party
         {
@@ -69,7 +69,7 @@ public class UpdatePartyHandlerTests : IDisposable
             Description = "Same desc"
         };
 
-        await _sut.HandleAsync(command, CancellationToken.None);
+        await _sut.Handle(command, CancellationToken.None);
 
         // LogUpdated is still called, but AuditLogger.LogUpdated handles the empty-changes case
         _auditLogger.Received(1).LogUpdated("Party", party.Id,

@@ -1,4 +1,4 @@
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Microsoft.AspNetCore.Identity;
 
@@ -7,9 +7,9 @@ namespace Homestead.WebApi.Features.Identity.v1.Login;
 public class LoginHandler(
     SignInManager<AppUser> signInManager,
     UserManager<AppUser> userManager)
-    : ICommandHandler<LoginRequest, LoginResponse>
+    : IRequestHandler<LoginRequest, LoginResponse>
 {
-    public async Task<LoginResponse> HandleAsync(LoginRequest request, CancellationToken ct)
+    public async Task<LoginResponse> Handle(LoginRequest request, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)

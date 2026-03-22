@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 
@@ -7,7 +8,7 @@ public static class GetDocumentVersionsEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapGet("/", async (Guid documentId, [AsParameters] PaginatedRequest pagination,
-            GetDocumentVersionsHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var request = new GetDocumentVersionsRequest
             {
@@ -15,7 +16,7 @@ public static class GetDocumentVersionsEndpoint
                 Page = pagination.Page,
                 PageSize = pagination.PageSize
             };
-            var response = await handler.HandleAsync(request, ct);
+            var response = await sender.Send(request, ct);
             return Results.Ok(response);
         })
         .WithName("GetDocumentVersions")

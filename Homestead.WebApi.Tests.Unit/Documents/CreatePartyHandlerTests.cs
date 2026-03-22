@@ -24,11 +24,11 @@ public class CreatePartyHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_LogsCreatedAudit()
+    public async Task Handle_LogsCreatedAudit()
     {
         var request = new CreatePartyRequest { Name = "Acme Corp" };
 
-        var response = await _sut.HandleAsync(request, CancellationToken.None);
+        var response = await _sut.Handle(request, CancellationToken.None);
 
         _auditLogger.Received(1).LogCreated("Party", response.Id, Arg.Any<Guid?>());
     }

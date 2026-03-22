@@ -24,11 +24,11 @@ public class GetPartiesHandlerTests : IDisposable
     public void Dispose() => _db.Dispose();
 
     [Fact]
-    public async Task HandleAsync_DefaultSort_OrdersByNameAsc()
+    public async Task Handle_DefaultSort_OrdersByNameAsc()
     {
         await SeedPartiesAsync("Charlie", "Alpha", "Bravo");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10 },
             CancellationToken.None);
 
@@ -37,11 +37,11 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByNameDesc_OrdersDescending()
+    public async Task Handle_SortByNameDesc_OrdersDescending()
     {
         await SeedPartiesAsync("Alpha", "Bravo", "Charlie");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.Name, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -50,7 +50,7 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByCreatedAtAsc_OrdersOldestFirst()
+    public async Task Handle_SortByCreatedAtAsc_OrdersOldestFirst()
     {
         var now = DateTimeOffset.UtcNow;
         _db.Parties.Add(new Party { Name = "Third", CreatedAt = now.AddHours(2) });
@@ -58,7 +58,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
@@ -67,7 +67,7 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByCreatedAtDesc_OrdersNewestFirst()
+    public async Task Handle_SortByCreatedAtDesc_OrdersNewestFirst()
     {
         var now = DateTimeOffset.UtcNow;
         _db.Parties.Add(new Party { Name = "First", CreatedAt = now });
@@ -75,7 +75,7 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -84,7 +84,7 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
+    public async Task Handle_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
     {
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
@@ -105,7 +105,7 @@ public class GetPartiesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
@@ -115,7 +115,7 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
+    public async Task Handle_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
     {
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
@@ -132,7 +132,7 @@ public class GetPartiesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
@@ -142,11 +142,11 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_NullSortBy_DefaultsToNameAsc()
+    public async Task Handle_NullSortBy_DefaultsToNameAsc()
     {
         await SeedPartiesAsync("Zulu", "Alpha");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             CancellationToken.None);
 
@@ -155,11 +155,11 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_SortByNameAsc_WithSearch_FiltersAndSorts()
+    public async Task Handle_SortByNameAsc_WithSearch_FiltersAndSorts()
     {
         await SeedPartiesAsync("Banana Corp", "Apple Inc", "Cherry LLC", "Avocado Ltd");
 
-        var result = await _sut.HandleAsync(
+        var result = await _sut.Handle(
             new GetPartiesRequest { Page = 1, PageSize = 10, Search = "a", SortBy = PartySortBy.Name, SortDir = SortDirection.Asc },
             CancellationToken.None);
 

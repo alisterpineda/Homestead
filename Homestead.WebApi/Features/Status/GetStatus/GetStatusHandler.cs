@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -8,9 +8,9 @@ using Microsoft.Extensions.Options;
 namespace Homestead.WebApi.Features.Status.GetStatus;
 
 public class GetStatusHandler(UserManager<AppUser> userManager, IOptions<OidcOptions> oidcOptions)
-    : IQueryHandler<GetStatusRequest, GetStatusResponse>
+    : IRequestHandler<GetStatusRequest, GetStatusResponse>
 {
-    public async Task<GetStatusResponse> HandleAsync(GetStatusRequest request, CancellationToken ct)
+    public async Task<GetStatusResponse> Handle(GetStatusRequest request, CancellationToken ct)
     {
         var hasUsers = await userManager.Users.AnyAsync(ct);
         var oidc = oidcOptions.Value;

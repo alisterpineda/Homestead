@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Auditing;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -10,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
 public class GetActivityHandler(AppDbContext db, IAuthorizationService authService, IHttpContextAccessor httpContext)
-    : IQueryHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
+    : IRequestHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
@@ -25,7 +26,7 @@ public class GetActivityHandler(AppDbContext db, IAuthorizationService authServi
         ["ExtractedText"] = "extracted text"
     };
 
-    public async Task<PaginatedResponse<GetActivityResponse>> HandleAsync(
+    public async Task<PaginatedResponse<GetActivityResponse>> Handle(
         GetActivityRequest request, CancellationToken ct)
     {
         await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Read);

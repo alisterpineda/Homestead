@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateComment;
 
@@ -7,10 +8,10 @@ public static class CreateCommentEndpoint
     public static void Map(RouteGroupBuilder group)
     {
         group.MapPost("/", async (Guid documentId, CreateCommentRequest request,
-            CreateCommentHandler handler, CancellationToken ct) =>
+            ISender sender, CancellationToken ct) =>
         {
             var command = request with { DocumentId = documentId };
-            var response = await handler.HandleAsync(command, ct);
+            var response = await sender.Send(command, ct);
             return Results.Created($"/api/v1/documents/{documentId}/comments/{response.Id}", response);
         })
         .WithName("CreateComment")

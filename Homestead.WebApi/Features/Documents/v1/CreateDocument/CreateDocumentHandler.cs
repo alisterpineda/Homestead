@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
@@ -12,9 +13,9 @@ namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentQueryService accessService)
-    : ICommandHandler<CreateDocumentRequest, CreateDocumentResponse>
+    : IRequestHandler<CreateDocumentRequest, CreateDocumentResponse>
 {
-    public async Task<CreateDocumentResponse> HandleAsync(CreateDocumentRequest request, CancellationToken ct)
+    public async Task<CreateDocumentResponse> Handle(CreateDocumentRequest request, CancellationToken ct)
     {
         // Validate GroupId if provided
         if (request.GroupId.HasValue)

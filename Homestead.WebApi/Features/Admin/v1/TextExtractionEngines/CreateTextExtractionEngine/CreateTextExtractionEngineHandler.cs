@@ -1,15 +1,16 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.CreateTextExtractionEngine;
 
 public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : ICommandHandler<CreateTextExtractionEngineRequest, TextExtractionEngineResponse>
+    : IRequestHandler<CreateTextExtractionEngineRequest, TextExtractionEngineResponse>
 {
-    public async Task<TextExtractionEngineResponse> HandleAsync(CreateTextExtractionEngineRequest request, CancellationToken ct)
+    public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineRequest request, CancellationToken ct)
     {
         var trimmedName = request.Name.Trim();
         if (string.IsNullOrWhiteSpace(trimmedName))
