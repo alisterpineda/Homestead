@@ -1,24 +1,19 @@
-using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocumentVersion;
 
 public class PatchDocumentVersionHandler(AppDbContext db,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
-    IAuthorizationService authService, IHttpContextAccessor httpContext)
+    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater)
     : IRequestHandler<PatchDocumentVersionCommand, PatchDocumentVersionResponse>
 {
     public async Task<PatchDocumentVersionResponse> Handle(PatchDocumentVersionCommand request, CancellationToken ct)
     {
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Write);
-
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
             .FirstOrDefaultAsync(ct);

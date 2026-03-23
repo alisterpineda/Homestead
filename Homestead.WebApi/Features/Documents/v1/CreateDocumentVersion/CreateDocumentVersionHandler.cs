@@ -1,5 +1,4 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domains.Documents;
@@ -7,7 +6,6 @@ using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateDocumentVersion;
@@ -16,9 +14,7 @@ public class CreateDocumentVersionHandler(
     AppDbContext db,
     IConfiguration configuration,
     ICurrentUserAccessor currentUser,
-    IJobQueue jobQueue,
-    IAuthorizationService authService,
-    IHttpContextAccessor httpContext)
+    IJobQueue jobQueue)
     : IRequestHandler<CreateDocumentVersionRequest, CreateDocumentVersionResponse>
 {
     public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionRequest request, CancellationToken ct)
@@ -26,8 +22,6 @@ public class CreateDocumentVersionHandler(
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
             throw new NotFoundException("Document not found.");
-
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Write);
 
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);

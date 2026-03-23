@@ -244,7 +244,7 @@ public class TrashTests : IntegrationTestBase
         // Attempt to comment — should return 404
         var commentResponse = await client.PostAsJsonAsync($"/api/v1/documents/{docId}/comments", new
         {
-            text = "Should not work"
+            body = "Should not work"
         }, CT);
         Assert.Equal(HttpStatusCode.NotFound, commentResponse.StatusCode);
     }

@@ -1,23 +1,18 @@
-using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
-    IAuthorizationService authService, IHttpContextAccessor httpContext,
     ILogger<DeleteDocumentVersionHandler> logger)
     : IRequestHandler<DeleteDocumentVersionRequest, bool>
 {
     public async Task<bool> Handle(DeleteDocumentVersionRequest request, CancellationToken ct)
     {
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Write);
-
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
             .FirstOrDefaultAsync(ct);

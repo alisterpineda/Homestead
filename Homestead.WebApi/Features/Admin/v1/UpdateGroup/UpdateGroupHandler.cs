@@ -16,8 +16,6 @@ public class UpdateGroupHandler(AppDbContext db, IAuditLogger auditLogger)
             throw new NotFoundException("Group not found.");
 
         var trimmedName = command.Request.Name.Trim();
-        if (string.IsNullOrWhiteSpace(trimmedName))
-            throw new BadRequestException("Name is required.");
 
         var nameConflict = await db.Groups
             .AnyAsync(g => g.Id != command.Id && g.Name == trimmedName, ct);

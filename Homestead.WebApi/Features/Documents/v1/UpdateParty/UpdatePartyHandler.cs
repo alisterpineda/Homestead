@@ -20,9 +20,6 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
 
         var name = request.Name.Trim();
 
-        if (string.IsNullOrWhiteSpace(name))
-            throw new BadRequestException("Name is required.");
-
         var nameConflict = await db.Parties.AnyAsync(p => p.Id != request.Id && p.Name == name, ct);
         if (nameConflict)
             throw new ConflictException("A party with this name already exists.");

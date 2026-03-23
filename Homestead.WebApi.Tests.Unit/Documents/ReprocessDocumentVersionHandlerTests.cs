@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Documents;
@@ -6,8 +5,6 @@ using Homestead.WebApi.Domains.Processing;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
 using Homestead.WebApi.Processing;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -17,8 +14,6 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IJobQueue _jobQueue;
-    private readonly IAuthorizationService _authService;
-    private readonly IHttpContextAccessor _httpContext;
     private readonly ReprocessDocumentVersionHandler _sut;
 
     private readonly Guid _docId = Guid.NewGuid();
@@ -33,13 +28,8 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         _jobQueue = Substitute.For<IJobQueue>();
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
             .Returns(Guid.NewGuid());
-        _authService = Substitute.For<IAuthorizationService>();
-        _authService.AuthorizeAsync(Arg.Any<ClaimsPrincipal>(), Arg.Any<object?>(), Arg.Any<IEnumerable<IAuthorizationRequirement>>())
-            .Returns(AuthorizationResult.Success());
-        _httpContext = Substitute.For<IHttpContextAccessor>();
-        _httpContext.HttpContext.Returns(new DefaultHttpContext());
 
-        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _jobQueue, _authService, _httpContext);
+        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _jobQueue);
 
         SeedDocumentAndVersion();
     }

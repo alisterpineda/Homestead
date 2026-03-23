@@ -1,18 +1,14 @@
-using Homestead.WebApi.Authorization;
 using MediatR;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
-public class GetDocumentHandler(AppDbContext db, IAuthorizationService authService, IHttpContextAccessor httpContext)
+public class GetDocumentHandler(AppDbContext db)
     : IRequestHandler<GetDocumentRequest, GetDocumentResponse?>
 {
     public async Task<GetDocumentResponse?> Handle(GetDocumentRequest request, CancellationToken ct)
     {
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.Id, DocumentOperations.Read);
-
         return await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)

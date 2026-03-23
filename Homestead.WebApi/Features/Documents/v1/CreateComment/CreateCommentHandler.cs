@@ -1,10 +1,8 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateComment;
@@ -12,9 +10,7 @@ namespace Homestead.WebApi.Features.Documents.v1.CreateComment;
 public class CreateCommentHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger,
-    IAuthorizationService authService,
-    IHttpContextAccessor httpContext)
+    IAuditLogger auditLogger)
     : IRequestHandler<CreateCommentRequest, CreateCommentResponse>
 {
     public async Task<CreateCommentResponse> Handle(CreateCommentRequest request, CancellationToken ct)
@@ -22,11 +18,6 @@ public class CreateCommentHandler(
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
             throw new NotFoundException("Document not found.");
-
-        await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, request.DocumentId, DocumentOperations.Write);
-
-        if (string.IsNullOrWhiteSpace(request.Body))
-            throw new BadRequestException("Comment body cannot be empty.");
 
         var userId = currentUser.UserId;
 

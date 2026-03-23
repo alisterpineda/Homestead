@@ -30,19 +30,6 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_EmptyName_ThrowsBadRequest()
-    {
-        var request = new CreateTextExtractionEngineRequest
-        {
-            Name = "   ",
-            EngineType = TextExtractionEngineType.Tesseract
-        };
-
-        await Assert.ThrowsAsync<BadRequestException>(
-            () => _sut.Handle(request, CancellationToken.None));
-    }
-
-    [Fact]
     public async Task Handle_DuplicateDbName_ThrowsConflict()
     {
         var existing = new TextExtractionEngine

@@ -12,9 +12,6 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
 {
     public async Task<GroupResponse> Handle(CreateGroupRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            throw new BadRequestException("Name is required.");
-
         var nameExists = await db.Groups
             .AnyAsync(g => g.Name == request.Name.Trim(), ct);
 

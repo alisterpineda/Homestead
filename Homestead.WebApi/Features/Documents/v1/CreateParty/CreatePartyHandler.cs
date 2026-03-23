@@ -14,9 +14,6 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
     {
         var name = request.Name.Trim();
 
-        if (string.IsNullOrWhiteSpace(name))
-            throw new BadRequestException("Name is required.");
-
         var nameExists = await db.Parties.AnyAsync(p => p.Name == name, ct);
         if (nameExists)
             throw new ConflictException("A party with this name already exists.");

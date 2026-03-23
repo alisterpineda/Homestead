@@ -13,8 +13,6 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
     public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineRequest request, CancellationToken ct)
     {
         var trimmedName = request.Name.Trim();
-        if (string.IsNullOrWhiteSpace(trimmedName))
-            throw new BadRequestException("Name is required.");
 
         if (string.Equals(trimmedName, BuiltInTextExtractionEngines.TesseractDefaultName, StringComparison.OrdinalIgnoreCase))
             throw new ConflictException("A text extraction engine with this name already exists.");
