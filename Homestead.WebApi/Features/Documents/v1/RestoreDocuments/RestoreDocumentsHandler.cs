@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.RestoreDocuments;
 
 public class RestoreDocumentsHandler(AppDbContext db,
-    IAuditLogger auditLogger, IDocumentQueryService accessService)
+    IAuditContext audit, IDocumentQueryService accessService)
     : IRequestHandler<RestoreDocumentsCommand, RestoreDocumentsResponse>
 {
     public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
@@ -24,7 +25,7 @@ public class RestoreDocumentsHandler(AppDbContext db,
         {
             doc.DeletedAt = null;
             doc.DeletedByUserId = null;
-            auditLogger.LogRestored("Document", doc.Id, description: doc.Name);
+            audit.Restored("Document", doc.Id, description: doc.Name);
         }
 
         await db.SaveChangesAsync(ct);

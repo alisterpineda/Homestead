@@ -1,11 +1,12 @@
 using Homestead.WebApi.Authorization;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteParties;
 
-public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
+public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit)
     : IRequestHandler<BulkDeletePartiesCommand, BulkDeletePartiesResponse>
 {
     public async Task<BulkDeletePartiesResponse> Handle(BulkDeletePartiesCommand request, CancellationToken ct)
@@ -25,9 +26,10 @@ public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService acc
         await accessService.EnsureAllDocumentsWritableAsync(relatedDocIds, ct);
 
         foreach (var party in parties)
-            auditLogger.LogDeleted("Party", party.Id, description: party.Name);
+            audit.Deleted("Party", party.Id, description: party.Name);
 
         db.Parties.RemoveRange(parties);
+
         await db.SaveChangesAsync(ct);
 
         return new BulkDeletePartiesResponse(parties.Count);

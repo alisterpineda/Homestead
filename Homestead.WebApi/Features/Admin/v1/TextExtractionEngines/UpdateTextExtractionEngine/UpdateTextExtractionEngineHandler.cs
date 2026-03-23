@@ -1,13 +1,14 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Settings;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
 
-public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditLogger auditLogger)
+public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext audit)
     : IRequestHandler<UpdateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
     public async Task<TextExtractionEngineResponse> Handle(UpdateTextExtractionEngineCommand command, CancellationToken ct)
@@ -36,17 +37,11 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditLogger aud
 
         TextExtractionEngineConfigValidator.Validate(engine.EngineType, command.Request.Configuration);
 
-        var before = TextExtractionEngineSnapshot.From(engine);
+        audit.Track<TextExtractionEngineSnapshot, TextExtractionEngine>(engine, "TextExtractionEngine", engine.Id);
 
         engine.Name = trimmedName;
         engine.Configuration = command.Request.Configuration;
         engine.UpdatedAt = DateTimeOffset.UtcNow;
-
-        var after = TextExtractionEngineSnapshot.From(engine);
-        var changes = before.Diff(after);
-
-        if (changes.Count > 0)
-            auditLogger.LogUpdated("TextExtractionEngine", engine.Id, changes);
 
         await db.SaveChangesAsync(ct);
 

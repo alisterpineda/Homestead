@@ -1,13 +1,15 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
+using Homestead.WebApi.Domains.Parties;
+using Homestead.WebApi.Features.Auditing;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.UpdateParty;
 
-public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
+public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit)
     : IRequestHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
@@ -31,15 +33,10 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
 
         await accessService.EnsureAllDocumentsAccessibleAsync(relatedDocIds, ct);
 
-        var before = PartySnapshot.From(party);
+        audit.Track<PartySnapshot, Party>(party, "Party", party.Id);
 
         party.Name = name;
         party.Description = request.Description?.Trim();
-
-        var after = PartySnapshot.From(party);
-        var changes = before.Diff(after);
-        auditLogger.LogUpdated("Party", party.Id, changes);
-
         await db.SaveChangesAsync(ct);
 
         return new UpdatePartyResponse

@@ -1,11 +1,12 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.DeleteGroup;
 
-public class DeleteGroupHandler(AppDbContext db, IAuditLogger auditLogger)
+public class DeleteGroupHandler(AppDbContext db, IAuditContext audit)
     : IRequestHandler<DeleteGroupCommand, bool>
 {
     public async Task<bool> Handle(DeleteGroupCommand request, CancellationToken ct)
@@ -19,9 +20,10 @@ public class DeleteGroupHandler(AppDbContext db, IAuditLogger auditLogger)
             .Where(d => d.GroupId == request.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.GroupId, (Guid?)null), ct);
 
-        auditLogger.LogDeleted("Group", group.Id, description: group.Name);
+        audit.Deleted("Group", group.Id, description: group.Name);
 
         db.Groups.Remove(group);
+
         await db.SaveChangesAsync(ct);
 
         return true;

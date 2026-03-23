@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domains.Parties;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Features.Documents.v1.BulkDeleteParties;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
@@ -9,15 +10,15 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class BulkDeletePartiesHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly BulkDeletePartiesHandler _sut;
 
     public BulkDeletePartiesHandlerTests()
     {
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new BulkDeletePartiesHandler(_db, accessService, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new BulkDeletePartiesHandler(_db, accessService, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -35,8 +36,8 @@ public class BulkDeletePartiesHandlerTests : IDisposable
 
         await _sut.Handle(new BulkDeletePartiesCommand([id1, id2]), CancellationToken.None);
 
-        _auditLogger.Received(1).LogDeleted("Party", id1, "Party A", Arg.Any<Guid?>());
-        _auditLogger.Received(1).LogDeleted("Party", id2, "Party B", Arg.Any<Guid?>());
+        _audit.Received(1).Deleted("Party", id1, "Party A", Arg.Any<Guid?>());
+        _audit.Received(1).Deleted("Party", id2, "Party B", Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -44,6 +45,6 @@ public class BulkDeletePartiesHandlerTests : IDisposable
     {
         await _sut.Handle(new BulkDeletePartiesCommand([Guid.NewGuid()]), CancellationToken.None);
 
-        _auditLogger.DidNotReceive().LogDeleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        _audit.DidNotReceive().Deleted(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 }

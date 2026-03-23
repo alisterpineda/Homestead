@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -10,7 +11,7 @@ namespace Homestead.WebApi.Features.Documents.v1.CreateComment;
 public class CreateCommentHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger)
+    IAuditContext audit)
     : IRequestHandler<CreateCommentCommand, CreateCommentResponse>
 {
     public async Task<CreateCommentResponse> Handle(CreateCommentCommand request, CancellationToken ct)
@@ -26,13 +27,13 @@ public class CreateCommentHandler(
             Id = Guid.NewGuid(),
             Body = request.Body.Trim(),
             DocumentId = request.DocumentId,
-            CreatedByUserId = userId
+            CreatedByUserId = userId,
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         db.DocumentComments.Add(comment);
 
-        auditLogger.LogCreated("DocumentComment", comment.Id, parentEntityId: request.DocumentId);
-
+        audit.Created("DocumentComment", comment.Id, parentEntityId: request.DocumentId);
         await db.SaveChangesAsync(ct);
 
         return new CreateCommentResponse

@@ -1,6 +1,7 @@
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Groups;
 using Homestead.WebApi.Features.Admin.v1.UpdateGroup;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 
@@ -9,14 +10,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class UpdateGroupHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly UpdateGroupHandler _sut;
 
     public UpdateGroupHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new UpdateGroupHandler(_db, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new UpdateGroupHandler(_db, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -42,12 +43,11 @@ public class UpdateGroupHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Group", group.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
+        _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task Handle_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_StillCallsTrack()
     {
         var group = new Group
         {
@@ -67,7 +67,7 @@ public class UpdateGroupHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Group", group.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
+        // Track is always called before mutations; diff computation is deferred
+        _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
     }
 }

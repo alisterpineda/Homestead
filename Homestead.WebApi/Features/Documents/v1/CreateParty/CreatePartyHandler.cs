@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Domains.Parties;
 using Homestead.WebApi.Persistence;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
-public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
     : IRequestHandler<CreatePartyCommand, CreatePartyResponse>
 {
     public async Task<CreatePartyResponse> Handle(CreatePartyCommand request, CancellationToken ct)
@@ -28,7 +29,7 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Parties.Add(party);
-        auditLogger.LogCreated("Party", party.Id);
+        audit.Created("Party", party.Id);
         await db.SaveChangesAsync(ct);
 
         return new CreatePartyResponse

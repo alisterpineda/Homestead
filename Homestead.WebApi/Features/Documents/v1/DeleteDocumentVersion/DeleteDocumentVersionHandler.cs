@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Domains.Documents;
 using Homestead.WebApi.Persistence;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
+    IAuditContext audit, ISearchVectorUpdater searchVectorUpdater,
     ILogger<DeleteDocumentVersionHandler> logger)
     : IRequestHandler<DeleteDocumentVersionCommand, bool>
 {
@@ -38,7 +39,7 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
         if (!string.IsNullOrWhiteSpace(version.Label))
             description += $" ({version.Label})";
 
-        auditLogger.LogDeleted("DocumentVersion", version.Id,
+        audit.Deleted("DocumentVersion", version.Id,
             description: description, parentEntityId: documentId);
 
         db.DocumentVersions.Remove(version);

@@ -1,11 +1,12 @@
 using Homestead.WebApi.Authorization;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 
-public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
+public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit)
     : IRequestHandler<BulkDeleteTagsCommand, BulkDeleteTagsResponse>
 {
     public async Task<BulkDeleteTagsResponse> Handle(BulkDeleteTagsCommand request, CancellationToken ct)
@@ -95,9 +96,10 @@ public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService access
         }
 
         foreach (var tag in tags)
-            auditLogger.LogDeleted("Tag", tag.Id, description: tag.Name);
+            audit.Deleted("Tag", tag.Id, description: tag.Name);
 
         db.Tags.RemoveRange(tags);
+
         await db.SaveChangesAsync(ct);
 
         return new BulkDeleteTagsResponse(tags.Count);

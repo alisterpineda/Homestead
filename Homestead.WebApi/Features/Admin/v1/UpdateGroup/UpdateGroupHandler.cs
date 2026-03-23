@@ -1,12 +1,14 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
+using Homestead.WebApi.Domains.Groups;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateGroup;
 
-public class UpdateGroupHandler(AppDbContext db, IAuditLogger auditLogger)
+public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
     : IRequestHandler<UpdateGroupCommand, GroupResponse>
 {
     public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
@@ -23,14 +25,10 @@ public class UpdateGroupHandler(AppDbContext db, IAuditLogger auditLogger)
         if (nameConflict)
             throw new ConflictException("A group with this name already exists.");
 
-        var before = GroupSnapshot.From(group);
+        audit.Track<GroupSnapshot, Group>(group, "Group", group.Id);
 
         group.Name = trimmedName;
         group.Description = command.Request.Description?.Trim();
-
-        var after = GroupSnapshot.From(group);
-        var changes = before.Diff(after);
-        auditLogger.LogUpdated("Group", group.Id, changes);
 
         await db.SaveChangesAsync(ct);
 

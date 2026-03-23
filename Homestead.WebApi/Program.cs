@@ -12,6 +12,7 @@ using Homestead.WebApi.Features.Status;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
 using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Features.Documents.TextExtraction;
 using Homestead.WebApi.Features.Documents.Thumbnails;
 using Microsoft.AspNetCore.Identity;
@@ -86,6 +87,7 @@ builder.AddAppAuthentication();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
+builder.Services.AddScoped<IAuditContext, AuditContext>();
 builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
@@ -101,6 +103,7 @@ builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<Program>();
     cfg.Lifetime = ServiceLifetime.Scoped;
+    cfg.AddOpenBehavior(typeof(UnitOfWorkBehavior<,>));
     cfg.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });

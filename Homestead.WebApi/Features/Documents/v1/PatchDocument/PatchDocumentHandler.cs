@@ -1,8 +1,9 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
-using MediatR;
 using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Features.Auditing;
+using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
@@ -10,8 +11,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db,
-    IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater, IDocumentMetadataService metadataService,
-    IDocumentQueryService queryService)
+    IAuditContext audit, ISearchVectorUpdater searchVectorUpdater,
+    IDocumentMetadataService metadataService, IDocumentQueryService queryService)
     : IRequestHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
     public async Task<PatchDocumentResponse> Handle(PatchDocumentCommand request, CancellationToken ct)
@@ -24,7 +25,7 @@ public class PatchDocumentHandler(AppDbContext db,
         if (document is null)
             throw new NotFoundException("Document not found.");
 
-        var before = DocumentSnapshot.From(document);
+        audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
         // Populate model from current DB state
         var model = new PatchDocumentModel
@@ -81,10 +82,6 @@ public class PatchDocumentHandler(AppDbContext db,
 
         // Update parties
         metadataService.SetParties(document, model.PartyIds);
-
-        var after = DocumentSnapshot.From(document);
-        var changes = before.Diff(after);
-        auditLogger.LogUpdated("Document", document.Id, changes);
 
         await db.SaveChangesAsync(ct);
 

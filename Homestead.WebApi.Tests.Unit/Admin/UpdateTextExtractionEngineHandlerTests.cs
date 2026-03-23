@@ -1,6 +1,8 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Settings;
 using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -10,14 +12,14 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class UpdateTextExtractionEngineHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly UpdateTextExtractionEngineHandler _sut;
 
     public UpdateTextExtractionEngineHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new UpdateTextExtractionEngineHandler(_db, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new UpdateTextExtractionEngineHandler(_db, _audit);
     }
 
     public void Dispose()

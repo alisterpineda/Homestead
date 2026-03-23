@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Features.Documents.v1.PatchTag;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
@@ -12,15 +13,15 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class PatchTagHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly PatchTagHandler _sut;
 
     public PatchTagHandlerTests()
     {
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new PatchTagHandler(_db, accessService, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new PatchTagHandler(_db, accessService, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -39,12 +40,11 @@ public class PatchTagHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
+        _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task Handle_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_StillCallsTrack()
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Same", Path = "Same" };
         _db.Tags.Add(tag);
@@ -57,8 +57,8 @@ public class PatchTagHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
+        // Track is always called before mutations; diff computation is deferred
+        _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -76,8 +76,7 @@ public class PatchTagHandlerTests : IDisposable
         var result = await _sut.Handle(command, CancellationToken.None);
 
         Assert.Equal("New description", result.Description);
-        _auditLogger.Received(1).LogUpdated("Tag", tag.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
+        _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
     }
 
     [Fact]

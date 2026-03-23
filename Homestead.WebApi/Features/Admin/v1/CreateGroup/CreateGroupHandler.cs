@@ -1,13 +1,14 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Groups;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.CreateGroup;
 
-public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
     : IRequestHandler<CreateGroupCommand, GroupResponse>
 {
     public async Task<GroupResponse> Handle(CreateGroupCommand request, CancellationToken ct)
@@ -30,7 +31,8 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
         };
 
         db.Groups.Add(group);
-        auditLogger.LogCreated("Group", group.Id);
+        audit.Created("Group", group.Id);
+        await db.SaveChangesAsync(ct);
 
         // Auto-add creator as Owner
         if (userId.HasValue)
@@ -42,8 +44,6 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
                 AccessLevel = GroupAccessLevel.Owner
             });
         }
-
-        await db.SaveChangesAsync(ct);
 
         var creatorName = userId.HasValue
             ? await db.Users.Where(u => u.Id == userId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)

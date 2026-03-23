@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Features.Documents.v1.CreateTag;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
@@ -11,7 +12,7 @@ public class CreateTagHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly ITagPathResolver _tagPathResolver;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly CreateTagHandler _sut;
 
     public CreateTagHandlerTests()
@@ -20,8 +21,8 @@ public class CreateTagHandlerTests : IDisposable
         _tagPathResolver = Substitute.For<ITagPathResolver>();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new CreateTagHandler(_db, _tagPathResolver, _currentUser, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new CreateTagHandler(_db, _tagPathResolver, _currentUser, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -37,7 +38,7 @@ public class CreateTagHandlerTests : IDisposable
 
         await _sut.Handle(new CreateTagCommand("Test"), CancellationToken.None);
 
-        _auditLogger.Received(1).LogCreated("Tag", tagId, Arg.Any<Guid?>());
+        _audit.Received(1).Created("Tag", tagId, Arg.Any<Guid?>());
     }
 
     [Fact]

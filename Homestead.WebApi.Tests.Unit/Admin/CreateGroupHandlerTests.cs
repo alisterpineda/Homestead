@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Features.Admin.v1.CreateGroup;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 
@@ -9,7 +10,7 @@ public class CreateGroupHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly CreateGroupHandler _sut;
 
     public CreateGroupHandlerTests()
@@ -17,8 +18,8 @@ public class CreateGroupHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new CreateGroupHandler(_db, _currentUser, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new CreateGroupHandler(_db, _currentUser, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -30,6 +31,6 @@ public class CreateGroupHandlerTests : IDisposable
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
-        _auditLogger.Received(1).LogCreated("Group", response.Id, Arg.Any<Guid?>());
+        _audit.Received(1).Created("Group", response.Id, Arg.Any<Guid?>());
     }
 }

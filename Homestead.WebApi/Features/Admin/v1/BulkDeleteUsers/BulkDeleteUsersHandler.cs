@@ -30,7 +30,7 @@ public class BulkDeleteUsersHandler(
             return new BulkDeleteUsersResponse(0);
 
         var strategy = db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
@@ -43,9 +43,10 @@ public class BulkDeleteUsersHandler(
                     throw new IdentityValidationException(result.ToErrorDictionary());
             }
 
+            await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-        });
 
-        return new BulkDeleteUsersResponse(users.Count);
+            return new BulkDeleteUsersResponse(users.Count);
+        });
     }
 }

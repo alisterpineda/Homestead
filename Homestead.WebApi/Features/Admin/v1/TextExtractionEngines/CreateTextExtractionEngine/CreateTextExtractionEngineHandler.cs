@@ -1,13 +1,14 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domains.Settings;
+using Homestead.WebApi.Features.Auditing;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.CreateTextExtractionEngine;
 
-public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
     : IRequestHandler<CreateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
     public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineCommand request, CancellationToken ct)
@@ -38,7 +39,7 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
         };
 
         db.TextExtractionEngines.Add(engine);
-        auditLogger.LogCreated("TextExtractionEngine", engine.Id);
+        audit.Created("TextExtractionEngine", engine.Id);
         await db.SaveChangesAsync(ct);
 
         var creatorName = userId.HasValue

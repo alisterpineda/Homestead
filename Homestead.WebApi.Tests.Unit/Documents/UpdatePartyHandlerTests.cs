@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domains.Auditing.Snapshots;
 using Homestead.WebApi.Domains.Parties;
+using Homestead.WebApi.Features.Auditing;
 using Homestead.WebApi.Features.Documents.v1.UpdateParty;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
@@ -10,15 +11,15 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class UpdatePartyHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
     private readonly UpdatePartyHandler _sut;
 
     public UpdatePartyHandlerTests()
     {
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new UpdatePartyHandler(_db, accessService, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _sut = new UpdatePartyHandler(_db, accessService, _audit);
     }
 
     public void Dispose() => _db.Dispose();
@@ -45,12 +46,11 @@ public class UpdatePartyHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        _auditLogger.Received(1).LogUpdated("Party", party.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count > 0), Arg.Any<Guid?>());
+        _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
     }
 
     [Fact]
-    public async Task Handle_NoChanges_LogsEmptyChanges()
+    public async Task Handle_NoChanges_StillCallsTrack()
     {
         var party = new Party
         {
@@ -71,8 +71,7 @@ public class UpdatePartyHandlerTests : IDisposable
 
         await _sut.Handle(command, CancellationToken.None);
 
-        // LogUpdated is still called, but AuditLogger.LogUpdated handles the empty-changes case
-        _auditLogger.Received(1).LogUpdated("Party", party.Id,
-            Arg.Is<List<FieldChange>>(c => c.Count == 0), Arg.Any<Guid?>());
+        // Track is always called before mutations; diff computation is deferred
+        _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
     }
 }
