@@ -75,6 +75,33 @@ Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints 
 - **Snapshots** per entity (e.g., `DocumentSnapshot`) implement `IAuditSnapshot` with `From()` and `Diff()`
 - **`IAuditLogger`** — DI-injected service (`Persistence/AuditLogger.cs`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Auto-resolves the current user from `ICurrentUserAccessor` — handlers do not pass `userId`. Background job handlers use `auditLogger.ForUser(job.CreatedByUserId)` to attribute audit entries to the user who initiated the job.
 
+## Error Handling (RFC 9457)
+
+All error responses use RFC 9457 Problem Details (`application/problem+json`). A single `DomainExceptionHandler` maps domain exceptions to responses via a switch expression — no per-exception handler classes.
+
+### Exception Hierarchy (HTTP-decoupled)
+
+| Exception | Maps to | Use when |
+|---|---|---|
+| `BusinessRuleException` | 400 | Business logic violation. Supports optional `Errors` (structured validation errors) |
+| `EntityNotFoundException` | 404 | Resource not found |
+| `AccessDeniedException` | 403 | Insufficient permissions |
+| `DuplicateEntityException` | 409 | Uniqueness constraint violation |
+| `ValidationException` (FluentValidation) | 400 | Request validation failure |
+| `IdentityValidationException` | 400 | ASP.NET Identity operation failure |
+
+Exceptions have **no knowledge of HTTP status codes** — the mapping lives exclusively in `DomainExceptionHandler` and `ProblemDetailsFactory`.
+
+### ProblemDetailsFactory
+
+Static factory (`Common/DomainExceptionHandler.cs`) for constructing `ProblemDetails` responses. Used by the exception handler, auth middleware, and endpoints directly:
+- `Create(statusCode, title, detail?)` — generic
+- `BusinessRule(detail)` / `BusinessRuleResult(detail)` — 400 with detail
+- `Forbidden(detail, errorCode?)` / `Unauthorized(detail, errorCode)` — with optional `errorCode` extension
+- `ValidationErrors(errors, detail?)` — 400 with field-level errors in `Extensions["errors"]`
+
+The `errorCode` extension enables frontend-specific handling (e.g., `account_inactive`, `account_locked`) without parsing message strings.
+
 ## Conventions
 
 - Minimal APIs (no controllers)
