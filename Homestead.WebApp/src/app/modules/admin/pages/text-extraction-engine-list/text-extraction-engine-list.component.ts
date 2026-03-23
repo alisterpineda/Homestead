@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
@@ -19,9 +18,7 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
 import { CreateTextExtractionEngineDialogComponent } from '../../components/create-text-extraction-engine-dialog/create-text-extraction-engine-dialog.component';
 import { EditTextExtractionEngineSheetComponent } from '../../components/edit-text-extraction-engine-sheet/edit-text-extraction-engine-sheet.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getTextExtractionEngines } from '@/api/generated/fn/admin/get-text-extraction-engines';
-import { bulkDeleteTextExtractionEngines } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfTextExtractionEngineResponse } from '@/api/generated/models/paginated-response-of-text-extraction-engine-response';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
@@ -201,8 +198,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class TextExtractionEngineListComponent implements OnDestroy {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -263,14 +259,14 @@ export class TextExtractionEngineListComponent implements OnDestroy {
       switchMap(([page, pageSize, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getTextExtractionEngines(this.http, this.apiConfig.rootUrl, {
+        return this.adminApi.getTextExtractionEngines({
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
         }).pipe(
           map(r => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfTextExtractionEngineResponse;
+            return r as PaginatedResponseOfTextExtractionEngineResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -348,13 +344,13 @@ export class TextExtractionEngineListComponent implements OnDestroy {
     if (ids.length === 0) return;
     this.deleting.set(true);
 
-    bulkDeleteTextExtractionEngines(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.bulkDeleteTextExtractionEngines({
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +(response.body as BulkDeleteTextExtractionEnginesResponse).deletedCount;
+        const count = +(response as BulkDeleteTextExtractionEnginesResponse).deletedCount;
         toast.success(`${count} ${count > 1 ? 'engines' : 'engine'} deleted.`);
         this.clearSelection();
         this.onRefresh();

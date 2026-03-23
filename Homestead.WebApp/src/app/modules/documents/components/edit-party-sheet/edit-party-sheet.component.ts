@@ -10,15 +10,13 @@ import {
 } from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { updateParty } from '@/api/generated/fn/documents/update-party';
+import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { extractApiError } from '@/shared/utils/api-error.utils';
@@ -115,8 +113,7 @@ export class EditPartySheetComponent {
     return false;
   });
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private partyApi = inject(PartyApiService);
 
   constructor() {
     effect(() => {
@@ -146,7 +143,7 @@ export class EditPartySheetComponent {
     const p = this.party();
     if (!p) return;
     this.saving.set(true);
-    updateParty(this.http, this.apiConfig.rootUrl, {
+    this.partyApi.updateParty({
       id: p.id,
       body: { name: this.editName(), description: this.editDescription() || null },
     }).subscribe({

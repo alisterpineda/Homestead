@@ -11,7 +11,6 @@ import {
   effect,
   untracked,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -22,10 +21,8 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { bulkUpdateDocuments } from '@/api/generated/fn/documents/bulk-update-documents';
-import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { createParty } from '@/api/generated/fn/documents/create-party';
+import { PartyApiService } from '@/api/services/party-api.service';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
@@ -182,8 +179,8 @@ export class BulkEditPartiesPopoverComponent {
 
   private partyContainer = viewChild<ElementRef<HTMLDivElement>>('partyContainer');
   private partySearchEl = viewChild<ElementRef<HTMLInputElement>>('partySearchEl');
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private partyApi = inject(PartyApiService);
+  private documentApi = inject(DocumentApiService);
 
   // Party autocomplete
   private suggestions = toSignal(
@@ -194,12 +191,12 @@ export class BulkEditPartiesPopoverComponent {
           this.loading.set(false);
           return of([]);
         }
-        return getParties(this.http, this.apiConfig.rootUrl, {
+        return this.partyApi.getParties({
           Search: text,
           Page: 1,
           PageSize: 10,
         }).pipe(
-          map((r) => r.body.items as GetPartiesResponse[]),
+          map((r) => r.items as GetPartiesResponse[]),
           tap(() => this.loading.set(false)),
           catchError(() => {
             this.loading.set(false);
@@ -311,7 +308,7 @@ export class BulkEditPartiesPopoverComponent {
     const ids = Array.from(this.selectedIds());
     this.applying.set(true);
 
-    bulkUpdateDocuments(this.http, this.apiConfig.rootUrl, {
+    this.documentApi.bulkUpdateDocuments({
       body: {
         ids,
         tagPaths: null,
@@ -322,7 +319,7 @@ export class BulkEditPartiesPopoverComponent {
     }).subscribe({
       next: (response) => {
         this.applying.set(false);
-        const count = +response.body.updatedCount;
+        const count = +response.updatedCount;
         toast.success(`Updated ${count} document${count > 1 ? 's' : ''}.`);
         ctx.close();
         this.popoverState.set('closed');
@@ -402,12 +399,12 @@ export class BulkEditPartiesPopoverComponent {
   private createAndAddParty(name: string): void {
     if (this.creatingParty()) return;
     this.creatingParty.set(true);
-    createParty(this.http, this.apiConfig.rootUrl, {
+    this.partyApi.createParty({
       body: { name },
     }).subscribe({
       next: (r) => {
         this.creatingParty.set(false);
-        this.addFromSuggestion({ id: r.body.id, name: r.body.name });
+        this.addFromSuggestion({ id: r.id, name: r.name });
       },
       error: () => {
         this.creatingParty.set(false);

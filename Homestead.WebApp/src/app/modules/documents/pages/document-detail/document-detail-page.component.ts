@@ -62,14 +62,8 @@ import type { PartyOption } from '../../components/party-input/party-input.compo
 import { AddVersionDialogComponent } from '../../components/add-version-dialog/add-version-dialog.component';
 import { ReprocessDialogComponent } from '../../components/reprocess-dialog/reprocess-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual } from '@/shared/utils';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getDocument } from '@/api/generated/fn/documents/get-document';
-import { getDocumentVersion } from '@/api/generated/fn/documents/get-document-version';
-import { patchDocument } from '@/api/generated/fn/documents/patch-document';
-import { patchDocumentVersion } from '@/api/generated/fn/documents/patch-document-version';
-import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
-import { getDocumentActivity } from '@/api/generated/fn/documents/get-document-activity';
-import { createComment } from '@/api/generated/fn/documents/create-comment';
+import { DocumentApiService } from '@/api/services/document-api.service';
+import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
@@ -628,7 +622,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
   isMobile = this.sidebarService.isMobile;
 
   private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private documentApi = inject(DocumentApiService);
+  private versionApi = inject(DocumentVersionApiService);
   private sanitizer = inject(DomSanitizer);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -782,10 +777,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
       switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
-        return getDocument(this.http, this.apiConfig.rootUrl, { id }).pipe(
+        return this.documentApi.getDocument({ id }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as GetDocumentResponse;
+            return r as GetDocumentResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -938,12 +933,12 @@ export class DocumentDetailPageComponent implements OnDestroy {
         return;
       }
 
-      this.versionDetailSub = getDocumentVersion(this.http, this.apiConfig.rootUrl, {
+      this.versionDetailSub = this.versionApi.getDocumentVersion({
         documentId: docId,
         id: verId,
       })
         .pipe(
-          map((r) => r.body as GetDocumentVersionResponse),
+          map((r) => r as GetDocumentVersionResponse),
           catchError(() => of(null)),
         )
         .subscribe((detail) => this.versionDetail.set(detail));
@@ -1073,7 +1068,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const id = this.documentId();
     if (!id) return;
     this.deleting.set(true);
-    deleteDocument(this.http, this.apiConfig.rootUrl, { id }).subscribe({
+    this.documentApi.deleteDocument({ id }).subscribe({
       next: () => {
         this.editStateService.discardChanges(id);
         this.openDocumentsService.removeDocument(id);
@@ -1128,12 +1123,12 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
     const docOps = this.buildDocumentPatchOps();
     const docUpdate$ = docOps.length > 0
-      ? patchDocument(this.http, this.apiConfig.rootUrl, { id, body: docOps })
+      ? this.documentApi.patchDocument({ id, body: docOps })
       : of(null);
 
     const verOps = this.buildVersionPatchOps();
     const versionUpdate$ = verOps.length > 0 && ver
-      ? patchDocumentVersion(this.http, this.apiConfig.rootUrl, {
+      ? this.versionApi.patchDocumentVersion({
           documentId: id,
           id: ver.id,
           body: verOps,
@@ -1222,13 +1217,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const id = this.documentId();
     if (!id) return;
     this.activityLoading.set(true);
-    getDocumentActivity(this.http, this.apiConfig.rootUrl, {
+    this.versionApi.getDocumentActivity({
       documentId: id,
       Page: 1,
       PageSize: 100,
     })
       .pipe(
-        map((r) => r.body.items ?? []),
+        map((r) => r.items ?? []),
         catchError(() => of([])),
       )
       .subscribe((items) => {
@@ -1242,7 +1237,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const body = this.commentBody().trim();
     if (!id || !body) return;
     this.commentSubmitting.set(true);
-    createComment(this.http, this.apiConfig.rootUrl, {
+    this.versionApi.createComment({
       documentId: id,
       body: { body },
     }).subscribe({

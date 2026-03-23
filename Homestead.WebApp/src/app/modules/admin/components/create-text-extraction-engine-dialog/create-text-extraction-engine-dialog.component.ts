@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -8,8 +7,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
 import { ENGINE_TYPE_OPTIONS } from '../../constants/engine-type-labels';
 import { extractApiError } from '@/shared/utils/api-error.utils';
@@ -106,8 +104,7 @@ export class CreateTextExtractionEngineDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon'>('default');
   created = output();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   engineTypeOptions = ENGINE_TYPE_OPTIONS;
   languages = TESSERACT_LANGUAGES;
@@ -163,7 +160,7 @@ export class CreateTextExtractionEngineDialogComponent {
       configuration = JSON.stringify({ languages: this.selectedLanguages() });
     }
 
-    createTextExtractionEngine(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.createTextExtractionEngine({
       body: {
         name: this.name().trim(),
         engineType,

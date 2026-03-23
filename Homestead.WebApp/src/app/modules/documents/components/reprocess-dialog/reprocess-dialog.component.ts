@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
@@ -7,9 +6,7 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getTextExtractionEngineSummaries } from '@/api/generated/fn/documents/get-text-extraction-engine-summaries';
-import { reprocessDocumentVersion } from '@/api/generated/fn/documents/reprocess-document-version';
+import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import { toast } from 'ngx-sonner';
 
@@ -87,8 +84,7 @@ export class ReprocessDialogComponent {
   reprocessing = signal(false);
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private versionApi = inject(DocumentVersionApiService);
 
   open(): void {
     this.dialog()?.open();
@@ -115,7 +111,7 @@ export class ReprocessDialogComponent {
     this.reprocessing.set(true);
     const engineId = this.selectedEngineId();
 
-    reprocessDocumentVersion(this.http, this.apiConfig.rootUrl, {
+    this.versionApi.reprocessDocumentVersion({
       documentId: docId,
       versionId: verId,
       body: { textExtractionEngineId: engineId },
@@ -123,7 +119,7 @@ export class ReprocessDialogComponent {
       next: (r) => {
         this.reprocessing.set(false);
         ctx.close();
-        this.reprocessStarted.emit(r.body.jobId);
+        this.reprocessStarted.emit(r.jobId);
       },
       error: () => {
         this.reprocessing.set(false);
@@ -136,9 +132,9 @@ export class ReprocessDialogComponent {
     this.loadingEngines.set(true);
     this.loadError.set(false);
 
-    getTextExtractionEngineSummaries(this.http, this.apiConfig.rootUrl).subscribe({
+    this.versionApi.getTextExtractionEngineSummaries().subscribe({
       next: (r) => {
-        this.engines.set(r.body);
+        this.engines.set(r);
         this.loadingEngines.set(false);
       },
       error: () => {

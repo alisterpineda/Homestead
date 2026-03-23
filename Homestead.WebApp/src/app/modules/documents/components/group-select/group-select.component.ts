@@ -1,9 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
 
 @Component({
@@ -30,15 +28,14 @@ export class GroupSelectComponent {
   triggerClass = input<string>('w-48');
   valueChange = output<string>();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private documentApi = inject(DocumentApiService);
 
   groups = signal<GetMyGroupsResponse[]>([]);
 
   constructor() {
-    getMyGroups(this.http, this.apiConfig.rootUrl).subscribe({
+    this.documentApi.getMyGroups().subscribe({
       next: (r) => {
-        this.groups.set(r.body as GetMyGroupsResponse[]);
+        this.groups.set(r as GetMyGroupsResponse[]);
       },
       error: () => {
         this.groups.set([]);

@@ -11,7 +11,6 @@ import {
   effect,
   untracked,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -22,9 +21,8 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { bulkUpdateDocuments } from '@/api/generated/fn/documents/bulk-update-documents';
-import { getTags } from '@/api/generated/fn/documents/get-tags';
+import { TagApiService } from '@/api/services/tag-api.service';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
@@ -181,8 +179,8 @@ export class BulkEditTagsPopoverComponent {
 
   private tagContainer = viewChild<ElementRef<HTMLDivElement>>('tagContainer');
   private tagSearchEl = viewChild<ElementRef<HTMLInputElement>>('tagSearchEl');
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private tagApi = inject(TagApiService);
+  private documentApi = inject(DocumentApiService);
 
   // Tag autocomplete
   private suggestions = toSignal(
@@ -193,13 +191,13 @@ export class BulkEditTagsPopoverComponent {
           this.loading.set(false);
           return of([]);
         }
-        return getTags(this.http, this.apiConfig.rootUrl, {
+        return this.tagApi.getTags({
           Search: text,
           IncludeChildren: false,
           Page: 1,
           PageSize: 50,
         }).pipe(
-          map((r) => r.body.items as GetTagsResponse[]),
+          map((r) => r.items as GetTagsResponse[]),
           tap(() => this.loading.set(false)),
           catchError(() => {
             this.loading.set(false);
@@ -320,7 +318,7 @@ export class BulkEditTagsPopoverComponent {
     const ids = Array.from(this.selectedIds());
     this.applying.set(true);
 
-    bulkUpdateDocuments(this.http, this.apiConfig.rootUrl, {
+    this.documentApi.bulkUpdateDocuments({
       body: {
         ids,
         tagPaths: tagPathsToAdd.length > 0 ? tagPathsToAdd : null,
@@ -331,7 +329,7 @@ export class BulkEditTagsPopoverComponent {
     }).subscribe({
       next: (response) => {
         this.applying.set(false);
-        const count = +response.body.updatedCount;
+        const count = +response.updatedCount;
         toast.success(`Updated ${count} document${count > 1 ? 's' : ''}.`);
         ctx.close();
         this.popoverState.set('closed');

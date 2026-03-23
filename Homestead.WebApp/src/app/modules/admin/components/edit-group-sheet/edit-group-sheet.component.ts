@@ -1,11 +1,9 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, effect } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { updateGroup } from '@/api/generated/fn/admin/update-group';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GroupDetailResponse } from '@/api/generated/models/group-detail-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
@@ -53,8 +51,7 @@ export class EditGroupSheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   editName = signal('');
   editDescription = signal('');
@@ -87,7 +84,7 @@ export class EditGroupSheetComponent {
     if (!g) return;
     this.saving.set(true);
 
-    updateGroup(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.updateGroup({
       id: g.id,
       body: {
         name: this.editName().trim(),

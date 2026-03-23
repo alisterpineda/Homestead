@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, computed, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -8,8 +7,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createUser } from '@/api/generated/fn/admin/create-user';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { AppRole } from '@/api/generated/models/app-role';
 import { toast } from 'ngx-sonner';
 import { extractApiError } from '@/shared/utils/api-error.utils';
@@ -123,8 +121,7 @@ export class CreateUserDialogComponent {
   createError = signal('');
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   canSubmit = computed(() =>
     this.email().trim().length > 0 &&
@@ -156,7 +153,7 @@ export class CreateUserDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    createUser(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.createUser({
       body: {
         email: this.email().trim(),
         displayName: this.displayName().trim(),

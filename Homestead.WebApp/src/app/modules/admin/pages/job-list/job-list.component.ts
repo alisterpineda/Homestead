@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
@@ -12,8 +11,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge, type BadgeVariants } from '@/shared/components/spartan/badge';
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getProcessingJobs } from '@/api/generated/fn/processing/get-processing-jobs';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 import type { ProcessingJobType } from '@/api/generated/models/processing-job-type';
@@ -151,8 +149,7 @@ import type { ProcessingJobType } from '@/api/generated/models/processing-job-ty
   `,
 })
 export class JobListComponent {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -183,14 +180,14 @@ export class JobListComponent {
       switchMap(([page, pageSize, status]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getProcessingJobs(this.http, this.apiConfig.rootUrl, {
+        return this.adminApi.getProcessingJobs({
           Page: page,
           PageSize: pageSize,
           Status: status ?? undefined,
         }).pipe(
           map(r => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetProcessingJobsResponse;
+            return r as PaginatedResponseOfGetProcessingJobsResponse;
           }),
           catchError(() => {
             this.loading.set(false);

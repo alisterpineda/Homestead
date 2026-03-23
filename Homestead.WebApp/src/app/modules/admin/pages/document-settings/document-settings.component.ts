@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert } from '@ng-icons/lucide';
@@ -11,10 +10,8 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getDocumentSettings } from '@/api/generated/fn/admin/get-document-settings';
-import { patchDocumentSettings } from '@/api/generated/fn/admin/patch-document-settings';
-import { getTextExtractionEngineSummaries } from '@/api/generated/fn/documents/get-text-extraction-engine-summaries';
+import { AdminApiService } from '@/api/services/admin-api.service';
+import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { toast } from 'ngx-sonner';
@@ -94,8 +91,8 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
   `,
 })
 export class DocumentSettingsComponent {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
+  private docVersionApi = inject(DocumentVersionApiService);
 
   loading = signal(true);
   saving = signal(false);
@@ -129,10 +126,10 @@ export class DocumentSettingsComponent {
       { op: 'replace', path: '/defaultTextExtractionEngineId', value: value },
     ];
 
-    patchDocumentSettings(this.http, this.apiConfig.rootUrl, { body: patch }).subscribe({
+    this.adminApi.patchDocumentSettings({ body: patch }).subscribe({
       next: (r) => {
         this.saving.set(false);
-        const newId = r.body.defaultTextExtractionEngineId ?? null;
+        const newId = r.defaultTextExtractionEngineId ?? null;
         this.savedEngineId.set(newId);
         this.selectedEngineId.set(newId);
         toast.success('Document settings saved.');
@@ -149,12 +146,12 @@ export class DocumentSettingsComponent {
     this.loadError.set(false);
 
     forkJoin({
-      settings: getDocumentSettings(this.http, this.apiConfig.rootUrl),
-      engines: getTextExtractionEngineSummaries(this.http, this.apiConfig.rootUrl),
+      settings: this.adminApi.getDocumentSettings(),
+      engines: this.docVersionApi.getTextExtractionEngineSummaries(),
     }).subscribe({
       next: ({ settings, engines }) => {
-        const savedId = settings.body.defaultTextExtractionEngineId ?? null;
-        this.engines.set(engines.body);
+        const savedId = settings.defaultTextExtractionEngineId ?? null;
+        this.engines.set(engines);
         this.savedEngineId.set(savedId);
         // staleEngineId computed derives from savedEngineId + engines
         this.selectedEngineId.set(this.staleEngineId() ? null : savedId);

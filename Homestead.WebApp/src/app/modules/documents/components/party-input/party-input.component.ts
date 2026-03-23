@@ -11,13 +11,10 @@ import {
   effect,
   untracked,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { createParty } from '@/api/generated/fn/documents/create-party';
+import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { CREATE_OPTION_ID } from '../bulk-edit-shared';
 
@@ -96,8 +93,7 @@ export class PartyInputComponent {
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private partyApi = inject(PartyApiService);
 
   private suggestions = toSignal(
     toObservable(this.searchText).pipe(
@@ -107,12 +103,12 @@ export class PartyInputComponent {
           this.loading.set(false);
           return of([]);
         }
-        return getParties(this.http, this.apiConfig.rootUrl, {
+        return this.partyApi.getParties({
           Search: text,
           Page: 1,
           PageSize: 10,
         }).pipe(
-          map((r) => r.body.items as GetPartiesResponse[]),
+          map((r) => r.items as GetPartiesResponse[]),
           tap(() => this.loading.set(false)),
           catchError(() => {
             this.loading.set(false);
@@ -173,12 +169,12 @@ export class PartyInputComponent {
   private createAndAdd(name: string): void {
     if (this.creating()) return;
     this.creating.set(true);
-    createParty(this.http, this.apiConfig.rootUrl, {
+    this.partyApi.createParty({
       body: { name },
     }).subscribe({
       next: (r) => {
         this.creating.set(false);
-        this.addParty({ id: r.body.id, name: r.body.name });
+        this.addParty({ id: r.id, name: r.name });
       },
       error: () => {
         this.creating.set(false);

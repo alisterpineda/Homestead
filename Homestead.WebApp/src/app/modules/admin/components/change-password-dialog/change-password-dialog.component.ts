@@ -8,14 +8,12 @@ import {
   computed,
   viewChild,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { changeUserPassword } from '@/api/generated/fn/admin/change-user-password';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import { toast } from 'ngx-sonner';
 import { extractApiError } from '@/shared/utils/api-error.utils';
 
@@ -92,8 +90,7 @@ export class ChangePasswordDialogComponent {
   errorMessage = signal('');
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   canSubmit = computed(() =>
     this.password().length >= 8 &&
@@ -124,7 +121,7 @@ export class ChangePasswordDialogComponent {
     this.submitting.set(true);
     this.errorMessage.set('');
 
-    changeUserPassword(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.changeUserPassword({
       id: this.userId(),
       body: { password: this.password() },
     }).subscribe({

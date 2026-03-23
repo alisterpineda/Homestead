@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { ReactiveFormsModule, FormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -18,8 +17,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { patchTag } from '@/api/generated/fn/documents/patch-tag';
+import { TagApiService } from '@/api/services/tag-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -186,8 +184,7 @@ export class EditTagSheetComponent {
     return false;
   });
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private tagApi = inject(TagApiService);
 
   constructor() {
     effect(() => {
@@ -220,7 +217,7 @@ export class EditTagSheetComponent {
     if (this.editParentId() !== (t.parentId ?? null)) ops.push(replace('/parentId', this.editParentId()));
     if (this.editColor() !== (t.color ?? null)) ops.push(replace('/color', this.editColor()));
 
-    patchTag(this.http, this.apiConfig.rootUrl, {
+    this.tagApi.patchTag({
       id: t.id,
       body: ops,
     }).subscribe({

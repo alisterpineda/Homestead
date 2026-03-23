@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { provideIcons } from '@ng-icons/core';
 import { lucidePlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -8,8 +7,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createGroup } from '@/api/generated/fn/admin/create-group';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
@@ -62,8 +60,7 @@ export class CreateGroupDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon'>('default');
   created = output();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private dialog = viewChild(BrnDialog);
 
   name = signal('');
@@ -93,7 +90,7 @@ export class CreateGroupDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    createGroup(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.createGroup({
       body: {
         name: this.name().trim(),
         description: this.description().trim() || null,

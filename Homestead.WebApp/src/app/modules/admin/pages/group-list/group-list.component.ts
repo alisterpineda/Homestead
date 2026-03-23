@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
@@ -14,8 +13,7 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
 import { CreateGroupDialogComponent } from '../../components/create-group-dialog/create-group-dialog.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getGroups } from '@/api/generated/fn/admin/get-groups';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/paginated-response-of-group-response';
 
 @Component({
@@ -109,8 +107,7 @@ import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/pa
   `,
 })
 export class GroupListComponent implements OnDestroy {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -144,14 +141,14 @@ export class GroupListComponent implements OnDestroy {
       switchMap(([page, pageSize, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getGroups(this.http, this.apiConfig.rootUrl, {
+        return this.adminApi.getGroups({
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
         }).pipe(
           map(r => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGroupResponse;
+            return r as PaginatedResponseOfGroupResponse;
           }),
           catchError(() => {
             this.loading.set(false);

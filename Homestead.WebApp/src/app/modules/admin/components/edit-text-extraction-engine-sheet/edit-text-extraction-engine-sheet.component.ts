@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, effect } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -9,8 +8,7 @@ import { HlmBadge } from '@/shared/components/spartan/badge';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text-extraction-engine';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
@@ -122,8 +120,7 @@ export class EditTextExtractionEngineSheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   languages = TESSERACT_LANGUAGES;
   editName = signal('');
@@ -218,7 +215,7 @@ export class EditTextExtractionEngineSheetComponent {
     if (!e || e.isBuiltIn) return;
     this.saving.set(true);
 
-    updateTextExtractionEngine(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.updateTextExtractionEngine({
       id: e.id,
       body: {
         name: this.editName().trim(),

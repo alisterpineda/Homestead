@@ -1,15 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createTag } from '@/api/generated/fn/documents/create-tag';
+import { TagApiService } from '@/api/services/tag-api.service';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { toast } from 'ngx-sonner';
 
@@ -95,8 +93,7 @@ export class CreateTagDialogComponent {
   createError = signal(false);
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private tagApi = inject(TagApiService);
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
@@ -122,7 +119,7 @@ export class CreateTagDialogComponent {
 
     const descVal = this.descriptionControl.value.trim() || null;
 
-    createTag(this.http, this.apiConfig.rootUrl, {
+    this.tagApi.createTag({
       body: { path: pathVal, color: this.selectedColor(), description: descVal },
     }).subscribe({
       next: () => {

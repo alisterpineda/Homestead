@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUserPlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -10,9 +9,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getUsers } from '@/api/generated/fn/admin/get-users';
-import { addGroupMember } from '@/api/generated/fn/admin/add-group-member';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
 import { extractApiError } from '@/shared/utils/api-error.utils';
@@ -95,8 +92,7 @@ export class AddMemberDialogComponent {
   groupId = input.required<string>();
   added = output();
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private dialog = viewChild(BrnDialog);
 
   userSearch = signal('');
@@ -128,14 +124,14 @@ export class AddMemberDialogComponent {
 
   private searchUsers(search: string): void {
     this.loadingUsers.set(true);
-    getUsers(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.getUsers({
       Page: 1,
       PageSize: 10,
       Search: search,
     }).subscribe({
       next: (r) => {
         this.loadingUsers.set(false);
-        const body = r.body as { items: UserResponse[] };
+        const body = r as { items: UserResponse[] };
         this.userResults.set(body.items?.filter((u: UserResponse) => u.isActive) ?? []);
       },
       error: () => {
@@ -170,7 +166,7 @@ export class AddMemberDialogComponent {
     this.adding.set(true);
     this.addError.set('');
 
-    addGroupMember(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.addGroupMember({
       id: this.groupId(),
       body: {
         userId,

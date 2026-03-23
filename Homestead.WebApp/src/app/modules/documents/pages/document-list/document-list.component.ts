@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
@@ -28,11 +27,9 @@ import { DocumentListStateService } from '../../services/document-list-state.ser
 import { BulkEditTagsPopoverComponent } from '../../components/bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from '../../components/bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { OpenDocumentsService } from '../../services/open-documents.service';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getDocuments } from '@/api/generated/fn/documents/get-documents';
-import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { getTags } from '@/api/generated/fn/documents/get-tags';
-import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
+import { DocumentApiService } from '@/api/services/document-api.service';
+import { TagApiService } from '@/api/services/tag-api.service';
+import { PartyApiService } from '@/api/services/party-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
@@ -360,8 +357,9 @@ import { toast } from 'ngx-sonner';
 })
 export class DocumentListComponent implements OnDestroy {
   auth = inject(AuthService);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private documentApi = inject(DocumentApiService);
+  private tagApi = inject(TagApiService);
+  private partyApi = inject(PartyApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
@@ -489,14 +487,14 @@ export class DocumentListComponent implements OnDestroy {
       distinctUntilChanged(),
       switchMap(search => {
         this.partyOptionsLoading.set(true);
-        return getParties(this.http, this.apiConfig.rootUrl, {
+        return this.partyApi.getParties({
           Search: search || undefined,
           Page: 1,
           PageSize: 100,
         }).pipe(
           map(r => {
             this.partyOptionsLoading.set(false);
-            const items = r.body?.items ?? [];
+            const items = r?.items ?? [];
             return items.map(p => ({ id: p.id, label: p.name } as FilterOption));
           }),
           catchError(() => {
@@ -515,7 +513,7 @@ export class DocumentListComponent implements OnDestroy {
       distinctUntilChanged(),
       switchMap(search => {
         this.tagOptionsLoading.set(true);
-        return getTags(this.http, this.apiConfig.rootUrl, {
+        return this.tagApi.getTags({
           Search: search || undefined,
           IncludeChildren: false,
           Page: 1,
@@ -523,7 +521,7 @@ export class DocumentListComponent implements OnDestroy {
         }).pipe(
           map(r => {
             this.tagOptionsLoading.set(false);
-            const items = r.body?.items ?? [];
+            const items = r?.items ?? [];
             return items.map(t => ({ id: t.id, label: t.path } as FilterOption));
           }),
           catchError(() => {
@@ -625,7 +623,7 @@ export class DocumentListComponent implements OnDestroy {
       switchMap(([page, pageSize, , partyIds, tagIds, includeChildTags, sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getDocuments(this.http, this.apiConfig.rootUrl, {
+        return this.documentApi.getDocuments({
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
@@ -637,7 +635,7 @@ export class DocumentListComponent implements OnDestroy {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetDocumentsResponse;
+            return r as PaginatedResponseOfGetDocumentsResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -797,13 +795,13 @@ export class DocumentListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    bulkDeleteDocuments(this.http, this.apiConfig.rootUrl, {
+    this.documentApi.bulkDeleteDocuments({
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} document${count > 1 ? 's' : ''} moved to trash.`);
         this.clearSelection();
         this.onRefresh();

@@ -11,12 +11,10 @@ import {
   effect,
   untracked,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getTags } from '@/api/generated/fn/documents/get-tags';
+import { TagApiService } from '@/api/services/tag-api.service';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import { CREATE_OPTION_ID } from '../bulk-edit-shared';
 
@@ -107,8 +105,7 @@ export class TagInputComponent {
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private tagApi = inject(TagApiService);
 
   private suggestions = toSignal(
     toObservable(this.searchText).pipe(
@@ -118,13 +115,13 @@ export class TagInputComponent {
           this.loading.set(false);
           return of([]);
         }
-        return getTags(this.http, this.apiConfig.rootUrl, {
+        return this.tagApi.getTags({
           Search: text,
           IncludeChildren: false,
           Page: 1,
           PageSize: 50,
         }).pipe(
-          map((r) => r.body.items as GetTagsResponse[]),
+          map((r) => r.items as GetTagsResponse[]),
           tap(() => this.loading.set(false)),
           catchError(() => {
             this.loading.set(false);

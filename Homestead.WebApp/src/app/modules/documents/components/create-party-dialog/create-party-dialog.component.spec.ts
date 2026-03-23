@@ -1,7 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { CreatePartyDialogComponent } from './create-party-dialog.component';
 
 describe('CreatePartyDialogComponent', () => {
@@ -13,7 +12,6 @@ describe('CreatePartyDialogComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ApiConfiguration, useValue: { rootUrl: '' } },
       ],
     });
     fixture = TestBed.createComponent(CreatePartyDialogComponent);

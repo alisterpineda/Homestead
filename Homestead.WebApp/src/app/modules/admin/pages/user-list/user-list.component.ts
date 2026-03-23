@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
@@ -16,9 +15,7 @@ import { UserTableComponent } from '../../components/user-table/user-table.compo
 import { CreateUserDialogComponent } from '../../components/create-user-dialog/create-user-dialog.component';
 import { EditUserSheetComponent } from '../../components/edit-user-sheet/edit-user-sheet.component';
 import { PaginationComponent } from '@/modules/documents/components/pagination/pagination.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getUsers } from '@/api/generated/fn/admin/get-users';
-import { bulkDeleteUsers } from '@/api/generated/fn/admin/bulk-delete-users';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -180,8 +177,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class UserListComponent implements OnDestroy {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -225,14 +221,14 @@ export class UserListComponent implements OnDestroy {
       switchMap(([page, pageSize, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getUsers(this.http, this.apiConfig.rootUrl, {
+        return this.adminApi.getUsers({
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfUserResponse;
+            return r as PaginatedResponseOfUserResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -312,13 +308,13 @@ export class UserListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    bulkDeleteUsers(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.bulkDeleteUsers({
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} ${count > 1 ? 'users' : 'user'} deleted.`);
         this.clearSelection();
         this.onRefresh();

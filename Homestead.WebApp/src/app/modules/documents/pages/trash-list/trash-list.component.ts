@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
@@ -16,10 +15,7 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getDocuments } from '@/api/generated/fn/documents/get-documents';
-import { bulkRestoreDocuments } from '@/api/generated/fn/documents/bulk-restore-documents';
-import { bulkPermanentlyDeleteDocuments } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
-import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import { formatBytes } from '@/shared/utils';
 import { toast } from 'ngx-sonner';
@@ -226,7 +222,7 @@ import { toast } from 'ngx-sonner';
 })
 export class TrashListComponent {
   auth = inject(AuthService);
-  private http = inject(HttpClient);
+  private documentApi = inject(DocumentApiService);
   private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -277,7 +273,7 @@ export class TrashListComponent {
       switchMap(([page, pageSize]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getDocuments(this.http, this.apiConfig.rootUrl, {
+        return this.documentApi.getDocuments({
           Page: page,
           PageSize: pageSize,
           Deleted: true,
@@ -287,7 +283,7 @@ export class TrashListComponent {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetDocumentsResponse;
+            return r as PaginatedResponseOfGetDocumentsResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -362,12 +358,12 @@ export class TrashListComponent {
 
     this.restoring.set(true);
 
-    bulkRestoreDocuments(this.http, this.apiConfig.rootUrl, {
+    this.documentApi.bulkRestoreDocuments({
       body: { ids },
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         this.restoring.set(false);
-        const count = +response.body.restoredCount;
+        const count = +response.restoredCount;
         toast.success(`${count} document${count > 1 ? 's' : ''} restored.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
@@ -385,13 +381,13 @@ export class TrashListComponent {
 
     this.deleting.set(true);
 
-    bulkPermanentlyDeleteDocuments(this.http, this.apiConfig.rootUrl, {
+    this.documentApi.bulkPermanentlyDeleteDocuments({
       body: { ids },
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
@@ -406,11 +402,11 @@ export class TrashListComponent {
   onEmptyTrash(ctx: { close: () => void }): void {
     this.emptyingTrash.set(true);
 
-    emptyTrash(this.http, this.apiConfig.rootUrl).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.documentApi.emptyTrash().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (response) => {
         this.emptyingTrash.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);

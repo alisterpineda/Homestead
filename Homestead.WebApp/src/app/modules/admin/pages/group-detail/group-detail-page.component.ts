@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
@@ -14,11 +13,7 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { EditGroupSheetComponent } from '../../components/edit-group-sheet/edit-group-sheet.component';
 import { AddMemberDialogComponent } from '../../components/add-member-dialog/add-member-dialog.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getGroup } from '@/api/generated/fn/admin/get-group';
-import { deleteGroup } from '@/api/generated/fn/admin/delete-group';
-import { removeGroupMember } from '@/api/generated/fn/admin/remove-group-member';
-import { updateGroupMember } from '@/api/generated/fn/admin/update-group-member';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GroupDetailResponse } from '@/api/generated/models/group-detail-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -141,8 +136,7 @@ import { toast } from 'ngx-sonner';
   `,
 })
 export class GroupDetailPageComponent implements OnDestroy {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -164,10 +158,10 @@ export class GroupDetailPageComponent implements OnDestroy {
       switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
-        return getGroup(this.http, this.apiConfig.rootUrl, { id }).pipe(
+        return this.adminApi.getGroup({ id }).pipe(
           map(r => {
             this.loading.set(false);
-            return r.body as GroupDetailResponse;
+            return r as GroupDetailResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -198,7 +192,7 @@ export class GroupDetailPageComponent implements OnDestroy {
     const g = this.group();
     if (!g) return;
     this.deleting.set(true);
-    deleteGroup(this.http, this.apiConfig.rootUrl, { id: g.id }).subscribe({
+    this.adminApi.deleteGroup({ id: g.id }).subscribe({
       next: () => {
         this.deleting.set(false);
         ctx.close();
@@ -213,7 +207,7 @@ export class GroupDetailPageComponent implements OnDestroy {
   }
 
   onAccessLevelChange(groupId: string, userId: string, level: GroupAccessLevel): void {
-    updateGroupMember(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.updateGroupMember({
       id: groupId,
       userId,
       body: { accessLevel: level },
@@ -229,7 +223,7 @@ export class GroupDetailPageComponent implements OnDestroy {
   }
 
   onRemoveMember(groupId: string, userId: string, name: string): void {
-    removeGroupMember(this.http, this.apiConfig.rootUrl, { id: groupId, userId }).subscribe({
+    this.adminApi.removeGroupMember({ id: groupId, userId }).subscribe({
       next: () => {
         toast.success(`${name} removed from group.`);
         this.onRefresh();

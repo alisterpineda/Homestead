@@ -1,7 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { EditTagSheetComponent } from './edit-tag-sheet.component';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 
@@ -38,7 +37,6 @@ describe('EditTagSheetComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ApiConfiguration, useValue: { rootUrl: '' } },
       ],
     });
     fixture = TestBed.createComponent(EditTagSheetComponent);

@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -20,9 +19,7 @@ import { EditPartySheetComponent } from '../../components/edit-party-sheet/edit-
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { PartyListStateService } from '../../services/party-list-state.service';
 import type { VisibilityState } from '@tanstack/angular-table';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getParties } from '@/api/generated/fn/documents/get-parties';
-import { bulkDeleteParties } from '@/api/generated/fn/documents/bulk-delete-parties';
+import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/models/paginated-response-of-get-parties-response';
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
@@ -262,8 +259,7 @@ import { toast } from 'ngx-sonner';
 })
 export class PartyListComponent implements OnDestroy {
   auth = inject(AuthService);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private partyApi = inject(PartyApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private listState = inject(PartyListStateService);
@@ -405,7 +401,7 @@ export class PartyListComponent implements OnDestroy {
       switchMap(([page, pageSize, , sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getParties(this.http, this.apiConfig.rootUrl, {
+        return this.partyApi.getParties({
           Page: page,
           PageSize: pageSize,
           Search: search || undefined,
@@ -414,7 +410,7 @@ export class PartyListComponent implements OnDestroy {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetPartiesResponse;
+            return r as PaginatedResponseOfGetPartiesResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -516,13 +512,13 @@ export class PartyListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    bulkDeleteParties(this.http, this.apiConfig.rootUrl, {
+    this.partyApi.bulkDeleteParties({
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} ${count > 1 ? 'parties' : 'party'} deleted.`);
         this.clearSelection();
         this.onRefresh();

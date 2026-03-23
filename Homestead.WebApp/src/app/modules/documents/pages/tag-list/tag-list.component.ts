@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -20,9 +19,7 @@ import { EditTagSheetComponent } from '../../components/edit-tag-sheet/edit-tag-
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { TagListStateService } from '../../services/tag-list-state.service';
 import type { VisibilityState } from '@tanstack/angular-table';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { getTags } from '@/api/generated/fn/documents/get-tags';
-import { bulkDeleteTags } from '@/api/generated/fn/documents/bulk-delete-tags';
+import { TagApiService } from '@/api/services/tag-api.service';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { PaginatedResponseOfGetTagsResponse } from '@/api/generated/models/paginated-response-of-get-tags-response';
 import type { TagSortBy } from '@/api/generated/models/tag-sort-by';
@@ -262,8 +259,7 @@ import { toast } from 'ngx-sonner';
 })
 export class TagListComponent implements OnDestroy {
   auth = inject(AuthService);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private tagApi = inject(TagApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private listState = inject(TagListStateService);
@@ -406,7 +402,7 @@ export class TagListComponent implements OnDestroy {
       switchMap(([page, pageSize, , sortBy, sortDir, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        return getTags(this.http, this.apiConfig.rootUrl, {
+        return this.tagApi.getTags({
           Page: page,
           PageSize: pageSize,
           IncludeChildren: true,
@@ -416,7 +412,7 @@ export class TagListComponent implements OnDestroy {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r.body as PaginatedResponseOfGetTagsResponse;
+            return r as PaginatedResponseOfGetTagsResponse;
           }),
           catchError(() => {
             this.loading.set(false);
@@ -433,12 +429,12 @@ export class TagListComponent implements OnDestroy {
   allTags = toSignal(
     toObservable(this.refreshTrigger).pipe(
       switchMap(() =>
-        getTags(this.http, this.apiConfig.rootUrl, {
+        this.tagApi.getTags({
           IncludeChildren: true,
           Page: 1,
           PageSize: 100,
         }).pipe(
-          map(r => r.body.items as GetTagsResponse[]),
+          map(r => r.items as GetTagsResponse[]),
           catchError(() => of([] as GetTagsResponse[])),
         ),
       ),
@@ -535,13 +531,13 @@ export class TagListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    bulkDeleteTags(this.http, this.apiConfig.rootUrl, {
+    this.tagApi.bulkDeleteTags({
       body: { ids },
     }).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
-        const count = +response.body.deletedCount;
+        const count = +response.deletedCount;
         toast.success(`${count} tag${count > 1 ? 's' : ''} deleted.`);
         this.clearSelection();
         this.onRefresh();

@@ -10,7 +10,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -18,8 +17,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { updateUser } from '@/api/generated/fn/admin/update-user';
+import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -154,8 +152,7 @@ export class EditUserSheetComponent {
     return false;
   });
 
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private adminApi = inject(AdminApiService);
 
   constructor() {
     effect(() => {
@@ -189,7 +186,7 @@ export class EditUserSheetComponent {
     const u = this.user();
     if (!u) return;
     this.saving.set(true);
-    updateUser(this.http, this.apiConfig.rootUrl, {
+    this.adminApi.updateUser({
       id: u.id,
       body: {
         email: this.editEmail(),

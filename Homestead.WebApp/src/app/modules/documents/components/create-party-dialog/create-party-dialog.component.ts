@@ -1,15 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { createParty } from '@/api/generated/fn/documents/create-party';
+import { PartyApiService } from '@/api/services/party-api.service';
 import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
@@ -91,8 +89,7 @@ export class CreatePartyDialogComponent {
   createError = signal('');
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private partyApi = inject(PartyApiService);
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
@@ -117,7 +114,7 @@ export class CreatePartyDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    createParty(this.http, this.apiConfig.rootUrl, {
+    this.partyApi.createParty({
       body: { name: nameVal, description: this.description().trim() || null },
     }).subscribe({
       next: () => {

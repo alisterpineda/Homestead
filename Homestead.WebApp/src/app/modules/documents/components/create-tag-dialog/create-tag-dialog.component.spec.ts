@@ -1,7 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { CreateTagDialogComponent } from './create-tag-dialog.component';
 
 describe('CreateTagDialogComponent', () => {
@@ -13,7 +12,6 @@ describe('CreateTagDialogComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: ApiConfiguration, useValue: { rootUrl: '' } },
       ],
     });
     fixture = TestBed.createComponent(CreateTagDialogComponent);
