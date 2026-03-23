@@ -10,7 +10,7 @@ public static class GetActivityEndpoint
         group.MapGet("/", async (Guid documentId, [AsParameters] PaginatedRequest pagination,
             ISender sender, CancellationToken ct) =>
         {
-            var request = new GetActivityRequest
+            var request = new GetActivityQuery
             {
                 DocumentId = documentId,
                 Page = pagination.Page,

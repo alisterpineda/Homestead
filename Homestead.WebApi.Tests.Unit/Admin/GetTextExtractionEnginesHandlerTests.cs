@@ -22,7 +22,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyDb_ReturnsBuiltInOnly()
     {
-        var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
+        var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -43,7 +43,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
+        var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -65,7 +65,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50, Search = "Custom" };
+        var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50, Search = "Custom" };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -90,7 +90,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
         }
         await _db.SaveChangesAsync();
 
-        var request = new GetTextExtractionEnginesRequest { Page = 1, PageSize = 50 };
+        var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 

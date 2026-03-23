@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Features.Documents.v1.RestoreDocuments;
 
 public class RestoreDocumentsHandler(AppDbContext db,
     IAuditLogger auditLogger, IDocumentQueryService accessService)
-    : IRequestHandler<RestoreDocumentsRequest, RestoreDocumentsResponse>
+    : IRequestHandler<RestoreDocumentsCommand, RestoreDocumentsResponse>
 {
-    public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsRequest request, CancellationToken ct)
+    public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Where(d => d.DeletedAt != null && request.Ids.Contains(d.Id));

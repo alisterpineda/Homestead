@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<GetDocumentsRequest, PaginatedResponse<GetDocumentsResponse>>
+    : IRequestHandler<GetDocumentsQuery, PaginatedResponse<GetDocumentsResponse>>
 {
     private const string TsLanguage = "english";
     public async Task<PaginatedResponse<GetDocumentsResponse>> Handle(
-        GetDocumentsRequest request, CancellationToken ct)
+        GetDocumentsQuery request, CancellationToken ct)
     {
         IQueryable<Domains.Documents.Document> query;
 

@@ -26,7 +26,7 @@ public class CreatePartyHandlerTests : IDisposable
     [Fact]
     public async Task Handle_LogsCreatedAudit()
     {
-        var request = new CreatePartyRequest { Name = "Acme Corp" };
+        var request = new CreatePartyCommand { Name = "Acme Corp" };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 

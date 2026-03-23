@@ -8,10 +8,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Processing.v1.GetProcessingJobs;
 
 public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : IRequestHandler<GetProcessingJobsRequest, PaginatedResponse<GetProcessingJobsResponse>>
+    : IRequestHandler<GetProcessingJobsQuery, PaginatedResponse<GetProcessingJobsResponse>>
 {
     public async Task<PaginatedResponse<GetProcessingJobsResponse>> Handle(
-        GetProcessingJobsRequest request, CancellationToken ct)
+        GetProcessingJobsQuery request, CancellationToken ct)
     {
         var query = db.ProcessingJobs.AsNoTracking();
 

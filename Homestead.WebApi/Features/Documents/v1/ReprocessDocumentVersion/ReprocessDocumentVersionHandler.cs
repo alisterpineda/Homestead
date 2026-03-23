@@ -14,9 +14,9 @@ public class ReprocessDocumentVersionHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IJobQueue jobQueue)
-    : IRequestHandler<ReprocessDocumentVersionRequest, ReprocessDocumentVersionResponse>
+    : IRequestHandler<ReprocessDocumentVersionCommand, ReprocessDocumentVersionResponse>
 {
-    public async Task<ReprocessDocumentVersionResponse> Handle(ReprocessDocumentVersionRequest request, CancellationToken ct)
+    public async Task<ReprocessDocumentVersionResponse> Handle(ReprocessDocumentVersionCommand request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

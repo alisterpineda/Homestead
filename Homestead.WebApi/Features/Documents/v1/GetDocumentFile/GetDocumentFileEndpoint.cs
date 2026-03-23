@@ -8,7 +8,7 @@ public static class GetDocumentFileEndpoint
     {
         group.MapGet("/{id:guid}/file", async (Guid id, Guid? versionId, bool? download, ISender sender, CancellationToken ct) =>
         {
-            var request = new GetDocumentFileRequest(id, versionId, download);
+            var request = new GetDocumentFileQuery(id, versionId, download);
             return await sender.Send(request, ct);
         })
         .WithName("GetDocumentFile")

@@ -42,8 +42,8 @@ Opt-in external authentication via any OpenID Connect provider. When OIDC config
 
 The WebApi uses vertical slice architecture with MediatR for CQRS handler dispatch:
 
-- **Features/{Domain}/v{n}/{Operation}/**: Each operation has four files: `Endpoint.cs`, `Handler.cs`, `Request.cs`, `Response.cs`
-- **Request types** implement `IRequest<TResponse>` from MediatR
+- **Features/{Domain}/v{n}/{Operation}/**: Each operation has four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+- **Naming convention**: Use `*Command` suffix for mutations (POST/PUT/PATCH/DELETE) and `*Query` suffix for reads (GET). Both implement `IRequest<TResponse>` from MediatR
 - **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
 - **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers. They inject `ISender` from MediatR and dispatch requests via `sender.Send(request, ct)`
 - **Modules** (e.g., `DocumentsModule.cs`) register versioned route groups on `IVersionedEndpointRouteBuilder`
@@ -52,8 +52,8 @@ The WebApi uses vertical slice architecture with MediatR for CQRS handler dispat
 
 ### Adding a New Endpoint
 
-1. Create four files under `Features/{Domain}/v1/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Request.cs`, `Response.cs`
-2. The request record should implement `IRequest<TResponse>` from MediatR
+1. Create four files under `Features/{Domain}/v1/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+2. The command/query record should implement `IRequest<TResponse>` from MediatR. Use `*Command` for mutations, `*Query` for reads
 3. The handler class should implement `IRequestHandler<TRequest, TResponse>` from MediatR with a `Handle` method
 4. The endpoint should inject `ISender` and call `sender.Send(request, ct)`
 5. Register the endpoint in the domain's module class (e.g., `DocumentsModule.cs`)

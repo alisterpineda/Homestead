@@ -6,7 +6,7 @@ public static class RegisterEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/register", async (RegisterRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/register", async (RegisterCommand request, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);
             if (response.SetupAlreadyComplete)

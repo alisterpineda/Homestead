@@ -6,7 +6,7 @@ public static class BulkDeleteUsersEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-delete", async (BulkDeleteUsersRequest request,
+        group.MapPost("/bulk-delete", async (BulkDeleteUsersCommand request,
             ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)

@@ -11,9 +11,9 @@ public class RegisterHandler(
     SignInManager<AppUser> signInManager,
     IRoleSourceManager roleSourceManager,
     AppDbContext db)
-    : IRequestHandler<RegisterRequest, RegisterResponse>
+    : IRequestHandler<RegisterCommand, RegisterResponse>
 {
-    public async Task<RegisterResponse> Handle(RegisterRequest request, CancellationToken ct)
+    public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken ct)
     {
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>

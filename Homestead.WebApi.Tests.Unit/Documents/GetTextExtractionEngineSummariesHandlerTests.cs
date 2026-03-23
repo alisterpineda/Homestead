@@ -22,7 +22,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyDb_ReturnsEmptyList()
     {
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -39,7 +39,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal("Custom Engine", result[0].Name);
@@ -48,7 +48,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_DoesNotIncludeBuiltInEngine()
     {
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
 
         Assert.DoesNotContain(result, e => e.Id == BuiltInTextExtractionEngines.TesseractDefaultId);
     }
@@ -73,7 +73,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
             });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Equal("Alpha Engine", result[0].Name);
@@ -94,7 +94,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesRequest(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal(engineId, result[0].Id);

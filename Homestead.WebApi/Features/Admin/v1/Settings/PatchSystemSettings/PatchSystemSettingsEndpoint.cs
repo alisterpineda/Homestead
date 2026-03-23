@@ -6,7 +6,7 @@ public static class PatchSystemSettingsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPatch("/system", async (PatchSystemSettingsRequest request,
+        group.MapPatch("/system", async (PatchSystemSettingsCommand request,
             ISender sender, CancellationToken ct) =>
         {
             return Results.Ok(await sender.Send(request, ct));

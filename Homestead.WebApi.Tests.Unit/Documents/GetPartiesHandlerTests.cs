@@ -29,7 +29,7 @@ public class GetPartiesHandlerTests : IDisposable
         await SeedPartiesAsync("Charlie", "Alpha", "Bravo");
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10 },
+            new GetPartiesQuery { Page = 1, PageSize = 10 },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -42,7 +42,7 @@ public class GetPartiesHandlerTests : IDisposable
         await SeedPartiesAsync("Alpha", "Bravo", "Charlie");
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.Name, SortDir = SortDirection.Desc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.Name, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -59,7 +59,7 @@ public class GetPartiesHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Asc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -76,7 +76,7 @@ public class GetPartiesHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Desc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -106,7 +106,7 @@ public class GetPartiesHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Desc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -133,7 +133,7 @@ public class GetPartiesHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Asc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -147,7 +147,7 @@ public class GetPartiesHandlerTests : IDisposable
         await SeedPartiesAsync("Zulu", "Alpha");
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();
@@ -160,7 +160,7 @@ public class GetPartiesHandlerTests : IDisposable
         await SeedPartiesAsync("Banana Corp", "Apple Inc", "Cherry LLC", "Avocado Ltd");
 
         var result = await _sut.Handle(
-            new GetPartiesRequest { Page = 1, PageSize = 10, Search = "a", SortBy = PartySortBy.Name, SortDir = SortDirection.Asc },
+            new GetPartiesQuery { Page = 1, PageSize = 10, Search = "a", SortBy = PartySortBy.Name, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var names = result.Items.Select(p => p.Name).ToList();

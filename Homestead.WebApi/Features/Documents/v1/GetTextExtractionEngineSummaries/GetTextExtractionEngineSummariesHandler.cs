@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetTextExtractionEngineSummaries;
 
 public class GetTextExtractionEngineSummariesHandler(AppDbContext db)
-    : IRequestHandler<GetTextExtractionEngineSummariesRequest, IReadOnlyList<TextExtractionEngineSummary>>
+    : IRequestHandler<GetTextExtractionEngineSummariesQuery, IReadOnlyList<TextExtractionEngineSummary>>
 {
     public async Task<IReadOnlyList<TextExtractionEngineSummary>> Handle(
-        GetTextExtractionEngineSummariesRequest request, CancellationToken ct)
+        GetTextExtractionEngineSummariesQuery request, CancellationToken ct)
     {
         var items = await db.TextExtractionEngines
             .AsNoTracking()

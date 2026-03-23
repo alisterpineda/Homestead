@@ -13,7 +13,7 @@ public static class GetUserInfoEndpoint
             if (userId is null)
                 return Results.Unauthorized();
 
-            var response = await sender.Send(new GetUserInfoRequest(userId.Value), ct);
+            var response = await sender.Send(new GetUserInfoQuery(userId.Value), ct);
             return response is not null ? Results.Ok(response) : Results.Unauthorized();
         })
         .WithName("GetUserInfo")

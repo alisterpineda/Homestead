@@ -23,7 +23,7 @@ public class GetTagsHandlerTests : IDisposable
         await SeedTagsAsync("Charlie", "Alpha", "Bravo");
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10 },
+            new GetTagsQuery { Page = 1, PageSize = 10 },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -36,7 +36,7 @@ public class GetTagsHandlerTests : IDisposable
         await SeedTagsAsync("Alpha", "Bravo", "Charlie");
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Name, SortDir = SortDirection.Desc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Name, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -52,7 +52,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Asc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var paths = result.Items.Select(t => t.Path).ToList();
@@ -68,7 +68,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Desc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var paths = result.Items.Select(t => t.Path).ToList();
@@ -85,7 +85,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Asc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -102,7 +102,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Desc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -132,7 +132,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Desc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Desc },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -159,7 +159,7 @@ public class GetTagsHandlerTests : IDisposable
         await _db.SaveChangesAsync();
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Asc },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Asc },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();
@@ -173,7 +173,7 @@ public class GetTagsHandlerTests : IDisposable
         await SeedTagsAsync("Zulu", "Alpha");
 
         var result = await _sut.Handle(
-            new GetTagsRequest { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
             CancellationToken.None);
 
         var names = result.Items.Select(t => t.Name).ToList();

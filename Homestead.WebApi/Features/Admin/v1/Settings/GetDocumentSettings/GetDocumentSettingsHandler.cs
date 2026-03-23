@@ -9,9 +9,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.Settings.GetDocumentSettings;
 
 public class GetDocumentSettingsHandler(AppDbContext db)
-    : IRequestHandler<GetDocumentSettingsRequest, DocumentSettingsResponse>
+    : IRequestHandler<GetDocumentSettingsQuery, DocumentSettingsResponse>
 {
-    public async Task<DocumentSettingsResponse> Handle(GetDocumentSettingsRequest request, CancellationToken ct)
+    public async Task<DocumentSettingsResponse> Handle(GetDocumentSettingsQuery request, CancellationToken ct)
     {
         var entity = await db.AppSettings
             .AsNoTracking()

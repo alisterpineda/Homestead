@@ -7,7 +7,7 @@ public static class CreateCommentEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (Guid documentId, CreateCommentRequest request,
+        group.MapPost("/", async (Guid documentId, CreateCommentCommand request,
             ISender sender, CancellationToken ct) =>
         {
             var command = request with { DocumentId = documentId };

@@ -9,7 +9,7 @@ public static class GetDocumentVersionEndpoint
         group.MapGet("/{id:guid}", async (Guid documentId, Guid id,
             ISender sender, CancellationToken ct) =>
         {
-            var request = new GetDocumentVersionRequest(documentId, id);
+            var request = new GetDocumentVersionQuery(documentId, id);
             var response = await sender.Send(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })

@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetParties;
 
 public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<GetPartiesRequest, PaginatedResponse<GetPartiesResponse>>
+    : IRequestHandler<GetPartiesQuery, PaginatedResponse<GetPartiesResponse>>
 {
     public async Task<PaginatedResponse<GetPartiesResponse>> Handle(
-        GetPartiesRequest request, CancellationToken ct)
+        GetPartiesQuery request, CancellationToken ct)
     {
         var query = db.Parties.AsNoTracking();
 

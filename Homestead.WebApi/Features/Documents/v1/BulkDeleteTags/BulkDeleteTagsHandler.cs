@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
 
 public class BulkDeleteTagsHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
-    : IRequestHandler<BulkDeleteTagsRequest, BulkDeleteTagsResponse>
+    : IRequestHandler<BulkDeleteTagsCommand, BulkDeleteTagsResponse>
 {
-    public async Task<BulkDeleteTagsResponse> Handle(BulkDeleteTagsRequest request, CancellationToken ct)
+    public async Task<BulkDeleteTagsResponse> Handle(BulkDeleteTagsCommand request, CancellationToken ct)
     {
         var tags = await db.Tags
             .Where(t => request.Ids.Contains(t.Id))

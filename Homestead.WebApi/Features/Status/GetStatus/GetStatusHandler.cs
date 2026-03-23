@@ -8,9 +8,9 @@ using Microsoft.Extensions.Options;
 namespace Homestead.WebApi.Features.Status.GetStatus;
 
 public class GetStatusHandler(UserManager<AppUser> userManager, IOptions<OidcOptions> oidcOptions)
-    : IRequestHandler<GetStatusRequest, GetStatusResponse>
+    : IRequestHandler<GetStatusQuery, GetStatusResponse>
 {
-    public async Task<GetStatusResponse> Handle(GetStatusRequest request, CancellationToken ct)
+    public async Task<GetStatusResponse> Handle(GetStatusQuery request, CancellationToken ct)
     {
         var hasUsers = await userManager.Users.AnyAsync(ct);
         var oidc = oidcOptions.Value;

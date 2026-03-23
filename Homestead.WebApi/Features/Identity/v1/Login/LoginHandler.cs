@@ -7,9 +7,9 @@ namespace Homestead.WebApi.Features.Identity.v1.Login;
 public class LoginHandler(
     SignInManager<AppUser> signInManager,
     UserManager<AppUser> userManager)
-    : IRequestHandler<LoginRequest, LoginResponse>
+    : IRequestHandler<LoginCommand, LoginResponse>
 {
-    public async Task<LoginResponse> Handle(LoginRequest request, CancellationToken ct)
+    public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null)

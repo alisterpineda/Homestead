@@ -9,9 +9,9 @@ namespace Homestead.WebApi.Features.Documents.v1.PermanentlyDeleteDocuments;
 public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
-    : IRequestHandler<PermanentlyDeleteDocumentsRequest, PermanentlyDeleteDocumentsResponse>
+    : IRequestHandler<PermanentlyDeleteDocumentsCommand, PermanentlyDeleteDocumentsResponse>
 {
-    public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsRequest request, CancellationToken ct)
+    public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsCommand request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Include(d => d.Versions)

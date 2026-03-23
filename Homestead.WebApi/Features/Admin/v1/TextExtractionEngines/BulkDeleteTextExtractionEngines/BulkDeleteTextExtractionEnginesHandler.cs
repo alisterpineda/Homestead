@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 
 public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, IAuditLogger auditLogger)
-    : IRequestHandler<BulkDeleteTextExtractionEnginesRequest, BulkDeleteTextExtractionEnginesResponse>
+    : IRequestHandler<BulkDeleteTextExtractionEnginesCommand, BulkDeleteTextExtractionEnginesResponse>
 {
-    public async Task<BulkDeleteTextExtractionEnginesResponse> Handle(BulkDeleteTextExtractionEnginesRequest request, CancellationToken ct)
+    public async Task<BulkDeleteTextExtractionEnginesResponse> Handle(BulkDeleteTextExtractionEnginesCommand request, CancellationToken ct)
     {
         var idsToDelete = request.Ids
             .Where(id => id != BuiltInTextExtractionEngines.TesseractDefaultId)

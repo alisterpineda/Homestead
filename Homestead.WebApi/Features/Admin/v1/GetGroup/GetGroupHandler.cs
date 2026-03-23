@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.GetGroup;
 
 public class GetGroupHandler(AppDbContext db)
-    : IRequestHandler<GetGroupRequest, GroupDetailResponse?>
+    : IRequestHandler<GetGroupQuery, GroupDetailResponse?>
 {
-    public async Task<GroupDetailResponse?> Handle(GetGroupRequest request, CancellationToken ct)
+    public async Task<GroupDetailResponse?> Handle(GetGroupQuery request, CancellationToken ct)
     {
         return await db.Groups
             .AsNoTracking()

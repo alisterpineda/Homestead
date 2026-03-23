@@ -5,9 +5,9 @@ using Homestead.WebApi.Persistence;
 namespace Homestead.WebApi.Features.Documents.v1.CreateTag;
 
 public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : IRequestHandler<CreateTagRequest, CreateTagResponse>
+    : IRequestHandler<CreateTagCommand, CreateTagResponse>
 {
-    public async Task<CreateTagResponse> Handle(CreateTagRequest request, CancellationToken ct)
+    public async Task<CreateTagResponse> Handle(CreateTagCommand request, CancellationToken ct)
     {
         var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 

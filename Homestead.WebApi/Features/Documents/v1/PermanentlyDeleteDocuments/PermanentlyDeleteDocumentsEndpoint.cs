@@ -7,7 +7,7 @@ public static class PermanentlyDeleteDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-permanently-delete", async (PermanentlyDeleteDocumentsRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/bulk-permanently-delete", async (PermanentlyDeleteDocumentsCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one document ID must be provided.");
@@ -22,7 +22,7 @@ public static class PermanentlyDeleteDocumentsEndpoint
 
         group.MapPost("/{id:guid}/permanently-delete", async (Guid id, ISender sender, CancellationToken ct) =>
         {
-            var request = new PermanentlyDeleteDocumentsRequest([id]);
+            var request = new PermanentlyDeleteDocumentsCommand([id]);
             var response = await sender.Send(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })

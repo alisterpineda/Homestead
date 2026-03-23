@@ -13,9 +13,9 @@ public class BulkDeleteUsersHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger)
-    : IRequestHandler<BulkDeleteUsersRequest, BulkDeleteUsersResponse>
+    : IRequestHandler<BulkDeleteUsersCommand, BulkDeleteUsersResponse>
 {
-    public async Task<BulkDeleteUsersResponse> Handle(BulkDeleteUsersRequest request, CancellationToken ct)
+    public async Task<BulkDeleteUsersResponse> Handle(BulkDeleteUsersCommand request, CancellationToken ct)
     {
         if (currentUser.UserId is { } currentId && request.Ids.Contains(currentId))
         {

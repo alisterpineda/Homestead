@@ -7,7 +7,7 @@ public static class RestoreDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-restore", async (RestoreDocumentsRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/bulk-restore", async (RestoreDocumentsCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one document ID must be provided.");
@@ -22,7 +22,7 @@ public static class RestoreDocumentsEndpoint
 
         group.MapPost("/{id:guid}/restore", async (Guid id, ISender sender, CancellationToken ct) =>
         {
-            var request = new RestoreDocumentsRequest([id]);
+            var request = new RestoreDocumentsCommand([id]);
             var response = await sender.Send(request, ct);
             return response.RestoredCount > 0 ? Results.NoContent() : Results.NotFound();
         })

@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocument;
 
 public class GetDocumentHandler(AppDbContext db)
-    : IRequestHandler<GetDocumentRequest, GetDocumentResponse?>
+    : IRequestHandler<GetDocumentQuery, GetDocumentResponse?>
 {
-    public async Task<GetDocumentResponse?> Handle(GetDocumentRequest request, CancellationToken ct)
+    public async Task<GetDocumentResponse?> Handle(GetDocumentQuery request, CancellationToken ct)
     {
         return await db.Documents
             .AsNoTracking()

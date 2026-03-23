@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteParties;
 
 public class BulkDeletePartiesHandler(AppDbContext db, IDocumentQueryService accessService, IAuditLogger auditLogger)
-    : IRequestHandler<BulkDeletePartiesRequest, BulkDeletePartiesResponse>
+    : IRequestHandler<BulkDeletePartiesCommand, BulkDeletePartiesResponse>
 {
-    public async Task<BulkDeletePartiesResponse> Handle(BulkDeletePartiesRequest request, CancellationToken ct)
+    public async Task<BulkDeletePartiesResponse> Handle(BulkDeletePartiesCommand request, CancellationToken ct)
     {
         var parties = await db.Parties
             .Where(p => request.Ids.Contains(p.Id))

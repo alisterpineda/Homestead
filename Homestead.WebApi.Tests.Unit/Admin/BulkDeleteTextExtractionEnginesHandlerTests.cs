@@ -27,7 +27,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_BuiltInIdOnly_ReturnsZero()
     {
-        var request = new BulkDeleteTextExtractionEnginesRequest([BuiltInTextExtractionEngines.TesseractDefaultId]);
+        var request = new BulkDeleteTextExtractionEnginesCommand([BuiltInTextExtractionEngines.TesseractDefaultId]);
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -37,7 +37,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NonExistentIds_ReturnsZero()
     {
-        var request = new BulkDeleteTextExtractionEnginesRequest([Guid.NewGuid(), Guid.NewGuid()]);
+        var request = new BulkDeleteTextExtractionEnginesCommand([Guid.NewGuid(), Guid.NewGuid()]);
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -55,7 +55,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        var request = new BulkDeleteTextExtractionEnginesRequest([id1, id2]);
+        var request = new BulkDeleteTextExtractionEnginesCommand([id1, id2]);
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -73,7 +73,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var request = new BulkDeleteTextExtractionEnginesRequest([BuiltInTextExtractionEngines.TesseractDefaultId, id]);
+        var request = new BulkDeleteTextExtractionEnginesCommand([BuiltInTextExtractionEngines.TesseractDefaultId, id]);
 
         var response = await _sut.Handle(request, CancellationToken.None);
 
@@ -92,7 +92,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
         );
         await _db.SaveChangesAsync();
 
-        await _sut.Handle(new BulkDeleteTextExtractionEnginesRequest([id1, id2]), CancellationToken.None);
+        await _sut.Handle(new BulkDeleteTextExtractionEnginesCommand([id1, id2]), CancellationToken.None);
 
         _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id1, Arg.Any<string?>(), Arg.Any<Guid?>());
         _auditLogger.Received(1).LogDeleted("TextExtractionEngine", id2, Arg.Any<string?>(), Arg.Any<Guid?>());

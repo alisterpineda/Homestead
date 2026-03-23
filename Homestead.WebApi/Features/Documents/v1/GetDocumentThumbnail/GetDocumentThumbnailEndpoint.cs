@@ -9,7 +9,7 @@ public static class GetDocumentThumbnailEndpoint
         group.MapGet("/{id:guid}/thumbnail", async (Guid id, Guid? versionId, ISender sender, HttpContext httpContext, CancellationToken ct) =>
         {
             httpContext.Response.Headers.CacheControl = "private, max-age=86400";
-            var request = new GetDocumentThumbnailRequest(id, versionId);
+            var request = new GetDocumentThumbnailQuery(id, versionId);
             return await sender.Send(request, ct);
         })
         .WithName("GetDocumentThumbnail")

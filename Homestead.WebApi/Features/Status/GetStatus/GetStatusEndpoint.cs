@@ -8,7 +8,7 @@ public static class GetStatusEndpoint
     {
         group.MapGet("", async (ISender sender, CancellationToken ct) =>
         {
-            var response = await sender.Send(new GetStatusRequest(), ct);
+            var response = await sender.Send(new GetStatusQuery(), ct);
             return Results.Ok(response);
         })
         .WithName("GetStatus")

@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.GetUsers;
 
 public class GetUsersHandler(AppDbContext db)
-    : IRequestHandler<GetUsersRequest, PaginatedResponse<UserResponse>>
+    : IRequestHandler<GetUsersQuery, PaginatedResponse<UserResponse>>
 {
     public async Task<PaginatedResponse<UserResponse>> Handle(
-        GetUsersRequest request, CancellationToken ct)
+        GetUsersQuery request, CancellationToken ct)
     {
         var query = db.Users.AsNoTracking();
 

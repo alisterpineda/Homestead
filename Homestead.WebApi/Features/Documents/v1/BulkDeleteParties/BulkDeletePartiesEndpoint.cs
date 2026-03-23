@@ -7,7 +7,7 @@ public static class BulkDeletePartiesEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-delete", async (BulkDeletePartiesRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/bulk-delete", async (BulkDeletePartiesCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one party ID must be provided.");

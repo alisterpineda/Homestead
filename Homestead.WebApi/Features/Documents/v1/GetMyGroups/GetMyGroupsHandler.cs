@@ -6,10 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetMyGroups;
 
 public class GetMyGroupsHandler(AppDbContext db, ICurrentUserAccessor currentUser)
-    : IRequestHandler<GetMyGroupsRequest, IReadOnlyList<GetMyGroupsResponse>>
+    : IRequestHandler<GetMyGroupsQuery, IReadOnlyList<GetMyGroupsResponse>>
 {
     public async Task<IReadOnlyList<GetMyGroupsResponse>> Handle(
-        GetMyGroupsRequest request, CancellationToken ct)
+        GetMyGroupsQuery request, CancellationToken ct)
     {
         var userId = currentUser.UserId;
         if (userId is null)

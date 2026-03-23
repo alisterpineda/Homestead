@@ -8,14 +8,14 @@ using Homestead.WebApi.Domains.Settings;
 
 namespace Homestead.WebApi.Tests.Unit.Validators;
 
-public class CreateCommentRequestValidatorTests
+public class CreateCommentCommandValidatorTests
 {
-    private readonly CreateCommentRequestValidator _sut = new();
+    private readonly CreateCommentCommandValidator _sut = new();
 
     [Fact]
     public async Task EmptyBody_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateCommentRequest(""));
+        var result = await _sut.ValidateAsync(new CreateCommentCommand(""));
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Body");
     }
@@ -23,14 +23,14 @@ public class CreateCommentRequestValidatorTests
     [Fact]
     public async Task ValidBody_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreateCommentRequest("A comment"));
+        var result = await _sut.ValidateAsync(new CreateCommentCommand("A comment"));
         Assert.True(result.IsValid);
     }
 }
 
-public class CreatePartyRequestValidatorTests
+public class CreatePartyCommandValidatorTests
 {
-    private readonly CreatePartyRequestValidator _sut = new();
+    private readonly CreatePartyCommandValidator _sut = new();
 
     [Theory]
     [InlineData(null)]
@@ -38,7 +38,7 @@ public class CreatePartyRequestValidatorTests
     [InlineData("   ")]
     public async Task WhitespaceName_IsInvalid(string? name)
     {
-        var result = await _sut.ValidateAsync(new CreatePartyRequest { Name = name! });
+        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = name! });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
@@ -46,7 +46,7 @@ public class CreatePartyRequestValidatorTests
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreatePartyRequest { Name = "Acme Corp" });
+        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = "Acme Corp" });
         Assert.True(result.IsValid);
     }
 }
@@ -70,21 +70,21 @@ public class UpdatePartyCommandValidatorTests
     }
 }
 
-public class CreateGroupRequestValidatorTests
+public class CreateGroupCommandValidatorTests
 {
-    private readonly CreateGroupRequestValidator _sut = new();
+    private readonly CreateGroupCommandValidator _sut = new();
 
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateGroupRequest { Name = "  " });
+        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "  " });
         Assert.False(result.IsValid);
     }
 
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreateGroupRequest { Name = "Engineering" });
+        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "Engineering" });
         Assert.True(result.IsValid);
     }
 }
@@ -116,14 +116,14 @@ public class UpdateGroupCommandValidatorTests
     }
 }
 
-public class CreateTextExtractionEngineRequestValidatorTests
+public class CreateTextExtractionEngineCommandValidatorTests
 {
-    private readonly CreateTextExtractionEngineRequestValidator _sut = new();
+    private readonly CreateTextExtractionEngineCommandValidator _sut = new();
 
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineRequest
+        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineCommand
         {
             Name = "   ",
             EngineType = TextExtractionEngineType.Tesseract
@@ -134,7 +134,7 @@ public class CreateTextExtractionEngineRequestValidatorTests
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineRequest
+        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineCommand
         {
             Name = "My Engine",
             EngineType = TextExtractionEngineType.Tesseract

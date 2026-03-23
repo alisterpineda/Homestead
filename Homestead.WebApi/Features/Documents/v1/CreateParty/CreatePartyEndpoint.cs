@@ -7,7 +7,7 @@ public static class CreatePartyEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (CreatePartyRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/", async (CreatePartyCommand request, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);
             return Results.Created($"/api/v1/documents/parties/{response.Id}", response);

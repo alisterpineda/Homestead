@@ -7,10 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.GetTextExtractionEngines;
 
 public class GetTextExtractionEnginesHandler(AppDbContext db)
-    : IRequestHandler<GetTextExtractionEnginesRequest, PaginatedResponse<TextExtractionEngineResponse>>
+    : IRequestHandler<GetTextExtractionEnginesQuery, PaginatedResponse<TextExtractionEngineResponse>>
 {
     public async Task<PaginatedResponse<TextExtractionEngineResponse>> Handle(
-        GetTextExtractionEnginesRequest request, CancellationToken ct)
+        GetTextExtractionEnginesQuery request, CancellationToken ct)
     {
         var builtIn = TextExtractionEngineResponse.TesseractDefault;
         var searchLower = request.Search?.Trim().ToLower();

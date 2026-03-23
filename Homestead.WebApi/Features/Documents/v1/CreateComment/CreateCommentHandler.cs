@@ -11,9 +11,9 @@ public class CreateCommentHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger)
-    : IRequestHandler<CreateCommentRequest, CreateCommentResponse>
+    : IRequestHandler<CreateCommentCommand, CreateCommentResponse>
 {
-    public async Task<CreateCommentResponse> Handle(CreateCommentRequest request, CancellationToken ct)
+    public async Task<CreateCommentResponse> Handle(CreateCommentCommand request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

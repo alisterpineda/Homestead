@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetActivity;
 
 public class GetActivityHandler(AppDbContext db)
-    : IRequestHandler<GetActivityRequest, PaginatedResponse<GetActivityResponse>>
+    : IRequestHandler<GetActivityQuery, PaginatedResponse<GetActivityResponse>>
 {
     private static readonly Dictionary<string, string> FieldDisplayNames = new()
     {
@@ -25,7 +25,7 @@ public class GetActivityHandler(AppDbContext db)
     };
 
     public async Task<PaginatedResponse<GetActivityResponse>> Handle(
-        GetActivityRequest request, CancellationToken ct)
+        GetActivityQuery request, CancellationToken ct)
     {
         var auditRows = await db.AuditLogs
             .AsNoTracking()

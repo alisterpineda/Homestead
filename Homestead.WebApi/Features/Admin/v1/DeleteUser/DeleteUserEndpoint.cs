@@ -11,7 +11,7 @@ public static class DeleteUserEndpoint
         {
             try
             {
-                var request = new BulkDeleteUsersRequest([id]);
+                var request = new BulkDeleteUsersCommand([id]);
                 var response = await sender.Send(request, ct);
                 return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
             }

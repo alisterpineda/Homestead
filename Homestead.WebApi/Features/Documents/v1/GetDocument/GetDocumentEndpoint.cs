@@ -8,7 +8,7 @@ public static class GetDocumentEndpoint
     {
         group.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
         {
-            var request = new GetDocumentRequest(id);
+            var request = new GetDocumentQuery(id);
             var response = await sender.Send(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })

@@ -62,7 +62,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NullEngineId_Succeeds()
     {
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = _versionId,
@@ -77,7 +77,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_BuiltInEngineId_Succeeds()
     {
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = _versionId,
@@ -102,7 +102,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = _versionId,
@@ -117,7 +117,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NonExistentEngineId_ThrowsBadRequest()
     {
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = _versionId,
@@ -133,7 +133,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NonExistentDocument_ThrowsNotFound()
     {
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = Guid.NewGuid(),
             VersionId = _versionId,
@@ -146,7 +146,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NonExistentVersion_ThrowsNotFound()
     {
-        var request = new ReprocessDocumentVersionRequest
+        var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = Guid.NewGuid(),

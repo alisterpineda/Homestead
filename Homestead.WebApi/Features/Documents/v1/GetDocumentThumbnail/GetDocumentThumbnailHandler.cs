@@ -9,9 +9,9 @@ public class GetDocumentThumbnailHandler(
     AppDbContext db,
     IConfiguration configuration,
     ThumbnailService thumbnailService)
-    : IRequestHandler<GetDocumentThumbnailRequest, IResult>
+    : IRequestHandler<GetDocumentThumbnailQuery, IResult>
 {
-    public async Task<IResult> Handle(GetDocumentThumbnailRequest request, CancellationToken ct)
+    public async Task<IResult> Handle(GetDocumentThumbnailQuery request, CancellationToken ct)
     {
         var versionQuery = db.DocumentVersions
             .AsNoTracking()

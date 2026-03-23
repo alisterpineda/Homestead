@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.CreateGroup;
 
 public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : IRequestHandler<CreateGroupRequest, GroupResponse>
+    : IRequestHandler<CreateGroupCommand, GroupResponse>
 {
-    public async Task<GroupResponse> Handle(CreateGroupRequest request, CancellationToken ct)
+    public async Task<GroupResponse> Handle(CreateGroupCommand request, CancellationToken ct)
     {
         var nameExists = await db.Groups
             .AnyAsync(g => g.Name == request.Name.Trim(), ct);

@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.CreateTextExtractionEngine;
 
 public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : IRequestHandler<CreateTextExtractionEngineRequest, TextExtractionEngineResponse>
+    : IRequestHandler<CreateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
-    public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineRequest request, CancellationToken ct)
+    public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineCommand request, CancellationToken ct)
     {
         var trimmedName = request.Name.Trim();
 

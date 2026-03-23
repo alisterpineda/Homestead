@@ -6,10 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.GetGroups;
 
 public class GetGroupsHandler(AppDbContext db)
-    : IRequestHandler<GetGroupsRequest, PaginatedResponse<GroupResponse>>
+    : IRequestHandler<GetGroupsQuery, PaginatedResponse<GroupResponse>>
 {
     public async Task<PaginatedResponse<GroupResponse>> Handle(
-        GetGroupsRequest request, CancellationToken ct)
+        GetGroupsQuery request, CancellationToken ct)
     {
         var query = db.Groups.AsNoTracking();
 

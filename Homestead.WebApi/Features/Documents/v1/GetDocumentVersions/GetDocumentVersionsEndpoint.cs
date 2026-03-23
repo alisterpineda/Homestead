@@ -10,7 +10,7 @@ public static class GetDocumentVersionsEndpoint
         group.MapGet("/", async (Guid documentId, [AsParameters] PaginatedRequest pagination,
             ISender sender, CancellationToken ct) =>
         {
-            var request = new GetDocumentVersionsRequest
+            var request = new GetDocumentVersionsQuery
             {
                 DocumentId = documentId,
                 Page = pagination.Page,

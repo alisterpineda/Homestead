@@ -9,7 +9,7 @@ public static class LogoutEndpoint
     {
         group.MapPost("/logout", async (ISender sender, CancellationToken ct) =>
         {
-            await sender.Send(new LogoutRequest(), ct);
+            await sender.Send(new LogoutCommand(), ct);
             return Results.Ok();
         })
         .WithName("Logout")

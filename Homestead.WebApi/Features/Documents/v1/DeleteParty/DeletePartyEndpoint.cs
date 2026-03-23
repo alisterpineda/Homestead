@@ -10,7 +10,7 @@ public static class DeletePartyEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
         {
-            var request = new BulkDeletePartiesRequest([id]);
+            var request = new BulkDeletePartiesCommand([id]);
             var response = await sender.Send(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })

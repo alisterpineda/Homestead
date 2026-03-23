@@ -7,7 +7,7 @@ public static class GetUsersEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", async ([AsParameters] GetUsersRequest request,
+        group.MapGet("/", async ([AsParameters] GetUsersQuery request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

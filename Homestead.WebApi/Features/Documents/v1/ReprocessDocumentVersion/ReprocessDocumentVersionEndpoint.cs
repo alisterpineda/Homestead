@@ -11,7 +11,7 @@ public static class ReprocessDocumentVersionEndpoint
             ReprocessDocumentVersionBody? body,
             ISender sender, CancellationToken ct) =>
         {
-            var request = new ReprocessDocumentVersionRequest
+            var request = new ReprocessDocumentVersionCommand
             {
                 DocumentId = documentId,
                 VersionId = versionId,

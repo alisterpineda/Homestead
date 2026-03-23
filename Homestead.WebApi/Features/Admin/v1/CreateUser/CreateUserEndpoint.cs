@@ -7,7 +7,7 @@ public static class CreateUserEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (CreateUserRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/", async (CreateUserCommand request, ISender sender, CancellationToken ct) =>
         {
             try
             {

@@ -9,9 +9,9 @@ namespace Homestead.WebApi.Features.Documents.v1.BulkDeleteDocuments;
 
 public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger, IAuthorizationService authService, IHttpContextAccessor httpContext)
-    : IRequestHandler<BulkDeleteDocumentsRequest, BulkDeleteDocumentsResponse>
+    : IRequestHandler<BulkDeleteDocumentsCommand, BulkDeleteDocumentsResponse>
 {
-    public async Task<BulkDeleteDocumentsResponse> Handle(BulkDeleteDocumentsRequest request, CancellationToken ct)
+    public async Task<BulkDeleteDocumentsResponse> Handle(BulkDeleteDocumentsCommand request, CancellationToken ct)
     {
         var documents = await db.Documents
             .Where(d => request.Ids.Contains(d.Id))

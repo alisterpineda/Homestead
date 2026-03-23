@@ -10,7 +10,7 @@ public static class GetTextExtractionEngineSummariesEndpoint
         group.MapGet("/text-extraction-engines", async (
             ISender sender, CancellationToken ct) =>
         {
-            var response = await sender.Send(new GetTextExtractionEngineSummariesRequest(), ct);
+            var response = await sender.Send(new GetTextExtractionEngineSummariesQuery(), ct);
             return Results.Ok(response);
         })
         .WithName("GetTextExtractionEngineSummaries")

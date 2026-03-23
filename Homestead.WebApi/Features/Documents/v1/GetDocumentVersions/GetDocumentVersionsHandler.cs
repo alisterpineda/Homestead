@@ -6,10 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentVersions;
 
 public class GetDocumentVersionsHandler(AppDbContext db)
-    : IRequestHandler<GetDocumentVersionsRequest, PaginatedResponse<GetDocumentVersionsResponse>>
+    : IRequestHandler<GetDocumentVersionsQuery, PaginatedResponse<GetDocumentVersionsResponse>>
 {
     public async Task<PaginatedResponse<GetDocumentVersionsResponse>> Handle(
-        GetDocumentVersionsRequest request, CancellationToken ct)
+        GetDocumentVersionsQuery request, CancellationToken ct)
     {
         return await db.DocumentVersions
             .AsNoTracking()

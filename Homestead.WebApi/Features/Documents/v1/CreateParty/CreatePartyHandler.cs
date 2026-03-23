@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.CreateParty;
 
 public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
-    : IRequestHandler<CreatePartyRequest, CreatePartyResponse>
+    : IRequestHandler<CreatePartyCommand, CreatePartyResponse>
 {
-    public async Task<CreatePartyResponse> Handle(CreatePartyRequest request, CancellationToken ct)
+    public async Task<CreatePartyResponse> Handle(CreatePartyCommand request, CancellationToken ct)
     {
         var name = request.Name.Trim();
 

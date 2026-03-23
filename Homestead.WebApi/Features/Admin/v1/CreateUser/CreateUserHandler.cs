@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Identity;
 namespace Homestead.WebApi.Features.Admin.v1.CreateUser;
 
 public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, IAuditLogger auditLogger, AppDbContext db)
-    : IRequestHandler<CreateUserRequest, UserResponse>
+    : IRequestHandler<CreateUserCommand, UserResponse>
 {
-    public async Task<UserResponse> Handle(CreateUserRequest request, CancellationToken ct)
+    public async Task<UserResponse> Handle(CreateUserCommand request, CancellationToken ct)
     {
         var user = new AppUser
         {

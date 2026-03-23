@@ -3,9 +3,9 @@ using MediatR;
 namespace Homestead.WebApi.Features.Admin.v1.Settings.GetSystemSettings;
 
 public class GetSystemSettingsHandler
-    : IRequestHandler<GetSystemSettingsRequest, SystemSettingsResponse>
+    : IRequestHandler<GetSystemSettingsQuery, SystemSettingsResponse>
 {
-    public Task<SystemSettingsResponse> Handle(GetSystemSettingsRequest request, CancellationToken ct)
+    public Task<SystemSettingsResponse> Handle(GetSystemSettingsQuery request, CancellationToken ct)
     {
         return Task.FromResult(new SystemSettingsResponse());
     }

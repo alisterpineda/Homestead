@@ -33,7 +33,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoExistingRow_CreatesNewSetting()
     {
-        var request = new PatchSystemSettingsRequest();
+        var request = new PatchSystemSettingsCommand();
 
         await _sut.Handle(request, CancellationToken.None);
 
@@ -44,7 +44,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_NoExistingRow_LogsCreated()
     {
-        var request = new PatchSystemSettingsRequest();
+        var request = new PatchSystemSettingsCommand();
 
         await _sut.Handle(request, CancellationToken.None);
 
@@ -63,7 +63,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var request = new PatchSystemSettingsRequest();
+        var request = new PatchSystemSettingsCommand();
 
         await _sut.Handle(request, CancellationToken.None);
 

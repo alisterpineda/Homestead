@@ -7,7 +7,7 @@ public static class GetTextExtractionEnginesEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", async ([AsParameters] GetTextExtractionEnginesRequest request,
+        group.MapGet("/", async ([AsParameters] GetTextExtractionEnginesQuery request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

@@ -8,7 +8,7 @@ public static class GetSystemSettingsEndpoint
     {
         group.MapGet("/system", async (ISender sender, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(new GetSystemSettingsRequest(), ct));
+            return Results.Ok(await sender.Send(new GetSystemSettingsQuery(), ct));
         })
         .WithName("GetSystemSettings")
         .Produces<SystemSettingsResponse>();

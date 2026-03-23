@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Admin.v1.DeleteGroup;
 
 public class DeleteGroupHandler(AppDbContext db, IAuditLogger auditLogger)
-    : IRequestHandler<DeleteGroupRequest, bool>
+    : IRequestHandler<DeleteGroupCommand, bool>
 {
-    public async Task<bool> Handle(DeleteGroupRequest request, CancellationToken ct)
+    public async Task<bool> Handle(DeleteGroupCommand request, CancellationToken ct)
     {
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == request.Id, ct);
         if (group is null)
@@ -28,4 +28,4 @@ public class DeleteGroupHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record DeleteGroupRequest(Guid Id) : IRequest<bool>;
+public record DeleteGroupCommand(Guid Id) : IRequest<bool>;

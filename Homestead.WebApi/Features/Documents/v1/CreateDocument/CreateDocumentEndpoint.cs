@@ -10,7 +10,7 @@ public class CreateDocumentEndpoint
     {
         group.MapPost("/", async ([FromForm] string? name, [FromForm] string? label, [FromForm] Guid? groupId, IFormFile file, ISender sender, CancellationToken ct) =>
         {
-            var request = new CreateDocumentRequest { Name = name, Label = label, GroupId = groupId, File = file };
+            var request = new CreateDocumentCommand { Name = name, Label = label, GroupId = groupId, File = file };
             var response = await sender.Send(request, ct);
             return Results.Accepted(null, response);
         })

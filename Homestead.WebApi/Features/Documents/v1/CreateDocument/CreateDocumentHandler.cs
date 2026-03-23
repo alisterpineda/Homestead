@@ -13,9 +13,9 @@ namespace Homestead.WebApi.Features.Documents.v1.CreateDocument;
 
 public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<CreateDocumentRequest, CreateDocumentResponse>
+    : IRequestHandler<CreateDocumentCommand, CreateDocumentResponse>
 {
-    public async Task<CreateDocumentResponse> Handle(CreateDocumentRequest request, CancellationToken ct)
+    public async Task<CreateDocumentResponse> Handle(CreateDocumentCommand request, CancellationToken ct)
     {
         // Validate GroupId if provided
         if (request.GroupId.HasValue)

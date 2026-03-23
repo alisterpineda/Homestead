@@ -7,7 +7,7 @@ public static class GetPartiesEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", async ([AsParameters] GetPartiesRequest request,
+        group.MapGet("/", async ([AsParameters] GetPartiesQuery request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

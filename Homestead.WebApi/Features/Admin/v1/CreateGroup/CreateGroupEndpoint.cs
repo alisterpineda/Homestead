@@ -6,7 +6,7 @@ public static class CreateGroupEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (CreateGroupRequest request,
+        group.MapPost("/", async (CreateGroupCommand request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

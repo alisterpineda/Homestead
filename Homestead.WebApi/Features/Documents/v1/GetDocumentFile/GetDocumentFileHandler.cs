@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetDocumentFile;
 
 public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuration)
-    : IRequestHandler<GetDocumentFileRequest, IResult>
+    : IRequestHandler<GetDocumentFileQuery, IResult>
 {
-    public async Task<IResult> Handle(GetDocumentFileRequest request, CancellationToken ct)
+    public async Task<IResult> Handle(GetDocumentFileQuery request, CancellationToken ct)
     {
         var documentName = await db.Documents
             .IgnoreQueryFilters()

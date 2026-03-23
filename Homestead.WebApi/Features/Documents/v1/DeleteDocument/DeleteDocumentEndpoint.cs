@@ -10,7 +10,7 @@ public static class DeleteDocumentEndpoint
     {
         group.MapDelete("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
         {
-            var request = new BulkDeleteDocumentsRequest([id]);
+            var request = new BulkDeleteDocumentsCommand([id]);
             var response = await sender.Send(request, ct);
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })

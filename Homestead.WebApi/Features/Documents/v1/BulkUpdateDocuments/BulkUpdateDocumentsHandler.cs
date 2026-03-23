@@ -10,9 +10,9 @@ namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
 public class BulkUpdateDocumentsHandler(AppDbContext db,
     IAuditLogger auditLogger, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService)
-    : IRequestHandler<BulkUpdateDocumentsRequest, BulkUpdateDocumentsResponse>
+    : IRequestHandler<BulkUpdateDocumentsCommand, BulkUpdateDocumentsResponse>
 {
-    public async Task<BulkUpdateDocumentsResponse> Handle(BulkUpdateDocumentsRequest request, CancellationToken ct)
+    public async Task<BulkUpdateDocumentsResponse> Handle(BulkUpdateDocumentsCommand request, CancellationToken ct)
     {
         var documents = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)

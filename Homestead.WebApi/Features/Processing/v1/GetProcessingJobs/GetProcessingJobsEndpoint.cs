@@ -7,7 +7,7 @@ public static class GetProcessingJobsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", async ([AsParameters] GetProcessingJobsRequest request,
+        group.MapGet("/", async ([AsParameters] GetProcessingJobsQuery request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

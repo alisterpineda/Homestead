@@ -15,9 +15,9 @@ public class CreateDocumentVersionHandler(
     IConfiguration configuration,
     ICurrentUserAccessor currentUser,
     IJobQueue jobQueue)
-    : IRequestHandler<CreateDocumentVersionRequest, CreateDocumentVersionResponse>
+    : IRequestHandler<CreateDocumentVersionCommand, CreateDocumentVersionResponse>
 {
-    public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionRequest request, CancellationToken ct)
+    public async Task<CreateDocumentVersionResponse> Handle(CreateDocumentVersionCommand request, CancellationToken ct)
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)

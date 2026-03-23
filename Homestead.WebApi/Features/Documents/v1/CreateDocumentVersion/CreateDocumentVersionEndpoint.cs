@@ -11,7 +11,7 @@ public static class CreateDocumentVersionEndpoint
         group.MapPost("/", async (Guid documentId, [FromForm] string? label,
             IFormFile file, ISender sender, CancellationToken ct) =>
         {
-            var request = new CreateDocumentVersionRequest
+            var request = new CreateDocumentVersionCommand
             {
                 DocumentId = documentId,
                 Label = label,

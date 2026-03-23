@@ -26,7 +26,7 @@ public class CreateGroupHandlerTests : IDisposable
     [Fact]
     public async Task Handle_LogsCreatedAudit()
     {
-        var request = new CreateGroupRequest { Name = "Engineering" };
+        var request = new CreateGroupCommand { Name = "Engineering" };
 
         var response = await _sut.Handle(request, CancellationToken.None);
 

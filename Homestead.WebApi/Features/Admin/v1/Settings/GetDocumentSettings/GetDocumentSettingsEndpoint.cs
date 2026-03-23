@@ -8,7 +8,7 @@ public static class GetDocumentSettingsEndpoint
     {
         group.MapGet("/documents", async (ISender sender, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(new GetDocumentSettingsRequest(), ct));
+            return Results.Ok(await sender.Send(new GetDocumentSettingsQuery(), ct));
         })
         .WithName("GetDocumentSettings")
         .Produces<DocumentSettingsResponse>();

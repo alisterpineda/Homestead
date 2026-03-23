@@ -9,9 +9,9 @@ namespace Homestead.WebApi.Features.Documents.v1.DeleteDocumentVersion;
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, ISearchVectorUpdater searchVectorUpdater,
     ILogger<DeleteDocumentVersionHandler> logger)
-    : IRequestHandler<DeleteDocumentVersionRequest, bool>
+    : IRequestHandler<DeleteDocumentVersionCommand, bool>
 {
-    public async Task<bool> Handle(DeleteDocumentVersionRequest request, CancellationToken ct)
+    public async Task<bool> Handle(DeleteDocumentVersionCommand request, CancellationToken ct)
     {
         var version = await db.DocumentVersions
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)

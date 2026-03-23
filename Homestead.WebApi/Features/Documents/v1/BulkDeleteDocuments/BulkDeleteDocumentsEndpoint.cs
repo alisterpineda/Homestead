@@ -7,7 +7,7 @@ public static class BulkDeleteDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-delete", async (BulkDeleteDocumentsRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/bulk-delete", async (BulkDeleteDocumentsCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one document ID must be provided.");

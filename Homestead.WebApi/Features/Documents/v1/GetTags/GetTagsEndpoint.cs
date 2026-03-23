@@ -7,7 +7,7 @@ public static class GetTagsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/", async ([AsParameters] GetTagsRequest request,
+        group.MapGet("/", async ([AsParameters] GetTagsQuery request,
             ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);

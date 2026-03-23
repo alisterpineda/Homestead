@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetParty;
 
 public class GetPartyHandler(AppDbContext db)
-    : IRequestHandler<GetPartyRequest, GetPartyResponse?>
+    : IRequestHandler<GetPartyQuery, GetPartyResponse?>
 {
-    public async Task<GetPartyResponse?> Handle(GetPartyRequest request, CancellationToken ct)
+    public async Task<GetPartyResponse?> Handle(GetPartyQuery request, CancellationToken ct)
     {
         var query = db.Parties.AsNoTracking().Where(p => p.Id == request.Id);
 

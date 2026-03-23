@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Identity;
 namespace Homestead.WebApi.Features.Identity.v1.GetUserInfo;
 
 public class GetUserInfoHandler(UserManager<AppUser> userManager)
-    : IRequestHandler<GetUserInfoRequest, GetUserInfoResponse?>
+    : IRequestHandler<GetUserInfoQuery, GetUserInfoResponse?>
 {
-    public async Task<GetUserInfoResponse?> Handle(GetUserInfoRequest request, CancellationToken ct)
+    public async Task<GetUserInfoResponse?> Handle(GetUserInfoQuery request, CancellationToken ct)
     {
         var user = await userManager.FindByIdAsync(request.UserId.ToString());
         if (user is null)

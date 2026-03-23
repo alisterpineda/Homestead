@@ -7,7 +7,7 @@ public static class LoginEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/login", async (LoginRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/login", async (LoginCommand request, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);
 

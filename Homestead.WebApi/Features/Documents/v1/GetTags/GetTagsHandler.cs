@@ -6,9 +6,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Features.Documents.v1.GetTags;
 
 public class GetTagsHandler(AppDbContext db)
-    : IRequestHandler<GetTagsRequest, PaginatedResponse<GetTagsResponse>>
+    : IRequestHandler<GetTagsQuery, PaginatedResponse<GetTagsResponse>>
 {
-    public async Task<PaginatedResponse<GetTagsResponse>> Handle(GetTagsRequest request, CancellationToken ct)
+    public async Task<PaginatedResponse<GetTagsResponse>> Handle(GetTagsQuery request, CancellationToken ct)
     {
         var query = db.Tags.AsNoTracking();
 

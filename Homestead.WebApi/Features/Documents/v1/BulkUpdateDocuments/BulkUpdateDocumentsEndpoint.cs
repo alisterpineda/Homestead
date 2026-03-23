@@ -7,7 +7,7 @@ public static class BulkUpdateDocumentsEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/bulk-update", async (BulkUpdateDocumentsRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/bulk-update", async (BulkUpdateDocumentsCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
                 return Results.BadRequest("At least one document ID must be provided.");

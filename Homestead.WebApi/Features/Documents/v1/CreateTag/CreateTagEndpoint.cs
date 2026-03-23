@@ -7,7 +7,7 @@ public static class CreateTagEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/", async (CreateTagRequest request, ISender sender, CancellationToken ct) =>
+        group.MapPost("/", async (CreateTagCommand request, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(request, ct);
             return Results.Created($"/api/v1/documents/tags/{response.Id}", response);

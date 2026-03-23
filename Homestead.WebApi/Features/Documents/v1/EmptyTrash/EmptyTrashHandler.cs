@@ -8,9 +8,9 @@ namespace Homestead.WebApi.Features.Documents.v1.EmptyTrash;
 public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
     IAuditLogger auditLogger, IDocumentQueryService accessService,
     ILogger<EmptyTrashHandler> logger)
-    : IRequestHandler<EmptyTrashRequest, EmptyTrashResponse>
+    : IRequestHandler<EmptyTrashCommand, EmptyTrashResponse>
 {
-    public async Task<EmptyTrashResponse> Handle(EmptyTrashRequest request, CancellationToken ct)
+    public async Task<EmptyTrashResponse> Handle(EmptyTrashCommand request, CancellationToken ct)
     {
         var query = db.Documents.IgnoreQueryFilters()
             .Include(d => d.Versions)

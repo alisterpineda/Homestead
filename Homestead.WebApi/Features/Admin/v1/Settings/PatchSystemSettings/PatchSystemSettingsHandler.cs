@@ -14,10 +14,10 @@ public class PatchSystemSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditLogger auditLogger)
-    : IRequestHandler<PatchSystemSettingsRequest, SystemSettingsResponse>
+    : IRequestHandler<PatchSystemSettingsCommand, SystemSettingsResponse>
 {
     public async Task<SystemSettingsResponse> Handle(
-        PatchSystemSettingsRequest request, CancellationToken ct)
+        PatchSystemSettingsCommand request, CancellationToken ct)
     {
         _ = request; // Placeholder — will apply properties as SystemSettings grows
 

@@ -42,7 +42,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         _db.TextExtractionEngines.Add(existing);
         await _db.SaveChangesAsync();
 
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "My Custom Engine",
             EngineType = TextExtractionEngineType.Tesseract
@@ -55,7 +55,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_DuplicateBuiltInName_ThrowsConflict()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Tesseract (Default)",
             EngineType = TextExtractionEngineType.Tesseract
@@ -68,7 +68,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_InvalidConfigJson_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Invalid Config Engine",
             EngineType = TextExtractionEngineType.Tesseract,
@@ -82,7 +82,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ValidRequest_CreatesEngine()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "My Tesseract",
             EngineType = TextExtractionEngineType.Tesseract,
@@ -104,7 +104,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyLanguagesArray_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Empty Languages",
             EngineType = TextExtractionEngineType.Tesseract,
@@ -118,7 +118,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_DuplicateLanguages_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Duplicate Languages",
             EngineType = TextExtractionEngineType.Tesseract,
@@ -132,7 +132,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_MultipleLanguages_CreatesEngine()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Multi-Language",
             EngineType = TextExtractionEngineType.Tesseract,
@@ -148,7 +148,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AzureDocumentIntelligence_ValidConfig_CreatesEngine()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Azure DI Engine",
             EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
@@ -169,7 +169,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AzureDocumentIntelligence_NullConfig_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Azure No Config",
             EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
@@ -183,7 +183,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AzureDocumentIntelligence_MissingEndpoint_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Azure Missing Endpoint",
             EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
@@ -197,7 +197,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AzureDocumentIntelligence_MissingApiKey_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Azure Missing ApiKey",
             EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
@@ -211,7 +211,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AzureDocumentIntelligence_InvalidJson_ThrowsBadRequest()
     {
-        var request = new CreateTextExtractionEngineRequest
+        var request = new CreateTextExtractionEngineCommand
         {
             Name = "Azure Bad JSON",
             EngineType = TextExtractionEngineType.AzureDocumentIntelligence,
