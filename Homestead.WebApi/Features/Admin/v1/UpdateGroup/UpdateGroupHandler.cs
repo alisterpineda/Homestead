@@ -15,7 +15,7 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
     {
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == command.Id, ct);
         if (group is null)
-            throw new NotFoundException("Group not found.");
+            throw new EntityNotFoundException("Group not found.");
 
         var trimmedName = command.Request.Name.Trim();
 
@@ -23,7 +23,7 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
             .AnyAsync(g => g.Id != command.Id && g.Name == trimmedName, ct);
 
         if (nameConflict)
-            throw new ConflictException("A group with this name already exists.");
+            throw new DuplicateEntityException("A group with this name already exists.");
 
         audit.Track<GroupSnapshot, Group>(group, "Group", group.Id);
 

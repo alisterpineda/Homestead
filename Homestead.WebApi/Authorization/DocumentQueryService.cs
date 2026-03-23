@@ -117,6 +117,6 @@ public class DocumentQueryService(
             .AnyAsync(docId => !allowedDocIds.Contains(docId), ct);
 
         if (hasDisallowed)
-            throw new ForbiddenAccessException();
+            throw new AccessDeniedException();
     }
 }

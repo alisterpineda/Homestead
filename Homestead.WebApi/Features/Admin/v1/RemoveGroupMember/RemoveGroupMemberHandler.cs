@@ -16,7 +16,7 @@ public class RemoveGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
             .FirstOrDefaultAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.UserId, ct);
 
         if (member is null)
-            throw new NotFoundException("Group member not found.");
+            throw new EntityNotFoundException("Group member not found.");
 
         auditLogger.LogUpdated("Group", command.GroupId,
         [

@@ -19,7 +19,7 @@ public class RestoreDocumentsHandler(AppDbContext db,
         var documents = await accessService.FilterByWriteAccess(query).ToListAsync(ct);
 
         if (documents.Count != request.Ids.Count)
-            throw new ForbiddenAccessException();
+            throw new AccessDeniedException();
 
         foreach (var doc in documents)
         {

@@ -21,7 +21,7 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
         if (documents.Count == 0)
             return new BulkDeleteDocumentsResponse(0);
 
-        // All-or-nothing: throws ForbiddenAccessException on first unauthorized document
+        // All-or-nothing: throws AccessDeniedException on first unauthorized document
         foreach (var doc in documents)
         {
             await authService.AuthorizeDocumentAsync(httpContext.HttpContext!.User, doc.Id, DocumentOperations.Write);

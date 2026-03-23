@@ -14,26 +14,26 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext au
     public async Task<TextExtractionEngineResponse> Handle(UpdateTextExtractionEngineCommand command, CancellationToken ct)
     {
         if (command.Id == BuiltInTextExtractionEngines.TesseractDefaultId)
-            throw new BadRequestException("Cannot modify a built-in engine.");
+            throw new BusinessRuleException("Cannot modify a built-in engine.");
 
         var engine = await db.TextExtractionEngines
             .Include(e => e.CreatedByUser)
             .FirstOrDefaultAsync(e => e.Id == command.Id, ct);
         if (engine is null)
-            throw new NotFoundException("Text extraction engine not found.");
+            throw new EntityNotFoundException("Text extraction engine not found.");
 
         var trimmedName = command.Request.Name.Trim();
         if (string.IsNullOrWhiteSpace(trimmedName))
-            throw new BadRequestException("Name is required.");
+            throw new BusinessRuleException("Name is required.");
 
         if (string.Equals(trimmedName, BuiltInTextExtractionEngines.TesseractDefaultName, StringComparison.OrdinalIgnoreCase))
-            throw new ConflictException("A text extraction engine with this name already exists.");
+            throw new DuplicateEntityException("A text extraction engine with this name already exists.");
 
         var nameConflict = await db.TextExtractionEngines
             .AnyAsync(e => e.Id != command.Id && e.Name == trimmedName, ct);
 
         if (nameConflict)
-            throw new ConflictException("A text extraction engine with this name already exists.");
+            throw new DuplicateEntityException("A text extraction engine with this name already exists.");
 
         TextExtractionEngineConfigValidator.Validate(engine.EngineType, command.Request.Configuration);
 

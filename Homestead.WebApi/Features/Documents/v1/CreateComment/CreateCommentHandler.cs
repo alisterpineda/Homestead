@@ -18,7 +18,7 @@ public class CreateCommentHandler(
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
-            throw new NotFoundException("Document not found.");
+            throw new EntityNotFoundException("Document not found.");
 
         var userId = currentUser.UserId;
 

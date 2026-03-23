@@ -34,7 +34,7 @@ public class PatchDocumentSettingsHandler(
         command.PatchDocument.ApplyTo(settings, error => errors.Add(error));
 
         if (errors.Count > 0)
-            throw new BadRequestException(errors.Select(e => new
+            throw new BusinessRuleException(errors.Select(e => new
             {
                 Operation = e.Operation?.ToString(),
                 e.ErrorMessage

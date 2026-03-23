@@ -28,8 +28,8 @@ public class IsActiveTests : IntegrationTestBase
         var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
-        Assert.Equal("account_inactive", body!.Error);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Equal("account_inactive", body!.ErrorCode);
     }
 
     [Fact]

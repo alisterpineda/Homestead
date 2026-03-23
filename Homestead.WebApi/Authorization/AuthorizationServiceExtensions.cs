@@ -15,6 +15,6 @@ public static class AuthorizationServiceExtensions
     {
         var result = await authorizationService.AuthorizeAsync(user, documentId, operation);
         if (!result.Succeeded)
-            throw new ForbiddenAccessException();
+            throw new AccessDeniedException();
     }
 }

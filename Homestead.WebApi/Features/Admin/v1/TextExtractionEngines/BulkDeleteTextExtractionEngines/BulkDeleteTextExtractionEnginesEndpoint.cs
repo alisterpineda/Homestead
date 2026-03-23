@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
@@ -10,7 +11,7 @@ public static class BulkDeleteTextExtractionEnginesEndpoint
             ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
-                return Results.BadRequest("At least one engine ID must be provided.");
+                return ProblemDetailsFactory.BusinessRuleResult("At least one engine ID must be provided.");
 
             var response = await sender.Send(request, ct);
             return Results.Ok(response);

@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.BulkDeleteUsers;
@@ -10,17 +11,10 @@ public static class BulkDeleteUsersEndpoint
             ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
-                return Results.BadRequest("At least one user ID must be provided.");
+                return ProblemDetailsFactory.BusinessRuleResult("At least one user ID must be provided.");
 
-            try
-            {
-                var response = await sender.Send(request, ct);
-                return Results.Ok(response);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return Results.BadRequest(ex.Message);
-            }
+            var response = await sender.Send(request, ct);
+            return Results.Ok(response);
         })
         .WithName("BulkDeleteUsers")
         .Produces<BulkDeleteUsersResponse>(StatusCodes.Status200OK)

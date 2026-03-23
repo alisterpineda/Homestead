@@ -1,8 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
+import { extractErrorCode, extractApiError } from '@/shared/utils/api-error.utils';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -138,15 +138,9 @@ export class LoginComponent implements OnInit {
       await this.auth.login(email, password);
       this.router.navigate(['/documents']);
     } catch (e) {
-      if (e instanceof HttpErrorResponse) {
-        const code = e.error?.error;
-        if (code === 'account_locked') {
-          this.error.set('Too many failed login attempts. Your account has been temporarily locked. Please try again later.');
-        } else if (code === 'account_inactive') {
-          this.error.set(INACTIVE_ERROR);
-        } else {
-          this.error.set('Invalid email or password.');
-        }
+      const code = extractErrorCode(e);
+      if (code === 'account_locked' || code === 'account_inactive') {
+        this.error.set(extractApiError(e, 'Invalid email or password.'));
       } else {
         this.error.set('Invalid email or password.');
       }

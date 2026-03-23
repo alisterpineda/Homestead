@@ -26,7 +26,7 @@ public class DocumentMetadataService(AppDbContext db, ITagPathResolver tagPathRe
 
         var invalidIds = partyIds.Except(existingPartyIds).ToList();
         if (invalidIds.Count > 0)
-            throw new BadRequestException("One or more party IDs are invalid.");
+            throw new BusinessRuleException("One or more party IDs are invalid.");
     }
 
     public void SetTags(Document document, List<Tag> tags)

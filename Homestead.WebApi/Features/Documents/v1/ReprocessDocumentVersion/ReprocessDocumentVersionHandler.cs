@@ -20,12 +20,12 @@ public class ReprocessDocumentVersionHandler(
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
-            throw new NotFoundException("Document not found.");
+            throw new EntityNotFoundException("Document not found.");
 
         var versionExists = await db.DocumentVersions
             .AnyAsync(v => v.Id == request.VersionId && v.DocumentId == request.DocumentId, ct);
         if (!versionExists)
-            throw new NotFoundException("Document version not found.");
+            throw new EntityNotFoundException("Document version not found.");
 
         if (request.TextExtractionEngineId is { } engineId)
         {

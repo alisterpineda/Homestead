@@ -49,7 +49,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract
         };
 
-        await Assert.ThrowsAsync<ConflictException>(
+        await Assert.ThrowsAsync<DuplicateEntityException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -62,7 +62,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract
         };
 
-        await Assert.ThrowsAsync<ConflictException>(
+        await Assert.ThrowsAsync<DuplicateEntityException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -76,7 +76,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = "not-valid-json"
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -112,7 +112,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":[]}"""
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -126,7 +126,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":["Eng","Eng"]}"""
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -177,7 +177,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = null
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -191,7 +191,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"apiKey":"key123"}"""
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -205,7 +205,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"endpoint":"https://test.cognitiveservices.azure.com"}"""
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -219,7 +219,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = "not-valid-json"
         };
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 }

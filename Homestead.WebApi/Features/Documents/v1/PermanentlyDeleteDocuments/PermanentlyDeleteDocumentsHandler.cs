@@ -20,7 +20,7 @@ public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration c
         var documents = await accessService.FilterByWriteAccess(query).ToListAsync(ct);
 
         if (documents.Count != request.Ids.Count)
-            throw new ForbiddenAccessException();
+            throw new AccessDeniedException();
 
         if (documents.Count == 0)
             return new PermanentlyDeleteDocumentsResponse(0);

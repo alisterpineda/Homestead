@@ -23,7 +23,7 @@ public class PatchDocumentHandler(AppDbContext db,
             .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
 
         if (document is null)
-            throw new NotFoundException("Document not found.");
+            throw new EntityNotFoundException("Document not found.");
 
         audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
@@ -44,7 +44,7 @@ public class PatchDocumentHandler(AppDbContext db,
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            throw new BadRequestException(errors.Select(e => new
+            throw new BusinessRuleException(errors.Select(e => new
             {
                 Operation = e.Operation?.ToString(),
                 e.ErrorMessage
@@ -52,7 +52,7 @@ public class PatchDocumentHandler(AppDbContext db,
 
         // Validate
         if (string.IsNullOrWhiteSpace(model.Name))
-            throw new BadRequestException("Name is required.");
+            throw new BusinessRuleException("Name is required.");
 
         // Validate party IDs
         await metadataService.ValidatePartyIdsAsync(model.PartyIds, ct);
@@ -62,11 +62,11 @@ public class PatchDocumentHandler(AppDbContext db,
         {
             var groupExists = await db.Groups.AnyAsync(g => g.Id == model.GroupId.Value, ct);
             if (!groupExists)
-                throw new BadRequestException("Group not found.");
+                throw new BusinessRuleException("Group not found.");
 
             var canWriteToGroup = await queryService.CanWriteToGroupAsync(model.GroupId.Value, ct);
             if (!canWriteToGroup)
-                throw new ForbiddenAccessException();
+                throw new AccessDeniedException();
         }
 
         // Update entity from patched model

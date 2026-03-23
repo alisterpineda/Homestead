@@ -10,6 +10,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createParty } from '@/api/generated/fn/documents/create-party';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -125,9 +126,9 @@ export class CreatePartyDialogComponent {
         this.dialog()?.close();
         this.created.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(err?.error?.error ?? 'Failed to create party.');
+        this.createError.set(extractApiError(err, 'Failed to create party.'));
       },
     });
   }

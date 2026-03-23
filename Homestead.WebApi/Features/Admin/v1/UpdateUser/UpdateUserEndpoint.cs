@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.UpdateUser;
@@ -19,15 +18,8 @@ public static class UpdateUserEndpoint
                 IsActive = request.IsActive
             };
 
-            try
-            {
-                var response = await sender.Send(command, ct);
-                return response is not null ? Results.Ok(response) : Results.NotFound();
-            }
-            catch (IdentityValidationException ex)
-            {
-                return Results.ValidationProblem(ex.Errors);
-            }
+            var response = await sender.Send(command, ct);
+            return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("UpdateUser")
         .Produces<UserResponse>()

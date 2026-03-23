@@ -20,7 +20,7 @@ public class PatchDocumentVersionHandler(AppDbContext db,
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
-            throw new NotFoundException("Document version not found.");
+            throw new EntityNotFoundException("Document version not found.");
 
         audit.Track<DocumentVersionSnapshot, DocumentVersion>(version, "DocumentVersion", version.Id,
             parentEntityId: version.DocumentId);
@@ -37,7 +37,7 @@ public class PatchDocumentVersionHandler(AppDbContext db,
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            throw new BadRequestException(errors.Select(e => new
+            throw new BusinessRuleException(errors.Select(e => new
             {
                 Operation = e.Operation?.ToString(),
                 e.ErrorMessage

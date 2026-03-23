@@ -19,14 +19,14 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
             .FirstOrDefaultAsync(ct);
 
         if (version is null)
-            throw new NotFoundException("Document version not found.");
+            throw new EntityNotFoundException("Document version not found.");
 
         // Prevent deleting the last version
         var versionCount = await db.DocumentVersions
             .CountAsync(r => r.DocumentId == request.DocumentId, ct);
 
         if (versionCount <= 1)
-            throw new BadRequestException("Cannot delete the last version of a document.");
+            throw new BusinessRuleException("Cannot delete the last version of a document.");
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");

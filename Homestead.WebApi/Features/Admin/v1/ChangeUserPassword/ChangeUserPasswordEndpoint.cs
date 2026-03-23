@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Admin.v1.ChangeUserPassword;
@@ -16,15 +15,8 @@ public static class ChangeUserPasswordEndpoint
                 Password = request.Password
             };
 
-            try
-            {
-                var found = await sender.Send(command, ct);
-                return found ? Results.NoContent() : Results.NotFound();
-            }
-            catch (IdentityValidationException ex)
-            {
-                return Results.ValidationProblem(ex.Errors);
-            }
+            var found = await sender.Send(command, ct);
+            return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("ChangeUserPassword")
         .Produces(StatusCodes.Status204NoContent)

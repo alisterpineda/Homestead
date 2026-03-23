@@ -17,6 +17,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { changeUserPassword } from '@/api/generated/fn/admin/change-user-password';
 import { toast } from 'ngx-sonner';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 
 @Component({
   selector: 'app-change-password-dialog',
@@ -135,13 +136,7 @@ export class ChangePasswordDialogComponent {
       },
       error: (err) => {
         this.submitting.set(false);
-        const errors = err?.error?.errors;
-        if (errors) {
-          const firstError = Object.values<string[]>(errors)[0]?.[0];
-          this.errorMessage.set(firstError ?? 'Failed to change password.');
-        } else {
-          this.errorMessage.set('Failed to change password. Please try again.');
-        }
+        this.errorMessage.set(extractApiError(err, 'Failed to change password.'));
       },
     });
   }

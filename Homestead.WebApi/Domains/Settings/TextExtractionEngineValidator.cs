@@ -13,6 +13,6 @@ public static class TextExtractionEngineValidator
 
         var exists = await db.TextExtractionEngines.AnyAsync(e => e.Id == engineId, ct);
         if (!exists)
-            throw new BadRequestException("The specified text extraction engine does not exist.");
+            throw new BusinessRuleException("The specified text extraction engine does not exist.");
     }
 }

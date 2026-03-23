@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Documents.v1.BulkUpdateDocuments;
@@ -10,18 +11,18 @@ public static class BulkUpdateDocumentsEndpoint
         group.MapPost("/bulk-update", async (BulkUpdateDocumentsCommand request, ISender sender, CancellationToken ct) =>
         {
             if (request.Ids.Count == 0)
-                return Results.BadRequest("At least one document ID must be provided.");
+                return ProblemDetailsFactory.BusinessRuleResult("At least one document ID must be provided.");
 
             if (request.TagPaths is { Count: > 0 } && request.RemoveTagPaths is { Count: > 0 }
                 && request.TagPaths.Intersect(request.RemoveTagPaths, StringComparer.OrdinalIgnoreCase).Any())
             {
-                return Results.BadRequest("Tags cannot be both added and removed in the same request.");
+                return ProblemDetailsFactory.BusinessRuleResult("Tags cannot be both added and removed in the same request.");
             }
 
             if (request.PartyIds is { Count: > 0 } && request.RemovePartyIds is { Count: > 0 }
                 && request.PartyIds.Intersect(request.RemovePartyIds).Any())
             {
-                return Results.BadRequest("Parties cannot be both added and removed in the same request.");
+                return ProblemDetailsFactory.BusinessRuleResult("Parties cannot be both added and removed in the same request.");
             }
 
             var response = await sender.Send(request, ct);

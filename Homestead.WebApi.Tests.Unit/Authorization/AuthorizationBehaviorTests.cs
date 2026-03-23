@@ -73,7 +73,7 @@ public class AuthorizationBehaviorTests
 
         var behavior = new AuthorizationBehavior<AuthorizedRequest, string>(_authService, _httpContextAccessor);
 
-        await Assert.ThrowsAsync<ForbiddenAccessException>(() =>
+        await Assert.ThrowsAsync<AccessDeniedException>(() =>
             behavior.Handle(
                 new AuthorizedRequest(Guid.NewGuid()),
                 () => Task.FromResult("ok"),

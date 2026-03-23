@@ -24,7 +24,7 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
 
         var nameConflict = await db.Parties.AnyAsync(p => p.Id != request.Id && p.Name == name, ct);
         if (nameConflict)
-            throw new ConflictException("A party with this name already exists.");
+            throw new DuplicateEntityException("A party with this name already exists.");
 
         // Block modification if the party is used on inaccessible documents
         var relatedDocIds = db.DocumentParties

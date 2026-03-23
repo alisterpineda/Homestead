@@ -36,12 +36,18 @@ describe('LoginComponent', () => {
     const submitPromise = comp.onSubmit();
 
     const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    req.flush({ error: 'account_locked' }, { status: 401, statusText: 'Unauthorized' });
+    req.flush({
+      type: 'https://tools.ietf.org/html/rfc9110#section-15.5.2',
+      title: 'Unauthorized',
+      status: 401,
+      detail: 'Too many failed login attempts. Your account has been temporarily locked.',
+      errorCode: 'account_locked',
+    }, { status: 401, statusText: 'Unauthorized' });
 
     await submitPromise;
 
     expect(comp.error()).toBe(
-      'Too many failed login attempts. Your account has been temporarily locked. Please try again later.',
+      'Too many failed login attempts. Your account has been temporarily locked.',
     );
   });
 
@@ -52,7 +58,13 @@ describe('LoginComponent', () => {
     const submitPromise = comp.onSubmit();
 
     const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    req.flush({ error: 'account_inactive' }, { status: 401, statusText: 'Unauthorized' });
+    req.flush({
+      type: 'https://tools.ietf.org/html/rfc9110#section-15.5.2',
+      title: 'Unauthorized',
+      status: 401,
+      detail: 'Your account is inactive. Please contact an administrator.',
+      errorCode: 'account_inactive',
+    }, { status: 401, statusText: 'Unauthorized' });
 
     await submitPromise;
 

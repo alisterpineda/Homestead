@@ -12,6 +12,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createUser } from '@/api/generated/fn/admin/create-user';
 import type { AppRole } from '@/api/generated/models/app-role';
 import { toast } from 'ngx-sonner';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 
 @Component({
   selector: 'app-create-user-dialog',
@@ -171,13 +172,7 @@ export class CreateUserDialogComponent {
       },
       error: (err) => {
         this.creating.set(false);
-        const errors = err?.error?.errors;
-        if (errors) {
-          const firstError = Object.values<string[]>(errors)[0]?.[0];
-          this.createError.set(firstError ?? 'Failed to create user.');
-        } else {
-          this.createError.set('Failed to create user. Please try again.');
-        }
+        this.createError.set(extractApiError(err, 'Failed to create user.'));
       },
     });
   }

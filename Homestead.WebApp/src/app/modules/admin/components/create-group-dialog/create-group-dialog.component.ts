@@ -10,6 +10,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createGroup } from '@/api/generated/fn/admin/create-group';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -104,9 +105,9 @@ export class CreateGroupDialogComponent {
         this.dialog()?.close();
         this.created.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(err?.error?.error ?? 'Failed to create group.');
+        this.createError.set(extractApiError(err, 'Failed to create group.'));
       },
     });
   }

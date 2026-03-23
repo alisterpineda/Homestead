@@ -81,7 +81,9 @@ public class InactiveUserAuthorizationMiddlewareResultHandler(
                 .Any(r => r.Message == AuthPolicies.AccountInactiveError) == true)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            await context.Response.WriteAsJsonAsync(new { error = AuthPolicies.AccountInactiveError });
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(
+                Common.ProblemDetailsFactory.Forbidden("Your account is inactive.", AuthPolicies.AccountInactiveError));
             return;
         }
 

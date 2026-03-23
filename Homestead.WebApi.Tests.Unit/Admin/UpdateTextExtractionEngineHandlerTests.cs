@@ -39,7 +39,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
             }
         };
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(command, CancellationToken.None));
 
         Assert.Equal("Cannot modify a built-in engine.", ex.Message);
@@ -57,7 +57,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
             }
         };
 
-        await Assert.ThrowsAsync<NotFoundException>(
+        await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(command, CancellationToken.None));
     }
 

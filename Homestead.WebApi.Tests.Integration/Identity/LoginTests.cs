@@ -65,8 +65,8 @@ public class LoginTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword!" }, CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
-        Assert.Equal("account_locked", body?.Error);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Equal("account_locked", body?.ErrorCode);
     }
 
     [Fact]
@@ -83,8 +83,8 @@ public class LoginTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
-        Assert.Equal("account_locked", body?.Error);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Equal("account_locked", body?.ErrorCode);
     }
 
     [Fact]
@@ -122,8 +122,8 @@ public class LoginTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password }, CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
-        Assert.Equal("account_inactive", body?.Error);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Equal("account_inactive", body?.ErrorCode);
     }
 
     [Fact]
@@ -137,8 +137,8 @@ public class LoginTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPassword!" }, CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>(CT);
-        Assert.Equal("account_inactive", body?.Error);
+        var body = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Equal("account_inactive", body?.ErrorCode);
     }
 
     private async Task SeedUserAsync(string email, string password, bool isActive = true)

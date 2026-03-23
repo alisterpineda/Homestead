@@ -21,6 +21,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { updateParty } from '@/api/generated/fn/documents/update-party';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -154,9 +155,9 @@ export class EditPartySheetComponent {
         toast.success('Party updated.');
         this.saved.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.saving.set(false);
-        toast.error(err?.error?.error ?? 'Failed to save changes.');
+        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

@@ -15,6 +15,7 @@ import { getUsers } from '@/api/generated/fn/admin/get-users';
 import { addGroupMember } from '@/api/generated/fn/admin/add-group-member';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -182,9 +183,9 @@ export class AddMemberDialogComponent {
         this.dialog()?.close();
         this.added.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.adding.set(false);
-        this.addError.set(err?.error?.error ?? 'Failed to add member.');
+        this.addError.set(extractApiError(err, 'Failed to add member.'));
       },
     });
   }

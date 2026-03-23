@@ -124,7 +124,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = Guid.NewGuid(),
         };
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(request, CancellationToken.None));
 
         Assert.Contains("does not exist", ex.Message);
@@ -139,7 +139,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             VersionId = _versionId,
         };
 
-        await Assert.ThrowsAsync<NotFoundException>(
+        await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 
@@ -152,7 +152,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             VersionId = Guid.NewGuid(),
         };
 
-        await Assert.ThrowsAsync<NotFoundException>(
+        await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(request, CancellationToken.None));
     }
 }

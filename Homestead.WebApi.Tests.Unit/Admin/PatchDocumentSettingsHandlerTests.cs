@@ -163,7 +163,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, Guid.NewGuid()));
 
-        await Assert.ThrowsAsync<BadRequestException>(
+        await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(command, CancellationToken.None));
     }
 

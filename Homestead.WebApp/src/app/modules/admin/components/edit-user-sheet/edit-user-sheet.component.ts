@@ -24,6 +24,7 @@ import type { UserResponse } from '@/api/generated/models/user-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { ChangePasswordDialogComponent } from '../change-password-dialog/change-password-dialog.component';
 
 @Component({
@@ -204,13 +205,7 @@ export class EditUserSheetComponent {
       },
       error: (err) => {
         this.saving.set(false);
-        const errors = err?.error?.errors;
-        if (errors) {
-          const firstError = Object.values<string[]>(errors)[0]?.[0];
-          toast.error(firstError ?? 'Failed to save changes.');
-        } else {
-          toast.error('Failed to save changes.');
-        }
+        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

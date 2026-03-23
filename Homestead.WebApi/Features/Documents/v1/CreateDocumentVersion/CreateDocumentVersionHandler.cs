@@ -21,7 +21,7 @@ public class CreateDocumentVersionHandler(
     {
         var documentExists = await db.Documents.AnyAsync(d => d.Id == request.DocumentId, ct);
         if (!documentExists)
-            throw new NotFoundException("Document not found.");
+            throw new EntityNotFoundException("Document not found.");
 
         var file = request.File;
         var extension = Path.GetExtension(file.FileName);

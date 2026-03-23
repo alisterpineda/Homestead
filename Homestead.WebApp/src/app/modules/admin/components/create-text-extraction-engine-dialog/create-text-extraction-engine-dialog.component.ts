@@ -12,6 +12,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
 import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
 import { ENGINE_TYPE_OPTIONS } from '../../constants/engine-type-labels';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -175,9 +176,9 @@ export class CreateTextExtractionEngineDialogComponent {
         ctx.close();
         this.created.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(err?.error?.error ?? 'Failed to create engine.');
+        this.createError.set(extractApiError(err, 'Failed to create engine.'));
       },
     });
   }

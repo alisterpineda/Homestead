@@ -23,7 +23,7 @@ internal record DocumentListItem(Guid Id, string Name, Guid? GroupId, string? Gr
 
 internal record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);
 
-internal record ErrorResponse(string? Error);
+internal record ProblemDetailsResponse(string? Type, string? Title, int? Status, string? Detail, string? ErrorCode);
 
 internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
 

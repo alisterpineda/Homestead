@@ -16,13 +16,13 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
         var trimmedName = request.Name.Trim();
 
         if (string.Equals(trimmedName, BuiltInTextExtractionEngines.TesseractDefaultName, StringComparison.OrdinalIgnoreCase))
-            throw new ConflictException("A text extraction engine with this name already exists.");
+            throw new DuplicateEntityException("A text extraction engine with this name already exists.");
 
         var nameExists = await db.TextExtractionEngines
             .AnyAsync(e => e.Name == trimmedName, ct);
 
         if (nameExists)
-            throw new ConflictException("A text extraction engine with this name already exists.");
+            throw new DuplicateEntityException("A text extraction engine with this name already exists.");
 
         TextExtractionEngineConfigValidator.Validate(request.EngineType, request.Configuration);
 

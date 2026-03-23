@@ -19,7 +19,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             .FirstOrDefaultAsync(t => t.Id == request.Id, ct);
 
         if (tag is null)
-            throw new NotFoundException("Tag not found.");
+            throw new EntityNotFoundException("Tag not found.");
 
         audit.Track<TagSnapshot, Tag>(tag, "Tag", tag.Id);
 
@@ -53,7 +53,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         request.PatchDocument.ApplyTo(model, error => errors.Add(error));
 
         if (errors.Count > 0)
-            throw new BadRequestException(errors.Select(e => new
+            throw new BusinessRuleException(errors.Select(e => new
             {
                 Operation = e.Operation?.ToString(),
                 e.ErrorMessage
@@ -61,16 +61,16 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
         // Validate name
         if (string.IsNullOrWhiteSpace(model.Name))
-            throw new BadRequestException("Tag name cannot be empty.");
+            throw new BusinessRuleException("Tag name cannot be empty.");
 
         if (model.Name.Contains('/'))
-            throw new BadRequestException("Tag name cannot contain '/' characters.");
+            throw new BusinessRuleException("Tag name cannot contain '/' characters.");
 
         var normalizedName = model.Name.Trim();
 
         // Validate parent
         if (model.ParentId == request.Id)
-            throw new BadRequestException("A tag cannot be its own parent.");
+            throw new BusinessRuleException("A tag cannot be its own parent.");
 
         string? parentPath = null;
         string? newParentEffectiveColor = null;
@@ -80,11 +80,11 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
                 .FirstOrDefaultAsync(t => t.Id == model.ParentId, ct);
 
             if (parent is null)
-                throw new BadRequestException("Parent tag not found.");
+                throw new BusinessRuleException("Parent tag not found.");
 
             // Check for circular reference: new parent must not be a descendant of this tag
             if (parent.Path.StartsWith(oldPath + "/") || parent.Path == oldPath)
-                throw new BadRequestException("Cannot move a tag under one of its own descendants.");
+                throw new BusinessRuleException("Cannot move a tag under one of its own descendants.");
 
             parentPath = parent.Path;
             newParentEffectiveColor = parent.EffectiveColor;
@@ -116,7 +116,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
                 .AnyAsync(t => t.Path == newPath && t.Id != request.Id, ct);
 
             if (conflictExists)
-                throw new ConflictException($"A tag with path '{newPath}' already exists.");
+                throw new DuplicateEntityException($"A tag with path '{newPath}' already exists.");
 
             tag.Path = newPath;
 

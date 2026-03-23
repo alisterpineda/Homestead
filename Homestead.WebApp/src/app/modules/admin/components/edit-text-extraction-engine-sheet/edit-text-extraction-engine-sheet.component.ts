@@ -14,6 +14,7 @@ import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -229,9 +230,9 @@ export class EditTextExtractionEngineSheetComponent {
         toast.success('Engine updated.');
         this.saved.emit();
       },
-      error: (err: { error?: { error?: string } }) => {
+      error: (err: unknown) => {
         this.saving.set(false);
-        toast.error(err?.error?.error ?? 'Failed to save changes.');
+        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

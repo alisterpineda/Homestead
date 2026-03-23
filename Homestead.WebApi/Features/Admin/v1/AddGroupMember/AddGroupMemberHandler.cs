@@ -14,7 +14,7 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     {
         var groupExists = await db.Groups.AnyAsync(g => g.Id == command.GroupId, ct);
         if (!groupExists)
-            throw new NotFoundException("Group not found.");
+            throw new EntityNotFoundException("Group not found.");
 
         var user = await db.Users
             .AsNoTracking()
@@ -23,16 +23,16 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
             .FirstOrDefaultAsync(ct);
 
         if (user is null)
-            throw new BadRequestException("User not found.");
+            throw new BusinessRuleException("User not found.");
 
         if (!user.IsActive)
-            throw new BadRequestException("User is not active.");
+            throw new BusinessRuleException("User is not active.");
 
         var alreadyMember = await db.GroupMembers
             .AnyAsync(gm => gm.GroupId == command.GroupId && gm.UserId == command.Request.UserId, ct);
 
         if (alreadyMember)
-            throw new ConflictException("User is already a member of this group.");
+            throw new DuplicateEntityException("User is already a member of this group.");
 
         db.GroupMembers.Add(new GroupMember
         {

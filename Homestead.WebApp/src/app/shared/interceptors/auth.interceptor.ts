@@ -2,6 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
+import { extractErrorCode } from '@/shared/utils/api-error.utils';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
@@ -9,7 +10,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     tap({
       error: (err) => {
-        if (err.status === 403 && err.error?.error === 'account_inactive') {
+        if (err.status === 403 && extractErrorCode(err) === 'account_inactive') {
           router.navigate(['/pending-activation']);
           return;
         }

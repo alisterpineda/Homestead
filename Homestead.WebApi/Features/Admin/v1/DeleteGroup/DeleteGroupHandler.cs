@@ -13,7 +13,7 @@ public class DeleteGroupHandler(AppDbContext db, IAuditContext audit)
     {
         var group = await db.Groups.FirstOrDefaultAsync(g => g.Id == request.Id, ct);
         if (group is null)
-            throw new NotFoundException("Group not found.");
+            throw new EntityNotFoundException("Group not found.");
 
         // Set GroupId to null on affected documents (including soft-deleted ones)
         await db.Documents.IgnoreQueryFilters()

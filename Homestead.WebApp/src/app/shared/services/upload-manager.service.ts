@@ -2,6 +2,7 @@ import { Injectable, computed, signal, inject, DestroyRef } from '@angular/core'
 import { HttpClient, HttpRequest, HttpEventType, HttpResponse, HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { toast } from 'ngx-sonner';
+import { extractApiError } from '@/shared/utils/api-error.utils';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
@@ -178,7 +179,7 @@ export class UploadManagerService {
       error: (err: HttpErrorResponse) => {
         const errorMsg = err.status === 0
           ? 'Network error'
-          : err.error?.message ?? err.statusText ?? 'Upload failed';
+          : extractApiError(err, err.statusText ?? 'Upload failed');
         this.updateItem(item.id, { status: 'failed', error: errorMsg });
         toast.error(`Upload failed for "${item.fileName}": ${errorMsg}`);
         this.activeUploads.delete(item.id);

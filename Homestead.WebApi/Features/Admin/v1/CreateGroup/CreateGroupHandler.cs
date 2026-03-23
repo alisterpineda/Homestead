@@ -17,7 +17,7 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
             .AnyAsync(g => g.Name == request.Name.Trim(), ct);
 
         if (nameExists)
-            throw new ConflictException("A group with this name already exists.");
+            throw new DuplicateEntityException("A group with this name already exists.");
 
         var userId = currentUser.UserId;
 

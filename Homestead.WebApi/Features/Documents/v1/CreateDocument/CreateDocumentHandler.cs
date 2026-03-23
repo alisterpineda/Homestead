@@ -22,11 +22,11 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
         {
             var groupExists = await db.Groups.AnyAsync(g => g.Id == request.GroupId.Value, ct);
             if (!groupExists)
-                throw new BadRequestException("Group not found.");
+                throw new BusinessRuleException("Group not found.");
 
             var canWrite = await accessService.CanWriteToGroupAsync(request.GroupId.Value, ct);
             if (!canWrite)
-                throw new ForbiddenAccessException();
+                throw new AccessDeniedException();
         }
 
         var file = request.File;

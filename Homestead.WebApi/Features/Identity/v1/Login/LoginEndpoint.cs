@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using MediatR;
 
 namespace Homestead.WebApi.Features.Identity.v1.Login;
@@ -12,11 +13,20 @@ public static class LoginEndpoint
             var response = await sender.Send(request, ct);
 
             if (response.IsInactive)
-                return Results.Json(new { error = AuthPolicies.AccountInactiveError },
-                    statusCode: StatusCodes.Status401Unauthorized);
+                return Results.Json(
+                    ProblemDetailsFactory.Unauthorized(
+                        "Your account is inactive. Please contact an administrator.",
+                        AuthPolicies.AccountInactiveError),
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    contentType: "application/problem+json");
 
             if (response.IsLockedOut)
-                return Results.Json(new { error = AuthPolicies.AccountLockedError }, statusCode: StatusCodes.Status401Unauthorized);
+                return Results.Json(
+                    ProblemDetailsFactory.Unauthorized(
+                        "Too many failed login attempts. Your account has been temporarily locked.",
+                        AuthPolicies.AccountLockedError),
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    contentType: "application/problem+json");
 
             return response.Succeeded
                 ? Results.Ok()

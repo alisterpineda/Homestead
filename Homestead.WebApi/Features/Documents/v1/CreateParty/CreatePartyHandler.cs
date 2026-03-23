@@ -17,7 +17,7 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
 
         var nameExists = await db.Parties.AnyAsync(p => p.Name == name, ct);
         if (nameExists)
-            throw new ConflictException("A party with this name already exists.");
+            throw new DuplicateEntityException("A party with this name already exists.");
 
         var party = new Party
         {

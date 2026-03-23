@@ -19,7 +19,7 @@ public class BulkDeleteUsersHandler(
     {
         if (currentUser.UserId is { } currentId && request.Ids.Contains(currentId))
         {
-            throw new InvalidOperationException("Cannot delete your own account.");
+            throw new BusinessRuleException("Cannot delete your own account.");
         }
 
         var users = await db.Users
