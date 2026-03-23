@@ -22,7 +22,8 @@ import type { UserResponse } from '@/api/generated/models/user-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ChangePasswordDialogComponent } from '../change-password-dialog/change-password-dialog.component';
 
 @Component({
@@ -153,6 +154,7 @@ export class EditUserSheetComponent {
   });
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   constructor() {
     effect(() => {
@@ -194,15 +196,13 @@ export class EditUserSheetComponent {
         role: this.editRole(),
         isActive: this.editIsActive(),
       },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         toast.success('User updated.');
         this.saved.emit();
-      },
-      error: (err) => {
-        this.saving.set(false);
-        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

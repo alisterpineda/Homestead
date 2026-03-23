@@ -12,7 +12,8 @@ import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -121,6 +122,7 @@ export class EditTextExtractionEngineSheetComponent {
   closed = output<void>();
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   languages = TESSERACT_LANGUAGES;
   editName = signal('');
@@ -221,15 +223,13 @@ export class EditTextExtractionEngineSheetComponent {
         name: this.editName().trim(),
         configuration: this.editConfiguration(),
       },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         toast.success('Engine updated.');
         this.saved.emit();
-      },
-      error: (err: unknown) => {
-        this.saving.set(false);
-        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

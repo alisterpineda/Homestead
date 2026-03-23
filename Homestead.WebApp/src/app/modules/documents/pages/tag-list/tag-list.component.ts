@@ -25,6 +25,8 @@ import type { PaginatedResponseOfGetTagsResponse } from '@/api/generated/models/
 import type { TagSortBy } from '@/api/generated/models/tag-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -263,6 +265,7 @@ export class TagListComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private listState = inject(TagListStateService);
+  private errorHandler = inject(ErrorHandlerService);
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: TagSortBy; label: string }[] = [
@@ -414,11 +417,7 @@ export class TagListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfGetTagsResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -533,7 +532,9 @@ export class TagListComponent implements OnDestroy {
 
     this.tagApi.bulkDeleteTags({
       body: { ids },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete tags. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
@@ -541,10 +542,6 @@ export class TagListComponent implements OnDestroy {
         toast.success(`${count} tag${count > 1 ? 's' : ''} deleted.`);
         this.clearSelection();
         this.onRefresh();
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete tags. Please try again.');
       },
     });
   }

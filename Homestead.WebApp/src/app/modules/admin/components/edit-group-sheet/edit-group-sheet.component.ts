@@ -7,6 +7,8 @@ import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GroupDetailResponse } from '@/api/generated/models/group-detail-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-edit-group-sheet',
@@ -52,6 +54,7 @@ export class EditGroupSheetComponent {
   closed = output<void>();
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   editName = signal('');
   editDescription = signal('');
@@ -90,15 +93,13 @@ export class EditGroupSheetComponent {
         name: this.editName().trim(),
         description: this.editDescription().trim() || null,
       },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         toast.success('Group updated.');
         this.saved.emit();
-      },
-      error: () => {
-        this.saving.set(false);
-        toast.error('Failed to save changes.');
       },
     });
   }

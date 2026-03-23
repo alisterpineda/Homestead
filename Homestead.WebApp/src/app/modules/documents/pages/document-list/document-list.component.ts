@@ -33,6 +33,8 @@ import { PartyApiService } from '@/api/services/party-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -366,6 +368,7 @@ export class DocumentListComponent implements OnDestroy {
   private listState = inject(DocumentListStateService);
   private openDocumentsService = inject(OpenDocumentsService);
   private uploadManager = inject(UploadManagerService);
+  private errorHandler = inject(ErrorHandlerService);
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
 
@@ -637,11 +640,7 @@ export class DocumentListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfGetDocumentsResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -797,7 +796,9 @@ export class DocumentListComponent implements OnDestroy {
 
     this.documentApi.bulkDeleteDocuments({
       body: { ids },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete documents. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
@@ -805,10 +806,6 @@ export class DocumentListComponent implements OnDestroy {
         toast.success(`${count} document${count > 1 ? 's' : ''} moved to trash.`);
         this.clearSelection();
         this.onRefresh();
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete documents. Please try again.');
       },
     });
   }

@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
@@ -19,6 +19,8 @@ import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -178,6 +180,7 @@ import { toast } from 'ngx-sonner';
 })
 export class UserListComponent implements OnDestroy {
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -230,11 +233,7 @@ export class UserListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfUserResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -319,10 +318,11 @@ export class UserListComponent implements OnDestroy {
         this.clearSelection();
         this.onRefresh();
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.deleting.set(false);
-        const message = err?.error ?? 'Failed to delete users. Please try again.';
-        toast.error(typeof message === 'string' ? message : 'Failed to delete users. Please try again.');
+        if (!this.errorHandler.isServerOrNetworkError(err)) {
+          toast.error(this.errorHandler.getErrorMessage(err, 'Failed to delete users. Please try again.'));
+        }
       },
     });
   }

@@ -74,6 +74,8 @@ import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { OpenDocumentsService } from '../../services/open-documents.service';
 import { DocumentEditStateService, type DocumentEditState } from '../../services/document-edit-state.service';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -628,6 +630,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
+  private errorHandler = inject(ErrorHandlerService);
   private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
   private pendingSavedState: DocumentEditState | null = null;
@@ -1068,16 +1071,14 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const id = this.documentId();
     if (!id) return;
     this.deleting.set(true);
-    this.documentApi.deleteDocument({ id }).subscribe({
+    this.documentApi.deleteDocument({ id }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete document.'),
+    ).subscribe({
       next: () => {
         this.editStateService.discardChanges(id);
         this.openDocumentsService.removeDocument(id);
         toast.success('Document deleted.');
         this.router.navigate(['/documents']);
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete document.');
       },
     });
   }
@@ -1135,17 +1136,15 @@ export class DocumentDetailPageComponent implements OnDestroy {
         })
       : of(null);
 
-    forkJoin([docUpdate$, versionUpdate$]).subscribe({
+    forkJoin([docUpdate$, versionUpdate$]).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
-      },
-      error: () => {
-        this.saving.set(false);
-        toast.error('Failed to save changes.');
       },
     });
   }
@@ -1240,15 +1239,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.versionApi.createComment({
       documentId: id,
       body: { body },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.commentSubmitting, 'Failed to post comment.'),
+    ).subscribe({
       next: () => {
         this.commentBody.set('');
         this.commentSubmitting.set(false);
         this.loadActivity();
-      },
-      error: () => {
-        this.commentSubmitting.set(false);
-        toast.error('Failed to post comment.');
       },
     });
   }

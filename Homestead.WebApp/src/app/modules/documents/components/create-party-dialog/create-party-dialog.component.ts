@@ -8,8 +8,8 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { PartyApiService } from '@/api/services/party-api.service';
-import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-create-party-dialog',
@@ -90,6 +90,7 @@ export class CreatePartyDialogComponent {
 
   private dialog = viewChild(BrnDialog);
   private partyApi = inject(PartyApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
@@ -125,7 +126,7 @@ export class CreatePartyDialogComponent {
       },
       error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(extractApiError(err, 'Failed to create party.'));
+        this.createError.set(this.errorHandler.getErrorMessage(err, 'Failed to create party.'));
       },
     });
   }

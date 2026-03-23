@@ -15,7 +15,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import { toast } from 'ngx-sonner';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-change-password-dialog',
@@ -91,6 +91,7 @@ export class ChangePasswordDialogComponent {
 
   private dialog = viewChild(BrnDialog);
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   canSubmit = computed(() =>
     this.password().length >= 8 &&
@@ -131,9 +132,9 @@ export class ChangePasswordDialogComponent {
         this.dialog()?.close();
         this.passwordChanged.emit();
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.submitting.set(false);
-        this.errorMessage.set(extractApiError(err, 'Failed to change password.'));
+        this.errorMessage.set(this.errorHandler.getErrorMessage(err, 'Failed to change password.'));
       },
     });
   }

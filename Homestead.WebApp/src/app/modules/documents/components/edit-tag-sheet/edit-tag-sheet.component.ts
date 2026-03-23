@@ -24,6 +24,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { replace } from '@/shared/json-patch';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from 'ngx-sonner';
 
 const NONE_VALUE = '__none__';
@@ -185,6 +186,7 @@ export class EditTagSheetComponent {
   });
 
   private tagApi = inject(TagApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   constructor() {
     effect(() => {
@@ -226,12 +228,10 @@ export class EditTagSheetComponent {
         toast.success('Tag updated.');
         this.saved.emit();
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.saving.set(false);
-        if (err.status === 409) {
-          toast.error('A tag with that path already exists.');
-        } else {
-          toast.error('Failed to update tag.');
+        if (!this.errorHandler.isServerOrNetworkError(err)) {
+          toast.error(this.errorHandler.getErrorMessage(err, 'Failed to update tag.'));
         }
       },
     });

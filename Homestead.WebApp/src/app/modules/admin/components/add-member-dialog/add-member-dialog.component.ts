@@ -12,7 +12,7 @@ import { BrnSelectImports } from '@spartan-ng/brain/select';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -93,6 +93,7 @@ export class AddMemberDialogComponent {
   added = output();
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
   private dialog = viewChild(BrnDialog);
 
   userSearch = signal('');
@@ -181,7 +182,7 @@ export class AddMemberDialogComponent {
       },
       error: (err: unknown) => {
         this.adding.set(false);
-        this.addError.set(extractApiError(err, 'Failed to add member.'));
+        this.addError.set(this.errorHandler.getErrorMessage(err, 'Failed to add member.'));
       },
     });
   }

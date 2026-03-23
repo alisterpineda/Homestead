@@ -9,6 +9,8 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-reprocess-dialog',
@@ -85,6 +87,7 @@ export class ReprocessDialogComponent {
 
   private dialog = viewChild(BrnDialog);
   private versionApi = inject(DocumentVersionApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   open(): void {
     this.dialog()?.open();
@@ -115,15 +118,13 @@ export class ReprocessDialogComponent {
       documentId: docId,
       versionId: verId,
       body: { textExtractionEngineId: engineId },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.reprocessing, 'Failed to start text extraction reprocessing.'),
+    ).subscribe({
       next: (r) => {
         this.reprocessing.set(false);
         ctx.close();
         this.reprocessStarted.emit(r.jobId);
-      },
-      error: () => {
-        this.reprocessing.set(false);
-        toast.error('Failed to start text extraction reprocessing.');
       },
     });
   }

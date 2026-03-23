@@ -19,7 +19,8 @@ import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -114,6 +115,7 @@ export class EditPartySheetComponent {
   });
 
   private partyApi = inject(PartyApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   constructor() {
     effect(() => {
@@ -146,15 +148,13 @@ export class EditPartySheetComponent {
     this.partyApi.updateParty({
       id: p.id,
       body: { name: this.editName(), description: this.editDescription() || null },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         toast.success('Party updated.');
         this.saved.emit();
-      },
-      error: (err: unknown) => {
-        this.saving.set(false);
-        toast.error(extractApiError(err, 'Failed to save changes.'));
       },
     });
   }

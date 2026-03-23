@@ -10,6 +10,7 @@ import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-create-tag-dialog',
@@ -94,6 +95,7 @@ export class CreateTagDialogComponent {
 
   private dialog = viewChild(BrnDialog);
   private tagApi = inject(TagApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
@@ -128,10 +130,9 @@ export class CreateTagDialogComponent {
         this.dialog()?.close();
         this.created.emit();
       },
-      error: () => {
+      error: (err: unknown) => {
         this.creating.set(false);
         this.createError.set(true);
-        toast.error('Failed to create tag. Please try again.');
       },
     });
   }

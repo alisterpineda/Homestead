@@ -9,6 +9,7 @@ import { UploadDropzoneComponent } from '../upload-dropzone/upload-dropzone.comp
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-add-version-dialog',
@@ -72,6 +73,7 @@ export class AddVersionDialogComponent {
   private http = inject(HttpClient);
   private apiConfig = inject(ApiConfiguration);
   private processingHub = inject(ProcessingHubService);
+  private errorHandler = inject(ErrorHandlerService);
 
   open(): void {
     this.dialog()?.open();
@@ -121,7 +123,6 @@ export class AddVersionDialogComponent {
         error: () => {
           this.uploading.set(false);
           this.uploadError.set(true);
-          toast.error('Upload failed. Please try again.');
         },
       });
   }

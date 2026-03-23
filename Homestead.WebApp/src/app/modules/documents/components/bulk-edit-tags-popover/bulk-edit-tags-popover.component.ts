@@ -27,6 +27,8 @@ import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } from '../bulk-edit-shared';
 
 @Component({
@@ -181,6 +183,7 @@ export class BulkEditTagsPopoverComponent {
   private tagSearchEl = viewChild<ElementRef<HTMLInputElement>>('tagSearchEl');
   private tagApi = inject(TagApiService);
   private documentApi = inject(DocumentApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   // Tag autocomplete
   private suggestions = toSignal(
@@ -326,7 +329,9 @@ export class BulkEditTagsPopoverComponent {
         partyIds: null,
         removePartyIds: null,
       },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.applying, 'Failed to update documents. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.applying.set(false);
         const count = +response.updatedCount;
@@ -334,10 +339,6 @@ export class BulkEditTagsPopoverComponent {
         ctx.close();
         this.popoverState.set('closed');
         this.applied.emit();
-      },
-      error: () => {
-        this.applying.set(false);
-        toast.error('Failed to update documents. Please try again.');
       },
     });
   }

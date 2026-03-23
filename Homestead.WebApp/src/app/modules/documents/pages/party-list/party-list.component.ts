@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -25,6 +25,8 @@ import type { PaginatedResponseOfGetPartiesResponse } from '@/api/generated/mode
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -263,6 +265,7 @@ export class PartyListComponent implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private listState = inject(PartyListStateService);
+  private errorHandler = inject(ErrorHandlerService);
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: PartySortBy; label: string }[] = [
@@ -412,11 +415,7 @@ export class PartyListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfGetPartiesResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -514,7 +513,9 @@ export class PartyListComponent implements OnDestroy {
 
     this.partyApi.bulkDeleteParties({
       body: { ids },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete parties. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
@@ -522,10 +523,6 @@ export class PartyListComponent implements OnDestroy {
         toast.success(`${count} ${count > 1 ? 'parties' : 'party'} deleted.`);
         this.clearSelection();
         this.onRefresh();
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete parties. Please try again.');
       },
     });
   }

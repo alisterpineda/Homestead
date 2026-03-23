@@ -1,14 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import type { ApiProblemDetails } from '@/shared/types/api-problem-details';
 
-interface ApiProblemDetails {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  errors?: Record<string, string[]>;
-  errorCode?: string;
-}
-
+/** @deprecated Use `ErrorHandlerService.getErrorMessage()` or `ErrorHandlerService.handleError()` instead. */
 export function extractApiError(err: unknown, fallback: string): string {
   if (err instanceof HttpErrorResponse && err.error) {
     const body = err.error as ApiProblemDetails;
@@ -21,6 +14,7 @@ export function extractApiError(err: unknown, fallback: string): string {
   return fallback;
 }
 
+/** @deprecated Use `ErrorHandlerService.getValidationErrors()` instead. */
 export function extractValidationErrors(err: unknown): Record<string, string[]> | null {
   if (err instanceof HttpErrorResponse && err.error) {
     const body = err.error as ApiProblemDetails;
@@ -29,6 +23,7 @@ export function extractValidationErrors(err: unknown): Record<string, string[]> 
   return null;
 }
 
+/** @deprecated Use `ErrorHandlerService.getErrorCode()` instead. */
 export function extractErrorCode(err: unknown): string | null {
   if (err instanceof HttpErrorResponse && err.error) {
     const body = err.error as ApiProblemDetails;

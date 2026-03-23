@@ -8,8 +8,8 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { AdminApiService } from '@/api/services/admin-api.service';
-import { extractApiError } from '@/shared/utils/api-error.utils';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-create-group-dialog',
@@ -61,6 +61,7 @@ export class CreateGroupDialogComponent {
   created = output();
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
   private dialog = viewChild(BrnDialog);
 
   name = signal('');
@@ -104,7 +105,7 @@ export class CreateGroupDialogComponent {
       },
       error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(extractApiError(err, 'Failed to create group.'));
+        this.createError.set(this.errorHandler.getErrorMessage(err, 'Failed to create group.'));
       },
     });
   }

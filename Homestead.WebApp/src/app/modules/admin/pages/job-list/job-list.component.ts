@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/cor
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
+import { switchMap, map, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideActivity } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -15,6 +15,7 @@ import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 import type { ProcessingJobType } from '@/api/generated/models/processing-job-type';
+import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-job-list',
@@ -189,11 +190,7 @@ export class JobListComponent {
             this.loading.set(false);
             return r as PaginatedResponseOfGetProcessingJobsResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),

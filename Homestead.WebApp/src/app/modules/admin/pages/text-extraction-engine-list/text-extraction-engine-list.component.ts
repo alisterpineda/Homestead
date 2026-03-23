@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -25,6 +25,8 @@ import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/mo
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../../constants/engine-type-labels';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-text-extraction-engine-list',
@@ -201,6 +203,7 @@ export class TextExtractionEngineListComponent implements OnDestroy {
   private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private errorHandler = inject(ErrorHandlerService);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -268,11 +271,7 @@ export class TextExtractionEngineListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfTextExtractionEngineResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -346,7 +345,9 @@ export class TextExtractionEngineListComponent implements OnDestroy {
 
     this.adminApi.bulkDeleteTextExtractionEngines({
       body: { ids },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete engines. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
@@ -354,10 +355,6 @@ export class TextExtractionEngineListComponent implements OnDestroy {
         toast.success(`${count} ${count > 1 ? 'engines' : 'engine'} deleted.`);
         this.clearSelection();
         this.onRefresh();
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete engines. Please try again.');
       },
     });
   }

@@ -27,6 +27,8 @@ import { PartyBadgeComponent } from '../party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage, CREATE_OPTION_ID } from '../bulk-edit-shared';
 
 @Component({
@@ -181,6 +183,7 @@ export class BulkEditPartiesPopoverComponent {
   private partySearchEl = viewChild<ElementRef<HTMLInputElement>>('partySearchEl');
   private partyApi = inject(PartyApiService);
   private documentApi = inject(DocumentApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   // Party autocomplete
   private suggestions = toSignal(
@@ -316,7 +319,9 @@ export class BulkEditPartiesPopoverComponent {
         partyIds: partyIdsToAdd.length > 0 ? partyIdsToAdd : null,
         removePartyIds: partyIdsToRemove.length > 0 ? partyIdsToRemove : null,
       },
-    }).subscribe({
+    }).pipe(
+      handleMutationError(this.errorHandler, this.applying, 'Failed to update documents. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.applying.set(false);
         const count = +response.updatedCount;
@@ -324,10 +329,6 @@ export class BulkEditPartiesPopoverComponent {
         ctx.close();
         this.popoverState.set('closed');
         this.applied.emit();
-      },
-      error: () => {
-        this.applying.set(false);
-        toast.error('Failed to update documents. Please try again.');
       },
     });
   }

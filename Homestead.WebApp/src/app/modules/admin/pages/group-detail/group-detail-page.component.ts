@@ -18,6 +18,8 @@ import type { GroupDetailResponse } from '@/api/generated/models/group-detail-re
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-group-detail-page',
@@ -139,6 +141,7 @@ export class GroupDetailPageComponent implements OnDestroy {
   private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private errorHandler = inject(ErrorHandlerService);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -192,16 +195,14 @@ export class GroupDetailPageComponent implements OnDestroy {
     const g = this.group();
     if (!g) return;
     this.deleting.set(true);
-    this.adminApi.deleteGroup({ id: g.id }).subscribe({
+    this.adminApi.deleteGroup({ id: g.id }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete group.'),
+    ).subscribe({
       next: () => {
         this.deleting.set(false);
         ctx.close();
         toast.success('Group deleted.');
         this.router.navigate(['/admin/groups']);
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete group.');
       },
     });
   }
@@ -216,8 +217,10 @@ export class GroupDetailPageComponent implements OnDestroy {
         toast.success('Access level updated.');
         this.onRefresh();
       },
-      error: () => {
-        toast.error('Failed to update access level.');
+      error: (err: unknown) => {
+        if (!this.errorHandler.isServerOrNetworkError(err)) {
+          this.errorHandler.handleError(err, 'Failed to update access level.');
+        }
       },
     });
   }
@@ -228,8 +231,10 @@ export class GroupDetailPageComponent implements OnDestroy {
         toast.success(`${name} removed from group.`);
         this.onRefresh();
       },
-      error: () => {
-        toast.error('Failed to remove member.');
+      error: (err: unknown) => {
+        if (!this.errorHandler.isServerOrNetworkError(err)) {
+          this.errorHandler.handleError(err, 'Failed to remove member.');
+        }
       },
     });
   }

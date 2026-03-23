@@ -7,13 +7,14 @@ import { provideNativeDateAdapter } from '@spartan-ng/brain/date-time';
 import { routes } from './app.routes';
 import { AuthService } from '@/shared/services/auth.service';
 import { authInterceptor } from '@/shared/interceptors/auth.interceptor';
+import { errorInterceptor } from '@/shared/interceptors/error.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
     provideNativeDateAdapter(),
     {
       provide: APP_INITIALIZER,

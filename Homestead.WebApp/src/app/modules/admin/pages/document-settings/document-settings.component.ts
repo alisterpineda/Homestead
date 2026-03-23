@@ -15,6 +15,8 @@ import { DocumentVersionApiService } from '@/api/services/document-version-api.s
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { toast } from 'ngx-sonner';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
 const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -93,6 +95,7 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
 export class DocumentSettingsComponent {
   private adminApi = inject(AdminApiService);
   private docVersionApi = inject(DocumentVersionApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   loading = signal(true);
   saving = signal(false);
@@ -126,17 +129,15 @@ export class DocumentSettingsComponent {
       { op: 'replace', path: '/defaultTextExtractionEngineId', value: value },
     ];
 
-    this.adminApi.patchDocumentSettings({ body: patch }).subscribe({
+    this.adminApi.patchDocumentSettings({ body: patch }).pipe(
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save document settings. Please try again.'),
+    ).subscribe({
       next: (r) => {
         this.saving.set(false);
         const newId = r.defaultTextExtractionEngineId ?? null;
         this.savedEngineId.set(newId);
         this.selectedEngineId.set(newId);
         toast.success('Document settings saved.');
-      },
-      error: () => {
-        this.saving.set(false);
-        toast.error('Failed to save document settings. Please try again.');
       },
     });
   }

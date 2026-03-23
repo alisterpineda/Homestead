@@ -3,7 +3,7 @@ import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
-import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
+import { switchMap, map, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTrash2, lucideRotateCcw, lucideX, lucideEye } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -18,6 +18,8 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import { formatBytes } from '@/shared/utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -227,6 +229,7 @@ export class TrashListComponent {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
+  private errorHandler = inject(ErrorHandlerService);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -285,11 +288,7 @@ export class TrashListComponent {
             this.loading.set(false);
             return r as PaginatedResponseOfGetDocumentsResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
@@ -360,17 +359,16 @@ export class TrashListComponent {
 
     this.documentApi.bulkRestoreDocuments({
       body: { ids },
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.restoring, 'Failed to restore documents. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.restoring.set(false);
         const count = +response.restoredCount;
         toast.success(`${count} document${count > 1 ? 's' : ''} restored.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
-      },
-      error: () => {
-        this.restoring.set(false);
-        toast.error('Failed to restore documents. Please try again.');
       },
     });
   }
@@ -383,7 +381,10 @@ export class TrashListComponent {
 
     this.documentApi.bulkPermanentlyDeleteDocuments({
       body: { ids },
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete documents. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.deleting.set(false);
         ctx.close();
@@ -391,10 +392,6 @@ export class TrashListComponent {
         toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
-      },
-      error: () => {
-        this.deleting.set(false);
-        toast.error('Failed to delete documents. Please try again.');
       },
     });
   }
@@ -402,7 +399,10 @@ export class TrashListComponent {
   onEmptyTrash(ctx: { close: () => void }): void {
     this.emptyingTrash.set(true);
 
-    this.documentApi.emptyTrash().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.documentApi.emptyTrash().pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.emptyingTrash, 'Failed to empty trash. Please try again.'),
+    ).subscribe({
       next: (response) => {
         this.emptyingTrash.set(false);
         ctx.close();
@@ -410,10 +410,6 @@ export class TrashListComponent {
         toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
-      },
-      error: () => {
-        this.emptyingTrash.set(false);
-        toast.error('Failed to empty trash. Please try again.');
       },
     });
   }

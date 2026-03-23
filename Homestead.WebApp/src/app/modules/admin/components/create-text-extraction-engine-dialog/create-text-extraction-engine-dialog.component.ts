@@ -10,7 +10,7 @@ import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-c
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
 import { ENGINE_TYPE_OPTIONS } from '../../constants/engine-type-labels';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -105,6 +105,7 @@ export class CreateTextExtractionEngineDialogComponent {
   created = output();
 
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   engineTypeOptions = ENGINE_TYPE_OPTIONS;
   languages = TESSERACT_LANGUAGES;
@@ -175,7 +176,7 @@ export class CreateTextExtractionEngineDialogComponent {
       },
       error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(extractApiError(err, 'Failed to create engine.'));
+        this.createError.set(this.errorHandler.getErrorMessage(err, 'Failed to create engine.'));
       },
     });
   }

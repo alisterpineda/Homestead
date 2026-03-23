@@ -10,7 +10,7 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { AppRole } from '@/api/generated/models/app-role';
 import { toast } from 'ngx-sonner';
-import { extractApiError } from '@/shared/utils/api-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-create-user-dialog',
@@ -122,6 +122,7 @@ export class CreateUserDialogComponent {
 
   private dialog = viewChild(BrnDialog);
   private adminApi = inject(AdminApiService);
+  private errorHandler = inject(ErrorHandlerService);
 
   canSubmit = computed(() =>
     this.email().trim().length > 0 &&
@@ -167,9 +168,9 @@ export class CreateUserDialogComponent {
         this.dialog()?.close();
         this.created.emit();
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.creating.set(false);
-        this.createError.set(extractApiError(err, 'Failed to create user.'));
+        this.createError.set(this.errorHandler.getErrorMessage(err, 'Failed to create user.'));
       },
     });
   }

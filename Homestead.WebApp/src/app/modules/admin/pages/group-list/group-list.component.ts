@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers2, lucideSearch, lucidePlus } from '@ng-icons/lucide';
@@ -15,6 +15,7 @@ import { PaginationComponent } from '@/modules/documents/components/pagination/p
 import { CreateGroupDialogComponent } from '../../components/create-group-dialog/create-group-dialog.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfGroupResponse } from '@/api/generated/models/paginated-response-of-group-response';
+import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
   selector: 'app-group-list',
@@ -150,11 +151,7 @@ export class GroupListComponent implements OnDestroy {
             this.loading.set(false);
             return r as PaginatedResponseOfGroupResponse;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          handleQueryError(this.loading, this.error, null),
         );
       }),
     ),
