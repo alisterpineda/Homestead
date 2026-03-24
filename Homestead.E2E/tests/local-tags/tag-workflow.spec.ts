@@ -1,5 +1,6 @@
 import { test, expect } from '../../fixtures/app.fixture';
 import { TEST_DATA } from '../../e2e.config';
+import { fillSignalInput } from '../../helpers/playwright.helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -41,14 +42,17 @@ test.describe('Tag workflow', () => {
     await expect(page.getByLabel('Name')).toBeVisible({ timeout: 15_000 });
 
     // Use the tag input to add a tag
-    const tagInput = page.getByPlaceholder('Add tags...').or(
-      page.locator('app-tag-input input'),
-    ).first();
+    const tagInput = page.locator('app-tag-input input').first();
     await tagInput.click();
-    await tagInput.fill(TEST_DATA.tags.finance);
-    await page.waitForTimeout(500);
-    // Select the tag from autocomplete
-    await page.getByText(TEST_DATA.tags.finance).first().click();
+    await fillSignalInput(tagInput, TEST_DATA.tags.finance);
+
+    // Wait for autocomplete suggestions, then click the matching option
+    const suggestion = page.locator('app-tag-input button').filter({ hasText: TEST_DATA.tags.finance }).first();
+    await suggestion.waitFor({ state: 'visible', timeout: 5_000 });
+    await suggestion.click();
+
+    // Wait for Angular to update the Save button state
+    await expect(page.getByRole('button', { name: /^Save$/ })).toBeEnabled({ timeout: 10_000 });
 
     // Save the document
     await page.getByRole('button', { name: /^Save$/ }).click();
@@ -67,8 +71,8 @@ test.describe('Tag workflow', () => {
     await filterSearch.fill(TEST_DATA.tags.finance);
     await page.waitForTimeout(500);
 
-    // Click the checkbox next to the tag name (exact match to avoid selecting sub-tags)
-    await page.getByText(TEST_DATA.tags.finance, { exact: true }).click();
+    // Click the filter option button (not the tag badge on a document card)
+    await page.getByRole('button', { name: TEST_DATA.tags.finance, exact: true }).click();
 
     await page.waitForLoadState('networkidle');
 

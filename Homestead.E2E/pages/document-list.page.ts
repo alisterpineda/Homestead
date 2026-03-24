@@ -46,8 +46,13 @@ export class DocumentListPage {
   }
 
   async switchToTableView() {
-    await this.tableViewButton.click();
-    await this.page.waitForLoadState('networkidle');
+    // The view toggle is hidden when the document list is empty (showInitialEmpty).
+    // Wait for it to appear after data loads; skip if the list is genuinely empty.
+    await this.tableViewButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    if (await this.tableViewButton.isVisible()) {
+      await this.tableViewButton.click();
+      await this.page.waitForLoadState('networkidle');
+    }
   }
 
   async enterSelectionMode() {
