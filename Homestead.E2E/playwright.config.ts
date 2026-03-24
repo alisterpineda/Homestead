@@ -13,7 +13,7 @@ const OIDC_ONLY_URL = baseUrl('homestead-oidc-only');
 export default defineConfig({
   testDir: './tests',
   globalSetup: require.resolve('./global-setup'),
-  globalTimeout: 600_000,
+  globalTimeout: 900_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -55,6 +55,38 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
       dependencies: ['local-auth-setup'],
     },
+    // --- Business workflow tests (local-only instance) ---
+    {
+      name: 'local-data-setup',
+      testMatch: /local-data-setup\.ts/,
+      use: { baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
+      dependencies: ['local-auth-setup'],
+    },
+    {
+      name: 'local-upload',
+      testDir: './tests/local-upload',
+      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
+      dependencies: ['local-data-setup'],
+    },
+    {
+      name: 'local-tags',
+      testDir: './tests/local-tags',
+      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
+      dependencies: ['local-upload'],
+    },
+    {
+      name: 'local-bulk-ops',
+      testDir: './tests/local-bulk-ops',
+      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
+      dependencies: ['local-upload'],
+    },
+    {
+      name: 'local-trash',
+      testDir: './tests/local-trash',
+      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
+      dependencies: ['local-bulk-ops'],
+    },
+    // --- OIDC tests ---
     {
       name: 'oidc-local',
       testDir: './tests/oidc-local',

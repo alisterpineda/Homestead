@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, computed } from '@angular/core';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { type CellContext, type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-table';
 
@@ -27,10 +27,17 @@ export class TableHeadSelection<T> {
     <hlm-checkbox
       [checked]="context.row.getIsSelected()"
       (checkedChange)="context.row.getToggleSelectedHandler()($event)"
-      [attr.aria-label]="'Select row'"
+      [aria-label]="selectLabel()"
     />
   `,
 })
 export class TableRowSelection<T> {
   protected readonly context = injectFlexRenderContext<CellContext<T, unknown>>();
+  protected selectLabel = computed(() => {
+    const original = this.context.row.original;
+    if (original && typeof original === 'object' && 'name' in original) {
+      return `Select ${(original as { name: string }).name}`;
+    }
+    return 'Select row';
+  });
 }

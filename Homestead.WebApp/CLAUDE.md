@@ -65,6 +65,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Many Spartan UI elements are **directives** applied to native elements (e.g., `hlmBtn` on `<button>`, `hlmInput` on `<input>`, `hlmBadge` on `<span>`)
 - Others are **components** (e.g., `<hlm-card>`, `<hlm-tabs>`, `<hlm-sidebar>`)
 - Always import from the local `@/shared/components/spartan/` path aliases, not directly from `@spartan-ng/brain`
+- **`hlm-checkbox` aria-label**: Use input binding `[aria-label]="expr"`, NOT attribute binding `[attr.aria-label]="expr"`. The host nullifies the attribute and forwards the input to the inner `brn-checkbox`. Same applies to `aria-labelledby` and `aria-describedby`
 
 ## Accessibility Requirements
 
@@ -92,6 +93,7 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use `persistedSignal()` from `shared/utils/persisted-signal.ts` for state that must survive page refresh — never access `localStorage`/`sessionStorage` directly
 - All storage keys must use the `homestead-` prefix
 - Add new cross-cutting preferences to `UserPreferencesService` (`shared/services/user-preferences.service.ts`)
+- **Effects that initialize edit state from API data**: Guard with an ID check so re-fetches of the same entity (e.g., triggered by `refreshTrigger` or SignalR) don't silently overwrite the user's pending edits. Reset the guard after a successful save so the post-save re-fetch reinitializes. See `document-detail-page.component.ts` for the pattern
 
 ## Templates
 

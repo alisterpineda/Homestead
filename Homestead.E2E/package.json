@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
+    "pdf-lib": "^1.17.1",
     "testcontainers": "^11.12.0"
   }
 }

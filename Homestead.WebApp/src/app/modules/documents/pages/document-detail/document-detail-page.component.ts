@@ -634,6 +634,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
   private pendingSavedState: DocumentEditState | null = null;
+  private initializedDocId: string | null = null;
 
   private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
 
@@ -813,6 +814,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   constructor() {
     // Save edit state when documentId changes (component reuse on sidebar navigation)
+    // and initialize edit fields when a new document loads.
     let prevDocId: string | null = null;
     effect(() => {
       const id = this.documentId();
@@ -828,6 +830,12 @@ export class DocumentDetailPageComponent implements OnDestroy {
     effect(() => {
       const doc = this.document();
       if (doc) {
+        // Only initialize edit fields when switching to a different document.
+        // Re-fetches of the same document (e.g., from refreshTrigger after a
+        // background job completes) should not overwrite the user's pending edits.
+        if (doc.id === this.initializedDocId) return;
+        this.initializedDocId = doc.id;
+
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
           this.pendingSavedState = saved;
@@ -1143,6 +1151,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.saving.set(false);
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
+        // Reset so the re-fetch reinitializes edit fields with server values
+        this.initializedDocId = null;
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },

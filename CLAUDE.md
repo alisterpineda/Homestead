@@ -52,7 +52,7 @@ When backend endpoints are added or modified, regenerate the frontend API client
 | `Homestead.WebApi.Tests.Unit/` | xUnit v3 + NSubstitute + EF InMemory | Backend unit tests |
 | `Homestead.WebApi.Tests.Integration/` | xUnit v3 + WebApplicationFactory + Testcontainers (PostgreSQL) + Respawn | Backend integration tests (requires Docker) |
 | `Homestead.WebApp/` (ng test) | Angular unit-test builder (Vitest) | Frontend unit tests (`*.spec.ts` files) |
-| `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests across auth configurations (requires Docker) |
+| `Homestead.E2E/` | Playwright + Testcontainers | End-to-end tests — auth flows + business workflows (requires Docker) |
 
 ### Running Tests
 
@@ -74,4 +74,9 @@ cd Homestead.WebApp && npm test
 **E2E tests** (requires Docker — spins up full stack via Testcontainers):
 ```bash
 cd Homestead.E2E && npm run e2e
+```
+
+**E2E business workflow tests only** (faster — skips OIDC suites):
+```bash
+cd Homestead.E2E && npx playwright test --project=local-upload --project=local-tags --project=local-bulk-ops --project=local-trash
 ```
