@@ -13,8 +13,6 @@ public static class GetDocumentThumbnailEndpoint
             return await sender.Send(request, ct);
         })
         .WithName("GetDocumentThumbnail")
-        .Produces(StatusCodes.Status200OK, contentType: "image/webp")
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status200OK, contentType: "image/webp");
     }
 }

@@ -19,8 +19,6 @@ public static class ChangeUserPasswordEndpoint
             return found ? Results.NoContent() : Results.NotFound();
         })
         .WithName("ChangeUserPassword")
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
-        .ProducesValidationProblem();
+        .Produces(StatusCodes.Status204NoContent);
     }
 }

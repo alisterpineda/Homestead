@@ -13,8 +13,6 @@ public static class GetDocumentEndpoint
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDocument")
-        .Produces<GetDocumentResponse>()
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces<GetDocumentResponse>();
     }
 }

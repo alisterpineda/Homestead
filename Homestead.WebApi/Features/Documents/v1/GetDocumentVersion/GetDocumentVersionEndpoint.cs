@@ -14,7 +14,6 @@ public static class GetDocumentVersionEndpoint
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetDocumentVersion")
-        .Produces<GetDocumentVersionResponse>()
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces<GetDocumentVersionResponse>();
     }
 }

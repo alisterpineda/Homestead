@@ -18,7 +18,6 @@ public static class BulkDeleteDocumentsEndpoint
         })
         .WithName("BulkDeleteDocuments")
         .Produces<BulkDeleteDocumentsResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

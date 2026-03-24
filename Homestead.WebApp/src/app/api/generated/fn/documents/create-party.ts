@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreatePartyRequest } from '../../models/create-party-request';
+import { CreatePartyCommand } from '../../models/create-party-command';
 import { CreatePartyResponse } from '../../models/create-party-response';
 
 export interface CreateParty$Params {
-      body: CreatePartyRequest
+      body: CreatePartyCommand
 }
 
 export function createParty(http: HttpClient, rootUrl: string, params: CreateParty$Params, context?: HttpContext): Observable<StrictHttpResponse<CreatePartyResponse>> {

@@ -16,8 +16,6 @@ public static class DeleteDocumentVersionEndpoint
         })
         .WithName("DeleteDocumentVersion")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

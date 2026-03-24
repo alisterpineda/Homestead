@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreateGroupRequest } from '../../models/create-group-request';
+import { CreateGroupCommand } from '../../models/create-group-command';
 import { GroupResponse } from '../../models/group-response';
 
 export interface CreateGroup$Params {
-      body: CreateGroupRequest
+      body: CreateGroupCommand
 }
 
 export function createGroup(http: HttpClient, rootUrl: string, params: CreateGroup$Params, context?: HttpContext): Observable<StrictHttpResponse<GroupResponse>> {

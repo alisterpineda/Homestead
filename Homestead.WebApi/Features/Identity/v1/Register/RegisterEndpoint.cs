@@ -18,7 +18,6 @@ public static class RegisterEndpoint
         .WithName("Register")
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status403Forbidden)
-        .ProducesValidationProblem()
         .AllowAnonymous();
     }
 }

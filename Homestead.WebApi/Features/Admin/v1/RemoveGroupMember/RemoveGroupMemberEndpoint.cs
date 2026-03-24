@@ -14,7 +14,6 @@ public static class RemoveGroupMemberEndpoint
             return Results.NoContent();
         })
         .WithName("RemoveGroupMember")
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status204NoContent);
     }
 }

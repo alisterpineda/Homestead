@@ -14,7 +14,6 @@ public static class CreateTextExtractionEngineEndpoint
         })
         .WithName("CreateTextExtractionEngine")
         .Produces<TextExtractionEngineResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status409Conflict);
     }
 }

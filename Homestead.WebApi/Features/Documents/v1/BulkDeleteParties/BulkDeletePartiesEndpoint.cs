@@ -18,7 +18,6 @@ public static class BulkDeletePartiesEndpoint
         })
         .WithName("BulkDeleteParties")
         .Produces<BulkDeletePartiesResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

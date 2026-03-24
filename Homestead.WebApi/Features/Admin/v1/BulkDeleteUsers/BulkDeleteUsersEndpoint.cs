@@ -17,7 +17,6 @@ public static class BulkDeleteUsersEndpoint
             return Results.Ok(response);
         })
         .WithName("BulkDeleteUsers")
-        .Produces<BulkDeleteUsersResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces<BulkDeleteUsersResponse>(StatusCodes.Status200OK);
     }
 }

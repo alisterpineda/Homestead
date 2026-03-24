@@ -22,9 +22,6 @@ public static class UpdateUserEndpoint
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("UpdateUser")
-        .Produces<UserResponse>()
-        .Produces(StatusCodes.Status404NotFound)
-        .ProducesValidationProblem()
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces<UserResponse>();
     }
 }

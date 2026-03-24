@@ -22,8 +22,6 @@ public static class PatchTagEndpoint
         .WithName("PatchTag")
         .Accepts<JsonPatchDocument<PatchTagModel>>("application/json-patch+json")
         .Produces<PatchTagResponse>()
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .Produces(StatusCodes.Status409Conflict)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }

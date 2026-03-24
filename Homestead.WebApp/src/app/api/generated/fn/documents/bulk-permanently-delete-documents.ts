@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PermanentlyDeleteDocumentsRequest } from '../../models/permanently-delete-documents-request';
+import { PermanentlyDeleteDocumentsCommand } from '../../models/permanently-delete-documents-command';
 import { PermanentlyDeleteDocumentsResponse } from '../../models/permanently-delete-documents-response';
 
 export interface BulkPermanentlyDeleteDocuments$Params {
-      body: PermanentlyDeleteDocumentsRequest
+      body: PermanentlyDeleteDocumentsCommand
 }
 
 export function bulkPermanentlyDeleteDocuments(http: HttpClient, rootUrl: string, params: BulkPermanentlyDeleteDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<PermanentlyDeleteDocumentsResponse>> {

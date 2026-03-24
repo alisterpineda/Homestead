@@ -18,7 +18,6 @@ public static class UpdateGroupMemberEndpoint
             return Results.Ok(await sender.Send(command, ct));
         })
         .WithName("UpdateGroupMember")
-        .Produces<GroupMemberResponse>()
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces<GroupMemberResponse>();
     }
 }

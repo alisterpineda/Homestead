@@ -13,7 +13,6 @@ public static class DeleteGroupEndpoint
             return Results.NoContent();
         })
         .WithName("DeleteGroup")
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status204NoContent);
     }
 }

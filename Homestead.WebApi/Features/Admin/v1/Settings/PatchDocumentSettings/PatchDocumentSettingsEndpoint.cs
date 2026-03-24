@@ -17,7 +17,6 @@ public static class PatchDocumentSettingsEndpoint
         })
         .WithName("PatchDocumentSettings")
         .Accepts<JsonPatchDocument<DocumentSettings>>("application/json-patch+json")
-        .Produces<DocumentSettingsResponse>()
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces<DocumentSettingsResponse>();
     }
 }

@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { BulkUpdateDocumentsRequest } from '../../models/bulk-update-documents-request';
+import { BulkUpdateDocumentsCommand } from '../../models/bulk-update-documents-command';
 import { BulkUpdateDocumentsResponse } from '../../models/bulk-update-documents-response';
 
 export interface BulkUpdateDocuments$Params {
-      body: BulkUpdateDocumentsRequest
+      body: BulkUpdateDocumentsCommand
 }
 
 export function bulkUpdateDocuments(http: HttpClient, rootUrl: string, params: BulkUpdateDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<BulkUpdateDocumentsResponse>> {

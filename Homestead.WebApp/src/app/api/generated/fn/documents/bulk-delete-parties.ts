@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { BulkDeletePartiesRequest } from '../../models/bulk-delete-parties-request';
+import { BulkDeletePartiesCommand } from '../../models/bulk-delete-parties-command';
 import { BulkDeletePartiesResponse } from '../../models/bulk-delete-parties-response';
 
 export interface BulkDeleteParties$Params {
-      body: BulkDeletePartiesRequest
+      body: BulkDeletePartiesCommand
 }
 
 export function bulkDeleteParties(http: HttpClient, rootUrl: string, params: BulkDeleteParties$Params, context?: HttpContext): Observable<StrictHttpResponse<BulkDeletePartiesResponse>> {

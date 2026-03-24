@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { BulkDeleteTagsRequest } from '../../models/bulk-delete-tags-request';
+import { BulkDeleteTagsCommand } from '../../models/bulk-delete-tags-command';
 import { BulkDeleteTagsResponse } from '../../models/bulk-delete-tags-response';
 
 export interface BulkDeleteTags$Params {
-      body: BulkDeleteTagsRequest
+      body: BulkDeleteTagsCommand
 }
 
 export function bulkDeleteTags(http: HttpClient, rootUrl: string, params: BulkDeleteTags$Params, context?: HttpContext): Observable<StrictHttpResponse<BulkDeleteTagsResponse>> {

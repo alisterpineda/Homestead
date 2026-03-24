@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreateTagRequest } from '../../models/create-tag-request';
+import { CreateTagCommand } from '../../models/create-tag-command';
 import { CreateTagResponse } from '../../models/create-tag-response';
 
 export interface CreateTag$Params {
-      body: CreateTagRequest
+      body: CreateTagCommand
 }
 
 export function createTag(http: HttpClient, rootUrl: string, params: CreateTag$Params, context?: HttpContext): Observable<StrictHttpResponse<CreateTagResponse>> {

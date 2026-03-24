@@ -13,7 +13,6 @@ public static class GetPartyEndpoint
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetParty")
-        .Produces<GetPartyResponse>()
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces<GetPartyResponse>();
     }
 }

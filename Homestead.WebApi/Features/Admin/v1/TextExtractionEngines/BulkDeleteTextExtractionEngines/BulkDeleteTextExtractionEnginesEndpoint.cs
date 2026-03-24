@@ -17,7 +17,6 @@ public static class BulkDeleteTextExtractionEnginesEndpoint
             return Results.Ok(response);
         })
         .WithName("BulkDeleteTextExtractionEngines")
-        .Produces<BulkDeleteTextExtractionEnginesResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces<BulkDeleteTextExtractionEnginesResponse>(StatusCodes.Status200OK);
     }
 }

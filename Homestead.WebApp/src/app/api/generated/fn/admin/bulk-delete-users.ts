@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { BulkDeleteUsersRequest } from '../../models/bulk-delete-users-request';
+import { BulkDeleteUsersCommand } from '../../models/bulk-delete-users-command';
 import { BulkDeleteUsersResponse } from '../../models/bulk-delete-users-response';
 
 export interface BulkDeleteUsers$Params {
-      body: BulkDeleteUsersRequest
+      body: BulkDeleteUsersCommand
 }
 
 export function bulkDeleteUsers(http: HttpClient, rootUrl: string, params: BulkDeleteUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<BulkDeleteUsersResponse>> {

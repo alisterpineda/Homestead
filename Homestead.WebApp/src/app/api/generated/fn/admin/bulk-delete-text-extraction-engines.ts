@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { BulkDeleteTextExtractionEnginesRequest } from '../../models/bulk-delete-text-extraction-engines-request';
+import { BulkDeleteTextExtractionEnginesCommand } from '../../models/bulk-delete-text-extraction-engines-command';
 import { BulkDeleteTextExtractionEnginesResponse } from '../../models/bulk-delete-text-extraction-engines-response';
 
 export interface BulkDeleteTextExtractionEngines$Params {
-      body: BulkDeleteTextExtractionEnginesRequest
+      body: BulkDeleteTextExtractionEnginesCommand
 }
 
 export function bulkDeleteTextExtractionEngines(http: HttpClient, rootUrl: string, params: BulkDeleteTextExtractionEngines$Params, context?: HttpContext): Observable<StrictHttpResponse<BulkDeleteTextExtractionEnginesResponse>> {

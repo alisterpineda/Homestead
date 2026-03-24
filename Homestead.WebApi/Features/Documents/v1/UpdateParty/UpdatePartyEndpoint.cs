@@ -21,7 +21,6 @@ public static class UpdatePartyEndpoint
         })
         .WithName("UpdateParty")
         .Produces<UpdatePartyResponse>()
-        .Produces(StatusCodes.Status404NotFound)
         .Produces(StatusCodes.Status409Conflict)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }

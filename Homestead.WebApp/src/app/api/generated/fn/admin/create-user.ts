@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreateUserRequest } from '../../models/create-user-request';
+import { CreateUserCommand } from '../../models/create-user-command';
 import { UserResponse } from '../../models/user-response';
 
 export interface CreateUser$Params {
-      body: CreateUserRequest
+      body: CreateUserCommand
 }
 
 export function createUser(http: HttpClient, rootUrl: string, params: CreateUser$Params, context?: HttpContext): Observable<StrictHttpResponse<UserResponse>> {

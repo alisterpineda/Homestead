@@ -18,7 +18,6 @@ public static class PermanentlyDeleteDocumentsEndpoint
         })
         .WithName("BulkPermanentlyDeleteDocuments")
         .Produces<PermanentlyDeleteDocumentsResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
 
         group.MapPost("/{id:guid}/permanently-delete", async (Guid id, ISender sender, CancellationToken ct) =>
@@ -29,7 +28,6 @@ public static class PermanentlyDeleteDocumentsEndpoint
         })
         .WithName("PermanentlyDeleteDocument")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

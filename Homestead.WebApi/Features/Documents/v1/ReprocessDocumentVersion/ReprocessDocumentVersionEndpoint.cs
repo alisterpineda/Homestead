@@ -22,8 +22,6 @@ public static class ReprocessDocumentVersionEndpoint
         })
         .WithName("ReprocessDocumentVersion")
         .Produces<ReprocessDocumentVersionResponse>(StatusCodes.Status202Accepted)
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

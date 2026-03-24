@@ -16,7 +16,6 @@ public static class DeleteTagEndpoint
         })
         .WithName("DeleteTag")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

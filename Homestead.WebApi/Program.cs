@@ -18,6 +18,7 @@ using Homestead.WebApi.Features.Documents.Thumbnails;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Homestead.WebApi.OpenApi;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -170,6 +171,8 @@ builder.Services.AddOpenApi("v1", options =>
 
         return Task.CompletedTask;
     });
+
+    options.AddOperationTransformer<ProblemDetailsResponseTransformer>();
 });
 
 var app = builder.Build();

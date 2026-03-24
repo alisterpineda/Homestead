@@ -7,10 +7,10 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { RegisterRequest } from '../../models/register-request';
+import { RegisterCommand } from '../../models/register-command';
 
 export interface Register$Params {
-      body: RegisterRequest
+      body: RegisterCommand
 }
 
 export function register(http: HttpClient, rootUrl: string, params: Register$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {

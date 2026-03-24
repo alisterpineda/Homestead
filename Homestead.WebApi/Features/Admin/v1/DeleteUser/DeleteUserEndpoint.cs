@@ -14,8 +14,6 @@ public static class DeleteUserEndpoint
             return response.DeletedCount > 0 ? Results.NoContent() : Results.NotFound();
         })
         .WithName("DeleteUser")
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces(StatusCodes.Status204NoContent);
     }
 }

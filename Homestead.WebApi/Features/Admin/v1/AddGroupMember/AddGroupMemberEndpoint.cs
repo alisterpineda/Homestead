@@ -15,8 +15,6 @@ public static class AddGroupMemberEndpoint
         })
         .WithName("AddGroupMember")
         .Produces<GroupMemberResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .Produces(StatusCodes.Status409Conflict);
     }
 }

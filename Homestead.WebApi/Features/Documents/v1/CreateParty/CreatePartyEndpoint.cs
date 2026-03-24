@@ -14,7 +14,6 @@ public static class CreatePartyEndpoint
         })
         .WithName("CreateParty")
         .Produces<CreatePartyResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status409Conflict)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }

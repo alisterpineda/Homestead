@@ -12,7 +12,6 @@ public static class PatchSystemSettingsEndpoint
             return Results.Ok(await sender.Send(request, ct));
         })
         .WithName("PatchSystemSettings")
-        .Produces<SystemSettingsResponse>()
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces<SystemSettingsResponse>();
     }
 }

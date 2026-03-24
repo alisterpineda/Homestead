@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreateTextExtractionEngineRequest } from '../../models/create-text-extraction-engine-request';
+import { CreateTextExtractionEngineCommand } from '../../models/create-text-extraction-engine-command';
 import { TextExtractionEngineResponse } from '../../models/text-extraction-engine-response';
 
 export interface CreateTextExtractionEngine$Params {
-      body: CreateTextExtractionEngineRequest
+      body: CreateTextExtractionEngineCommand
 }
 
 export function createTextExtractionEngine(http: HttpClient, rootUrl: string, params: CreateTextExtractionEngine$Params, context?: HttpContext): Observable<StrictHttpResponse<TextExtractionEngineResponse>> {

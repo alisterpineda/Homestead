@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { PatchSystemSettingsRequest } from '../../models/patch-system-settings-request';
+import { PatchSystemSettingsCommand } from '../../models/patch-system-settings-command';
 import { SystemSettingsResponse } from '../../models/system-settings-response';
 
 export interface PatchSystemSettings$Params {
-      body: PatchSystemSettingsRequest
+      body: PatchSystemSettingsCommand
 }
 
 export function patchSystemSettings(http: HttpClient, rootUrl: string, params: PatchSystemSettings$Params, context?: HttpContext): Observable<StrictHttpResponse<SystemSettingsResponse>> {

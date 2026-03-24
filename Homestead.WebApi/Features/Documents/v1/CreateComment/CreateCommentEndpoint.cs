@@ -16,8 +16,6 @@ public static class CreateCommentEndpoint
         })
         .WithName("CreateComment")
         .Produces<CreateCommentResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

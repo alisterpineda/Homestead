@@ -22,7 +22,6 @@ public static class CreateDocumentVersionEndpoint
         })
         .WithName("CreateDocumentVersion")
         .Produces<CreateDocumentVersionResponse>(StatusCodes.Status202Accepted)
-        .Produces(StatusCodes.Status404NotFound)
         .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data")
         .RequireAuthorization(AuthPolicies.RequireContributor);

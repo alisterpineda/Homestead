@@ -23,8 +23,6 @@ public static class PatchDocumentVersionEndpoint
         .WithName("PatchDocumentVersion")
         .Accepts<JsonPatchDocument<PatchDocumentVersionModel>>("application/json-patch+json")
         .Produces<PatchDocumentVersionResponse>()
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

@@ -7,12 +7,12 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { CreateCommentRequest } from '../../models/create-comment-request';
+import { CreateCommentCommand } from '../../models/create-comment-command';
 import { CreateCommentResponse } from '../../models/create-comment-response';
 
 export interface CreateComment$Params {
   documentId: string;
-      body: CreateCommentRequest
+      body: CreateCommentCommand
 }
 
 export function createComment(http: HttpClient, rootUrl: string, params: CreateComment$Params, context?: HttpContext): Observable<StrictHttpResponse<CreateCommentResponse>> {

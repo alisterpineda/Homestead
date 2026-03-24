@@ -7,11 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { RestoreDocumentsRequest } from '../../models/restore-documents-request';
+import { RestoreDocumentsCommand } from '../../models/restore-documents-command';
 import { RestoreDocumentsResponse } from '../../models/restore-documents-response';
 
 export interface BulkRestoreDocuments$Params {
-      body: RestoreDocumentsRequest
+      body: RestoreDocumentsCommand
 }
 
 export function bulkRestoreDocuments(http: HttpClient, rootUrl: string, params: BulkRestoreDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<RestoreDocumentsResponse>> {

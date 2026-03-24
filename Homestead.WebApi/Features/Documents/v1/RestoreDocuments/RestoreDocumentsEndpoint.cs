@@ -18,7 +18,6 @@ public static class RestoreDocumentsEndpoint
         })
         .WithName("BulkRestoreDocuments")
         .Produces<RestoreDocumentsResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
 
         group.MapPost("/{id:guid}/restore", async (Guid id, ISender sender, CancellationToken ct) =>
@@ -29,7 +28,6 @@ public static class RestoreDocumentsEndpoint
         })
         .WithName("RestoreDocument")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

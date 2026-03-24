@@ -14,7 +14,6 @@ public static class UpdateGroupEndpoint
         })
         .WithName("UpdateGroup")
         .Produces<GroupResponse>()
-        .Produces(StatusCodes.Status404NotFound)
         .Produces(StatusCodes.Status409Conflict);
     }
 }

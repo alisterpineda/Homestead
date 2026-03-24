@@ -12,8 +12,6 @@ public static class GetDocumentFileEndpoint
             return await sender.Send(request, ct);
         })
         .WithName("GetDocumentFile")
-        .Produces(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces(StatusCodes.Status200OK);
     }
 }

@@ -30,7 +30,6 @@ public static class BulkUpdateDocumentsEndpoint
         })
         .WithName("BulkUpdateDocuments")
         .Produces<BulkUpdateDocumentsResponse>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

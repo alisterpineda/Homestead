@@ -12,7 +12,6 @@ public static class CreateUserEndpoint
             return Results.Created($"/api/v1/admin/users/{response.Id}", response);
         })
         .WithName("CreateUser")
-        .Produces<UserResponse>(StatusCodes.Status201Created)
-        .ProducesValidationProblem();
+        .Produces<UserResponse>(StatusCodes.Status201Created);
     }
 }

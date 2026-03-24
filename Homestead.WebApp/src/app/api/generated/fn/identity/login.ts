@@ -7,10 +7,10 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { LoginRequest } from '../../models/login-request';
+import { LoginCommand } from '../../models/login-command';
 
 export interface Login$Params {
-      body: LoginRequest
+      body: LoginCommand
 }
 
 export function login(http: HttpClient, rootUrl: string, params: Login$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {

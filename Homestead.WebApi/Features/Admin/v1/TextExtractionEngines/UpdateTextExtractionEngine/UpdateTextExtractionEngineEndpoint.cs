@@ -14,8 +14,6 @@ public static class UpdateTextExtractionEngineEndpoint
         })
         .WithName("UpdateTextExtractionEngine")
         .Produces<TextExtractionEngineResponse>()
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status404NotFound)
         .Produces(StatusCodes.Status409Conflict);
     }
 }

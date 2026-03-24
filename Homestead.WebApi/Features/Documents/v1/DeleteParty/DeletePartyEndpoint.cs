@@ -16,7 +16,6 @@ public static class DeletePartyEndpoint
         })
         .WithName("DeleteParty")
         .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }
