@@ -25,7 +25,10 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 - **Page Header**: The app shell renders a single unified header bar with sidebar trigger, page title, and optional action buttons. Page titles come from route `data: { title }` in each `*.routes.ts` file. Action buttons are projected via `PageHeaderService` (`shared/services/page-header.service.ts`) — pages with actions define an `<ng-template #headerActions>` and register it with `PageHeaderService.setActions()` in `afterNextRender`, clearing in `ngOnDestroy`. Actions are also auto-cleared on `NavigationStart`. Pages without actions need no service interaction — just set the route `data.title`.
 - **Document List Search**: The document list uses URL query param `search` for full-text search, debounced at 300ms. The search term is maintained as a writable signal (`searchInput`) synced to the URL, with a separate `searchTerm` signal reading from query params for the API call pipeline.
 - **Shared**: `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
-- **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations
+- **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations. State persistence uses three tiers:
+  - **`localStorage`** via `persistedSignal()` (`shared/utils/persisted-signal.ts`): User preferences that survive across sessions (theme, view mode, column visibility, page size). `UserPreferencesService` (`shared/services/user-preferences.service.ts`) owns cross-cutting preferences
+  - **`sessionStorage`**: Transient editing state that survives refresh but not session close (document edit drafts via `DocumentEditStateService`)
+  - **In-memory signals**: Ephemeral state that resets on navigation (search filters, selections, sort, URL params via list state services)
 - **Styling**: Tailwind CSS v4 with Spartan.NG OKLCH CSS variable theming (neutral palette)
 
 - **Error handling**: Centralized via `ErrorHandlerService` (`shared/services/error-handler.service.ts`). The backend returns RFC 9457 Problem Details (`ApiProblemDetails` type in `shared/types/`). Key patterns:
@@ -86,6 +89,9 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Use `computed()` for derived state
 - Keep state transformations pure and predictable
 - Do NOT use `mutate` on signals, use `update` or `set` instead
+- Use `persistedSignal()` from `shared/utils/persisted-signal.ts` for state that must survive page refresh — never access `localStorage`/`sessionStorage` directly
+- All storage keys must use the `homestead-` prefix
+- Add new cross-cutting preferences to `UserPreferencesService` (`shared/services/user-preferences.service.ts`)
 
 ## Templates
 

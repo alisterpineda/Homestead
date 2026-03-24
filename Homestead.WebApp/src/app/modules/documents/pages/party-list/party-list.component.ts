@@ -18,6 +18,7 @@ import { CreatePartyDialogComponent } from '../../components/create-party-dialog
 import { EditPartySheetComponent } from '../../components/edit-party-sheet/edit-party-sheet.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { PartyListStateService } from '../../services/party-list-state.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
@@ -266,6 +267,7 @@ export class PartyListComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private listState = inject(PartyListStateService);
   private errorHandler = inject(ErrorHandlerService);
+  private prefs = inject(UserPreferencesService);
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: PartySortBy; label: string }[] = [
@@ -337,8 +339,8 @@ export class PartyListComponent implements OnDestroy {
   private stateSaveSub: Subscription;
 
   constructor() {
-    const savedVisibility = this.listState.getSavedColumnVisibility();
-    if (savedVisibility) {
+    const savedVisibility = this.prefs.partyColumnVisibility();
+    if (Object.keys(savedVisibility).length > 0) {
       this.columnVisibility.set({ ...DEFAULT_COLUMN_VISIBILITY, ...savedVisibility });
     }
 
@@ -386,8 +388,8 @@ export class PartyListComponent implements OnDestroy {
   );
 
   private pageSize = toSignal(
-    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? 50))),
-    { initialValue: 50 },
+    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? this.prefs.pageSize()))),
+    { initialValue: this.prefs.pageSize() },
   );
 
   data = toSignal(
@@ -432,6 +434,7 @@ export class PartyListComponent implements OnDestroy {
   }
 
   onPageSizeChange(newSize: number): void {
+    this.prefs.pageSize.set(newSize);
     this.clearSelection();
     this.router.navigate(['/documents/parties'], {
       queryParams: { page: 1, pageSize: newSize },
@@ -493,7 +496,7 @@ export class PartyListComponent implements OnDestroy {
       ...prev,
       [id]: prev[id] === false,
     }));
-    this.listState.saveColumnVisibility(this.columnVisibility());
+    this.prefs.partyColumnVisibility.set(this.columnVisibility());
   }
 
   resetSearch(): void {

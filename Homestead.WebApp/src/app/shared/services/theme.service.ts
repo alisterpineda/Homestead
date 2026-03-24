@@ -1,8 +1,7 @@
 import { Injectable, signal, computed, effect } from '@angular/core';
+import { persistedSignal } from '../utils/persisted-signal';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-
-const STORAGE_KEY = 'homestead-theme';
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -10,7 +9,11 @@ function getSystemTheme(): 'light' | 'dark' {
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  readonly mode = signal<ThemeMode>(this.loadMode());
+  readonly mode = persistedSignal<ThemeMode>({
+    key: 'homestead-theme',
+    defaultValue: 'system',
+    validate: (v): v is ThemeMode => v === 'light' || v === 'dark' || v === 'system',
+  });
   readonly systemTheme = signal<'light' | 'dark'>(getSystemTheme());
   readonly resolved = computed<'light' | 'dark'>(() => {
     const m = this.mode();
@@ -34,15 +37,6 @@ export class ThemeService {
   }
 
   setMode(mode: ThemeMode): void {
-    localStorage.setItem(STORAGE_KEY, mode);
     this.mode.set(mode);
-  }
-
-  private loadMode(): ThemeMode {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') {
-      return stored;
-    }
-    return 'system';
   }
 }

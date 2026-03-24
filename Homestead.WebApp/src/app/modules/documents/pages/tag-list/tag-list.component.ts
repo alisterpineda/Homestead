@@ -18,6 +18,7 @@ import { CreateTagDialogComponent } from '../../components/create-tag-dialog/cre
 import { EditTagSheetComponent } from '../../components/edit-tag-sheet/edit-tag-sheet.component';
 import { PaginationComponent } from '../../components/pagination/pagination.component';
 import { TagListStateService } from '../../services/tag-list-state.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { VisibilityState } from '@tanstack/angular-table';
 import { TagApiService } from '@/api/services/tag-api.service';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
@@ -266,6 +267,7 @@ export class TagListComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private listState = inject(TagListStateService);
   private errorHandler = inject(ErrorHandlerService);
+  private prefs = inject(UserPreferencesService);
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: TagSortBy; label: string }[] = [
@@ -338,8 +340,8 @@ export class TagListComponent implements OnDestroy {
   private stateSaveSub: Subscription;
 
   constructor() {
-    const savedVisibility = this.listState.getSavedColumnVisibility();
-    if (savedVisibility) {
+    const savedVisibility = this.prefs.tagColumnVisibility();
+    if (Object.keys(savedVisibility).length > 0) {
       this.columnVisibility.set({ ...DEFAULT_COLUMN_VISIBILITY, ...savedVisibility });
     }
 
@@ -387,8 +389,8 @@ export class TagListComponent implements OnDestroy {
   );
 
   private pageSize = toSignal(
-    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? 50))),
-    { initialValue: 50 },
+    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? this.prefs.pageSize()))),
+    { initialValue: this.prefs.pageSize() },
   );
 
   data = toSignal(
@@ -451,6 +453,7 @@ export class TagListComponent implements OnDestroy {
   }
 
   onPageSizeChange(newSize: number): void {
+    this.prefs.pageSize.set(newSize);
     this.clearSelection();
     this.router.navigate(['/documents/tags'], {
       queryParams: { page: 1, pageSize: newSize },
@@ -512,7 +515,7 @@ export class TagListComponent implements OnDestroy {
       ...prev,
       [id]: prev[id] === false,
     }));
-    this.listState.saveColumnVisibility(this.columnVisibility());
+    this.prefs.tagColumnVisibility.set(this.columnVisibility());
   }
 
   resetSearch(): void {

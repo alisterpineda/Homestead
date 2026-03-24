@@ -3,6 +3,7 @@ import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { switchMap, map, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTrash2, lucideRotateCcw, lucideX, lucideEye } from '@ng-icons/lucide';
@@ -230,6 +231,7 @@ export class TrashListComponent {
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
   private errorHandler = inject(ErrorHandlerService);
+  private prefs = inject(UserPreferencesService);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -263,8 +265,8 @@ export class TrashListComponent {
   );
 
   private pageSize = toSignal(
-    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? 50))),
-    { initialValue: 50 },
+    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? this.prefs.pageSize()))),
+    { initialValue: this.prefs.pageSize() },
   );
 
   data = toSignal(
@@ -327,6 +329,7 @@ export class TrashListComponent {
   }
 
   onPageSizeChange(newSize: number): void {
+    this.prefs.pageSize.set(newSize);
     this.clearSelection();
     this.router.navigate(['/documents/trash'], {
       queryParams: { page: 1, pageSize: newSize },

@@ -4,7 +4,7 @@ import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { PartyListComponent } from './party-list.component';
 import { DEFAULT_COLUMN_VISIBILITY } from '../../components/party-table/party-table.component';
-import { PartyListStateService } from '../../services/party-list-state.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
 
 describe('PartyListComponent', () => {
@@ -165,8 +165,8 @@ describe('PartyListComponent', () => {
     });
 
     it('should merge defaults underneath saved state', () => {
-      const listState = TestBed.inject(PartyListStateService);
-      listState.saveColumnVisibility({ description: false });
+      const prefs = TestBed.inject(UserPreferencesService);
+      prefs.partyColumnVisibility.set({ description: false });
 
       const newFixture = TestBed.createComponent(PartyListComponent);
       const newComponent = newFixture.componentInstance;
@@ -179,8 +179,8 @@ describe('PartyListComponent', () => {
     });
 
     it('should let saved state override defaults for date columns', () => {
-      const listState = TestBed.inject(PartyListStateService);
-      listState.saveColumnVisibility({ createdAt: true });
+      const prefs = TestBed.inject(UserPreferencesService);
+      prefs.partyColumnVisibility.set({ createdAt: true });
 
       const newFixture = TestBed.createComponent(PartyListComponent);
       const newComponent = newFixture.componentInstance;
@@ -189,13 +189,12 @@ describe('PartyListComponent', () => {
       expect(vis['createdAt']).toBe(true);
     });
 
-    it('should toggle a column and save visibility state', () => {
-      const listState = TestBed.inject(PartyListStateService);
-      const saveSpy = vi.spyOn(listState, 'saveColumnVisibility');
+    it('should toggle a column and persist to preferences', () => {
+      const prefs = TestBed.inject(UserPreferencesService);
 
       component.onToggleColumn('createdAt');
       expect(component.columnVisibility()['createdAt']).toBe(true);
-      expect(saveSpy).toHaveBeenCalled();
+      expect(prefs.partyColumnVisibility()).toEqual(expect.objectContaining({ createdAt: true }));
     });
 
     it('should toggle description column off when it starts visible', () => {

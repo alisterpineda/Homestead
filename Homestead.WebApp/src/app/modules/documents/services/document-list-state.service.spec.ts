@@ -14,10 +14,6 @@ describe('DocumentListStateService', () => {
       expect(service.getSavedParams()).toBeNull();
     });
 
-    it('should have no saved column visibility', () => {
-      expect(service.getSavedColumnVisibility()).toBeNull();
-    });
-
     it('should report hasParams as false', () => {
       expect(service.hasParams).toBe(false);
     });
@@ -66,23 +62,4 @@ describe('DocumentListStateService', () => {
     });
   });
 
-  describe('saveColumnVisibility / getSavedColumnVisibility', () => {
-    it('should store and retrieve column visibility', () => {
-      service.saveColumnVisibility({ parties: false, tags: true });
-      expect(service.getSavedColumnVisibility()).toEqual({ parties: false, tags: true });
-    });
-
-    it('should overwrite previously saved column visibility', () => {
-      service.saveColumnVisibility({ parties: false });
-      service.saveColumnVisibility({ parties: true, tags: false });
-      expect(service.getSavedColumnVisibility()).toEqual({ parties: true, tags: false });
-    });
-
-    it('should store a shallow copy so external mutations do not affect saved state', () => {
-      const visibility = { parties: false };
-      service.saveColumnVisibility(visibility);
-      visibility.parties = true;
-      expect(service.getSavedColumnVisibility()!['parties']).toBe(false);
-    });
-  });
 });

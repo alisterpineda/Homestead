@@ -14,10 +14,6 @@ describe('PartyListStateService', () => {
       expect(service.getSavedParams()).toBeNull();
     });
 
-    it('should have no saved column visibility', () => {
-      expect(service.getSavedColumnVisibility()).toBeNull();
-    });
-
     it('should report hasParams as false', () => {
       expect(service.hasParams).toBe(false);
     });
@@ -66,23 +62,4 @@ describe('PartyListStateService', () => {
     });
   });
 
-  describe('saveColumnVisibility / getSavedColumnVisibility', () => {
-    it('should store and retrieve column visibility', () => {
-      service.saveColumnVisibility({ description: false, createdAt: true });
-      expect(service.getSavedColumnVisibility()).toEqual({ description: false, createdAt: true });
-    });
-
-    it('should overwrite previously saved column visibility', () => {
-      service.saveColumnVisibility({ description: false });
-      service.saveColumnVisibility({ description: true, createdAt: false });
-      expect(service.getSavedColumnVisibility()).toEqual({ description: true, createdAt: false });
-    });
-
-    it('should store a shallow copy so external mutations do not affect saved state', () => {
-      const visibility = { description: false };
-      service.saveColumnVisibility(visibility);
-      visibility.description = true;
-      expect(service.getSavedColumnVisibility()!['description']).toBe(false);
-    });
-  });
 });

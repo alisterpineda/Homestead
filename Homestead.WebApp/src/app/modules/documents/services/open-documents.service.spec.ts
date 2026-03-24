@@ -71,8 +71,10 @@ describe('OpenDocumentsService', () => {
 
     it('should not write to localStorage when name is unchanged', () => {
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       (localStorage.setItem as ReturnType<typeof vi.fn>).mockClear();
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       expect(localStorage.setItem).not.toHaveBeenCalled();
     });
 
@@ -91,8 +93,10 @@ describe('OpenDocumentsService', () => {
       expect(service.openDocuments()[19].id).toBe('id-24');
     });
 
-    it('should persist to localStorage', () => {
+    it('should persist to localStorage via effect', () => {
+      TestBed.flushEffects(); // initial skip
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       expect(localStorage.setItem).toHaveBeenCalledWith(
         'homestead-open-documents',
         JSON.stringify([{ id: '1', name: 'Doc A' }]),
@@ -110,16 +114,20 @@ describe('OpenDocumentsService', () => {
 
     it('should do nothing when id does not exist', () => {
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       (localStorage.setItem as ReturnType<typeof vi.fn>).mockClear();
       service.removeDocument('nonexistent');
+      TestBed.flushEffects();
       expect(service.openDocuments()).toEqual([{ id: '1', name: 'Doc A' }]);
       expect(localStorage.setItem).not.toHaveBeenCalled();
     });
 
-    it('should persist to localStorage', () => {
+    it('should persist to localStorage via effect', () => {
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       (localStorage.setItem as ReturnType<typeof vi.fn>).mockClear();
       service.removeDocument('1');
+      TestBed.flushEffects();
       expect(localStorage.setItem).toHaveBeenCalledWith(
         'homestead-open-documents',
         '[]',
@@ -135,10 +143,12 @@ describe('OpenDocumentsService', () => {
       expect(service.openDocuments()).toEqual([]);
     });
 
-    it('should persist empty array to localStorage', () => {
+    it('should persist empty array to localStorage via effect', () => {
       service.addDocument('1', 'Doc A');
+      TestBed.flushEffects();
       (localStorage.setItem as ReturnType<typeof vi.fn>).mockClear();
       service.clearAll();
+      TestBed.flushEffects();
       expect(localStorage.setItem).toHaveBeenCalledWith(
         'homestead-open-documents',
         '[]',
@@ -151,40 +161,41 @@ describe('OpenDocumentsService', () => {
       const stored = [{ id: '1', name: 'Saved Doc' }];
       mockStorage['homestead-open-documents'] = JSON.stringify(stored);
 
-      const freshService = new OpenDocumentsService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(OpenDocumentsService);
       expect(freshService.openDocuments()).toEqual(stored);
     });
 
     it('should handle invalid JSON in localStorage gracefully', () => {
       mockStorage['homestead-open-documents'] = 'not valid json';
 
-      const freshService = new OpenDocumentsService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(OpenDocumentsService);
       expect(freshService.openDocuments()).toEqual([]);
     });
 
     it('should handle non-array JSON in localStorage gracefully', () => {
       mockStorage['homestead-open-documents'] = '{"foo":"bar"}';
 
-      const freshService = new OpenDocumentsService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(OpenDocumentsService);
       expect(freshService.openDocuments()).toEqual([]);
     });
 
-    it('should filter out invalid entries from localStorage', () => {
+    it('should fall back to empty when any entry is invalid', () => {
       const stored = [
         { id: '1', name: 'Valid' },
         { id: 2, name: 'Bad id type' },
-        { name: 'Missing id' },
-        { id: '3' },
-        null,
-        { id: '4', name: 'Also Valid' },
       ];
       mockStorage['homestead-open-documents'] = JSON.stringify(stored);
 
-      const freshService = new OpenDocumentsService();
-      expect(freshService.openDocuments()).toEqual([
-        { id: '1', name: 'Valid' },
-        { id: '4', name: 'Also Valid' },
-      ]);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(OpenDocumentsService);
+      expect(freshService.openDocuments()).toEqual([]);
     });
   });
 

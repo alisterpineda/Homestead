@@ -24,6 +24,7 @@ import { PaginationComponent } from '../../components/pagination/pagination.comp
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
 import { handleFileInputChange } from '@/shared/utils';
 import { DocumentListStateService } from '../../services/document-list-state.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { BulkEditTagsPopoverComponent } from '../../components/bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from '../../components/bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { OpenDocumentsService } from '../../services/open-documents.service';
@@ -369,10 +370,9 @@ export class DocumentListComponent implements OnDestroy {
   private openDocumentsService = inject(OpenDocumentsService);
   private uploadManager = inject(UploadManagerService);
   private errorHandler = inject(ErrorHandlerService);
+  private prefs = inject(UserPreferencesService);
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
-
-  private static readonly VIEW_MODE_KEY = 'document-view-mode';
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
@@ -382,7 +382,7 @@ export class DocumentListComponent implements OnDestroy {
     { value: 'ContentType', label: 'Content Type' },
     { value: 'FileSize', label: 'File Size' },
   ];
-  viewMode = signal<'table' | 'grid'>(this.loadViewMode());
+  viewMode = this.prefs.documentViewMode;
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
@@ -542,8 +542,8 @@ export class DocumentListComponent implements OnDestroy {
 
   constructor() {
     // Restore saved column visibility (merge defaults underneath so new columns default to hidden)
-    const savedVisibility = this.listState.getSavedColumnVisibility();
-    if (savedVisibility) {
+    const savedVisibility = this.prefs.documentColumnVisibility();
+    if (Object.keys(savedVisibility).length > 0) {
       this.columnVisibility.set({ ...DEFAULT_COLUMN_VISIBILITY, ...savedVisibility });
     }
 
@@ -605,8 +605,8 @@ export class DocumentListComponent implements OnDestroy {
   );
 
   private pageSize = toSignal(
-    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? 50))),
-    { initialValue: 50 },
+    this.route.queryParamMap.pipe(map((params) => +(params.get('pageSize') ?? this.prefs.pageSize()))),
+    { initialValue: this.prefs.pageSize() },
   );
 
   data = toSignal(
@@ -657,6 +657,7 @@ export class DocumentListComponent implements OnDestroy {
   }
 
   onPageSizeChange(newSize: number): void {
+    this.prefs.pageSize.set(newSize);
     this.clearSelection();
     this.router.navigate(['/documents'], {
       queryParams: { page: 1, pageSize: newSize },
@@ -667,12 +668,6 @@ export class DocumentListComponent implements OnDestroy {
 
   setViewMode(mode: 'table' | 'grid'): void {
     this.viewMode.set(mode);
-    localStorage.setItem(DocumentListComponent.VIEW_MODE_KEY, mode);
-  }
-
-  private loadViewMode(): 'table' | 'grid' {
-    const stored = localStorage.getItem(DocumentListComponent.VIEW_MODE_KEY);
-    return stored === 'table' || stored === 'grid' ? stored : 'grid';
   }
 
   onDocumentSelect(id: string): void {
@@ -756,7 +751,7 @@ export class DocumentListComponent implements OnDestroy {
       ...prev,
       [id]: prev[id] === false,
     }));
-    this.listState.saveColumnVisibility(this.columnVisibility());
+    this.prefs.documentColumnVisibility.set(this.columnVisibility());
   }
 
   resetFilters(): void {
