@@ -20,6 +20,23 @@ export async function waitForProcessingComplete(
   throw new Error(`Processing jobs did not complete within ${timeoutMs}ms`);
 }
 
+// --- Documents ---
+
+/**
+ * Delete all documents (soft-delete then empty trash).
+ * Used to ensure a clean state before serial test blocks that assume an empty list.
+ */
+export async function deleteAllDocuments(request: APIRequestContext): Promise<void> {
+  const response = await request.get('/api/v1/documents?Page=1&PageSize=100');
+  if (!response.ok()) return;
+  const body = await response.json();
+  const ids = (body.items ?? []).map((d: { id: string }) => d.id);
+  if (ids.length === 0) return;
+
+  await request.post('/api/v1/documents/bulk-delete', { data: { ids } });
+  await request.post('/api/v1/documents/empty-trash');
+}
+
 // --- Tags ---
 
 export async function createTagViaApi(

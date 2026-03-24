@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { test, expect } from '../../fixtures/app.fixture';
 import { TEST_DATA } from '../../e2e.config';
-import { waitForProcessingComplete } from '../../helpers/api.helpers';
+import { waitForProcessingComplete, deleteAllDocuments } from '../../helpers/api.helpers';
 
 const PDF_PATH = path.resolve(__dirname, '../../fixtures/files/test-document.pdf');
 const IMAGE_PATH = path.resolve(__dirname, '../../fixtures/files/test-image.png');
@@ -9,6 +9,11 @@ const IMAGE_PATH = path.resolve(__dirname, '../../fixtures/files/test-image.png'
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Document upload and search workflow', () => {
+  // Clean up documents from previous runs so retries start from a clean state
+  test.beforeAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+  });
+
   test('shows empty state when no documents exist', async ({ documentListPage }) => {
     await documentListPage.goto();
     await expect(documentListPage.noDocsEmpty).toBeVisible();
@@ -18,8 +23,12 @@ test.describe('Document upload and search workflow', () => {
   test('can upload a PDF document via the upload popover', async ({ page, request, documentListPage }) => {
     await documentListPage.goto();
 
+    const uploadResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'POST',
+    );
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(PDF_PATH);
+    await uploadResponse;
     await waitForProcessingComplete(request, 60_000);
 
     await documentListPage.goto();
@@ -29,8 +38,17 @@ test.describe('Document upload and search workflow', () => {
   test('can upload an image document', async ({ page, request, documentListPage }) => {
     await documentListPage.goto();
 
-    const fileInput = page.locator('input[type="file"]').first();
-    await fileInput.setInputFiles(IMAGE_PATH);
+    // Open the upload popover so its file input is rendered in the DOM
+    // (the empty-state file input is hidden when documents already exist)
+    await page.getByRole('button', { name: 'Upload', exact: true }).click();
+    await page.getByRole('button', { name: 'Choose files' }).waitFor({ state: 'visible' });
+    const popoverInput = page.locator('[data-state="open"] input[type="file"]');
+
+    const uploadResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'POST',
+    );
+    await popoverInput.setInputFiles(IMAGE_PATH);
+    await uploadResponse;
     await waitForProcessingComplete(request, 60_000);
 
     await documentListPage.goto();
