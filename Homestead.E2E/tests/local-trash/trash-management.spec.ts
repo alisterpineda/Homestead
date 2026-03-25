@@ -7,10 +7,13 @@ test.describe('Trash management', () => {
     await documentListPage.goto();
     await documentListPage.switchToTableView();
 
-    await page.locator('table tbody tr td:first-child [role="checkbox"]').first().click();
+    await page.getByLabel(/^Select /).first().click();
     await documentListPage.bulkDeleteButton().click();
+    const deleteResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: /^Delete$/ }).last().click();
-    await page.waitForLoadState('networkidle');
+    await deleteResponse;
   });
 
   test('trash page shows soft-deleted documents', async ({ trashListPage }) => {
@@ -28,22 +31,30 @@ test.describe('Trash management', () => {
     await trashListPage.selectDocument(docName);
     await trashListPage.restore();
 
+    const docsResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'GET' && resp.status() === 200,
+    );
     await page.goto('/documents');
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByText(docName).first()).toBeVisible({ timeout: 10_000 });
+    await docsResponse;
+    await expect(page.getByText(docName).first()).toBeVisible();
   });
 
   test('can permanently delete a document', async ({ page, documentListPage, trashListPage }) => {
     await documentListPage.goto();
     await documentListPage.switchToTableView();
 
-    const docName = await page.locator('table tbody tr td:nth-child(2)').first().textContent();
+    const firstNameCell = page.locator('table tbody tr').first().locator('td').nth(1);
+    await expect(firstNameCell).toBeVisible();
+    const docName = await firstNameCell.textContent();
     const trimmedName = docName?.trim() ?? '';
 
-    await page.locator('table tbody tr td:first-child [role="checkbox"]').first().click();
+    await page.getByLabel(/^Select /).first().click();
     await documentListPage.bulkDeleteButton().click();
+    const deleteResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: /^Delete$/ }).last().click();
-    await page.waitForLoadState('networkidle');
+    await deleteResponse;
 
     await trashListPage.goto();
     await trashListPage.waitForDocumentVisible(trimmedName);
@@ -56,17 +67,26 @@ test.describe('Trash management', () => {
   test('can empty entire trash', async ({ page, documentListPage, trashListPage }) => {
     await documentListPage.goto();
     await documentListPage.switchToTableView();
-    await page.waitForLoadState('networkidle');
 
-    const rowCount = await page.locator('table tbody tr').count();
-    if (rowCount > 0) {
+    // Check if there are documents to soft-delete first
+    const hasDocuments = await page.locator('table tbody tr').first().isVisible().catch(() => false);
+    if (hasDocuments) {
       await page.getByLabel('Select all').first().click();
       await documentListPage.bulkDeleteButton().click();
+      const deleteResponse = page.waitForResponse(
+        (resp) => resp.url().includes('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
+      );
       await page.getByRole('button', { name: /^Delete$/ }).last().click();
-      await page.waitForLoadState('networkidle');
+      await deleteResponse;
     }
 
     await trashListPage.goto();
+
+    // Wait for either the empty state or table rows to render before checking
+    await Promise.race([
+      trashListPage.trashEmpty.waitFor({ state: 'visible', timeout: 5_000 }),
+      trashListPage.page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 5_000 }),
+    ]);
 
     if (await trashListPage.trashEmpty.isVisible()) {
       test.skip(true, 'No documents available to test empty trash');

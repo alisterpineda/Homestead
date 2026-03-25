@@ -10,8 +10,12 @@ export class TagListPage {
   }
 
   async goto() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags') && resp.request().method() === 'GET' && resp.status() === 200,
+    );
     await this.page.goto('/documents/tags');
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async createTag(tagPath: string, options?: { description?: string }) {
@@ -24,24 +28,40 @@ export class TagListPage {
       await this.page.getByLabel('Description').fill(options.description);
     }
 
-    // Submit
+    // Submit and wait for the API response
+    const createResponse = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags') && resp.request().method() === 'POST' && resp.status() === 201,
+    );
     await this.page.getByRole('button', { name: 'Create' }).click();
+    await createResponse;
 
-    // Wait for dialog to close and list to refresh
+    // Wait for dialog to close
     await expect(this.page.getByRole('heading', { name: 'Create Tag' })).not.toBeVisible({ timeout: 5_000 });
-    await this.page.waitForLoadState('networkidle');
   }
 
   async searchTags(term: string) {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags') &&
+        resp.url().includes('Search=') &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+    );
     await this.searchInput.fill(term);
-    await this.page.waitForTimeout(500); // debounce
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async clearSearch() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags') &&
+        !resp.url().includes('Search=') &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+    );
     await this.searchInput.fill('');
-    await this.page.waitForTimeout(500);
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async waitForTagVisible(tagPath: string, timeout = 10_000) {
@@ -54,8 +74,11 @@ export class TagListPage {
 
   async deleteSelected() {
     await this.page.getByRole('button', { name: 'Delete' }).click();
-    // Confirm in alert dialog
+    // Confirm in alert dialog and wait for API response
+    const deleteResponse = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/tags/bulk-delete') && resp.request().method() === 'POST',
+    );
     await this.page.getByRole('button', { name: 'Delete' }).last().click();
-    await this.page.waitForLoadState('networkidle');
+    await deleteResponse;
   }
 }

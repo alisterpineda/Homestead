@@ -14,6 +14,7 @@ export default defineConfig({
   testDir: './tests',
   globalSetup: require.resolve('./global-setup'),
   globalTimeout: 900_000,
+  timeout: 60_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -21,8 +22,12 @@ export default defineConfig({
   reporter: process.env.CI
     ? [['html', { open: 'never' }], ['github']]
     : [['html', { open: 'on-failure' }]],
+  expect: {
+    timeout: 10_000,
+  },
   use: {
-    trace: 'on-first-retry',
+    actionTimeout: 15_000,
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [

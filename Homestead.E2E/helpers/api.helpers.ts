@@ -7,6 +7,9 @@ export async function waitForProcessingComplete(
   timeoutMs = 30_000,
 ): Promise<void> {
   const start = Date.now();
+  let pollInterval = 250;
+  const maxInterval = 2_000;
+
   while (Date.now() - start < timeoutMs) {
     const response = await request.get('/api/v1/processing/jobs?Page=1&PageSize=100');
     expect(response.ok()).toBeTruthy();
@@ -15,7 +18,8 @@ export async function waitForProcessingComplete(
       (j: { status: string }) => j.status === 'Pending' || j.status === 'InProgress',
     );
     if (!pending || pending.length === 0) return;
-    await new Promise((r) => setTimeout(r, 1_000));
+    await new Promise((r) => setTimeout(r, pollInterval));
+    pollInterval = Math.min(pollInterval * 1.5, maxInterval);
   }
   throw new Error(`Processing jobs did not complete within ${timeoutMs}ms`);
 }

@@ -23,12 +23,26 @@ test.describe('Bulk operations', () => {
 
     await documentListPage.bulkTagsButton().click();
 
-    await fillSignalInput(page.getByPlaceholder(/search tags to add/i).first(), TEST_DATA.tags.bulkTag1);
-    await page.waitForTimeout(1_000);
+    const tagInput = page.getByPlaceholder(/search tags to add/i).first();
+    await fillSignalInput(tagInput, TEST_DATA.tags.bulkTag1);
+
+    await page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/tags') &&
+        resp.url().includes('Search=') &&
+        resp.request().method() === 'GET',
+    );
+
+    await expect(page.getByText(TEST_DATA.tags.bulkTag1).first()).toBeVisible();
     await page.getByText(TEST_DATA.tags.bulkTag1).first().click();
 
     await page.getByRole('button', { name: /Apply/i }).click();
-    await page.waitForLoadState('networkidle');
+
+    const bulkUpdateResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-update') && resp.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: /Confirm/i }).click();
+    await bulkUpdateResponse;
   });
 
   test('can bulk assign parties to selected documents', async ({ page, documentListPage }) => {
@@ -40,12 +54,26 @@ test.describe('Bulk operations', () => {
 
     await documentListPage.bulkPartiesButton().click();
 
-    await fillSignalInput(page.getByPlaceholder(/search parties to add/i).first(), TEST_DATA.parties.acmeCorp);
-    await page.waitForTimeout(1_000);
+    const partyInput = page.getByPlaceholder(/search parties to add/i).first();
+    await fillSignalInput(partyInput, TEST_DATA.parties.acmeCorp);
+
+    await page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents/parties') &&
+        resp.url().includes('Search=') &&
+        resp.request().method() === 'GET',
+    );
+
+    await expect(page.getByText(TEST_DATA.parties.acmeCorp).first()).toBeVisible();
     await page.getByText(TEST_DATA.parties.acmeCorp).first().click();
 
     await page.getByRole('button', { name: /Apply/i }).click();
-    await page.waitForLoadState('networkidle');
+
+    const bulkUpdateResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-update') && resp.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: /Confirm/i }).click();
+    await bulkUpdateResponse;
   });
 
   test('can bulk delete selected documents (soft delete)', async ({ page, documentListPage }) => {
@@ -54,8 +82,11 @@ test.describe('Bulk operations', () => {
 
     await documentListPage.selectDocumentCheckbox('test-image');
     await documentListPage.bulkDeleteButton().click();
+    const deleteResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-delete') && resp.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: /^Delete$/ }).last().click();
-    await page.waitForLoadState('networkidle');
+    await deleteResponse;
   });
 
   test('can select all documents on page', async ({ page, documentListPage }) => {

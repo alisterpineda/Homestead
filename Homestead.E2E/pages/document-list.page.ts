@@ -20,21 +20,37 @@ export class DocumentListPage {
   }
 
   async goto() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'GET' && resp.status() === 200,
+    );
     await this.page.goto('/documents');
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async search(term: string) {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents') &&
+        resp.url().includes('Search=') &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+    );
     await this.searchInput.fill(term);
-    // Wait for debounce (300ms) and URL update
     await this.page.waitForURL(/search=/, { timeout: 5_000 });
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async clearSearch() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents') &&
+        !resp.url().includes('Search=') &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+    );
     await this.searchInput.fill('');
-    await this.page.waitForTimeout(500);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForURL((url) => !url.searchParams.has('search'), { timeout: 5_000 });
+    await responsePromise;
   }
 
   async clickDocument(name: string) {
@@ -46,21 +62,25 @@ export class DocumentListPage {
   }
 
   async switchToTableView() {
-    // The view toggle is hidden when the document list is empty (showInitialEmpty).
-    // Wait for it to appear after data loads; skip if the list is genuinely empty.
-    await this.tableViewButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    // Wait for either the table view toggle or the empty state to appear
+    await Promise.race([
+      this.tableViewButton.waitFor({ state: 'visible', timeout: 10_000 }),
+      this.noDocsEmpty.waitFor({ state: 'visible', timeout: 10_000 }),
+    ]).catch(() => {});
     if (await this.tableViewButton.isVisible()) {
       await this.tableViewButton.click();
-      await this.page.waitForLoadState('networkidle');
+      await expect(this.page.locator('table')).toBeVisible();
     }
   }
 
   async enterSelectionMode() {
     // In table view, clicking a row checkbox enters selection mode automatically
     // In grid view, click the "Select" button
-    const selectBtn = this.selectButton;
-    if (await selectBtn.isVisible()) {
-      await selectBtn.click();
+    try {
+      await expect(this.selectButton).toBeVisible({ timeout: 2_000 });
+      await this.selectButton.click();
+    } catch {
+      // Not visible = table view, where checkboxes handle selection directly
     }
   }
 
@@ -85,7 +105,6 @@ export class DocumentListPage {
   }
 
   bulkTagsButton() {
-    // Target the Tags button inside the bulk edit popover component (selection toolbar)
     return this.page.locator('app-bulk-edit-tags-popover button');
   }
 

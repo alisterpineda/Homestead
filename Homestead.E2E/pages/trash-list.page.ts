@@ -8,8 +8,15 @@ export class TrashListPage {
   }
 
   async goto() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/api/v1/documents') &&
+        resp.url().includes('Deleted=true') &&
+        resp.request().method() === 'GET' &&
+        resp.status() === 200,
+    );
     await this.page.goto('/documents/trash');
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async selectDocument(name: string) {
@@ -21,27 +28,38 @@ export class TrashListPage {
   }
 
   async restore() {
+    const responsePromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-restore') && resp.request().method() === 'POST',
+    );
     await this.page.getByRole('button', { name: /^Restore$|^Restoring/ }).click();
-    await this.page.waitForLoadState('networkidle');
+    await responsePromise;
   }
 
   async deletePermanently() {
     await this.page.getByRole('button', { name: /Delete Permanently/ }).click();
-    // Confirm in alert dialog
+    // Confirm in alert dialog and wait for API response
+    const deleteResponse = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/bulk-permanently-delete') && resp.request().method() === 'POST',
+    );
     await this.page.getByRole('button', { name: /Delete Permanently/ }).last().click();
-    await this.page.waitForLoadState('networkidle');
+    await deleteResponse;
   }
 
   async emptyTrash() {
     // Click the "Empty Trash" toolbar button (not in selection mode)
     await this.page.getByRole('button', { name: 'Empty Trash' }).first().click();
-    // Confirm in alert dialog
+    // Confirm in alert dialog and wait for API response
+    const emptyResponse = this.page.waitForResponse(
+      (resp) => resp.url().includes('/api/v1/documents/empty-trash') && resp.request().method() === 'POST',
+    );
     await this.page.getByRole('button', { name: /Empty Trash/ }).last().click();
-    await this.page.waitForLoadState('networkidle');
+    await emptyResponse;
   }
 
   async getFirstDocumentName(): Promise<string> {
-    const name = await this.page.locator('table tbody tr td:nth-child(2)').first().textContent();
+    const firstNameCell = this.page.locator('table tbody tr').first().locator('td').nth(1);
+    await expect(firstNameCell).toBeVisible();
+    const name = await firstNameCell.textContent();
     return name?.trim() ?? '';
   }
 
