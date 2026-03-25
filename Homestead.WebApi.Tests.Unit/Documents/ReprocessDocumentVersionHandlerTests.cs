@@ -1,9 +1,9 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Processing;
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Documents.v1.ReprocessDocumentVersion;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Features.Documents.Versions.ReprocessDocumentVersion;
 using Homestead.WebApi.Processing;
 using NSubstitute;
 

@@ -1,5 +1,6 @@
+using Homestead.WebApi.Features.Identity;
 using System.Security.Claims;
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

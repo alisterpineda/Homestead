@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Homestead.WebApi.Domains.Auditing;
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Documents.TextExtraction;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Infrastructure.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 

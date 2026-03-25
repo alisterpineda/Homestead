@@ -1,4 +1,4 @@
-using Homestead.WebApi.Features.Documents.Thumbnails;
+using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

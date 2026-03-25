@@ -1,7 +1,8 @@
+using Homestead.WebApi.Features.Documents;
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Features.Auditing;
-using Homestead.WebApi.Features.Documents.v1.CreateTag;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Features.Documents.Tags.CreateTag;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

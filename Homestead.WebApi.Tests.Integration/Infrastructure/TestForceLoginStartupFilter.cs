@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

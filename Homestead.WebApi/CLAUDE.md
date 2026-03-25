@@ -40,9 +40,11 @@ Opt-in external authentication via any OpenID Connect provider. When OIDC config
 
 ## Architecture: Vertical Slice + CQRS (MediatR)
 
-The WebApi uses vertical slice architecture with MediatR for CQRS handler dispatch:
+The WebApi uses vertical slice architecture organized by module, with MediatR for CQRS handler dispatch:
 
-- **Features/{Domain}/v{n}/{Operation}/**: Each operation has four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+- **Features/{Module}/{SubDomain}/{Operation}/**: Each operation has up to four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+- **Modules** map to frontend areas: `Admin`, `Documents`, `Identity`, `Processing`, `Status`
+- **Sub-domains** group related operations within a module (e.g., `Documents/Tags/`, `Admin/Groups/`)
 - **Naming convention**: Use `*Command` suffix for mutations (POST/PUT/PATCH/DELETE) and `*Query` suffix for reads (GET). Both implement `IRequest<TResponse>` from MediatR
 - **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
 - **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers. They inject `ISender` from MediatR and dispatch requests via `sender.Send(request, ct)`
@@ -50,20 +52,33 @@ The WebApi uses vertical slice architecture with MediatR for CQRS handler dispat
 - **API versioning** is URL-based: `/api/v{version:apiVersion}/documents`
 - **Persistence**: EF Core with PostgreSQL. Migrations auto-run on startup in `Program.cs`
 
+### Project Structure
+
+| Directory | Description |
+|---|---|
+| `Authentication/` | Auth setup, claims, OIDC options, current user accessor |
+| `Authorization/` | Document-level auth handlers, policies, MediatR auth behavior |
+| `Common/` | Cross-cutting concerns: exceptions (`Exceptions/`), MediatR behaviors (`Behaviors/`), audit infrastructure (`Auditing/`), pagination, query extensions |
+| `Domain/` | Domain model layer: EF entities, enums, value objects, audit snapshots |
+| `Features/` | Vertical slices organized by module → sub-domain → operation |
+| `Infrastructure/` | External integrations: `TextExtraction/` (OCR engines), `Thumbnails/` (generation) |
+| `Persistence/` | EF Core: `AppDbContext`, `DesignTimeDbContextFactory`, entity `Configurations/` |
+| `Processing/` | Generic job queue framework, SignalR hub for real-time updates |
+
 ### Adding a New Endpoint
 
-1. Create four files under `Features/{Domain}/v1/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+1. Create files under `Features/{Module}/{SubDomain}/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
 2. The command/query record should implement `IRequest<TResponse>` from MediatR. Use `*Command` for mutations, `*Query` for reads
 3. The handler class should implement `IRequestHandler<TRequest, TResponse>` from MediatR with a `Handle` method
 4. The endpoint should inject `ISender` and call `sender.Send(request, ct)`
-5. Register the endpoint in the domain's module class (e.g., `DocumentsModule.cs`)
+5. Register the endpoint in the module class (e.g., `DocumentsModule.cs`)
 
 ## Full-Text Search
 
 Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) column on the `documents` table, indexed with GIN.
 
 - **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B
-- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Persistence/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
+- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Features/Documents/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
 - **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 
@@ -71,9 +86,10 @@ Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) co
 
 Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints — survives entity deletion.
 
-- **Infrastructure** in `Domains/Auditing/`: `AuditLog`, `AuditAction` enum, polymorphic `FieldChange` (`ScalarFieldChange`/`ArrayFieldChange`), `IAuditSnapshot<TSelf, TSource>` interface
+- **Domain types** in `Domain/Auditing/`: `AuditLog`, `AuditAction` enum, polymorphic `FieldChange` (`ScalarFieldChange`/`ArrayFieldChange`), `IAuditSnapshot<TSelf, TSource>` interface
 - **Snapshots** per entity (e.g., `DocumentSnapshot`) implement `IAuditSnapshot` with `From()` and `Diff()`
-- **`IAuditLogger`** — DI-injected service (`Persistence/AuditLogger.cs`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Auto-resolves the current user from `ICurrentUserAccessor` — handlers do not pass `userId`. Background job handlers use `auditLogger.ForUser(job.CreatedByUserId)` to attribute audit entries to the user who initiated the job.
+- **`IAuditLogger`** — DI-injected service (`Common/Auditing/AuditLogger.cs`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Auto-resolves the current user from `ICurrentUserAccessor` — handlers do not pass `userId`. Background job handlers use `auditLogger.ForUser(job.CreatedByUserId)` to attribute audit entries to the user who initiated the job.
+- **`IAuditContext`** — scoped service (`Common/Auditing/AuditContext.cs`) for batching audit entries within a request, flushed by `UnitOfWorkBehavior`
 
 ## Error Handling (RFC 9457)
 
@@ -94,7 +110,7 @@ Exceptions have **no knowledge of HTTP status codes** — the mapping lives excl
 
 ### ProblemDetailsFactory
 
-Static factory (`Common/DomainExceptionHandler.cs`) for constructing `ProblemDetails` responses. Used by the exception handler, auth middleware, and endpoints directly:
+Static factory (`Common/Exceptions/DomainExceptionHandler.cs`) for constructing `ProblemDetails` responses. Used by the exception handler, auth middleware, and endpoints directly:
 - `Create(statusCode, title, detail?)` — generic
 - `BusinessRule(detail)` / `BusinessRuleResult(detail)` — 400 with detail
 - `Forbidden(detail, errorCode?)` / `Unauthorized(detail, errorCode)` — with optional `errorCode` extension

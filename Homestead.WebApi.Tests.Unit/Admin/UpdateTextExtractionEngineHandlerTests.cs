@@ -1,8 +1,8 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.UpdateTextExtractionEngine;
-using Homestead.WebApi.Features.Auditing;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Features.Admin.TextExtractionEngines.UpdateTextExtractionEngine;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;

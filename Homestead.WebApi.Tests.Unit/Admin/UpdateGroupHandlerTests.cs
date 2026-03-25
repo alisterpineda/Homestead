@@ -1,7 +1,7 @@
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Groups;
-using Homestead.WebApi.Features.Admin.v1.UpdateGroup;
-using Homestead.WebApi.Features.Auditing;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Groups;
+using Homestead.WebApi.Features.Admin.Groups.UpdateGroup;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

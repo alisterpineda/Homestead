@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;

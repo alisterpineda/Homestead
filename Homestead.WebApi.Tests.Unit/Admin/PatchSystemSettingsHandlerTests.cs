@@ -1,8 +1,9 @@
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Admin.v1.Settings;
-using Homestead.WebApi.Features.Admin.v1.Settings.PatchSystemSettings;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Features.Admin.Settings;
+using Homestead.WebApi.Features.Admin.Settings.PatchSystemSettings;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;

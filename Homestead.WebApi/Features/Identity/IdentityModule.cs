@@ -1,11 +1,11 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Features.Identity.v1.GetUserInfo;
-using Homestead.WebApi.Features.Identity.v1.Login;
-using Homestead.WebApi.Features.Identity.v1.Logout;
-using Homestead.WebApi.Features.Identity.v1.OidcCallback;
-using Homestead.WebApi.Features.Identity.v1.OidcLogin;
-using Homestead.WebApi.Features.Identity.v1.OidcLogout;
-using Homestead.WebApi.Features.Identity.v1.Register;
+using Homestead.WebApi.Features.Identity.GetUserInfo;
+using Homestead.WebApi.Features.Identity.Login;
+using Homestead.WebApi.Features.Identity.Logout;
+using Homestead.WebApi.Features.Identity.OidcCallback;
+using Homestead.WebApi.Features.Identity.OidcLogin;
+using Homestead.WebApi.Features.Identity.OidcLogout;
+using Homestead.WebApi.Features.Identity.Register;
 
 namespace Homestead.WebApi.Features.Identity;
 

@@ -1,11 +1,13 @@
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Features.Documents;
 using System.Text.Json;
-using Homestead.WebApi.Domains.Auditing;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Processing;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Features.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using Homestead.WebApi.Features.Documents.TextExtraction;
+using Homestead.WebApi.Infrastructure.TextExtraction;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -42,8 +44,8 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
         _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(new TextExtractionContext(
-                Homestead.WebApi.Domains.Settings.TextExtractionEngineType.Tesseract,
-                Homestead.WebApi.Domains.Settings.BuiltInTextExtractionEngines.TesseractDefaultConfiguration));
+                Homestead.WebApi.Domain.Settings.TextExtractionEngineType.Tesseract,
+                Homestead.WebApi.Domain.Settings.BuiltInTextExtractionEngines.TesseractDefaultConfiguration));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -54,7 +56,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         var logger = Substitute.For<ILogger<ReprocessDocumentVersionJobHandler>>();
         var serviceProvider = new ServiceCollection()
-            .AddKeyedSingleton(Homestead.WebApi.Domains.Settings.TextExtractionEngineType.Tesseract, _textExtractionEngine)
+            .AddKeyedSingleton(Homestead.WebApi.Domain.Settings.TextExtractionEngineType.Tesseract, _textExtractionEngine)
             .BuildServiceProvider();
         var textExtractionHelper = new TextExtractionHelper(
             serviceProvider, _engineResolver);

@@ -1,8 +1,8 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Features.Auditing;
-using Homestead.WebApi.Features.Documents.v1.PatchTag;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Features.Documents.Tags.PatchTag;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson.Operations;

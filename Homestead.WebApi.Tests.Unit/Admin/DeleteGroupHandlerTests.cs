@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domains.Groups;
-using Homestead.WebApi.Features.Admin.v1.DeleteGroup;
-using Homestead.WebApi.Features.Auditing;
+using Homestead.WebApi.Domain.Groups;
+using Homestead.WebApi.Features.Admin.Groups.DeleteGroup;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

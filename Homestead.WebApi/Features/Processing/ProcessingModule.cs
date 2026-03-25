@@ -1,5 +1,5 @@
 using Asp.Versioning.Builder;
-using Homestead.WebApi.Features.Processing.v1.GetProcessingJobs;
+using Homestead.WebApi.Features.Processing.GetProcessingJobs;
 
 using Homestead.WebApi.Authentication;
 

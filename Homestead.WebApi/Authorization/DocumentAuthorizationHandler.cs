@@ -1,6 +1,6 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Domains.Groups;
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Groups;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;

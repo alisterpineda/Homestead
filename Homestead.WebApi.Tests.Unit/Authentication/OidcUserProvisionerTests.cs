@@ -1,6 +1,7 @@
+using Homestead.WebApi.Features.Identity;
 using System.Security.Claims;
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Unit.Infrastructure;
 using Microsoft.AspNetCore.Identity;

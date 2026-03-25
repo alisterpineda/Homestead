@@ -1,7 +1,7 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Features.Auditing;
-using Homestead.WebApi.Features.Documents.v1.BulkDeleteTags;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Features.Documents.Tags.BulkDeleteTags;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

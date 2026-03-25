@@ -1,8 +1,8 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Groups;
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Groups;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 

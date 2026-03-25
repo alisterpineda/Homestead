@@ -61,7 +61,7 @@ public class ProcessingJobTests : IntegrationTestBase
         var db = scope.ServiceProvider.GetRequiredService<Homestead.WebApi.Persistence.AppDbContext>();
         var job = await db.ProcessingJobs.FindAsync([jobBody.JobId], CT);
         Assert.NotNull(job);
-        Assert.Equal(Homestead.WebApi.Domains.Processing.ProcessingJobType.UploadDocument, job!.Type);
+        Assert.Equal(Homestead.WebApi.Domain.Processing.ProcessingJobType.UploadDocument, job!.Type);
     }
 
     [Fact]

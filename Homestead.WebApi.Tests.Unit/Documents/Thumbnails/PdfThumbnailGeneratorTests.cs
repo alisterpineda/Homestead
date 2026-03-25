@@ -1,4 +1,4 @@
-using Homestead.WebApi.Features.Documents.Thumbnails;
+using Homestead.WebApi.Infrastructure.Thumbnails;
 using SkiaSharp;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.Thumbnails;

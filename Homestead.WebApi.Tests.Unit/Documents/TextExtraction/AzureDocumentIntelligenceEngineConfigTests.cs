@@ -1,4 +1,4 @@
-using Homestead.WebApi.Features.Documents.TextExtraction.Configurations;
+using Homestead.WebApi.Infrastructure.TextExtraction.Configurations;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 

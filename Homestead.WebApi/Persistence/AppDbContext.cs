@@ -1,10 +1,10 @@
-using Homestead.WebApi.Domains.Auditing;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Groups;
-using Homestead.WebApi.Domains.Identity;
-using Homestead.WebApi.Domains.Parties;
-using Homestead.WebApi.Domains.Processing;
-using Homestead.WebApi.Domains.Settings;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Groups;
+using Homestead.WebApi.Domain.Identity;
+using Homestead.WebApi.Domain.Parties;
+using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Domain.Settings;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;

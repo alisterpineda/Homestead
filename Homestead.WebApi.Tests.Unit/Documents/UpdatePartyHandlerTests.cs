@@ -1,8 +1,8 @@
 using Homestead.WebApi.Authorization;
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Parties;
-using Homestead.WebApi.Features.Auditing;
-using Homestead.WebApi.Features.Documents.v1.UpdateParty;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Parties;
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Features.Documents.Parties.UpdateParty;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

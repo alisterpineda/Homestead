@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Auditing;
+using Homestead.WebApi.Domain.Auditing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

@@ -1,5 +1,5 @@
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Documents.v1.GetTextExtractionEngineSummaries;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Features.Documents.TextExtractionEngineSummaries.GetTextExtractionEngineSummaries;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 

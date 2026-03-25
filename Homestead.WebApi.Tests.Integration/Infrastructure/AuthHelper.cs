@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Identity;
+using Homestead.WebApi.Domain.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;

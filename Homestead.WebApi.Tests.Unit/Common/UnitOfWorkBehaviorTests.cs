@@ -1,5 +1,5 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Features.Auditing;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using NSubstitute;

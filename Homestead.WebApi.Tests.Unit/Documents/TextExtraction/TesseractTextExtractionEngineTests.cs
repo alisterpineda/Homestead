@@ -1,4 +1,4 @@
-using Homestead.WebApi.Features.Documents.TextExtraction;
+using Homestead.WebApi.Infrastructure.TextExtraction;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 

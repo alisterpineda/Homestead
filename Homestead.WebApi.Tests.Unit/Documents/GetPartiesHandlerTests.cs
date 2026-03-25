@@ -1,8 +1,8 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Parties;
-using Homestead.WebApi.Features.Documents.v1.GetParties;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Parties;
+using Homestead.WebApi.Features.Documents.Parties.GetParties;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;

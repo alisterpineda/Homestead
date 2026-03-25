@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domains.Settings;
-using Homestead.WebApi.Features.Admin.v1.TextExtractionEngines.BulkDeleteTextExtractionEngines;
-using Homestead.WebApi.Features.Auditing;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Features.Admin.TextExtractionEngines.BulkDeleteTextExtractionEngines;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;

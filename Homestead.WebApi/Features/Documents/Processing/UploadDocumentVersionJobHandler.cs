@@ -1,10 +1,11 @@
+using Homestead.WebApi.Common.Auditing;
 using System.Security.Cryptography;
-using Homestead.WebApi.Domains.Documents;
-using Homestead.WebApi.Domains.Processing;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
-using Homestead.WebApi.Features.Documents.TextExtraction;
-using Homestead.WebApi.Features.Documents.Thumbnails;
+using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Processing;

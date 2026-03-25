@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;

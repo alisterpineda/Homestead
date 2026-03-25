@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Documents;
+using Homestead.WebApi.Domain.Documents;
 
 namespace Homestead.WebApi.Tests.Unit.Domains.Documents;
 

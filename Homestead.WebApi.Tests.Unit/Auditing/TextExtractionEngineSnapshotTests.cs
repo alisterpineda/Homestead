@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domains.Auditing;
-using Homestead.WebApi.Domains.Auditing.Snapshots;
-using Homestead.WebApi.Domains.Settings;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Settings;
 
 namespace Homestead.WebApi.Tests.Unit.Auditing;
 

@@ -1,4 +1,4 @@
-using Homestead.WebApi.Domains.Processing;
+using Homestead.WebApi.Domain.Processing;
 
 namespace Homestead.WebApi.Processing;
 
