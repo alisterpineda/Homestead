@@ -1,10 +1,10 @@
 import { Routes } from '@angular/router';
-import { DocumentListComponent } from './pages/document-list/document-list.component';
-import { PartyListComponent } from './pages/party-list/party-list.component';
-import { TagListComponent } from './pages/tag-list/tag-list.component';
-import { TrashListComponent } from './pages/trash-list/trash-list.component';
-import { DocumentDetailPageComponent } from './pages/document-detail/document-detail-page.component';
-import { DocumentsLayoutComponent } from './components/documents-layout/documents-layout.component';
+import { DocumentListComponent } from './list/document-list.component';
+import { PartyListComponent } from './parties/party-list.component';
+import { TagListComponent } from './tags/tag-list.component';
+import { TrashListComponent } from './trash/trash-list.component';
+import { DocumentDetailPageComponent } from './detail/document-detail-page.component';
+import { DocumentsLayoutComponent } from './layout/documents-layout.component';
 
 export const DOCUMENTS_ROUTES: Routes = [
   {

@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
-import { AdminIndexComponent } from './pages/admin-index/admin-index.component';
-import { UserListComponent } from './pages/user-list/user-list.component';
-import { GroupListComponent } from './pages/group-list/group-list.component';
-import { GroupDetailPageComponent } from './pages/group-detail/group-detail-page.component';
-import { JobListComponent } from './pages/job-list/job-list.component';
-import { TextExtractionEngineListComponent } from './pages/text-extraction-engine-list/text-extraction-engine-list.component';
-import { DocumentSettingsComponent } from './pages/document-settings/document-settings.component';
+import { AdminIndexComponent } from './admin-index/admin-index.component';
+import { UserListComponent } from './users/user-list.component';
+import { GroupListComponent } from './groups/group-list.component';
+import { GroupDetailPageComponent } from './groups/group-detail-page.component';
+import { JobListComponent } from './jobs/job-list.component';
+import { TextExtractionEngineListComponent } from './text-extraction/text-extraction-engine-list.component';
+import { DocumentSettingsComponent } from './settings/document-settings.component';
 
 export const ADMIN_ROUTES: Routes = [
   { path: '', component: AdminIndexComponent, data: { title: 'Admin' } },
