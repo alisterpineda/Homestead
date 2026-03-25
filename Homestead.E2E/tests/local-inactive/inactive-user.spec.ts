@@ -53,6 +53,6 @@ test.describe('Inactive user flow', () => {
     await loginPage.login(LOCAL_INACTIVE_USER.email, LOCAL_INACTIVE_USER.password);
 
     await page.waitForURL('**/documents');
-    await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible();
   });
 });
