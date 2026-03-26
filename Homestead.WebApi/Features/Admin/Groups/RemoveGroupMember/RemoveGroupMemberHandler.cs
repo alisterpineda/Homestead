@@ -1,6 +1,7 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,16 @@ public class RemoveGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
 
         if (member is null)
             throw new EntityNotFoundException("Group member not found.");
+
+        if (member.AccessLevel == GroupAccessLevel.Owner)
+        {
+            var ownerCount = await db.GroupMembers
+                .CountAsync(gm => gm.GroupId == command.GroupId
+                                && gm.AccessLevel == GroupAccessLevel.Owner, ct);
+
+            if (ownerCount <= 1)
+                throw new BusinessRuleException("Cannot remove the last owner of the group.");
+        }
 
         auditLogger.LogUpdated("Group", command.GroupId,
         [

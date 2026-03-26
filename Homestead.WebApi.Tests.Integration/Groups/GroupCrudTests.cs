@@ -147,4 +147,60 @@ public class GroupCrudTests : IntegrationTestBase
         Assert.Single(body!.Items);
         Assert.Equal("Alpha Team", body.Items[0].Name);
     }
+
+    [Fact]
+    public async Task CreateGroup_NameTooLong_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/groups", new
+        {
+            name = new string('a', 257)
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateGroup_DescriptionTooLong_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/groups", new
+        {
+            name = "Valid Name",
+            description = new string('a', 1025)
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateGroup_NameTooLong_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(client, "Original Name");
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/groups/{groupId}", new
+        {
+            name = new string('a', 257)
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateGroup_DescriptionTooLong_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(client, "Desc Test Group");
+
+        var response = await client.PutAsJsonAsync($"/api/v1/admin/groups/{groupId}", new
+        {
+            name = "Desc Test Group",
+            description = new string('a', 1025)
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

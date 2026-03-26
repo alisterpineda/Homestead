@@ -99,4 +99,74 @@ public class GroupMemberTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<GroupMemberItem>(CT);
         Assert.Equal("Owner", body!.AccessLevel);
     }
+
+    [Fact]
+    public async Task RemoveLastOwner_Returns400()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Last Owner Remove Group");
+        var adminUserId = await GetUserIdAsync(adminClient);
+
+        var response = await adminClient.DeleteAsync(
+            $"/api/v1/admin/groups/{groupId}/members/{adminUserId}", CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemoveOwner_WhenOtherOwnersExist_Returns204()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Multi Owner Remove Group");
+        var adminUserId = await GetUserIdAsync(adminClient);
+
+        var targetClient = await CreateUserClientAsync(role: "Contributor");
+        var targetUserId = await GetUserIdAsync(targetClient);
+
+        await AddGroupMemberAsync(adminClient, groupId, targetUserId, "Owner");
+
+        var response = await adminClient.DeleteAsync(
+            $"/api/v1/admin/groups/{groupId}/members/{adminUserId}", CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateLastOwnerToEditor_Returns400()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Last Owner Update Group");
+        var adminUserId = await GetUserIdAsync(adminClient);
+
+        var response = await adminClient.PutAsJsonAsync(
+            $"/api/v1/admin/groups/{groupId}/members/{adminUserId}", new
+            {
+                accessLevel = "Editor"
+            }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateOwnerToEditor_WhenOtherOwnersExist_Returns200()
+    {
+        var adminClient = await CreateAdminClientAsync();
+        var groupId = await CreateGroupAsync(adminClient, "Multi Owner Update Group");
+        var adminUserId = await GetUserIdAsync(adminClient);
+
+        var targetClient = await CreateUserClientAsync(role: "Contributor");
+        var targetUserId = await GetUserIdAsync(targetClient);
+
+        await AddGroupMemberAsync(adminClient, groupId, targetUserId, "Owner");
+
+        var response = await adminClient.PutAsJsonAsync(
+            $"/api/v1/admin/groups/{groupId}/members/{adminUserId}", new
+            {
+                accessLevel = "Editor"
+            }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GroupMemberItem>(CT);
+        Assert.Equal("Editor", body!.AccessLevel);
+    }
 }

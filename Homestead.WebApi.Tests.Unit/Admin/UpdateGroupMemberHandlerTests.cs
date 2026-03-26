@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Groups;
@@ -94,5 +95,115 @@ public class UpdateGroupMemberHandlerTests : IDisposable
 
         _auditLogger.DidNotReceive().LogUpdated(Arg.Any<string>(), Arg.Any<Guid>(),
             Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_DowngradeLastOwner_ThrowsBusinessRuleException()
+    {
+        var groupId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _db.Groups.Add(new Group { Id = groupId, Name = "Test Group", CreatedAt = DateTimeOffset.UtcNow });
+        _db.Users.Add(new AppUser
+        {
+            Id = userId,
+            UserName = "owner@test.com",
+            Email = "owner@test.com",
+            DisplayName = "Owner User",
+            IsActive = true
+        });
+        _db.GroupMembers.Add(new GroupMember
+        {
+            GroupId = groupId,
+            UserId = userId,
+            AccessLevel = GroupAccessLevel.Owner
+        });
+        await _db.SaveChangesAsync();
+
+        var command = new UpdateGroupMemberCommand
+        {
+            GroupId = groupId,
+            UserId = userId,
+            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
+        };
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(command, CancellationToken.None));
+        Assert.Contains("last owner", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_DowngradeOwner_WhenOtherOwnersExist_Succeeds()
+    {
+        var groupId = Guid.NewGuid();
+        var userId1 = Guid.NewGuid();
+        var userId2 = Guid.NewGuid();
+
+        _db.Groups.Add(new Group { Id = groupId, Name = "Test Group", CreatedAt = DateTimeOffset.UtcNow });
+        _db.Users.Add(new AppUser
+        {
+            Id = userId1,
+            UserName = "owner1@test.com",
+            Email = "owner1@test.com",
+            DisplayName = "Owner One",
+            IsActive = true
+        });
+        _db.Users.Add(new AppUser
+        {
+            Id = userId2,
+            UserName = "owner2@test.com",
+            Email = "owner2@test.com",
+            DisplayName = "Owner Two",
+            IsActive = true
+        });
+        _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId1, AccessLevel = GroupAccessLevel.Owner });
+        _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId2, AccessLevel = GroupAccessLevel.Owner });
+        await _db.SaveChangesAsync();
+
+        var command = new UpdateGroupMemberCommand
+        {
+            GroupId = groupId,
+            UserId = userId1,
+            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
+        };
+
+        var result = await _sut.Handle(command, CancellationToken.None);
+
+        Assert.Equal(GroupAccessLevel.Editor, result.AccessLevel);
+    }
+
+    [Fact]
+    public async Task Handle_OwnerToOwner_NoOp_Succeeds()
+    {
+        var groupId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _db.Groups.Add(new Group { Id = groupId, Name = "Test Group", CreatedAt = DateTimeOffset.UtcNow });
+        _db.Users.Add(new AppUser
+        {
+            Id = userId,
+            UserName = "owner@test.com",
+            Email = "owner@test.com",
+            DisplayName = "Owner User",
+            IsActive = true
+        });
+        _db.GroupMembers.Add(new GroupMember
+        {
+            GroupId = groupId,
+            UserId = userId,
+            AccessLevel = GroupAccessLevel.Owner
+        });
+        await _db.SaveChangesAsync();
+
+        var command = new UpdateGroupMemberCommand
+        {
+            GroupId = groupId,
+            UserId = userId,
+            Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Owner }
+        };
+
+        var result = await _sut.Handle(command, CancellationToken.None);
+
+        Assert.Equal(GroupAccessLevel.Owner, result.AccessLevel);
     }
 }
