@@ -55,6 +55,13 @@ export function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+export function triggerDownload(url: string, filename: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+}
+
 /** Compare two Dates by year/month/day only (ignoring time). */
 export function datesEqual(a: Date | null, b: Date | null): boolean {
   if (a === b) return true;

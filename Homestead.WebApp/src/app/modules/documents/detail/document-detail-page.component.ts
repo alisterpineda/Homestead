@@ -13,7 +13,6 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { Location, NgTemplateOutlet } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -61,7 +60,7 @@ import { PartyInputComponent } from '../parties/party-input/party-input.componen
 import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
 import { ReprocessDialogComponent } from './reprocess-dialog/reprocess-dialog.component';
-import { formatBytes, parseDate, toIsoDateString, datesEqual } from '@/shared/utils';
+import { formatBytes, parseDate, toIsoDateString, datesEqual, triggerDownload } from '@/shared/utils';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -623,7 +622,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private destroyRef = inject(DestroyRef);
   isMobile = this.sidebarService.isMobile;
 
-  private http = inject(HttpClient);
   private documentApi = inject(DocumentApiService);
   private versionApi = inject(DocumentVersionApiService);
   private sanitizer = inject(DomSanitizer);
@@ -916,13 +914,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
       if (!id) return;
 
-      let url = `/api/v1/documents/${id}/file`;
-      if (verId) {
-        url += `?versionId=${verId}`;
-      }
-
-      this.fileSub = this.http
-        .get(url, { responseType: 'blob' })
+      this.fileSub = this.documentApi
+        .getDocumentFile(id, verId)
         .pipe(
           map((blob) => URL.createObjectURL(blob)),
           catchError(() => of(null)),
@@ -1069,10 +1062,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const url = this.fileBlobUrl();
     const doc = this.document();
     if (!url || !doc) return;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${doc.name}${this.displayFileExtension()}`;
-    a.click();
+    triggerDownload(url, `${doc.name}${this.displayFileExtension()}`);
   }
 
   handleDelete(): void {

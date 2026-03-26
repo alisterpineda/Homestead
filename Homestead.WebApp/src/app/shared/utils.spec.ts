@@ -1,4 +1,4 @@
-import { parseDate, toIsoDateString, datesEqual, handleFileInputChange, isNavItemActive } from './utils';
+import { parseDate, toIsoDateString, datesEqual, handleFileInputChange, isNavItemActive, triggerDownload } from './utils';
 
 describe('parseDate', () => {
   it('should return null for null/undefined/empty', () => {
@@ -82,6 +82,33 @@ describe('isNavItemActive', () => {
   it('should return false when url does not match path at all', () => {
     expect(isNavItemActive('/admin', '/documents', navPaths)).toBe(false);
     expect(isNavItemActive('/other', '/documents/parties', navPaths)).toBe(false);
+  });
+});
+
+describe('triggerDownload', () => {
+  it('should create a temporary anchor and click it', () => {
+    const clickSpy = vi.fn();
+    vi.spyOn(document, 'createElement').mockReturnValue({
+      set href(_: string) {},
+      get href() { return ''; },
+      download: '',
+      click: clickSpy,
+    } as unknown as HTMLAnchorElement);
+
+    triggerDownload('blob:http://localhost/abc', 'report.pdf');
+
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it('should set href and download attributes', () => {
+    const fakeAnchor: Partial<HTMLAnchorElement> = { href: '', download: '', click: vi.fn() };
+    vi.spyOn(document, 'createElement').mockReturnValue(fakeAnchor as HTMLAnchorElement);
+
+    triggerDownload('blob:http://localhost/abc', 'report.pdf');
+
+    expect(fakeAnchor.href).toBe('blob:http://localhost/abc');
+    expect(fakeAnchor.download).toBe('report.pdf');
   });
 });
 

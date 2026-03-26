@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -84,5 +84,14 @@ export class DocumentApiService {
 
   getMyGroups(): Observable<Array<GetMyGroupsResponse>> {
     return getMyGroups(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  getDocumentFile(id: string, versionId?: string | null): Observable<Blob> {
+    const url = `${this.config.rootUrl}/api/v1/documents/${id}/file`;
+    let params = new HttpParams();
+    if (versionId != null) {
+      params = params.set('versionId', versionId);
+    }
+    return this.http.get(url, { responseType: 'blob', params });
   }
 }

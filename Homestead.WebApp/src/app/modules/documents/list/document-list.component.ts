@@ -23,7 +23,7 @@ import { DocumentCardGridComponent } from './document-card-grid/document-card-gr
 import type { VisibilityState } from '@tanstack/angular-table';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { UploadManagerService } from '@/shared/services/upload-manager.service';
-import { handleFileInputChange } from '@/shared/utils';
+import { handleFileInputChange, triggerDownload } from '@/shared/utils';
 import { DocumentListStateService } from './document-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
@@ -827,7 +827,30 @@ export class DocumentListComponent implements OnDestroy {
   onExportSelected(): void {
     const ids = Array.from(this.selectedDocumentIds());
     if (ids.length === 0) return;
+
+    if (ids.length === 1) {
+      this.downloadSingleDocument(ids[0]);
+      return;
+    }
+
     this.startExport(ids);
+  }
+
+  private downloadSingleDocument(id: string): void {
+    const doc = this.data()?.items?.find(d => d.id === id);
+    if (!doc) return;
+
+    this.exporting.set(true);
+
+    this.documentApi.getDocumentFile(id).pipe(
+      handleMutationError(this.errorHandler, this.exporting, 'Failed to download document.'),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${doc.name}${doc.fileExtension}`);
+      setTimeout(() => URL.revokeObjectURL(url));
+      this.exporting.set(false);
+    });
   }
 
   onExportAll(): void {

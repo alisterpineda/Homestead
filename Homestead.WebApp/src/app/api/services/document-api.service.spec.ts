@@ -88,4 +88,29 @@ describe('DocumentApiService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(mockBody);
   });
+
+  it('getDocumentFile sends GET with blob responseType', () => {
+    const mockBlob = new Blob(['file content'], { type: 'application/pdf' });
+    service.getDocumentFile('doc-1').subscribe(result => {
+      expect(result).toBeInstanceOf(Blob);
+    });
+    const req = httpTesting.expectOne('/api/v1/documents/doc-1/file');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    req.flush(mockBlob);
+  });
+
+  it('getDocumentFile appends versionId query param when provided', () => {
+    service.getDocumentFile('doc-1', 'ver-2').subscribe();
+    const req = httpTesting.expectOne('/api/v1/documents/doc-1/file?versionId=ver-2');
+    expect(req.request.method).toBe('GET');
+    req.flush(new Blob());
+  });
+
+  it('getDocumentFile omits versionId when null', () => {
+    service.getDocumentFile('doc-1', null).subscribe();
+    const req = httpTesting.expectOne('/api/v1/documents/doc-1/file');
+    expect(req.request.method).toBe('GET');
+    req.flush(new Blob());
+  });
 });
