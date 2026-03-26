@@ -70,7 +70,7 @@ describe('DocumentDetailPageComponent', () => {
         { provide: DocumentEditStateService, useValue: mockEditStateService },
         {
           provide: ProcessingHubService,
-          useValue: { jobCompleted$: new Subject() },
+          useValue: { jobCompleted$: new Subject(), waitForJob: vi.fn(() => new Promise(() => {})) },
         },
         {
           provide: ActivatedRoute,

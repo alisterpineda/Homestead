@@ -115,8 +115,11 @@ export class AddVersionDialogComponent {
       .subscribe({
         next: (response) => {
           this.uploading.set(false);
-          const toastId = toast.loading('Version uploaded. Processing...');
-          this.processingHub.trackJob(response.jobId, toastId);
+          toast.promise(this.processingHub.waitForJob(response.jobId), {
+            loading: 'Version uploaded. Processing...',
+            success: 'Version has been processed successfully.',
+            error: (err: unknown) => `Processing failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+          });
           this.dialog()?.close();
           this.versionCreated.emit();
         },

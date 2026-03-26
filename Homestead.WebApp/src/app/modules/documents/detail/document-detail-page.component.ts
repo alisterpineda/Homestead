@@ -1110,8 +1110,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   onReprocessStarted(jobId: string): void {
-    const toastId = toast.loading('Reprocessing text extraction...');
-    this.processingHub.trackJob(jobId, toastId);
+    toast.promise(this.processingHub.waitForJob(jobId), {
+      loading: 'Reprocessing text extraction...',
+      success: 'Text extraction completed successfully.',
+      error: (err: unknown) => `Reprocessing failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+    });
   }
 
   handleSave(): void {
