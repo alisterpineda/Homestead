@@ -42,7 +42,6 @@ export type { GetDocumentTagDto } from './models/get-document-tag-dto';
 export type { GetDocumentVersionDto } from './models/get-document-version-dto';
 export type { GetDocumentVersionResponse } from './models/get-document-version-response';
 export type { GetDocumentVersionsResponse } from './models/get-document-versions-response';
-export type { GetExportsResponse } from './models/get-exports-response';
 export type { GetMyGroupsResponse } from './models/get-my-groups-response';
 export type { GetPartiesResponse } from './models/get-parties-response';
 export type { GetPartyResponse } from './models/get-party-response';
@@ -63,7 +62,6 @@ export type { OperationAuthorizationRequirement } from './models/operation-autho
 export type { PaginatedResponseOfGetActivityResponse } from './models/paginated-response-of-get-activity-response';
 export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated-response-of-get-documents-response';
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
-export type { PaginatedResponseOfGetExportsResponse } from './models/paginated-response-of-get-exports-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
 export type { PaginatedResponseOfGetTagsResponse } from './models/paginated-response-of-get-tags-response';

@@ -1,10 +1,10 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy, DestroyRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy, DestroyRef, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -28,6 +28,7 @@ import { DocumentListStateService } from './document-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
+import { ExportProgressDialogComponent } from './export-progress-dialog/export-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { ExportApiService } from '@/api/services/export-api.service';
@@ -60,6 +61,7 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
     BulkEditTagsPopoverComponent,
     BulkEditPartiesPopoverComponent,
+    ExportProgressDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload })],
@@ -367,6 +369,7 @@ import { toast } from 'ngx-sonner';
       }
 
     </div>
+    <app-export-progress-dialog />
   `,
 })
 export class DocumentListComponent implements OnDestroy {
@@ -382,6 +385,8 @@ export class DocumentListComponent implements OnDestroy {
   private uploadManager = inject(UploadManagerService);
   private errorHandler = inject(ErrorHandlerService);
   private exportApi = inject(ExportApiService);
+  private exportDialog = viewChild(ExportProgressDialogComponent);
+  private cancelExport$ = new Subject<void>();
   private destroyRef = inject(DestroyRef);
   private prefs = inject(UserPreferencesService);
   private hubSub: Subscription;
@@ -831,6 +836,7 @@ export class DocumentListComponent implements OnDestroy {
 
   private startExport(ids?: string[]): void {
     this.exporting.set(true);
+    this.cancelExport$.next();
 
     this.exportApi.exportDocuments({
       body: { ids: ids ?? null },
@@ -838,23 +844,22 @@ export class DocumentListComponent implements OnDestroy {
       handleMutationError(this.errorHandler, this.exporting, 'Failed to start export.'),
     ).subscribe({
       next: (response) => {
-        this.exporting.set(false);
         this.processingHub.registerManagedJob(response.jobId);
-        toast.message('Preparing export...');
+        const downloadUrl = this.exportApi.getDownloadUrl(response.jobId);
+        this.exportDialog()?.startExport(downloadUrl);
 
         this.processingHub.jobStatusChanged$.pipe(
           filter(msg => msg.jobId === response.jobId),
           filter(msg => msg.status === 'Completed' || msg.status === 'Failed'),
           take(1),
+          takeUntil(this.cancelExport$),
           takeUntilDestroyed(this.destroyRef),
         ).subscribe(msg => {
+          this.exporting.set(false);
           if (msg.status === 'Completed') {
-            toast.success('Export ready! Starting download...');
-            const a = document.createElement('a');
-            a.href = this.exportApi.getDownloadUrl(response.jobId);
-            a.click();
+            this.exportDialog()?.markCompleted();
           } else {
-            toast.error(msg.error ?? 'Export failed.');
+            this.exportDialog()?.markFailed(msg.error);
           }
         });
       },

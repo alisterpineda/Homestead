@@ -98,7 +98,6 @@ public static class DocumentsModule
 
         var exports = v1.MapGroup("/export");
         ExportDocumentsEndpoint.Map(exports);
-        GetExportsEndpoint.Map(exports);
         DownloadExportEndpoint.Map(exports);
 
         return app;

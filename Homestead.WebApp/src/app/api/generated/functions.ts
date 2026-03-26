@@ -81,8 +81,6 @@ export type { PatchTag$Params as PatchTag$Params } from './fn/documents/patch-ta
 export { patchTag as patchTag } from './fn/documents/patch-tag';
 export type { GetMyGroups$Params as GetMyGroups$Params } from './fn/documents/get-my-groups';
 export { getMyGroups as getMyGroups } from './fn/documents/get-my-groups';
-export type { GetExports$Params as GetExports$Params } from './fn/documents/get-exports';
-export { getExports as getExports } from './fn/documents/get-exports';
 export type { ExportDocuments$Params as ExportDocuments$Params } from './fn/documents/export-documents';
 export { exportDocuments as exportDocuments } from './fn/documents/export-documents';
 export type { DownloadExport$Params as DownloadExport$Params } from './fn/documents/download-export';

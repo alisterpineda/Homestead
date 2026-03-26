@@ -100,28 +100,6 @@ public class ExportTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetExports_ReturnsUserExports()
-    {
-        var client = await CreateAdminClientAsync();
-        await UploadAndWaitAsync(client, "ForExport.pdf");
-
-        var exportResponse = await client.PostAsJsonAsync("/api/v1/documents/export",
-            new { ids = (List<Guid>?)null }, CT);
-        var exportBody = await exportResponse.Content.ReadFromJsonAsync<JobResponse>(CT);
-        await WaitForJobCompletionAsync(exportBody!.JobId);
-
-        var listResponse = await client.GetAsync("/api/v1/documents/export?Page=1&PageSize=10", CT);
-
-        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
-        var body = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<ExportItem>>(CT);
-        Assert.True(body!.TotalCount >= 1);
-        var item = body.Items.First(i => i.Id == exportBody.JobId);
-        Assert.Equal("Completed", item.Status);
-        Assert.True(item.DocumentCount > 0);
-        Assert.True(item.ZipFileSize > 0);
-    }
-
-    [Fact]
     public async Task DownloadExport_InvalidJobId_Returns404()
     {
         var client = await CreateAdminClientAsync();
@@ -170,6 +148,4 @@ public class ExportTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
 
-    private record ExportItem(Guid Id, string Status, int? DocumentCount, long? ZipFileSize,
-        DateTimeOffset CreatedAt, DateTimeOffset? CompletedAt, DateTimeOffset? ExpiresAt);
 }
