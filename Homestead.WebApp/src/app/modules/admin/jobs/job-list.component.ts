@@ -9,7 +9,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
-import { HlmBadge, type BadgeVariants } from '@/shared/components/spartan/badge';
+import { HlmBadge } from '@/shared/components/spartan/badge';
+import { statusBadgeVariant as _statusBadgeVariant, statusLabel as _statusLabel } from '@/shared/utils/processing-status.utils';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
@@ -233,16 +234,6 @@ export class JobListComponent {
     }
   }
 
-  statusBadgeVariant(status: ProcessingJobStatus): BadgeVariants['variant'] {
-    switch (status) {
-      case 'Pending': return 'outline';
-      case 'InProgress': return 'default';
-      case 'Completed': return 'secondary';
-      case 'Failed': return 'destructive';
-    }
-  }
-
-  statusLabel(status: ProcessingJobStatus): string {
-    return status === 'InProgress' ? 'In Progress' : status;
-  }
+  statusBadgeVariant = _statusBadgeVariant;
+  statusLabel = _statusLabel;
 }

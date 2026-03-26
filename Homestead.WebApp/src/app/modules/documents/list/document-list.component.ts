@@ -1,11 +1,12 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy, DestroyRef } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -29,6 +30,7 @@ import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
+import { ExportApiService } from '@/api/services/export-api.service';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
@@ -60,7 +62,7 @@ import { toast } from 'ngx-sonner';
     BulkEditPartiesPopoverComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload })],
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
       @if (loading() && !data()) {
@@ -219,6 +221,11 @@ import { toast } from 'ngx-sonner';
                           </hlm-dropdown-menu-sub>
                         </ng-template>
                       }
+                      <hlm-dropdown-menu-separator />
+                      <button hlmDropdownMenuItem (triggered)="onExportAll()" [disabled]="exporting()">
+                        <ng-icon hlm name="lucideDownload" size="sm" />
+                        {{ exporting() ? 'Exporting...' : 'Export All' }}
+                      </button>
                     </hlm-dropdown-menu>
                   </ng-template>
                 </div>
@@ -278,6 +285,10 @@ import { toast } from 'ngx-sonner';
               <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+                <button hlmBtn variant="outline" size="sm" (click)="onExportSelected()" [disabled]="!hasSelection() || exporting()">
+                  <ng-icon hlm name="lucideDownload" size="sm" />
+                  {{ exporting() ? 'Exporting...' : 'Export' }}
+                </button>
                 <hlm-alert-dialog>
                   <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
                     <ng-icon hlm name="lucideTrash2" size="sm" />
@@ -370,6 +381,8 @@ export class DocumentListComponent implements OnDestroy {
   private openDocumentsService = inject(OpenDocumentsService);
   private uploadManager = inject(UploadManagerService);
   private errorHandler = inject(ErrorHandlerService);
+  private exportApi = inject(ExportApiService);
+  private destroyRef = inject(DestroyRef);
   private prefs = inject(UserPreferencesService);
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
@@ -387,6 +400,7 @@ export class DocumentListComponent implements OnDestroy {
   loading = signal(false);
   error = signal(false);
   deleting = signal(false);
+  exporting = signal(false);
 
   ready = signal(true);
 
@@ -801,6 +815,48 @@ export class DocumentListComponent implements OnDestroy {
         toast.success(`${count} document${count > 1 ? 's' : ''} moved to trash.`);
         this.clearSelection();
         this.onRefresh();
+      },
+    });
+  }
+
+  onExportSelected(): void {
+    const ids = Array.from(this.selectedDocumentIds());
+    if (ids.length === 0) return;
+    this.startExport(ids);
+  }
+
+  onExportAll(): void {
+    this.startExport(undefined);
+  }
+
+  private startExport(ids?: string[]): void {
+    this.exporting.set(true);
+
+    this.exportApi.exportDocuments({
+      body: { ids: ids ?? null },
+    }).pipe(
+      handleMutationError(this.errorHandler, this.exporting, 'Failed to start export.'),
+    ).subscribe({
+      next: (response) => {
+        this.exporting.set(false);
+        this.processingHub.registerManagedJob(response.jobId);
+        toast.message('Preparing export...');
+
+        this.processingHub.jobStatusChanged$.pipe(
+          filter(msg => msg.jobId === response.jobId),
+          filter(msg => msg.status === 'Completed' || msg.status === 'Failed'),
+          take(1),
+          takeUntilDestroyed(this.destroyRef),
+        ).subscribe(msg => {
+          if (msg.status === 'Completed') {
+            toast.success('Export ready! Starting download...');
+            const a = document.createElement('a');
+            a.href = this.exportApi.getDownloadUrl(response.jobId);
+            a.click();
+          } else {
+            toast.error(msg.error ?? 'Export failed.');
+          }
+        });
       },
     });
   }

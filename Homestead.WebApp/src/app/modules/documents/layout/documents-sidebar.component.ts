@@ -3,7 +3,7 @@ import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX } from '@ng-icons/lucide';
+import { lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX, lucidePackage } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -21,7 +21,7 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
     HlmSidebarImports,
     HlmAlertDialogImports,
   ],
-  providers: [provideIcons({ lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX })],
+  providers: [provideIcons({ lucideFileText, lucideFiles, lucideUsers, lucideTags, lucideTrash2, lucideX, lucidePackage })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupContent>
@@ -130,6 +130,12 @@ import { DocumentEditStateService } from '../detail/document-edit-state.service'
               <span>Tags</span>
             </a>
           </li>
+          <li hlmSidebarMenuItem>
+            <a hlmSidebarMenuButton routerLink="/documents/exports" [isActive]="isActive('/documents/exports')">
+              <ng-icon hlm name="lucidePackage" size="sm" />
+              <span>Exports</span>
+            </a>
+          </li>
         </ul>
       </div>
     </div>
@@ -169,7 +175,7 @@ export class DocumentsSidebarComponent {
   protected hasAnyUnsavedChanges = computed(() => this.editStateService.unsavedDocIds().size > 0);
 
   /** More specific paths (e.g. /documents/parties) take priority over shorter ones (e.g. /documents). */
-  private readonly navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash'];
+  private readonly navPaths = ['/documents', '/documents/parties', '/documents/tags', '/documents/trash', '/documents/exports'];
 
   /** Doc ID pending close confirmation. */
   private pendingCloseDocId = signal<string | null>(null);

@@ -3,3 +3,4 @@ export { PartyApiService } from './party-api.service';
 export { DocumentApiService } from './document-api.service';
 export { DocumentVersionApiService } from './document-version-api.service';
 export { AdminApiService } from './admin-api.service';
+export { ExportApiService } from './export-api.service';

@@ -32,6 +32,7 @@ using Homestead.WebApi.Features.Documents.Documents.RestoreDocuments;
 using Homestead.WebApi.Features.Documents.Documents.PermanentlyDeleteDocuments;
 using Homestead.WebApi.Features.Documents.Documents.EmptyTrash;
 using Homestead.WebApi.Features.Documents.TextExtractionEngineSummaries.GetTextExtractionEngineSummaries;
+using Homestead.WebApi.Features.Documents.Export;
 
 using Homestead.WebApi.Authentication;
 
@@ -94,6 +95,11 @@ public static class DocumentsModule
 
         var groups = v1.MapGroup("/groups");
         GetMyGroupsEndpoint.Map(groups);
+
+        var exports = v1.MapGroup("/export");
+        ExportDocumentsEndpoint.Map(exports);
+        GetExportsEndpoint.Map(exports);
+        DownloadExportEndpoint.Map(exports);
 
         return app;
     }
