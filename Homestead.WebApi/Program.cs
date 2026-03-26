@@ -198,7 +198,26 @@ app.Use(async (context, next) =>
 });
 
 // Serve static frontend assets before auth so they don't require authentication
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.Context.Request.Path.Value ?? "";
+        // index.html and service worker files must always revalidate so browsers pick up new deployments
+        if (path.EndsWith("/index.html", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith("/ngsw.json", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith("/ngsw-worker.js", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith("/manifest.webmanifest", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+        }
+        else
+        {
+            // Hashed assets (JS/CSS/fonts/images) are safe to cache indefinitely
+            ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        }
+    },
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -227,7 +246,13 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-// SPA fallback for client-side routing
-app.MapFallbackToFile("index.html").AllowAnonymous();
+// SPA fallback for client-side routing — must also send no-cache since this always serves index.html
+app.MapFallbackToFile("index.html", new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.CacheControl = "no-cache";
+    },
+}).AllowAnonymous();
 
 app.Run();
