@@ -50,7 +50,7 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
           </div>
         </section>
       } @else {
-        <div class="max-w-2xl">
+        <div class="mx-auto w-full max-w-2xl">
           <hlm-card>
             <div hlmCardHeader>
               <h3 hlmCardTitle>Text Extraction</h3>
