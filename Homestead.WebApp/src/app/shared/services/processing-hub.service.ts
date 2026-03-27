@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import { firstValueFrom, Subject } from 'rxjs';
 import { filter, map, take } from 'rxjs/operators';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 
 export interface JobStatusChangedMessage {

@@ -1,13 +1,13 @@
 import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HlmPaginationImports, createPageArray } from '@/shared/components/spartan/pagination';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 
 @Component({
   selector: 'app-pagination',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, HlmPaginationImports, BrnSelectImports, HlmSelectImports],
+  imports: [FormsModule, HlmPaginationImports, HlmSelectImports],
   template: `
     @if (totalCount() > 0) {
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4">
@@ -15,17 +15,19 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
           Showing {{ rangeStart() }}\u2013{{ rangeEnd() }} of {{ totalCount() }}
         </span>
 
-        <brn-select [ngModel]="pageSize()" (ngModelChange)="pageSizeChange.emit(+$event)" placeholder="Page size">
+        <hlm-select [ngModel]="pageSize()" (ngModelChange)="pageSizeChange.emit(+$event)">
           <hlm-select-trigger class="w-fit">
-            <hlm-select-value />
+            <hlm-select-value placeholder="Page size" />
           </hlm-select-trigger>
-          <hlm-select-content>
-            <hlm-option [value]="10">10 / page</hlm-option>
-            <hlm-option [value]="20">20 / page</hlm-option>
-            <hlm-option [value]="50">50 / page</hlm-option>
-            <hlm-option [value]="100">100 / page</hlm-option>
-          </hlm-select-content>
-        </brn-select>
+          <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+            <hlm-select-item [value]="10">10 / page</hlm-select-item>
+            <hlm-select-item [value]="20">20 / page</hlm-select-item>
+            <hlm-select-item [value]="50">50 / page</hlm-select-item>
+            <hlm-select-item [value]="100">100 / page</hlm-select-item>
+          </hlm-select-group>
+</hlm-select-content>
+        </hlm-select>
 
         @if (totalPages() > 1) {
           <nav hlmPagination class="w-full sm:w-auto">

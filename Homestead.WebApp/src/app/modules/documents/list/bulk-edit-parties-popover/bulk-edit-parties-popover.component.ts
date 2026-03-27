@@ -26,7 +26,7 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage, CREATE_OPTION_ID } from '../../bulk-edit-shared';

@@ -8,7 +8,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { PartyApiService } from '@/api/services/party-api.service';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({

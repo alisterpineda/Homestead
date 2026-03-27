@@ -6,7 +6,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GroupDetailResponse } from '@/api/generated/models/group-detail-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 

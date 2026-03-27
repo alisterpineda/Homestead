@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import type { ApiProblemDetails } from '@/shared/types/api-problem-details';
 
 const STATUS_MESSAGES: Record<number, string> = {

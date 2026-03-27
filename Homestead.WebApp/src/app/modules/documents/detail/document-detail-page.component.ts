@@ -75,7 +75,7 @@ import { OpenDocumentsService } from './open-documents.service';
 import { DocumentEditStateService, type DocumentEditState } from './document-edit-state.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-document-detail-page',

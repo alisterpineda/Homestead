@@ -15,7 +15,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { TagApiService } from '@/api/services/tag-api.service';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -25,7 +25,7 @@ import { replace } from '@/shared/json-patch';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 const NONE_VALUE = '__none__';
 
@@ -40,8 +40,7 @@ const NONE_VALUE = '__none__';
     HlmLabel,
     HlmInput,
     HlmFormFieldImports,
-    BrnSelectImports,
-    HlmSelectImports,
+        HlmSelectImports,
     ColorPickerComponent,
     TagBadgeComponent,
   ],
@@ -77,17 +76,19 @@ const NONE_VALUE = '__none__';
 
             <div class="space-y-2">
               <label hlmLabel>Parent</label>
-              <brn-select [ngModel]="parentSelectValue()" (ngModelChange)="onParentChange($event)">
+              <hlm-select [ngModel]="parentSelectValue()" (ngModelChange)="onParentChange($event)">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
-                <hlm-select-content>
-                  <hlm-option value="__none__">None (root)</hlm-option>
+                <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+                  <hlm-select-item value="__none__">None (root)</hlm-select-item>
                   @for (parent of availableParents(); track parent.id) {
-                    <hlm-option [value]="parent.id">{{ parent.path }}</hlm-option>
+                    <hlm-select-item [value]="parent.id">{{ parent.path }}</hlm-select-item>
                   }
-                </hlm-select-content>
-              </brn-select>
+                </hlm-select-group>
+</hlm-select-content>
+              </hlm-select>
             </div>
 
             <hlm-form-field>

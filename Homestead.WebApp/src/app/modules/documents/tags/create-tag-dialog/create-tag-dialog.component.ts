@@ -9,7 +9,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({

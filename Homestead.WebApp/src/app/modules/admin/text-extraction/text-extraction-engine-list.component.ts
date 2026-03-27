@@ -24,7 +24,7 @@ import type { TextExtractionEngineResponse } from '@/api/generated/models/text-e
 import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from './engine-type-labels';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 

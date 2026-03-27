@@ -21,7 +21,7 @@ import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/pag
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-user-list',

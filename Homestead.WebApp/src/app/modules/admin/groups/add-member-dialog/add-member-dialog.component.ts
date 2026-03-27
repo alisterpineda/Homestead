@@ -8,17 +8,17 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-add-member-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, BrnSelectImports],
+  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, ],
   providers: [provideIcons({ lucideUserPlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -61,16 +61,18 @@ import { toast } from 'ngx-sonner';
 
           <div class="flex flex-col gap-2">
             <label hlmLabel>Access Level</label>
-            <brn-select [value]="accessLevel()" (valueChange)="accessLevel.set($any($event))">
+            <hlm-select [value]="accessLevel()" (valueChange)="accessLevel.set($any($event))">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
-              <hlm-select-content>
-                <hlm-option value="Owner">Owner</hlm-option>
-                <hlm-option value="Editor">Editor</hlm-option>
-                <hlm-option value="Viewer">Viewer</hlm-option>
-              </hlm-select-content>
-            </brn-select>
+              <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+                <hlm-select-item value="Owner">Owner</hlm-select-item>
+                <hlm-select-item value="Editor">Editor</hlm-select-item>
+                <hlm-select-item value="Viewer">Viewer</hlm-select-item>
+              </hlm-select-group>
+</hlm-select-content>
+            </hlm-select>
           </div>
 
           @if (addError()) {

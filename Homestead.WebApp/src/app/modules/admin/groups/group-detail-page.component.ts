@@ -10,14 +10,14 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { EditGroupSheetComponent } from './edit-group-sheet/edit-group-sheet.component';
 import { AddMemberDialogComponent } from './add-member-dialog/add-member-dialog.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GroupDetailResponse } from '@/api/generated/models/group-detail-response';
 import type { GroupAccessLevel } from '@/api/generated/models/group-access-level';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
@@ -26,8 +26,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon, HlmIconImports, HlmSpinner, HlmButton, HlmTableImports,
-    HlmAlertDialogImports, HlmSelectImports, BrnSelectImports,
-    EditGroupSheetComponent, AddMemberDialogComponent,
+    HlmAlertDialogImports, HlmSelectImports,     EditGroupSheetComponent, AddMemberDialogComponent,
   ],
   providers: [provideIcons({ lucideUsers2, lucideEdit, lucideTrash2, lucideShield, lucidePen, lucideEye })],
   template: `
@@ -100,17 +99,19 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
                         <td hlmTd class="font-medium">{{ member.displayName }}</td>
                         <td hlmTd class="hidden md:table-cell text-muted-foreground">{{ member.email }}</td>
                         <td hlmTd>
-                          <brn-select [value]="member.accessLevel"
+                          <hlm-select [value]="member.accessLevel"
                             (valueChange)="onAccessLevelChange(g.id, member.userId, $any($event))">
                             <hlm-select-trigger class="w-full h-8 text-xs">
                               <hlm-select-value />
                             </hlm-select-trigger>
-                            <hlm-select-content>
-                              <hlm-option value="Owner">Owner</hlm-option>
-                              <hlm-option value="Editor">Editor</hlm-option>
-                              <hlm-option value="Viewer">Viewer</hlm-option>
-                            </hlm-select-content>
-                          </brn-select>
+                            <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+                              <hlm-select-item value="Owner">Owner</hlm-select-item>
+                              <hlm-select-item value="Editor">Editor</hlm-select-item>
+                              <hlm-select-item value="Viewer">Viewer</hlm-select-item>
+                            </hlm-select-group>
+</hlm-select-content>
+                          </hlm-select>
                         </td>
                         <td hlmTd>
                           <button hlmBtn variant="ghost" size="icon"

@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -8,7 +8,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
@@ -20,8 +20,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
     HlmButton,
     HlmLabel,
     HlmSpinner,
-    BrnSelectImports,
-    HlmSelectImports,
+        HlmSelectImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -47,19 +46,21 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           } @else {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel>Text Extraction Engine</label>
-              <brn-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
+              <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
-                <hlm-select-content class="max-h-60">
-                  <hlm-select-scroll-up />
-                  <hlm-option value="">Default (system setting)</hlm-option>
+                <hlm-select-content *hlmSelectPortal class="max-h-60">
+<hlm-select-group>
+                  
+                  <hlm-select-item value="">Default (system setting)</hlm-select-item>
                   @for (engine of engines(); track engine.id) {
-                    <hlm-option [value]="engine.id">{{ engine.name }}</hlm-option>
+                    <hlm-select-item [value]="engine.id">{{ engine.name }}</hlm-select-item>
                   }
-                  <hlm-select-scroll-down />
-                </hlm-select-content>
-              </brn-select>
+                  
+                </hlm-select-group>
+</hlm-select-content>
+              </hlm-select>
             </div>
           }
         </div>

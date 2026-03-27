@@ -4,21 +4,21 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
 import { ENGINE_TYPE_OPTIONS } from '../engine-type-labels';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-create-text-extraction-engine-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, HlmDialogImports, HlmButton, HlmInput, HlmLabel,
-    BrnSelectImports, HlmSelectImports,
+    HlmSelectImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -41,33 +41,37 @@ import { toast } from 'ngx-sonner';
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Engine Type</label>
-            <brn-select [ngModel]="selectedEngineType()" (ngModelChange)="selectedEngineType.set($event)">
+            <hlm-select [ngModel]="selectedEngineType()" (ngModelChange)="selectedEngineType.set($event)">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
-              <hlm-select-content>
+              <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
                 @for (type of engineTypeOptions; track type.value) {
-                  <hlm-option [value]="type.value">{{ type.label }}</hlm-option>
+                  <hlm-select-item [value]="type.value">{{ type.label }}</hlm-select-item>
                 }
-              </hlm-select-content>
-            </brn-select>
+              </hlm-select-group>
+</hlm-select-content>
+            </hlm-select>
           </div>
 
           @if (selectedEngineType() === 'Tesseract') {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel>Languages</label>
-              <brn-select [multiple]="true" [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
+              <hlm-select-multiple [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
-                <hlm-select-content class="max-h-60">
-                  <hlm-select-scroll-up />
+                <hlm-select-content *hlmSelectPortal class="max-h-60">
+<hlm-select-group>
+                  
                   @for (lang of languages; track lang.value) {
-                    <hlm-option [value]="lang.value">{{ lang.label }}</hlm-option>
+                    <hlm-select-item [value]="lang.value">{{ lang.label }}</hlm-select-item>
                   }
-                  <hlm-select-scroll-down />
-                </hlm-select-content>
-              </brn-select>
+                  
+                </hlm-select-group>
+</hlm-select-content>
+              </hlm-select-multiple>
             </div>
           }
 

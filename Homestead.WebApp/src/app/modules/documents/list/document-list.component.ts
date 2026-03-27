@@ -41,7 +41,7 @@ import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-document-list',

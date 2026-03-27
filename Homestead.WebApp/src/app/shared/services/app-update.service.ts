@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
 import { filter, timer } from 'rxjs';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 /** Interval between automatic update checks (6 hours). */
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;

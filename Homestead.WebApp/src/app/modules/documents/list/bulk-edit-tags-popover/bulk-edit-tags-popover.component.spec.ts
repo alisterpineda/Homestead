@@ -2,7 +2,7 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Component, signal } from '@angular/core';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 

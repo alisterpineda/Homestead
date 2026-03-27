@@ -15,13 +15,13 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ChangePasswordDialogComponent } from '../change-password-dialog/change-password-dialog.component';
@@ -36,8 +36,7 @@ import { ChangePasswordDialogComponent } from '../change-password-dialog/change-
     HlmLabel,
     HlmInput,
     HlmCheckboxImports,
-    BrnSelectImports,
-    HlmSelectImports,
+        HlmSelectImports,
     ChangePasswordDialogComponent,
   ],
   template: `
@@ -75,17 +74,19 @@ import { ChangePasswordDialogComponent } from '../change-password-dialog/change-
 
             <div class="space-y-2">
               <label hlmLabel>Role</label>
-              <brn-select [ngModel]="editRole()" (ngModelChange)="editRole.set($event)">
+              <hlm-select [ngModel]="editRole()" (ngModelChange)="editRole.set($event)">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
-                <hlm-select-content>
-                  <hlm-option value="Admin">Admin</hlm-option>
-                  <hlm-option value="Contributor">Contributor</hlm-option>
-                  <hlm-option value="Viewer">Viewer</hlm-option>
-                  <hlm-option value="Guest">Guest</hlm-option>
-                </hlm-select-content>
-              </brn-select>
+                <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+                  <hlm-select-item value="Admin">Admin</hlm-select-item>
+                  <hlm-select-item value="Contributor">Contributor</hlm-select-item>
+                  <hlm-select-item value="Viewer">Viewer</hlm-select-item>
+                  <hlm-select-item value="Guest">Guest</hlm-select-item>
+                </hlm-select-group>
+</hlm-select-content>
+              </hlm-select>
             </div>
 
             <div class="flex items-center gap-2">

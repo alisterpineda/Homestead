@@ -1,25 +1,27 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output } from '@angular/core';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
 
 @Component({
   selector: 'app-group-select',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSelectImports, BrnSelectImports],
+  imports: [HlmSelectImports, ],
   template: `
-    <brn-select [value]="value()" (valueChange)="onValueChange($any($event))" [placeholder]="placeholder()">
+    <hlm-select [value]="value()" (valueChange)="onValueChange($any($event))">
       <hlm-select-trigger [class]="triggerClass()">
-        <hlm-select-value />
+        <hlm-select-value [placeholder]="placeholder()" />
       </hlm-select-trigger>
-      <hlm-select-content>
-        <hlm-option value="">All Groups</hlm-option>
+      <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+        <hlm-select-item value="">All Groups</hlm-select-item>
         @for (group of groups(); track group.id) {
-          <hlm-option [value]="group.id">{{ group.name }}</hlm-option>
+          <hlm-select-item [value]="group.id">{{ group.name }}</hlm-select-item>
         }
-      </hlm-select-content>
-    </brn-select>
+      </hlm-select-group>
+</hlm-select-content>
+    </hlm-select>
   `,
 })
 export class GroupSelectComponent {

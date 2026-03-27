@@ -5,11 +5,11 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { AppRole } from '@/api/generated/models/app-role';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
@@ -21,8 +21,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
     HlmButton,
     HlmInput,
     HlmLabel,
-    BrnSelectImports,
-    HlmSelectImports,
+        HlmSelectImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -82,17 +81,19 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
           </div>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Role</label>
-            <brn-select [ngModel]="role()" (ngModelChange)="role.set($event)">
+            <hlm-select [ngModel]="role()" (ngModelChange)="role.set($event)">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
-              <hlm-select-content>
-                <hlm-option value="Admin">Admin</hlm-option>
-                <hlm-option value="Contributor">Contributor</hlm-option>
-                <hlm-option value="Viewer">Viewer</hlm-option>
-                <hlm-option value="Guest">Guest</hlm-option>
-              </hlm-select-content>
-            </brn-select>
+              <hlm-select-content *hlmSelectPortal>
+<hlm-select-group>
+                <hlm-select-item value="Admin">Admin</hlm-select-item>
+                <hlm-select-item value="Contributor">Contributor</hlm-select-item>
+                <hlm-select-item value="Viewer">Viewer</hlm-select-item>
+                <hlm-select-item value="Guest">Guest</hlm-select-item>
+              </hlm-select-group>
+</hlm-select-content>
+            </hlm-select>
           </div>
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>

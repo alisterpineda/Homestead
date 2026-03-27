@@ -8,7 +8,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { UploadDropzoneComponent } from '../../list/upload-dropzone/upload-dropzone.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({

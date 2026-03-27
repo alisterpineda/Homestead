@@ -21,7 +21,7 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-edit-party-sheet',

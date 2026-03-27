@@ -5,7 +5,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { AdminApiService } from '@/api/services/admin-api.service';
@@ -14,14 +14,14 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../engine-type-labels';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-edit-text-extraction-engine-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, HlmSheetImports, HlmButton, HlmInput, HlmLabel, HlmBadge,
-    BrnSelectImports, HlmSelectImports,
+    HlmSelectImports,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -54,18 +54,20 @@ import { toast } from 'ngx-sonner';
                 @if (e.isBuiltIn) {
                   <p class="text-sm text-muted-foreground">{{ getLanguagesLabel(e.configuration) }}</p>
                 } @else {
-                  <brn-select [multiple]="true" [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)">
+                  <hlm-select-multiple [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)">
                     <hlm-select-trigger class="w-full">
                       <hlm-select-value />
                     </hlm-select-trigger>
-                    <hlm-select-content class="max-h-60">
-                      <hlm-select-scroll-up />
+                    <hlm-select-content *hlmSelectPortal class="max-h-60">
+<hlm-select-group>
+                      
                       @for (lang of languages; track lang.value) {
-                        <hlm-option [value]="lang.value">{{ lang.label }}</hlm-option>
+                        <hlm-select-item [value]="lang.value">{{ lang.label }}</hlm-select-item>
                       }
-                      <hlm-select-scroll-down />
-                    </hlm-select-content>
-                  </brn-select>
+                      
+                    </hlm-select-group>
+</hlm-select-content>
+                  </hlm-select-multiple>
                 }
               </div>
             }

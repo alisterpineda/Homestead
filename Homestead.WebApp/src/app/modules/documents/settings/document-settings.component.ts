@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@a
 import { forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert } from '@ng-icons/lucide';
-import { BrnSelectImports } from '@spartan-ng/brain/select';
+
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -14,7 +14,7 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 
@@ -31,8 +31,7 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
     HlmLabel,
     HlmSpinner,
     HlmEmptyImports,
-    BrnSelectImports,
-    HlmSelectImports,
+        HlmSelectImports,
   ],
   providers: [provideIcons({ lucideTriangleAlert })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -59,19 +58,21 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
             <div hlmCardContent>
               <div class="flex flex-col gap-1.5">
                 <label hlmLabel>Default Engine</label>
-                <brn-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
+                <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
                   <hlm-select-trigger class="w-full">
                     <hlm-select-value />
                   </hlm-select-trigger>
-                  <hlm-select-content class="max-h-60">
-                    <hlm-select-scroll-up />
-                    <hlm-option value="">Built-in Tesseract (default)</hlm-option>
+                  <hlm-select-content *hlmSelectPortal class="max-h-60">
+<hlm-select-group>
+                    
+                    <hlm-select-item value="">Built-in Tesseract (default)</hlm-select-item>
                     @for (engine of engines(); track engine.id) {
-                      <hlm-option [value]="engine.id">{{ engine.name }}</hlm-option>
+                      <hlm-select-item [value]="engine.id">{{ engine.name }}</hlm-select-item>
                     }
-                    <hlm-select-scroll-down />
-                  </hlm-select-content>
-                </brn-select>
+                    
+                  </hlm-select-group>
+</hlm-select-content>
+                </hlm-select>
               </div>
 
               @if (staleEngineId()) {

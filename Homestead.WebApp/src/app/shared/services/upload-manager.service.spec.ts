@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { UploadManagerService } from './upload-manager.service';
 import { ProcessingHubService } from './processing-hub.service';
 import { ApiConfiguration } from '@/api/generated/api-configuration';

@@ -26,7 +26,7 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } from '../../bulk-edit-shared';

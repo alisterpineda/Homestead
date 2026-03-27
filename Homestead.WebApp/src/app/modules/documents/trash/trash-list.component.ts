@@ -21,7 +21,7 @@ import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/mo
 import { formatBytes } from '@/shared/utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
-import { toast } from 'ngx-sonner';
+import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-trash-list',
