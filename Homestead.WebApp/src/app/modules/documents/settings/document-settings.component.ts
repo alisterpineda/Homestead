@@ -10,7 +10,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { AdminApiService } from '@/api/services/admin-api.service';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { TextExtractionEngineSummary } from '@/api/generated/models/text-extraction-engine-summary';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -93,7 +93,7 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
   `,
 })
 export class DocumentSettingsComponent {
-  private adminApi = inject(AdminApiService);
+  private documentApi = inject(DocumentApiService);
   private docVersionApi = inject(DocumentVersionApiService);
   private errorHandler = inject(ErrorHandlerService);
 
@@ -129,7 +129,7 @@ export class DocumentSettingsComponent {
       { op: 'replace', path: '/defaultTextExtractionEngineId', value: value },
     ];
 
-    this.adminApi.patchDocumentSettings({ body: patch }).pipe(
+    this.documentApi.patchDocumentSettings({ body: patch }).pipe(
       handleMutationError(this.errorHandler, this.saving, 'Failed to save document settings. Please try again.'),
     ).subscribe({
       next: (r) => {
@@ -147,14 +147,13 @@ export class DocumentSettingsComponent {
     this.loadError.set(false);
 
     forkJoin({
-      settings: this.adminApi.getDocumentSettings(),
+      settings: this.documentApi.getDocumentSettings(),
       engines: this.docVersionApi.getTextExtractionEngineSummaries(),
     }).subscribe({
       next: ({ settings, engines }) => {
         const savedId = settings.defaultTextExtractionEngineId ?? null;
         this.engines.set(engines);
         this.savedEngineId.set(savedId);
-        // staleEngineId computed derives from savedEngineId + engines
         this.selectedEngineId.set(this.staleEngineId() ? null : savedId);
         this.loading.set(false);
       },

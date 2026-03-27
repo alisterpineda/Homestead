@@ -20,8 +20,6 @@ import { getTextExtractionEngines } from '@/api/generated/fn/admin/get-text-extr
 import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
 import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text-extraction-engine';
 import { bulkDeleteTextExtractionEngines } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
-import { getDocumentSettings } from '@/api/generated/fn/admin/get-document-settings';
-import { patchDocumentSettings } from '@/api/generated/fn/admin/patch-document-settings';
 import { getProcessingJobs } from '@/api/generated/fn/processing/get-processing-jobs';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { UserResponse } from '@/api/generated/models/user-response';
@@ -33,7 +31,6 @@ import type { GroupMemberResponse } from '@/api/generated/models/group-member-re
 import type { PaginatedResponseOfTextExtractionEngineResponse } from '@/api/generated/models/paginated-response-of-text-extraction-engine-response';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
-import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 
 export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
@@ -53,8 +50,6 @@ export type { GetTextExtractionEngines$Params } from '@/api/generated/fn/admin/g
 export type { CreateTextExtractionEngine$Params } from '@/api/generated/fn/admin/create-text-extraction-engine';
 export type { UpdateTextExtractionEngine$Params } from '@/api/generated/fn/admin/update-text-extraction-engine';
 export type { BulkDeleteTextExtractionEngines$Params } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
-export type { GetDocumentSettings$Params } from '@/api/generated/fn/admin/get-document-settings';
-export type { PatchDocumentSettings$Params } from '@/api/generated/fn/admin/patch-document-settings';
 export type { GetProcessingJobs$Params } from '@/api/generated/fn/processing/get-processing-jobs';
 
 @Injectable({ providedIn: 'root' })
@@ -128,14 +123,6 @@ export class AdminApiService {
 
   bulkDeleteTextExtractionEngines(params: Parameters<typeof bulkDeleteTextExtractionEngines>[2]): Observable<BulkDeleteTextExtractionEnginesResponse> {
     return bulkDeleteTextExtractionEngines(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
-  }
-
-  getDocumentSettings(): Observable<DocumentSettingsResponse> {
-    return getDocumentSettings(this.http, this.config.rootUrl).pipe(map(r => r.body));
-  }
-
-  patchDocumentSettings(params: Parameters<typeof patchDocumentSettings>[2]): Observable<DocumentSettingsResponse> {
-    return patchDocumentSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   getProcessingJobs(params: Parameters<typeof getProcessingJobs>[2]): Observable<PaginatedResponseOfGetProcessingJobsResponse> {

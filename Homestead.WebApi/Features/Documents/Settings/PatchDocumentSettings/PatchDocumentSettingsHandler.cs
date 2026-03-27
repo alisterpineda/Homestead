@@ -2,7 +2,6 @@ using Homestead.WebApi.Common.Auditing;
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Features.Admin.Settings;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
@@ -11,7 +10,7 @@ using MediatR;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Admin.Settings.PatchDocumentSettings;
+namespace Homestead.WebApi.Features.Documents.Settings.PatchDocumentSettings;
 
 public class PatchDocumentSettingsHandler(
     AppDbContext db,

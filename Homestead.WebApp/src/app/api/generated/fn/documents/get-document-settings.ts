@@ -8,16 +8,13 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 import { DocumentSettingsResponse } from '../../models/document-settings-response';
-import { JsonPatchDocument } from '../../models/json-patch-document';
 
-export interface PatchDocumentSettings$Params {
-      body: JsonPatchDocument
+export interface GetDocumentSettings$Params {
 }
 
-export function patchDocumentSettings(http: HttpClient, rootUrl: string, params: PatchDocumentSettings$Params, context?: HttpContext): Observable<StrictHttpResponse<DocumentSettingsResponse>> {
-  const rb = new RequestBuilder(rootUrl, patchDocumentSettings.PATH, 'patch');
+export function getDocumentSettings(http: HttpClient, rootUrl: string, params?: GetDocumentSettings$Params, context?: HttpContext): Observable<StrictHttpResponse<DocumentSettingsResponse>> {
+  const rb = new RequestBuilder(rootUrl, getDocumentSettings.PATH, 'get');
   if (params) {
-    rb.body(params.body, 'application/json-patch+json');
   }
 
   return http.request(
@@ -30,4 +27,4 @@ export function patchDocumentSettings(http: HttpClient, rootUrl: string, params:
   );
 }
 
-patchDocumentSettings.PATH = '/api/v1/admin/settings/documents';
+getDocumentSettings.PATH = '/api/v1/documents/settings';

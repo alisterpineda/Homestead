@@ -85,6 +85,10 @@ export type { DownloadDocuments$Params as DownloadDocuments$Params } from './fn/
 export { downloadDocuments as downloadDocuments } from './fn/documents/download-documents';
 export type { GetDownloadFile$Params as GetDownloadFile$Params } from './fn/documents/get-download-file';
 export { getDownloadFile as getDownloadFile } from './fn/documents/get-download-file';
+export type { GetDocumentSettings$Params as GetDocumentSettings$Params } from './fn/documents/get-document-settings';
+export { getDocumentSettings as getDocumentSettings } from './fn/documents/get-document-settings';
+export type { PatchDocumentSettings$Params as PatchDocumentSettings$Params } from './fn/documents/patch-document-settings';
+export { patchDocumentSettings as patchDocumentSettings } from './fn/documents/patch-document-settings';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
 export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
 export type { GetUsers$Params as GetUsers$Params } from './fn/admin/get-users';
@@ -123,10 +127,6 @@ export type { UpdateTextExtractionEngine$Params as UpdateTextExtractionEngine$Pa
 export { updateTextExtractionEngine as updateTextExtractionEngine } from './fn/admin/update-text-extraction-engine';
 export type { BulkDeleteTextExtractionEngines$Params as BulkDeleteTextExtractionEngines$Params } from './fn/admin/bulk-delete-text-extraction-engines';
 export { bulkDeleteTextExtractionEngines as bulkDeleteTextExtractionEngines } from './fn/admin/bulk-delete-text-extraction-engines';
-export type { GetDocumentSettings$Params as GetDocumentSettings$Params } from './fn/admin/get-document-settings';
-export { getDocumentSettings as getDocumentSettings } from './fn/admin/get-document-settings';
-export type { PatchDocumentSettings$Params as PatchDocumentSettings$Params } from './fn/admin/patch-document-settings';
-export { patchDocumentSettings as patchDocumentSettings } from './fn/admin/patch-document-settings';
 export type { GetSystemSettings$Params as GetSystemSettings$Params } from './fn/admin/get-system-settings';
 export { getSystemSettings as getSystemSettings } from './fn/admin/get-system-settings';
 export type { PatchSystemSettings$Params as PatchSystemSettings$Params } from './fn/admin/patch-system-settings';

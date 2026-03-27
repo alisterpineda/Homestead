@@ -35,6 +35,8 @@ using Homestead.WebApi.Features.Documents.TextExtractionEngineSummaries.GetTextE
 using Homestead.WebApi.Features.Documents.Download;
 
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Features.Documents.Settings.GetDocumentSettings;
+using Homestead.WebApi.Features.Documents.Settings.PatchDocumentSettings;
 
 namespace Homestead.WebApi.Features.Documents;
 
@@ -99,6 +101,12 @@ public static class DocumentsModule
         var downloads = v1.MapGroup("/download");
         DownloadDocumentsEndpoint.Map(downloads);
         GetDownloadFileEndpoint.Map(downloads);
+
+        var settings = v1.MapGroup("/settings")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetDocumentSettingsEndpoint.Map(settings);
+        PatchDocumentSettingsEndpoint.Map(settings);
 
         return app;
     }

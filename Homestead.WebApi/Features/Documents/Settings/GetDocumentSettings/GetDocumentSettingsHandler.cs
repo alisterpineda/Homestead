@@ -1,12 +1,11 @@
 using System.Text.Json;
-using Homestead.WebApi.Features.Admin.Settings;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Admin.Settings.GetDocumentSettings;
+namespace Homestead.WebApi.Features.Documents.Settings.GetDocumentSettings;
 
 public class GetDocumentSettingsHandler(AppDbContext db)
     : IRequestHandler<GetDocumentSettingsQuery, DocumentSettingsResponse>

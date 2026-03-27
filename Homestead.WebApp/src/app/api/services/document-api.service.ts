@@ -14,6 +14,8 @@ import { bulkRestoreDocuments } from '@/api/generated/fn/documents/bulk-restore-
 import { bulkPermanentlyDeleteDocuments } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
 import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
 import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
+import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
+import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
@@ -24,6 +26,7 @@ import type { RestoreDocumentsResponse } from '@/api/generated/models/restore-do
 import type { PermanentlyDeleteDocumentsResponse } from '@/api/generated/models/permanently-delete-documents-response';
 import type { EmptyTrashResponse } from '@/api/generated/models/empty-trash-response';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
+import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
 
 export type { GetDocuments$Params } from '@/api/generated/fn/documents/get-documents';
 export type { GetDocument$Params } from '@/api/generated/fn/documents/get-document';
@@ -36,6 +39,7 @@ export type { BulkRestoreDocuments$Params } from '@/api/generated/fn/documents/b
 export type { BulkPermanentlyDeleteDocuments$Params } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
 export type { EmptyTrash$Params } from '@/api/generated/fn/documents/empty-trash';
 export type { GetMyGroups$Params } from '@/api/generated/fn/documents/get-my-groups';
+export type { PatchDocumentSettings$Params } from '@/api/generated/fn/documents/patch-document-settings';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentApiService {
@@ -84,6 +88,14 @@ export class DocumentApiService {
 
   getMyGroups(): Observable<Array<GetMyGroupsResponse>> {
     return getMyGroups(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  getDocumentSettings(): Observable<DocumentSettingsResponse> {
+    return getDocumentSettings(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  patchDocumentSettings(params: Parameters<typeof patchDocumentSettings>[2]): Observable<DocumentSettingsResponse> {
+    return patchDocumentSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   getDocumentFile(id: string, versionId?: string | null): Observable<Blob> {

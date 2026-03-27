@@ -12,7 +12,7 @@ public class SettingsCrudTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        var response = await client.GetAsync("/api/v1/documents/settings", CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
@@ -45,7 +45,7 @@ public class SettingsCrudTests : IntegrationTestBase
     {
         var client = await CreateUserClientAsync(role: "Contributor");
 
-        var response = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        var response = await client.GetAsync("/api/v1/documents/settings", CT);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -55,7 +55,7 @@ public class SettingsCrudTests : IntegrationTestBase
     {
         var client = CreateAnonymousClient();
 
-        var response = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        var response = await client.GetAsync("/api/v1/documents/settings", CT);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -65,7 +65,7 @@ public class SettingsCrudTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents",
+        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings",
             Array.Empty<object>());
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -79,7 +79,7 @@ public class SettingsCrudTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var builtInId = "00000000-0000-0000-0000-000000000001";
 
-        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)builtInId }
         });
@@ -94,7 +94,7 @@ public class SettingsCrudTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)Guid.NewGuid().ToString() }
         });
@@ -109,13 +109,13 @@ public class SettingsCrudTests : IntegrationTestBase
         var builtInId = "00000000-0000-0000-0000-000000000001";
 
         // Set
-        await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)builtInId }
         });
 
         // Clear
-        var response = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new object[]
+        var response = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new object[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object?)null! }
         });
@@ -142,7 +142,7 @@ public class SettingsCrudTests : IntegrationTestBase
         var engineId = created!.Id;
 
         // 2. Set it as default
-        var patchResponse = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new[]
+        var patchResponse = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object)engineId.ToString() }
         });
@@ -156,20 +156,20 @@ public class SettingsCrudTests : IntegrationTestBase
         deleteResponse.EnsureSuccessStatusCode();
 
         // 4. GET still returns the stale engine ID
-        var getResponse = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        var getResponse = await client.GetAsync("/api/v1/documents/settings", CT);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var settings = await getResponse.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
         Assert.Equal(engineId, settings!.DefaultTextExtractionEngineId);
 
         // 5. Clear the stale reference
-        var clearResponse = await SendJsonPatchAsync(client, "/api/v1/admin/settings/documents", new object[]
+        var clearResponse = await SendJsonPatchAsync(client, "/api/v1/documents/settings", new object[]
         {
             new { op = "replace", path = "/defaultTextExtractionEngineId", value = (object?)null! }
         });
         Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
 
         // 6. Verify it's cleared
-        var verifyResponse = await client.GetAsync("/api/v1/admin/settings/documents", CT);
+        var verifyResponse = await client.GetAsync("/api/v1/documents/settings", CT);
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
         var verified = await verifyResponse.Content.ReadFromJsonAsync<DocumentSettingsItem>(CT);
         Assert.Null(verified!.DefaultTextExtractionEngineId);

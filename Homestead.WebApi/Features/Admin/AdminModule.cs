@@ -17,9 +17,7 @@ using Homestead.WebApi.Features.Admin.TextExtractionEngines.BulkDeleteTextExtrac
 using Homestead.WebApi.Features.Admin.TextExtractionEngines.CreateTextExtractionEngine;
 using Homestead.WebApi.Features.Admin.TextExtractionEngines.GetTextExtractionEngines;
 using Homestead.WebApi.Features.Admin.TextExtractionEngines.UpdateTextExtractionEngine;
-using Homestead.WebApi.Features.Admin.Settings.GetDocumentSettings;
 using Homestead.WebApi.Features.Admin.Settings.GetSystemSettings;
-using Homestead.WebApi.Features.Admin.Settings.PatchDocumentSettings;
 using Homestead.WebApi.Features.Admin.Settings.PatchSystemSettings;
 using Homestead.WebApi.Features.Admin.Users.UpdateUser;
 
@@ -75,8 +73,6 @@ public static class AdminModule
             .WithTags("Admin")
             .RequireAuthorization(AuthPolicies.RequireAdmin);
 
-        GetDocumentSettingsEndpoint.Map(settings);
-        PatchDocumentSettingsEndpoint.Map(settings);
         GetSystemSettingsEndpoint.Map(settings);
         PatchSystemSettingsEndpoint.Map(settings);
 

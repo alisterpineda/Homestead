@@ -69,16 +69,6 @@ describe('AdminApiService', () => {
     req.flush(null);
   });
 
-  it('getDocumentSettings sends GET and unwraps body', () => {
-    const mockBody = { defaultTextExtractionEngineId: 'e1' };
-    service.getDocumentSettings().subscribe(result => {
-      expect(result).toEqual(mockBody);
-    });
-    const req = httpTesting.expectOne('/api/v1/admin/settings/documents');
-    expect(req.request.method).toBe('GET');
-    req.flush(mockBody);
-  });
-
   it('getProcessingJobs sends GET and unwraps body', () => {
     const mockBody = { items: [], page: 1, pageSize: 10, totalCount: 0, totalPages: 0 };
     service.getProcessingJobs({ Page: 1, PageSize: 10 }).subscribe(result => {

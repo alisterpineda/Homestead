@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Homestead.WebApi.Features.Admin.Settings;
+namespace Homestead.WebApi.Features.Documents.Settings;
 
 public class DocumentSettings
 {
