@@ -150,4 +150,18 @@ After setup, additional users can be created from the admin panel at `/admin`, o
 
 ## Development
 
-See [CLAUDE.md](CLAUDE.md) for development setup and project structure details.
+### Dev Container Setup
+
+**Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) and [VS Code](https://code.visualstudio.com/) with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension.
+
+1. Ensure your SSH key is loaded so Git works inside the container:
+   ```bash
+   ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+   ```
+2. Open the repository in VS Code and click **"Reopen in Container"** when prompted.
+3. Once the container is ready, start the full stack:
+   ```bash
+   cd Homestead.AppHost && dotnet run
+   ```
+
+See [CLAUDE.md](CLAUDE.md) for project structure and test commands.
