@@ -1,14 +1,23 @@
 {
   "name": "Homestead",
-  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:dev-10.0-noble",
   "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "enableNonRootDocker": true,
+      "moby": true
+    },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "25"
     },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/dotnet/aspire-devcontainer-feature/dotnetaspire:1": {},
     "ghcr.io/anthropics/devcontainer-feature-claude-code:1": {}
   },
-  "forwardPorts": [4200, 5000, 5001, 8080],
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "postStartCommand": "dotnet dev-certs https --trust",
   "postCreateCommand": "cd Homestead.WebApp && npm install",
   "customizations": {
     "vscode": {
