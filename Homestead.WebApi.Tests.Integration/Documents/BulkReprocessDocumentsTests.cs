@@ -20,12 +20,9 @@ public class BulkReprocessDocumentsTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<BulkReprocessResult>(CT);
-        Assert.Equal(2, body!.JobIds.Count);
+        Assert.Single(body!.JobIds);
 
-        foreach (var jobId in body.JobIds)
-        {
-            await WaitForJobCompletionAsync(jobId);
-        }
+        await WaitForJobCompletionAsync(body.JobIds[0]);
     }
 
     [Fact]

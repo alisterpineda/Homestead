@@ -126,13 +126,13 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_NoMatchingDocuments_StillReturnsParentJobId()
+    public async Task Handle_NoMatchingDocuments_ReturnsEmptyJobIds()
     {
         var result = await _sut.Handle(
             new BulkReprocessDocumentsCommand([Guid.NewGuid()]),
             CancellationToken.None);
 
-        Assert.Single(result.JobIds);
+        Assert.Empty(result.JobIds);
     }
 
     [Fact]
