@@ -26,10 +26,10 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
   styles: `
     .scrim-overlay {
       background: linear-gradient(in oklch to top,
-        oklch(0% 0 0 / 0.85) 0%, oklch(0% 0 0 / 0.72) 12%,
-        oklch(0% 0 0 / 0.58) 24%, oklch(0% 0 0 / 0.42) 36%,
-        oklch(0% 0 0 / 0.28) 48%, oklch(0% 0 0 / 0.18) 58%,
-        oklch(0% 0 0 / 0.10) 68%, oklch(0% 0 0 / 0.04) 80%,
+        oklch(0% 0 0 / 0.9) 0%, oklch(0% 0 0 / 0.82) 10%,
+        oklch(0% 0 0 / 0.72) 20%, oklch(0% 0 0 / 0.6) 32%,
+        oklch(0% 0 0 / 0.46) 44%, oklch(0% 0 0 / 0.32) 56%,
+        oklch(0% 0 0 / 0.18) 70%, oklch(0% 0 0 / 0.08) 85%,
         oklch(0% 0 0 / 0) 100%);
     }
     .text-shadow-scrim {
@@ -117,7 +117,7 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
           }
 
           <!-- Bottom metadata overlay -->
-          <div class="scrim-overlay absolute bottom-0 inset-x-0 p-3 pt-12">
+          <div class="scrim-overlay absolute bottom-0 inset-x-0 p-3 pt-20">
             <!-- Detail lines above the title -->
             @if (doc.documentDate) {
               <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
