@@ -480,6 +480,7 @@ describe('UploadManagerService', () => {
       expect(item.status).toBe('duplicate');
       expect(item.duplicateDocumentId).toBe('doc-123');
       expect(item.duplicateDocumentName).toBe('Existing Doc');
+      expect(item.duplicateIsTrashed).toBe(false);
     });
 
     it('should show info toast for duplicate, not error toast', () => {
@@ -576,6 +577,84 @@ describe('UploadManagerService', () => {
 
       expect(service.duplicateCount()).toBe(1);
       expect(service.failedCount()).toBe(0);
+    });
+
+    it('should set duplicateIsTrashed to true when errorData contains isTrashed true', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Trashed Doc', isTrashed: 'true' },
+      });
+
+      const item = service.items()[0];
+      expect(item.status).toBe('duplicate');
+      expect(item.duplicateDocumentId).toBe('doc-123');
+      expect(item.duplicateIsTrashed).toBe(true);
+    });
+
+    it('should show "(in trash)" in toast for trashed duplicate', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Trashed Doc', isTrashed: 'true' },
+      });
+
+      expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('(in trash)'));
+    });
+
+    it('should not show "(in trash)" in toast for non-trashed duplicate', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Existing Doc', isTrashed: 'false' },
+      });
+
+      expect(toast.info).toHaveBeenCalledWith(expect.not.stringContaining('(in trash)'));
+    });
+
+    it('should default duplicateIsTrashed to false when isTrashed key is missing from errorData', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: { documentId: 'doc-123', documentName: 'Old Doc' },
+      });
+
+      const item = service.items()[0];
+      expect(item.status).toBe('duplicate');
+      expect(item.duplicateIsTrashed).toBe(false);
+      expect(toast.info).toHaveBeenCalledWith(expect.not.stringContaining('(in trash)'));
     });
   });
 });

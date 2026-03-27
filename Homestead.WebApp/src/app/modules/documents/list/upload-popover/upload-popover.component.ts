@@ -106,10 +106,13 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                   } @else if (item.status === 'duplicate') {
                     <p class="text-xs text-muted-foreground">
                       Already exists as
-                      @if (item.duplicateDocumentId) {
+                      @if (item.duplicateDocumentId && !item.duplicateIsTrashed) {
                         <a [routerLink]="['/documents', item.duplicateDocumentId]" class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ item.duplicateDocumentName ?? 'unknown' }}</a>
                       } @else {
                         <span class="font-medium">{{ item.duplicateDocumentName ?? 'unknown' }}</span>
+                        @if (item.duplicateIsTrashed) {
+                          <span class="text-muted-foreground"> (in trash)</span>
+                        }
                       }
                     </p>
                   }

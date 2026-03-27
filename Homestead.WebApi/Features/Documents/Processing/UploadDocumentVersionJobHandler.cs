@@ -62,7 +62,7 @@ public class UploadDocumentVersionJobHandler(
             var existingDocument = await db.DocumentVersions
                 .IgnoreQueryFilters()
                 .Where(v => v.FileHash == fileHash)
-                .Select(v => new { v.Document.Id, v.Document.Name })
+                .Select(v => new { v.Document.Id, v.Document.Name, v.Document.DeletedAt })
                 .FirstOrDefaultAsync(ct);
 
             if (existingDocument is not null)
@@ -70,7 +70,8 @@ public class UploadDocumentVersionJobHandler(
                 throw new DuplicateDocumentException(
                     "A document with the same content already exists.",
                     existingDocument.Id,
-                    existingDocument.Name);
+                    existingDocument.Name,
+                    isTrashed: existingDocument.DeletedAt != null);
             }
 
             // Compute next version number

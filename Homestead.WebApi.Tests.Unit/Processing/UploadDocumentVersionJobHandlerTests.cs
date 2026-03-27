@@ -326,6 +326,53 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         Assert.Equal(doc.Id, ex.ExistingDocumentId);
         Assert.Equal(doc.Name, ex.ExistingDocumentName);
         Assert.Equal("duplicate_content", ex.ErrorCode);
+        Assert.False(ex.IsTrashed);
+        Assert.Equal("false", ex.ErrorData["isTrashed"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateHash_TrashedDocument_SetsIsTrashed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var (job1, _) = CreateVersionUploadJob(doc.Id);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        await _handler.HandleAsync(job1, ct);
+
+        // Soft-delete the document
+        doc.DeletedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        // Create a second document to upload a version against (can't upload version to trashed doc)
+        var doc2 = SeedDocument();
+        var existingVersion = await _db.DocumentVersions.IgnoreQueryFilters().FirstAsync(ct);
+        var uploadId2 = Guid.NewGuid();
+        var stagingPath2 = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId2}.pdf");
+        var finalPath = Path.Combine(_mediaPath, existingVersion.FilePath);
+        File.Copy(finalPath, stagingPath2);
+
+        var payload2 = new UploadDocumentVersionPayload(
+            uploadId2, doc2.Id, "dupe-version.pdf", "v-dupe",
+            "application/pdf", 2048, ".pdf");
+        var job2 = new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.UploadDocumentVersion,
+            Status = ProcessingJobStatus.InProgress,
+            Payload = System.Text.Json.JsonSerializer.Serialize(payload2),
+            CreatedByUserId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
+            () => _handler.HandleAsync(job2, ct));
+
+        Assert.Equal(doc.Id, ex.ExistingDocumentId);
+        Assert.True(ex.IsTrashed);
+        Assert.Equal("true", ex.ErrorData["isTrashed"]);
     }
 
     [Fact]

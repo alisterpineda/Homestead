@@ -21,6 +21,7 @@ export interface UploadItem {
   error: string | null;
   duplicateDocumentId: string | null;
   duplicateDocumentName: string | null;
+  duplicateIsTrashed: boolean;
 }
 
 const MAX_CONCURRENT = 3;
@@ -78,6 +79,7 @@ export class UploadManagerService {
       error: null,
       duplicateDocumentId: null,
       duplicateDocumentName: null,
+      duplicateIsTrashed: false,
     }));
 
     this.items.update(prev => [...prev, ...newItems]);
@@ -210,12 +212,16 @@ export class UploadManagerService {
       });
     } else if (status === 'Failed') {
       if (errorCode === 'duplicate_content' && errorData) {
+        const isTrashed = errorData['isTrashed'] === 'true';
         this.updateItem(item.id, {
           status: 'duplicate',
           duplicateDocumentId: errorData['documentId'] ?? null,
           duplicateDocumentName: errorData['documentName'] ?? null,
+          duplicateIsTrashed: isTrashed,
         });
-        toast.info(`"${item.fileName}" already exists as "${errorData['documentName'] ?? 'unknown'}".`);
+        const name = errorData['documentName'] ?? 'unknown';
+        const suffix = isTrashed ? ' (in trash)' : '';
+        toast.info(`"${item.fileName}" already exists as "${name}"${suffix}.`);
       } else {
         const errorMsg = error ?? 'Processing failed';
         this.updateItem(item.id, { status: 'failed', error: errorMsg });

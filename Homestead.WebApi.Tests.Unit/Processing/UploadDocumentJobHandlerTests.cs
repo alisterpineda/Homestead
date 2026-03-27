@@ -279,6 +279,53 @@ public class UploadDocumentJobHandlerTests : IDisposable
         Assert.Equal(existingDoc.Id, ex.ExistingDocumentId);
         Assert.Equal(existingDoc.Name, ex.ExistingDocumentName);
         Assert.Equal("duplicate_content", ex.ErrorCode);
+        Assert.False(ex.IsTrashed);
+        Assert.Equal("false", ex.ErrorData["isTrashed"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateHash_TrashedDocument_SetsIsTrashed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job1, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        await _handler.HandleAsync(job1, ct);
+
+        // Soft-delete the document
+        var doc = await _db.Documents.FirstAsync(ct);
+        doc.DeletedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        // Create a second upload with same file content (same hash)
+        var uploadId = Guid.NewGuid();
+        var existingVersion = await _db.DocumentVersions.IgnoreQueryFilters().FirstAsync(ct);
+
+        var stagingPath2 = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId}.pdf");
+        var finalPath = Path.Combine(_mediaPath, existingVersion.FilePath);
+        File.Copy(finalPath, stagingPath2);
+
+        var payload2 = new UploadDocumentPayload(
+            uploadId, "dupe.pdf", "Duplicate", null,
+            "application/pdf", 1024, ".pdf");
+        var job2 = new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.UploadDocument,
+            Status = ProcessingJobStatus.InProgress,
+            Payload = JsonSerializer.Serialize(payload2),
+            CreatedByUserId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
+            () => _handler.HandleAsync(job2, ct));
+
+        Assert.Equal(doc.Id, ex.ExistingDocumentId);
+        Assert.True(ex.IsTrashed);
+        Assert.Equal("true", ex.ErrorData["isTrashed"]);
     }
 
     [Fact]
