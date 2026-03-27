@@ -1,0 +1,21 @@
+{
+  "name": "Homestead",
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "25"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/anthropics/devcontainer-feature-claude-code:1": {}
+  },
+  "forwardPorts": [4200, 5000, 5001, 8080],
+  "postCreateCommand": "cd Homestead.WebApp && npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "angular.ng-template"
+      ]
+    }
+  }
+}
