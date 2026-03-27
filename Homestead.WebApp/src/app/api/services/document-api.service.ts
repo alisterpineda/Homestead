@@ -9,6 +9,7 @@ import { createDocument } from '@/api/generated/fn/documents/create-document';
 import { patchDocument } from '@/api/generated/fn/documents/patch-document';
 import { deleteDocument } from '@/api/generated/fn/documents/delete-document';
 import { bulkDeleteDocuments } from '@/api/generated/fn/documents/bulk-delete-documents';
+import { bulkReprocessDocuments } from '@/api/generated/fn/documents/bulk-reprocess-documents';
 import { bulkUpdateDocuments } from '@/api/generated/fn/documents/bulk-update-documents';
 import { bulkRestoreDocuments } from '@/api/generated/fn/documents/bulk-restore-documents';
 import { bulkPermanentlyDeleteDocuments } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
@@ -21,6 +22,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
 import type { PatchDocumentResponse } from '@/api/generated/models/patch-document-response';
 import type { BulkDeleteDocumentsResponse } from '@/api/generated/models/bulk-delete-documents-response';
+import type { BulkReprocessDocumentsResponse } from '@/api/generated/models/bulk-reprocess-documents-response';
 import type { BulkUpdateDocumentsResponse } from '@/api/generated/models/bulk-update-documents-response';
 import type { RestoreDocumentsResponse } from '@/api/generated/models/restore-documents-response';
 import type { PermanentlyDeleteDocumentsResponse } from '@/api/generated/models/permanently-delete-documents-response';
@@ -34,6 +36,7 @@ export type { CreateDocument$Params } from '@/api/generated/fn/documents/create-
 export type { PatchDocument$Params } from '@/api/generated/fn/documents/patch-document';
 export type { DeleteDocument$Params } from '@/api/generated/fn/documents/delete-document';
 export type { BulkDeleteDocuments$Params } from '@/api/generated/fn/documents/bulk-delete-documents';
+export type { BulkReprocessDocuments$Params } from '@/api/generated/fn/documents/bulk-reprocess-documents';
 export type { BulkUpdateDocuments$Params } from '@/api/generated/fn/documents/bulk-update-documents';
 export type { BulkRestoreDocuments$Params } from '@/api/generated/fn/documents/bulk-restore-documents';
 export type { BulkPermanentlyDeleteDocuments$Params } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
@@ -68,6 +71,10 @@ export class DocumentApiService {
 
   bulkDeleteDocuments(params: Parameters<typeof bulkDeleteDocuments>[2]): Observable<BulkDeleteDocumentsResponse> {
     return bulkDeleteDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  bulkReprocessDocuments(params: Parameters<typeof bulkReprocessDocuments>[2]): Observable<BulkReprocessDocumentsResponse> {
+    return bulkReprocessDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   bulkUpdateDocuments(params: Parameters<typeof bulkUpdateDocuments>[2]): Observable<BulkUpdateDocumentsResponse> {

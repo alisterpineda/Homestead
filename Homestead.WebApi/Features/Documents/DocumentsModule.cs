@@ -1,5 +1,6 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Features.Documents.Documents.BulkDeleteDocuments;
+using Homestead.WebApi.Features.Documents.Documents.BulkReprocessDocuments;
 using Homestead.WebApi.Features.Documents.Parties.BulkDeleteParties;
 using Homestead.WebApi.Features.Documents.Documents.BulkUpdateDocuments;
 using Homestead.WebApi.Features.Documents.Tags.BulkDeleteTags;
@@ -52,6 +53,7 @@ public static class DocumentsModule
             .RequireAuthorization(AuthPolicies.ActiveUser);
 
         BulkDeleteDocumentsEndpoint.Map(v1);
+        BulkReprocessDocumentsEndpoint.Map(v1);
         BulkUpdateDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
         DeleteDocumentEndpoint.Map(v1);

@@ -13,6 +13,8 @@ export type { BulkDeleteTextExtractionEnginesCommand } from './models/bulk-delet
 export type { BulkDeleteTextExtractionEnginesResponse } from './models/bulk-delete-text-extraction-engines-response';
 export type { BulkDeleteUsersCommand } from './models/bulk-delete-users-command';
 export type { BulkDeleteUsersResponse } from './models/bulk-delete-users-response';
+export type { BulkReprocessDocumentsCommand } from './models/bulk-reprocess-documents-command';
+export type { BulkReprocessDocumentsResponse } from './models/bulk-reprocess-documents-response';
 export type { BulkUpdateDocumentsCommand } from './models/bulk-update-documents-command';
 export type { BulkUpdateDocumentsResponse } from './models/bulk-update-documents-response';
 export type { ChangeUserPasswordRequest } from './models/change-user-password-request';

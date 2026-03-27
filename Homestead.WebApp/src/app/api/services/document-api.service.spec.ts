@@ -69,6 +69,16 @@ describe('DocumentApiService', () => {
     req.flush(mockBody);
   });
 
+  it('bulkReprocessDocuments sends POST and unwraps body', () => {
+    const mockBody = { jobIds: ['job-1', 'job-2'] };
+    service.bulkReprocessDocuments({ body: { ids: ['1', '2'] } }).subscribe(result => {
+      expect(result).toEqual(mockBody);
+    });
+    const req = httpTesting.expectOne('/api/v1/documents/bulk-reprocess');
+    expect(req.request.method).toBe('POST');
+    req.flush(mockBody);
+  });
+
   it('emptyTrash sends POST', () => {
     const mockBody = { deletedCount: 5 };
     service.emptyTrash().subscribe(result => {

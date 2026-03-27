@@ -13,6 +13,8 @@ export type { GetStatus$Params as GetStatus$Params } from './fn/status/get-statu
 export { getStatus as getStatus } from './fn/status/get-status';
 export type { BulkDeleteDocuments$Params as BulkDeleteDocuments$Params } from './fn/documents/bulk-delete-documents';
 export { bulkDeleteDocuments as bulkDeleteDocuments } from './fn/documents/bulk-delete-documents';
+export type { BulkReprocessDocuments$Params as BulkReprocessDocuments$Params } from './fn/documents/bulk-reprocess-documents';
+export { bulkReprocessDocuments as bulkReprocessDocuments } from './fn/documents/bulk-reprocess-documents';
 export type { BulkUpdateDocuments$Params as BulkUpdateDocuments$Params } from './fn/documents/bulk-update-documents';
 export { bulkUpdateDocuments as bulkUpdateDocuments } from './fn/documents/bulk-update-documents';
 export type { GetDocuments$Params as GetDocuments$Params } from './fn/documents/get-documents';

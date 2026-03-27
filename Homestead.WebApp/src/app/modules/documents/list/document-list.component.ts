@@ -28,6 +28,7 @@ import { DocumentListStateService } from './document-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
+import { BulkReprocessDialogComponent } from './bulk-reprocess-dialog/bulk-reprocess-dialog.component';
 import { DownloadProgressDialogComponent } from './download-progress-dialog/download-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -61,6 +62,7 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
     BulkEditTagsPopoverComponent,
     BulkEditPartiesPopoverComponent,
+    BulkReprocessDialogComponent,
     DownloadProgressDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -287,6 +289,7 @@ import { toast } from 'ngx-sonner';
               <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+                <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
                 <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                   <ng-icon hlm name="lucideDownload" size="sm" />
                   Download
@@ -800,6 +803,35 @@ export class DocumentListComponent implements OnDestroy {
   onBulkUpdateApplied(): void {
     this.clearSelection();
     this.onRefresh();
+  }
+
+  onBulkReprocessStarted(jobIds: string[]): void {
+    const count = jobIds.length;
+    this.clearSelection();
+
+    const allDone = Promise.allSettled(
+      jobIds.map(id => this.processingHub.waitForJob(id)),
+    );
+
+    toast.promise(
+      allDone.then((results) => {
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        this.onRefresh();
+        if (failed === 0) {
+          return `Text extraction completed for ${succeeded} document${succeeded > 1 ? 's' : ''}.`;
+        }
+        if (succeeded === 0) {
+          throw new Error(`Text extraction failed for all ${failed} document${failed > 1 ? 's' : ''}.`);
+        }
+        return `Text extraction completed for ${succeeded} of ${count} document${count > 1 ? 's' : ''} (${failed} failed).`;
+      }),
+      {
+        loading: `Reprocessing text for ${count} document${count > 1 ? 's' : ''}...`,
+        success: (message) => message,
+        error: (err: unknown) => err instanceof Error ? err.message : 'Text extraction failed.',
+      },
+    );
   }
 
   onBulkDelete(ctx: { close: () => void }): void {
