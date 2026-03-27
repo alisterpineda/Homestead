@@ -13,3 +13,6 @@ node_modules/
 Homestead.WebApi/wwwroot/
 
 .local/
+
+# Claude Code
+.claude/settings.local.json
