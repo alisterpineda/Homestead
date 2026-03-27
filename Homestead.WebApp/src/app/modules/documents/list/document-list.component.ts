@@ -106,7 +106,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               </button>
             }
           </section>
-          <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
+          <div class="relative shrink-0 overflow-hidden" [class.hidden]="showInitialEmpty()">
             <!-- Normal toolbar: always rendered to hold layout height -->
             <div [class.opacity-0]="isInSelectionState()" [class.pointer-events-none]="isInSelectionState()" [attr.inert]="isInSelectionState() ? '' : null">
               <div class="flex items-center gap-2 mb-3">
@@ -288,7 +288,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <span class="whitespace-nowrap text-sm text-muted-foreground">Select items</span>
               }
 
-              <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
+              <div class="sm:ml-auto max-sm:basis-full flex flex-wrap items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
