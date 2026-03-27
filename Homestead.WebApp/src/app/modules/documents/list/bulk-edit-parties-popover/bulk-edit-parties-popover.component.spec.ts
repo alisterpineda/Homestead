@@ -219,6 +219,43 @@ describe('BulkEditPartiesPopoverComponent', () => {
     );
   });
 
+  describe('create dialog integration', () => {
+    it('selectOption with Create hides suggestions and sets dialogOpen', () => {
+      component.onPopoverStateChanged('open');
+      component.showSuggestions.set(true);
+
+      component.selectOption({ id: CREATE_OPTION_ID, name: 'New Corp' });
+
+      expect(component.showSuggestions()).toBe(false);
+      expect(component.dialogOpen()).toBe(true);
+    });
+
+    it('onPartyCreated adds new item to items list', () => {
+      component.onPopoverStateChanged('open');
+
+      component.onPartyCreated({ id: 'p3', name: 'New Corp' });
+
+      const newItem = component.items().find((p) => p.id === 'p3');
+      expect(newItem).toBeDefined();
+      expect(newItem!.initial).toBe('new');
+      expect(newItem!.state).toBe('checked');
+      expect(newItem!.name).toBe('New Corp');
+    });
+
+    it('onDialogClosed resets dialogOpen after a tick', () => {
+      vi.useFakeTimers();
+      component.dialogOpen.set(true);
+
+      component.onDialogClosed();
+      expect(component.dialogOpen()).toBe(true);
+
+      vi.advanceTimersByTime(0);
+      expect(component.dialogOpen()).toBe(false);
+
+      vi.useRealTimers();
+    });
+  });
+
   describe('loading signal', () => {
     it('loading starts false after open', () => {
       component.onPopoverStateChanged('open');

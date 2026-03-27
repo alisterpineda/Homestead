@@ -244,15 +244,39 @@ describe('BulkEditTagsPopoverComponent', () => {
       expect(component.loading()).toBe(false);
     });
 
-    it('selectOption with Create adds new item to items list', () => {
+    it('selectOption with Create hides suggestions and sets dialogOpen', () => {
       component.onPopoverStateChanged('open');
+      component.showSuggestions.set(true);
 
       component.selectOption({ type: 'create', path: 'brand-new', effectiveColor: null });
+
+      expect(component.showSuggestions()).toBe(false);
+      expect(component.dialogOpen()).toBe(true);
+    });
+
+    it('onTagCreated adds new item to items list', () => {
+      component.onPopoverStateChanged('open');
+
+      component.onTagCreated({ path: 'brand-new', effectiveColor: '#ff0000' });
 
       const newItem = component.items().find((t) => t.path === 'brand-new');
       expect(newItem).toBeDefined();
       expect(newItem!.initial).toBe('new');
       expect(newItem!.state).toBe('checked');
+      expect(newItem!.color).toBe('#ff0000');
+    });
+
+    it('onDialogClosed resets dialogOpen after a tick', () => {
+      vi.useFakeTimers();
+      component.dialogOpen.set(true);
+
+      component.onDialogClosed();
+      expect(component.dialogOpen()).toBe(true);
+
+      vi.advanceTimersByTime(0);
+      expect(component.dialogOpen()).toBe(false);
+
+      vi.useRealTimers();
     });
   });
 });

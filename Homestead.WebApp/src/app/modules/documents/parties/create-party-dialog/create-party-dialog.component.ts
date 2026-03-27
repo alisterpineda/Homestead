@@ -24,7 +24,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
-      <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
+      <button hlmBtn [size]="triggerSize()" [class.hidden]="hideTrigger()" hlmDialogTrigger>
         <ng-content />
       </button>
 
@@ -77,7 +77,10 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 })
 export class CreatePartyDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
-  created = output();
+  initialName = input('');
+  hideTrigger = input(false);
+  created = output<{ id: string; name: string }>();
+  closed = output();
 
   nameControl = new FormControl('', {
     nonNullable: true,
@@ -96,14 +99,20 @@ export class CreatePartyDialogComponent {
     return (event.target as HTMLInputElement).value;
   }
 
+  open(): void {
+    this.dialog()?.open();
+  }
+
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.nameControl.setValue('');
+      this.nameControl.setValue(this.initialName());
       this.nameControl.markAsPristine();
       this.nameControl.markAsUntouched();
       this.description.set('');
       this.creating.set(false);
       this.createError.set('');
+    } else {
+      this.closed.emit();
     }
   }
 
@@ -118,11 +127,11 @@ export class CreatePartyDialogComponent {
     this.partyApi.createParty({
       body: { name: nameVal, description: this.description().trim() || null },
     }).subscribe({
-      next: () => {
+      next: (response) => {
         this.creating.set(false);
         toast.success('Party created.');
         this.dialog()?.close();
-        this.created.emit();
+        this.created.emit({ id: response.id, name: response.name });
       },
       error: (err: unknown) => {
         this.creating.set(false);

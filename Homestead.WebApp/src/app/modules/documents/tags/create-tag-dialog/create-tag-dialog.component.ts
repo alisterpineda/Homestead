@@ -26,7 +26,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
-      <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
+      <button hlmBtn [size]="triggerSize()" [class.hidden]="hideTrigger()" hlmDialogTrigger>
         <ng-content />
       </button>
 
@@ -78,7 +78,10 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 })
 export class CreateTagDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
-  created = output();
+  initialPath = input('');
+  hideTrigger = input(false);
+  created = output<{ path: string; effectiveColor: string | null }>();
+  closed = output();
 
   pathControl = new FormControl('', {
     nonNullable: true,
@@ -97,9 +100,13 @@ export class CreateTagDialogComponent {
   private tagApi = inject(TagApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  open(): void {
+    this.dialog()?.open();
+  }
+
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.pathControl.setValue('');
+      this.pathControl.setValue(this.initialPath());
       this.pathControl.markAsPristine();
       this.pathControl.markAsUntouched();
       this.descriptionControl.setValue('');
@@ -108,6 +115,8 @@ export class CreateTagDialogComponent {
       this.selectedColor.set(null);
       this.creating.set(false);
       this.createError.set(false);
+    } else {
+      this.closed.emit();
     }
   }
 
@@ -124,11 +133,11 @@ export class CreateTagDialogComponent {
     this.tagApi.createTag({
       body: { path: pathVal, color: this.selectedColor(), description: descVal },
     }).subscribe({
-      next: () => {
+      next: (response) => {
         this.creating.set(false);
         toast.success('Tag created.');
         this.dialog()?.close();
-        this.created.emit();
+        this.created.emit({ path: response.path, effectiveColor: response.effectiveColor ?? null });
       },
       error: (err: unknown) => {
         this.creating.set(false);

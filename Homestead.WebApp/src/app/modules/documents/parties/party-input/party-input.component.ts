@@ -14,6 +14,7 @@ import {
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { PartyBadgeComponent } from '../party-badge/party-badge.component';
+import { CreatePartyDialogComponent } from '../create-party-dialog/create-party-dialog.component';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
@@ -26,7 +27,7 @@ export interface PartyOption {
 @Component({
   selector: 'app-party-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PartyBadgeComponent],
+  imports: [PartyBadgeComponent, CreatePartyDialogComponent],
   host: {
     '(document:mousedown)': 'onClickOutside($event)',
   },
@@ -75,6 +76,13 @@ export interface PartyOption {
           }
         </div>
       }
+
+      <app-create-party-dialog
+        #createPartyDialog
+        [initialName]="searchText()"
+        [hideTrigger]="true"
+        (created)="addParty($event)"
+      />
     </div>
   `,
 })
@@ -87,11 +95,11 @@ export class PartyInputComponent {
   searchText = signal('');
   showSuggestions = signal(false);
   selectedIndex = signal(0);
-  creating = signal(false);
   loading = signal(false);
 
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
+  private createPartyDialog = viewChild<CreatePartyDialogComponent>('createPartyDialog');
 
   private partyApi = inject(PartyApiService);
 
@@ -147,7 +155,8 @@ export class PartyInputComponent {
 
   selectOption(option: PartyOption): void {
     if (option.id === CREATE_OPTION_ID) {
-      this.createAndAdd(option.name);
+      this.showSuggestions.set(false);
+      this.createPartyDialog()?.open();
     } else {
       this.addParty(option);
     }
@@ -164,22 +173,6 @@ export class PartyInputComponent {
 
   removeParty(id: string): void {
     this.valueChange.emit(this.value().filter((p) => p.id !== id));
-  }
-
-  private createAndAdd(name: string): void {
-    if (this.creating()) return;
-    this.creating.set(true);
-    this.partyApi.createParty({
-      body: { name },
-    }).subscribe({
-      next: (r) => {
-        this.creating.set(false);
-        this.addParty({ id: r.id, name: r.name });
-      },
-      error: () => {
-        this.creating.set(false);
-      },
-    });
   }
 
   onSearchInput(event: Event): void {

@@ -80,6 +80,15 @@ describe('CreateTagDialogComponent', () => {
       expect(component.pathControl.untouched).toBe(true);
     });
 
+    it('should pre-fill pathControl from initialPath input', () => {
+      fixture.componentRef.setInput('initialPath', 'finance/invoices');
+      fixture.detectChanges();
+
+      component.onStateChanged('open');
+
+      expect(component.pathControl.value).toBe('finance/invoices');
+    });
+
     it('should reset descriptionControl on open', () => {
       component.descriptionControl.setValue('some description');
       component.descriptionControl.markAsDirty();
@@ -102,6 +111,26 @@ describe('CreateTagDialogComponent', () => {
       expect(component.selectedColor()).toBeNull();
       expect(component.creating()).toBe(false);
       expect(component.createError()).toBe(false);
+    });
+  });
+
+  describe('closed output', () => {
+    it('should emit closed when state changes to closed', () => {
+      const closedSpy = vi.fn();
+      component.closed.subscribe(closedSpy);
+
+      component.onStateChanged('closed');
+
+      expect(closedSpy).toHaveBeenCalledOnce();
+    });
+
+    it('should not emit closed when state changes to open', () => {
+      const closedSpy = vi.fn();
+      component.closed.subscribe(closedSpy);
+
+      component.onStateChanged('open');
+
+      expect(closedSpy).not.toHaveBeenCalled();
     });
   });
 

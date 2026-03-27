@@ -24,6 +24,7 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { TagApiService } from '@/api/services/tag-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
+import { CreateTagDialogComponent } from '../../tags/create-tag-dialog/create-tag-dialog.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -43,13 +44,14 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
     HlmButton,
     HlmAlertDialogImports,
     TagBadgeComponent,
+    CreateTagDialogComponent,
   ],
   providers: [provideIcons({ lucideTags, lucideCheck, lucideMinus, lucideX })],
   host: {
     '(document:mousedown)': 'onClickOutside($event)',
   },
   template: `
-    <div hlmPopover [state]="popoverState()" (stateChanged)="onPopoverStateChanged($event)">
+    <div hlmPopover [state]="popoverState()" [closeOnOutsidePointerEvents]="!dialogOpen()" (stateChanged)="onPopoverStateChanged($event)">
       <button hlmPopoverTrigger hlmBtn variant="outline" size="sm" [disabled]="disabled()">
         <ng-icon hlm name="lucideTags" size="sm" />
         Tags
@@ -161,6 +163,14 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
         }
       </div>
     </div>
+
+    <app-create-tag-dialog
+      #createTagDialog
+      [initialPath]="tagSearchText()"
+      [hideTrigger]="true"
+      (created)="onTagCreated($event)"
+      (closed)="onDialogClosed()"
+    />
   `,
 })
 export class BulkEditTagsPopoverComponent {
@@ -173,6 +183,8 @@ export class BulkEditTagsPopoverComponent {
   applying = signal(false);
   popoverState = signal<'open' | 'closed'>('closed');
 
+  dialogOpen = signal(false);
+
   // Search
   tagSearchText = signal('');
   showSuggestions = signal(false);
@@ -181,6 +193,7 @@ export class BulkEditTagsPopoverComponent {
 
   private tagContainer = viewChild<ElementRef<HTMLDivElement>>('tagContainer');
   private tagSearchEl = viewChild<ElementRef<HTMLInputElement>>('tagSearchEl');
+  private createTagDialog = viewChild<CreateTagDialogComponent>('createTagDialog');
   private tagApi = inject(TagApiService);
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
@@ -383,21 +396,23 @@ export class BulkEditTagsPopoverComponent {
 
   selectOption(option: { type: 'existing' | 'create'; path: string; effectiveColor: string | null }): void {
     if (option.type === 'create') {
-      this.items.update((items) => [
-        ...items,
-        {
-          path: option.path,
-          color: null,
-          initial: 'new' as const,
-          state: 'checked' as const,
-        },
-      ]);
-      this.tagSearchText.set('');
       this.showSuggestions.set(false);
-      this.tagSearchEl()?.nativeElement.focus();
+      this.dialogOpen.set(true);
+      this.createTagDialog()?.open();
     } else {
       this.addFromSuggestion({ path: option.path, effectiveColor: option.effectiveColor });
     }
+  }
+
+  onTagCreated(event: { path: string; effectiveColor: string | null }): void {
+    this.addFromSuggestion({ path: event.path, effectiveColor: event.effectiveColor });
+  }
+
+  onDialogClosed(): void {
+    // Defer so dialogOpen stays true through the CDK overlay cleanup that follows
+    // the dialog close — otherwise the popover's outside-pointer-event handler
+    // fires in the same tick and closes the popover.
+    setTimeout(() => this.dialogOpen.set(false));
   }
 
   addFromSuggestion(suggestion: Pick<GetTagsResponse, 'path' | 'effectiveColor'>): void {

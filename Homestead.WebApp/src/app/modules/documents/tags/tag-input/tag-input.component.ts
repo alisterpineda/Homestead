@@ -14,6 +14,7 @@ import {
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
+import { CreateTagDialogComponent } from '../create-tag-dialog/create-tag-dialog.component';
 import { TagApiService } from '@/api/services/tag-api.service';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
@@ -21,7 +22,7 @@ import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
 @Component({
   selector: 'app-tag-input',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TagBadgeComponent],
+  imports: [TagBadgeComponent, CreateTagDialogComponent],
   host: {
     '(document:mousedown)': 'onClickOutside($event)',
   },
@@ -51,7 +52,7 @@ import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
           @for (option of allOptions(); track option.id; let i = $index) {
             <button
               type="button"
-              (click)="addTag(option.path, option.effectiveColor)"
+              (click)="selectOption(option)"
               [class]="
                 'w-full px-3 py-2 text-left text-sm transition-colors cursor-pointer flex items-center gap-2 ' +
                 (i === selectedIndex()
@@ -73,6 +74,13 @@ import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
           }
         </div>
       }
+
+      <app-create-tag-dialog
+        #createTagDialog
+        [initialPath]="searchText()"
+        [hideTrigger]="true"
+        (created)="addTag($event.path, $event.effectiveColor)"
+      />
     </div>
   `,
 })
@@ -104,6 +112,7 @@ export class TagInputComponent {
 
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   container = viewChild<ElementRef<HTMLDivElement>>('container');
+  private createTagDialog = viewChild<CreateTagDialogComponent>('createTagDialog');
 
   private tagApi = inject(TagApiService);
 
@@ -161,6 +170,15 @@ export class TagInputComponent {
     });
   }
 
+  selectOption(option: { id: string; path: string; effectiveColor?: string | null }): void {
+    if (option.id === CREATE_OPTION_ID) {
+      this.showSuggestions.set(false);
+      this.createTagDialog()?.open();
+    } else {
+      this.addTag(option.path, option.effectiveColor);
+    }
+  }
+
   addTag(path: string, color?: string | null): void {
     const normalized = path.trim();
     if (normalized && !this.value().includes(normalized)) {
@@ -205,8 +223,7 @@ export class TagInputComponent {
     if (event.key === 'Enter') {
       event.preventDefault();
       if (this.showSuggestions() && options.length > 0 && options[this.selectedIndex()]) {
-        const opt = options[this.selectedIndex()];
-        this.addTag(opt.path, opt.effectiveColor);
+        this.selectOption(options[this.selectedIndex()]);
       }
     } else if (event.key === 'Backspace' && this.searchText() === '' && this.value().length > 0) {
       this.removeTag(this.value()[this.value().length - 1]);

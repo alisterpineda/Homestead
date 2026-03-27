@@ -91,6 +91,22 @@ describe('TagInputComponent', () => {
     expect(fixture.componentInstance.tags()).toContain('newTag');
   });
 
+  it('selectOption with create option hides suggestions without adding tag', () => {
+    component.showSuggestions.set(true);
+
+    component.selectOption({ id: CREATE_OPTION_ID, path: 'new-tag', effectiveColor: null });
+
+    expect(component.showSuggestions()).toBe(false);
+    expect(fixture.componentInstance.tags()).not.toContain('new-tag');
+  });
+
+  it('selectOption with existing option adds tag directly', () => {
+    component.selectOption({ id: 't1', path: 'finance', effectiveColor: '#ff0000' });
+
+    expect(fixture.componentInstance.tags()).toContain('finance');
+    expect(component.colorMap().get('finance')).toBe('#ff0000');
+  });
+
   it('addTag with existing suggestion propagates color', () => {
     component.onSearchInput({ target: { value: 'fin' } } as unknown as Event);
 

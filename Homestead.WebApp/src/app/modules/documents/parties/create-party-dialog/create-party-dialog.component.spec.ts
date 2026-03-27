@@ -63,6 +63,15 @@ describe('CreatePartyDialogComponent', () => {
       expect(component.nameControl.untouched).toBe(true);
     });
 
+    it('should pre-fill nameControl from initialName input', () => {
+      fixture.componentRef.setInput('initialName', 'Acme Corp');
+      fixture.detectChanges();
+
+      component.onStateChanged('open');
+
+      expect(component.nameControl.value).toBe('Acme Corp');
+    });
+
     it('should reset other signals on open', () => {
       component.description.set('some desc');
       component.creating.set(true);
@@ -73,6 +82,26 @@ describe('CreatePartyDialogComponent', () => {
       expect(component.description()).toBe('');
       expect(component.creating()).toBe(false);
       expect(component.createError()).toBe('');
+    });
+  });
+
+  describe('closed output', () => {
+    it('should emit closed when state changes to closed', () => {
+      const closedSpy = vi.fn();
+      component.closed.subscribe(closedSpy);
+
+      component.onStateChanged('closed');
+
+      expect(closedSpy).toHaveBeenCalledOnce();
+    });
+
+    it('should not emit closed when state changes to open', () => {
+      const closedSpy = vi.fn();
+      component.closed.subscribe(closedSpy);
+
+      component.onStateChanged('open');
+
+      expect(closedSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -24,6 +24,7 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { PartyApiService } from '@/api/services/party-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
+import { CreatePartyDialogComponent } from '../../parties/create-party-dialog/create-party-dialog.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -43,13 +44,14 @@ import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage,
     HlmButton,
     HlmAlertDialogImports,
     PartyBadgeComponent,
+    CreatePartyDialogComponent,
   ],
   providers: [provideIcons({ lucideUsers, lucideCheck, lucideMinus, lucideX })],
   host: {
     '(document:mousedown)': 'onClickOutside($event)',
   },
   template: `
-    <div hlmPopover [state]="popoverState()" (stateChanged)="onPopoverStateChanged($event)">
+    <div hlmPopover [state]="popoverState()" [closeOnOutsidePointerEvents]="!dialogOpen()" (stateChanged)="onPopoverStateChanged($event)">
       <button hlmPopoverTrigger hlmBtn variant="outline" size="sm" [disabled]="disabled()">
         <ng-icon hlm name="lucideUsers" size="sm" />
         Parties
@@ -158,6 +160,14 @@ import { type PartyCheckboxItem, nextState, isChanged, buildConfirmationMessage,
         }
       </div>
     </div>
+
+    <app-create-party-dialog
+      #createPartyDialog
+      [initialName]="partySearchText()"
+      [hideTrigger]="true"
+      (created)="onPartyCreated($event)"
+      (closed)="onDialogClosed()"
+    />
   `,
 })
 export class BulkEditPartiesPopoverComponent {
@@ -172,15 +182,17 @@ export class BulkEditPartiesPopoverComponent {
   applying = signal(false);
   popoverState = signal<'open' | 'closed'>('closed');
 
+  dialogOpen = signal(false);
+
   // Search
   partySearchText = signal('');
   showSuggestions = signal(false);
   selectedIndex = signal(0);
-  creatingParty = signal(false);
   loading = signal(false);
 
   private partyContainer = viewChild<ElementRef<HTMLDivElement>>('partyContainer');
   private partySearchEl = viewChild<ElementRef<HTMLInputElement>>('partySearchEl');
+  private createPartyDialog = viewChild<CreatePartyDialogComponent>('createPartyDialog');
   private partyApi = inject(PartyApiService);
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
@@ -373,10 +385,23 @@ export class BulkEditPartiesPopoverComponent {
 
   selectOption(option: { id: string; name: string }): void {
     if (option.id === CREATE_OPTION_ID) {
-      this.createAndAddParty(option.name);
+      this.showSuggestions.set(false);
+      this.dialogOpen.set(true);
+      this.createPartyDialog()?.open();
     } else {
       this.addFromSuggestion(option);
     }
+  }
+
+  onPartyCreated(event: { id: string; name: string }): void {
+    this.addFromSuggestion(event);
+  }
+
+  onDialogClosed(): void {
+    // Defer so dialogOpen stays true through the CDK overlay cleanup that follows
+    // the dialog close — otherwise the popover's outside-pointer-event handler
+    // fires in the same tick and closes the popover.
+    setTimeout(() => this.dialogOpen.set(false));
   }
 
   addFromSuggestion(party: { id: string; name: string }): void {
@@ -401,22 +426,6 @@ export class BulkEditPartiesPopoverComponent {
     this.partySearchText.set('');
     this.showSuggestions.set(false);
     this.partySearchEl()?.nativeElement.focus();
-  }
-
-  private createAndAddParty(name: string): void {
-    if (this.creatingParty()) return;
-    this.creatingParty.set(true);
-    this.partyApi.createParty({
-      body: { name },
-    }).subscribe({
-      next: (r) => {
-        this.creatingParty.set(false);
-        this.addFromSuggestion({ id: r.id, name: r.name });
-      },
-      error: () => {
-        this.creatingParty.set(false);
-      },
-    });
   }
 
   // --- Click outside ---

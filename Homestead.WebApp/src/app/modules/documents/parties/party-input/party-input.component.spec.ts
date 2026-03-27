@@ -67,6 +67,21 @@ describe('PartyInputComponent', () => {
     expect(component.allOptions().find((o) => o.id === CREATE_OPTION_ID)!.name).toBe('New Corp');
   });
 
+  it('selectOption with create option hides suggestions without adding party', () => {
+    component.showSuggestions.set(true);
+
+    component.selectOption({ id: CREATE_OPTION_ID, name: 'New Corp' });
+
+    expect(component.showSuggestions()).toBe(false);
+    expect(fixture.componentInstance.parties()).toEqual([]);
+  });
+
+  it('selectOption with existing option adds party directly', () => {
+    component.selectOption({ id: 'p1', name: 'Acme Corp' });
+
+    expect(fixture.componentInstance.parties()).toEqual([{ id: 'p1', name: 'Acme Corp' }]);
+  });
+
   it('Create option hidden when exact match found', () => {
     component.onSearchInput({ target: { value: 'Acme Corp' } } as unknown as Event);
     component.showSuggestions.set(true);
