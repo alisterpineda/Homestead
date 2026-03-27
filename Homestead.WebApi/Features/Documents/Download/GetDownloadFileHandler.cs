@@ -4,20 +4,20 @@ using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Documents.Export;
+namespace Homestead.WebApi.Features.Documents.Download;
 
-public class DownloadExportHandler(
+public class GetDownloadFileHandler(
     AppDbContext db,
     IConfiguration configuration,
-    ICurrentUserAccessor currentUser) : IRequestHandler<DownloadExportQuery, IResult>
+    ICurrentUserAccessor currentUser) : IRequestHandler<GetDownloadFileQuery, IResult>
 {
-    public async Task<IResult> Handle(DownloadExportQuery request, CancellationToken ct)
+    public async Task<IResult> Handle(GetDownloadFileQuery request, CancellationToken ct)
     {
         var job = await db.ProcessingJobs
             .AsNoTracking()
             .FirstOrDefaultAsync(j => j.Id == request.JobId, ct);
 
-        if (job is null || job.Type != ProcessingJobType.ExportDocuments)
+        if (job is null || job.Type != ProcessingJobType.DownloadDocuments)
             return Results.NotFound();
 
         if (job.CreatedByUserId != currentUser.UserId)
@@ -25,20 +25,20 @@ public class DownloadExportHandler(
 
         if (job.Status != ProcessingJobStatus.Completed)
             return Results.Problem(
-                detail: "Export is not ready for download.",
+                detail: "Download is not ready yet.",
                 statusCode: StatusCodes.Status409Conflict);
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        var zipPath = ExportCleanupHelper.GetExportPath(mediaPath, job.Id);
+        var zipPath = DownloadCleanupHelper.GetDownloadPath(mediaPath, job.Id);
 
         if (!File.Exists(zipPath))
             return Results.Problem(
-                detail: "Export file has expired. Please create a new export.",
+                detail: "Download has expired. Please create a new download.",
                 statusCode: StatusCodes.Status410Gone);
 
-        var fileName = $"Homestead-Export-{job.CompletedAt?.UtcDateTime:yyyy-MM-dd}.zip";
+        var fileName = $"Homestead-Download-{job.CompletedAt?.UtcDateTime:yyyy-MM-dd}.zip";
         return Results.File(zipPath, "application/zip", fileName);
     }
 }

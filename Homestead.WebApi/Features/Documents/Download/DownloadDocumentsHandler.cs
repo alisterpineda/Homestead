@@ -8,25 +8,25 @@ using Homestead.WebApi.Processing;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Features.Documents.Export;
+namespace Homestead.WebApi.Features.Documents.Download;
 
-public class ExportDocumentsHandler(
+public class DownloadDocumentsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IDocumentQueryService accessService,
-    IJobQueue jobQueue) : IRequestHandler<ExportDocumentsCommand, ExportDocumentsResponse>
+    IJobQueue jobQueue) : IRequestHandler<DownloadDocumentsCommand, DownloadDocumentsResponse>
 {
-    public async Task<ExportDocumentsResponse> Handle(ExportDocumentsCommand request, CancellationToken ct)
+    public async Task<DownloadDocumentsResponse> Handle(DownloadDocumentsCommand request, CancellationToken ct)
     {
-        // Guard: only one active export per user
-        var hasActiveExport = await db.ProcessingJobs
+        // Guard: only one active download per user
+        var hasActiveDownload = await db.ProcessingJobs
             .AnyAsync(j =>
-                j.Type == ProcessingJobType.ExportDocuments &&
+                j.Type == ProcessingJobType.DownloadDocuments &&
                 j.CreatedByUserId == currentUser.UserId &&
                 (j.Status == ProcessingJobStatus.Pending || j.Status == ProcessingJobStatus.InProgress), ct);
 
-        if (hasActiveExport)
-            throw new BusinessRuleException("An export is already in progress.");
+        if (hasActiveDownload)
+            throw new BusinessRuleException("A download is already in progress.");
 
         List<Guid> documentIds;
 
@@ -42,18 +42,18 @@ public class ExportDocumentsHandler(
             documentIds = await accessService.AccessibleDocumentIds().ToListAsync(ct);
 
             if (documentIds.Count == 0)
-                throw new BusinessRuleException("No documents available to export.");
+                throw new BusinessRuleException("No documents available to download.");
         }
 
-        var payload = new ExportDocumentsPayload(documentIds);
+        var payload = new DownloadDocumentsPayload(documentIds);
 
-        var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.ExportDocuments, opts =>
+        var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.DownloadDocuments, opts =>
         {
-            opts.EntityType = ProcessingEntityType.Export;
+            opts.EntityType = ProcessingEntityType.Download;
             opts.CreatedByUserId = currentUser.UserId;
             opts.Payload = System.Text.Json.JsonSerializer.Serialize(payload);
         }, ct);
 
-        return new ExportDocumentsResponse(jobId);
+        return new DownloadDocumentsResponse(jobId);
     }
 }

@@ -8,12 +8,12 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 
-export interface DownloadExport$Params {
+export interface GetDownloadFile$Params {
   jobId: string;
 }
 
-export function downloadExport(http: HttpClient, rootUrl: string, params: DownloadExport$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, downloadExport.PATH, 'get');
+export function getDownloadFile(http: HttpClient, rootUrl: string, params: GetDownloadFile$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, getDownloadFile.PATH, 'get');
   if (params) {
     rb.path('jobId', params.jobId, {});
   }
@@ -28,4 +28,4 @@ export function downloadExport(http: HttpClient, rootUrl: string, params: Downlo
   );
 }
 
-downloadExport.PATH = '/api/v1/documents/export/{jobId}/download';
+getDownloadFile.PATH = '/api/v1/documents/download/{jobId}';

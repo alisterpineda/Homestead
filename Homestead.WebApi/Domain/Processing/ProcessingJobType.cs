@@ -5,5 +5,5 @@ public enum ProcessingJobType
     UploadDocument,
     UploadDocumentVersion,
     ReprocessDocumentVersion,
-    ExportDocuments
+    DownloadDocuments
 }

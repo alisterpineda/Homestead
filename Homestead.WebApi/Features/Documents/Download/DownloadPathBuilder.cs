@@ -1,26 +1,26 @@
 using System.Text.RegularExpressions;
 
-namespace Homestead.WebApi.Features.Documents.Export;
+namespace Homestead.WebApi.Features.Documents.Download;
 
-public record ExportDocumentMetadata(
+public record DownloadDocumentMetadata(
     string DocumentName,
     string FileExtension,
     List<string> TagPaths,
     List<string> PartyNames);
 
-public interface IExportPathBuilder
+public interface IDownloadPathBuilder
 {
-    List<string> BuildPaths(ExportDocumentMetadata document);
+    List<string> BuildPaths(DownloadDocumentMetadata document);
 }
 
-public partial class TagBasedExportPathBuilder : IExportPathBuilder
+public partial class TagBasedDownloadPathBuilder : IDownloadPathBuilder
 {
     private const int MaxFileNameLength = 200;
     private const string UntaggedFolder = "_Untagged";
     private const string FallbackDocumentName = "Untitled";
     private const string FallbackTagSegment = "Unknown Tag";
 
-    public List<string> BuildPaths(ExportDocumentMetadata document)
+    public List<string> BuildPaths(DownloadDocumentMetadata document)
     {
         var fileName = BuildFileName(document.DocumentName, document.PartyNames, document.FileExtension);
 

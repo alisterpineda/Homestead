@@ -12,7 +12,7 @@ using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Features.Documents.Export;
+using Homestead.WebApi.Features.Documents.Download;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.AspNetCore.Identity;
@@ -105,7 +105,7 @@ builder.Services.AddMediatR(cfg =>
 });
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
 builder.Services.AddProcessing();
-builder.Services.AddSingleton<IExportPathBuilder, TagBasedExportPathBuilder>();
+builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddThumbnails();
 

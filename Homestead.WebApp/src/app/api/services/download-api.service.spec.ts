@@ -2,10 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
-import { ExportApiService } from './export-api.service';
+import { DownloadApiService } from './download-api.service';
 
-describe('ExportApiService', () => {
-  let service: ExportApiService;
+describe('DownloadApiService', () => {
+  let service: DownloadApiService;
   let httpTesting: HttpTestingController;
 
   beforeEach(() => {
@@ -16,35 +16,35 @@ describe('ExportApiService', () => {
         { provide: ApiConfiguration, useValue: { rootUrl: '' } },
       ],
     });
-    service = TestBed.inject(ExportApiService);
+    service = TestBed.inject(DownloadApiService);
     httpTesting = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => httpTesting.verify());
 
-  it('exportDocuments sends POST and unwraps body', () => {
+  it('downloadDocuments sends POST and unwraps body', () => {
     const mockBody = { jobId: 'abc-123' };
-    service.exportDocuments({ body: { ids: ['id-1', 'id-2'] } }).subscribe(result => {
+    service.downloadDocuments({ body: { ids: ['id-1', 'id-2'] } }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
-    const req = httpTesting.expectOne(r => r.url === '/api/v1/documents/export');
+    const req = httpTesting.expectOne(r => r.url === '/api/v1/documents/download');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ ids: ['id-1', 'id-2'] });
     req.flush(mockBody);
   });
 
-  it('exportDocuments sends null ids for export all', () => {
+  it('downloadDocuments sends null ids for download all', () => {
     const mockBody = { jobId: 'abc-456' };
-    service.exportDocuments({ body: { ids: null } }).subscribe(result => {
+    service.downloadDocuments({ body: { ids: null } }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
-    const req = httpTesting.expectOne(r => r.url === '/api/v1/documents/export');
+    const req = httpTesting.expectOne(r => r.url === '/api/v1/documents/download');
     expect(req.request.body).toEqual({ ids: null });
     req.flush(mockBody);
   });
 
   it('getDownloadUrl returns correct URL', () => {
     const url = service.getDownloadUrl('job-123');
-    expect(url).toBe('/api/v1/documents/export/job-123/download');
+    expect(url).toBe('/api/v1/documents/download/job-123');
   });
 });

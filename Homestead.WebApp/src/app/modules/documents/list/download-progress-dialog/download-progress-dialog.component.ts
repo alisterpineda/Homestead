@@ -7,12 +7,12 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 
-type ExportStatus = 'idle' | 'in-progress' | 'completed' | 'failed';
+type DownloadStatus = 'idle' | 'in-progress' | 'completed' | 'failed';
 
-const DEFAULT_ERROR = 'Export failed. Please try again.';
+const DEFAULT_ERROR = 'Download failed. Please try again.';
 
 @Component({
-  selector: 'app-export-progress-dialog',
+  selector: 'app-download-progress-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
@@ -28,7 +28,7 @@ const DEFAULT_ERROR = 'Export failed. Please try again.';
 
       <hlm-dialog-content *hlmDialogPortal [showCloseButton]="status() !== 'in-progress'">
         <div hlmDialogHeader>
-          <h2 hlmDialogTitle>Export Documents</h2>
+          <h2 hlmDialogTitle>Download Documents</h2>
         </div>
 
         <div class="flex w-72 flex-col items-center gap-4 self-center py-6">
@@ -36,15 +36,15 @@ const DEFAULT_ERROR = 'Export failed. Please try again.';
             @case ('in-progress') {
               <hlm-spinner />
               <p class="text-center text-sm text-muted-foreground">
-                Preparing your export&hellip; Please do not refresh the page.
+                Preparing your download&hellip; Please do not refresh the page.
               </p>
             }
             @case ('completed') {
               <ng-icon hlm name="lucideCircleCheck" size="xl" class="text-primary" />
-              <p class="text-center text-sm text-foreground">Your export is ready.</p>
-              <a hlmBtn [href]="downloadUrl()" aria-label="Download export">
+              <p class="text-center text-sm text-foreground">Your download is ready.</p>
+              <a hlmBtn [href]="downloadUrl()" aria-label="Download documents">
                 <ng-icon hlm name="lucideDownload" size="sm" />
-                Download Export
+                Download
               </a>
             }
             @case ('failed') {
@@ -59,14 +59,14 @@ const DEFAULT_ERROR = 'Export failed. Please try again.';
     </hlm-dialog>
   `,
 })
-export class ExportProgressDialogComponent {
+export class DownloadProgressDialogComponent {
   private dialog = viewChild(BrnDialog);
 
-  status = signal<ExportStatus>('idle');
+  status = signal<DownloadStatus>('idle');
   errorMessage = signal<string>(DEFAULT_ERROR);
   downloadUrl = signal<string>('');
 
-  startExport(downloadUrl: string): void {
+  startDownload(downloadUrl: string): void {
     this.status.set('in-progress');
     this.downloadUrl.set(downloadUrl);
     this.dialog()?.open();

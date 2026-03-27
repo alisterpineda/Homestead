@@ -81,10 +81,10 @@ export type { PatchTag$Params as PatchTag$Params } from './fn/documents/patch-ta
 export { patchTag as patchTag } from './fn/documents/patch-tag';
 export type { GetMyGroups$Params as GetMyGroups$Params } from './fn/documents/get-my-groups';
 export { getMyGroups as getMyGroups } from './fn/documents/get-my-groups';
-export type { ExportDocuments$Params as ExportDocuments$Params } from './fn/documents/export-documents';
-export { exportDocuments as exportDocuments } from './fn/documents/export-documents';
-export type { DownloadExport$Params as DownloadExport$Params } from './fn/documents/download-export';
-export { downloadExport as downloadExport } from './fn/documents/download-export';
+export type { DownloadDocuments$Params as DownloadDocuments$Params } from './fn/documents/download-documents';
+export { downloadDocuments as downloadDocuments } from './fn/documents/download-documents';
+export type { GetDownloadFile$Params as GetDownloadFile$Params } from './fn/documents/get-download-file';
+export { getDownloadFile as getDownloadFile } from './fn/documents/get-download-file';
 export type { GetProcessingJobs$Params as GetProcessingJobs$Params } from './fn/processing/get-processing-jobs';
 export { getProcessingJobs as getProcessingJobs } from './fn/processing/get-processing-jobs';
 export type { GetUsers$Params as GetUsers$Params } from './fn/admin/get-users';

@@ -29,9 +29,9 @@ export type { CreateTextExtractionEngineCommand } from './models/create-text-ext
 export type { CreateUserCommand } from './models/create-user-command';
 export type { DocumentSettingsResponse } from './models/document-settings-response';
 export type { DocumentSortBy } from './models/document-sort-by';
+export type { DownloadDocumentsCommand } from './models/download-documents-command';
+export type { DownloadDocumentsResponse } from './models/download-documents-response';
 export type { EmptyTrashResponse } from './models/empty-trash-response';
-export type { ExportDocumentsCommand } from './models/export-documents-command';
-export type { ExportDocumentsResponse } from './models/export-documents-response';
 export type { GetActivityResponse } from './models/get-activity-response';
 export type { GetDocumentPartyDto } from './models/get-document-party-dto';
 export type { GetDocumentResponse } from './models/get-document-response';

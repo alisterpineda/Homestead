@@ -7,15 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ExportDocumentsCommand } from '../../models/export-documents-command';
-import { ExportDocumentsResponse } from '../../models/export-documents-response';
+import { DownloadDocumentsCommand } from '../../models/download-documents-command';
+import { DownloadDocumentsResponse } from '../../models/download-documents-response';
 
-export interface ExportDocuments$Params {
-      body: ExportDocumentsCommand
+export interface DownloadDocuments$Params {
+      body: DownloadDocumentsCommand
 }
 
-export function exportDocuments(http: HttpClient, rootUrl: string, params: ExportDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<ExportDocumentsResponse>> {
-  const rb = new RequestBuilder(rootUrl, exportDocuments.PATH, 'post');
+export function downloadDocuments(http: HttpClient, rootUrl: string, params: DownloadDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<DownloadDocumentsResponse>> {
+  const rb = new RequestBuilder(rootUrl, downloadDocuments.PATH, 'post');
   if (params) {
     rb.body(params.body, 'application/json');
   }
@@ -25,9 +25,9 @@ export function exportDocuments(http: HttpClient, rootUrl: string, params: Expor
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<ExportDocumentsResponse>;
+      return r as StrictHttpResponse<DownloadDocumentsResponse>;
     })
   );
 }
 
-exportDocuments.PATH = '/api/v1/documents/export';
+downloadDocuments.PATH = '/api/v1/documents/download';

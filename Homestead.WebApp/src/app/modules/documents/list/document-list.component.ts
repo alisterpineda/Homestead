@@ -28,10 +28,10 @@ import { DocumentListStateService } from './document-list-state.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
-import { ExportProgressDialogComponent } from './export-progress-dialog/export-progress-dialog.component';
+import { DownloadProgressDialogComponent } from './download-progress-dialog/download-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
-import { ExportApiService } from '@/api/services/export-api.service';
+import { DownloadApiService } from '@/api/services/download-api.service';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
@@ -61,7 +61,7 @@ import { toast } from 'ngx-sonner';
     PaginationComponent,
     BulkEditTagsPopoverComponent,
     BulkEditPartiesPopoverComponent,
-    ExportProgressDialogComponent,
+    DownloadProgressDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload })],
@@ -224,9 +224,9 @@ import { toast } from 'ngx-sonner';
                         </ng-template>
                       }
                       <hlm-dropdown-menu-separator />
-                      <button hlmDropdownMenuItem (triggered)="onExportAll()" [disabled]="exporting()">
+                      <button hlmDropdownMenuItem (triggered)="onDownloadAll()" [disabled]="downloading()">
                         <ng-icon hlm name="lucideDownload" size="sm" />
-                        {{ exporting() ? 'Exporting...' : 'Export All' }}
+                        {{ downloading() ? 'Downloading...' : 'Download All' }}
                       </button>
                     </hlm-dropdown-menu>
                   </ng-template>
@@ -287,9 +287,9 @@ import { toast } from 'ngx-sonner';
               <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
-                <button hlmBtn variant="outline" size="sm" (click)="onExportSelected()" [disabled]="!hasSelection() || exporting()">
+                <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection() || downloading()">
                   <ng-icon hlm name="lucideDownload" size="sm" />
-                  {{ exporting() ? 'Exporting...' : 'Export' }}
+                  {{ downloading() ? 'Downloading...' : 'Download' }}
                 </button>
                 <hlm-alert-dialog>
                   <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
@@ -369,7 +369,7 @@ import { toast } from 'ngx-sonner';
       }
 
     </div>
-    <app-export-progress-dialog />
+    <app-download-progress-dialog />
   `,
 })
 export class DocumentListComponent implements OnDestroy {
@@ -384,9 +384,9 @@ export class DocumentListComponent implements OnDestroy {
   private openDocumentsService = inject(OpenDocumentsService);
   private uploadManager = inject(UploadManagerService);
   private errorHandler = inject(ErrorHandlerService);
-  private exportApi = inject(ExportApiService);
-  private exportDialog = viewChild(ExportProgressDialogComponent);
-  private cancelExport$ = new Subject<void>();
+  private downloadApi = inject(DownloadApiService);
+  private downloadDialog = viewChild(DownloadProgressDialogComponent);
+  private cancelDownload$ = new Subject<void>();
   private destroyRef = inject(DestroyRef);
   private prefs = inject(UserPreferencesService);
   private hubSub: Subscription;
@@ -405,7 +405,7 @@ export class DocumentListComponent implements OnDestroy {
   loading = signal(false);
   error = signal(false);
   deleting = signal(false);
-  exporting = signal(false);
+  downloading = signal(false);
 
   ready = signal(true);
 
@@ -830,7 +830,7 @@ export class DocumentListComponent implements OnDestroy {
     );
   }
 
-  onExportSelected(): void {
+  onDownloadSelected(): void {
     const ids = Array.from(this.selectedDocumentIds());
     if (ids.length === 0) return;
 
@@ -839,56 +839,56 @@ export class DocumentListComponent implements OnDestroy {
       return;
     }
 
-    this.startExport(ids);
+    this.startDownload(ids);
   }
 
   private downloadSingleDocument(id: string): void {
     const doc = this.data()?.items?.find(d => d.id === id);
     if (!doc) return;
 
-    this.exporting.set(true);
+    this.downloading.set(true);
 
     this.documentApi.getDocumentFile(id).pipe(
-      handleMutationError(this.errorHandler, this.exporting, 'Failed to download document.'),
+      handleMutationError(this.errorHandler, this.downloading, 'Failed to download document.'),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(blob => {
       const url = URL.createObjectURL(blob);
       triggerDownload(url, `${doc.name}${doc.fileExtension}`);
       setTimeout(() => URL.revokeObjectURL(url));
-      this.exporting.set(false);
+      this.downloading.set(false);
     });
   }
 
-  onExportAll(): void {
-    this.startExport(undefined);
+  onDownloadAll(): void {
+    this.startDownload(undefined);
   }
 
-  private startExport(ids?: string[]): void {
-    this.exporting.set(true);
-    this.cancelExport$.next();
+  private startDownload(ids?: string[]): void {
+    this.downloading.set(true);
+    this.cancelDownload$.next();
 
-    this.exportApi.exportDocuments({
+    this.downloadApi.downloadDocuments({
       body: { ids: ids ?? null },
     }).pipe(
-      handleMutationError(this.errorHandler, this.exporting, 'Failed to start export.'),
+      handleMutationError(this.errorHandler, this.downloading, 'Failed to start download.'),
     ).subscribe({
       next: (response) => {
         this.processingHub.registerManagedJob(response.jobId);
-        const downloadUrl = this.exportApi.getDownloadUrl(response.jobId);
-        this.exportDialog()?.startExport(downloadUrl);
+        const downloadUrl = this.downloadApi.getDownloadUrl(response.jobId);
+        this.downloadDialog()?.startDownload(downloadUrl);
 
         this.processingHub.jobStatusChanged$.pipe(
           filter(msg => msg.jobId === response.jobId),
           filter(msg => msg.status === 'Completed' || msg.status === 'Failed'),
           take(1),
-          takeUntil(this.cancelExport$),
+          takeUntil(this.cancelDownload$),
           takeUntilDestroyed(this.destroyRef),
         ).subscribe(msg => {
-          this.exporting.set(false);
+          this.downloading.set(false);
           if (msg.status === 'Completed') {
-            this.exportDialog()?.markCompleted();
+            this.downloadDialog()?.markCompleted();
           } else {
-            this.exportDialog()?.markFailed(msg.error);
+            this.downloadDialog()?.markFailed(msg.error);
           }
         });
       },

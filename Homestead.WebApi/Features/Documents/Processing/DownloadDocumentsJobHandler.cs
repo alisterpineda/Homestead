@@ -1,30 +1,30 @@
 using System.IO.Compression;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Features.Documents.Export;
+using Homestead.WebApi.Features.Documents.Download;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Processing;
 
-public class ExportDocumentsJobHandler(
+public class DownloadDocumentsJobHandler(
     AppDbContext db,
     IConfiguration configuration,
-    ILogger<ExportDocumentsJobHandler> logger,
+    ILogger<DownloadDocumentsJobHandler> logger,
     IProcessingNotifier notifier,
-    IExportPathBuilder pathBuilder) : IJobHandler
+    IDownloadPathBuilder pathBuilder) : IJobHandler
 {
-    public ProcessingJobType Type => ProcessingJobType.ExportDocuments;
+    public ProcessingJobType Type => ProcessingJobType.DownloadDocuments;
 
     public async Task HandleAsync(ProcessingJob job, CancellationToken ct)
     {
-        var payload = job.GetPayload<ExportDocumentsPayload>()
+        var payload = job.GetPayload<DownloadDocumentsPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        ExportCleanupHelper.CleanupExpired(mediaPath, logger);
+        DownloadCleanupHelper.CleanupExpired(mediaPath, logger);
 
         var documents = await db.Documents
             .AsNoTracking()
@@ -42,7 +42,7 @@ public class ExportDocumentsJobHandler(
             })
             .ToListAsync(ct);
 
-        var zipPath = ExportCleanupHelper.GetExportPath(mediaPath, job.Id);
+        var zipPath = DownloadCleanupHelper.GetDownloadPath(mediaPath, job.Id);
         Directory.CreateDirectory(Path.GetDirectoryName(zipPath)!);
 
         var usedPaths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -66,7 +66,7 @@ public class ExportDocumentsJobHandler(
                     continue;
                 }
 
-                var metadata = new ExportDocumentMetadata(
+                var metadata = new DownloadDocumentMetadata(
                     doc.Name,
                     doc.LatestVersion.FileExtension,
                     doc.TagPaths,
@@ -90,20 +90,20 @@ public class ExportDocumentsJobHandler(
         if (documentCount == 0)
         {
             try { File.Delete(zipPath); } catch { }
-            throw new InvalidOperationException("No documents could be exported — all files were missing or had no versions.");
+            throw new InvalidOperationException("No documents could be downloaded — all files were missing or had no versions.");
         }
 
         var zipFileSize = new FileInfo(zipPath).Length;
-        var expiresAt = DateTimeOffset.UtcNow + ExportCleanupHelper.ExpirationPeriod;
+        var expiresAt = DateTimeOffset.UtcNow + DownloadCleanupHelper.ExpirationPeriod;
 
-        job.SetPayload(new ExportResultPayload(zipFileSize, documentCount, expiresAt));
+        job.SetPayload(new DownloadResultPayload(zipFileSize, documentCount, expiresAt));
 
         await notifier.NotifyJobStatusAsync(
             job.Id,
             ProcessingJobStatus.Completed,
-            ProcessingEntityType.Export,
+            ProcessingEntityType.Download,
             entityId: null,
-            documentName: $"Export ({documentCount} document{(documentCount != 1 ? "s" : "")})",
+            documentName: $"Download ({documentCount} document{(documentCount != 1 ? "s" : "")})",
             error: null,
             job.CreatedByUserId,
             ct);

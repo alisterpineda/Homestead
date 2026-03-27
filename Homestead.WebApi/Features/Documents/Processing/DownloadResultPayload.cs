@@ -1,6 +1,6 @@
 namespace Homestead.WebApi.Features.Documents.Processing;
 
-public record ExportResultPayload(
+public record DownloadResultPayload(
     long ZipFileSize,
     int DocumentCount,
     DateTimeOffset ExpiresAt);

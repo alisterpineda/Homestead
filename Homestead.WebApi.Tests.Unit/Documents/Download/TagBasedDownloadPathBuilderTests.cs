@@ -1,15 +1,15 @@
-using Homestead.WebApi.Features.Documents.Export;
+using Homestead.WebApi.Features.Documents.Download;
 
-namespace Homestead.WebApi.Tests.Unit.Documents.Export;
+namespace Homestead.WebApi.Tests.Unit.Documents.Download;
 
-public class TagBasedExportPathBuilderTests
+public class TagBasedDownloadPathBuilderTests
 {
-    private readonly TagBasedExportPathBuilder _sut = new();
+    private readonly TagBasedDownloadPathBuilder _sut = new();
 
     [Fact]
     public void UntaggedDocument_GoesToUntaggedFolder()
     {
-        var metadata = new ExportDocumentMetadata("Invoice", ".pdf", [], []);
+        var metadata = new DownloadDocumentMetadata("Invoice", ".pdf", [], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -20,7 +20,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void SingleTag_ReturnsSinglePath()
     {
-        var metadata = new ExportDocumentMetadata("Policy", ".pdf", ["Insurance/Home"], []);
+        var metadata = new DownloadDocumentMetadata("Policy", ".pdf", ["Insurance/Home"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -31,7 +31,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void MultipleTags_ReturnsDuplicatedPaths()
     {
-        var metadata = new ExportDocumentMetadata("W2", ".pdf", ["Tax/2024", "Insurance"], []);
+        var metadata = new DownloadDocumentMetadata("W2", ".pdf", ["Tax/2024", "Insurance"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -43,7 +43,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void WithParties_IncludesPartiesInFileName()
     {
-        var metadata = new ExportDocumentMetadata("Policy", ".pdf", ["Insurance"], ["State Farm", "Allstate"]);
+        var metadata = new DownloadDocumentMetadata("Policy", ".pdf", ["Insurance"], ["State Farm", "Allstate"]);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -54,7 +54,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void WithSingleParty_IncludesPartyInFileName()
     {
-        var metadata = new ExportDocumentMetadata("W2", ".pdf", ["Tax"], ["Employer Inc"]);
+        var metadata = new DownloadDocumentMetadata("W2", ".pdf", ["Tax"], ["Employer Inc"]);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -64,7 +64,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void EmptyPartyList_ExcludesPartySuffix()
     {
-        var metadata = new ExportDocumentMetadata("W2", ".pdf", ["Tax"], []);
+        var metadata = new DownloadDocumentMetadata("W2", ".pdf", ["Tax"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -74,7 +74,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void IllegalCharactersInDocumentName_AreSanitized()
     {
-        var metadata = new ExportDocumentMetadata("file:name*test?", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("file:name*test?", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -86,7 +86,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void IllegalCharactersInTagPath_AreSanitized()
     {
-        var metadata = new ExportDocumentMetadata("Doc", ".pdf", ["Tax:2024/W2*Forms"], []);
+        var metadata = new DownloadDocumentMetadata("Doc", ".pdf", ["Tax:2024/W2*Forms"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -97,7 +97,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void EmptyDocumentName_UsesFallback()
     {
-        var metadata = new ExportDocumentMetadata("", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -107,7 +107,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void DocumentNameWithOnlyIllegalChars_SanitizesToUnderscores()
     {
-        var metadata = new ExportDocumentMetadata("???", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("???", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -121,7 +121,7 @@ public class TagBasedExportPathBuilderTests
     public void VeryLongDocumentName_IsTruncated()
     {
         var longName = new string('A', 300);
-        var metadata = new ExportDocumentMetadata(longName, ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata(longName, ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -134,7 +134,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void EmptyTagPathSegments_UseFallback()
     {
-        var metadata = new ExportDocumentMetadata("Doc", ".pdf", ["Insurance//Home"], []);
+        var metadata = new DownloadDocumentMetadata("Doc", ".pdf", ["Insurance//Home"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -144,7 +144,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void UntaggedWithParties_CombinesCorrectly()
     {
-        var metadata = new ExportDocumentMetadata("Contract", ".pdf", [], ["Acme Corp"]);
+        var metadata = new DownloadDocumentMetadata("Contract", ".pdf", [], ["Acme Corp"]);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -155,7 +155,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void PartyWithIllegalChars_SanitizesPartyName()
     {
-        var metadata = new ExportDocumentMetadata("Doc", ".pdf", ["Tag"], ["Company: Ltd"]);
+        var metadata = new DownloadDocumentMetadata("Doc", ".pdf", ["Tag"], ["Company: Ltd"]);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -165,7 +165,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void ControlCharactersInName_AreReplaced()
     {
-        var metadata = new ExportDocumentMetadata("test\x00name\x1F", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("test\x00name\x1F", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -177,7 +177,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void LeadingTrailingDots_AreTrimmedFromName()
     {
-        var metadata = new ExportDocumentMetadata("...test file...", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("...test file...", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
@@ -189,7 +189,7 @@ public class TagBasedExportPathBuilderTests
     [Fact]
     public void ConsecutiveWhitespace_IsCollapsedInName()
     {
-        var metadata = new ExportDocumentMetadata("hello   world", ".pdf", ["Tag"], []);
+        var metadata = new DownloadDocumentMetadata("hello   world", ".pdf", ["Tag"], []);
 
         var paths = _sut.BuildPaths(metadata);
 
