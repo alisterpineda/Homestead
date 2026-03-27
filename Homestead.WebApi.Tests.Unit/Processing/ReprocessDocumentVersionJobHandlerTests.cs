@@ -217,6 +217,28 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_SkipsNotification_WhenChildJob()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion();
+        var job = CreateJob(doc.Id, version.Id);
+        job.ParentJobId = Guid.NewGuid();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        await _handler.HandleAsync(job, ct);
+
+        await _notifier.DidNotReceive().NotifyJobStatusAsync(
+            Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
+            Arg.Any<ProcessingEntityType?>(), Arg.Any<Guid?>(),
+            Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<Guid?>(), Arg.Any<CancellationToken>(),
+            Arg.Any<string?>(), Arg.Any<Dictionary<string, string>?>(),
+            Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<int?>());
+    }
+
+    [Fact]
     public async Task HandleAsync_ThrowsWhenVersionNotFound()
     {
         var ct = TestContext.Current.CancellationToken;

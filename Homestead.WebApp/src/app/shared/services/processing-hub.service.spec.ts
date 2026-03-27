@@ -43,6 +43,9 @@ describe('ProcessingHubService', () => {
       error: null,
       errorCode: null,
       errorData: null,
+      totalChildCount: null,
+      completedChildCount: null,
+      failedChildCount: null,
       ...overrides,
     };
   }

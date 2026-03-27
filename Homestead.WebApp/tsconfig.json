@@ -121,6 +121,9 @@
       ],
       "@/shared/components/spartan/radio-group": [
         "./src/app/shared/components/spartan/radio-group/src/index.ts"
+      ],
+      "@/shared/components/spartan/progress": [
+        "./src/app/shared/components/spartan/progress/src/index.ts"
       ]
     }
   },

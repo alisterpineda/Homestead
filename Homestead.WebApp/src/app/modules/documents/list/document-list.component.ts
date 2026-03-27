@@ -4,7 +4,7 @@ import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationErro
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil, firstValueFrom } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil, takeWhile, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -29,6 +29,7 @@ import { UserPreferencesService } from '@/shared/services/user-preferences.servi
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { BulkReprocessDialogComponent } from './bulk-reprocess-dialog/bulk-reprocess-dialog.component';
+import { BulkReprocessProgressDialogComponent } from './bulk-reprocess-progress-dialog/bulk-reprocess-progress-dialog.component';
 import { DownloadProgressDialogComponent } from './download-progress-dialog/download-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -63,6 +64,7 @@ import { toast } from 'ngx-sonner';
     BulkEditTagsPopoverComponent,
     BulkEditPartiesPopoverComponent,
     BulkReprocessDialogComponent,
+    BulkReprocessProgressDialogComponent,
     DownloadProgressDialogComponent,
   ],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -372,6 +374,7 @@ import { toast } from 'ngx-sonner';
       }
 
     </div>
+    <app-bulk-reprocess-progress-dialog />
     <app-download-progress-dialog />
   `,
 })
@@ -388,6 +391,7 @@ export class DocumentListComponent implements OnDestroy {
   private uploadManager = inject(UploadManagerService);
   private errorHandler = inject(ErrorHandlerService);
   private downloadApi = inject(DownloadApiService);
+  private reprocessProgressDialog = viewChild(BulkReprocessProgressDialogComponent);
   private downloadDialog = viewChild(DownloadProgressDialogComponent);
   private cancelDownload$ = new Subject<void>();
   private destroyRef = inject(DestroyRef);
@@ -807,28 +811,40 @@ export class DocumentListComponent implements OnDestroy {
 
   onBulkReprocessStarted(jobIds: string[]): void {
     const parentJobId = jobIds[0];
+    const documentCount = this.selectedDocumentIds().size;
     this.clearSelection();
+    this.processingHub.registerManagedJob(parentJobId);
 
-    toast.promise(
-      this.processingHub.waitForJob(parentJobId).then(msg => {
+    this.reprocessProgressDialog()?.start(documentCount);
+
+    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+
+    this.processingHub.jobStatusChanged$.pipe(
+      filter(msg => msg.jobId === parentJobId),
+      takeWhile(msg => !isTerminal(msg.status), true),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(msg => {
+      const dialog = this.reprocessProgressDialog();
+      if (!dialog) return;
+
+      dialog.updateProgress(
+        msg.completedChildCount ?? 0,
+        msg.failedChildCount ?? 0,
+        msg.totalChildCount ?? documentCount,
+      );
+
+      if (msg.status === 'Completed') {
+        dialog.markCompleted();
+      } else if (msg.status === 'PartiallyCompleted') {
+        dialog.markPartiallyCompleted();
+      } else if (msg.status === 'Failed') {
+        dialog.markFailed();
+      }
+
+      if (isTerminal(msg.status)) {
         this.onRefresh();
-        const total = msg.totalChildCount ?? 0;
-        const failed = msg.failedChildCount ?? 0;
-        const succeeded = total - failed;
-        if (failed === 0) {
-          return `Text extraction completed for ${succeeded} document${succeeded > 1 ? 's' : ''}.`;
-        }
-        if (succeeded === 0) {
-          throw new Error(`Text extraction failed for all ${failed} document${failed > 1 ? 's' : ''}.`);
-        }
-        return `Text extraction completed for ${succeeded} of ${total} document${total > 1 ? 's' : ''} (${failed} failed).`;
-      }),
-      {
-        loading: 'Reprocessing text extraction...',
-        success: (message) => message,
-        error: (err: unknown) => err instanceof Error ? err.message : 'Text extraction failed.',
-      },
-    );
+      }
+    });
   }
 
   onBulkDelete(ctx: { close: () => void }): void {

@@ -198,6 +198,9 @@ describe('UploadManagerService', () => {
         error: null,
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       const item = service.items()[0];
@@ -218,6 +221,9 @@ describe('UploadManagerService', () => {
         error: 'OCR failed',
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       const item = service.items()[0];
@@ -238,6 +244,9 @@ describe('UploadManagerService', () => {
         error: null,
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(service.items()[0].status).toBe('processing');
@@ -391,6 +400,9 @@ describe('UploadManagerService', () => {
         error: 'OCR failed',
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('a.pdf'));
@@ -410,6 +422,9 @@ describe('UploadManagerService', () => {
         error: null,
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.success).toHaveBeenCalledWith('1 file uploaded successfully.');
@@ -474,6 +489,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Existing Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       const item = service.items()[0];
@@ -496,6 +514,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Existing Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('Existing Doc'));
@@ -518,6 +539,9 @@ describe('UploadManagerService', () => {
         error: 'duplicate',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-1', documentName: 'Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       // Mark second as completed
@@ -530,6 +554,9 @@ describe('UploadManagerService', () => {
         error: null,
         errorCode: null,
         errorData: null,
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(service.items().length).toBe(2);
@@ -552,6 +579,9 @@ describe('UploadManagerService', () => {
         error: 'duplicate',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-1', documentName: 'Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.success).not.toHaveBeenCalled();
@@ -573,6 +603,9 @@ describe('UploadManagerService', () => {
         error: 'duplicate',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-1', documentName: 'Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(service.duplicateCount()).toBe(1);
@@ -592,6 +625,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Trashed Doc', isTrashed: 'true' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       const item = service.items()[0];
@@ -613,6 +649,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Trashed Doc', isTrashed: 'true' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('(in trash)'));
@@ -631,6 +670,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Existing Doc', isTrashed: 'false' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       expect(toast.info).toHaveBeenCalledWith(expect.not.stringContaining('(in trash)'));
@@ -649,6 +691,9 @@ describe('UploadManagerService', () => {
         error: 'A document with the same content already exists.',
         errorCode: 'duplicate_content',
         errorData: { documentId: 'doc-123', documentName: 'Old Doc' },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
       });
 
       const item = service.items()[0];

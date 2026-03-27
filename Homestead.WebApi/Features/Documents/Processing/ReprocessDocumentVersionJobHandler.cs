@@ -60,14 +60,19 @@ public class ReprocessDocumentVersionJobHandler(
 
         job.EntityId = payload.DocumentId;
 
-        await notifier.NotifyJobStatusAsync(
-            job.Id,
-            ProcessingJobStatus.Completed,
-            ProcessingEntityType.Document,
-            payload.DocumentId,
-            version.Document.Name,
-            error: null,
-            job.CreatedByUserId,
-            ct);
+        // Skip individual notification for child jobs — the parent job's
+        // progress updates (via UpdateParentProgressAsync) handle notification.
+        if (job.ParentJobId is null)
+        {
+            await notifier.NotifyJobStatusAsync(
+                job.Id,
+                ProcessingJobStatus.Completed,
+                ProcessingEntityType.Document,
+                payload.DocumentId,
+                version.Document.Name,
+                error: null,
+                job.CreatedByUserId,
+                ct);
+        }
     }
 }
