@@ -46,7 +46,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           } @else {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel>Text Extraction Engine</label>
-              <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
+              <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))" [itemToString]="engineToString">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
@@ -89,6 +89,11 @@ export class ReprocessDialogComponent {
   private dialog = viewChild(BrnDialog);
   private versionApi = inject(DocumentVersionApiService);
   private errorHandler = inject(ErrorHandlerService);
+
+  engineToString = (id: string): string => {
+    if (id === '') return 'Default (system setting)';
+    return this.engines().find(e => e.id === id)?.name ?? id;
+  };
 
   open(): void {
     this.dialog()?.open();

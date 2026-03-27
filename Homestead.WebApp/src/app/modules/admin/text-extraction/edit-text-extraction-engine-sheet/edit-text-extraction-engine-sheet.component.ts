@@ -54,7 +54,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 @if (e.isBuiltIn) {
                   <p class="text-sm text-muted-foreground">{{ getLanguagesLabel(e.configuration) }}</p>
                 } @else {
-                  <hlm-select-multiple [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)">
+                  <hlm-select-multiple [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)" [itemToString]="languageToString">
                     <hlm-select-trigger class="w-full">
                       <hlm-select-value />
                     </hlm-select-trigger>
@@ -127,6 +127,7 @@ export class EditTextExtractionEngineSheetComponent {
   private errorHandler = inject(ErrorHandlerService);
 
   languages = TESSERACT_LANGUAGES;
+  languageToString = (value: string): string => this.languages.find(l => l.value === value)?.label ?? value;
   editName = signal('');
   editLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
   editEndpoint = signal('');

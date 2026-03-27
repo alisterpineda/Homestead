@@ -58,7 +58,7 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
             <div hlmCardContent>
               <div class="flex flex-col gap-1.5">
                 <label hlmLabel>Default Engine</label>
-                <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))">
+                <hlm-select [value]="selectedEngineId() ?? ''" (valueChange)="onEngineChange($any($event))" [itemToString]="engineToString">
                   <hlm-select-trigger class="w-full">
                     <hlm-select-value />
                   </hlm-select-trigger>
@@ -107,6 +107,11 @@ export class DocumentSettingsComponent {
   private savedEngineId = signal<string | null>(null);
 
   hasChanges = computed(() => this.selectedEngineId() !== this.savedEngineId());
+
+  engineToString = (id: string): string => {
+    if (id === '') return 'Built-in Tesseract (default)';
+    return this.engines().find(e => e.id === id)?.name ?? id;
+  };
 
   staleEngineId = computed(() => {
     const id = this.savedEngineId();

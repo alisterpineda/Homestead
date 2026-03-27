@@ -9,7 +9,7 @@ import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-r
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmSelectImports, ],
   template: `
-    <hlm-select [value]="value()" (valueChange)="onValueChange($any($event))">
+    <hlm-select [value]="value()" (valueChange)="onValueChange($any($event))" [itemToString]="groupToString">
       <hlm-select-trigger [class]="triggerClass()">
         <hlm-select-value [placeholder]="placeholder()" />
       </hlm-select-trigger>
@@ -33,6 +33,10 @@ export class GroupSelectComponent {
   private documentApi = inject(DocumentApiService);
 
   groups = signal<GetMyGroupsResponse[]>([]);
+  groupToString = (id: string): string => {
+    if (id === '') return 'All Groups';
+    return this.groups().find(g => g.id === id)?.name ?? id;
+  };
 
   constructor() {
     this.documentApi.getMyGroups().subscribe({

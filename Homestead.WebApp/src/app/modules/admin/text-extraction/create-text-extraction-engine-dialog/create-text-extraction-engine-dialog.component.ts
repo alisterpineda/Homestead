@@ -9,7 +9,7 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { DEFAULT_TESSERACT_LANGUAGES, TESSERACT_LANGUAGES } from '../tesseract-config-fields/tesseract-languages';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { TextExtractionEngineType } from '@/api/generated/models/text-extraction-engine-type';
-import { ENGINE_TYPE_OPTIONS } from '../engine-type-labels';
+import { ENGINE_TYPE_LABELS, ENGINE_TYPE_OPTIONS } from '../engine-type-labels';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -41,7 +41,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Engine Type</label>
-            <hlm-select [ngModel]="selectedEngineType()" (ngModelChange)="selectedEngineType.set($event)">
+            <hlm-select [ngModel]="selectedEngineType()" (ngModelChange)="selectedEngineType.set($event)" [itemToString]="engineTypeToString">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
@@ -58,7 +58,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           @if (selectedEngineType() === 'Tesseract') {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel>Languages</label>
-              <hlm-select-multiple [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)">
+              <hlm-select-multiple [ngModel]="selectedLanguages()" (ngModelChange)="selectedLanguages.set($event)" [itemToString]="languageToString">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
@@ -113,6 +113,8 @@ export class CreateTextExtractionEngineDialogComponent {
 
   engineTypeOptions = ENGINE_TYPE_OPTIONS;
   languages = TESSERACT_LANGUAGES;
+  engineTypeToString = (value: string): string => ENGINE_TYPE_LABELS[value] ?? value;
+  languageToString = (value: string): string => this.languages.find(l => l.value === value)?.label ?? value;
   name = signal('');
   selectedEngineType = signal<TextExtractionEngineType>('Tesseract');
   selectedLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
