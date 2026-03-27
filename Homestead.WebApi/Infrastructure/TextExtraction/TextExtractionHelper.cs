@@ -6,23 +6,27 @@ public class TextExtractionHelper(
     IServiceProvider serviceProvider,
     ITextExtractionEngineResolver engineResolver)
 {
-    public async Task<string?> ExtractTextSafeAsync(
+    public async Task<TextExtractionResult> ExtractTextSafeAsync(
         string filePath, string contentType, Guid? engineId,
-        ILogger logger, CancellationToken ct)
+        CancellationToken ct)
     {
         try
         {
             var context = await engineResolver.ResolveAsync(engineId, ct);
             var engine = serviceProvider.GetKeyedService<ITextExtractionEngine>(context.EngineType);
             if (engine is null)
-                return null;
+                return TextExtractionResult.NoEngineAvailable;
 
-            return await engine.ExtractTextAsync(filePath, contentType, context.Configuration, ct);
+            var text = await engine.ExtractTextAsync(filePath, contentType, context.Configuration, ct);
+            return TextExtractionResult.Success(text);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Text extraction failed for {FilePath}", filePath);
-            return null;
+            return TextExtractionResult.Failure(ex);
         }
     }
 }

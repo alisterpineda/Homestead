@@ -54,7 +54,6 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
             })
             .Build();
 
-        var logger = Substitute.For<ILogger<ReprocessDocumentVersionJobHandler>>();
         var serviceProvider = new ServiceCollection()
             .AddKeyedSingleton(Homestead.WebApi.Domain.Settings.TextExtractionEngineType.Tesseract, _textExtractionEngine)
             .BuildServiceProvider();
@@ -62,7 +61,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
             serviceProvider, _engineResolver);
 
         _handler = new ReprocessDocumentVersionJobHandler(
-            _db, config, logger,
+            _db, config,
             _notifier, _auditLogger, _searchVectorUpdater, textExtractionHelper);
     }
 
@@ -249,7 +248,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_HandlesTextExtractionFailure()
+    public async Task HandleAsync_TextExtractionFails_PreservesExistingText()
     {
         var ct = TestContext.Current.CancellationToken;
         var (doc, version) = SeedDocumentWithVersion("existing text");
@@ -258,11 +257,28 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
             .Returns<string?>(x => throw new Exception("OCR failed"));
 
-        await _handler.HandleAsync(job, ct);
+        await Assert.ThrowsAsync<TextExtractionFailedException>(
+            () => _handler.HandleAsync(job, ct));
 
-        // ExtractedText should be set to null (extraction returned null due to catch)
         var updated = _db.DocumentVersions.First(v => v.Id == version.Id);
-        Assert.Null(updated.ExtractedText);
+        Assert.Equal("existing text", updated.ExtractedText);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TextExtractionFails_ErrorImplementsIStructuredJobError()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (doc, version) = SeedDocumentWithVersion("existing text");
+        var job = CreateJob(doc.Id, version.Id);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns<string?>(x => throw new Exception("OCR failed"));
+
+        var ex = await Assert.ThrowsAsync<TextExtractionFailedException>(
+            () => _handler.HandleAsync(job, ct));
+
+        Assert.Equal("text_extraction_failed", ex.ErrorCode);
+        Assert.Equal("OCR failed", ex.ErrorData["innerError"]);
     }
 
     [Fact]

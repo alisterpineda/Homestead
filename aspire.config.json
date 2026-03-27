@@ -1,0 +1,5 @@
+{
+    "appHost": {
+        "path": "Homestead.AppHost/Homestead.AppHost.csproj"
+    }
+}

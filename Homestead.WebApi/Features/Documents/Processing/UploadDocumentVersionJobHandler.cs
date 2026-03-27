@@ -46,8 +46,17 @@ public class UploadDocumentVersionJobHandler(
                 throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
             // Text extraction
-            var extractedText = await textExtractionHelper.ExtractTextSafeAsync(
-                stagingPath, payload.ContentType, payload.TextExtractionEngineId, logger, ct);
+            var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
+                stagingPath, payload.ContentType, payload.TextExtractionEngineId, ct);
+
+            if (!extractionResult.Succeeded)
+            {
+                logger.LogWarning(extractionResult.Error,
+                    "Text extraction failed for version upload {UploadId}, proceeding without extracted text",
+                    payload.UploadId);
+            }
+
+            var extractedText = extractionResult.Text;
 
             // Compute SHA256 hash
             string fileHash;

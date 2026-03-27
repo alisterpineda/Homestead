@@ -12,7 +12,6 @@ namespace Homestead.WebApi.Features.Documents.Processing;
 public class ReprocessDocumentVersionJobHandler(
     AppDbContext db,
     IConfiguration configuration,
-    ILogger<ReprocessDocumentVersionJobHandler> logger,
     IProcessingNotifier notifier,
     IAuditLogger auditLogger,
     ISearchVectorUpdater searchVectorUpdater,
@@ -40,10 +39,17 @@ public class ReprocessDocumentVersionJobHandler(
         var before = DocumentVersionSnapshot.From(version);
 
         // Re-extract text
-        var extractedText = await textExtractionHelper.ExtractTextSafeAsync(
-            filePath, version.ContentType, payload.TextExtractionEngineId, logger, ct);
+        var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
+            filePath, version.ContentType, payload.TextExtractionEngineId, ct);
 
-        version.ExtractedText = extractedText;
+        if (!extractionResult.Succeeded)
+        {
+            throw new TextExtractionFailedException(
+                $"Text extraction failed during reprocess of version {payload.VersionId}.",
+                extractionResult.Error!);
+        }
+
+        version.ExtractedText = extractionResult.Text;
 
         var after = DocumentVersionSnapshot.From(version);
         var changes = before.Diff(after);
