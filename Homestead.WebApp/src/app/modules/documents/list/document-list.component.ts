@@ -224,9 +224,9 @@ import { toast } from 'ngx-sonner';
                         </ng-template>
                       }
                       <hlm-dropdown-menu-separator />
-                      <button hlmDropdownMenuItem (triggered)="onDownloadAll()" [disabled]="downloading()">
+                      <button hlmDropdownMenuItem (triggered)="onDownloadAll()">
                         <ng-icon hlm name="lucideDownload" size="sm" />
-                        {{ downloading() ? 'Downloading...' : 'Download All' }}
+                        Download All
                       </button>
                     </hlm-dropdown-menu>
                   </ng-template>
@@ -287,9 +287,9 @@ import { toast } from 'ngx-sonner';
               <div class="sm:ml-auto max-sm:basis-full flex items-center gap-2">
                 <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
                 <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
-                <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection() || downloading()">
+                <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                   <ng-icon hlm name="lucideDownload" size="sm" />
-                  {{ downloading() ? 'Downloading...' : 'Download' }}
+                  Download
                 </button>
                 <hlm-alert-dialog>
                   <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
