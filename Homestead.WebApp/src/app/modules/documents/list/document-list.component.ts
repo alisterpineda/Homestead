@@ -4,7 +4,7 @@ import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationErro
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -808,20 +808,26 @@ export class DocumentListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    this.documentApi.bulkDeleteDocuments({
+    const result$ = this.documentApi.bulkDeleteDocuments({
       body: { ids },
     }).pipe(
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete documents. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} document${count > 1 ? 's' : ''} moved to trash.`);
         this.clearSelection();
         this.onRefresh();
+        return `${count} document${count > 1 ? 's' : ''} moved to trash.`;
+      }),
+      {
+        loading: 'Moving documents to trash...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onExportSelected(): void {

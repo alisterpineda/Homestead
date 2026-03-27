@@ -2,6 +2,7 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Component, signal } from '@angular/core';
+import { toast } from 'ngx-sonner';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover.component';
 import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
@@ -200,16 +201,22 @@ describe('BulkEditPartiesPopoverComponent', () => {
     });
   });
 
-  it('confirmApply should call ctx.close on success', () => {
+  it('confirmApply should set applying and show loading toast', () => {
+    vi.spyOn(toast, 'promise').mockImplementation((promise) => {
+      (promise as Promise<unknown>).catch(() => {});
+      return 0 as never;
+    });
     component.onPopoverStateChanged('open');
     component.toggleItem('p2'); // mixed → checked (add)
 
     const ctx = { close: vi.fn() };
     component.confirmApply(ctx);
 
-    // The actual API call is async, so we verify the method is callable
-    // and doesn't throw synchronously
     expect(component.applying()).toBe(true);
+    expect(toast.promise).toHaveBeenCalledWith(
+      expect.any(Promise),
+      expect.objectContaining({ loading: 'Updating documents...' }),
+    );
   });
 
   describe('loading signal', () => {

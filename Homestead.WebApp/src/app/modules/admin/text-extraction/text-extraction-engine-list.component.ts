@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription, firstValueFrom } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -343,20 +343,26 @@ export class TextExtractionEngineListComponent implements OnDestroy {
     if (ids.length === 0) return;
     this.deleting.set(true);
 
-    this.adminApi.bulkDeleteTextExtractionEngines({
+    const result$ = this.adminApi.bulkDeleteTextExtractionEngines({
       body: { ids },
     }).pipe(
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete engines. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +(response as BulkDeleteTextExtractionEnginesResponse).deletedCount;
-        toast.success(`${count} ${count > 1 ? 'engines' : 'engine'} deleted.`);
         this.clearSelection();
         this.onRefresh();
+        return `${count} ${count > 1 ? 'engines' : 'engine'} deleted.`;
+      }),
+      {
+        loading: 'Deleting engines...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onPageChange(newPage: number): void {

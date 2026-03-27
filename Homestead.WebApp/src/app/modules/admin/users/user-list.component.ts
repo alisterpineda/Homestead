@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, combineLatest, Subscription } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription, firstValueFrom } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
@@ -20,7 +20,7 @@ import type { UserResponse } from '@/api/generated/models/user-response';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
+import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from 'ngx-sonner';
 
 @Component({
@@ -307,24 +307,26 @@ export class UserListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    this.adminApi.bulkDeleteUsers({
+    const result$ = this.adminApi.bulkDeleteUsers({
       body: { ids },
-    }).subscribe({
-      next: (response) => {
+    }).pipe(
+      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete users. Please try again.'),
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} ${count > 1 ? 'users' : 'user'} deleted.`);
         this.clearSelection();
         this.onRefresh();
+        return `${count} ${count > 1 ? 'users' : 'user'} deleted.`;
+      }),
+      {
+        loading: 'Deleting users...',
+        success: (message) => message,
       },
-      error: (err: unknown) => {
-        this.deleting.set(false);
-        if (!this.errorHandler.isServerOrNetworkError(err)) {
-          toast.error(this.errorHandler.getErrorMessage(err, 'Failed to delete users. Please try again.'));
-        }
-      },
-    });
+    );
   }
 
   onRefresh(): void {

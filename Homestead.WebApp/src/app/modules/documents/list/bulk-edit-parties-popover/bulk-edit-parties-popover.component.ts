@@ -12,7 +12,7 @@ import {
   untracked,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
+import { switchMap, debounceTime, of, map, tap, catchError, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideCheck, lucideMinus, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -311,7 +311,7 @@ export class BulkEditPartiesPopoverComponent {
     const ids = Array.from(this.selectedIds());
     this.applying.set(true);
 
-    this.documentApi.bulkUpdateDocuments({
+    const result$ = this.documentApi.bulkUpdateDocuments({
       body: {
         ids,
         tagPaths: null,
@@ -321,16 +321,22 @@ export class BulkEditPartiesPopoverComponent {
       },
     }).pipe(
       handleMutationError(this.errorHandler, this.applying, 'Failed to update documents. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.applying.set(false);
         const count = +response.updatedCount;
-        toast.success(`Updated ${count} document${count > 1 ? 's' : ''}.`);
         ctx.close();
         this.popoverState.set('closed');
         this.applied.emit();
+        return `Updated ${count} document${count > 1 ? 's' : ''}.`;
+      }),
+      {
+        loading: 'Updating documents...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   // --- Search ---

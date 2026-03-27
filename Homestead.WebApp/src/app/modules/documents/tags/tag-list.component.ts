@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -533,20 +533,26 @@ export class TagListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    this.tagApi.bulkDeleteTags({
+    const result$ = this.tagApi.bulkDeleteTags({
       body: { ids },
     }).pipe(
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete tags. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} tag${count > 1 ? 's' : ''} deleted.`);
         this.clearSelection();
         this.onRefresh();
+        return `${count} tag${count > 1 ? 's' : ''} deleted.`;
+      }),
+      {
+        loading: 'Deleting tags...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onRefresh(): void {

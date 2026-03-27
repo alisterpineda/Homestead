@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take } from 'rxjs';
+import { switchMap, map, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -514,20 +514,26 @@ export class PartyListComponent implements OnDestroy {
 
     this.deleting.set(true);
 
-    this.partyApi.bulkDeleteParties({
+    const result$ = this.partyApi.bulkDeleteParties({
       body: { ids },
     }).pipe(
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete parties. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} ${count > 1 ? 'parties' : 'party'} deleted.`);
         this.clearSelection();
         this.onRefresh();
+        return `${count} ${count > 1 ? 'parties' : 'party'} deleted.`;
+      }),
+      {
+        loading: 'Deleting parties...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onRefresh(): void {

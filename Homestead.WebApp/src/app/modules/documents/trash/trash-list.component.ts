@@ -4,7 +4,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
-import { switchMap, map, combineLatest } from 'rxjs';
+import { switchMap, map, combineLatest, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTrash2, lucideRotateCcw, lucideX, lucideEye } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -360,20 +360,26 @@ export class TrashListComponent {
 
     this.restoring.set(true);
 
-    this.documentApi.bulkRestoreDocuments({
+    const result$ = this.documentApi.bulkRestoreDocuments({
       body: { ids },
     }).pipe(
       takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.restoring, 'Failed to restore documents. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.restoring.set(false);
         const count = +response.restoredCount;
-        toast.success(`${count} document${count > 1 ? 's' : ''} restored.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
+        return `${count} document${count > 1 ? 's' : ''} restored.`;
+      }),
+      {
+        loading: 'Restoring documents...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onBulkPermanentlyDelete(ctx: { close: () => void }): void {
@@ -382,38 +388,50 @@ export class TrashListComponent {
 
     this.deleting.set(true);
 
-    this.documentApi.bulkPermanentlyDeleteDocuments({
+    const result$ = this.documentApi.bulkPermanentlyDeleteDocuments({
       body: { ids },
     }).pipe(
       takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete documents. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.deleting.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
+        return `${count} document${count > 1 ? 's' : ''} permanently deleted.`;
+      }),
+      {
+        loading: 'Permanently deleting documents...',
+        success: (message) => message,
       },
-    });
+    );
   }
 
   onEmptyTrash(ctx: { close: () => void }): void {
     this.emptyingTrash.set(true);
 
-    this.documentApi.emptyTrash().pipe(
+    const result$ = this.documentApi.emptyTrash().pipe(
       takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.emptyingTrash, 'Failed to empty trash. Please try again.'),
-    ).subscribe({
-      next: (response) => {
+    );
+
+    toast.promise(
+      firstValueFrom(result$).then((response) => {
         this.emptyingTrash.set(false);
         ctx.close();
         const count = +response.deletedCount;
-        toast.success(`${count} document${count > 1 ? 's' : ''} permanently deleted.`);
         this.clearSelection();
         this.refreshTrigger.update(v => v + 1);
+        return `${count} document${count > 1 ? 's' : ''} permanently deleted.`;
+      }),
+      {
+        loading: 'Emptying trash...',
+        success: (message) => message,
       },
-    });
+    );
   }
 }
