@@ -15,4 +15,8 @@ public record GetProcessingJobsResponse
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public Guid? CreatedByUserId { get; init; }
+    public Guid? ParentJobId { get; init; }
+    public int TotalChildCount { get; init; }
+    public int CompletedChildCount { get; init; }
+    public int FailedChildCount { get; init; }
 }

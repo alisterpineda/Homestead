@@ -15,6 +15,7 @@ export interface GetProcessingJobs$Params {
   EntityId?: string;
   EntityType?: ProcessingEntityType;
   Status?: ProcessingJobStatus;
+  ParentJobId?: string;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -25,6 +26,7 @@ export function getProcessingJobs(http: HttpClient, rootUrl: string, params: Get
     rb.query('EntityId', params.EntityId, {});
     rb.query('EntityType', params.EntityType, {});
     rb.query('Status', params.Status, {});
+    rb.query('ParentJobId', params.ParentJobId, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

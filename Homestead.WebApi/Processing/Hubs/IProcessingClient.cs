@@ -15,4 +15,7 @@ public record JobStatusChangedMessage(
     string? DocumentName,
     string? Error,
     string? ErrorCode,
-    Dictionary<string, string>? ErrorData);
+    Dictionary<string, string>? ErrorData,
+    int? TotalChildCount = null,
+    int? CompletedChildCount = null,
+    int? FailedChildCount = null);

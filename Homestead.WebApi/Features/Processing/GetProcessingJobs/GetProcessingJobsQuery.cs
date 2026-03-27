@@ -9,4 +9,5 @@ public record GetProcessingJobsQuery : PaginatedRequest, IRequest<PaginatedRespo
     public Guid? EntityId { get; init; }
     public ProcessingEntityType? EntityType { get; init; }
     public ProcessingJobStatus? Status { get; init; }
+    public Guid? ParentJobId { get; init; }
 }

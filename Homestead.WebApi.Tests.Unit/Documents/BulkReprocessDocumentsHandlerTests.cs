@@ -70,7 +70,7 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_MultipleDocuments_ReturnsJobIdPerDocument()
+    public async Task Handle_MultipleDocuments_ReturnsSingleParentJobId()
     {
         var (docId1, _) = SeedDocument("Doc1.pdf");
         var (docId2, _) = SeedDocument("Doc2.pdf");
@@ -79,12 +79,12 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
-        Assert.Equal(2, result.JobIds.Count);
-        Assert.All(result.JobIds, id => Assert.NotEqual(Guid.Empty, id));
+        Assert.Single(result.JobIds);
+        Assert.NotEqual(Guid.Empty, result.JobIds[0]);
     }
 
     [Fact]
-    public async Task Handle_EnqueuesReprocessDocumentVersionJobs()
+    public async Task Handle_EnqueuesSingleBulkReprocessParentJob()
     {
         var (docId1, _) = SeedDocument("Doc1.pdf");
         var (docId2, _) = SeedDocument("Doc2.pdf");
@@ -93,16 +93,17 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
-        await _jobQueue.Received(2).EnqueueAsync(
-            ProcessingJobType.ReprocessDocumentVersion,
+        await _jobQueue.Received(1).EnqueueAsync(
+            ProcessingJobType.BulkReprocessDocuments,
             Arg.Any<Action<EnqueueJobRequest>?>(),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_SelectsLatestVersion()
+    public async Task Handle_PayloadContainsDocumentIds()
     {
-        var (docId, latestVersionId) = SeedDocument("Multi.pdf", versionCount: 3);
+        var (docId1, _) = SeedDocument("Doc1.pdf");
+        var (docId2, _) = SeedDocument("Doc2.pdf");
 
         var capturedPayloads = new List<string>();
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
@@ -116,21 +117,22 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
             });
 
         await _sut.Handle(
-            new BulkReprocessDocumentsCommand([docId]),
+            new BulkReprocessDocumentsCommand([docId1, docId2]),
             CancellationToken.None);
 
         Assert.Single(capturedPayloads);
-        Assert.Contains(latestVersionId.ToString(), capturedPayloads[0]);
+        Assert.Contains(docId1.ToString(), capturedPayloads[0]);
+        Assert.Contains(docId2.ToString(), capturedPayloads[0]);
     }
 
     [Fact]
-    public async Task Handle_NoMatchingDocuments_ReturnsEmptyJobIds()
+    public async Task Handle_NoMatchingDocuments_StillReturnsParentJobId()
     {
         var result = await _sut.Handle(
             new BulkReprocessDocumentsCommand([Guid.NewGuid()]),
             CancellationToken.None);
 
-        Assert.Empty(result.JobIds);
+        Assert.Single(result.JobIds);
     }
 
     [Fact]

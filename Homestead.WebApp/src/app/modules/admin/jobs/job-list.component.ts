@@ -4,15 +4,17 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideActivity } from '@ng-icons/lucide';
+import { lucideActivity, lucideChevronRight, lucideChevronDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
+import { HlmButton } from '@/shared/components/spartan/button';
 import { statusBadgeVariant as _statusBadgeVariant, statusLabel as _statusLabel } from '@/shared/utils/processing-status.utils';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
+import type { GetProcessingJobsResponse } from '@/api/generated/models/get-processing-jobs-response';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 import type { ProcessingJobType } from '@/api/generated/models/processing-job-type';
@@ -29,9 +31,10 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
     HlmEmptyImports,
     HlmTableImports,
     HlmBadge,
+    HlmButton,
     PaginationComponent,
   ],
-  providers: [provideIcons({ lucideActivity })],
+  providers: [provideIcons({ lucideActivity, lucideChevronRight, lucideChevronDown })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
@@ -68,6 +71,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
             <option value="InProgress">In Progress</option>
             <option value="Completed">Completed</option>
             <option value="Failed">Failed</option>
+            <option value="PartiallyCompleted">Partially Completed</option>
           </select>
         </div>
 
@@ -99,8 +103,10 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                   <table hlmTable>
                     <thead hlmTHead class="sticky top-0 z-10 bg-background">
                       <tr hlmTr>
+                        <th hlmTh class="w-8"></th>
                         <th hlmTh>Type</th>
                         <th hlmTh>Status</th>
+                        <th hlmTh>Progress</th>
                         <th hlmTh>Created</th>
                         <th hlmTh class="hidden md:table-cell">Started</th>
                         <th hlmTh class="hidden md:table-cell">Completed</th>
@@ -110,11 +116,33 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                     <tbody hlmTBody>
                       @for (job of d.items; track job.id) {
                         <tr hlmTr>
+                          <td hlmTd class="w-8 px-2">
+                            @if (isParentJob(job)) {
+                              <button
+                                hlmBtn
+                                variant="ghost"
+                                size="icon"
+                                class="h-6 w-6"
+                                (click)="toggleExpand(job.id)"
+                                [attr.aria-expanded]="isExpanded(job.id)"
+                                aria-label="Toggle child jobs"
+                              >
+                                <ng-icon hlm [name]="isExpanded(job.id) ? 'lucideChevronDown' : 'lucideChevronRight'" size="sm" />
+                              </button>
+                            }
+                          </td>
                           <td hlmTd class="font-medium">{{ humanizeType(job.type) }}</td>
                           <td hlmTd>
                             <span hlmBadge [variant]="statusBadgeVariant(job.status)">
                               {{ statusLabel(job.status) }}
                             </span>
+                          </td>
+                          <td hlmTd class="text-muted-foreground text-sm">
+                            @if (isParentJob(job)) {
+                              {{ childProgress(job) }}
+                            } @else {
+                              —
+                            }
                           </td>
                           <td hlmTd class="text-muted-foreground text-sm">{{ job.createdAt | date:'medium' }}</td>
                           <td hlmTd class="hidden md:table-cell text-muted-foreground text-sm">
@@ -128,6 +156,38 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                             {{ job.error ?? '—' }}
                           </td>
                         </tr>
+                        @if (isExpanded(job.id)) {
+                          @if (childJobsLoading().has(job.id)) {
+                            <tr hlmTr>
+                              <td hlmTd [attr.colspan]="8" class="py-4 text-center">
+                                <hlm-spinner />
+                              </td>
+                            </tr>
+                          }
+                          @for (child of getChildJobs(job.id); track child.id) {
+                            <tr hlmTr class="bg-muted/50">
+                              <td hlmTd class="w-8"></td>
+                              <td hlmTd class="font-medium pl-8 text-muted-foreground">{{ humanizeType(child.type) }}</td>
+                              <td hlmTd>
+                                <span hlmBadge [variant]="statusBadgeVariant(child.status)">
+                                  {{ statusLabel(child.status) }}
+                                </span>
+                              </td>
+                              <td hlmTd>—</td>
+                              <td hlmTd class="text-muted-foreground text-sm">{{ child.createdAt | date:'medium' }}</td>
+                              <td hlmTd class="hidden md:table-cell text-muted-foreground text-sm">
+                                {{ child.startedAt ? (child.startedAt | date:'medium') : '—' }}
+                              </td>
+                              <td hlmTd class="hidden md:table-cell text-muted-foreground text-sm">
+                                {{ child.completedAt ? (child.completedAt | date:'medium') : '—' }}
+                              </td>
+                              <td hlmTd class="hidden lg:table-cell text-muted-foreground text-sm max-w-xs truncate"
+                                  [attr.title]="child.error ?? null">
+                                {{ child.error ?? '—' }}
+                              </td>
+                            </tr>
+                          }
+                        }
                       }
                     </tbody>
                   </table>
@@ -157,6 +217,10 @@ export class JobListComponent {
 
   loading = signal(false);
   error = signal(false);
+
+  private expandedJobs = signal(new Set<string>());
+  private childJobsMap = signal(new Map<string, GetProcessingJobsResponse[]>());
+  childJobsLoading = signal(new Set<string>());
 
   statusFilter = toSignal(
     this.route.queryParamMap.pipe(map(p => p.get('status') as ProcessingJobStatus | null)),
@@ -202,6 +266,69 @@ export class JobListComponent {
     return (event.target as HTMLSelectElement).value;
   }
 
+  isParentJob(job: GetProcessingJobsResponse): boolean {
+    return +(job.totalChildCount ?? 0) > 0;
+  }
+
+  isExpanded(jobId: string): boolean {
+    return this.expandedJobs().has(jobId);
+  }
+
+  getChildJobs(jobId: string): GetProcessingJobsResponse[] {
+    return this.childJobsMap().get(jobId) ?? [];
+  }
+
+  toggleExpand(jobId: string): void {
+    const expanded = new Set(this.expandedJobs());
+    if (expanded.has(jobId)) {
+      expanded.delete(jobId);
+      this.expandedJobs.set(expanded);
+    } else {
+      expanded.add(jobId);
+      this.expandedJobs.set(expanded);
+      this.loadChildJobs(jobId);
+    }
+  }
+
+  childProgress(job: GetProcessingJobsResponse): string {
+    const total = +(job.totalChildCount ?? 0);
+    const completed = +(job.completedChildCount ?? 0);
+    const failed = +(job.failedChildCount ?? 0);
+    const finished = completed + failed;
+    let result = `${finished}/${total}`;
+    if (failed > 0) {
+      result += ` (${failed} failed)`;
+    }
+    return result;
+  }
+
+  private loadChildJobs(parentJobId: string): void {
+    const loadingSet = new Set(this.childJobsLoading());
+    loadingSet.add(parentJobId);
+    this.childJobsLoading.set(loadingSet);
+
+    this.adminApi.getProcessingJobs({
+      ParentJobId: parentJobId,
+      Page: 1,
+      PageSize: 500,
+    }).subscribe({
+      next: (response) => {
+        const newMap = new Map(this.childJobsMap());
+        newMap.set(parentJobId, response.items);
+        this.childJobsMap.set(newMap);
+
+        const newLoading = new Set(this.childJobsLoading());
+        newLoading.delete(parentJobId);
+        this.childJobsLoading.set(newLoading);
+      },
+      error: () => {
+        const newLoading = new Set(this.childJobsLoading());
+        newLoading.delete(parentJobId);
+        this.childJobsLoading.set(newLoading);
+      },
+    });
+  }
+
   onStatusChange(value: string): void {
     this.router.navigate(['/admin/jobs'], {
       queryParams: { page: 1, status: value || null },
@@ -230,6 +357,9 @@ export class JobListComponent {
     switch (type) {
       case 'UploadDocument': return 'Upload Document';
       case 'UploadDocumentVersion': return 'Upload Version';
+      case 'ReprocessDocumentVersion': return 'Reprocess Version';
+      case 'BulkReprocessDocuments': return 'Bulk Reprocess';
+      case 'DownloadDocuments': return 'Download Documents';
       default: return type;
     }
   }

@@ -34,9 +34,28 @@ public class ProcessingJobConfiguration : IEntityTypeConfiguration<ProcessingJob
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(j => j.TotalChildCount)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.Property(j => j.CompletedChildCount)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.Property(j => j.FailedChildCount)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.HasOne<ProcessingJob>()
+            .WithMany()
+            .HasForeignKey(j => j.ParentJobId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(j => j.Type);
         builder.HasIndex(j => j.EntityId);
         builder.HasIndex(j => new { j.Status, j.Priority });
         builder.HasIndex(j => j.CreatedByUserId);
+        builder.HasIndex(j => j.ParentJobId);
+        builder.HasIndex(j => new { j.ParentJobId, j.Status });
     }
 }

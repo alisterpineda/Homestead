@@ -806,28 +806,25 @@ export class DocumentListComponent implements OnDestroy {
   }
 
   onBulkReprocessStarted(jobIds: string[]): void {
-    const count = jobIds.length;
+    const parentJobId = jobIds[0];
     this.clearSelection();
 
-    const allDone = Promise.allSettled(
-      jobIds.map(id => this.processingHub.waitForJob(id)),
-    );
-
     toast.promise(
-      allDone.then((results) => {
-        const succeeded = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
+      this.processingHub.waitForJob(parentJobId).then(msg => {
         this.onRefresh();
+        const total = msg.totalChildCount ?? 0;
+        const failed = msg.failedChildCount ?? 0;
+        const succeeded = total - failed;
         if (failed === 0) {
           return `Text extraction completed for ${succeeded} document${succeeded > 1 ? 's' : ''}.`;
         }
         if (succeeded === 0) {
           throw new Error(`Text extraction failed for all ${failed} document${failed > 1 ? 's' : ''}.`);
         }
-        return `Text extraction completed for ${succeeded} of ${count} document${count > 1 ? 's' : ''} (${failed} failed).`;
+        return `Text extraction completed for ${succeeded} of ${total} document${total > 1 ? 's' : ''} (${failed} failed).`;
       }),
       {
-        loading: `Reprocessing text for ${count} document${count > 1 ? 's' : ''}...`,
+        loading: 'Reprocessing text extraction...',
         success: (message) => message,
         error: (err: unknown) => err instanceof Error ? err.message : 'Text extraction failed.',
       },

@@ -17,6 +17,11 @@ public class ProcessingJob
     public DateTimeOffset? CompletedAt { get; set; }
     public Guid? CreatedByUserId { get; set; }
 
+    public Guid? ParentJobId { get; set; }
+    public int TotalChildCount { get; set; }
+    public int CompletedChildCount { get; set; }
+    public int FailedChildCount { get; set; }
+
     public T? GetPayload<T>() => Payload is null ? default : JsonSerializer.Deserialize<T>(Payload);
     public void SetPayload<T>(T value) => Payload = JsonSerializer.Serialize(value);
 }

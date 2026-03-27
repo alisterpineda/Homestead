@@ -507,6 +507,11 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("CompletedChildCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -524,6 +529,14 @@ namespace Homestead.WebApi.Migrations
                     b.Property<string>("Error")
                         .HasColumnType("text");
 
+                    b.Property<int>("FailedChildCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid?>("ParentJobId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Payload")
                         .HasColumnType("jsonb");
 
@@ -539,6 +552,11 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("TotalChildCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text");
@@ -549,7 +567,11 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("EntityId");
 
+                    b.HasIndex("ParentJobId");
+
                     b.HasIndex("Type");
+
+                    b.HasIndex("ParentJobId", "Status");
 
                     b.HasIndex("Status", "Priority");
 
@@ -952,6 +974,14 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Processing.ProcessingJob", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Processing.ProcessingJob", null)
+                        .WithMany()
+                        .HasForeignKey("ParentJobId")
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Settings.TextExtractionEngine", b =>

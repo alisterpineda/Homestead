@@ -5,5 +5,6 @@ public enum ProcessingJobStatus
     Pending,
     InProgress,
     Completed,
-    Failed
+    Failed,
+    PartiallyCompleted
 }

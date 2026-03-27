@@ -7,9 +7,14 @@ export function statusBadgeVariant(status: ProcessingJobStatus): BadgeVariants['
     case 'InProgress': return 'default';
     case 'Completed': return 'secondary';
     case 'Failed': return 'destructive';
+    case 'PartiallyCompleted': return 'outline';
   }
 }
 
 export function statusLabel(status: ProcessingJobStatus): string {
-  return status === 'InProgress' ? 'In Progress' : status;
+  switch (status) {
+    case 'InProgress': return 'In Progress';
+    case 'PartiallyCompleted': return 'Partially Completed';
+    default: return status;
+  }
 }

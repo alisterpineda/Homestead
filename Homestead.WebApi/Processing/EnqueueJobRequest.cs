@@ -9,4 +9,5 @@ public class EnqueueJobRequest
     public string? Payload { get; set; }
     public int Priority { get; set; }
     public Guid? CreatedByUserId { get; set; }
+    public Guid? ParentJobId { get; set; }
 }

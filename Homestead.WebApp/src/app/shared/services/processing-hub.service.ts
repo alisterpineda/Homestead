@@ -14,6 +14,9 @@ export interface JobStatusChangedMessage {
   error: string | null;
   errorCode: string | null;
   errorData: Record<string, string> | null;
+  totalChildCount: number | null;
+  completedChildCount: number | null;
+  failedChildCount: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -38,7 +41,7 @@ export class ProcessingHubService {
     return firstValueFrom(
       this.jobStatusChanged$.pipe(
         filter(msg => msg.jobId === jobId),
-        filter(msg => msg.status === 'Completed' || msg.status === 'Failed'),
+        filter(msg => msg.status === 'Completed' || msg.status === 'Failed' || msg.status === 'PartiallyCompleted'),
         take(1),
         map(msg => {
           if (msg.status === 'Failed') {
@@ -70,6 +73,14 @@ export class ProcessingHubService {
         } else {
           const name = message.documentName ?? 'Document';
           toast.success(`"${name}" has been processed successfully.`);
+        }
+        this.jobCompletedSubject.next(message);
+      } else if (message.status === 'PartiallyCompleted') {
+        if (isManaged) {
+          this.managedJobIds.delete(message.jobId);
+        } else {
+          const failed = message.failedChildCount ?? 0;
+          toast.warning(`Processing completed with ${failed} failed item${failed !== 1 ? 's' : ''}.`);
         }
         this.jobCompletedSubject.next(message);
       } else if (message.status === 'Failed') {

@@ -70,8 +70,11 @@ public class JobProcessorService(
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+            // Skip parent jobs that already spawned children — they are legitimately
+            // InProgress (waiting for children to complete), not orphaned.
             var recovered = await db.ProcessingJobs
                 .Where(j => j.Status == ProcessingJobStatus.InProgress)
+                .Where(j => j.TotalChildCount == 0)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(j => j.Status, ProcessingJobStatus.Pending)
                     .SetProperty(j => j.StartedAt, (DateTimeOffset?)null), ct);
@@ -158,11 +161,27 @@ public class JobProcessorService(
                 throw new TimeoutException($"Job {jobId} timed out after {JobTimeout.TotalMinutes} minutes");
             }
 
-            job.Status = ProcessingJobStatus.Completed;
-            job.CompletedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(ct);
+            if (handler is IParentJobHandler)
+            {
+                // Parent stays InProgress until UpdateParentProgressAsync transitions it
+                // when the last child completes.
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation(
+                    "Parent job {JobId} ({JobType}) spawned {ChildCount} children",
+                    job.Id, job.Type, job.TotalChildCount);
+            }
+            else
+            {
+                job.Status = ProcessingJobStatus.Completed;
+                job.CompletedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(ct);
 
-            logger.LogInformation("Job {JobId} ({JobType}) completed successfully", job.Id, job.Type);
+                if (job.ParentJobId is not null)
+                    await UpdateParentProgressAsync(db, job.ParentJobId.Value, scope.ServiceProvider, ct);
+
+                logger.LogInformation("Job {JobId} ({JobType}) completed successfully", job.Id, job.Type);
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -197,6 +216,9 @@ public class JobProcessorService(
                         documentName: null, error: ex.Message,
                         failedJob.CreatedByUserId, ct,
                         errorCode: errorCode, errorData: errorData);
+
+                    if (failedJob.ParentJobId is not null)
+                        await UpdateParentProgressAsync(errorDb, failedJob.ParentJobId.Value, errorScope.ServiceProvider, ct);
                 }
             }
             catch (Exception innerEx)
@@ -206,6 +228,50 @@ public class JobProcessorService(
 
             return true;
         }
+    }
+
+    private static async Task UpdateParentProgressAsync(
+        AppDbContext db, Guid parentJobId, IServiceProvider sp, CancellationToken ct)
+    {
+        var parent = await db.ProcessingJobs.FirstAsync(j => j.Id == parentJobId, ct);
+
+        var stats = await db.ProcessingJobs
+            .Where(j => j.ParentJobId == parentJobId)
+            .GroupBy(j => 1)
+            .Select(g => new
+            {
+                Completed = g.Count(j => j.Status == ProcessingJobStatus.Completed),
+                Failed = g.Count(j => j.Status == ProcessingJobStatus.Failed),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (stats is null) return;
+
+        parent.CompletedChildCount = stats.Completed;
+        parent.FailedChildCount = stats.Failed;
+
+        var finishedCount = stats.Completed + stats.Failed;
+        if (finishedCount >= parent.TotalChildCount)
+        {
+            parent.CompletedAt = DateTimeOffset.UtcNow;
+            parent.Status = stats.Failed == 0
+                ? ProcessingJobStatus.Completed
+                : stats.Completed == 0
+                    ? ProcessingJobStatus.Failed
+                    : ProcessingJobStatus.PartiallyCompleted;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var notifier = sp.GetRequiredService<IProcessingNotifier>();
+        await notifier.NotifyJobStatusAsync(
+            parent.Id, parent.Status,
+            parent.EntityType, parent.EntityId,
+            documentName: null, error: null,
+            parent.CreatedByUserId, ct,
+            totalChildCount: parent.TotalChildCount,
+            completedChildCount: parent.CompletedChildCount,
+            failedChildCount: parent.FailedChildCount);
     }
 
     private sealed class PauseHandle(SemaphoreSlim semaphore) : IAsyncDisposable

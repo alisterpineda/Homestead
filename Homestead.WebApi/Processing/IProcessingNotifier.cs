@@ -14,5 +14,8 @@ public interface IProcessingNotifier
         Guid? userId,
         CancellationToken ct,
         string? errorCode = null,
-        Dictionary<string, string>? errorData = null);
+        Dictionary<string, string>? errorData = null,
+        int? totalChildCount = null,
+        int? completedChildCount = null,
+        int? failedChildCount = null);
 }

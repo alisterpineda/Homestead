@@ -1,0 +1,201 @@
+using System.Text.Json;
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Features.Documents.Processing;
+using Homestead.WebApi.Processing;
+using Microsoft.EntityFrameworkCore;
+using NSubstitute;
+
+namespace Homestead.WebApi.Tests.Unit.Processing;
+
+public class BulkReprocessDocumentsJobHandlerTests : IDisposable
+{
+    private readonly TestAppDbContext _db;
+    private readonly IJobSignal _signal;
+    private readonly BulkReprocessDocumentsJobHandler _handler;
+
+    public BulkReprocessDocumentsJobHandlerTests()
+    {
+        _db = TestAppDbContext.Create();
+        _signal = Substitute.For<IJobSignal>();
+
+        _handler = new BulkReprocessDocumentsJobHandler(_db, _signal);
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    private Guid SeedDocument(string name = "Test.pdf", int versionCount = 1)
+    {
+        var docId = Guid.NewGuid();
+        _db.Documents.Add(new Document
+        {
+            Id = docId,
+            Name = name,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+
+        for (var i = 1; i <= versionCount; i++)
+        {
+            _db.DocumentVersions.Add(new DocumentVersion
+            {
+                Id = Guid.NewGuid(),
+                DocumentId = docId,
+                VersionNumber = i,
+                ContentType = "application/pdf",
+                FileSize = 1024,
+                FilePath = $"documents/files/{Guid.NewGuid()}.pdf",
+                FileHash = $"hash-{Guid.NewGuid()}",
+                FileExtension = ".pdf",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+        }
+
+        _db.SaveChanges();
+        return docId;
+    }
+
+    private ProcessingJob CreateParentJob(List<Guid> documentIds, Guid? engineId = null)
+    {
+        var payload = new BulkReprocessPayload(documentIds, engineId);
+        return new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.BulkReprocessDocuments,
+            Status = ProcessingJobStatus.InProgress,
+            CreatedByUserId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            Payload = JsonSerializer.Serialize(payload),
+        };
+    }
+
+    [Fact]
+    public async Task HandleAsync_CreatesChildJobPerDocument()
+    {
+        var docId1 = SeedDocument("Doc1.pdf");
+        var docId2 = SeedDocument("Doc2.pdf");
+        var job = CreateParentJob([docId1, docId2]);
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        Assert.Equal(2, children.Count);
+        Assert.All(children, c => Assert.Equal(ProcessingJobType.ReprocessDocumentVersion, c.Type));
+        Assert.All(children, c => Assert.Equal(ProcessingJobStatus.Pending, c.Status));
+        Assert.Equal(2, job.TotalChildCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SetsParentJobIdOnChildren()
+    {
+        var docId = SeedDocument();
+        var job = CreateParentJob([docId]);
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        Assert.Equal(job.Id, child.ParentJobId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SelectsLatestVersionPerDocument()
+    {
+        var docId = SeedDocument("Multi.pdf", versionCount: 3);
+        var job = CreateParentJob([docId]);
+
+        var latestVersion = _db.DocumentVersions
+            .Where(v => v.DocumentId == docId)
+            .OrderByDescending(v => v.VersionNumber)
+            .First();
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        Assert.Contains(latestVersion.Id.ToString(), child.Payload!);
+    }
+
+    [Fact]
+    public async Task HandleAsync_IdempotentOnRerun_DoesNotCreateDuplicateChildren()
+    {
+        var docId = SeedDocument();
+        var job = CreateParentJob([docId]);
+
+        _db.ProcessingJobs.Add(new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.ReprocessDocumentVersion,
+            Status = ProcessingJobStatus.Pending,
+            ParentJobId = job.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.SaveChanges();
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        Assert.Single(children);
+    }
+
+    [Fact]
+    public async Task HandleAsync_IdempotentOnRerun_RestoresTotalChildCount()
+    {
+        var job = CreateParentJob([Guid.NewGuid()]);
+
+        _db.ProcessingJobs.Add(new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.ReprocessDocumentVersion,
+            Status = ProcessingJobStatus.Completed,
+            ParentJobId = job.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.ProcessingJobs.Add(new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.ReprocessDocumentVersion,
+            Status = ProcessingJobStatus.Pending,
+            ParentJobId = job.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.SaveChanges();
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        Assert.Equal(2, job.TotalChildCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NoMatchingDocuments_SetsTotalChildCountToZero()
+    {
+        var job = CreateParentJob([Guid.NewGuid()]);
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        Assert.Equal(0, job.TotalChildCount);
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        Assert.Empty(children);
+    }
+
+    [Fact]
+    public async Task HandleAsync_PassesCreatedByUserIdToChildren()
+    {
+        var docId = SeedDocument();
+        var job = CreateParentJob([docId]);
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        Assert.Equal(job.CreatedByUserId, child.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SignalsOnceAfterBatchInsert()
+    {
+        var docId1 = SeedDocument("Doc1.pdf");
+        var docId2 = SeedDocument("Doc2.pdf");
+        var job = CreateParentJob([docId1, docId2]);
+
+        await _handler.HandleAsync(job, CancellationToken.None);
+
+        _signal.Received(1).Signal();
+    }
+}

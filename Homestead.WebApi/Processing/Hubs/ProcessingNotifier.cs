@@ -16,7 +16,10 @@ public class ProcessingNotifier(
         Guid? userId,
         CancellationToken ct,
         string? errorCode = null,
-        Dictionary<string, string>? errorData = null)
+        Dictionary<string, string>? errorData = null,
+        int? totalChildCount = null,
+        int? completedChildCount = null,
+        int? failedChildCount = null)
     {
         if (!userId.HasValue)
             return;
@@ -29,7 +32,10 @@ public class ProcessingNotifier(
             documentName,
             error,
             errorCode,
-            errorData);
+            errorData,
+            TotalChildCount: totalChildCount,
+            CompletedChildCount: completedChildCount,
+            FailedChildCount: failedChildCount);
 
         await hubContext.Clients.User(userId.Value.ToString()).JobStatusChanged(message);
     }

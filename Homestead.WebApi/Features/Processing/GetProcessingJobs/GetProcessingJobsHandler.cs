@@ -18,6 +18,11 @@ public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor curr
         if (currentUser.Role != AppRole.Admin)
             query = query.Where(j => j.CreatedByUserId == currentUser.UserId);
 
+        if (request.ParentJobId is not null)
+            query = query.Where(j => j.ParentJobId == request.ParentJobId);
+        else
+            query = query.Where(j => j.ParentJobId == null);
+
         if (request.EntityId is not null)
             query = query.Where(j => j.EntityId == request.EntityId);
 
@@ -41,7 +46,11 @@ public class GetProcessingJobsHandler(AppDbContext db, ICurrentUserAccessor curr
                 CreatedAt = j.CreatedAt,
                 StartedAt = j.StartedAt,
                 CompletedAt = j.CompletedAt,
-                CreatedByUserId = j.CreatedByUserId
+                CreatedByUserId = j.CreatedByUserId,
+                ParentJobId = j.ParentJobId,
+                TotalChildCount = j.TotalChildCount,
+                CompletedChildCount = j.CompletedChildCount,
+                FailedChildCount = j.FailedChildCount
             })
             .ToPaginatedAsync(request, ct);
     }
