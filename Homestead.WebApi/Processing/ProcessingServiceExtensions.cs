@@ -1,9 +1,13 @@
+using Microsoft.Extensions.Configuration;
+
 namespace Homestead.WebApi.Processing;
 
 public static class ProcessingServiceExtensions
 {
-    public static IServiceCollection AddProcessing(this IServiceCollection services)
+    public static IServiceCollection AddProcessing(this IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<JobProcessingOptions>(configuration.GetSection(JobProcessingOptions.SectionName));
+
         var assembly = typeof(Program).Assembly;
 
         var handlerTypes = assembly.GetTypes()

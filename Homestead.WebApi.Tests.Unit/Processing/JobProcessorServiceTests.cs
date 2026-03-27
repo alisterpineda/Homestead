@@ -1,6 +1,7 @@
 using Homestead.WebApi.Processing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
@@ -9,11 +10,12 @@ public class JobProcessorServiceTests
 {
     private readonly ILogger<JobProcessorService> _logger = Substitute.For<ILogger<JobProcessorService>>();
 
-    private JobProcessorService CreateService()
+    private JobProcessorService CreateService(int maxConcurrency = 1)
     {
         var services = new ServiceCollection();
         var sp = services.BuildServiceProvider();
-        return new JobProcessorService(sp.GetRequiredService<IServiceScopeFactory>(), _logger);
+        var options = Options.Create(new JobProcessingOptions { MaxConcurrency = maxConcurrency });
+        return new JobProcessorService(sp.GetRequiredService<IServiceScopeFactory>(), options, _logger);
     }
 
     [Fact]
@@ -67,5 +69,27 @@ public class JobProcessorServiceTests
         var handle = await service.PauseAsync(ct);
         await handle.DisposeAsync();
         await handle.DisposeAsync(); // Should not throw or double-release
+    }
+
+    [Fact]
+    public async Task PauseAsync_WithConcurrency_AcquiresAllSlots()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var service = CreateService(maxConcurrency: 3);
+
+        // First pause acquires all 3 slots
+        var handle1 = await service.PauseAsync(ct);
+
+        // Second pause should block since all slots are held
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.PauseAsync(cts.Token));
+
+        // After releasing, all 3 slots are available again
+        await handle1.DisposeAsync();
+        await using var handle2 = await service.PauseAsync(ct);
+        Assert.NotNull(handle2);
     }
 }

@@ -104,7 +104,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
-builder.Services.AddProcessing();
+builder.Services.AddProcessing(builder.Configuration);
 builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddThumbnails();
