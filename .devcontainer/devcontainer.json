@@ -13,7 +13,7 @@
   },
   "hostRequirements": {
     "cpus": 2,
-    "memory": "4gb",
+    "memory": "8gb",
     "storage": "32gb"
   },
   "postStartCommand": "dotnet dev-certs https --trust || true",
