@@ -58,12 +58,12 @@ When backend endpoints are added or modified, regenerate the frontend API client
 
 **Backend unit tests:**
 ```bash
-dotnet test --project Homestead.WebApi.Tests.Unit/Homestead.WebApi.Tests.Unit.csproj
+dotnet test --project Homestead.WebApi.Tests.Unit
 ```
 
 **Backend integration tests** (requires Docker for Testcontainers):
 ```bash
-dotnet test --project Homestead.WebApi.Tests.Integration/Homestead.WebApi.Tests.Integration.csproj
+dotnet test --project Homestead.WebApi.Tests.Integration
 ```
 
 **Frontend unit tests:**
@@ -80,3 +80,72 @@ cd Homestead.E2E && npm run e2e
 ```bash
 cd Homestead.E2E && npx playwright test --project=local-upload --project=local-tags --project=local-bulk-ops --project=local-trash
 ```
+
+### Backend Test Filtering (xUnit v3 + MTP v2)
+
+Backend tests use xUnit v3 with Microsoft Testing Platform v2 (opted in via `global.json`). This means the old VSTest `--filter "FullyQualifiedName~Foo"` syntax does **not** work. Use the xUnit-native filter switches instead.
+
+**Simple filters** — include/exclude by class, method, namespace, or trait:
+
+```bash
+# Run a single test class (wildcard supported at start/end)
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-class "*JobQueueTests"
+
+# Run a single test method
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-method "*EnqueueAsync_PersistsJobAndSignals"
+
+# Run all tests in a namespace
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-namespace "Homestead.WebApi.Tests.Unit.Processing"
+
+# Run multiple classes (OR logic — space-separated)
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-class "*JobQueueTests" "*JobProcessorServiceTests"
+
+# Exclude a class
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-not-class "*JobQueueTests"
+
+# Combine include + exclude (run namespace but skip one class)
+dotnet test --project Homestead.WebApi.Tests.Unit \
+  --filter-namespace "Homestead.WebApi.Tests.Unit.Processing" \
+  --filter-not-class "*JobQueueTests"
+
+# Filter by trait
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-trait "Category=Unit"
+```
+
+**Query filter language** — structured filter using `/assembly/namespace/type/method[trait=value]` (4 segments):
+
+```bash
+# Run a test class (type is the 3rd segment)
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-query "///JobQueueTests"
+
+# Run a single method (method is the 4th segment)
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-query "////EnqueueAsync_PersistsJobAndSignals"
+
+# Run all tests in a namespace (namespace is the 2nd segment)
+dotnet test --project Homestead.WebApi.Tests.Unit --filter-query "//Homestead.WebApi.Tests.Unit.Processing//"
+```
+
+Simple filters and query filters **cannot be mixed** in the same invocation.
+
+**Useful flags:**
+
+```bash
+# List matching tests without running them (verify your filter)
+dotnet test --project Homestead.WebApi.Tests.Unit --list-tests --filter-class "*JobQueueTests"
+
+# Stop on first failure
+dotnet test --project Homestead.WebApi.Tests.Unit --stop-on-fail on
+
+# Skip rebuild
+dotnet test --project Homestead.WebApi.Tests.Unit --no-build
+```
+
+### Running Slow Tests (Integration + E2E)
+
+**Do NOT pipe integration or E2E test output through `tail`, `head`, or other truncation commands.** These tests are slow to run. When they fail, the full output contains error messages, stack traces, and context needed to diagnose the issue. Truncating with `| tail -50` etc. loses this context and forces a costly re-run. Instead, use filters to narrow the scope of what runs:
+
+- Use `--filter-class`, `--filter-method`, or `--filter-namespace` to run fewer tests
+- Use `--stop-on-fail on` to stop at the first failure
+- For Playwright E2E tests, use `--project=<name>` or pass a test file path to narrow scope
+
+This does **not** apply to fast tests (backend unit tests, Angular unit tests) where truncation is fine.
