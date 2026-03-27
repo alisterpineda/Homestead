@@ -31,7 +31,7 @@ describe('AppUpdateService', () => {
   }
 
   beforeEach(() => {
-    vi.spyOn(toast, 'info').mockImplementation(() => undefined as never);
+    vi.spyOn(toast, 'message').mockImplementation(() => undefined as never);
     vi.spyOn(toast, 'error').mockImplementation(() => undefined as never);
   });
 
@@ -39,7 +39,7 @@ describe('AppUpdateService', () => {
     vi.restoreAllMocks();
   });
 
-  it('should show info toast when a new version is ready', () => {
+  it('should show toast when a new version is ready', () => {
     createService(true);
 
     versionUpdates$.next({
@@ -48,7 +48,7 @@ describe('AppUpdateService', () => {
       latestVersion: { hash: 'def' },
     });
 
-    expect(toast.info).toHaveBeenCalledWith('A new version is available.', expect.objectContaining({
+    expect(toast.message).toHaveBeenCalledWith('A new version is available.', expect.objectContaining({
       description: 'Reload to get the latest features and fixes.',
       duration: Infinity,
     }));
@@ -77,7 +77,7 @@ describe('AppUpdateService', () => {
       latestVersion: { hash: 'def' },
     });
 
-    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.message).not.toHaveBeenCalled();
   });
 
   it('should ignore non-VERSION_READY events', () => {
@@ -88,6 +88,6 @@ describe('AppUpdateService', () => {
       version: { hash: 'abc' },
     });
 
-    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.message).not.toHaveBeenCalled();
   });
 });

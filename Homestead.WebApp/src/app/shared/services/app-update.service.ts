@@ -16,7 +16,7 @@ export class AppUpdateService {
     this.swUpdate.versionUpdates
       .pipe(filter((event) => event.type === 'VERSION_READY'))
       .subscribe(() => {
-        toast.info('A new version is available.', {
+        toast.message('A new version is available.', {
           description: 'Reload to get the latest features and fixes.',
           duration: Infinity,
           action: {
