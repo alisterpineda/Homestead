@@ -9,7 +9,7 @@ import { AppUpdateService } from '@/shared/services/app-update.service';
   imports: [RouterOutlet, HlmToaster],
   template: `
     <router-outlet />
-    <hlm-toaster position="bottom-right" [richColors]="true" [closeButton]="true" />
+    <hlm-toaster position="bottom-right" />
   `,
 })
 export class App {
