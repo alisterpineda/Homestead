@@ -1,0 +1,26 @@
+{
+  "skill_name": "spartan-ng",
+  "evals": [
+    {
+      "id": 0,
+      "name": "add-toggle-component",
+      "prompt": "I need to add the toggle component from Spartan to the project. Can you set that up?",
+      "expected_output": "Runs `npx ng g @spartan-ng/cli:ui toggle` from Homestead.WebApp/, then adds the tsconfig.json path alias. Does NOT use --directory flag.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "reinstall-select",
+      "prompt": "The select component is acting weird after we bumped the Spartan packages. Can you reinstall it fresh?",
+      "expected_output": "Deletes the existing select directory under the componentsPath, then re-runs `npx ng g @spartan-ng/cli:ui select` from Homestead.WebApp/. Does NOT re-add the tsconfig alias since it already exists.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "run-healthcheck",
+      "prompt": "We just updated @spartan-ng/brain and @spartan-ng/cli to the latest version. Can you run the Spartan health checks and fix anything that comes up?",
+      "expected_output": "Runs `npx ng g @spartan-ng/cli:healthcheck` (or with --autoFix) from Homestead.WebApp/. Suggests re-installing helm components if needed.",
+      "files": []
+    }
+  ]
+}
