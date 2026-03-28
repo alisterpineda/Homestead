@@ -7,9 +7,9 @@ import {
 
 describe('DocumentTableComponent exports', () => {
   describe('HIDEABLE_COLUMNS', () => {
-    it('should include all six hideable column entries', () => {
+    it('should include all seven hideable column entries', () => {
       const ids = HIDEABLE_COLUMNS.map(c => c.id);
-      expect(ids).toEqual(['parties', 'tags', 'contentType', 'fileSize', 'createdAt', 'documentDate']);
+      expect(ids).toEqual(['parties', 'tags', 'contentType', 'fileSize', 'createdAt', 'updatedAt', 'documentDate']);
     });
 
     it('should label createdAt as "Date Added"', () => {
@@ -32,8 +32,8 @@ describe('DocumentTableComponent exports', () => {
       expect(DEFAULT_COLUMN_VISIBILITY['documentDate']).toBe(false);
     });
 
-    it('should only contain the two date columns', () => {
-      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY)).toEqual(['createdAt', 'documentDate']);
+    it('should only contain the three date columns', () => {
+      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY)).toEqual(['createdAt', 'updatedAt', 'documentDate']);
     });
   });
 });
@@ -76,6 +76,15 @@ describe('DocumentTableComponent', () => {
 
     const sorting = component['_sorting']();
     expect(sorting).toEqual([{ id: 'documentDate', desc: false }]);
+  });
+
+  it('should map updatedAt column to UpdatedAt sort key via sort change', () => {
+    fixture.componentRef.setInput('sortBy', 'UpdatedAt');
+    fixture.componentRef.setInput('sortDir', 'Desc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'updatedAt', desc: true }]);
   });
 
   it('should sync column visibility input to table state', () => {

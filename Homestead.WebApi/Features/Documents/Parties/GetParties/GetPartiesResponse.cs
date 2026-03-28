@@ -6,5 +6,8 @@ public record GetPartiesResponse
     public required string Name { get; init; }
     public string? Description { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? UpdatedAt { get; init; }
+    public Guid? UpdatedByUserId { get; init; }
+    public string? UpdatedByUserName { get; init; }
     public required int DocumentCount { get; init; }
 }

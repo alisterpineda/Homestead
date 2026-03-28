@@ -16,7 +16,7 @@ import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from './sort-header-button';
 import { TableHeadSelection, TableRowSelection } from './selection-column';
-import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, DocumentDateCell } from './table-cells';
+import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, ModifiedCell, DocumentDateCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, DocumentSortBy> = {
@@ -24,16 +24,13 @@ const COLUMN_ID_TO_SORT_KEY: Record<string, DocumentSortBy> = {
   contentType: 'ContentType',
   fileSize: 'FileSize',
   createdAt: 'CreatedAt',
+  updatedAt: 'UpdatedAt',
   documentDate: 'DocumentDate',
 };
 
-const SORT_KEY_TO_COLUMN_ID: Record<string, string> = {
-  Name: 'name',
-  ContentType: 'contentType',
-  FileSize: 'fileSize',
-  CreatedAt: 'createdAt',
-  DocumentDate: 'documentDate',
-};
+const SORT_KEY_TO_COLUMN_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(COLUMN_ID_TO_SORT_KEY).map(([k, v]) => [v, k]),
+);
 
 export interface HideableColumn {
   id: string;
@@ -46,11 +43,13 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'contentType', label: 'Content Type' },
   { id: 'fileSize', label: 'File Size' },
   { id: 'createdAt', label: 'Date Added' },
+  { id: 'updatedAt', label: 'Modified' },
   { id: 'documentDate', label: 'Document Date' },
 ];
 
 export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   createdAt: false,
+  updatedAt: false,
   documentDate: false,
 };
 
@@ -208,6 +207,14 @@ export class DocumentTableComponent {
       minSize: 100,
     },
     {
+      accessorKey: 'updatedAt',
+      id: 'updatedAt',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Modified' } }),
+      cell: () => flexRenderComponent(ModifiedCell),
+      size: 140,
+      minSize: 100,
+    },
+    {
       accessorKey: 'documentDate',
       id: 'documentDate',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Document Date' } }),
@@ -293,6 +300,7 @@ export class DocumentTableComponent {
     name: 'overflow-hidden',
     tags: 'overflow-hidden',
     createdAt: 'overflow-hidden',
+    updatedAt: 'overflow-hidden',
     documentDate: 'overflow-hidden',
   };
 

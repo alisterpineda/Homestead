@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Features.Admin.Groups.UpdateGroup;
@@ -17,7 +18,9 @@ public class UpdateGroupHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
-        _sut = new UpdateGroupHandler(_db, _audit);
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
+        currentUser.UserId.Returns(Guid.NewGuid());
+        _sut = new UpdateGroupHandler(_db, _audit, currentUser);
     }
 
     public void Dispose() => _db.Dispose();
@@ -44,6 +47,33 @@ public class UpdateGroupHandlerTests : IDisposable
         await _sut.Handle(command, CancellationToken.None);
 
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_WithChanges_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var group = new Group
+        {
+            Id = Guid.NewGuid(),
+            Name = "Old Name",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _db.Groups.Add(group);
+        await _db.SaveChangesAsync();
+
+        var before = DateTimeOffset.UtcNow;
+
+        var command = new UpdateGroupCommand
+        {
+            Id = group.Id,
+            Request = new UpdateGroupRequest { Name = "New Name" }
+        };
+
+        var result = await _sut.Handle(command, CancellationToken.None);
+
+        Assert.NotNull(result.UpdatedAt);
+        Assert.True(result.UpdatedAt >= before);
+        Assert.NotNull(result.UpdatedByUserId);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from '../../list/document-table/sort-header-button';
 import { TableHeadSelection, TableRowSelection } from '../../list/document-table/selection-column';
 import type { HideableColumn } from '../../list/document-table/document-table.component';
-import { TagNameCell, TagDateAddedCell } from './table-cells';
+import { TagNameCell, TagDateAddedCell, TagModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, TagSortBy> = {
@@ -24,6 +24,7 @@ const COLUMN_ID_TO_SORT_KEY: Record<string, TagSortBy> = {
   path: 'Path',
   documentCount: 'DocumentCount',
   createdAt: 'CreatedAt',
+  updatedAt: 'UpdatedAt',
 };
 
 const SORT_KEY_TO_COLUMN_ID: Record<string, string> = Object.fromEntries(
@@ -34,11 +35,13 @@ export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'path', label: 'Path' },
   { id: 'description', label: 'Description' },
   { id: 'createdAt', label: 'Date Added' },
+  { id: 'updatedAt', label: 'Modified' },
 ];
 
 export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   path: false,
   createdAt: false,
+  updatedAt: false,
 };
 
 @Component({
@@ -190,6 +193,14 @@ export class TagTableComponent {
       size: 140,
       minSize: 100,
     },
+    {
+      accessorKey: 'updatedAt',
+      id: 'updatedAt',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Modified' } }),
+      cell: () => flexRenderComponent(TagModifiedCell),
+      size: 140,
+      minSize: 100,
+    },
   ];
 
   protected readonly table = createAngularTable<GetTagsResponse>(() => ({
@@ -262,6 +273,7 @@ export class TagTableComponent {
     description: 'overflow-hidden',
     documentCount: 'text-right overflow-hidden',
     createdAt: 'overflow-hidden',
+    updatedAt: 'overflow-hidden',
   };
 
   getThClass(columnId: string): string {

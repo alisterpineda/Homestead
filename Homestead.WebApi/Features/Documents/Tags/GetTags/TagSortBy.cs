@@ -5,5 +5,6 @@ public enum TagSortBy
     Name,
     Path,
     DocumentCount,
-    CreatedAt
+    CreatedAt,
+    UpdatedAt
 }

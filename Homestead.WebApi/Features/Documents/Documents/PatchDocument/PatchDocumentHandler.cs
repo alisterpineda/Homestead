@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -12,7 +13,8 @@ namespace Homestead.WebApi.Features.Documents.Documents.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db,
     IAuditContext audit, ISearchVectorUpdater searchVectorUpdater,
-    IDocumentMetadataService metadataService, IDocumentQueryService queryService)
+    IDocumentMetadataService metadataService, IDocumentQueryService queryService,
+    ICurrentUserAccessor currentUser)
     : IRequestHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
     public async Task<PatchDocumentResponse> Handle(PatchDocumentCommand request, CancellationToken ct)
@@ -75,6 +77,8 @@ public class PatchDocumentHandler(AppDbContext db,
         document.ExpiryDate = model.ExpiryDate;
         document.Notes = model.Notes;
         document.GroupId = model.GroupId;
+        document.UpdatedAt = DateTimeOffset.UtcNow;
+        document.UpdatedByUserId = currentUser.UserId;
 
         // Update tags
         var resolvedTags = await metadataService.ResolveTagPathsAsync(model.TagPaths, ct);
@@ -148,6 +152,16 @@ public class PatchDocumentHandler(AppDbContext db,
             .OrderByDescending(r => r.VersionNumber)
             .FirstAsync(ct);
 
+        // Load updater info
+        string? updatedByUserName = null;
+        if (document.UpdatedByUserId.HasValue)
+        {
+            updatedByUserName = await db.Users
+                .Where(u => u.Id == document.UpdatedByUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return new PatchDocumentResponse
         {
             Id = document.Id,
@@ -157,6 +171,9 @@ public class PatchDocumentHandler(AppDbContext db,
             FileHash = latestVersion.FileHash,
             FileExtension = latestVersion.FileExtension,
             CreatedAt = document.CreatedAt,
+            UpdatedAt = document.UpdatedAt,
+            UpdatedByUserId = document.UpdatedByUserId,
+            UpdatedByUserName = updatedByUserName,
             DocumentDate = document.DocumentDate,
             ExpiryDate = document.ExpiryDate,
             Notes = document.Notes,

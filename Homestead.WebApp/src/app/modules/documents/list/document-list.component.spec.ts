@@ -44,9 +44,9 @@ describe('DocumentListComponent', () => {
   });
 
   describe('sortOptions', () => {
-    it('should expose the five expected sort fields in order', () => {
+    it('should expose the six expected sort fields in order', () => {
       const values = component.sortOptions.map(o => o.value);
-      expect(values).toEqual<DocumentSortBy[]>(['CreatedAt', 'DocumentDate', 'Name', 'ContentType', 'FileSize']);
+      expect(values).toEqual<DocumentSortBy[]>(['CreatedAt', 'UpdatedAt', 'DocumentDate', 'Name', 'ContentType', 'FileSize']);
     });
 
     it('should have a label for each sort option', () => {
@@ -73,6 +73,12 @@ describe('DocumentListComponent', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortByChange('CreatedAt');
       expect(spy).toHaveBeenCalledWith({ sortBy: 'CreatedAt', sortDir: 'Desc' });
+    });
+
+    it('should default to Desc for UpdatedAt when no sortDir is active', () => {
+      const spy = vi.spyOn(component, 'onSortChange');
+      component.onSortByChange('UpdatedAt');
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'UpdatedAt', sortDir: 'Desc' });
     });
 
     it('should default to Desc for DocumentDate when no sortDir is active', () => {

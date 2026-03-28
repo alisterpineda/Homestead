@@ -99,6 +99,28 @@ public class DocumentCrudTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task PatchDocument_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client);
+
+        // Verify UpdatedAt is null before any patch
+        var getResponse = await client.GetAsync($"/api/v1/documents/{docId}", CT);
+        var before = await getResponse.Content.ReadFromJsonAsync<DocumentDetail>(CT);
+        Assert.Null(before!.UpdatedAt);
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/name", value = (object)"Patched Name" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
+        Assert.NotNull(body!.UpdatedAt);
+        Assert.NotNull(body.UpdatedByUserId);
+    }
+
+    [Fact]
     public async Task PatchDocument_UpdatesNotes()
     {
         var client = await CreateAdminClientAsync();
@@ -488,9 +510,12 @@ public class DocumentCrudTests : IntegrationTestBase
         return await client.PostAsync("/api/v1/documents", form);
     }
 
-    private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension);
-    private record DocumentDetail(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt, string? Notes = null);
-    private record DocumentDetailWithMeta(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt, string? Notes, IReadOnlyList<TagItem> Tags, IReadOnlyList<PartyItem> Parties);
+    private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+    private record DocumentDetail(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt,
+        string? Notes = null, DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+    private record DocumentDetailWithMeta(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt, string? Notes, IReadOnlyList<TagItem> Tags, IReadOnlyList<PartyItem> Parties,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
     private record TagItem(Guid Id, string Name, string Path);
     private record PartyItem(Guid Id, string Name);
 }

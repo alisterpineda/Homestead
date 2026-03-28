@@ -34,9 +34,9 @@ describe('TagListComponent', () => {
   });
 
   describe('sortOptions', () => {
-    it('should expose the four expected sort fields in order', () => {
+    it('should expose the five expected sort fields in order', () => {
       const values = component.sortOptions.map(o => o.value);
-      expect(values).toEqual<TagSortBy[]>(['Name', 'Path', 'DocumentCount', 'CreatedAt']);
+      expect(values).toEqual<TagSortBy[]>(['Name', 'Path', 'DocumentCount', 'CreatedAt', 'UpdatedAt']);
     });
 
     it('should have a label for each sort option', () => {
@@ -79,6 +79,12 @@ describe('TagListComponent', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortByChange('CreatedAt');
       expect(spy).toHaveBeenCalledWith({ sortBy: 'CreatedAt', sortDir: 'Desc' });
+    });
+
+    it('should default to Desc for UpdatedAt', () => {
+      const spy = vi.spyOn(component, 'onSortChange');
+      component.onSortByChange('UpdatedAt');
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'UpdatedAt', sortDir: 'Desc' });
     });
 
     it('should preserve existing sort direction when changing field', () => {

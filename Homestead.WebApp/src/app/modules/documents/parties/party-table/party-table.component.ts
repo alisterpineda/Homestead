@@ -17,28 +17,29 @@ import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from '../../list/document-table/sort-header-button';
 import { TableHeadSelection, TableRowSelection } from '../../list/document-table/selection-column';
 import type { HideableColumn } from '../../list/document-table/document-table.component';
-import { PartyDateAddedCell } from './table-cells';
+import { PartyDateAddedCell, PartyModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, PartySortBy> = {
   name: 'Name',
   documentCount: 'DocumentCount',
   createdAt: 'CreatedAt',
+  updatedAt: 'UpdatedAt',
 };
 
-const SORT_KEY_TO_COLUMN_ID: Record<string, string> = {
-  Name: 'name',
-  DocumentCount: 'documentCount',
-  CreatedAt: 'createdAt',
-};
+const SORT_KEY_TO_COLUMN_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(COLUMN_ID_TO_SORT_KEY).map(([k, v]) => [v, k]),
+);
 
 export const HIDEABLE_COLUMNS: HideableColumn[] = [
   { id: 'description', label: 'Description' },
   { id: 'createdAt', label: 'Date Added' },
+  { id: 'updatedAt', label: 'Modified' },
 ];
 
 export const DEFAULT_COLUMN_VISIBILITY: VisibilityState = {
   createdAt: false,
+  updatedAt: false,
 };
 
 @Component({
@@ -182,6 +183,14 @@ export class PartyTableComponent {
       size: 140,
       minSize: 100,
     },
+    {
+      accessorKey: 'updatedAt',
+      id: 'updatedAt',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Modified' } }),
+      cell: () => flexRenderComponent(PartyModifiedCell),
+      size: 140,
+      minSize: 100,
+    },
   ];
 
   protected readonly table = createAngularTable<GetPartiesResponse>(() => ({
@@ -254,6 +263,7 @@ export class PartyTableComponent {
     description: 'overflow-hidden',
     documentCount: 'text-right overflow-hidden',
     createdAt: 'overflow-hidden',
+    updatedAt: 'overflow-hidden',
   };
 
   getThClass(columnId: string): string {

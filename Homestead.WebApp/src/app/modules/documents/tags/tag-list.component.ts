@@ -279,6 +279,7 @@ export class TagListComponent implements OnDestroy {
     { value: 'Path', label: 'Path' },
     { value: 'DocumentCount', label: 'Documents' },
     { value: 'CreatedAt', label: 'Date Added' },
+    { value: 'UpdatedAt', label: 'Modified' },
   ];
 
   refreshTrigger = signal(0);
@@ -320,7 +321,7 @@ export class TagListComponent implements OnDestroy {
     return explicit || 'Name' as TagSortBy;
   });
 
-  private static readonly DATE_SORT_FIELDS: Set<TagSortBy> = new Set(['CreatedAt']);
+  private static readonly DATE_SORT_FIELDS: Set<TagSortBy> = new Set(['CreatedAt', 'UpdatedAt']);
 
   effectiveSortDir = computed(() => {
     const explicit = this.sortDir();

@@ -7,5 +7,6 @@ public enum DocumentSortBy
     ContentType,
     DocumentDate,
     CreatedAt,
+    UpdatedAt,
     DeletedAt
 }

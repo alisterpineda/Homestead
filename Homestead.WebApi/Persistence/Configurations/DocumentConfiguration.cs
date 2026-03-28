@@ -19,6 +19,13 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(d => d.UpdatedAt);
+
+        builder.HasOne(d => d.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.UpdatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.Property(d => d.DocumentDate);
         builder.Property(d => d.ExpiryDate);
         builder.Property(d => d.Notes);
@@ -54,6 +61,9 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasMethod("GIN");
 
         builder.HasIndex(d => d.CreatedAt)
+            .IsDescending(true);
+
+        builder.HasIndex(d => d.UpdatedAt)
             .IsDescending(true);
 
         builder.HasIndex(d => d.DeletedAt);

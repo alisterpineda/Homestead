@@ -4,5 +4,6 @@ public enum PartySortBy
 {
     Name,
     DocumentCount,
-    CreatedAt
+    CreatedAt,
+    UpdatedAt
 }

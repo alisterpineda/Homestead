@@ -24,5 +24,8 @@ export interface GetDocumentsResponse {
   ownerUserName?: (string | null);
   parties: Array<GetDocumentsPartyDto>;
   tags: Array<GetDocumentsTagDto>;
+  updatedAt?: (string | null);
+  updatedByUserId?: (string | null);
+  updatedByUserName?: (string | null);
   versionCount?: (number | string);
 }

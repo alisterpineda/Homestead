@@ -26,6 +26,13 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(g => g.UpdatedAt);
+
+        builder.HasOne(g => g.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(g => g.UpdatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(g => g.CreatedByUser)
             .WithMany()
             .HasForeignKey(g => g.CreatedByUserId)

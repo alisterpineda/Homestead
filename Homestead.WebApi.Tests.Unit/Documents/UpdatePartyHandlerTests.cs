@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Parties;
@@ -19,7 +20,9 @@ public class UpdatePartyHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
         _audit = Substitute.For<IAuditContext>();
-        _sut = new UpdatePartyHandler(_db, accessService, _audit);
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
+        currentUser.UserId.Returns(Guid.NewGuid());
+        _sut = new UpdatePartyHandler(_db, accessService, _audit, currentUser);
     }
 
     public void Dispose() => _db.Dispose();
@@ -47,6 +50,35 @@ public class UpdatePartyHandlerTests : IDisposable
         await _sut.Handle(command, CancellationToken.None);
 
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_WithChanges_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var party = new Party
+        {
+            Id = Guid.NewGuid(),
+            Name = "Old Name",
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        _db.Parties.Add(party);
+        await _db.SaveChangesAsync();
+
+        var before = DateTimeOffset.UtcNow;
+
+        var command = new UpdatePartyCommand
+        {
+            Id = party.Id,
+            Name = "New Name",
+            Description = "New desc"
+        };
+
+        var result = await _sut.Handle(command, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.NotNull(result.UpdatedAt);
+        Assert.True(result.UpdatedAt >= before);
+        Assert.NotNull(result.UpdatedByUserId);
     }
 
     [Fact]

@@ -203,6 +203,63 @@ public class TagTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task PatchTag_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var client = await CreateAdminClientAsync();
+        var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UpdAtTag" }, CT);
+        createResponse.EnsureSuccessStatusCode();
+        var created = await createResponse.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.Null(created!.UpdatedAt);
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{created.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object)"modified" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
+        Assert.NotNull(body!.UpdatedAt);
+        Assert.NotNull(body.UpdatedByUserId);
+    }
+
+    [Fact]
+    public async Task GetTags_SortByUpdatedAtDesc_ReturnsSorted()
+    {
+        var client = await CreateAdminClientAsync();
+        var r1 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UaFirst" }, CT);
+        var t1 = await r1.Content.ReadFromJsonAsync<TagResult>(CT);
+        var r2 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UaSecond" }, CT);
+        var t2 = await r2.Content.ReadFromJsonAsync<TagResult>(CT);
+        var r3 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UaThird" }, CT);
+        var t3 = await r3.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        // Update them in order with delays to ensure distinct timestamps
+        await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{t1!.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object)"first update" }
+        });
+        await Task.Delay(50);
+        await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{t2!.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object)"second update" }
+        });
+        await Task.Delay(50);
+        await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{t3!.Id}", new[]
+        {
+            new { op = "replace", path = "/description", value = (object)"third update" }
+        });
+
+        var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&SortBy=UpdatedAt&SortDir=Desc&Search=Ua", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<TagListItem>>(CT);
+        var names = body!.Items.Select(t => t.Name).ToList();
+        Assert.Equal("UaThird", names[0]);
+        Assert.Equal("UaSecond", names[1]);
+        Assert.Equal("UaFirst", names[2]);
+    }
+
+    [Fact]
     public async Task PatchTag_CircularParent_Returns400()
     {
         var client = await CreateAdminClientAsync();
@@ -636,8 +693,10 @@ public class TagTests : IntegrationTestBase
         patchResponse.EnsureSuccessStatusCode();
     }
 
-    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description);
-    private record TagListItem(Guid Id, string Name, string Path, string? Description, int DocumentCount);
+    private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+    private record TagListItem(Guid Id, string Name, string Path, string? Description, int DocumentCount,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailTag> Tags);
     private record DocumentDetailTag(Guid Id, string Name, string Path);
 }

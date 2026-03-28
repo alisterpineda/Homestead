@@ -55,10 +55,12 @@ public class TrashTests : IntegrationTestBase
         var idx2 = body.Items.ToList().FindIndex(d => d.Id == docId2);
         Assert.True(idx2 < idx1, "Most recently deleted should appear first");
 
-        // DeletedAt fields should be populated
+        // DeletedAt and UpdatedAt fields should be populated
         var trashedDoc = body.Items.First(d => d.Id == docId1);
         Assert.NotNull(trashedDoc.DeletedAt);
         Assert.NotNull(trashedDoc.DeletedByUserId);
+        Assert.NotNull(trashedDoc.UpdatedAt);
+        Assert.NotNull(trashedDoc.UpdatedByUserId);
     }
 
     [Fact]

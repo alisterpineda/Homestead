@@ -278,6 +278,7 @@ export class PartyListComponent implements OnDestroy {
     { value: 'Name', label: 'Name' },
     { value: 'DocumentCount', label: 'Documents' },
     { value: 'CreatedAt', label: 'Date Added' },
+    { value: 'UpdatedAt', label: 'Modified' },
   ];
 
   refreshTrigger = signal(0);
@@ -319,7 +320,7 @@ export class PartyListComponent implements OnDestroy {
     return explicit || 'Name' as PartySortBy;
   });
 
-  private static readonly DATE_SORT_FIELDS: Set<PartySortBy> = new Set(['CreatedAt']);
+  private static readonly DATE_SORT_FIELDS: Set<PartySortBy> = new Set(['CreatedAt', 'UpdatedAt']);
 
   effectiveSortDir = computed(() => {
     const explicit = this.sortDir();

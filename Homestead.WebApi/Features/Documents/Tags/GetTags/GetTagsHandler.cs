@@ -51,6 +51,9 @@ public class GetTagsHandler(AppDbContext db)
                 EffectiveColor = t.EffectiveColor,
                 Description = t.Description,
                 CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt,
+                UpdatedByUserId = t.UpdatedByUserId,
+                UpdatedByUserName = t.UpdatedByUser != null ? t.UpdatedByUser.DisplayName : null,
                 DocumentCount = t.DocumentTags.Count
             })
             .ToPaginatedAsync(request, ct);
@@ -72,6 +75,8 @@ public class GetTagsHandler(AppDbContext db)
             (TagSortBy.DocumentCount, SortDirection.Desc) => query.OrderByDescending(t => t.DocumentTags.Count),
             (TagSortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(t => t.CreatedAt),
             (TagSortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.CreatedAt),
+            (TagSortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(t => t.UpdatedAt),
+            (TagSortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(t => t.UpdatedAt),
             _ => query.OrderBy(t => t.Name),
         };
     }

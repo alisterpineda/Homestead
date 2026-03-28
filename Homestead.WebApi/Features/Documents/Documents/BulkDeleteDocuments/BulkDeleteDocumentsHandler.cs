@@ -32,6 +32,8 @@ public class BulkDeleteDocumentsHandler(AppDbContext db, ICurrentUserAccessor cu
         {
             doc.DeletedAt = now;
             doc.DeletedByUserId = currentUser.UserId;
+            doc.UpdatedAt = now;
+            doc.UpdatedByUserId = currentUser.UserId;
             audit.SoftDeleted("Document", doc.Id, description: doc.Name);
         }
 

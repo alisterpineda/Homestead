@@ -84,6 +84,40 @@ public class GetPartiesHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_SortByUpdatedAtAsc_OrdersOldestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _db.Parties.Add(new Party { Name = "Third", UpdatedAt = now.AddHours(2) });
+        _db.Parties.Add(new Party { Name = "First", UpdatedAt = now });
+        _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.Handle(
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Asc },
+            CancellationToken.None);
+
+        var names = result.Items.Select(p => p.Name).ToList();
+        Assert.Equal(["First", "Second", "Third"], names);
+    }
+
+    [Fact]
+    public async Task Handle_SortByUpdatedAtDesc_OrdersNewestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _db.Parties.Add(new Party { Name = "First", UpdatedAt = now });
+        _db.Parties.Add(new Party { Name = "Third", UpdatedAt = now.AddHours(2) });
+        _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.Handle(
+            new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Desc },
+            CancellationToken.None);
+
+        var names = result.Items.Select(p => p.Name).ToList();
+        Assert.Equal(["Third", "Second", "First"], names);
+    }
+
+    [Fact]
     public async Task Handle_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
     {
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };

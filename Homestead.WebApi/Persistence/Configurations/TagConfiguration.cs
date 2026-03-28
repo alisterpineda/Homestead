@@ -36,6 +36,13 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(t => t.UpdatedAt);
+
+        builder.HasOne(t => t.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(t => t.UpdatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(t => t.Parent)
             .WithMany(t => t.Children)
             .HasForeignKey(t => t.ParentId)

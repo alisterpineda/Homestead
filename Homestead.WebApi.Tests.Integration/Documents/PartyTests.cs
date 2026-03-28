@@ -100,6 +100,52 @@ public class PartyTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task UpdateParty_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var client = await CreateAdminClientAsync();
+        var party = await CreatePartyAsync(client, "UpdAtParty");
+
+        Assert.Null(party.UpdatedAt);
+
+        var response = await client.PutAsJsonAsync($"/api/v1/documents/parties/{party.Id}", new
+        {
+            name = "UpdAtParty Modified",
+            description = "modified"
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PartyResult>(CT);
+        Assert.NotNull(body!.UpdatedAt);
+        Assert.NotNull(body.UpdatedByUserId);
+    }
+
+    [Fact]
+    public async Task GetParties_SortByUpdatedAtDesc_ReturnsSorted()
+    {
+        var client = await CreateAdminClientAsync();
+        var p1 = await CreatePartyAsync(client, "UaFirst");
+        var p2 = await CreatePartyAsync(client, "UaSecond");
+        var p3 = await CreatePartyAsync(client, "UaThird");
+
+        // Update them in order with delays to ensure distinct timestamps
+        await client.PutAsJsonAsync($"/api/v1/documents/parties/{p1.Id}", new { name = "UaFirst", description = "upd" }, CT);
+        await Task.Delay(50);
+        await client.PutAsJsonAsync($"/api/v1/documents/parties/{p2.Id}", new { name = "UaSecond", description = "upd" }, CT);
+        await Task.Delay(50);
+        await client.PutAsJsonAsync($"/api/v1/documents/parties/{p3.Id}", new { name = "UaThird", description = "upd" }, CT);
+
+        var response = await client.GetAsync(
+            "/api/v1/documents/parties?Page=1&PageSize=10&SortBy=UpdatedAt&SortDir=Desc&Search=Ua", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<PartyListItem>>(CT);
+        var names = body!.Items.Select(p => p.Name).ToList();
+        Assert.Equal("UaThird", names[0]);
+        Assert.Equal("UaSecond", names[1]);
+        Assert.Equal("UaFirst", names[2]);
+    }
+
+    [Fact]
     public async Task DeleteParty_Removes()
     {
         var client = await CreateAdminClientAsync();
@@ -271,8 +317,10 @@ public class PartyTests : IntegrationTestBase
         patchResponse.EnsureSuccessStatusCode();
     }
 
-    private record PartyResult(Guid Id, string Name, string? Description, DateTimeOffset CreatedAt);
-    private record PartyListItem(Guid Id, string Name, string? Description, int DocumentCount);
+    private record PartyResult(Guid Id, string Name, string? Description, DateTimeOffset CreatedAt,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+    private record PartyListItem(Guid Id, string Name, string? Description, int DocumentCount,
+        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailParty> Parties);
     private record DocumentDetailParty(Guid Id, string Name);
 }

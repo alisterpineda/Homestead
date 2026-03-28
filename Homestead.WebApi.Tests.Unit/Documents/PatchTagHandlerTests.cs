@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
@@ -21,7 +22,9 @@ public class PatchTagHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
         _audit = Substitute.For<IAuditContext>();
-        _sut = new PatchTagHandler(_db, accessService, _audit);
+        var currentUser = Substitute.For<ICurrentUserAccessor>();
+        currentUser.UserId.Returns(Guid.NewGuid());
+        _sut = new PatchTagHandler(_db, accessService, _audit, currentUser);
     }
 
     public void Dispose() => _db.Dispose();
@@ -77,6 +80,27 @@ public class PatchTagHandlerTests : IDisposable
 
         Assert.Equal("New description", result.Description);
         _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Handle_WithNameChange_SetsUpdatedAtAndUpdatedByUserId()
+    {
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "Old", Path = "Old" };
+        _db.Tags.Add(tag);
+        await _db.SaveChangesAsync();
+
+        var before = DateTimeOffset.UtcNow;
+
+        var patch = new JsonPatchDocument<PatchTagModel>();
+        patch.Replace(m => m.Name, "New");
+
+        var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
+
+        var result = await _sut.Handle(command, CancellationToken.None);
+
+        Assert.NotNull(result.UpdatedAt);
+        Assert.True(result.UpdatedAt >= before);
+        Assert.NotNull(result.UpdatedByUserId);
     }
 
     [Fact]

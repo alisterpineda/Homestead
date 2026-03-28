@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Groups;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Admin.Groups.UpdateGroup;
 
-public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
+public class UpdateGroupHandler(AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser)
     : IRequestHandler<UpdateGroupCommand, GroupResponse>
 {
     public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
@@ -29,6 +30,8 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
 
         group.Name = trimmedName;
         group.Description = command.Request.Description?.Trim();
+        group.UpdatedAt = DateTimeOffset.UtcNow;
+        group.UpdatedByUserId = currentUser.UserId;
 
         await db.SaveChangesAsync(ct);
 
@@ -37,12 +40,24 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit)
             ? await db.Users.Where(u => u.Id == group.CreatedByUserId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)
             : null;
 
+        string? updatedByUserName = null;
+        if (group.UpdatedByUserId.HasValue)
+        {
+            updatedByUserName = await db.Users
+                .Where(u => u.Id == group.UpdatedByUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return new GroupResponse
         {
             Id = group.Id,
             Name = group.Name,
             Description = group.Description,
             CreatedAt = group.CreatedAt,
+            UpdatedAt = group.UpdatedAt,
+            UpdatedByUserId = group.UpdatedByUserId,
+            UpdatedByUserName = updatedByUserName,
             CreatedByUserId = group.CreatedByUserId,
             CreatedByUserName = creatorName,
             MemberCount = memberCount

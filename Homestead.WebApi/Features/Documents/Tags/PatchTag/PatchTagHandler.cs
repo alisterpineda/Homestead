@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -10,7 +11,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Tags.PatchTag;
 
-public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit)
+public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
+    ICurrentUserAccessor currentUser)
     : IRequestHandler<PatchTagCommand, PatchTagResponse>
 {
     public async Task<PatchTagResponse> Handle(PatchTagCommand request, CancellationToken ct)
@@ -95,6 +97,8 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
         tag.ParentId = model.ParentId;
         tag.Color = model.Color;
         tag.Description = model.Description;
+        tag.UpdatedAt = DateTimeOffset.UtcNow;
+        tag.UpdatedByUserId = currentUser.UserId;
 
         // Recompute path if name or parent changed
         var nameChanged = normalizedName != oldName;
@@ -142,6 +146,16 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
 
         await db.SaveChangesAsync(ct);
 
+        // Load updater info
+        string? updatedByUserName = null;
+        if (tag.UpdatedByUserId.HasValue)
+        {
+            updatedByUserName = await db.Users
+                .Where(u => u.Id == tag.UpdatedByUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return new PatchTagResponse
         {
             Id = tag.Id,
@@ -150,7 +164,10 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             ParentId = tag.ParentId,
             Color = tag.Color,
             EffectiveColor = tag.EffectiveColor,
-            Description = tag.Description
+            Description = tag.Description,
+            UpdatedAt = tag.UpdatedAt,
+            UpdatedByUserId = tag.UpdatedByUserId,
+            UpdatedByUserName = updatedByUserName
         };
     }
 }

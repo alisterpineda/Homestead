@@ -34,6 +34,9 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                 Name = p.Name,
                 Description = p.Description,
                 CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                UpdatedByUserId = p.UpdatedByUserId,
+                UpdatedByUserName = p.UpdatedByUser != null ? p.UpdatedByUser.DisplayName : null,
                 DocumentCount = accessibleDocIds != null
                     ? p.DocumentParties.Count(dp => accessibleDocIds.Contains(dp.DocumentId))
                     : p.DocumentParties.Count
@@ -60,6 +63,8 @@ public class GetPartiesHandler(AppDbContext db, IDocumentQueryService accessServ
                 : query.OrderByDescending(p => p.DocumentParties.Count),
             (PartySortBy.CreatedAt, SortDirection.Asc) => query.OrderBy(p => p.CreatedAt),
             (PartySortBy.CreatedAt, SortDirection.Desc) => query.OrderByDescending(p => p.CreatedAt),
+            (PartySortBy.UpdatedAt, SortDirection.Asc) => query.OrderBy(p => p.UpdatedAt),
+            (PartySortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(p => p.UpdatedAt),
             _ => query.OrderBy(p => p.Name),
         };
     }

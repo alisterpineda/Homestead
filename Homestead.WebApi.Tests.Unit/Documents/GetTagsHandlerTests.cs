@@ -168,6 +168,40 @@ public class GetTagsHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_SortByUpdatedAtAsc_OrdersOldestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _db.Tags.Add(new Tag { Name = "Third", Path = "Third", UpdatedAt = now.AddHours(2) });
+        _db.Tags.Add(new Tag { Name = "First", Path = "First", UpdatedAt = now });
+        _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.Handle(
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Asc },
+            CancellationToken.None);
+
+        var names = result.Items.Select(t => t.Name).ToList();
+        Assert.Equal(["First", "Second", "Third"], names);
+    }
+
+    [Fact]
+    public async Task Handle_SortByUpdatedAtDesc_OrdersNewestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        _db.Tags.Add(new Tag { Name = "First", Path = "First", UpdatedAt = now });
+        _db.Tags.Add(new Tag { Name = "Third", Path = "Third", UpdatedAt = now.AddHours(2) });
+        _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.Handle(
+            new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Desc },
+            CancellationToken.None);
+
+        var names = result.Items.Select(t => t.Name).ToList();
+        Assert.Equal(["Third", "Second", "First"], names);
+    }
+
+    [Fact]
     public async Task Handle_NullSortBy_DefaultsToNameAsc()
     {
         await SeedTagsAsync("Zulu", "Alpha");

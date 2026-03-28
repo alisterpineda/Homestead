@@ -14,3 +14,16 @@ export class PartyDateAddedCell {
     return formatDate(this.context.row.original.createdAt!, 'mediumDate', this.locale);
   }
 }
+
+@Component({
+  selector: 'app-party-modified-cell',
+  template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
+})
+export class PartyModifiedCell {
+  private locale = inject(LOCALE_ID);
+  protected readonly context = injectFlexRenderContext<CellContext<GetPartiesResponse, unknown>>();
+  get formatted(): string {
+    const value = this.context.row.original.updatedAt ?? this.context.row.original.createdAt;
+    return value ? formatDate(value, 'mediumDate', this.locale) : '\u2014';
+  }
+}

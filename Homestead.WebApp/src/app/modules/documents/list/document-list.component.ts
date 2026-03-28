@@ -420,6 +420,7 @@ export class DocumentListComponent implements OnDestroy {
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
     { value: 'CreatedAt', label: 'Date Added' },
+    { value: 'UpdatedAt', label: 'Modified' },
     { value: 'DocumentDate', label: 'Document Date' },
     { value: 'Name', label: 'Name' },
     { value: 'ContentType', label: 'Content Type' },
@@ -496,7 +497,7 @@ export class DocumentListComponent implements OnDestroy {
     return this.isSearching() ? null : 'CreatedAt' as DocumentSortBy;
   });
 
-  private static readonly DATE_SORT_FIELDS: Set<DocumentSortBy> = new Set(['CreatedAt', 'DocumentDate']);
+  private static readonly DATE_SORT_FIELDS: Set<DocumentSortBy> = new Set(['CreatedAt', 'UpdatedAt', 'DocumentDate']);
 
   effectiveSortDir = computed(() => {
     const explicit = this.sortDir();

@@ -18,6 +18,9 @@ public class GetPartyHandler(AppDbContext db)
                 Name = p.Name,
                 Description = p.Description,
                 CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                UpdatedByUserId = p.UpdatedByUserId,
+                UpdatedByUserName = p.UpdatedByUser != null ? p.UpdatedByUser.DisplayName : null,
             })
             .FirstOrDefaultAsync(ct);
     }

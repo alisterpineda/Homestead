@@ -9,7 +9,7 @@ describe('TagTableComponent exports', () => {
   describe('HIDEABLE_COLUMNS', () => {
     it('should include path, description and createdAt', () => {
       const ids = HIDEABLE_COLUMNS.map(c => c.id);
-      expect(ids).toEqual(['path', 'description', 'createdAt']);
+      expect(ids).toEqual(['path', 'description', 'createdAt', 'updatedAt']);
     });
 
     it('should label path as "Path"', () => {
@@ -34,7 +34,7 @@ describe('TagTableComponent exports', () => {
     });
 
     it('should contain path and createdAt', () => {
-      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY).sort()).toEqual(['createdAt', 'path']);
+      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY).sort()).toEqual(['createdAt', 'path', 'updatedAt']);
     });
 
     it('should hide path by default', () => {
@@ -65,7 +65,7 @@ describe('TagTableComponent', () => {
   it('should define all expected columns', () => {
     fixture.detectChanges();
     const columnIds = component['_columns'].map(c => c.id);
-    expect(columnIds).toEqual(['select', 'name', 'path', 'description', 'documentCount', 'createdAt']);
+    expect(columnIds).toEqual(['select', 'name', 'path', 'description', 'documentCount', 'createdAt', 'updatedAt']);
   });
 
   it('should map name column to Name sort key via sort input', () => {
@@ -102,6 +102,15 @@ describe('TagTableComponent', () => {
 
     const sorting = component['_sorting']();
     expect(sorting).toEqual([{ id: 'createdAt', desc: true }]);
+  });
+
+  it('should map updatedAt column to UpdatedAt sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'UpdatedAt');
+    fixture.componentRef.setInput('sortDir', 'Desc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'updatedAt', desc: true }]);
   });
 
   it('should clear sorting when sortBy is null', () => {

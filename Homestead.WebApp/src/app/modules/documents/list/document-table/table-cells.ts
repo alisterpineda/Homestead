@@ -60,6 +60,19 @@ export class DateAddedCell {
 }
 
 @Component({
+  selector: 'app-modified-cell',
+  template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
+})
+export class ModifiedCell {
+  private locale = inject(LOCALE_ID);
+  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  get formatted(): string {
+    const value = this.context.row.original.updatedAt ?? this.context.row.original.createdAt;
+    return value ? formatDate(value, 'mediumDate', this.locale) : '\u2014';
+  }
+}
+
+@Component({
   selector: 'app-document-date-cell',
   template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
 })

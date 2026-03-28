@@ -1,3 +1,4 @@
+using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -9,7 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Features.Documents.Parties.UpdateParty;
 
-public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit)
+public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
+    ICurrentUserAccessor currentUser)
     : IRequestHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
@@ -37,14 +39,29 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
 
         party.Name = name;
         party.Description = request.Description?.Trim();
+        party.UpdatedAt = DateTimeOffset.UtcNow;
+        party.UpdatedByUserId = currentUser.UserId;
         await db.SaveChangesAsync(ct);
+
+        // Load updater info
+        string? updatedByUserName = null;
+        if (party.UpdatedByUserId.HasValue)
+        {
+            updatedByUserName = await db.Users
+                .Where(u => u.Id == party.UpdatedByUserId)
+                .Select(u => u.DisplayName)
+                .FirstOrDefaultAsync(ct);
+        }
 
         return new UpdatePartyResponse
         {
             Id = party.Id,
             Name = party.Name,
             Description = party.Description,
-            CreatedAt = party.CreatedAt
+            CreatedAt = party.CreatedAt,
+            UpdatedAt = party.UpdatedAt,
+            UpdatedByUserId = party.UpdatedByUserId,
+            UpdatedByUserName = updatedByUserName
         };
     }
 }
