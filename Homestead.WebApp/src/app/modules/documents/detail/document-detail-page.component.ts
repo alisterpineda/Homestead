@@ -20,7 +20,7 @@ import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, Subscr
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
-  lucideFileSearch,
+  lucideFileQuestion,
   lucideDownload,
   lucideTrash2,
   lucideSave,
@@ -110,7 +110,7 @@ import { toast } from '@spartan-ng/brain/sonner';
   providers: [
     provideIcons({
       lucideFileText,
-      lucideFileSearch,
+      lucideFileQuestion,
       lucideDownload,
       lucideTrash2,
       lucideSave,
@@ -289,7 +289,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               class="checkerboard max-h-full max-w-full"
             />
           </div>
-        } @else if (!fileBlobUrl() && (isPdf() || isImage())) {
+        } @else if (!fileBlobUrl() && !fileLoadError() && (isPdf() || isImage())) {
           <div class="flex h-full items-center justify-center">
             <hlm-spinner />
           </div>
@@ -297,7 +297,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           <div
             class="flex h-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground"
           >
-            <ng-icon hlm name="lucideFileText" size="xl" />
+            <ng-icon hlm name="lucideFileQuestion" size="xl" />
             <span class="text-sm">Preview not available</span>
           </div>
         }
@@ -654,6 +654,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private versionId = signal<string | null>(this.route.snapshot.paramMap.get('versionId'));
 
   fileBlobUrl = signal<string | null>(null);
+  fileLoadError = signal(false);
 
   safeFileUrl = computed(() => {
     const url = this.fileBlobUrl();
@@ -914,11 +915,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
       if (!id) return;
 
+      untracked(() => this.fileLoadError.set(false));
+
       this.fileSub = this.documentApi
         .getDocumentFile(id, verId)
         .pipe(
           map((blob) => URL.createObjectURL(blob)),
-          catchError(() => of(null)),
+          catchError((err) => {
+            this.fileLoadError.set(true);
+            if (!this.errorHandler.isServerOrNetworkError(err)) {
+              this.errorHandler.handleError(err, 'Failed to load file.');
+            }
+            return of(null);
+          }),
         )
         .subscribe((blobUrl) => this.swapBlobUrl(blobUrl));
     });

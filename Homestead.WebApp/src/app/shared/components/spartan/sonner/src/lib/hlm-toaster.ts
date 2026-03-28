@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input, numberAttribute } from '@angular/core';
 import { hlm } from '@/shared/components/spartan/utils';
 import type { ClassValue } from 'clsx';
-import { NgxSonnerToaster, type ToasterProps } from 'ngx-sonner';
+import { BrnSonnerToaster, type ToasterProps } from '@spartan-ng/brain/sonner';
 
 @Component({
 	selector: 'hlm-toaster',
-	imports: [NgxSonnerToaster],
+	imports: [BrnSonnerToaster],
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	template: `
-		<ngx-sonner-toaster
+		<brn-sonner-toaster
 			[class]="_computedClass()"
 			[invert]="invert()"
 			[theme]="theme()"
@@ -21,7 +21,6 @@ import { NgxSonnerToaster, type ToasterProps } from 'ngx-sonner';
 			[closeButton]="closeButton()"
 			[toastOptions]="toastOptions()"
 			[offset]="offset()"
-			[dir]="dir()"
 			[style]="userStyle()"
 		/>
 	`,
@@ -50,7 +49,6 @@ export class HlmToaster {
 	});
 	public readonly toastOptions = input<ToasterProps['toastOptions']>({});
 	public readonly offset = input<ToasterProps['offset']>(null);
-	public readonly dir = input<ToasterProps['dir']>('auto');
 	public readonly userClass = input<ClassValue>('', { alias: 'class' });
 	public readonly userStyle = input<Record<string, string>>(
 		{
