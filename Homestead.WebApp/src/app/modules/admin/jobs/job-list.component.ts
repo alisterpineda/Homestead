@@ -45,15 +45,15 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideActivity" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load jobs</h3>
-            <p hlmEmptyDescription>There was an error loading the job list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideActivity" />
+            </div>
+            <div hlmEmptyTitle>Failed to load jobs</div>
+            <div hlmEmptyDescription>There was an error loading the job list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (!loading() || data()) {
@@ -77,25 +77,25 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
         @if (data(); as d) {
           @if (d.items.length === 0 && !statusFilter()) {
-            <section hlmEmpty>
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideActivity" size="xl" />
-              </hlm-empty-media>
+            <div hlmEmpty>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No jobs yet</h3>
-                <p hlmEmptyDescription>Jobs will appear here once documents are uploaded.</p>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideActivity" />
+                </div>
+                <div hlmEmptyTitle>No jobs yet</div>
+                <div hlmEmptyDescription>Jobs will appear here once documents are uploaded.</div>
               </div>
-            </section>
+            </div>
           } @else if (d.items.length === 0) {
-            <section hlmEmpty>
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideActivity" size="xl" />
-              </hlm-empty-media>
+            <div hlmEmpty>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No results</h3>
-                <p hlmEmptyDescription>No jobs match the selected status filter.</p>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideActivity" />
+                </div>
+                <div hlmEmptyTitle>No results</div>
+                <div hlmEmptyDescription>No jobs match the selected status filter.</div>
               </div>
-            </section>
+            </div>
           } @else {
             <div class="min-h-0 flex-1 overflow-y-auto p-px">
               <div class="overflow-clip rounded-md border">

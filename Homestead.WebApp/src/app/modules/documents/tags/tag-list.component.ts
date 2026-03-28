@@ -59,33 +59,35 @@ import { toast } from '@spartan-ng/brain/sonner';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideTags" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load tags</h3>
-            <p hlmEmptyDescription>There was an error loading the tag list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideTags" />
+            </div>
+            <div hlmEmptyTitle>Failed to load tags</div>
+            <div hlmEmptyDescription>There was an error loading the tag list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (data(); as result) {
-        <section hlmEmpty [class.hidden]="!showInitialEmpty()">
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideTags" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty [class.hidden]="!showInitialEmpty()">
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>No tags yet</h3>
-            <p hlmEmptyDescription>Create your first tag to get started.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideTags" />
+            </div>
+            <div hlmEmptyTitle>No tags yet</div>
+            <div hlmEmptyDescription>Create your first tag to get started.</div>
           </div>
           @if (auth.canWrite()) {
-            <app-create-tag-dialog (created)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              New Tag
-            </app-create-tag-dialog>
+            <div hlmEmptyContent>
+              <app-create-tag-dialog (created)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                New Tag
+              </app-create-tag-dialog>
+            </div>
           }
-        </section>
+        </div>
         <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
           <!-- Normal toolbar -->
           <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()" [attr.inert]="hasSelection() ? '' : null">
@@ -214,18 +216,20 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
         </div>
 
-        <section hlmEmpty [class.hidden]="!showFilteredEmpty()">
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideTags" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty [class.hidden]="!showFilteredEmpty()">
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>No matching tags</h3>
-            <p hlmEmptyDescription>Try adjusting your search to find what you're looking for.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideTags" />
+            </div>
+            <div hlmEmptyTitle>No matching tags</div>
+            <div hlmEmptyDescription>Try adjusting your search to find what you're looking for.</div>
           </div>
-          <button hlmBtn variant="outline" size="sm" (click)="resetSearch()">
-            Reset search
-          </button>
-        </section>
+          <div hlmEmptyContent>
+            <button hlmBtn variant="outline" size="sm" (click)="resetSearch()">
+              Reset search
+            </button>
+          </div>
+        </div>
         <div class="min-h-0 flex-1 overflow-y-auto p-px" [class.hidden]="!hasItems()">
           <app-tag-table
             [tags]="result.items"

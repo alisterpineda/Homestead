@@ -42,12 +42,12 @@ const BUILT_IN_TESSERACT_ID = '00000000-0000-0000-0000-000000000001';
           <hlm-spinner />
         </div>
       } @else if (loadError()) {
-        <section hlmEmpty>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load settings</h3>
-            <p hlmEmptyDescription>There was an error loading document settings. Please try again.</p>
+            <div hlmEmptyTitle>Failed to load settings</div>
+            <div hlmEmptyDescription>There was an error loading document settings. Please try again.</div>
           </div>
-        </section>
+        </div>
       } @else {
         <div class="mx-auto w-full max-w-2xl">
           <hlm-card>

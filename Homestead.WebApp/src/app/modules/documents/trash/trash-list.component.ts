@@ -50,27 +50,27 @@ import { toast } from '@spartan-ng/brain/sonner';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideTrash2" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load trash</h3>
-            <p hlmEmptyDescription>There was an error loading the trash. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideTrash2" />
+            </div>
+            <div hlmEmptyTitle>Failed to load trash</div>
+            <div hlmEmptyDescription>There was an error loading the trash. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (data(); as result) {
-          <section hlmEmpty [class.hidden]="!showInitialEmpty()">
-            <hlm-empty-media variant="icon">
-              <ng-icon hlm name="lucideTrash2" size="xl" />
-            </hlm-empty-media>
+          <div hlmEmpty [class.hidden]="!showInitialEmpty()">
             <div hlmEmptyHeader>
-              <h3 hlmEmptyTitle>Trash is empty</h3>
-              <p hlmEmptyDescription>Items you delete will appear here.</p>
+              <div hlmEmptyMedia variant="icon">
+                <ng-icon name="lucideTrash2" />
+              </div>
+              <div hlmEmptyTitle>Trash is empty</div>
+              <div hlmEmptyDescription>Items you delete will appear here.</div>
             </div>
-          </section>
+          </div>
 
           <div class="relative shrink-0" [class.hidden]="showInitialEmpty()">
             <!-- Normal toolbar -->

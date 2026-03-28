@@ -47,33 +47,35 @@ import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideScanText" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load text extraction engines</h3>
-            <p hlmEmptyDescription>There was an error loading the engine list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideScanText" />
+            </div>
+            <div hlmEmptyTitle>Failed to load text extraction engines</div>
+            <div hlmEmptyDescription>There was an error loading the engine list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (!loading() || data()) {
         @if (data(); as d) {
           @if (d.items.length === 0 && !searchTerm()) {
-            <section hlmEmpty>
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideScanText" size="xl" />
-              </hlm-empty-media>
+            <div hlmEmpty>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No text extraction engines found</h3>
-                <p hlmEmptyDescription>Add an engine configuration to get started.</p>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideScanText" />
+                </div>
+                <div hlmEmptyTitle>No text extraction engines found</div>
+                <div hlmEmptyDescription>Add an engine configuration to get started.</div>
               </div>
-              <app-create-text-extraction-engine-dialog (created)="onRefresh()">
-                <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
-                Add Engine
-              </app-create-text-extraction-engine-dialog>
-            </section>
+              <div hlmEmptyContent>
+                <app-create-text-extraction-engine-dialog (created)="onRefresh()">
+                  <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                  Add Engine
+                </app-create-text-extraction-engine-dialog>
+              </div>
+            </div>
           } @else {
             <div class="relative shrink-0">
               <!-- Normal toolbar -->
@@ -126,15 +128,15 @@ import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error
             </div>
 
             @if (d.items.length === 0) {
-              <section hlmEmpty>
-                <hlm-empty-media variant="icon">
-                  <ng-icon hlm name="lucideSearch" size="xl" />
-                </hlm-empty-media>
+              <div hlmEmpty>
                 <div hlmEmptyHeader>
-                  <h3 hlmEmptyTitle>No results found</h3>
-                  <p hlmEmptyDescription>No engines match your search. Try a different term.</p>
+                  <div hlmEmptyMedia variant="icon">
+                    <ng-icon name="lucideSearch" />
+                  </div>
+                  <div hlmEmptyTitle>No results found</div>
+                  <div hlmEmptyDescription>No engines match your search. Try a different term.</div>
                 </div>
-              </section>
+              </div>
             } @else {
               <div class="min-h-0 flex-1 overflow-y-auto p-px">
                 <div class="overflow-clip rounded-md border">

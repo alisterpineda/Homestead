@@ -313,47 +313,51 @@ import { toast } from '@spartan-ng/brain/sonner';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideFileText" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load documents</h3>
-            <p hlmEmptyDescription>There was an error loading the document list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideFileText" />
+            </div>
+            <div hlmEmptyTitle>Failed to load documents</div>
+            <div hlmEmptyDescription>There was an error loading the document list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (data(); as result) {
-          <section hlmEmpty [class.hidden]="!showInitialEmpty()">
-            <hlm-empty-media variant="icon">
-              <ng-icon hlm name="lucideFileText" size="xl" />
-            </hlm-empty-media>
+          <div hlmEmpty [class.hidden]="!showInitialEmpty()">
             <div hlmEmptyHeader>
-              <h3 hlmEmptyTitle>No documents yet</h3>
-              <p hlmEmptyDescription>Upload your first document to get started.</p>
+              <div hlmEmptyMedia variant="icon">
+                <ng-icon name="lucideFileText" />
+              </div>
+              <div hlmEmptyTitle>No documents yet</div>
+              <div hlmEmptyDescription>Upload your first document to get started.</div>
             </div>
             @if (auth.canWrite()) {
-              <input #emptyUploadInput type="file" multiple class="hidden" (change)="onEmptyUploadFiles($event)" />
-              <button hlmBtn (click)="emptyUploadInput.click()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                Upload Document
-              </button>
-            }
-          </section>
-
-          <section hlmEmpty [class.hidden]="!showFilteredEmpty()">
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideFileText" size="xl" />
-              </hlm-empty-media>
-              <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No matching documents</h3>
-                <p hlmEmptyDescription>Try adjusting your search or filters to find what you're looking for.</p>
+              <div hlmEmptyContent>
+                <input #emptyUploadInput type="file" multiple class="hidden" (change)="onEmptyUploadFiles($event)" />
+                <button hlmBtn (click)="emptyUploadInput.click()">
+                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  Upload Document
+                </button>
               </div>
-              <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
-                Reset filters
-              </button>
-          </section>
+            }
+          </div>
+
+          <div hlmEmpty [class.hidden]="!showFilteredEmpty()">
+              <div hlmEmptyHeader>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideFileText" />
+                </div>
+                <div hlmEmptyTitle>No matching documents</div>
+                <div hlmEmptyDescription>Try adjusting your search or filters to find what you're looking for.</div>
+              </div>
+              <div hlmEmptyContent>
+                <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
+                  Reset filters
+                </button>
+              </div>
+          </div>
           <div class="p-px" [class.hidden]="!hasItems()">
               @if (viewMode() === 'table') {
                 <app-document-table

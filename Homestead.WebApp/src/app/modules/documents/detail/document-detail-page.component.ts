@@ -13,8 +13,9 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { Location, NgTemplateOutlet } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
-import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -34,6 +35,7 @@ import {
   lucideHistory,
   lucideSend,
   lucideRefreshCw,
+  lucideArrowLeft,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -49,6 +51,7 @@ import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { HlmBadge } from '@/shared/components/spartan/badge';
+import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
@@ -105,7 +108,9 @@ import { toast } from '@spartan-ng/brain/sonner';
     AddVersionDialogComponent,
     ReprocessDialogComponent,
     HlmBadge,
+    HlmEmptyImports,
     DatePickerComponent,
+    RouterLink,
   ],
   providers: [
     provideIcons({
@@ -124,6 +129,7 @@ import { toast } from '@spartan-ng/brain/sonner';
       lucideHistory,
       lucideSend,
       lucideRefreshCw,
+      lucideArrowLeft,
     }),
   ],
   template: `
@@ -176,9 +182,23 @@ import { toast } from '@spartan-ng/brain/sonner';
       <div class="flex h-full items-center justify-center">
         <hlm-spinner />
       </div>
-    }
-
-    @if (document(); as doc) {
+    } @else if (notFound()) {
+      <div hlmEmpty>
+        <div hlmEmptyHeader>
+          <div hlmEmptyMedia variant="icon">
+            <ng-icon name="lucideFileQuestion" />
+          </div>
+          <div hlmEmptyTitle>Document not found</div>
+          <div hlmEmptyDescription>This document may have been deleted or doesn't exist.</div>
+        </div>
+        <div hlmEmptyContent>
+          <a hlmBtn variant="outline" routerLink="/documents">
+            <ng-icon hlm name="lucideArrowLeft" size="sm" />
+            Back to Documents
+          </a>
+        </div>
+      </div>
+    } @else if (document(); as doc) {
       <div class="flex items-center gap-2 mb-4">
         <div hlmButtonGroup aria-label="Document navigation">
           <button hlmBtn size="icon-sm" variant="outline" (click)="hasChanges() ? closeDialogTrigger.click() : handleClose()" aria-label="Close document">
@@ -608,6 +628,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   saving = signal(false);
   deleting = signal(false);
   loading = signal(false);
+  notFound = signal(false);
   refreshTrigger = signal(0);
   activityItems = signal<GetActivityResponse[]>([]);
   activityLoading = signal(false);
@@ -780,13 +801,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
       switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
+        this.notFound.set(false);
         return this.documentApi.getDocument({ id }).pipe(
           map((r) => {
             this.loading.set(false);
             return r as GetDocumentResponse;
           }),
-          catchError(() => {
+          catchError((err) => {
             this.loading.set(false);
+            if (err instanceof HttpErrorResponse && err.status === 404) {
+              this.notFound.set(true);
+            } else if (!this.errorHandler.isServerOrNetworkError(err)) {
+              this.errorHandler.handleError(err, 'Failed to load document.');
+            }
             return of(null);
           }),
         );

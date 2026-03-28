@@ -50,32 +50,34 @@ import { toast } from '@spartan-ng/brain/sonner';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideUsers" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load users</h3>
-            <p hlmEmptyDescription>There was an error loading the user list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideUsers" />
+            </div>
+            <div hlmEmptyTitle>Failed to load users</div>
+            <div hlmEmptyDescription>There was an error loading the user list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (data(); as result) {
         @if (result.items.length === 0 && !searchTerm()) {
-          <section hlmEmpty>
-            <hlm-empty-media variant="icon">
-              <ng-icon hlm name="lucideUsers" size="xl" />
-            </hlm-empty-media>
+          <div hlmEmpty>
             <div hlmEmptyHeader>
-              <h3 hlmEmptyTitle>No users yet</h3>
-              <p hlmEmptyDescription>Create your first user to get started.</p>
+              <div hlmEmptyMedia variant="icon">
+                <ng-icon name="lucideUsers" />
+              </div>
+              <div hlmEmptyTitle>No users yet</div>
+              <div hlmEmptyDescription>Create your first user to get started.</div>
             </div>
-            <app-create-user-dialog (created)="onRefresh()">
-              <ng-icon hlm name="lucidePlus" size="sm" />
-              New User
-            </app-create-user-dialog>
-          </section>
+            <div hlmEmptyContent>
+              <app-create-user-dialog (created)="onRefresh()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                New User
+              </app-create-user-dialog>
+            </div>
+          </div>
         } @else {
           <div class="relative shrink-0">
             <!-- Normal toolbar -->
@@ -136,15 +138,15 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
 
           @if (result.items.length === 0) {
-            <section hlmEmpty>
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideSearch" size="xl" />
-              </hlm-empty-media>
+            <div hlmEmpty>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No results found</h3>
-                <p hlmEmptyDescription>No users match your search. Try a different term.</p>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideSearch" />
+                </div>
+                <div hlmEmptyTitle>No results found</div>
+                <div hlmEmptyDescription>No users match your search. Try a different term.</div>
               </div>
-            </section>
+            </div>
           } @else {
             <div class="min-h-0 flex-1 overflow-y-auto p-px">
               <app-user-table

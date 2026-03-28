@@ -35,15 +35,15 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
       }
 
       @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideUsers2" size="xl" />
-          </hlm-empty-media>
+        <div hlmEmpty>
           <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load groups</h3>
-            <p hlmEmptyDescription>There was an error loading the group list. Please try again.</p>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideUsers2" />
+            </div>
+            <div hlmEmptyTitle>Failed to load groups</div>
+            <div hlmEmptyDescription>There was an error loading the group list. Please try again.</div>
           </div>
-        </section>
+        </div>
       }
 
       @if (!loading() || data()) {
@@ -61,15 +61,15 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
         @if (data(); as d) {
           @if (d.items.length === 0) {
-            <section hlmEmpty>
-              <hlm-empty-media variant="icon">
-                <ng-icon hlm name="lucideUsers2" size="xl" />
-              </hlm-empty-media>
+            <div hlmEmpty>
               <div hlmEmptyHeader>
-                <h3 hlmEmptyTitle>No groups found</h3>
-                <p hlmEmptyDescription>Create a group to scope document access.</p>
+                <div hlmEmptyMedia variant="icon">
+                  <ng-icon name="lucideUsers2" />
+                </div>
+                <div hlmEmptyTitle>No groups found</div>
+                <div hlmEmptyDescription>Create a group to scope document access.</div>
               </div>
-            </section>
+            </div>
           } @else {
             <div class="min-h-0 flex-1 overflow-y-auto p-px">
               <div class="overflow-clip rounded-md border">

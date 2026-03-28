@@ -11,15 +11,15 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
   providers: [provideIcons({ lucideSettings })],
   template: `
     <div>
-      <section hlmEmpty>
-        <hlm-empty-media variant="icon">
-          <ng-icon hlm name="lucideSettings" size="xl" />
-        </hlm-empty-media>
+      <div hlmEmpty>
         <div hlmEmptyHeader>
-          <h3 hlmEmptyTitle>Admin features coming soon</h3>
-          <p hlmEmptyDescription>Configuration and system management tools will be available here.</p>
+          <div hlmEmptyMedia variant="icon">
+            <ng-icon name="lucideSettings" />
+          </div>
+          <div hlmEmptyTitle>Admin features coming soon</div>
+          <div hlmEmptyDescription>Configuration and system management tools will be available here.</div>
         </div>
-      </section>
+      </div>
     </div>
   `,
 })
