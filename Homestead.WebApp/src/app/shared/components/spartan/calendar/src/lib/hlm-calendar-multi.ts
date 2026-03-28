@@ -14,7 +14,6 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideChevronLeft, lucideChevronRight } from '@ng-icons/lucide';
 import { BrnCalendarImports, BrnCalendarMulti, injectBrnCalendarI18n, type Weekday } from '@spartan-ng/brain/calendar';
 import { injectDateAdapter } from '@spartan-ng/brain/date-time';
-
 import { buttonVariants } from '@/shared/components/spartan/button';
 import { HlmIcon } from '@/shared/components/spartan/icon';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
@@ -51,12 +50,12 @@ import type { ClassValue } from 'clsx';
 										<hlm-select-value />
 									</hlm-select-trigger>
 									<hlm-select-content *hlmSelectPortal class="max-h-80">
-<hlm-select-group>
-										@for (month of _i18n.config().months(); track month) {
-											<hlm-select-item [value]="month">{{ month }}</hlm-select-item>
-										}
-									</hlm-select-group>
-</hlm-select-content>
+										<hlm-select-group>
+											@for (month of _i18n.config().months(); track month) {
+												<hlm-select-item [value]="month">{{ month }}</hlm-select-item>
+											}
+										</hlm-select-group>
+									</hlm-select-content>
 								</hlm-select>
 							</ng-template>
 							<ng-template #year>
@@ -65,12 +64,12 @@ import type { ClassValue } from 'clsx';
 										<hlm-select-value />
 									</hlm-select-trigger>
 									<hlm-select-content *hlmSelectPortal class="max-h-80">
-<hlm-select-group>
-										@for (year of _i18n.config().years(); track year) {
-											<hlm-select-item [value]="year">{{ year }}</hlm-select-item>
-										}
-									</hlm-select-group>
-</hlm-select-content>
+										<hlm-select-group>
+											@for (year of _i18n.config().years(); track year) {
+												<hlm-select-item [value]="year">{{ year }}</hlm-select-item>
+											}
+										</hlm-select-group>
+									</hlm-select-content>
 								</hlm-select>
 							</ng-template>
 							@let heading = _heading();
