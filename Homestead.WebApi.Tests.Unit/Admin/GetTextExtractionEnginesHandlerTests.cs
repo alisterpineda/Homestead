@@ -24,7 +24,7 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
     {
         var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Single(response.Items);
         Assert.True(response.Items[0].IsBuiltIn);
@@ -41,11 +41,11 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, response.TotalCount);
         Assert.Equal(2, response.Items.Count);
@@ -63,11 +63,11 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50, Search = "Custom" };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Single(response.Items);
         Assert.False(response.Items[0].IsBuiltIn);
@@ -88,11 +88,11 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
                 CreatedAt = DateTimeOffset.UtcNow
             });
         }
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var request = new GetTextExtractionEnginesQuery { Page = 1, PageSize = 50 };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         // 3 db engines + 1 built-in
         Assert.Equal(4, response.TotalCount);

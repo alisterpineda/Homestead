@@ -41,7 +41,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.TextExtractionEngines.Add(existing);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var request = new CreateTextExtractionEngineCommand
         {
@@ -50,7 +50,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<DuplicateEntityException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<DuplicateEntityException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -90,14 +90,14 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":["Fra"]}"""
         };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("My Tesseract", response.Name);
         Assert.Equal(TextExtractionEngineType.Tesseract, response.EngineType);
         Assert.False(response.IsBuiltIn);
         Assert.Equal("""{"languages":["Fra"]}""", response.Configuration);
 
-        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == response.Id);
+        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == response.Id, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
         Assert.Equal("My Tesseract", saved.Name);
     }
@@ -113,7 +113,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"languages":["Eng","Fra","Deu"]}"""
         };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("Multi-Language", response.Name);
         Assert.Equal("""{"languages":["Eng","Fra","Deu"]}""", response.Configuration);
@@ -156,13 +156,13 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
             Configuration = """{"endpoint":"https://test.cognitiveservices.azure.com","apiKey":"key123"}"""
         };
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal("Azure DI Engine", response.Name);
         Assert.Equal(TextExtractionEngineType.AzureDocumentIntelligence, response.EngineType);
         Assert.False(response.IsBuiltIn);
 
-        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == response.Id);
+        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == response.Id, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
         Assert.Equal(TextExtractionEngineType.AzureDocumentIntelligence, saved.EngineType);
     }
@@ -178,7 +178,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -220,6 +220,6 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 }

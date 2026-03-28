@@ -270,8 +270,9 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task FirstOidcUser_GetsAdminRoleWithLocalSource()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin");
+        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin", ct);
 
         _userManager.FindByLoginAsync("oidc-provider", "first-key")
             .Returns((AppUser?)null);
@@ -310,7 +311,7 @@ public class OidcUserProvisionerTests : IDisposable
         await _sut.ProvisionOrUpdateAsync(loginInfo);
 
         var userRole = await _db.Set<AppUserRole>()
-            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id);
+            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id, ct);
         Assert.NotNull(userRole);
         Assert.Equal(RoleSource.Local, userRole.Source);
     }
@@ -318,8 +319,9 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task OidcClaimGrantsAdmin_SetsOidcSource()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin");
+        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin", ct);
         var existingUser = new AppUser
         {
             Id = userId,
@@ -353,7 +355,7 @@ public class OidcUserProvisionerTests : IDisposable
         await _sutWithRoleClaim.ProvisionOrUpdateAsync(loginInfo);
 
         var userRole = await _db.Set<AppUserRole>()
-            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id);
+            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id, ct);
         Assert.NotNull(userRole);
         Assert.Equal(RoleSource.Oidc, userRole.Source);
     }
@@ -361,8 +363,9 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task OidcClaimRemoved_RevokesAdminWhenSourceIsOidc()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin");
+        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin", ct);
 
         // Pre-seed an OIDC-sourced Admin role
         _db.Set<AppUserRole>().Add(new AppUserRole
@@ -371,7 +374,7 @@ public class OidcUserProvisionerTests : IDisposable
             RoleId = adminRole.Id,
             Source = RoleSource.Oidc
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var existingUser = new AppUser
         {
@@ -403,8 +406,9 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task OidcClaimRemoved_PreservesAdminWhenSourceIsLocal()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin");
+        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin", ct);
 
         // Pre-seed a locally-sourced Admin role
         _db.Set<AppUserRole>().Add(new AppUserRole
@@ -413,7 +417,7 @@ public class OidcUserProvisionerTests : IDisposable
             RoleId = adminRole.Id,
             Source = RoleSource.Local
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var existingUser = new AppUser
         {
@@ -443,8 +447,9 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task OidcClaimPresent_DoesNotOverrideLocalSource()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin");
+        var adminRole = await _db.Roles.FirstAsync(r => r.Name == "Admin", ct);
 
         // Pre-seed a locally-sourced Admin role
         _db.Set<AppUserRole>().Add(new AppUserRole
@@ -453,7 +458,7 @@ public class OidcUserProvisionerTests : IDisposable
             RoleId = adminRole.Id,
             Source = RoleSource.Local
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var existingUser = new AppUser
         {
@@ -478,7 +483,7 @@ public class OidcUserProvisionerTests : IDisposable
         await _sutWithRoleClaim.ProvisionOrUpdateAsync(loginInfo);
 
         var userRole = await _db.Set<AppUserRole>()
-            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id);
+            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == adminRole.Id, ct);
         Assert.NotNull(userRole);
         Assert.Equal(RoleSource.Local, userRole.Source);
     }

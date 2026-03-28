@@ -22,7 +22,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_EmptyDb_ReturnsEmptyList()
     {
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
     }
@@ -37,9 +37,9 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), TestContext.Current.CancellationToken);
 
         Assert.Single(result);
         Assert.Equal("Custom Engine", result[0].Name);
@@ -48,7 +48,7 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_DoesNotIncludeBuiltInEngine()
     {
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(result, e => e.Id == BuiltInTextExtractionEngines.TesseractDefaultId);
     }
@@ -71,9 +71,9 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
                 EngineType = TextExtractionEngineType.Tesseract,
                 CreatedAt = DateTimeOffset.UtcNow
             });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         Assert.Equal("Alpha Engine", result[0].Name);
@@ -92,9 +92,9 @@ public class GetTextExtractionEngineSummariesHandlerTests : IDisposable
             Configuration = """{"languages":["Eng"]}""",
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), CancellationToken.None);
+        var result = await _sut.Handle(new GetTextExtractionEngineSummariesQuery(), TestContext.Current.CancellationToken);
 
         Assert.Single(result);
         Assert.Equal(engineId, result[0].Id);

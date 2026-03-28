@@ -108,9 +108,9 @@ public class TagTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcFirst" }, CT);
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcSecond" }, CT);
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "TcThird" }, CT);
 
         var response = await client.GetAsync("/api/v1/documents/tags?Page=1&PageSize=10&SortBy=CreatedAt&SortDir=Desc&Search=Tc", CT);
@@ -238,12 +238,12 @@ public class TagTests : IntegrationTestBase
         {
             new { op = "replace", path = "/description", value = (object)"first update" }
         });
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{t2!.Id}", new[]
         {
             new { op = "replace", path = "/description", value = (object)"second update" }
         });
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{t3!.Id}", new[]
         {
             new { op = "replace", path = "/description", value = (object)"third update" }

@@ -40,7 +40,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
         };
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(command, CancellationToken.None));
+            () => _sut.Handle(command, TestContext.Current.CancellationToken));
 
         Assert.Equal("Cannot modify a built-in engine.", ex.Message);
     }
@@ -58,12 +58,13 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(command, CancellationToken.None));
+            () => _sut.Handle(command, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Handle_ValidRequest_UpdatesEngine()
     {
+        var ct = TestContext.Current.CancellationToken;
         var engineId = Guid.NewGuid();
         var engine = new TextExtractionEngine
         {
@@ -73,7 +74,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.TextExtractionEngines.Add(engine);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var command = new UpdateTextExtractionEngineCommand
         {
@@ -85,14 +86,14 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
             }
         };
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, ct);
 
         Assert.Equal("Updated Name", response.Name);
         Assert.Equal("""{"languages":["Deu"]}""", response.Configuration);
         Assert.False(response.IsBuiltIn);
         Assert.NotNull(response.UpdatedAt);
 
-        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == engineId);
+        var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == engineId, ct);
         Assert.NotNull(saved);
         Assert.Equal("Updated Name", saved.Name);
     }

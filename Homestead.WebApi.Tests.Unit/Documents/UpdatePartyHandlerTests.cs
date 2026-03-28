@@ -38,7 +38,7 @@ public class UpdatePartyHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Parties.Add(party);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdatePartyCommand
         {
@@ -47,7 +47,7 @@ public class UpdatePartyHandlerTests : IDisposable
             Description = "New desc"
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());
     }
@@ -62,7 +62,7 @@ public class UpdatePartyHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Parties.Add(party);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var before = DateTimeOffset.UtcNow;
 
@@ -73,7 +73,7 @@ public class UpdatePartyHandlerTests : IDisposable
             Description = "New desc"
         };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.NotNull(result.UpdatedAt);
@@ -92,7 +92,7 @@ public class UpdatePartyHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Parties.Add(party);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdatePartyCommand
         {
@@ -101,7 +101,7 @@ public class UpdatePartyHandlerTests : IDisposable
             Description = "Same desc"
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<PartySnapshot, Party>(Arg.Any<Party>(), "Party", party.Id, Arg.Any<Guid?>());

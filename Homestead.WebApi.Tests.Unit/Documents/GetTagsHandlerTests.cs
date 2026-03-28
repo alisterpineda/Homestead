@@ -24,7 +24,7 @@ public class GetTagsHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10 },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["Alpha", "Bravo", "Charlie"], names);
@@ -37,7 +37,7 @@ public class GetTagsHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Name, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["Charlie", "Bravo", "Alpha"], names);
@@ -49,11 +49,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "C", Path = "Z/C" });
         _db.Tags.Add(new Tag { Name = "A", Path = "A" });
         _db.Tags.Add(new Tag { Name = "B", Path = "M/B" });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var paths = result.Items.Select(t => t.Path).ToList();
         Assert.Equal(["A", "M/B", "Z/C"], paths);
@@ -65,11 +65,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "A", Path = "A" });
         _db.Tags.Add(new Tag { Name = "B", Path = "M/B" });
         _db.Tags.Add(new Tag { Name = "C", Path = "Z/C" });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.Path, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var paths = result.Items.Select(t => t.Path).ToList();
         Assert.Equal(["Z/C", "M/B", "A"], paths);
@@ -82,11 +82,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Third", Path = "Third", CreatedAt = now.AddHours(2) });
         _db.Tags.Add(new Tag { Name = "First", Path = "First", CreatedAt = now });
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["First", "Second", "Third"], names);
@@ -99,11 +99,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "First", Path = "First", CreatedAt = now });
         _db.Tags.Add(new Tag { Name = "Third", Path = "Third", CreatedAt = now.AddHours(2) });
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", CreatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.CreatedAt, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["Third", "Second", "First"], names);
@@ -112,6 +112,7 @@ public class GetTagsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
         var docC = new Document { Id = Guid.NewGuid(), Name = "DocC" };
@@ -121,7 +122,7 @@ public class GetTagsHandlerTests : IDisposable
         var tagMany = new Tag { Name = "Many", Path = "Many" };
         var tagNone = new Tag { Name = "None", Path = "None" };
         _db.Tags.AddRange(tagFew, tagMany, tagNone);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         _db.Set<DocumentTag>().AddRange(
             new DocumentTag { DocumentId = docA.Id, TagId = tagMany.Id },
@@ -129,11 +130,11 @@ public class GetTagsHandlerTests : IDisposable
             new DocumentTag { DocumentId = docC.Id, TagId = tagMany.Id },
             new DocumentTag { DocumentId = docA.Id, TagId = tagFew.Id }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            ct);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal("Many", names[0]);
@@ -143,6 +144,7 @@ public class GetTagsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
         _db.Documents.AddRange(docA, docB);
@@ -150,17 +152,17 @@ public class GetTagsHandlerTests : IDisposable
         var tagWithDocs = new Tag { Name = "WithDocs", Path = "WithDocs" };
         var tagWithout = new Tag { Name = "Without", Path = "Without" };
         _db.Tags.AddRange(tagWithDocs, tagWithout);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         _db.Set<DocumentTag>().AddRange(
             new DocumentTag { DocumentId = docA.Id, TagId = tagWithDocs.Id },
             new DocumentTag { DocumentId = docB.Id, TagId = tagWithDocs.Id }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.DocumentCount, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            ct);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal("Without", names[0]);
@@ -174,11 +176,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "Third", Path = "Third", UpdatedAt = now.AddHours(2) });
         _db.Tags.Add(new Tag { Name = "First", Path = "First", UpdatedAt = now });
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["First", "Second", "Third"], names);
@@ -191,11 +193,11 @@ public class GetTagsHandlerTests : IDisposable
         _db.Tags.Add(new Tag { Name = "First", Path = "First", UpdatedAt = now });
         _db.Tags.Add(new Tag { Name = "Third", Path = "Third", UpdatedAt = now.AddHours(2) });
         _db.Tags.Add(new Tag { Name = "Second", Path = "Second", UpdatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = TagSortBy.UpdatedAt, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["Third", "Second", "First"], names);
@@ -208,7 +210,7 @@ public class GetTagsHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetTagsQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(t => t.Name).ToList();
         Assert.Equal(["Alpha", "Zulu"], names);
@@ -218,6 +220,6 @@ public class GetTagsHandlerTests : IDisposable
     {
         foreach (var name in names)
             _db.Tags.Add(new Tag { Name = name, Path = name });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 }

@@ -71,13 +71,14 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_CreatesChildJobPerDocument()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId1 = SeedDocument("Doc1.pdf");
         var docId2 = SeedDocument("Doc2.pdf");
         var job = CreateParentJob([docId1, docId2]);
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
-        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync(ct);
         Assert.Equal(2, children.Count);
         Assert.All(children, c => Assert.Equal(ProcessingJobType.ReprocessDocumentVersion, c.Type));
         Assert.All(children, c => Assert.Equal(ProcessingJobStatus.Pending, c.Status));
@@ -87,18 +88,20 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_SetsParentJobIdOnChildren()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId = SeedDocument();
         var job = CreateParentJob([docId]);
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
-        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id, ct);
         Assert.Equal(job.Id, child.ParentJobId);
     }
 
     [Fact]
     public async Task HandleAsync_SelectsLatestVersionPerDocument()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId = SeedDocument("Multi.pdf", versionCount: 3);
         var job = CreateParentJob([docId]);
 
@@ -107,15 +110,16 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
             .OrderByDescending(v => v.VersionNumber)
             .First();
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
-        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id, ct);
         Assert.Contains(latestVersion.Id.ToString(), child.Payload!);
     }
 
     [Fact]
     public async Task HandleAsync_IdempotentOnRerun_DoesNotCreateDuplicateChildren()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId = SeedDocument();
         var job = CreateParentJob([docId]);
 
@@ -129,15 +133,16 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
         });
         _db.SaveChanges();
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
-        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync(ct);
         Assert.Single(children);
     }
 
     [Fact]
     public async Task HandleAsync_IdempotentOnRerun_RestoresTotalChildCount()
     {
+        var ct = TestContext.Current.CancellationToken;
         var job = CreateParentJob([Guid.NewGuid()]);
 
         _db.ProcessingJobs.Add(new ProcessingJob
@@ -158,7 +163,7 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
         });
         _db.SaveChanges();
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
         Assert.Equal(2, job.TotalChildCount);
     }
@@ -166,35 +171,38 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_NoMatchingDocuments_SetsTotalChildCountToZero()
     {
+        var ct = TestContext.Current.CancellationToken;
         var job = CreateParentJob([Guid.NewGuid()]);
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
         Assert.Equal(0, job.TotalChildCount);
-        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync();
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync(ct);
         Assert.Empty(children);
     }
 
     [Fact]
     public async Task HandleAsync_PassesCreatedByUserIdToChildren()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId = SeedDocument();
         var job = CreateParentJob([docId]);
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
-        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id);
+        var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id, ct);
         Assert.Equal(job.CreatedByUserId, child.CreatedByUserId);
     }
 
     [Fact]
     public async Task HandleAsync_SignalsOnceAfterBatchInsert()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docId1 = SeedDocument("Doc1.pdf");
         var docId2 = SeedDocument("Doc2.pdf");
         var job = CreateParentJob([docId1, docId2]);
 
-        await _handler.HandleAsync(job, CancellationToken.None);
+        await _handler.HandleAsync(job, ct);
 
         _signal.Received(1).Signal();
     }

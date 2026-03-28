@@ -30,7 +30,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     {
         var request = new BulkDeleteTextExtractionEnginesCommand([BuiltInTextExtractionEngines.TesseractDefaultId]);
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, response.DeletedCount);
     }
@@ -40,7 +40,7 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     {
         var request = new BulkDeleteTextExtractionEnginesCommand([Guid.NewGuid(), Guid.NewGuid()]);
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, response.DeletedCount);
     }
@@ -48,40 +48,42 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ValidIds_DeletesEngines()
     {
+        var ct = TestContext.Current.CancellationToken;
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
         _db.TextExtractionEngines.AddRange(
             new TextExtractionEngine { Id = id1, Name = "Engine 1", EngineType = TextExtractionEngineType.Tesseract, CreatedAt = DateTimeOffset.UtcNow },
             new TextExtractionEngine { Id = id2, Name = "Engine 2", EngineType = TextExtractionEngineType.Tesseract, CreatedAt = DateTimeOffset.UtcNow }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var request = new BulkDeleteTextExtractionEnginesCommand([id1, id2]);
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, ct);
 
         Assert.Equal(2, response.DeletedCount);
 
-        Assert.Empty(await _db.TextExtractionEngines.ToListAsync());
+        Assert.Empty(await _db.TextExtractionEngines.ToListAsync(ct));
     }
 
     [Fact]
     public async Task Handle_MixedIds_SkipsBuiltInAndDeletesRest()
     {
+        var ct = TestContext.Current.CancellationToken;
         var id = Guid.NewGuid();
         _db.TextExtractionEngines.Add(new TextExtractionEngine
         {
             Id = id, Name = "Real Engine", EngineType = TextExtractionEngineType.Tesseract, CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var request = new BulkDeleteTextExtractionEnginesCommand([BuiltInTextExtractionEngines.TesseractDefaultId, id]);
 
-        var response = await _sut.Handle(request, CancellationToken.None);
+        var response = await _sut.Handle(request, ct);
 
         Assert.Equal(1, response.DeletedCount);
 
-        Assert.Null(await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == id));
+        Assert.Null(await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == id, ct));
     }
 
     [Fact]
@@ -93,9 +95,9 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
             new TextExtractionEngine { Id = id1, Name = "Engine A", EngineType = TextExtractionEngineType.Tesseract, CreatedAt = DateTimeOffset.UtcNow },
             new TextExtractionEngine { Id = id2, Name = "Engine B", EngineType = TextExtractionEngineType.Tesseract, CreatedAt = DateTimeOffset.UtcNow }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        await _sut.Handle(new BulkDeleteTextExtractionEnginesCommand([id1, id2]), CancellationToken.None);
+        await _sut.Handle(new BulkDeleteTextExtractionEnginesCommand([id1, id2]), TestContext.Current.CancellationToken);
 
         _audit.Received(1).Deleted("TextExtractionEngine", id1, Arg.Any<string?>(), Arg.Any<Guid?>());
         _audit.Received(1).Deleted("TextExtractionEngine", id2, Arg.Any<string?>(), Arg.Any<Guid?>());

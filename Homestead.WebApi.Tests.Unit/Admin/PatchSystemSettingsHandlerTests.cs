@@ -36,9 +36,9 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     {
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, CancellationToken.None);
+        await _sut.Handle(request, TestContext.Current.CancellationToken);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
     }
 
@@ -47,7 +47,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     {
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, CancellationToken.None);
+        await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
@@ -57,18 +57,19 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ExistingRow_UpdatesEntity()
     {
+        var ct = TestContext.Current.CancellationToken;
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.SystemModule,
             Value = "{}"
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var request = new PatchSystemSettingsCommand();
 
-        await _sut.Handle(request, CancellationToken.None);
+        await _sut.Handle(request, ct);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
         Assert.NotNull(saved);
         Assert.NotNull(saved.UpdatedAt);
     }

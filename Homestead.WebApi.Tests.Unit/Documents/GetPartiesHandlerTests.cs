@@ -30,7 +30,7 @@ public class GetPartiesHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10 },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["Alpha", "Bravo", "Charlie"], names);
@@ -43,7 +43,7 @@ public class GetPartiesHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.Name, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["Charlie", "Bravo", "Alpha"], names);
@@ -56,11 +56,11 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Third", CreatedAt = now.AddHours(2) });
         _db.Parties.Add(new Party { Name = "First", CreatedAt = now });
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["First", "Second", "Third"], names);
@@ -73,11 +73,11 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "First", CreatedAt = now });
         _db.Parties.Add(new Party { Name = "Third", CreatedAt = now.AddHours(2) });
         _db.Parties.Add(new Party { Name = "Second", CreatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.CreatedAt, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["Third", "Second", "First"], names);
@@ -90,11 +90,11 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "Third", UpdatedAt = now.AddHours(2) });
         _db.Parties.Add(new Party { Name = "First", UpdatedAt = now });
         _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["First", "Second", "Third"], names);
@@ -107,11 +107,11 @@ public class GetPartiesHandlerTests : IDisposable
         _db.Parties.Add(new Party { Name = "First", UpdatedAt = now });
         _db.Parties.Add(new Party { Name = "Third", UpdatedAt = now.AddHours(2) });
         _db.Parties.Add(new Party { Name = "Second", UpdatedAt = now.AddHours(1) });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.UpdatedAt, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["Third", "Second", "First"], names);
@@ -120,6 +120,7 @@ public class GetPartiesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_SortByDocumentCountDesc_OrdersByMostDocumentsFirst()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
         var docC = new Document { Id = Guid.NewGuid(), Name = "DocC" };
@@ -129,7 +130,7 @@ public class GetPartiesHandlerTests : IDisposable
         var partyMany = new Party { Name = "Many" };
         var partyNone = new Party { Name = "None" };
         _db.Parties.AddRange(partyFew, partyMany, partyNone);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         _db.Set<DocumentParty>().AddRange(
             new DocumentParty { DocumentId = docA.Id, PartyId = partyMany.Id },
@@ -137,11 +138,11 @@ public class GetPartiesHandlerTests : IDisposable
             new DocumentParty { DocumentId = docC.Id, PartyId = partyMany.Id },
             new DocumentParty { DocumentId = docA.Id, PartyId = partyFew.Id }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Desc },
-            CancellationToken.None);
+            ct);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal("Many", names[0]);
@@ -151,6 +152,7 @@ public class GetPartiesHandlerTests : IDisposable
     [Fact]
     public async Task Handle_SortByDocumentCountAsc_OrdersByFewestDocumentsFirst()
     {
+        var ct = TestContext.Current.CancellationToken;
         var docA = new Document { Id = Guid.NewGuid(), Name = "DocA" };
         var docB = new Document { Id = Guid.NewGuid(), Name = "DocB" };
         _db.Documents.AddRange(docA, docB);
@@ -158,17 +160,17 @@ public class GetPartiesHandlerTests : IDisposable
         var partyWithDocs = new Party { Name = "WithDocs" };
         var partyWithout = new Party { Name = "Without" };
         _db.Parties.AddRange(partyWithDocs, partyWithout);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         _db.Set<DocumentParty>().AddRange(
             new DocumentParty { DocumentId = docA.Id, PartyId = partyWithDocs.Id },
             new DocumentParty { DocumentId = docB.Id, PartyId = partyWithDocs.Id }
         );
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = PartySortBy.DocumentCount, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            ct);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal("Without", names[0]);
@@ -182,7 +184,7 @@ public class GetPartiesHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, SortBy = null, SortDir = null },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         Assert.Equal(["Alpha", "Zulu"], names);
@@ -195,7 +197,7 @@ public class GetPartiesHandlerTests : IDisposable
 
         var result = await _sut.Handle(
             new GetPartiesQuery { Page = 1, PageSize = 10, Search = "a", SortBy = PartySortBy.Name, SortDir = SortDirection.Asc },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
         // All contain "a" (case-insensitive), sorted by name ascending
@@ -208,6 +210,6 @@ public class GetPartiesHandlerTests : IDisposable
     {
         foreach (var name in names)
             _db.Parties.Add(new Party { Name = name });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 }

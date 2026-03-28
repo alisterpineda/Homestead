@@ -18,7 +18,7 @@ public class CreateCommentCommandValidatorTests
     [Fact]
     public async Task EmptyBody_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateCommentCommand(""));
+        var result = await _sut.ValidateAsync(new CreateCommentCommand(""), TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Body");
     }
@@ -26,7 +26,7 @@ public class CreateCommentCommandValidatorTests
     [Fact]
     public async Task ValidBody_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreateCommentCommand("A comment"));
+        var result = await _sut.ValidateAsync(new CreateCommentCommand("A comment"), TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -41,7 +41,7 @@ public class CreatePartyCommandValidatorTests
     [InlineData("   ")]
     public async Task WhitespaceName_IsInvalid(string? name)
     {
-        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = name! });
+        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = name! }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
@@ -49,7 +49,7 @@ public class CreatePartyCommandValidatorTests
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = "Acme Corp" });
+        var result = await _sut.ValidateAsync(new CreatePartyCommand { Name = "Acme Corp" }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -61,14 +61,14 @@ public class UpdatePartyCommandValidatorTests
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "   " });
+        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "   " }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "Acme" });
+        var result = await _sut.ValidateAsync(new UpdatePartyCommand { Id = Guid.NewGuid(), Name = "Acme" }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -80,21 +80,21 @@ public class CreateGroupCommandValidatorTests
     [Fact]
     public async Task WhitespaceName_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "  " });
+        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "  " }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
     [Fact]
     public async Task ValidName_IsValid()
     {
-        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "Engineering" });
+        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = "Engineering" }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 
     [Fact]
     public async Task NameExceeds256Chars_IsInvalid()
     {
-        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = new string('a', 257) });
+        var result = await _sut.ValidateAsync(new CreateGroupCommand { Name = new string('a', 257) }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Name");
     }
@@ -106,7 +106,7 @@ public class CreateGroupCommandValidatorTests
         {
             Name = "Valid",
             Description = new string('a', 1025)
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Description");
     }
@@ -118,7 +118,7 @@ public class CreateGroupCommandValidatorTests
         {
             Name = "Valid",
             Description = null
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -134,7 +134,7 @@ public class UpdateGroupCommandValidatorTests
         {
             Id = Guid.NewGuid(),
             Request = new UpdateGroupRequest { Name = " " }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
@@ -145,7 +145,7 @@ public class UpdateGroupCommandValidatorTests
         {
             Id = Guid.NewGuid(),
             Request = new UpdateGroupRequest { Name = "Engineering" }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 
@@ -156,7 +156,7 @@ public class UpdateGroupCommandValidatorTests
         {
             Id = Guid.NewGuid(),
             Request = new UpdateGroupRequest { Name = new string('a', 257) }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Request.Name");
     }
@@ -172,7 +172,7 @@ public class UpdateGroupCommandValidatorTests
                 Name = "Valid",
                 Description = new string('a', 1025)
             }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Request.Description");
     }
@@ -193,7 +193,7 @@ public class AddGroupMemberCommandValidatorTests
                 UserId = Guid.Empty,
                 AccessLevel = GroupAccessLevel.Editor
             }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Request.UserId");
     }
@@ -209,7 +209,7 @@ public class AddGroupMemberCommandValidatorTests
                 UserId = Guid.NewGuid(),
                 AccessLevel = (GroupAccessLevel)99
             }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Request.AccessLevel");
     }
@@ -225,7 +225,7 @@ public class AddGroupMemberCommandValidatorTests
                 UserId = Guid.NewGuid(),
                 AccessLevel = GroupAccessLevel.Editor
             }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -242,7 +242,7 @@ public class UpdateGroupMemberCommandValidatorTests
             GroupId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             Request = new UpdateGroupMemberRequest { AccessLevel = (GroupAccessLevel)99 }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "Request.AccessLevel");
     }
@@ -255,7 +255,7 @@ public class UpdateGroupMemberCommandValidatorTests
             GroupId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Viewer }
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }
@@ -271,7 +271,7 @@ public class CreateTextExtractionEngineCommandValidatorTests
         {
             Name = "   ",
             EngineType = TextExtractionEngineType.Tesseract
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
     }
 
@@ -282,7 +282,7 @@ public class CreateTextExtractionEngineCommandValidatorTests
         {
             Name = "My Engine",
             EngineType = TextExtractionEngineType.Tesseract
-        });
+        }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }
 }

@@ -48,11 +48,11 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
         Assert.Contains(BuiltInTextExtractionEngines.TesseractDefaultId.ToString(), saved.Value);
     }
@@ -63,7 +63,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.Received(1).LogCreated(
             "AppSetting",
@@ -73,21 +73,22 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ExistingRow_UpdatesValue()
     {
+        var ct = TestContext.Current.CancellationToken;
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
             Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, ct);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
 
-        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule);
+        var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
         Assert.NotNull(saved);
         Assert.NotNull(saved.UpdatedAt);
     }
@@ -100,12 +101,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
             Key = AppSetting.DocumentsModule,
             Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.Received(1).LogUpdated(
             "AppSetting",
@@ -119,7 +120,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var patchDoc = new JsonPatchDocument<DocumentSettings>();
         var command = new PatchDocumentSettingsCommand { PatchDocument = patchDoc };
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
     }
@@ -132,12 +133,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
             Key = AppSetting.DocumentsModule,
             Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.DidNotReceive().LogUpdated(
             Arg.Any<string>(),
@@ -152,7 +153,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
     }
@@ -164,7 +165,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
             p.Replace(m => m.DefaultTextExtractionEngineId, Guid.NewGuid()));
 
         await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(command, CancellationToken.None));
+            () => _sut.Handle(command, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -178,12 +179,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, engineId));
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(engineId, response.DefaultTextExtractionEngineId);
     }
@@ -196,12 +197,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
             Key = AppSetting.DocumentsModule,
             Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
             p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
 
-        var response = await _sut.Handle(command, CancellationToken.None);
+        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Null(response.DefaultTextExtractionEngineId);
     }

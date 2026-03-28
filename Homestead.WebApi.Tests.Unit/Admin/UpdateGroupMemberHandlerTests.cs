@@ -45,7 +45,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             UserId = userId,
             AccessLevel = GroupAccessLevel.Viewer
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupMemberCommand
         {
@@ -54,7 +54,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberAccessLevel"),
@@ -82,7 +82,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             UserId = userId,
             AccessLevel = GroupAccessLevel.Editor
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupMemberCommand
         {
@@ -91,7 +91,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.DidNotReceive().LogUpdated(Arg.Any<string>(), Arg.Any<Guid>(),
             Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
@@ -118,7 +118,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             UserId = userId,
             AccessLevel = GroupAccessLevel.Owner
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupMemberCommand
         {
@@ -128,7 +128,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         };
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(command, CancellationToken.None));
+            _sut.Handle(command, TestContext.Current.CancellationToken));
         Assert.Contains("last owner", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -158,7 +158,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         });
         _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId1, AccessLevel = GroupAccessLevel.Owner });
         _db.GroupMembers.Add(new GroupMember { GroupId = groupId, UserId = userId2, AccessLevel = GroupAccessLevel.Owner });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupMemberCommand
         {
@@ -167,7 +167,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Editor }
         };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(GroupAccessLevel.Editor, result.AccessLevel);
     }
@@ -193,7 +193,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             UserId = userId,
             AccessLevel = GroupAccessLevel.Owner
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupMemberCommand
         {
@@ -202,7 +202,7 @@ public class UpdateGroupMemberHandlerTests : IDisposable
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Owner }
         };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal(GroupAccessLevel.Owner, result.AccessLevel);
     }

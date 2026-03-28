@@ -38,7 +38,7 @@ public class AddGroupMemberHandlerTests : IDisposable
             DisplayName = "Test User",
             IsActive = true
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new AddGroupMemberCommand
         {
@@ -46,7 +46,7 @@ public class AddGroupMemberHandlerTests : IDisposable
             Request = new AddGroupMemberRequest { UserId = userId, AccessLevel = GroupAccessLevel.Editor }
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _auditLogger.Received(1).LogUpdated("Group", groupId,
             Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberAdded"),

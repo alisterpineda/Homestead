@@ -69,7 +69,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = null,
         };
 
-        var result = await _sut.Handle(request, CancellationToken.None);
+        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -84,7 +84,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = BuiltInTextExtractionEngines.TesseractDefaultId,
         };
 
-        var result = await _sut.Handle(request, CancellationToken.None);
+        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -100,7 +100,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             EngineType = TextExtractionEngineType.Tesseract,
             CreatedAt = DateTimeOffset.UtcNow,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var request = new ReprocessDocumentVersionCommand
         {
@@ -109,7 +109,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
             TextExtractionEngineId = engineId,
         };
 
-        var result = await _sut.Handle(request, CancellationToken.None);
+        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
     }
@@ -125,7 +125,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         var ex = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
 
         Assert.Contains("does not exist", ex.Message);
     }
@@ -140,7 +140,7 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -153,6 +153,6 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         };
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
-            () => _sut.Handle(request, CancellationToken.None));
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
     }
 }

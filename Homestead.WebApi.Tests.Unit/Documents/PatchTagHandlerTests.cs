@@ -34,14 +34,14 @@ public class PatchTagHandlerTests : IDisposable
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Old", Path = "Old" };
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var patch = new JsonPatchDocument<PatchTagModel>();
         patch.Replace(m => m.Name, "New");
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
     }
@@ -51,14 +51,14 @@ public class PatchTagHandlerTests : IDisposable
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Same", Path = "Same" };
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var patch = new JsonPatchDocument<PatchTagModel>();
         patch.Replace(m => m.Name, "Same");
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
@@ -69,14 +69,14 @@ public class PatchTagHandlerTests : IDisposable
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Old" };
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var patch = new JsonPatchDocument<PatchTagModel>();
         patch.Replace(m => m.Description, "New description");
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Equal("New description", result.Description);
         _audit.Received(1).Track<TagSnapshot, Tag>(Arg.Any<Tag>(), "Tag", tag.Id, Arg.Any<Guid?>());
@@ -87,7 +87,7 @@ public class PatchTagHandlerTests : IDisposable
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Old", Path = "Old" };
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var before = DateTimeOffset.UtcNow;
 
@@ -96,7 +96,7 @@ public class PatchTagHandlerTests : IDisposable
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.UpdatedAt);
         Assert.True(result.UpdatedAt >= before);
@@ -108,14 +108,14 @@ public class PatchTagHandlerTests : IDisposable
     {
         var tag = new Tag { Id = Guid.NewGuid(), Name = "Test", Path = "Test", Description = "Existing" };
         _db.Tags.Add(tag);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var patch = new JsonPatchDocument<PatchTagModel>();
         patch.Replace(m => m.Description, null);
 
         var command = new PatchTagCommand { Id = tag.Id, PatchDocument = patch };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.Null(result.Description);
     }

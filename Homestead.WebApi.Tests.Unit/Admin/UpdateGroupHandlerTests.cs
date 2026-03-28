@@ -36,7 +36,7 @@ public class UpdateGroupHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Groups.Add(group);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupCommand
         {
@@ -44,7 +44,7 @@ public class UpdateGroupHandlerTests : IDisposable
             Request = new UpdateGroupRequest { Name = "New Name", Description = "New desc" }
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());
     }
@@ -59,7 +59,7 @@ public class UpdateGroupHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Groups.Add(group);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var before = DateTimeOffset.UtcNow;
 
@@ -69,7 +69,7 @@ public class UpdateGroupHandlerTests : IDisposable
             Request = new UpdateGroupRequest { Name = "New Name" }
         };
 
-        var result = await _sut.Handle(command, CancellationToken.None);
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.UpdatedAt);
         Assert.True(result.UpdatedAt >= before);
@@ -87,7 +87,7 @@ public class UpdateGroupHandlerTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         };
         _db.Groups.Add(group);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = new UpdateGroupCommand
         {
@@ -95,7 +95,7 @@ public class UpdateGroupHandlerTests : IDisposable
             Request = new UpdateGroupRequest { Name = "Same", Description = "Same desc" }
         };
 
-        await _sut.Handle(command, CancellationToken.None);
+        await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         // Track is always called before mutations; diff computation is deferred
         _audit.Received(1).Track<GroupSnapshot, Group>(Arg.Any<Group>(), "Group", group.Id, Arg.Any<Guid?>());

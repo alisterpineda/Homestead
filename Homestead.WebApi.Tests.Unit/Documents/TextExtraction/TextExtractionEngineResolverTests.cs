@@ -30,7 +30,7 @@ public class TextExtractionEngineResolverTests : IDisposable
             Key = AppSetting.DocumentsModule,
             Value = JsonSerializer.Serialize(settings, FieldChange.JsonOptions)
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     {
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(null, CancellationToken.None);
+        var result = await resolver.ResolveAsync(null, TestContext.Current.CancellationToken);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultConfiguration, result.Configuration);
@@ -50,7 +50,7 @@ public class TextExtractionEngineResolverTests : IDisposable
         await SetDefaultEngineId(BuiltInTextExtractionEngines.TesseractDefaultId);
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(null, CancellationToken.None);
+        var result = await resolver.ResolveAsync(null, TestContext.Current.CancellationToken);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultConfiguration, result.Configuration);
@@ -59,6 +59,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     [Fact]
     public async Task ResolveAsync_NullEngineId_DefaultIsDbEngine_ReturnsDbEngineConfig()
     {
+        var ct = TestContext.Current.CancellationToken;
         var engineId = Guid.NewGuid();
         var config = """{"languages":["Fra","Deu"]}""";
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -69,12 +70,12 @@ public class TextExtractionEngineResolverTests : IDisposable
             Configuration = config,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         await SetDefaultEngineId(engineId);
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(null, CancellationToken.None);
+        var result = await resolver.ResolveAsync(null, ct);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(config, result.Configuration);
@@ -85,7 +86,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     {
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(BuiltInTextExtractionEngines.TesseractDefaultId, CancellationToken.None);
+        var result = await resolver.ResolveAsync(BuiltInTextExtractionEngines.TesseractDefaultId, TestContext.Current.CancellationToken);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultConfiguration, result.Configuration);
@@ -94,6 +95,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     [Fact]
     public async Task ResolveAsync_ExplicitDbEngineId_ReturnsDbEngineConfig()
     {
+        var ct = TestContext.Current.CancellationToken;
         var engineId = Guid.NewGuid();
         var config = """{"languages":["Jpn"]}""";
         _db.TextExtractionEngines.Add(new TextExtractionEngine
@@ -104,11 +106,11 @@ public class TextExtractionEngineResolverTests : IDisposable
             Configuration = config,
             CreatedAt = DateTimeOffset.UtcNow
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(engineId, CancellationToken.None);
+        var result = await resolver.ResolveAsync(engineId, ct);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(config, result.Configuration);
@@ -119,7 +121,7 @@ public class TextExtractionEngineResolverTests : IDisposable
     {
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(Guid.NewGuid(), CancellationToken.None);
+        var result = await resolver.ResolveAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultConfiguration, result.Configuration);
@@ -131,7 +133,7 @@ public class TextExtractionEngineResolverTests : IDisposable
         await SetDefaultEngineId(Guid.NewGuid()); // non-existent engine
         var resolver = CreateResolver();
 
-        var result = await resolver.ResolveAsync(null, CancellationToken.None);
+        var result = await resolver.ResolveAsync(null, TestContext.Current.CancellationToken);
 
         Assert.Equal(TextExtractionEngineType.Tesseract, result.EngineType);
         Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultConfiguration, result.Configuration);

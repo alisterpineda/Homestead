@@ -129,9 +129,9 @@ public class PartyTests : IntegrationTestBase
 
         // Update them in order with delays to ensure distinct timestamps
         await client.PutAsJsonAsync($"/api/v1/documents/parties/{p1.Id}", new { name = "UaFirst", description = "upd" }, CT);
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await client.PutAsJsonAsync($"/api/v1/documents/parties/{p2.Id}", new { name = "UaSecond", description = "upd" }, CT);
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await client.PutAsJsonAsync($"/api/v1/documents/parties/{p3.Id}", new { name = "UaThird", description = "upd" }, CT);
 
         var response = await client.GetAsync(
@@ -181,9 +181,9 @@ public class PartyTests : IntegrationTestBase
         {
             name,
             description = $"Description for {name}"
-        });
+        }, CT);
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<PartyResult>())!;
+        return (await response.Content.ReadFromJsonAsync<PartyResult>(CT))!;
     }
 
     [Fact]
@@ -223,9 +223,9 @@ public class PartyTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         await CreatePartyAsync(client, "First");
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await CreatePartyAsync(client, "Second");
-        await Task.Delay(50);
+        await Task.Delay(50, CT);
         await CreatePartyAsync(client, "Third");
 
         var response = await client.GetAsync("/api/v1/documents/parties?Page=1&PageSize=10&SortBy=CreatedAt&SortDir=Desc", CT);
