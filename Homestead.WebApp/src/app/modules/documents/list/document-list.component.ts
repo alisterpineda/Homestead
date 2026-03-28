@@ -8,7 +8,8 @@ import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, d
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmSpinner } from '@/shared/components/spartan/spinner';
+import { HlmSkeletonImports } from '@/shared/components/spartan/skeleton';
+import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -49,7 +50,8 @@ import { toast } from '@spartan-ng/brain/sonner';
   imports: [
     NgIcon,
     HlmIconImports,
-    HlmSpinner,
+    HlmSkeletonImports,
+    HlmCardImports,
     HlmEmptyImports,
     HlmInput,
     HlmButton,
@@ -67,48 +69,12 @@ import { toast } from '@spartan-ng/brain/sonner';
     BulkReprocessProgressDialogComponent,
     DownloadProgressDialogComponent,
   ],
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'block' },
   providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload })],
   template: `
-    <div class="flex min-h-0 flex-1 flex-col">
-      @if (loading() && !data()) {
-        <div class="flex justify-center py-16">
-          <hlm-spinner />
-        </div>
-      }
-
-      @if (error()) {
-        <section hlmEmpty>
-          <hlm-empty-media variant="icon">
-            <ng-icon hlm name="lucideFileText" size="xl" />
-          </hlm-empty-media>
-          <div hlmEmptyHeader>
-            <h3 hlmEmptyTitle>Failed to load documents</h3>
-            <p hlmEmptyDescription>There was an error loading the document list. Please try again.</p>
-          </div>
-        </section>
-      }
-
-      @if (data(); as result) {
-          <section hlmEmpty [class.hidden]="!showInitialEmpty()">
-            <hlm-empty-media variant="icon">
-              <ng-icon hlm name="lucideFileText" size="xl" />
-            </hlm-empty-media>
-            <div hlmEmptyHeader>
-              <h3 hlmEmptyTitle>No documents yet</h3>
-              <p hlmEmptyDescription>Upload your first document to get started.</p>
-            </div>
-            @if (auth.canWrite()) {
-              <input #emptyUploadInput type="file" multiple class="hidden" (change)="onEmptyUploadFiles($event)" />
-              <button hlmBtn (click)="emptyUploadInput.click()">
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                Upload Document
-              </button>
-            }
-          </section>
-          <div class="relative shrink-0 overflow-hidden" [class.hidden]="showInitialEmpty()">
-            <!-- Normal toolbar: always rendered to hold layout height -->
-            <div [class.opacity-0]="isInSelectionState()" [class.pointer-events-none]="isInSelectionState()" [attr.inert]="isInSelectionState() ? '' : null">
+    <div>
+      <div [class.hidden]="showInitialEmpty()">
+            @if (!isInSelectionState() || !auth.canWrite()) {
               <div class="flex items-center gap-2 mb-3">
                 @if (auth.canWrite() && viewMode() === 'grid') {
                   <button hlmBtn variant="outline" size="sm" (click)="enterSelectionMode()" aria-label="Enter selection mode">
@@ -266,10 +232,10 @@ import { toast } from '@spartan-ng/brain/sonner';
                   </button>
                 }
               </div>
-            </div>
+            }
 
-            <!-- Selection toolbar: absolute overlay -->
-            <div class="absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-2 gap-y-1 min-h-8 bg-background" [class.opacity-0]="!isInSelectionState() || !auth.canWrite()" [class.pointer-events-none]="!isInSelectionState() || !auth.canWrite()" [attr.inert]="!isInSelectionState() || !auth.canWrite() ? '' : null">
+            @if (isInSelectionState() && auth.canWrite()) {
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3">
               <div hlmButtonGroup aria-label="Selection controls">
                 <button hlmBtn variant="outline" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
                   <ng-icon hlm name="lucideX" size="sm" />
@@ -319,7 +285,62 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </hlm-alert-dialog>
               </div>
             </div>
+            }
           </div>
+
+      @if (loading() && !data()) {
+        @if (viewMode() === 'table') {
+          <div class="space-y-3" aria-hidden="true">
+            <div hlmSkeleton class="h-10 w-full"></div>
+            @for (_ of skeletonCards; track $index) {
+              <div hlmSkeleton class="h-12 w-full"></div>
+            }
+          </div>
+        } @else {
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3" aria-hidden="true">
+            @for (_ of skeletonCards; track $index) {
+              <div hlmCard class="relative aspect-[3/4] overflow-hidden p-0 gap-0">
+                <div hlmSkeleton class="absolute inset-0 rounded-none"></div>
+                <div class="absolute bottom-0 inset-x-0 p-3 space-y-1.5">
+                  <div class="h-3 w-3/5 rounded-md bg-accent/50"></div>
+                  <div class="h-3 w-2/5 rounded-md bg-accent/50"></div>
+                  <div class="h-4 w-4/5 rounded-md bg-accent/50"></div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      @if (error()) {
+        <section hlmEmpty>
+          <hlm-empty-media variant="icon">
+            <ng-icon hlm name="lucideFileText" size="xl" />
+          </hlm-empty-media>
+          <div hlmEmptyHeader>
+            <h3 hlmEmptyTitle>Failed to load documents</h3>
+            <p hlmEmptyDescription>There was an error loading the document list. Please try again.</p>
+          </div>
+        </section>
+      }
+
+      @if (data(); as result) {
+          <section hlmEmpty [class.hidden]="!showInitialEmpty()">
+            <hlm-empty-media variant="icon">
+              <ng-icon hlm name="lucideFileText" size="xl" />
+            </hlm-empty-media>
+            <div hlmEmptyHeader>
+              <h3 hlmEmptyTitle>No documents yet</h3>
+              <p hlmEmptyDescription>Upload your first document to get started.</p>
+            </div>
+            @if (auth.canWrite()) {
+              <input #emptyUploadInput type="file" multiple class="hidden" (change)="onEmptyUploadFiles($event)" />
+              <button hlmBtn (click)="emptyUploadInput.click()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Upload Document
+              </button>
+            }
+          </section>
 
           <section hlmEmpty [class.hidden]="!showFilteredEmpty()">
               <hlm-empty-media variant="icon">
@@ -333,7 +354,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 Reset filters
               </button>
           </section>
-          <div class="flex min-h-0 flex-1 flex-col sm:overflow-y-auto p-px" [class.hidden]="!hasItems()">
+          <div class="p-px" [class.hidden]="!hasItems()">
               @if (viewMode() === 'table') {
                 <app-document-table
                   [documents]="result.items"
@@ -354,22 +375,14 @@ import { toast } from '@spartan-ng/brain/sonner';
                   (selectionChange)="selectedDocumentIds.set($event)"
                 />
               }
-              <ng-template #paginationTpl>
-                <app-pagination
-                  [page]="+result.page"
-                  [totalPages]="+(result.totalPages ?? 0)"
-                  [totalCount]="+result.totalCount"
-                  [pageSize]="+result.pageSize"
-                  (pageChange)="onPageChange($event)"
-                  (pageSizeChange)="onPageSizeChange($event)"
-                />
-              </ng-template>
-              <div class="mt-auto sm:hidden">
-                <ng-container [ngTemplateOutlet]="paginationTpl" />
-              </div>
-          </div>
-          <div class="shrink-0 max-sm:hidden" [class.hidden]="!hasItems()">
-              <ng-container [ngTemplateOutlet]="paginationTpl" />
+              <app-pagination
+                [page]="+result.page"
+                [totalPages]="+(result.totalPages ?? 0)"
+                [totalCount]="+result.totalCount"
+                [pageSize]="+result.pageSize"
+                (pageChange)="onPageChange($event)"
+                (pageSizeChange)="onPageSizeChange($event)"
+              />
           </div>
       }
 
@@ -399,6 +412,7 @@ export class DocumentListComponent implements OnDestroy {
   private hubSub: Subscription;
   private stateSaveSub: Subscription;
 
+  readonly skeletonCards = Array(12);
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
     { value: 'CreatedAt', label: 'Date Added' },
