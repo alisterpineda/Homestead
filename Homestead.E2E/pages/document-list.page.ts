@@ -105,10 +105,10 @@ export class DocumentListPage {
   }
 
   bulkTagsButton() {
-    return this.page.locator('app-bulk-edit-tags-popover button');
+    return this.page.locator('app-bulk-edit-tags-popover button[hlmpopovertrigger]');
   }
 
   bulkPartiesButton() {
-    return this.page.locator('app-bulk-edit-parties-popover button');
+    return this.page.locator('app-bulk-edit-parties-popover button[hlmpopovertrigger]');
   }
 }
