@@ -494,7 +494,7 @@ export class DocumentListComponent implements OnDestroy {
   effectiveSortBy = computed(() => {
     const explicit = this.sortBy();
     if (explicit) return explicit;
-    return this.isSearching() ? null : 'CreatedAt' as DocumentSortBy;
+    return this.isSearching() ? null : 'UpdatedAt' as DocumentSortBy;
   });
 
   private static readonly DATE_SORT_FIELDS: Set<DocumentSortBy> = new Set(['CreatedAt', 'UpdatedAt', 'DocumentDate']);

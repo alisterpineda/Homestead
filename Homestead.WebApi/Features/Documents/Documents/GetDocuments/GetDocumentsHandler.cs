@@ -185,7 +185,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)));
         }
 
-        var effectiveSortBy = sortBy ?? DocumentSortBy.CreatedAt;
+        var effectiveSortBy = sortBy ?? DocumentSortBy.UpdatedAt;
         var effectiveSortDir = sortDir ?? SortDirection.Desc;
 
         return (effectiveSortBy, effectiveSortDir) switch
@@ -208,7 +208,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
             (DocumentSortBy.UpdatedAt, SortDirection.Desc) => query.OrderByDescending(d => d.UpdatedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Asc) => query.OrderBy(d => d.DeletedAt),
             (DocumentSortBy.DeletedAt, SortDirection.Desc) => query.OrderByDescending(d => d.DeletedAt),
-            _ => query.OrderByDescending(d => d.CreatedAt),
+            _ => query.OrderByDescending(d => d.UpdatedAt),
         };
     }
 }

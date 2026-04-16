@@ -103,10 +103,10 @@ describe('DocumentListComponent', () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    it('should use default CreatedAt when not searching and no explicit sortBy is set', () => {
+    it('should use default UpdatedAt when not searching and no explicit sortBy is set', () => {
       const spy = vi.spyOn(component, 'onSortChange');
       component.onSortDirChange('Asc');
-      expect(spy).toHaveBeenCalledWith({ sortBy: 'CreatedAt', sortDir: 'Asc' });
+      expect(spy).toHaveBeenCalledWith({ sortBy: 'UpdatedAt', sortDir: 'Asc' });
     });
 
     it('should call onSortChange with active field and Desc direction', () => {
@@ -136,8 +136,8 @@ describe('DocumentListComponent', () => {
   });
 
   describe('effectiveSortBy', () => {
-    it('should return CreatedAt when no explicit sort and not searching', () => {
-      expect(component.effectiveSortBy()).toBe('CreatedAt');
+    it('should return UpdatedAt when no explicit sort and not searching', () => {
+      expect(component.effectiveSortBy()).toBe('UpdatedAt');
     });
 
     it('should return null when no explicit sort and searching (relevance)', () => {
@@ -152,7 +152,7 @@ describe('DocumentListComponent', () => {
   });
 
   describe('effectiveSortDir', () => {
-    it('should return Desc when no explicit sort (default for CreatedAt)', () => {
+    it('should return Desc when no explicit sort (default for UpdatedAt)', () => {
       expect(component.effectiveSortDir()).toBe('Desc');
     });
 
@@ -164,8 +164,8 @@ describe('DocumentListComponent', () => {
   });
 
   describe('sortLabel', () => {
-    it('should show Date Added by default', () => {
-      expect(component.sortLabel()).toBe('Date Added');
+    it('should show Modified by default', () => {
+      expect(component.sortLabel()).toBe('Modified');
     });
 
     it('should show Relevance when searching with no explicit sort', () => {
