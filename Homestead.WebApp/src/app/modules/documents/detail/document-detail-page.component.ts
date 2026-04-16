@@ -400,6 +400,16 @@ import { toast } from '@spartan-ng/brain/sonner';
             </p>
           </div>
 
+          <!-- Modified -->
+          @if (doc.updatedAt) {
+            <div class="space-y-2">
+              <label hlmLabel>Modified</label>
+              <p class="text-sm text-muted-foreground">
+                {{ formatDate(doc.updatedAt) }}
+              </p>
+            </div>
+          }
+
           <!-- Group -->
           @if (document()?.groupName; as groupName) {
             <div class="flex items-center gap-2">
