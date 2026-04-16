@@ -17,20 +17,11 @@ public static class AuthenticationExtensions
         builder.Services.AddHttpContextAccessor();
 
         builder.Services
-            .AddIdentityApiEndpoints<AppUser>(options =>
+            .AddIdentity<AppUser, IdentityRole<Guid>>(options =>
             {
                 options.User.RequireUniqueEmail = true;
                 options.SignIn.RequireConfirmedEmail = false;
-                options.Password.RequiredLength = 8;
-                options.Password.RequireDigit = false;
-                options.Password.RequireLowercase = false;
-                options.Password.RequireUppercase = false;
-                options.Password.RequireNonAlphanumeric = false;
-                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-                options.Lockout.MaxFailedAccessAttempts = 5;
-                options.Lockout.AllowedForNewUsers = true;
             })
-            .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<AppDbContext>()
             .AddClaimsPrincipalFactory<AppClaimsPrincipalFactory>();
 
@@ -108,47 +99,42 @@ public static class AuthenticationExtensions
 
         builder.Services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 
-        // Conditionally add OIDC authentication
         var oidcSection = builder.Configuration.GetSection(OidcOptions.SectionName);
-        var oidcOptions = oidcSection.Get<OidcOptions>();
+        var oidcOptions = oidcSection.Get<OidcOptions>() ?? new OidcOptions();
 
         builder.Services.Configure<OidcOptions>(oidcSection);
+        builder.Services.AddScoped<OidcUserProvisioner>();
 
-        if (oidcOptions?.IsConfigured == true)
-        {
-            builder.Services.AddScoped<OidcUserProvisioner>();
-
-            builder.Services.AddAuthentication()
-                .AddOpenIdConnect(OidcOptions.SchemeName, options =>
+        builder.Services.AddAuthentication()
+            .AddOpenIdConnect(OidcOptions.SchemeName, options =>
+            {
+                options.Authority = oidcOptions.Authority;
+                if (!string.IsNullOrEmpty(oidcOptions.MetadataAddress))
+                    options.MetadataAddress = oidcOptions.MetadataAddress;
+                options.ClientId = oidcOptions.ClientId;
+                options.ClientSecret = oidcOptions.ClientSecret;
+                options.RequireHttpsMetadata = !isDev;
+                options.ResponseType = "code";
+                options.SaveTokens = false;
+                options.GetClaimsFromUserInfoEndpoint = true;
+                options.MapInboundClaims = false;
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Scope.Add("profile");
+                options.Scope.Add("email");
+                foreach (var scope in oidcOptions.AdditionalScopes)
+                    options.Scope.Add(scope);
+                options.CallbackPath = "/signin-oidc";
+                options.SignedOutCallbackPath = "/signout-callback-oidc";
+                options.SignInScheme = IdentityConstants.ExternalScheme;
+                options.Events.OnRedirectToIdentityProviderForSignOut = context =>
                 {
-                    options.Authority = oidcOptions.Authority;
-                    if (!string.IsNullOrEmpty(oidcOptions.MetadataAddress))
-                        options.MetadataAddress = oidcOptions.MetadataAddress;
-                    options.ClientId = oidcOptions.ClientId;
-                    options.ClientSecret = oidcOptions.ClientSecret;
-                    options.RequireHttpsMetadata = !isDev;
-                    options.ResponseType = "code";
-                    options.SaveTokens = false;
-                    options.GetClaimsFromUserInfoEndpoint = true;
-                    options.MapInboundClaims = false;
-                    options.Scope.Clear();
-                    options.Scope.Add("openid");
-                    options.Scope.Add("profile");
-                    options.Scope.Add("email");
-                    foreach (var scope in oidcOptions.AdditionalScopes)
-                        options.Scope.Add(scope);
-                    options.CallbackPath = "/signin-oidc";
-                    options.SignedOutCallbackPath = "/signout-callback-oidc";
-                    options.SignInScheme = IdentityConstants.ExternalScheme;
-                    options.Events.OnRedirectToIdentityProviderForSignOut = context =>
-                    {
-                        // Keycloak requires client_id or id_token_hint with post_logout_redirect_uri.
-                        // Since we don't save tokens, send client_id explicitly.
-                        context.ProtocolMessage.ClientId = oidcOptions.ClientId;
-                        return Task.CompletedTask;
-                    };
-                });
-        }
+                    // Keycloak requires client_id or id_token_hint with post_logout_redirect_uri.
+                    // Since we don't save tokens, send client_id explicitly.
+                    context.ProtocolMessage.ClientId = oidcOptions.ClientId;
+                    return Task.CompletedTask;
+                };
+            });
 
         return builder;
     }

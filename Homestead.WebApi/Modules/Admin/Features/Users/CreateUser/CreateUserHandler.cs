@@ -22,7 +22,7 @@ public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var result = await userManager.CreateAsync(user, request.Password);
+        var result = await userManager.CreateAsync(user);
         if (!result.Succeeded)
             throw new IdentityValidationException(result.ToErrorDictionary());
 
@@ -39,7 +39,6 @@ public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
             Email = user.Email,
             Role = request.Role,
             IsActive = user.IsActive,
-            HasPassword = true,
             CreatedAt = user.CreatedAt
         };
     }

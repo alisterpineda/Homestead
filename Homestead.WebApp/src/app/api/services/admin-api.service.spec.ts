@@ -34,7 +34,7 @@ describe('AdminApiService', () => {
 
   it('createUser sends POST and unwraps body', () => {
     const mockBody = { id: '1', email: 'test@test.com' };
-    service.createUser({ body: { email: 'test@test.com', displayName: 'Test', password: 'pass123', role: 'Viewer' } }).subscribe(result => {
+    service.createUser({ body: { email: 'test@test.com', displayName: 'Test', role: 'Viewer' } }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
     const req = httpTesting.expectOne('/api/v1/admin/users');

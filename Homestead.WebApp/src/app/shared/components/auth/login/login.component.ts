@@ -1,11 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, OnInit } from '@angular/core';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
-import { extractErrorCode, extractApiError } from '@/shared/utils/api-error.utils';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmInput } from '@/shared/components/spartan/input';
-import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 
 const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrator.';
@@ -13,13 +9,7 @@ const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrato
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    ReactiveFormsModule,
-    HlmButton,
-    HlmInput,
-    HlmLabel,
-    HlmCardImports,
-  ],
+  imports: [HlmButton, HlmCardImports],
   template: `
     <div class="flex min-h-screen items-center justify-center bg-background px-4">
       <div hlmCard class="w-full max-w-sm">
@@ -39,59 +29,9 @@ const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrato
               </div>
             }
 
-            @if (auth.oidcEnabled()) {
-              <button hlmBtn type="button" class="w-full" (click)="onOidcLogin()">
-                Sign in with {{ auth.oidcDisplayName() }}
-              </button>
-            }
-
-            @if (auth.oidcEnabled() && auth.localLoginEnabled()) {
-              <div class="relative flex items-center justify-center">
-                <div class="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div class="w-full border-t border-border"></div>
-                </div>
-                <span class="relative bg-card px-2 text-xs text-muted-foreground">or</span>
-              </div>
-            }
-
-            @if (auth.localLoginEnabled()) {
-              <form [formGroup]="form" (ngSubmit)="onSubmit()" class="flex flex-col gap-4">
-                <div class="flex flex-col gap-2">
-                  <label hlmLabel for="email">Email</label>
-                  <input
-                    hlmInput
-                    id="email"
-                    type="email"
-                    formControlName="email"
-                    autocomplete="email"
-                    placeholder="name@example.com"
-                  />
-                  @if (submitted() && form.get('email')?.hasError('required')) {
-                    <p class="text-xs text-destructive">Email is required.</p>
-                  } @else if (submitted() && form.get('email')?.hasError('email')) {
-                    <p class="text-xs text-destructive">Enter a valid email address.</p>
-                  }
-                </div>
-
-                <div class="flex flex-col gap-2">
-                  <label hlmLabel for="password">Password</label>
-                  <input
-                    hlmInput
-                    id="password"
-                    type="password"
-                    formControlName="password"
-                    autocomplete="current-password"
-                  />
-                  @if (submitted() && form.get('password')?.hasError('required')) {
-                    <p class="text-xs text-destructive">Password is required.</p>
-                  }
-                </div>
-
-                <button hlmBtn type="submit" class="w-full" [disabled]="submitting()">
-                  {{ submitting() ? 'Signing in...' : 'Sign in' }}
-                </button>
-              </form>
-            }
+            <button hlmBtn type="button" class="w-full" (click)="onOidcLogin()">
+              Sign in with {{ auth.oidcDisplayName() }}
+            </button>
           </div>
         </div>
       </div>
@@ -99,19 +39,10 @@ const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrato
   `,
 })
 export class LoginComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private router = inject(Router);
   private route = inject(ActivatedRoute);
   protected auth = inject(AuthService);
 
   protected error = signal('');
-  protected submitting = signal(false);
-  protected submitted = signal(false);
-
-  protected form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
-    password: ['', Validators.required],
-  });
 
   ngOnInit(): void {
     const errorParam = this.route.snapshot.queryParamMap.get('error');
@@ -124,28 +55,5 @@ export class LoginComponent implements OnInit {
 
   onOidcLogin(): void {
     this.auth.loginWithOidc();
-  }
-
-  async onSubmit(): Promise<void> {
-    this.submitted.set(true);
-    if (this.form.invalid) return;
-
-    this.error.set('');
-    this.submitting.set(true);
-
-    try {
-      const { email, password } = this.form.getRawValue();
-      await this.auth.login(email, password);
-      this.router.navigate(['/documents']);
-    } catch (e) {
-      const code = extractErrorCode(e);
-      if (code === 'account_locked' || code === 'account_inactive') {
-        this.error.set(extractApiError(e, 'Invalid email or password.'));
-      } else {
-        this.error.set('Invalid email or password.');
-      }
-    } finally {
-      this.submitting.set(false);
-    }
   }
 }

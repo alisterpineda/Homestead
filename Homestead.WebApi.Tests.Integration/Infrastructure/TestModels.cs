@@ -10,7 +10,7 @@ internal record BulkReprocessResult(IReadOnlyList<Guid> JobIds);
 
 internal record BulkUpdateResult(int UpdatedCount);
 
-internal record UserItem(Guid Id, string DisplayName, string? Email, string Role, bool IsActive, bool HasPassword, DateTimeOffset CreatedAt);
+internal record UserItem(Guid Id, string DisplayName, string? Email, string Role, bool IsActive, DateTimeOffset CreatedAt);
 
 internal record UserInfoResult(Guid Id, string Email, string DisplayName, string Role, bool IsActive);
 

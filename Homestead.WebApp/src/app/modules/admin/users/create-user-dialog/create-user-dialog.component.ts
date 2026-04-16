@@ -32,7 +32,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
       <hlm-dialog-content *hlmDialogPortal="let ctx">
         <div hlmDialogHeader>
           <h2 hlmDialogTitle>Create User</h2>
-          <p hlmDialogDescription>Add a new user account.</p>
+          <p hlmDialogDescription>Add a new user account. The user will sign in via SSO.</p>
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
@@ -55,28 +55,6 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
               placeholder="Enter display name"
               [value]="displayName()"
               (input)="displayName.set(asInputValue($event))"
-            />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label hlmLabel for="create-user-password">Password</label>
-            <input
-              hlmInput
-              id="create-user-password"
-              type="password"
-              placeholder="Minimum 8 characters"
-              [value]="password()"
-              (input)="password.set(asInputValue($event))"
-            />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label hlmLabel for="create-user-confirm-password">Confirm Password</label>
-            <input
-              hlmInput
-              id="create-user-confirm-password"
-              type="password"
-              placeholder="Confirm password"
-              [value]="confirmPassword()"
-              (input)="confirmPassword.set(asInputValue($event))"
             />
           </div>
           <div class="flex flex-col gap-1.5">
@@ -115,8 +93,6 @@ export class CreateUserDialogComponent {
 
   email = signal('');
   displayName = signal('');
-  password = signal('');
-  confirmPassword = signal('');
   role = signal<AppRole>('Contributor');
   creating = signal(false);
   createError = signal('');
@@ -127,9 +103,7 @@ export class CreateUserDialogComponent {
 
   canSubmit = computed(() =>
     this.email().trim().length > 0 &&
-    this.displayName().trim().length > 0 &&
-    this.password().length >= 8 &&
-    this.password() === this.confirmPassword(),
+    this.displayName().trim().length > 0,
   );
 
   asInputValue(event: Event): string {
@@ -140,8 +114,6 @@ export class CreateUserDialogComponent {
     if (state === 'open') {
       this.email.set('');
       this.displayName.set('');
-      this.password.set('');
-      this.confirmPassword.set('');
       this.role.set('Contributor');
       this.creating.set(false);
       this.createError.set('');
@@ -159,7 +131,6 @@ export class CreateUserDialogComponent {
       body: {
         email: this.email().trim(),
         displayName: this.displayName().trim(),
-        password: this.password(),
         role: this.role(),
       },
     }).subscribe({

@@ -9,7 +9,6 @@ public class OidcOptions
     public string? MetadataAddress { get; set; }
     public string ClientId { get; set; } = "";
     public string ClientSecret { get; set; } = "";
-    public bool DisableLocalLogin { get; set; }
     public string DisplayName { get; set; } = "SSO";
     public List<string> AdditionalScopes { get; set; } = [];
     public string? RoleClaimType { get; set; }

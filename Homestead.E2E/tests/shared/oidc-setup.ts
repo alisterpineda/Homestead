@@ -1,6 +1,6 @@
 import { test as setup, expect } from '../../fixtures/app.fixture';
 import { KeycloakLoginPage } from '../../pages/keycloak-login.page';
-import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN } from '../../e2e.config';
+import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN, AUTH_STATE } from '../../e2e.config';
 
 export function defineOidcSetup() {
   setup(
@@ -30,12 +30,10 @@ export function defineOidcSetup() {
       await userContext.close();
 
       // 3. Admin activates the regular user via API
-      // First, get cookies from the admin's page context for API calls
       const cookies = await page.context().cookies();
       const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-
-      // Get users list
       const baseUrl = new URL(page.url()).origin;
+
       const usersResponse = await request.get(`${baseUrl}/api/v1/admin/users?Page=1&PageSize=50`, {
         headers: { Cookie: cookieHeader },
       });
@@ -46,7 +44,6 @@ export function defineOidcSetup() {
       );
       expect(regularUser).toBeDefined();
 
-      // Activate the regular user
       const activateResponse = await request.put(
         `${baseUrl}/api/v1/admin/users/${regularUser.id}`,
         {
@@ -61,7 +58,10 @@ export function defineOidcSetup() {
       );
       expect(activateResponse.ok()).toBeTruthy();
 
-      // 4. Log out admin so the login tests start fresh
+      // 4. Persist the admin's authenticated browser state for workflow tests
+      await page.context().storageState({ path: AUTH_STATE.adminPath });
+
+      // 5. Log out so the login tests start from an unauthenticated state
       await page.goto(`${baseUrl}/api/auth/logout`, { waitUntil: 'networkidle' });
     },
   );

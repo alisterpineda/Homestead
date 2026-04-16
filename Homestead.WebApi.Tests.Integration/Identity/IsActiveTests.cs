@@ -64,7 +64,6 @@ public class IsActiveTests : IntegrationTestBase
         {
             email = "activate-target@test.com",
             displayName = "Activate Target",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
@@ -114,7 +113,6 @@ public class IsActiveTests : IntegrationTestBase
         {
             email = "deactivate-target@test.com",
             displayName = "Deactivate Target",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();

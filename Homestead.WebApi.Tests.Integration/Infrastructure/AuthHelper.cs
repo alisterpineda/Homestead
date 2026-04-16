@@ -39,7 +39,6 @@ public static class AuthHelper
         var prefix = role.ToLowerInvariant();
         email ??= $"{prefix}{counter}@test.com";
         displayName ??= $"{role} {counter}";
-        const string password = "TestPassword123!";
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -58,24 +57,14 @@ public static class AuthHelper
             IsActive = isActive
         };
 
-        var result = await userManager.CreateAsync(user, password);
+        var result = await userManager.CreateAsync(user);
         if (!result.Succeeded)
             throw new Exception($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
 
         await userManager.AddToRoleAsync(user, role);
 
-        if (isActive)
-        {
-            var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
-            loginResponse.EnsureSuccessStatusCode();
-        }
-        else
-        {
-            // Inactive users can't login via the endpoint, so use the force-login test endpoint
-            // which bypasses the IsActive check by calling SignInManager.SignInAsync directly
-            var loginResponse = await client.GetAsync($"/test/force-login?email={Uri.EscapeDataString(email)}");
-            loginResponse.EnsureSuccessStatusCode();
-        }
+        var loginResponse = await client.GetAsync($"/test/force-login?email={Uri.EscapeDataString(email)}");
+        loginResponse.EnsureSuccessStatusCode();
 
         return client;
     }

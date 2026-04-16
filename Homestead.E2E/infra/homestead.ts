@@ -8,22 +8,11 @@ import { KEYCLOAK_HOST_PORT } from './keycloak.js';
 
 export const DB_PASSWORD = 'e2e-test-password';
 
-interface BaseConfig {
+export interface HomesteadConfig {
   name: string;
   hostPort: number;
   dbName: string;
 }
-
-interface LocalOnlyConfig extends BaseConfig {
-  oidc: false;
-}
-
-interface OidcConfig extends BaseConfig {
-  oidc: true;
-  disableLocalLogin: boolean;
-}
-
-export type HomesteadConfig = LocalOnlyConfig | OidcConfig;
 
 const COMMON_OIDC = {
   OIDC_AUTHORITY: `http://localhost:${KEYCLOAK_HOST_PORT}/realms/homestead`,
@@ -38,24 +27,9 @@ const COMMON_OIDC = {
 
 export const HOMESTEAD_CONFIGS: HomesteadConfig[] = [
   {
-    name: 'homestead-local',
-    hostPort: 3101,
-    dbName: 'homestead_local',
-    oidc: false,
-  },
-  {
-    name: 'homestead-oidc-local',
-    hostPort: 3102,
-    dbName: 'homestead_oidc_local',
-    oidc: true,
-    disableLocalLogin: false,
-  },
-  {
-    name: 'homestead-oidc-only',
+    name: 'homestead-oidc',
     hostPort: 3103,
-    dbName: 'homestead_oidc_only',
-    oidc: true,
-    disableLocalLogin: true,
+    dbName: 'homestead_oidc',
   },
 ];
 
@@ -68,15 +42,9 @@ export async function startHomestead(
     DB_HOST: 'postgres',
     DB_NAME: config.dbName,
     DB_PASSWORD,
+    ASPNETCORE_ENVIRONMENT: 'Development',
+    ...COMMON_OIDC,
   };
-
-  if (config.oidc) {
-    Object.assign(env, COMMON_OIDC);
-    env.ASPNETCORE_ENVIRONMENT = 'Development';
-    if (config.disableLocalLogin) {
-      env.OIDC_DISABLE_LOCAL_LOGIN = 'true';
-    }
-  }
 
   return new GenericContainer(imageName)
     .withNetwork(network)

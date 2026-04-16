@@ -13,9 +13,5 @@ export const authGuard: CanActivateFn = () => {
     return true;
   }
 
-  if (auth.needsSetup() && !auth.oidcEnabled()) {
-    return router.createUrlTree(['/setup']);
-  }
-
   return router.createUrlTree(['/login']);
 };

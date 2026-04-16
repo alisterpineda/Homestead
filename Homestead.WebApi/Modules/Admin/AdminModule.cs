@@ -2,7 +2,6 @@ using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Users.BulkDeleteUsers;
-using Homestead.WebApi.Modules.Admin.Features.Users.ChangeUserPassword;
 using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
 using Homestead.WebApi.Modules.Admin.Features.Users.CreateUser;
 using Homestead.WebApi.Modules.Admin.Features.Groups.DeleteGroup;
@@ -39,7 +38,6 @@ public static class AdminModule
         UpdateUserEndpoint.Map(v1);
         DeleteUserEndpoint.Map(v1);
         BulkDeleteUsersEndpoint.Map(v1);
-        ChangeUserPasswordEndpoint.Map(v1);
 
         var groups = app.MapGroup("/api/v{version:apiVersion}/admin/groups")
             .HasApiVersion(1, 0)

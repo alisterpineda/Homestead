@@ -72,7 +72,6 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
                 Email = user.Email,
                 Role = request.Role,
                 IsActive = user.IsActive,
-                HasPassword = await userManager.HasPasswordAsync(user),
                 CreatedAt = user.CreatedAt
             };
         });

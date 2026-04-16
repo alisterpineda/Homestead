@@ -176,7 +176,6 @@ import { toast } from '@spartan-ng/brain/sonner';
       [state]="sheetState()"
       (saved)="onSheetSaved()"
       (closed)="onSheetClosed()"
-      (passwordChanged)="onRefresh()"
     />
   `,
 })

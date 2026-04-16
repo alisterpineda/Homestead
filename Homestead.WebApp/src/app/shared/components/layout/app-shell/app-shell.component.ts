@@ -224,8 +224,8 @@ export class AppShellComponent {
     this.logoutDialog()?.open();
   }
 
-  protected async onLogout(ctx: { close: () => void }): Promise<void> {
+  protected onLogout(ctx: { close: () => void }): void {
     ctx.close();
-    await this.auth.logout();
+    this.auth.logout();
   }
 }

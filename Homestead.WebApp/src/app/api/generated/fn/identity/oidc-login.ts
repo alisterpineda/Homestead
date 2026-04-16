@@ -7,16 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { RegisterCommand } from '../../models/register-command';
 
-export interface Register$Params {
-      body: RegisterCommand
+export interface OidcLogin$Params {
+  returnUrl?: string;
 }
 
-export function register(http: HttpClient, rootUrl: string, params: Register$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, register.PATH, 'post');
+export function oidcLogin(http: HttpClient, rootUrl: string, params?: OidcLogin$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, oidcLogin.PATH, 'get');
   if (params) {
-    rb.body(params.body, 'application/json');
+    rb.query('returnUrl', params.returnUrl, {});
   }
 
   return http.request(
@@ -29,4 +28,4 @@ export function register(http: HttpClient, rootUrl: string, params: Register$Par
   );
 }
 
-register.PATH = '/api/auth/register';
+oidcLogin.PATH = '/api/auth/oidc/login';

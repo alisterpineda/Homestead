@@ -8,8 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
 /// <summary>
-/// Registers a test-only middleware that signs in a user by email, bypassing the IsActive check.
-/// This allows integration tests to obtain an authenticated session for inactive users.
+/// Test-only middleware that signs in a user by email. Bypasses the IsActive check
+/// so inactive-user test cases can obtain an authenticated session.
 /// </summary>
 public class TestForceLoginStartupFilter : IStartupFilter
 {

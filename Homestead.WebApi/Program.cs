@@ -61,10 +61,6 @@ if (!string.IsNullOrEmpty(oidcAuthority))
     builder.Configuration["Oidc:AdminClaimValue"] =
         Environment.GetEnvironmentVariable("OIDC_ADMIN_CLAIM_VALUE") ?? "";
 
-    var disableLocal = Environment.GetEnvironmentVariable("OIDC_DISABLE_LOCAL_LOGIN");
-    if (!string.IsNullOrEmpty(disableLocal))
-        builder.Configuration["Oidc:DisableLocalLogin"] = disableLocal;
-
     var additionalScopes = Environment.GetEnvironmentVariable("OIDC_ADDITIONAL_SCOPES");
     if (!string.IsNullOrEmpty(additionalScopes))
     {
@@ -176,6 +172,10 @@ builder.Services.AddOpenApi("v1", options =>
 
     options.AddOperationTransformer<ProblemDetailsResponseTransformer>();
 });
+
+// Hosted service (not a service-registration check) so build-time OpenAPI
+// generation — which builds the host but never calls StartAsync — bypasses it.
+builder.Services.AddHostedService<Homestead.WebApi.Authentication.OidcStartupValidator>();
 
 var app = builder.Build();
 

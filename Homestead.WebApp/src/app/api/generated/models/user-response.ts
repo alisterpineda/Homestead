@@ -6,7 +6,6 @@ export interface UserResponse {
   createdAt: string;
   displayName: string;
   email?: (string | null);
-  hasPassword: boolean;
   id: string;
   isActive: boolean;
   role: AppRole;

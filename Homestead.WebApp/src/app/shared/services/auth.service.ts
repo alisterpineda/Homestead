@@ -1,10 +1,8 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { GetStatusResponse } from '@/api/generated/models/get-status-response';
 import { GetUserInfoResponse } from '@/api/generated/models/get-user-info-response';
-import { OidcStatusResponse } from '@/api/generated/models/oidc-status-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 
 /** Role hierarchy levels — higher number = more access. */
@@ -13,15 +11,14 @@ const ROLE_LEVEL: Record<string, number> = { Admin: 3, Contributor: 2, Viewer: 1
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
-  private router = inject(Router);
 
   readonly initialized = signal(false);
-  readonly needsSetup = signal(false);
   readonly isAuthenticated = signal(false);
   readonly isActive = signal(true);
   readonly userName = signal('');
   readonly userEmail = signal('');
   readonly role = signal<AppRole | ''>('');
+  readonly oidcDisplayName = signal('SSO');
   readonly isAdmin = computed(() => this.role() === 'Admin');
   readonly canWrite = computed(() => this.roleLevel() >= ROLE_LEVEL['Contributor']);
   readonly canRead = computed(() => this.roleLevel() >= ROLE_LEVEL['Viewer']);
@@ -33,11 +30,6 @@ export class AuthService {
     return (ROLE_LEVEL[this.role()] ?? -1) >= (ROLE_LEVEL[required] ?? Infinity);
   }
 
-  private readonly oidcStatus = signal<OidcStatusResponse | null>(null);
-  readonly oidcEnabled = computed(() => this.oidcStatus() !== null);
-  readonly oidcDisplayName = computed(() => this.oidcStatus()?.displayName ?? 'SSO');
-  readonly localLoginEnabled = computed(() => !this.oidcStatus()?.disableLocalLogin);
-
   async initialize(): Promise<void> {
     try {
       const [statusResult, userResult] = await Promise.allSettled([
@@ -46,11 +38,10 @@ export class AuthService {
       ]);
 
       if (statusResult.status === 'fulfilled') {
-        this.needsSetup.set(statusResult.value.needsSetup);
-        this.oidcStatus.set(statusResult.value.oidc ?? null);
+        this.oidcDisplayName.set(statusResult.value.displayName);
       }
 
-      if (!this.needsSetup() && userResult.status === 'fulfilled') {
+      if (userResult.status === 'fulfilled') {
         this.setUser(userResult.value);
       }
     } catch {
@@ -60,48 +51,17 @@ export class AuthService {
     }
   }
 
-  async login(email: string, password: string): Promise<void> {
-    await firstValueFrom(
-      this.http.post('/api/auth/login?useCookies=true', { email, password }),
-    );
-    await this.fetchAndSetUser();
-  }
-
   loginWithOidc(returnUrl = '/documents'): void {
-    const fullReturnUrl = window.location.origin + returnUrl;
-    window.location.href = `/api/auth/oidc/login?returnUrl=${encodeURIComponent(fullReturnUrl)}`;
+    this.redirectToOidc('login', returnUrl);
   }
 
-  async setup(email: string, displayName: string, password: string): Promise<void> {
-    await firstValueFrom(
-      this.http.post('/api/auth/register', { email, displayName, password }),
-    );
-    await this.fetchAndSetUser();
-    this.needsSetup.set(false);
+  logout(): void {
+    this.redirectToOidc('logout', '/login');
   }
 
-  async logout(): Promise<void> {
-    if (this.oidcEnabled()) {
-      // Full page redirect for OIDC provider signout
-      const returnUrl = window.location.origin + '/login';
-      window.location.href = `/api/auth/oidc/logout?returnUrl=${encodeURIComponent(returnUrl)}`;
-      return;
-    }
-
-    await firstValueFrom(this.http.post('/api/auth/logout', {}));
-    this.isAuthenticated.set(false);
-    this.isActive.set(true);
-    this.userName.set('');
-    this.userEmail.set('');
-    this.role.set('');
-    this.router.navigate(['/login']);
-  }
-
-  private async fetchAndSetUser(): Promise<void> {
-    const user = await firstValueFrom(
-      this.http.get<GetUserInfoResponse>('/api/auth/user-info'),
-    );
-    this.setUser(user);
+  private redirectToOidc(action: 'login' | 'logout', returnPath: string): void {
+    const fullReturnUrl = window.location.origin + returnPath;
+    window.location.href = `/api/auth/oidc/${action}?returnUrl=${encodeURIComponent(fullReturnUrl)}`;
   }
 
   private setUser(user: GetUserInfoResponse): void {

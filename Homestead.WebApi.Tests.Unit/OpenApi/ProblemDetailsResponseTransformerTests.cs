@@ -96,14 +96,6 @@ public class ProblemDetailsResponseTransformerTests
         Assert.DoesNotContain("403", codes);
     }
 
-    [Fact]
-    public void Anonymous_login_endpoint_has_no_transformer_added_403()
-    {
-        var codes = GetResponseCodes("/api/auth/login", "post");
-        // Login is AllowAnonymous — 401 is manually declared (business response), not from transformer
-        Assert.DoesNotContain("403", codes);
-    }
-
     // --- Mutation endpoints get 400 ---
 
     [Theory]

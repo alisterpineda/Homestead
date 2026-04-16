@@ -1,116 +1,61 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter, ActivatedRoute } from '@angular/router';
 import { LoginComponent } from './login.component';
+import { AuthService } from '@/shared/services/auth.service';
+
+function configure(errorParam: string | null): ComponentFixture<LoginComponent> {
+  TestBed.configureTestingModule({
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideRouter([]),
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { queryParamMap: { get: (k: string) => (k === 'error' ? errorParam : null) } },
+        },
+      },
+    ],
+  });
+  const fixture = TestBed.createComponent(LoginComponent);
+  fixture.detectChanges();
+  return fixture;
+}
 
 describe('LoginComponent', () => {
-  let fixture: ComponentFixture<LoginComponent>;
-  let component: LoginComponent;
-  let httpTesting: HttpTestingController;
-  let router: Router;
-
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([{ path: 'documents', component: LoginComponent }]),
-      ],
-    });
-    fixture = TestBed.createComponent(LoginComponent);
-    component = fixture.componentInstance;
-    httpTesting = TestBed.inject(HttpTestingController);
-    router = TestBed.inject(Router);
+  it('renders the SSO button with the configured display name', () => {
+    const fixture = configure(null);
+    const auth = TestBed.inject(AuthService);
+    auth.oidcDisplayName.set('Keycloak');
     fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('button');
+    expect(button).toBeTruthy();
+    expect(button.textContent).toContain('Sign in with Keycloak');
   });
 
-  afterEach(() => {
-    httpTesting.verify();
+  it('delegates SSO click to AuthService.loginWithOidc', () => {
+    const fixture = configure(null);
+    const auth = TestBed.inject(AuthService);
+    const spy = vi.spyOn(auth, 'loginWithOidc').mockImplementation(() => undefined);
+
+    const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+    button.click();
+
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it('should display lockout error when API returns account_locked', async () => {
-    const comp = component as any;
-    comp.form.setValue({ email: 'test@test.com', password: 'password' });
-
-    const submitPromise = comp.onSubmit();
-
-    const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    req.flush({
-      type: 'https://tools.ietf.org/html/rfc9110#section-15.5.2',
-      title: 'Unauthorized',
-      status: 401,
-      detail: 'Too many failed login attempts. Your account has been temporarily locked.',
-      errorCode: 'account_locked',
-    }, { status: 401, statusText: 'Unauthorized' });
-
-    await submitPromise;
-
-    expect(comp.error()).toBe(
-      'Too many failed login attempts. Your account has been temporarily locked.',
-    );
+  it('shows the OIDC-failed error message when ?error=oidc-failed', () => {
+    const fixture = configure('oidc-failed');
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Single sign-on failed');
   });
 
-  it('should display inactive error when API returns account_inactive', async () => {
-    const comp = component as any;
-    comp.form.setValue({ email: 'test@test.com', password: 'password' });
-
-    const submitPromise = comp.onSubmit();
-
-    const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    req.flush({
-      type: 'https://tools.ietf.org/html/rfc9110#section-15.5.2',
-      title: 'Unauthorized',
-      status: 401,
-      detail: 'Your account is inactive. Please contact an administrator.',
-      errorCode: 'account_inactive',
-    }, { status: 401, statusText: 'Unauthorized' });
-
-    await submitPromise;
-
-    expect(comp.error()).toBe(
-      'Your account is inactive. Please contact an administrator.',
-    );
-  });
-
-  it('should display generic error for other 401 responses', async () => {
-    const comp = component as any;
-    comp.form.setValue({ email: 'test@test.com', password: 'wrong' });
-
-    const submitPromise = comp.onSubmit();
-
-    const req = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    req.flush(null, { status: 401, statusText: 'Unauthorized' });
-
-    await submitPromise;
-
-    expect(comp.error()).toBe('Invalid email or password.');
-  });
-
-  it('should navigate to documents on successful login', async () => {
-    const navigateSpy = vi.spyOn(router, 'navigate');
-    const comp = component as any;
-    comp.form.setValue({ email: 'test@test.com', password: 'password' });
-
-    const submitPromise = comp.onSubmit();
-
-    const loginReq = httpTesting.expectOne('/api/auth/login?useCookies=true');
-    loginReq.flush(null, { status: 200, statusText: 'OK' });
-
-    // Allow the microtask from the login POST to resolve before the next HTTP call
-    await Promise.resolve();
-
-    const userInfoReq = httpTesting.expectOne('/api/auth/user-info');
-    userInfoReq.flush({
-      id: '00000000-0000-0000-0000-000000000001',
-      email: 'test@test.com',
-      displayName: 'Test User',
-      role: 'Admin',
-      isActive: true,
-    });
-
-    await submitPromise;
-
-    expect(navigateSpy).toHaveBeenCalledWith(['/documents']);
+  it('shows the account-inactive message when ?error=account-inactive', () => {
+    const fixture = configure('account-inactive');
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('account is inactive');
   });
 });

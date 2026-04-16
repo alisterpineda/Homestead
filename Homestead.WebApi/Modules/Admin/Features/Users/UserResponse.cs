@@ -9,6 +9,5 @@ public record UserResponse
     public string? Email { get; init; }
     public required AppRole Role { get; init; }
     public required bool IsActive { get; init; }
-    public required bool HasPassword { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 }

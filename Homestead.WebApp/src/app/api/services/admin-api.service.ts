@@ -7,7 +7,6 @@ import { getUsers } from '@/api/generated/fn/admin/get-users';
 import { createUser } from '@/api/generated/fn/admin/create-user';
 import { updateUser } from '@/api/generated/fn/admin/update-user';
 import { bulkDeleteUsers } from '@/api/generated/fn/admin/bulk-delete-users';
-import { changeUserPassword } from '@/api/generated/fn/admin/change-user-password';
 import { getGroups } from '@/api/generated/fn/admin/get-groups';
 import { getGroup } from '@/api/generated/fn/admin/get-group';
 import { createGroup } from '@/api/generated/fn/admin/create-group';
@@ -37,7 +36,6 @@ export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
 export type { CreateUser$Params } from '@/api/generated/fn/admin/create-user';
 export type { UpdateUser$Params } from '@/api/generated/fn/admin/update-user';
 export type { BulkDeleteUsers$Params } from '@/api/generated/fn/admin/bulk-delete-users';
-export type { ChangeUserPassword$Params } from '@/api/generated/fn/admin/change-user-password';
 export type { GetGroups$Params } from '@/api/generated/fn/admin/get-groups';
 export type { GetGroup$Params } from '@/api/generated/fn/admin/get-group';
 export type { CreateGroup$Params } from '@/api/generated/fn/admin/create-group';
@@ -71,10 +69,6 @@ export class AdminApiService {
 
   bulkDeleteUsers(params: Parameters<typeof bulkDeleteUsers>[2]): Observable<BulkDeleteUsersResponse> {
     return bulkDeleteUsers(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
-  }
-
-  changeUserPassword(params: Parameters<typeof changeUserPassword>[2]): Observable<void> {
-    return changeUserPassword(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   getGroups(params: Parameters<typeof getGroups>[2]): Observable<PaginatedResponseOfGroupResponse> {

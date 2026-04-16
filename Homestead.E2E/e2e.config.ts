@@ -1,21 +1,3 @@
-export const LOCAL_ADMIN = {
-  email: 'admin@test.com',
-  displayName: 'Admin User',
-  password: 'Password123!',
-};
-
-export const LOCAL_USER = {
-  email: 'user@test.com',
-  displayName: 'Regular User',
-  password: 'Password123!',
-};
-
-export const LOCAL_INACTIVE_USER = {
-  email: 'inactive@test.com',
-  displayName: 'Inactive User',
-  password: 'Password123!',
-};
-
 export const KEYCLOAK_ADMIN = { email: 'admin@test.com', password: 'admin123' };
 export const KEYCLOAK_USER = { email: 'user@test.com', password: 'user123' };
 

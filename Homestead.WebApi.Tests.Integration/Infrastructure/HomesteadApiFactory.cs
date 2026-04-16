@@ -38,6 +38,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("FileStorage:MediaPath", _mediaPath);
         builder.UseSetting("FileStorage:CachePath", _cachePath);
 
+        // Satisfy OidcStartupValidator. OIDC is never actually exercised in integration tests
+        // (auth happens through /test/force-login), so placeholder values are fine.
+        builder.UseSetting("Oidc:Authority", "https://test-oidc.local");
+        builder.UseSetting("Oidc:ClientId", "test-client");
+        builder.UseSetting("Oidc:ClientSecret", "test-secret");
+
         builder.ConfigureServices(services =>
         {
             // Register test-only force-login endpoint for inactive user authentication

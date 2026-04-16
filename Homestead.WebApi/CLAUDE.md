@@ -15,26 +15,25 @@ dotnet ef migrations add <MigrationName> --project Homestead.WebApi
 
 ## Authentication
 
-Uses ASP.NET Core Identity with cookie-based auth, plus optional OIDC:
+OIDC is the only sign-in method. ASP.NET Core Identity stays as the user store and cookie machinery; all local-user endpoints (register/login/password-reset) have been removed.
 
-- `AppUser` extends `IdentityUser<Guid>` with custom `DisplayName` and `CreatedAt` properties
+- `AppUser` extends `IdentityUser<Guid>` with custom `DisplayName`, `IsActive`, and `CreatedAt` properties
 - `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
-- Identity API endpoints mapped at `/api/auth` via `MapIdentityApi<AppUser>()`
-- Custom endpoints: `/api/auth/register` (setup only — returns 403 when users exist), `/api/auth/logout`, `/api/auth/user-info`
-- `GET /api/status` (anonymous) returns `{ needsSetup, oidc? }` — used by frontend to decide setup vs login flow and whether to show SSO button
+- Auth endpoints at `/api/auth`: `/logout`, `/user-info`, `/oidc/login`, `/oidc/callback`, `/oidc/logout`
+- `GET /api/status` (anonymous) returns `{ displayName }` — used by the frontend to label the SSO button
 - Cookie configured with `HttpOnly`, `SameSite=Lax` (dev) / `Strict` (prod), 14-day sliding expiration
 - SPA-friendly: returns 401/403 status codes instead of redirects
 - Protected endpoints use explicit `.RequireAuthorization()` (on modules, hub, and custom auth endpoints)
 - `ICurrentUserAccessor.UserId` reads `ClaimTypes.NameIdentifier` from the cookie claims
 - All Identity tables are in the `identity` schema (configured in `Persistence/Configurations/IdentitySchemaConfiguration.cs`)
 
-### OIDC (Optional)
+### OIDC (Required)
 
-Opt-in external authentication via any OpenID Connect provider. When OIDC config is absent, the app behaves exactly as before.
+OIDC is a startup requirement — the app throws at `IHostedService` start-up (`OidcStartupValidator`) if `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` are not all set. The validator skips itself when the entry assembly is `GetDocument.Insider` (build-time OpenAPI generation).
 
-- Config in `Authentication/OidcOptions.cs` — bound from `Oidc:*` config section. `IsConfigured` property gates all OIDC behavior
-- Docker env vars: `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME`, `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_CLAIM_VALUE`, `OIDC_DISABLE_LOCAL_LOGIN`, `OIDC_ADDITIONAL_SCOPES` — mapped in `Program.cs`
-- Endpoints (conditionally registered in `IdentityModule`): `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
+- Config in `Authentication/OidcOptions.cs` — bound from `Oidc:*` config section. `IsConfigured` is true when Authority, ClientId, and ClientSecret are all set
+- Docker env vars: `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME`, `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_CLAIM_VALUE`, `OIDC_ADDITIONAL_SCOPES` — mapped in `Program.cs`
+- Endpoints registered in `IdentityModule`: `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
 - `OidcUserProvisioner` auto-provisions users from OIDC claims, links by email, syncs Admin role from a configurable claim
 - Uses `IdentityConstants.ExternalScheme` for the OIDC sign-in, then signs into the application cookie in the callback
 

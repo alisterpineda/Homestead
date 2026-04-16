@@ -148,7 +148,6 @@ public class RoleAuthorizationTests : IntegrationTestBase
         {
             email = "role-change@test.com",
             displayName = "Role Change",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();

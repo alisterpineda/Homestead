@@ -8,7 +8,7 @@ public class StatusTests : IntegrationTestBase
     public StatusTests(PostgresFixture postgres) : base(postgres) { }
 
     [Fact]
-    public async Task GetStatus_NoUsers_ReturnsNeedsSetup()
+    public async Task GetStatus_ReturnsDisplayName()
     {
         var client = CreateAnonymousClient();
 
@@ -16,34 +16,8 @@ public class StatusTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        Assert.True(body!.NeedsSetup);
+        Assert.False(string.IsNullOrEmpty(body!.DisplayName));
     }
 
-    [Fact]
-    public async Task GetStatus_WithUsers_ReturnsReady()
-    {
-        await CreateAdminClientAsync();
-        var client = CreateAnonymousClient();
-
-        var response = await client.GetAsync("/api/status", CT);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        Assert.False(body!.NeedsSetup);
-    }
-
-    [Fact]
-    public async Task GetStatus_NoOidc_OmitsOidcField()
-    {
-        var client = CreateAnonymousClient();
-
-        var response = await client.GetAsync("/api/status", CT);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<StatusResult>(CT);
-        Assert.Null(body!.Oidc);
-    }
-
-    private record OidcStatus(string DisplayName, bool DisableLocalLogin);
-    private record StatusResult(bool NeedsSetup, OidcStatus? Oidc);
+    private record StatusResult(string DisplayName);
 }

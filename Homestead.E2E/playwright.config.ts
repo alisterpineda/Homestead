@@ -6,9 +6,7 @@ const baseUrl = (name: string) => {
   return `http://localhost:${config.hostPort}`;
 };
 
-const LOCAL_URL = baseUrl('homestead-local');
-const OIDC_LOCAL_URL = baseUrl('homestead-oidc-local');
-const OIDC_ONLY_URL = baseUrl('homestead-oidc-only');
+const OIDC_URL = baseUrl('homestead-oidc');
 
 export default defineConfig({
   testDir: './tests',
@@ -32,99 +30,52 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'local-only',
-      testDir: './tests/local-only',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
-    },
-    {
-      name: 'local-auth-setup',
-      testMatch: /local-auth-setup\.ts/,
-      use: { baseURL: LOCAL_URL },
-      dependencies: ['local-only'],
-    },
-    {
-      name: 'local-admin',
-      testDir: './tests/local-admin',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
-      dependencies: ['local-auth-setup'],
-    },
-    {
-      name: 'local-user',
-      testDir: './tests/local-user',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
-      dependencies: ['local-auth-setup'],
-    },
-    {
-      name: 'local-inactive',
-      testDir: './tests/local-inactive',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL },
-      dependencies: ['local-auth-setup'],
-    },
-    // --- Business workflow tests (local-only instance) ---
-    {
-      name: 'local-data-setup',
-      testMatch: /local-data-setup\.ts/,
-      use: { baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
-      dependencies: ['local-auth-setup'],
-    },
-    {
-      name: 'local-upload',
-      testDir: './tests/local-upload',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
-      dependencies: ['local-data-setup'],
-    },
-    {
-      name: 'local-tags',
-      testDir: './tests/local-tags',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
-      dependencies: ['local-upload'],
-    },
-    {
-      name: 'local-bulk-ops',
-      testDir: './tests/local-bulk-ops',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
-      dependencies: ['local-upload'],
-    },
-    {
-      name: 'local-trash',
-      testDir: './tests/local-trash',
-      use: { ...devices['Desktop Chrome'], baseURL: LOCAL_URL, storageState: '.auth/admin.json' },
-      dependencies: ['local-bulk-ops'],
-    },
-    // --- OIDC tests ---
-    {
-      name: 'oidc-local',
-      testDir: './tests/oidc-local',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
-    },
-    {
-      name: 'oidc-local-setup',
-      testDir: './tests/oidc-local-setup',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
-      dependencies: ['oidc-local'],
-    },
-    {
-      name: 'oidc-local-login',
-      testDir: './tests/oidc-local-login',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_LOCAL_URL },
-      dependencies: ['oidc-local-setup'],
-    },
-    {
       name: 'oidc-only',
       testDir: './tests/oidc-only',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
     },
     {
       name: 'oidc-only-setup',
       testDir: './tests/oidc-only-setup',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
       dependencies: ['oidc-only'],
     },
     {
       name: 'oidc-only-login',
       testDir: './tests/oidc-only-login',
-      use: { ...devices['Desktop Chrome'], baseURL: OIDC_ONLY_URL },
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
       dependencies: ['oidc-only-setup'],
+    },
+    // --- Business workflow tests (use admin storageState from oidc-only-setup) ---
+    {
+      name: 'data-setup',
+      testMatch: /data-setup\.ts/,
+      use: { baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['oidc-only-setup'],
+    },
+    {
+      name: 'upload',
+      testDir: './tests/upload',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['data-setup'],
+    },
+    {
+      name: 'tags',
+      testDir: './tests/tags',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['upload'],
+    },
+    {
+      name: 'bulk-ops',
+      testDir: './tests/bulk-ops',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['upload'],
+    },
+    {
+      name: 'trash',
+      testDir: './tests/trash',
+      use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['bulk-ops'],
     },
   ],
 });

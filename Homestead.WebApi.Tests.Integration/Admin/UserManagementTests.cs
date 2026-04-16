@@ -38,7 +38,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "newuser@test.com",
             displayName = "New User",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
 
@@ -47,23 +46,6 @@ public class UserManagementTests : IntegrationTestBase
         Assert.Equal("newuser@test.com", body!.Email);
         Assert.Equal("New User", body.DisplayName);
         Assert.Equal("Contributor", body.Role);
-        Assert.True(body.HasPassword);
-    }
-
-    [Fact]
-    public async Task CreateUser_InvalidPassword_Returns400()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var response = await client.PostAsJsonAsync("/api/v1/admin/users", new
-        {
-            email = "badpw@test.com",
-            displayName = "Bad PW",
-            password = "short",
-            role = "Contributor"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -75,7 +57,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "update-target@test.com",
             displayName = "Original",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
@@ -103,7 +84,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "todelete@test.com",
             displayName = "Delete Me",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
@@ -137,7 +117,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "bulk1@test.com",
             displayName = "Bulk 1",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         var u1 = await r1.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -146,7 +125,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "bulk2@test.com",
             displayName = "Bulk 2",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         var u2 = await r2.Content.ReadFromJsonAsync<UserItem>(CT);
@@ -180,7 +158,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "active-check@test.com",
             displayName = "Active Check",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
 
@@ -210,7 +187,6 @@ public class UserManagementTests : IntegrationTestBase
         {
             email = "toggle-active@test.com",
             displayName = "Toggle Active",
-            password = "Password123!",
             role = "Contributor"
         }, CT);
         createResponse.EnsureSuccessStatusCode();
@@ -240,123 +216,6 @@ public class UserManagementTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, activateResponse.StatusCode);
         var activated = await activateResponse.Content.ReadFromJsonAsync<UserItem>(CT);
         Assert.True(activated!.IsActive);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_AsAdmin_Returns204()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var createResponse = await client.PostAsJsonAsync("/api/v1/admin/users", new
-        {
-            email = "changepw@test.com",
-            displayName = "Change PW",
-            password = "Password123!",
-            role = "Contributor"
-        }, CT);
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
-
-        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{created!.Id}/password", new
-        {
-            password = "NewPassword123!"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_InvalidPassword_ReturnsBadRequest()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var createResponse = await client.PostAsJsonAsync("/api/v1/admin/users", new
-        {
-            email = "changepw-invalid@test.com",
-            displayName = "Change PW Invalid",
-            password = "Password123!",
-            role = "Contributor"
-        }, CT);
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
-
-        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{created!.Id}/password", new
-        {
-            password = "short"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_NonExistentUser_Returns404()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{Guid.NewGuid()}/password", new
-        {
-            password = "NewPassword123!"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_AsNonAdmin_Returns403()
-    {
-        var client = await CreateUserClientAsync();
-
-        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{Guid.NewGuid()}/password", new
-        {
-            password = "NewPassword123!"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_Unauthenticated_Returns401()
-    {
-        var client = CreateAnonymousClient();
-
-        var response = await client.PutAsJsonAsync($"/api/v1/admin/users/{Guid.NewGuid()}/password", new
-        {
-            password = "NewPassword123!"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ChangeUserPassword_ThenLoginWithNewPassword()
-    {
-        var client = await CreateAdminClientAsync();
-
-        var createResponse = await client.PostAsJsonAsync("/api/v1/admin/users", new
-        {
-            email = "changepw-login@test.com",
-            displayName = "Change PW Login",
-            password = "Password123!",
-            role = "Contributor"
-        }, CT);
-        createResponse.EnsureSuccessStatusCode();
-        var created = await createResponse.Content.ReadFromJsonAsync<UserItem>(CT);
-
-        var changeResponse = await client.PutAsJsonAsync($"/api/v1/admin/users/{created!.Id}/password", new
-        {
-            password = "NewPassword123!"
-        }, CT);
-        Assert.Equal(HttpStatusCode.NoContent, changeResponse.StatusCode);
-
-        // Login with new password
-        var loginClient = CreateAnonymousClient();
-        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/login", new
-        {
-            email = "changepw-login@test.com",
-            password = "NewPassword123!"
-        }, CT);
-
-        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
     }
 
     [Fact]
@@ -411,5 +270,4 @@ public class UserManagementTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<UserItem>(CT);
         Assert.Equal("Updated Admin Name", body!.DisplayName);
     }
-
 }

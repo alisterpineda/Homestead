@@ -7,7 +7,6 @@ import {
   computed,
   inject,
   effect,
-  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
@@ -24,7 +23,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { ChangePasswordDialogComponent } from '../change-password-dialog/change-password-dialog.component';
 
 @Component({
   selector: 'app-edit-user-sheet',
@@ -37,7 +35,6 @@ import { ChangePasswordDialogComponent } from '../change-password-dialog/change-
     HlmInput,
     HlmCheckboxImports,
         HlmSelectImports,
-    ChangePasswordDialogComponent,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -108,25 +105,12 @@ import { ChangePasswordDialogComponent } from '../change-password-dialog/change-
         }
 
         <hlm-sheet-footer class="flex flex-col gap-2">
-          @if (user(); as u) {
-            <button hlmBtn variant="outline" class="w-full" (click)="openPasswordDialog()">
-              {{ u.hasPassword ? 'Change Password' : 'Set Password' }}
-            </button>
-          }
           <button hlmBtn class="w-full" (click)="handleSave()" [disabled]="!hasChanges() || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
       </hlm-sheet-content>
     </hlm-sheet>
-
-    @if (user(); as u) {
-      <app-change-password-dialog
-        [userId]="u.id"
-        [hasPassword]="u.hasPassword"
-        (passwordChanged)="passwordChanged.emit()"
-      />
-    }
   `,
 })
 export class EditUserSheetComponent {
@@ -134,15 +118,12 @@ export class EditUserSheetComponent {
   state = input<BrnDialogState>('closed');
   saved = output<void>();
   closed = output<void>();
-  passwordChanged = output<void>();
 
   editEmail = signal('');
   editDisplayName = signal('');
   editRole = signal<AppRole>('Contributor');
   editIsActive = signal(true);
   saving = signal(false);
-
-  private changePasswordDialog = viewChild(ChangePasswordDialogComponent);
 
   hasChanges = computed(() => {
     const u = this.user();
@@ -179,10 +160,6 @@ export class EditUserSheetComponent {
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
-  }
-
-  openPasswordDialog(): void {
-    this.changePasswordDialog()?.open();
   }
 
   handleSave(): void {

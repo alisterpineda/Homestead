@@ -5,6 +5,5 @@ import { AppRole } from '../models/app-role';
 export interface CreateUserCommand {
   displayName: string;
   email: string;
-  password: string;
   role?: AppRole;
 }
