@@ -1,5 +1,5 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Features.Admin.Groups.CreateGroup;
+using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using NSubstitute;

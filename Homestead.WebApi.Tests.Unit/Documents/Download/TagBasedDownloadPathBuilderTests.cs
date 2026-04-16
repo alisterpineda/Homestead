@@ -1,4 +1,4 @@
-using Homestead.WebApi.Features.Documents.Download;
+using Homestead.WebApi.Modules.Documents.Features.Download;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.Download;
 

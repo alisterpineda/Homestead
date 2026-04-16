@@ -3,7 +3,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Features.Documents.Versions.ReprocessDocumentVersion;
+using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVersion;
 using Homestead.WebApi.Processing;
 using NSubstitute;
 

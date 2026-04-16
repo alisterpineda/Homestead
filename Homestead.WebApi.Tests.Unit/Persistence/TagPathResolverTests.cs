@@ -1,4 +1,5 @@
-using Homestead.WebApi.Features.Documents;
+using Homestead.WebApi.Modules.Documents;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 

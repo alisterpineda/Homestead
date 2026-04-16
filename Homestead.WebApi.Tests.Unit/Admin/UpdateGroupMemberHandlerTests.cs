@@ -3,7 +3,7 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Identity;
-using Homestead.WebApi.Features.Admin.Groups.UpdateGroupMember;
+using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

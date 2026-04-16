@@ -1,7 +1,7 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Features.Documents.Parties.BulkDeleteParties;
+using Homestead.WebApi.Modules.Documents.Features.Parties.BulkDeleteParties;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

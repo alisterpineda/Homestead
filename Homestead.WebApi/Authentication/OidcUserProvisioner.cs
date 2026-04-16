@@ -1,4 +1,5 @@
-using Homestead.WebApi.Features.Identity;
+using Homestead.WebApi.Modules.Identity;
+using Homestead.WebApi.Modules.Identity.Services;
 using System.Security.Claims;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;

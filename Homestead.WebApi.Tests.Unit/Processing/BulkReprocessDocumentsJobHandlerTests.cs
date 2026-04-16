@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Features.Documents.Processing;
+using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;

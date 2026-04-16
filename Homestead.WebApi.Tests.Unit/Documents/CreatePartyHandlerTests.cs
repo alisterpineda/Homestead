@@ -1,6 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Features.Documents.Parties.CreateParty;
+using Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 using Homestead.WebApi.Persistence;
 using NSubstitute;
 

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Homestead.WebApi.Features.Documents.Settings;
+using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;

@@ -42,13 +42,15 @@ Opt-in external authentication via any OpenID Connect provider. When OIDC config
 
 The WebApi uses vertical slice architecture organized by module, with MediatR for CQRS handler dispatch:
 
-- **Features/{Module}/{SubDomain}/{Operation}/**: Each operation has up to four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+- **Modules/{Module}/Features/{SubDomain}/{Operation}/**: Each operation has up to four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
 - **Modules** map to frontend areas: `Admin`, `Documents`, `Identity`, `Processing`, `Status`
-- **Sub-domains** group related operations within a module (e.g., `Documents/Tags/`, `Admin/Groups/`)
+- **Sub-domains** group related operations within a module (e.g., `Documents/Features/Tags/`, `Admin/Features/Groups/`)
+- **Services** (`Modules/{Module}/Services/`): Module-scoped service interfaces and implementations shared across features (e.g., `ISearchVectorUpdater`, `ITagPathResolver`)
+- **Processing** (`Modules/Documents/Processing/`): Background job handlers, payloads, and exceptions — not vertical slices
 - **Naming convention**: Use `*Command` suffix for mutations (POST/PUT/PATCH/DELETE) and `*Query` suffix for reads (GET). Both implement `IRequest<TResponse>` from MediatR
 - **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
 - **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers. They inject `ISender` from MediatR and dispatch requests via `sender.Send(request, ct)`
-- **Modules** (e.g., `DocumentsModule.cs`) register versioned route groups on `IVersionedEndpointRouteBuilder`
+- **Modules** (e.g., `Modules/Documents/DocumentsModule.cs`) register versioned route groups on `IVersionedEndpointRouteBuilder`
 - **API versioning** is URL-based: `/api/v{version:apiVersion}/documents`
 - **Persistence**: EF Core with PostgreSQL. Migrations auto-run on startup in `Program.cs`
 
@@ -60,25 +62,27 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 | `Authorization/` | Document-level auth handlers, policies, MediatR auth behavior |
 | `Common/` | Cross-cutting concerns: exceptions (`Exceptions/`), MediatR behaviors (`Behaviors/`), audit infrastructure (`Auditing/`), pagination, query extensions |
 | `Domain/` | Domain model layer: EF entities, enums, value objects, audit snapshots |
-| `Features/` | Vertical slices organized by module → sub-domain → operation |
+| `Modules/` | Modules with explicit `Features/`, `Services/`, and `Processing/` subdirectories |
 | `Infrastructure/` | External integrations: `TextExtraction/` (OCR engines), `Thumbnails/` (generation) |
 | `Persistence/` | EF Core: `AppDbContext`, `DesignTimeDbContextFactory`, entity `Configurations/` |
 | `Processing/` | Generic job queue framework, SignalR hub for real-time updates |
 
 ### Adding a New Endpoint
 
-1. Create files under `Features/{Module}/{SubDomain}/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
+1. Create files under `Modules/{Module}/Features/{SubDomain}/{Operation}/`: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
 2. The command/query record should implement `IRequest<TResponse>` from MediatR. Use `*Command` for mutations, `*Query` for reads
 3. The handler class should implement `IRequestHandler<TRequest, TResponse>` from MediatR with a `Handle` method
 4. The endpoint should inject `ISender` and call `sender.Send(request, ct)`
 5. Register the endpoint in the module class (e.g., `DocumentsModule.cs`)
+6. Module-scoped services (interfaces + implementations shared across features) go in `Modules/{Module}/Services/`
+7. Background job handlers go in `Modules/{Module}/Processing/`
 
 ## Full-Text Search
 
 Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) column on the `documents` table, indexed with GIN.
 
 - **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B
-- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Features/Documents/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
+- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Modules/Documents/Services/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
 - **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 

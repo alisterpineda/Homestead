@@ -1,13 +1,13 @@
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Features.Admin.Groups.AddGroupMember;
-using Homestead.WebApi.Features.Admin.Groups.CreateGroup;
-using Homestead.WebApi.Features.Admin.Groups.UpdateGroup;
-using Homestead.WebApi.Features.Admin.Groups.UpdateGroupMember;
-using Homestead.WebApi.Features.Admin.TextExtractionEngines.CreateTextExtractionEngine;
-using Homestead.WebApi.Features.Documents.Comments.CreateComment;
-using Homestead.WebApi.Features.Documents.Parties.CreateParty;
-using Homestead.WebApi.Features.Documents.Parties.UpdateParty;
+using Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
+using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
+using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
+using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
+using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
+using Homestead.WebApi.Modules.Documents.Features.Comments.CreateComment;
+using Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
+using Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
 
 namespace Homestead.WebApi.Tests.Unit.Validators;
 

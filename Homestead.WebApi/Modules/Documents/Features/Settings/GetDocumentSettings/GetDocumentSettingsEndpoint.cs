@@ -1,0 +1,16 @@
+using MediatR;
+
+namespace Homestead.WebApi.Modules.Documents.Features.Settings.GetDocumentSettings;
+
+public static class GetDocumentSettingsEndpoint
+{
+    public static void Map(RouteGroupBuilder group)
+    {
+        group.MapGet("", async (ISender sender, CancellationToken ct) =>
+        {
+            return Results.Ok(await sender.Send(new GetDocumentSettingsQuery(), ct));
+        })
+        .WithName("GetDocumentSettings")
+        .Produces<DocumentSettingsResponse>();
+    }
+}

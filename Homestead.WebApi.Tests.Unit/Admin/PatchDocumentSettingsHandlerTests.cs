@@ -1,11 +1,11 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Features.Documents.Settings;
+using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Features.Documents.Settings.PatchDocumentSettings;
+using Homestead.WebApi.Modules.Documents.Features.Settings.PatchDocumentSettings;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;

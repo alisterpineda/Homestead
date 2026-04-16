@@ -1,10 +1,11 @@
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Features.Documents;
+using Homestead.WebApi.Modules.Documents;
+using Homestead.WebApi.Modules.Documents.Services;
 using System.Text.Json;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Features.Documents.Processing;
+using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;

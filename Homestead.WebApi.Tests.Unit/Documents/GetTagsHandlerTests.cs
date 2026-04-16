@@ -1,6 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
-using Homestead.WebApi.Features.Documents.Tags.GetTags;
+using Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 

@@ -1,0 +1,3 @@
+namespace Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
+
+public record BulkDeleteTextExtractionEnginesResponse(int DeletedCount);
