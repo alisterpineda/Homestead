@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domain.Identity;
+using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Tests.Integration.Identity;
@@ -45,16 +45,6 @@ public class IsActiveTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task InactiveUser_CanLogout()
-    {
-        var client = await CreateUserClientAsync(isActive: false);
-
-        var response = await client.PostAsync("/api/auth/logout", null, CT);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
     public async Task AdminCanActivateUser()
     {
         var adminClient = await CreateAdminClientAsync();
@@ -79,12 +69,10 @@ public class IsActiveTests : IntegrationTestBase
         }, CT);
 
         // Verify the user is inactive
-        var userClient = await CreateUserClientAsync();
-        // We need to use the admin endpoint to check
         using var scope = CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-        var user = await userManager.FindByEmailAsync("activate-target@test.com");
-        Assert.False(user!.IsActive);
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Email == "activate-target@test.com", CT);
+        Assert.False(user.IsActive);
 
         // Re-activate the user
         var activateResponse = await adminClient.PutAsJsonAsync($"/api/v1/admin/users/{created.Id}", new
@@ -98,9 +86,9 @@ public class IsActiveTests : IntegrationTestBase
 
         // Verify re-activation
         using var scope2 = CreateScope();
-        var userManager2 = scope2.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-        var reactivatedUser = await userManager2.FindByEmailAsync("activate-target@test.com");
-        Assert.True(reactivatedUser!.IsActive);
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var reactivatedUser = await db2.Users.FirstAsync(u => u.Email == "activate-target@test.com", CT);
+        Assert.True(reactivatedUser.IsActive);
     }
 
     [Fact]

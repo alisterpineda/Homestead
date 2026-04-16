@@ -1,34 +1,31 @@
-using Homestead.WebApi.Modules.Identity;
-using Homestead.WebApi.Modules.Identity.Services;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Common.Auditing;
-using MediatR;
+using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Identity;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.CreateUser;
 
-public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, IAuditContext audit)
+public class CreateUserHandler(AppDbContext db, IAuditContext audit)
     : IRequestHandler<CreateUserCommand, UserResponse>
 {
     public async Task<UserResponse> Handle(CreateUserCommand request, CancellationToken ct)
     {
+        var email = request.Email.Trim();
+        if (await db.Users.AnyAsync(u => u.Email == email, ct))
+            throw new DuplicateEntityException("A user with that email already exists.");
+
         var user = new AppUser
         {
-            UserName = request.Email,
-            Email = request.Email,
+            Id = Guid.NewGuid(),
+            Email = email,
             DisplayName = request.DisplayName.Trim(),
-            CreatedAt = DateTimeOffset.UtcNow
+            Role = request.Role,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
         };
-
-        var result = await userManager.CreateAsync(user);
-        if (!result.Succeeded)
-            throw new IdentityValidationException(result.ToErrorDictionary());
-
-        var roleName = request.Role.ToString();
-        await userManager.AddToRoleAsync(user, roleName);
-        await roleSourceManager.SetSourceAsync(user.Id, roleName, RoleSource.Local);
+        db.Users.Add(user);
 
         audit.Created("AppUser", user.Id);
 
@@ -37,9 +34,9 @@ public class CreateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
             Id = user.Id,
             DisplayName = user.DisplayName,
             Email = user.Email,
-            Role = request.Role,
+            Role = user.Role,
             IsActive = user.IsActive,
-            CreatedAt = user.CreatedAt
+            CreatedAt = user.CreatedAt,
         };
     }
 }

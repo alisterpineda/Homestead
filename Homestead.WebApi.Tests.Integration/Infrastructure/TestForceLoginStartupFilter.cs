@@ -1,8 +1,11 @@
-using Homestead.WebApi.Domain.Identity;
+using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Persistence;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -28,17 +31,18 @@ public class TestForceLoginStartupFilter : IStartupFilter
                         return;
                     }
 
-                    var userManager = context.RequestServices.GetRequiredService<UserManager<AppUser>>();
-                    var signInManager = context.RequestServices.GetRequiredService<SignInManager<AppUser>>();
-
-                    var user = await userManager.FindByEmailAsync(email);
+                    var db = context.RequestServices.GetRequiredService<AppDbContext>();
+                    var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
                     if (user is null)
                     {
                         context.Response.StatusCode = 404;
                         return;
                     }
 
-                    await signInManager.SignInAsync(user, isPersistent: true);
+                    await context.SignInAsync(
+                        CookieAuthenticationDefaults.AuthenticationScheme,
+                        AppUserPrincipal.Build(user),
+                        new AuthenticationProperties { IsPersistent = true });
                     context.Response.StatusCode = 200;
                     return;
                 }

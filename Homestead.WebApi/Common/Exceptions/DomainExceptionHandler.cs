@@ -25,8 +25,6 @@ public class DomainExceptionHandler : IExceptionHandler
                 ProblemDetailsFactory.ValidationErrors(e.Errors
                     .GroupBy(f => f.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).ToArray())),
-            IdentityValidationException e =>
-                ProblemDetailsFactory.ValidationErrors(e.Errors),
             _ => null
         };
 

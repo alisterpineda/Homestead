@@ -15,17 +15,18 @@ dotnet ef migrations add <MigrationName> --project Homestead.WebApi
 
 ## Authentication
 
-OIDC is the only sign-in method. ASP.NET Core Identity stays as the user store and cookie machinery; all local-user endpoints (register/login/password-reset) have been removed.
+OIDC is the only sign-in method. ASP.NET Core Identity has been removed — `AppUser` is a plain EF entity and cookie auth is registered directly via `AddCookie()`.
 
-- `AppUser` extends `IdentityUser<Guid>` with custom `DisplayName`, `IsActive`, and `CreatedAt` properties
-- `AppDbContext` extends `IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>`
-- Auth endpoints at `/api/auth`: `/logout`, `/user-info`, `/oidc/login`, `/oidc/callback`, `/oidc/logout`
+- `AppUser` is a plain POCO with `Id`, `Email`, `DisplayName`, `Role` (AppRole enum), `IsActive`, `CreatedAt`
+- `AppDbContext` extends `DbContext` (no Identity base) and implements `IDataProtectionKeyContext`
+- Auth endpoints at `/api/auth`: `/user-info`, `/oidc/login`, `/oidc/callback`, `/oidc/logout`
 - `GET /api/status` (anonymous) returns `{ displayName }` — used by the frontend to label the SSO button
-- Cookie configured with `HttpOnly`, `SameSite=Lax` (dev) / `Strict` (prod), 14-day sliding expiration
+- Main app cookie `.Homestead.Auth` configured with `HttpOnly`, `SameSite=Lax` (dev) / `Strict` (prod), 14-day sliding expiration
 - SPA-friendly: returns 401/403 status codes instead of redirects
-- Protected endpoints use explicit `.RequireAuthorization()` (on modules, hub, and custom auth endpoints)
-- `ICurrentUserAccessor.UserId` reads `ClaimTypes.NameIdentifier` from the cookie claims
-- All Identity tables are in the `identity` schema (configured in `Persistence/Configurations/IdentitySchemaConfiguration.cs`)
+- Protected endpoints use explicit `.RequireAuthorization()` (on modules, hub, and custom auth endpoints); policies use a single `ClaimTypes.Role` claim populated from `AppUser.Role`
+- `ICurrentUserAccessor.UserId` reads `ClaimTypes.NameIdentifier`; `.Role` reads `ClaimTypes.Role` — both flow from the cookie claims set at sign-in
+- `ActiveUserHandler` reads the `IsActive` claim (set at sign-in) with no DB fallback
+- User data lives in the default schema — no `identity` schema
 
 ### OIDC (Required)
 
@@ -34,8 +35,8 @@ OIDC is a startup requirement — the app throws at `IHostedService` start-up (`
 - Config in `Authentication/OidcOptions.cs` — bound from `Oidc:*` config section. `IsConfigured` is true when Authority, ClientId, and ClientSecret are all set
 - Docker env vars: `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME`, `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_CLAIM_VALUE`, `OIDC_ADDITIONAL_SCOPES` — mapped in `Program.cs`
 - Endpoints registered in `IdentityModule`: `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
-- `OidcUserProvisioner` auto-provisions users from OIDC claims, links by email, syncs Admin role from a configurable claim
-- Uses `IdentityConstants.ExternalScheme` for the OIDC sign-in, then signs into the application cookie in the callback
+- `OidcUserProvisioner` auto-provisions users from OIDC claims, matches by email, and syncs the Admin role from a configurable claim — OIDC is the source of truth (admin claim present → Role=Admin; absent → demoted to Contributor)
+- The OIDC handler writes to a short-lived `ExternalOidc` bridge cookie; the callback reads it, provisions the user, then signs in to the main app cookie scheme
 
 ## Architecture: Vertical Slice + CQRS (MediatR)
 

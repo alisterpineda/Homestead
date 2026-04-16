@@ -1,8 +1,7 @@
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Modules.Identity.Features.OidcLogin;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Homestead.WebApi.Modules.Identity.Features.OidcCallback;
 
@@ -12,22 +11,27 @@ public static class OidcCallbackEndpoint
     {
         group.MapGet("/oidc/callback", async (
             string? returnUrl,
-            SignInManager<AppUser> signInManager,
-            OidcUserProvisioner provisioner) =>
+            HttpContext ctx,
+            OidcUserProvisioner provisioner,
+            CancellationToken cancellationToken) =>
         {
-            var info = await signInManager.GetExternalLoginInfoAsync();
-            if (info is null)
+            var authResult = await ctx.AuthenticateAsync(AuthenticationExtensions.ExternalOidcScheme);
+            if (!authResult.Succeeded || authResult.Principal is null)
                 return Results.Redirect("/login?error=oidc-failed");
 
-            var user = await provisioner.ProvisionOrUpdateAsync(info);
+            var user = await provisioner.ProvisionOrUpdateAsync(authResult.Principal, cancellationToken);
 
-            // Always clean up the external cookie, even when sign-in is blocked
-            await signInManager.Context.SignOutAsync(IdentityConstants.ExternalScheme);
+            // Always clean up the external bridge cookie, even when sign-in is blocked.
+            await ctx.SignOutAsync(AuthenticationExtensions.ExternalOidcScheme);
 
             if (!user.IsActive)
                 return Results.Redirect("/login?error=account-inactive");
 
-            await signInManager.SignInAsync(user, isPersistent: true);
+            await ctx.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                AppUserPrincipal.Build(user),
+                new AuthenticationProperties { IsPersistent = true });
+
             var redirect = OidcLoginEndpoint.IsSafeReturnUrl(returnUrl) ? returnUrl! : "/";
             return Results.Redirect(redirect);
         })

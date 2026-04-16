@@ -1,8 +1,6 @@
 using System.Security.Claims;
-using Homestead.WebApi.Domain.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
-using Microsoft.AspNetCore.Identity;
 
 namespace Homestead.WebApi.Authentication;
 
@@ -11,7 +9,6 @@ public static class AuthPolicies
     public const string AuthenticatedOnly = "AuthenticatedOnly";
     public const string ActiveUser = "ActiveUser";
     public const string AccountInactiveError = "account_inactive";
-    public const string AccountLockedError = "account_locked";
 
     public const string RequireAdmin = "RequireAdmin";
     public const string RequireContributor = "RequireContributor";
@@ -20,49 +17,25 @@ public static class AuthPolicies
 
 public class ActiveUserRequirement : IAuthorizationRequirement;
 
-public class ActiveUserHandler(
-    UserManager<AppUser> userManager)
-    : AuthorizationHandler<ActiveUserRequirement>
+public class ActiveUserHandler : AuthorizationHandler<ActiveUserRequirement>
 {
-    protected override async Task HandleRequirementAsync(
+    protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context, ActiveUserRequirement requirement)
     {
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null)
         {
             context.Fail();
-            return;
+            return Task.CompletedTask;
         }
 
-        // Check the IsActive claim first (set at sign-in time) to avoid a DB query
-        var isActiveClaim = context.User.FindFirstValue("IsActive");
-        if (isActiveClaim is not null)
-        {
-            if (string.Equals(isActiveClaim, "true", StringComparison.OrdinalIgnoreCase))
-            {
-                context.Succeed(requirement);
-                return;
-            }
-
+        var isActiveClaim = context.User.FindFirstValue(AppUserPrincipal.IsActiveClaimType);
+        if (string.Equals(isActiveClaim, "true", StringComparison.OrdinalIgnoreCase))
+            context.Succeed(requirement);
+        else
             context.Fail(new AuthorizationFailureReason(this, AuthPolicies.AccountInactiveError));
-            return;
-        }
 
-        // Fallback: query the database (e.g., if claim is missing for legacy sessions)
-        var user = await userManager.FindByIdAsync(userId);
-        if (user is null)
-        {
-            context.Fail();
-            return;
-        }
-
-        if (!user.IsActive)
-        {
-            context.Fail(new AuthorizationFailureReason(this, AuthPolicies.AccountInactiveError));
-            return;
-        }
-
-        context.Succeed(requirement);
+        return Task.CompletedTask;
     }
 }
 

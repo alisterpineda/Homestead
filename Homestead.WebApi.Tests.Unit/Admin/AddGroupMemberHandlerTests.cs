@@ -33,7 +33,6 @@ public class AddGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId,
-            UserName = "user@test.com",
             Email = "user@test.com",
             DisplayName = "Test User",
             IsActive = true

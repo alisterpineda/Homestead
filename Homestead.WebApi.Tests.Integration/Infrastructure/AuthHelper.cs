@@ -1,5 +1,5 @@
 using Homestead.WebApi.Domain.Identity;
-using Microsoft.AspNetCore.Identity;
+using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -45,23 +45,20 @@ public static class AuthHelper
             HandleCookies = true
         });
 
-        using var scope = factory.Services.CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-
-        var user = new AppUser
+        using (var scope = factory.Services.CreateScope())
         {
-            UserName = email,
-            Email = email,
-            DisplayName = displayName,
-            EmailConfirmed = true,
-            IsActive = isActive
-        };
-
-        var result = await userManager.CreateAsync(user);
-        if (!result.Succeeded)
-            throw new Exception($"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-
-        await userManager.AddToRoleAsync(user, role);
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.Add(new AppUser
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = displayName,
+                Role = Enum.Parse<AppRole>(role),
+                IsActive = isActive,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
 
         var loginResponse = await client.GetAsync($"/test/force-login?email={Uri.EscapeDataString(email)}");
         loginResponse.EnsureSuccessStatusCode();

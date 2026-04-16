@@ -34,7 +34,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId,
-            UserName = "user@test.com",
             Email = "user@test.com",
             DisplayName = "Test User",
             IsActive = true
@@ -71,7 +70,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId,
-            UserName = "user@test.com",
             Email = "user@test.com",
             DisplayName = "Test User",
             IsActive = true
@@ -107,7 +105,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId,
-            UserName = "owner@test.com",
             Email = "owner@test.com",
             DisplayName = "Owner User",
             IsActive = true
@@ -143,7 +140,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId1,
-            UserName = "owner1@test.com",
             Email = "owner1@test.com",
             DisplayName = "Owner One",
             IsActive = true
@@ -151,7 +147,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId2,
-            UserName = "owner2@test.com",
             Email = "owner2@test.com",
             DisplayName = "Owner Two",
             IsActive = true
@@ -182,7 +177,6 @@ public class UpdateGroupMemberHandlerTests : IDisposable
         _db.Users.Add(new AppUser
         {
             Id = userId,
-            UserName = "owner@test.com",
             Email = "owner@test.com",
             DisplayName = "Owner User",
             IsActive = true

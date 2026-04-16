@@ -1,27 +1,27 @@
+using Homestead.WebApi.Persistence;
 using MediatR;
-using Homestead.WebApi.Domain.Identity;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Identity.Features.GetUserInfo;
 
-public class GetUserInfoHandler(UserManager<AppUser> userManager)
+public class GetUserInfoHandler(AppDbContext db)
     : IRequestHandler<GetUserInfoQuery, GetUserInfoResponse?>
 {
     public async Task<GetUserInfoResponse?> Handle(GetUserInfoQuery request, CancellationToken ct)
     {
-        var user = await userManager.FindByIdAsync(request.UserId.ToString());
+        var user = await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == request.UserId, ct);
         if (user is null)
             return null;
-
-        var roles = await userManager.GetRolesAsync(user);
 
         return new GetUserInfoResponse
         {
             Id = user.Id,
-            Email = user.Email!,
+            Email = user.Email,
             DisplayName = user.DisplayName,
-            Role = AppRoles.Resolve(roles),
-            IsActive = user.IsActive
+            Role = user.Role,
+            IsActive = user.IsActive,
         };
     }
 }

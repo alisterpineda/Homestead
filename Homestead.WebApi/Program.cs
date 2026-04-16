@@ -5,7 +5,6 @@ using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Admin;
 using Homestead.WebApi.Modules.Identity;
-using Homestead.WebApi.Modules.Identity.Services;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Processing;
@@ -17,7 +16,6 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Download;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -90,7 +88,6 @@ builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
-builder.Services.AddScoped<IRoleSourceManager, RoleSourceManager>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>
@@ -153,8 +150,8 @@ builder.Services.AddOpenApi("v1", options =>
             {
                 Type = SecuritySchemeType.ApiKey,
                 In = ParameterLocation.Cookie,
-                Name = ".AspNetCore.Identity.Application",
-                Description = "ASP.NET Core Identity authentication cookie"
+                Name = Homestead.WebApi.Authentication.AuthenticationExtensions.AuthCookieName,
+                Description = "Homestead authentication cookie"
             }
         };
 

@@ -1,108 +1,69 @@
-using Homestead.WebApi.Modules.Identity;
-using Homestead.WebApi.Modules.Identity.Services;
 using System.Security.Claims;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Authentication;
 
 public class OidcUserProvisioner(
-    UserManager<AppUser> userManager,
-    IRoleSourceManager roleSourceManager,
-    IOptions<OidcOptions> oidcOptions,
-    AppDbContext db)
+    AppDbContext db,
+    IOptions<OidcOptions> oidcOptions)
 {
     private readonly OidcOptions _oidc = oidcOptions.Value;
 
-    public async Task<AppUser> ProvisionOrUpdateAsync(ExternalLoginInfo loginInfo)
+    public async Task<AppUser> ProvisionOrUpdateAsync(ClaimsPrincipal principal, CancellationToken ct = default)
     {
-        var providerKey = loginInfo.ProviderKey;
-        var displayName = BuildDisplayName(loginInfo.Principal);
-        var user = await userManager.FindByLoginAsync(loginInfo.LoginProvider, providerKey);
+        var email = principal.FindFirstValue(ClaimTypes.Email)
+                    ?? principal.FindFirstValue("email")
+                    ?? throw new InvalidOperationException("OIDC principal missing email claim.");
+        var displayName = BuildDisplayName(principal);
+        var hasAdminClaim = HasAdminClaim(principal);
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
         {
-            var email = loginInfo.Principal.FindFirstValue(ClaimTypes.Email)
-                        ?? loginInfo.Principal.FindFirstValue("email");
+            // Auto-activate the first user to bootstrap the system;
+            // subsequent OIDC users require admin activation.
+            var isFirstUser = !await db.Users.AnyAsync(ct);
 
-            if (!string.IsNullOrEmpty(email))
-                user = await userManager.FindByEmailAsync(email);
-
-            if (user is null)
+            user = new AppUser
             {
-                // Auto-activate the first user to bootstrap the system;
-                // subsequent OIDC users require admin activation.
-                var isFirstUser = !await userManager.Users.AnyAsync();
-
-                user = new AppUser
-                {
-                    UserName = email,
-                    Email = email,
-                    EmailConfirmed = true,
-                    DisplayName = displayName,
-                    IsActive = isFirstUser
-                };
-
-                var result = await userManager.CreateAsync(user);
-                if (!result.Succeeded)
-                    throw new InvalidOperationException(
-                        $"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-
-                // First OIDC user also gets Admin role (same as first local registration)
-                if (isFirstUser)
-                {
-                    await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
-                    await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Local);
-                }
-            }
-
-            await userManager.AddLoginAsync(user, new UserLoginInfo(
-                loginInfo.LoginProvider, providerKey, loginInfo.ProviderDisplayName));
+                Id = Guid.NewGuid(),
+                Email = email,
+                DisplayName = displayName,
+                IsActive = isFirstUser,
+                CreatedAt = DateTimeOffset.UtcNow,
+                Role = (isFirstUser || hasAdminClaim)
+                    ? AppRole.Admin
+                    : AppRole.Contributor,
+            };
+            db.Users.Add(user);
         }
-
-        if (!string.IsNullOrEmpty(displayName) && displayName != user.DisplayName)
+        else
         {
-            user.DisplayName = displayName;
-            await userManager.UpdateAsync(user);
+            if (!string.IsNullOrEmpty(displayName) && displayName != user.DisplayName)
+                user.DisplayName = displayName;
+
+            // OIDC is source of truth for the Admin role.
+            if (hasAdminClaim)
+                user.Role = AppRole.Admin;
+            else if (user.Role == AppRole.Admin)
+                user.Role = AppRole.Contributor;
         }
 
-        await SyncRoleAsync(user, loginInfo.Principal);
-        await db.SaveChangesAsync();
-
+        // The callback endpoint that calls this isn't wrapped by UnitOfWorkBehavior, so save here.
+        await db.SaveChangesAsync(ct);
         return user;
     }
 
-    private async Task SyncRoleAsync(AppUser user, ClaimsPrincipal principal)
+    private bool HasAdminClaim(ClaimsPrincipal principal)
     {
-        var currentRoles = await userManager.GetRolesAsync(user);
-
-        // Sync Admin role from OIDC claims if configured
-        if (!string.IsNullOrEmpty(_oidc.RoleClaimType) && !string.IsNullOrEmpty(_oidc.AdminClaimValue))
-        {
-            var hasAdminClaim = principal.FindAll(_oidc.RoleClaimType)
-                .Any(c => string.Equals(c.Value, _oidc.AdminClaimValue, StringComparison.OrdinalIgnoreCase));
-            var isAdmin = currentRoles.Contains(nameof(AppRole.Admin));
-
-            if (hasAdminClaim && !isAdmin)
-            {
-                await userManager.AddToRoleAsync(user, nameof(AppRole.Admin));
-                await roleSourceManager.SetSourceAsync(user.Id, nameof(AppRole.Admin), RoleSource.Oidc);
-            }
-            else if (!hasAdminClaim && isAdmin)
-            {
-                // Only revoke Admin if it was granted by OIDC; protect locally-granted roles
-                var source = await roleSourceManager.GetSourceAsync(user.Id, nameof(AppRole.Admin));
-                if (source == RoleSource.Oidc)
-                    await userManager.RemoveFromRoleAsync(user, nameof(AppRole.Admin));
-            }
-        }
-
-        // Ensure user has at least one app role (assign default if none)
-        if (!currentRoles.Any(r => AppRoles.All.Contains(r)))
-            await userManager.AddToRoleAsync(user, AppRoles.Default);
+        if (string.IsNullOrEmpty(_oidc.RoleClaimType) || string.IsNullOrEmpty(_oidc.AdminClaimValue))
+            return false;
+        return principal.FindAll(_oidc.RoleClaimType)
+            .Any(c => string.Equals(c.Value, _oidc.AdminClaimValue, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildDisplayName(ClaimsPrincipal principal)

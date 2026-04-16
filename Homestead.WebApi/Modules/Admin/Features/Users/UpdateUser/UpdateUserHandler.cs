@@ -1,18 +1,15 @@
-using Homestead.WebApi.Modules.Identity;
-using Homestead.WebApi.Modules.Identity.Services;
-using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
-using MediatR;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
-using Microsoft.AspNetCore.Identity;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.UpdateUser;
 
-public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceManager roleSourceManager, AppDbContext db, ICurrentUserAccessor currentUser, IAuditLogger auditLogger)
+public class UpdateUserHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
     : IRequestHandler<UpdateUserCommand, UserResponse?>
 {
     public async Task<UserResponse?> Handle(UpdateUserCommand request, CancellationToken ct)
@@ -21,60 +18,40 @@ public class UpdateUserHandler(UserManager<AppUser> userManager, IRoleSourceMana
         {
             if (!request.IsActive)
                 throw new BusinessRuleException("Cannot deactivate your own account.");
-
             if (request.Role != AppRole.Admin)
                 throw new BusinessRuleException("Cannot demote your own admin role.");
         }
 
-        var user = await userManager.FindByIdAsync(request.Id.ToString());
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.Id, ct);
         if (user is null)
             return null;
 
-        var currentRoles = await userManager.GetRolesAsync(user);
-        var currentRole = AppRoles.Resolve(currentRoles).ToString();
-        var before = AppUserSnapshot.From(user, currentRole);
-
-        var strategy = db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        var email = request.Email.Trim();
+        if (!string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase)
+            && await db.Users.AnyAsync(u => u.Id != user.Id && u.Email == email, ct))
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            throw new DuplicateEntityException("A user with that email already exists.");
+        }
 
-            user.Email = request.Email;
-            user.UserName = request.Email;
-            user.DisplayName = request.DisplayName.Trim();
-            user.IsActive = request.IsActive;
+        var before = AppUserSnapshot.From(user, user.Role.ToString());
 
-            var result = await userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-                throw new IdentityValidationException(result.ToErrorDictionary());
+        user.Email = email;
+        user.DisplayName = request.DisplayName.Trim();
+        user.IsActive = request.IsActive;
+        user.Role = request.Role;
 
-            var newRole = request.Role.ToString();
-            if (!currentRoles.Contains(newRole))
-            {
-                var rolesToRemove = currentRoles.Intersect(AppRoles.All).ToList();
-                if (rolesToRemove.Count > 0)
-                    await userManager.RemoveFromRolesAsync(user, rolesToRemove);
-                await userManager.AddToRoleAsync(user, newRole);
-                await roleSourceManager.SetSourceAsync(user.Id, newRole, RoleSource.Local);
-            }
+        // Defer diff until after save so the snapshot reflects the actual committed state.
+        audit.Track(() => before.Diff(AppUserSnapshot.From(user, user.Role.ToString())),
+            "AppUser", user.Id);
 
-            var after = AppUserSnapshot.From(user, request.Role.ToString());
-            var changes = before.Diff(after);
-            auditLogger.LogUpdated("AppUser", user.Id, changes);
-            await db.SaveChangesAsync(ct);
-
-            await transaction.CommitAsync(ct);
-
-            return new UserResponse
-            {
-                Id = user.Id,
-                DisplayName = user.DisplayName,
-                Email = user.Email,
-                Role = request.Role,
-                IsActive = user.IsActive,
-                CreatedAt = user.CreatedAt
-            };
-        });
+        return new UserResponse
+        {
+            Id = user.Id,
+            DisplayName = user.DisplayName,
+            Email = user.Email,
+            Role = user.Role,
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt,
+        };
     }
-
 }
