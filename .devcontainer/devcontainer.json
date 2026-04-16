@@ -20,7 +20,7 @@
   "remoteEnv": {
     "SSL_CERT_DIR": "$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs"
   },
-  "postCreateCommand": "dotnet tool install -g aspire.cli && cd Homestead.WebApp && npm install && npm install -g @anthropic-ai/claude-code",
+  "postCreateCommand": "dotnet tool install -g aspire.cli && cd Homestead.WebApp && npm install && cd ../Homestead.E2E && npm install && npx playwright install --with-deps && npm install -g @anthropic-ai/claude-code",
   "customizations": {
     "vscode": {
       "extensions": [
