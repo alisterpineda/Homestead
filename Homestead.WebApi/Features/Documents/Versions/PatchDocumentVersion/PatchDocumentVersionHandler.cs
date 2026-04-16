@@ -46,6 +46,7 @@ public class PatchDocumentVersionHandler(AppDbContext db,
         // Update entity from patched model
         version.Label = model.Label;
         version.ExtractedText = model.ExtractedText;
+        version.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
 
@@ -59,7 +60,8 @@ public class PatchDocumentVersionHandler(AppDbContext db,
             ContentType = version.ContentType,
             FileSize = version.FileSize,
             FileExtension = version.FileExtension,
-            CreatedAt = version.CreatedAt
+            CreatedAt = version.CreatedAt,
+            UpdatedAt = version.UpdatedAt
         };
     }
 }

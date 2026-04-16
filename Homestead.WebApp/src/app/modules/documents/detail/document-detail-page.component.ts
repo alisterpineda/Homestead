@@ -401,14 +401,12 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
 
           <!-- Modified -->
-          @if (doc.updatedAt) {
-            <div class="space-y-2">
-              <label hlmLabel>Modified</label>
-              <p class="text-sm text-muted-foreground">
-                {{ formatDate(doc.updatedAt) }}
-              </p>
-            </div>
-          }
+          <div class="space-y-2">
+            <label hlmLabel>Modified</label>
+            <p class="text-sm text-muted-foreground">
+              {{ formatDate(doc.updatedAt) }}
+            </p>
+          </div>
 
           <!-- Group -->
           @if (document()?.groupName; as groupName) {
@@ -429,6 +427,15 @@ import { toast } from '@spartan-ng/brain/sonner';
               <label hlmLabel>Added</label>
               <p class="text-sm text-muted-foreground">
                 {{ formatDate(displayVersionCreatedAt()) }}
+              </p>
+            </div>
+          }
+          <!-- Version Modified -->
+          @if (displayVersionUpdatedAt()) {
+            <div class="space-y-2">
+              <label hlmLabel>Modified</label>
+              <p class="text-sm text-muted-foreground">
+                {{ formatDate(displayVersionUpdatedAt()) }}
               </p>
             </div>
           }
@@ -791,6 +798,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
   displayVersionCreatedAt = computed(() => {
     const ver = this.activeVersion();
     return ver?.createdAt ?? '';
+  });
+
+  displayVersionUpdatedAt = computed(() => {
+    const ver = this.activeVersion();
+    return ver?.updatedAt ?? '';
   });
 
   displayExtractedText = computed(() => {

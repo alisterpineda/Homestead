@@ -22,7 +22,8 @@ public class GetDocumentVersionHandler(AppDbContext db)
                 FileHash = r.FileHash,
                 FileExtension = r.FileExtension,
                 ExtractedText = r.ExtractedText,
-                CreatedAt = r.CreatedAt
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
             })
             .FirstOrDefaultAsync(ct);
     }

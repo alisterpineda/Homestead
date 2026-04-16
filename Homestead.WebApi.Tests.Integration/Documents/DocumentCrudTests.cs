@@ -104,10 +104,11 @@ public class DocumentCrudTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
 
-        // Verify UpdatedAt is null before any patch
+        // Verify UpdatedAt is populated before any patch (initial state)
         var getResponse = await client.GetAsync($"/api/v1/documents/{docId}", CT);
         var before = await getResponse.Content.ReadFromJsonAsync<DocumentDetail>(CT);
-        Assert.Null(before!.UpdatedAt);
+        Assert.NotEqual(default, before!.UpdatedAt);
+        var initialUpdatedAt = before.UpdatedAt;
 
         var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
         {
@@ -116,7 +117,7 @@ public class DocumentCrudTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<DocumentDetail>(CT);
-        Assert.NotNull(body!.UpdatedAt);
+        Assert.True(body!.UpdatedAt > initialUpdatedAt);
         Assert.NotNull(body.UpdatedByUserId);
     }
 
@@ -511,11 +512,11 @@ public class DocumentCrudTests : IntegrationTestBase
     }
 
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null);
     private record DocumentDetail(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt,
-        string? Notes = null, DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+        string? Notes = null, DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null);
     private record DocumentDetailWithMeta(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt, string? Notes, IReadOnlyList<TagItem> Tags, IReadOnlyList<PartyItem> Parties,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null);
     private record TagItem(Guid Id, string Name, string Path);
     private record PartyItem(Guid Id, string Name);
 }

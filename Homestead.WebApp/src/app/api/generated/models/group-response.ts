@@ -9,4 +9,7 @@ export interface GroupResponse {
   id: string;
   memberCount?: (number | string);
   name: string;
+  updatedAt: string;
+  updatedByUserId?: (string | null);
+  updatedByUserName?: (string | null);
 }

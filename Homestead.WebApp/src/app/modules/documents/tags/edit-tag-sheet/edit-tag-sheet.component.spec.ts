@@ -23,6 +23,7 @@ function makeTag(overrides: Partial<GetTagsResponse> = {}): GetTagsResponse {
     effectiveColor: null,
     description: null,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     documentCount: 0,
     ...overrides,
   };

@@ -7,7 +7,7 @@ export interface GetPartiesResponse {
   documentCount: (number | string);
   id: string;
   name: string;
-  updatedAt?: (string | null);
+  updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
 }

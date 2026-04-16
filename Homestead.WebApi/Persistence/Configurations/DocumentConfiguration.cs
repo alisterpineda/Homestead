@@ -19,7 +19,9 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.Property(d => d.UpdatedAt);
+        builder.Property(d => d.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.HasOne(d => d.UpdatedByUser)
             .WithMany()

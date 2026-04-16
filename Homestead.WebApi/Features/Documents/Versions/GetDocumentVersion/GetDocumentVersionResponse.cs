@@ -11,4 +11,5 @@ public record GetDocumentVersionResponse
     public required string FileExtension { get; init; }
     public string? ExtractedText { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
 }

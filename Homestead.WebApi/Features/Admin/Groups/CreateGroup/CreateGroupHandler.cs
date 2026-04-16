@@ -55,6 +55,7 @@ public class CreateGroupHandler(AppDbContext db, ICurrentUserAccessor currentUse
             Name = group.Name,
             Description = group.Description,
             CreatedAt = group.CreatedAt,
+            UpdatedAt = group.UpdatedAt,
             CreatedByUserId = group.CreatedByUserId,
             CreatedByUserName = creatorName,
             MemberCount = userId.HasValue ? 1 : 0

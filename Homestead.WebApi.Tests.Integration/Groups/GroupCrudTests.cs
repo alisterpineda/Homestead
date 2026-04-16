@@ -68,7 +68,7 @@ public class GroupCrudTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<GroupItem>(CT);
         Assert.Equal("New Name", body!.Name);
-        Assert.NotNull(body.UpdatedAt);
+        Assert.NotEqual(default, body.UpdatedAt);
         Assert.NotNull(body.UpdatedByUserId);
     }
 

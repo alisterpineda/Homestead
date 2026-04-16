@@ -42,6 +42,10 @@ public class DocumentVersionConfiguration : IEntityTypeConfiguration<DocumentVer
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+        builder.Property(r => r.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
         builder.HasOne(r => r.Document)
             .WithMany(d => d.Versions)
             .HasForeignKey(r => r.DocumentId)

@@ -117,8 +117,8 @@ describe('PartyTableComponent', () => {
 
   it('should sync selected IDs input to row selection state', () => {
     fixture.componentRef.setInput('parties', [
-      { id: 'p1', name: 'A', documentCount: 0, createdAt: new Date().toISOString() },
-      { id: 'p2', name: 'B', documentCount: 0, createdAt: new Date().toISOString() },
+      { id: 'p1', name: 'A', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: 'p2', name: 'B', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ]);
     fixture.componentRef.setInput('selectedIds', new Set(['p1']));
     fixture.detectChanges();
@@ -159,7 +159,7 @@ describe('PartyTableComponent', () => {
 
   it('should emit selectionChange when row selection changes via table', () => {
     fixture.componentRef.setInput('parties', [
-      { id: 'p1', name: 'A', documentCount: 0, createdAt: new Date().toISOString() },
+      { id: 'p1', name: 'A', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ]);
     fixture.detectChanges();
 

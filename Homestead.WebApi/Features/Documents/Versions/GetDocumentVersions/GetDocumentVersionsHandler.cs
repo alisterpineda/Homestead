@@ -23,7 +23,8 @@ public class GetDocumentVersionsHandler(AppDbContext db)
                 ContentType = r.ContentType,
                 FileSize = r.FileSize,
                 FileExtension = r.FileExtension,
-                CreatedAt = r.CreatedAt
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
             })
             .ToPaginatedAsync(request, ct);
     }

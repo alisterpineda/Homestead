@@ -16,7 +16,7 @@ public record GetDocumentsResponse
     public Guid? GroupId { get; init; }
     public string? GroupName { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
     public Guid? UpdatedByUserId { get; init; }
     public string? UpdatedByUserName { get; init; }
     public DateTimeOffset? DeletedAt { get; init; }

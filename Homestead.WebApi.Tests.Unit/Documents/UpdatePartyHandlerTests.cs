@@ -76,7 +76,6 @@ public class UpdatePartyHandlerTests : IDisposable
         var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
-        Assert.NotNull(result.UpdatedAt);
         Assert.True(result.UpdatedAt >= before);
         Assert.NotNull(result.UpdatedByUserId);
     }

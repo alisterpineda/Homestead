@@ -9,7 +9,7 @@ public class TextExtractionEngine
     public TextExtractionEngineType EngineType { get; set; }
     public string? Configuration { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public AppUser? CreatedByUser { get; set; }
 }

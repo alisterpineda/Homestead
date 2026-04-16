@@ -90,7 +90,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
         Assert.NotNull(saved);
-        Assert.NotNull(saved.UpdatedAt);
+        Assert.NotEqual(default, saved.UpdatedAt);
     }
 
     [Fact]

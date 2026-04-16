@@ -15,7 +15,7 @@ internal record UserItem(Guid Id, string DisplayName, string? Email, string Role
 internal record UserInfoResult(Guid Id, string Email, string DisplayName, string Role, bool IsActive);
 
 internal record GroupItem(Guid Id, string Name, string? Description, int MemberCount,
-    DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+    DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null);
 
 internal record GroupDetail(Guid Id, string Name, string? Description, IReadOnlyList<GroupMemberItem> Members);
 
@@ -23,7 +23,7 @@ internal record GroupMemberItem(Guid UserId, string DisplayName, string? Email, 
 
 internal record DocumentListItem(Guid Id, string Name, Guid? GroupId, string? GroupName,
     DateTimeOffset? DeletedAt = null, Guid? DeletedByUserId = null, string? DeletedByUserName = null,
-    DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null);
+    DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null);
 
 internal record VersionItem(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension);
 

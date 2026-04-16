@@ -71,6 +71,6 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule, ct);
         Assert.NotNull(saved);
-        Assert.NotNull(saved.UpdatedAt);
+        Assert.NotEqual(default, saved.UpdatedAt);
     }
 }

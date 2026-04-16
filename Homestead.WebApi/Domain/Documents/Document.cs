@@ -15,7 +15,7 @@ public class Document
     public string Notes { get; set; } = string.Empty;
     public NpgsqlTsVector? SearchVector { get; set; }
 
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
     public Guid? UpdatedByUserId { get; set; }
     public AppUser? UpdatedByUser { get; set; }
 

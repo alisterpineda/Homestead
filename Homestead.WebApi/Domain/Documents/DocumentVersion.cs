@@ -26,6 +26,7 @@ public class DocumentVersion
     public string? ExtractedText { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
     public Guid DocumentId { get; set; }
     public Document Document { get; set; } = null!;
 }

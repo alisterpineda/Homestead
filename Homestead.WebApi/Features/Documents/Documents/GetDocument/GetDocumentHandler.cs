@@ -50,7 +50,8 @@ public class GetDocumentHandler(AppDbContext db)
                         ContentType = r.ContentType,
                         FileSize = r.FileSize,
                         FileExtension = r.FileExtension,
-                        CreatedAt = r.CreatedAt
+                        CreatedAt = r.CreatedAt,
+                        UpdatedAt = r.UpdatedAt
                     })
                     .ToList(),
                 VersionCount = d.Versions.Count,

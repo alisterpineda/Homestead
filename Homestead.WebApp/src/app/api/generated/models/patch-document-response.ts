@@ -22,7 +22,7 @@ export interface PatchDocumentResponse {
   ownerUserName?: (string | null);
   parties: Array<PartyDto>;
   tags: Array<TagDto>;
-  updatedAt?: (string | null);
+  updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
 }

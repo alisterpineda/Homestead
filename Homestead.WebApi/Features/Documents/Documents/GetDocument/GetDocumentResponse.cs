@@ -9,7 +9,7 @@ public record GetDocumentResponse
     public required string FileHash { get; init; }
     public required string FileExtension { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
     public Guid? UpdatedByUserId { get; init; }
     public string? UpdatedByUserName { get; init; }
     public DateOnly? DocumentDate { get; init; }
@@ -37,6 +37,7 @@ public record GetDocumentVersionDto
     public required long FileSize { get; init; }
     public required string FileExtension { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
 }
 
 public record GetDocumentTagDto

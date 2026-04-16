@@ -6,7 +6,7 @@ export interface GetPartyResponse {
   description?: (string | null);
   id: string;
   name: string;
-  updatedAt?: (string | null);
+  updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
 }

@@ -105,7 +105,7 @@ public class PartyTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var party = await CreatePartyAsync(client, "UpdAtParty");
 
-        Assert.Null(party.UpdatedAt);
+        var initialUpdatedAt = party.UpdatedAt;
 
         var response = await client.PutAsJsonAsync($"/api/v1/documents/parties/{party.Id}", new
         {
@@ -115,7 +115,7 @@ public class PartyTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PartyResult>(CT);
-        Assert.NotNull(body!.UpdatedAt);
+        Assert.True(body!.UpdatedAt > initialUpdatedAt);
         Assert.NotNull(body.UpdatedByUserId);
     }
 
@@ -318,9 +318,9 @@ public class PartyTests : IntegrationTestBase
     }
 
     private record PartyResult(Guid Id, string Name, string? Description, DateTimeOffset CreatedAt,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record PartyListItem(Guid Id, string Name, string? Description, int DocumentCount,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailParty> Parties);
     private record DocumentDetailParty(Guid Id, string Name);
 }

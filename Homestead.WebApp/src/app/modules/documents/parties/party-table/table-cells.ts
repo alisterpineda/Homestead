@@ -23,7 +23,6 @@ export class PartyModifiedCell {
   private locale = inject(LOCALE_ID);
   protected readonly context = injectFlexRenderContext<CellContext<GetPartiesResponse, unknown>>();
   get formatted(): string {
-    const value = this.context.row.original.updatedAt ?? this.context.row.original.createdAt;
-    return value ? formatDate(value, 'mediumDate', this.locale) : '\u2014';
+    return formatDate(this.context.row.original.updatedAt, 'mediumDate', this.locale);
   }
 }

@@ -20,7 +20,9 @@ public class DocumentCommentConfiguration : IEntityTypeConfiguration<DocumentCom
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.Property(c => c.UpdatedAt);
+        builder.Property(c => c.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.HasOne(c => c.Document)
             .WithMany(d => d.Comments)

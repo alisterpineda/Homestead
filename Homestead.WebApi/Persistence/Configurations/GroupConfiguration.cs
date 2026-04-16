@@ -26,7 +26,9 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.Property(g => g.UpdatedAt);
+        builder.Property(g => g.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.HasOne(g => g.UpdatedByUser)
             .WithMany()

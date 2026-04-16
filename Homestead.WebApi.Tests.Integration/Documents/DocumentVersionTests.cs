@@ -138,5 +138,31 @@ public class DocumentVersionTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private record VersionDetail(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
+    [Fact]
+    public async Task PatchVersion_SetsUpdatedAt()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client);
+
+        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
+        var list = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
+        var versionId = list!.Items.First().Id;
+
+        // Get version before patch to capture initial UpdatedAt
+        var getResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions/{versionId}", CT);
+        var before = await getResponse.Content.ReadFromJsonAsync<VersionDetail>(CT);
+        var initialUpdatedAt = before!.UpdatedAt;
+
+        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}/versions/{versionId}", new[]
+        {
+            new { op = "replace", path = "/label", value = (object)"Patched Label" }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<VersionDetail>(CT);
+        Assert.True(body!.UpdatedAt > initialUpdatedAt);
+    }
+
+    private record VersionDetail(Guid Id, int VersionNumber, string? Label, string ContentType, long FileSize, string FileExtension,
+        DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt = default);
 }

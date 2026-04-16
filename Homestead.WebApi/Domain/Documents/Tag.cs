@@ -12,7 +12,7 @@ public class Tag
     public string? EffectiveColor { get; set; }
     public string? Description { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
 

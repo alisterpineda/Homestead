@@ -135,8 +135,8 @@ describe('TagTableComponent', () => {
 
   it('should sync selected IDs input to row selection state', () => {
     fixture.componentRef.setInput('tags', [
-      { id: 't1', name: 'A', path: 'A', documentCount: 0, createdAt: new Date().toISOString() },
-      { id: 't2', name: 'B', path: 'B', documentCount: 0, createdAt: new Date().toISOString() },
+      { id: 't1', name: 'A', path: 'A', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: 't2', name: 'B', path: 'B', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ]);
     fixture.componentRef.setInput('selectedIds', new Set(['t1']));
     fixture.detectChanges();
@@ -176,7 +176,7 @@ describe('TagTableComponent', () => {
 
   it('should emit selectionChange when row selection changes via table', () => {
     fixture.componentRef.setInput('tags', [
-      { id: 't1', name: 'A', path: 'A', documentCount: 0, createdAt: new Date().toISOString() },
+      { id: 't1', name: 'A', path: 'A', documentCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ]);
     fixture.detectChanges();
 

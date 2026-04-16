@@ -59,7 +59,7 @@ public class TrashTests : IntegrationTestBase
         var trashedDoc = body.Items.First(d => d.Id == docId1);
         Assert.NotNull(trashedDoc.DeletedAt);
         Assert.NotNull(trashedDoc.DeletedByUserId);
-        Assert.NotNull(trashedDoc.UpdatedAt);
+        Assert.NotEqual(default, trashedDoc.UpdatedAt);
         Assert.NotNull(trashedDoc.UpdatedByUserId);
     }
 

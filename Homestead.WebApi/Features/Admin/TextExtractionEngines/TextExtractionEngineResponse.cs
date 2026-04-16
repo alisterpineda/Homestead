@@ -10,7 +10,7 @@ public record TextExtractionEngineResponse
     public string? Configuration { get; init; }
     public required bool IsBuiltIn { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public required DateTimeOffset UpdatedAt { get; init; }
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }
 
@@ -22,5 +22,6 @@ public record TextExtractionEngineResponse
         Configuration = BuiltInTextExtractionEngines.TesseractDefaultConfiguration,
         IsBuiltIn = true,
         CreatedAt = DateTimeOffset.MinValue,
+        UpdatedAt = DateTimeOffset.MinValue,
     };
 }

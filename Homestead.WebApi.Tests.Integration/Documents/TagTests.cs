@@ -209,7 +209,7 @@ public class TagTests : IntegrationTestBase
         var createResponse = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "UpdAtTag" }, CT);
         createResponse.EnsureSuccessStatusCode();
         var created = await createResponse.Content.ReadFromJsonAsync<TagResult>(CT);
-        Assert.Null(created!.UpdatedAt);
+        var initialUpdatedAt = created!.UpdatedAt;
 
         var response = await SendJsonPatchAsync(client, $"/api/v1/documents/tags/{created.Id}", new[]
         {
@@ -218,7 +218,7 @@ public class TagTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TagResult>(CT);
-        Assert.NotNull(body!.UpdatedAt);
+        Assert.True(body!.UpdatedAt > initialUpdatedAt);
         Assert.NotNull(body.UpdatedByUserId);
     }
 
@@ -694,9 +694,9 @@ public class TagTests : IntegrationTestBase
     }
 
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record TagListItem(Guid Id, string Name, string Path, string? Description, int DocumentCount,
-        DateTimeOffset? UpdatedAt = null, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+        DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailTag> Tags);
     private record DocumentDetailTag(Guid Id, string Name, string Path);
 }

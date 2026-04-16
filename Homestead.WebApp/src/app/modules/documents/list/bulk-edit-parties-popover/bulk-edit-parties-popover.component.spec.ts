@@ -14,6 +14,9 @@ function makeDoc(id: string, parties: { id: string; name: string }[] = []): GetD
     contentType: 'application/pdf',
     fileSize: 1000,
     fileExtension: '.pdf',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    versionCount: 1,
     tags: [],
     parties,
   };

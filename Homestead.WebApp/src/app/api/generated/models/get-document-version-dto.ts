@@ -8,5 +8,6 @@ export interface GetDocumentVersionDto {
   fileSize: (number | string);
   id: string;
   label?: (string | null);
+  updatedAt: string;
   versionNumber: (number | string);
 }

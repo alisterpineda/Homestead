@@ -26,7 +26,9 @@ public class PartyConfiguration : IEntityTypeConfiguration<Party>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.Property(p => p.UpdatedAt);
+        builder.Property(p => p.UpdatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
         builder.HasOne(p => p.UpdatedByUser)
             .WithMany()

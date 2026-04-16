@@ -13,6 +13,9 @@ function makeDoc(id: string, tags: { path: string; color?: string }[] = []): Get
     contentType: 'application/pdf',
     fileSize: 1000,
     fileExtension: '.pdf',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    versionCount: 1,
     tags: tags.map((t) => ({ id: t.path, name: t.path, path: t.path, effectiveColor: t.color ?? null })),
     parties: [],
   };

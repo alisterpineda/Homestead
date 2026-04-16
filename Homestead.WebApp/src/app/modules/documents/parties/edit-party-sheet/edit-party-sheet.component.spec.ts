@@ -10,6 +10,7 @@ function makeParty(overrides: Partial<GetPartiesResponse> = {}): GetPartiesRespo
     name: 'Acme Corp',
     description: 'A test party',
     createdAt: '2025-01-15T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z',
     documentCount: 0,
     ...overrides,
   };

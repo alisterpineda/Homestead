@@ -11,7 +11,7 @@ export interface GetTagsResponse {
   name: string;
   parentId?: (string | null);
   path: string;
-  updatedAt?: (string | null);
+  updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
 }

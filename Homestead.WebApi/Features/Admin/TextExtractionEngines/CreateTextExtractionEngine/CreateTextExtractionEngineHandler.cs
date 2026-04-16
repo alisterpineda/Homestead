@@ -54,6 +54,7 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
             Configuration = engine.Configuration,
             IsBuiltIn = false,
             CreatedAt = engine.CreatedAt,
+            UpdatedAt = engine.UpdatedAt,
             CreatedByUserId = engine.CreatedByUserId,
             CreatedByUserName = creatorName,
         };

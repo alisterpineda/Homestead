@@ -11,5 +11,5 @@ export interface TextExtractionEngineResponse {
   id: string;
   isBuiltIn: boolean;
   name: string;
-  updatedAt?: (string | null);
+  updatedAt: string;
 }

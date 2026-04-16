@@ -91,7 +91,7 @@ public class UpdateTextExtractionEngineHandlerTests : IDisposable
         Assert.Equal("Updated Name", response.Name);
         Assert.Equal("""{"languages":["Deu"]}""", response.Configuration);
         Assert.False(response.IsBuiltIn);
-        Assert.NotNull(response.UpdatedAt);
+        Assert.NotEqual(default, response.UpdatedAt);
 
         var saved = await _db.TextExtractionEngines.FirstOrDefaultAsync(e => e.Id == engineId, ct);
         Assert.NotNull(saved);
