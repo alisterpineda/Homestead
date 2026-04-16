@@ -30,7 +30,7 @@ public class OidcUserProvisionerTests : IDisposable
             ClientId = "client-id",
             ClientSecret = "client-secret",
             RoleClaimType = "roles",
-            AdminClaimValue = "admin"
+            AdminClaimValues = ["admin", "platform-owner"]
         }));
     }
 
@@ -92,6 +92,18 @@ public class OidcUserProvisionerTests : IDisposable
     }
 
     [Fact]
+    public async Task SubsequentOidcUser_WithAlternateAdminClaimValue_IsAdmin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedExistingUser("existing@test.com", AppRole.Admin);
+
+        var principal = CreatePrincipal("alt@test.com", "Alt Admin", "platform-owner");
+        var user = await _sutWithRoleClaim.ProvisionOrUpdateAsync(principal, ct);
+
+        Assert.Equal(AppRole.Admin, user.Role);
+    }
+
+    [Fact]
     public async Task ExistingUser_GainsAdminClaim_PromotedToAdmin()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -130,7 +142,7 @@ public class OidcUserProvisionerTests : IDisposable
     [Fact]
     public async Task RoleClaimNotConfigured_DemotesAdminToDefault()
     {
-        // With no RoleClaimType/AdminClaimValue configured, HasAdminClaim always returns false,
+        // With no RoleClaimType/AdminClaimValues configured, HasAdminClaim always returns false,
         // so an existing Admin with no admin claim on the principal gets demoted on each sign-in.
         // Deployments that want to preserve an Admin role across sign-ins must configure the
         // OIDC role claim on OidcOptions.

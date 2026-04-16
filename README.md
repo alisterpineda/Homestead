@@ -83,7 +83,7 @@ services:
 
 2. Set `OIDC_AUTHORITY` to the provider's issuer URL (the base URL where `/.well-known/openid-configuration` is served).
 
-3. (Optional) To map a provider group/role to the Homestead admin role, set `OIDC_ROLE_CLAIM` to the claim type your provider uses (e.g., `groups`, `roles`) and `OIDC_ADMIN_CLAIM_VALUE` to the value that should grant admin access. Users matching that claim will automatically receive admin privileges on login.
+3. (Optional) To map provider groups/roles to the Homestead admin role, set `OIDC_ROLE_CLAIM` to the claim type your provider uses (e.g., `groups`, `roles`) and `OIDC_ADMIN_CLAIM_VALUES` to a comma-separated list of values that should grant admin access. Users whose claim matches any listed value will automatically receive admin privileges on login.
 
 Users logging in via OIDC are automatically provisioned — no manual account creation needed.
 
@@ -110,7 +110,7 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 | `OIDC_CLIENT_SECRET` | — | OIDC client secret |
 | `OIDC_DISPLAY_NAME` | `SSO` | Label shown on the login button |
 | `OIDC_ROLE_CLAIM` | — | Claim type used for role mapping (e.g., `groups`) |
-| `OIDC_ADMIN_CLAIM_VALUE` | — | Claim value that grants the admin role |
+| `OIDC_ADMIN_CLAIM_VALUES` | — | Comma-separated claim values that grant the admin role |
 | `OIDC_DISABLE_LOCAL_LOGIN` | `false` | Set to `true` to hide the local login form |
 | `OIDC_ADDITIONAL_SCOPES` | — | Comma-separated additional OAuth scopes |
 

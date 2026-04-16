@@ -56,16 +56,19 @@ if (!string.IsNullOrEmpty(oidcAuthority))
         Environment.GetEnvironmentVariable("OIDC_DISPLAY_NAME") ?? "SSO";
     builder.Configuration["Oidc:RoleClaimType"] =
         Environment.GetEnvironmentVariable("OIDC_ROLE_CLAIM") ?? "";
-    builder.Configuration["Oidc:AdminClaimValue"] =
-        Environment.GetEnvironmentVariable("OIDC_ADMIN_CLAIM_VALUE") ?? "";
 
-    var additionalScopes = Environment.GetEnvironmentVariable("OIDC_ADDITIONAL_SCOPES");
-    if (!string.IsNullOrEmpty(additionalScopes))
-    {
-        var scopes = additionalScopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        for (var i = 0; i < scopes.Length; i++)
-            builder.Configuration[$"Oidc:AdditionalScopes:{i}"] = scopes[i];
-    }
+    MapCsvEnvToConfigArray("OIDC_ADMIN_CLAIM_VALUES", "Oidc:AdminClaimValues");
+    MapCsvEnvToConfigArray("OIDC_ADDITIONAL_SCOPES", "Oidc:AdditionalScopes");
+}
+
+void MapCsvEnvToConfigArray(string envVar, string configPrefix)
+{
+    var raw = Environment.GetEnvironmentVariable(envVar);
+    if (string.IsNullOrEmpty(raw))
+        return;
+    var values = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    for (var i = 0; i < values.Length; i++)
+        builder.Configuration[$"{configPrefix}:{i}"] = values[i];
 }
 
 builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");

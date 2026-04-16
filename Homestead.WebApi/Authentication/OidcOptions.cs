@@ -12,7 +12,7 @@ public class OidcOptions
     public string DisplayName { get; set; } = "SSO";
     public List<string> AdditionalScopes { get; set; } = [];
     public string? RoleClaimType { get; set; }
-    public string? AdminClaimValue { get; set; }
+    public List<string> AdminClaimValues { get; set; } = [];
 
     public bool IsConfigured =>
         Authority.Length > 0 && ClientId.Length > 0 && ClientSecret.Length > 0;

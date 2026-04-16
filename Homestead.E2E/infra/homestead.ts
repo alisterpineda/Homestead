@@ -22,7 +22,7 @@ const COMMON_OIDC = {
   OIDC_CLIENT_SECRET: 'homestead-dev-secret',
   OIDC_DISPLAY_NAME: 'Keycloak',
   OIDC_ROLE_CLAIM: 'groups',
-  OIDC_ADMIN_CLAIM_VALUE: 'homestead-admin',
+  OIDC_ADMIN_CLAIM_VALUES: 'homestead-admin',
 };
 
 export const HOMESTEAD_CONFIGS: HomesteadConfig[] = [

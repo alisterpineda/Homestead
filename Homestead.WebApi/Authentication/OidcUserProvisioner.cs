@@ -60,10 +60,10 @@ public class OidcUserProvisioner(
 
     private bool HasAdminClaim(ClaimsPrincipal principal)
     {
-        if (string.IsNullOrEmpty(_oidc.RoleClaimType) || string.IsNullOrEmpty(_oidc.AdminClaimValue))
+        if (string.IsNullOrEmpty(_oidc.RoleClaimType) || _oidc.AdminClaimValues.Count == 0)
             return false;
         return principal.FindAll(_oidc.RoleClaimType)
-            .Any(c => string.Equals(c.Value, _oidc.AdminClaimValue, StringComparison.OrdinalIgnoreCase));
+            .Any(c => _oidc.AdminClaimValues.Contains(c.Value, StringComparer.OrdinalIgnoreCase));
     }
 
     private static string BuildDisplayName(ClaimsPrincipal principal)
