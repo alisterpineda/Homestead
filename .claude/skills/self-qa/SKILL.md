@@ -81,6 +81,8 @@ Walk through the change with intent, not just clicks. The goal is to catch both 
 
 Snapshots from `browser_snapshot` are usually more useful than screenshots for reasoning about structure — reach for screenshots when the issue is visual (spacing, color, alignment).
 
+When you *do* take a screenshot, **always prefix the filename with `.playwright-mcp/`** (e.g., `filename: ".playwright-mcp/foo.png"`). The MCP server's `--output-dir` only governs auto-named artifacts (console dumps, snapshot YAMLs); an explicit `filename` is passed straight to Playwright's `page.screenshot({ path })` and resolves against the MCP server's CWD — the repo root — so a bare name like `foo.png` will litter the project root.
+
 ### 5. Teardown — only if you started the stack
 
 If step 1's probe said *down* and you launched Aspire yourself, kill it at the end of the self-QA pass so the developer doesn't inherit a stranded background process:
