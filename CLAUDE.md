@@ -23,6 +23,8 @@ cd Homestead.AppHost && dotnet run
 
 This starts PostgreSQL (with pgWeb admin UI), Keycloak (with pre-imported realm), the WebApi, and the Angular dev server via Aspire. OIDC config is automatically passed to the WebApi.
 
+For UI changes, Claude Code can self-validate against the running stack via the `playwright` MCP server registered in `.mcp.json`. See `Homestead.WebApp/CLAUDE.md` → *Self-QA with Playwright MCP* for the workflow.
+
 ## Aspire Orchestration
 
 `Homestead.AppHost` orchestrates all services: PostgreSQL, Keycloak, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. Keycloak runs on port 8080 with a pre-imported `homestead` realm (`KeycloakRealms/homestead-realm.json`) containing test users (`admin@test.com`/`admin123`, `user@test.com`/`user123`). The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.

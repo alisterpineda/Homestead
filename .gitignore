@@ -17,3 +17,6 @@ Homestead.WebApi/wwwroot/
 # Claude Code
 .claude/settings.local.json
 .claude/skills/*-workspace/
+
+# Playwright MCP (Claude Code self-QA)
+.playwright-mcp/
