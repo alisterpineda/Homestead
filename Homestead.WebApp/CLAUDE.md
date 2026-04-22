@@ -42,59 +42,7 @@ Generated files (`src/app/api/generated/` and `src/app/shared/components/spartan
 
 ## Self-QA with Playwright MCP
 
-After a UI-affecting change, use the `playwright` MCP server (registered in `.mcp.json` at the repo root) to drive a real browser and verify the change works before reporting the task complete. This is ephemeral validation, not a replacement for the E2E suite in `Homestead.E2E/`.
-
-### Start the stack (automated)
-
-The workflow assumes minimal developer intervention: Claude starts the stack itself if it is not already running.
-
-1. **Probe**. Run two quick readiness checks:
-   ```bash
-   curl -sSf -o /dev/null -m 2 http://localhost:4200 && echo ui-up || echo ui-down
-   curl -sSf -o /dev/null -m 2 http://localhost:8080/realms/homestead/.well-known/openid-configuration && echo oidc-up || echo oidc-down
-   ```
-2. **If both are `up`**, the developer already has the stack running — skip to *Log in*. Do not start a second copy and do not attempt to shut it down at the end of the session.
-3. **If either is `down`**, launch Aspire as a background process via the Bash tool with `run_in_background: true`:
-   ```bash
-   dotnet run --project Homestead.AppHost
-   ```
-   Record that *you* started it so you are the one who tears it down later. First run in a fresh devcontainer may take several minutes because Postgres and Keycloak images get pulled via DinD; subsequent runs are ~30–60 seconds.
-4. **Wait for readiness**. Poll both probes above at ~2-second intervals until both return `up`, with a ~180-second overall timeout for a cold start (60 seconds for warm). If the timeout expires, read the background task's stdout/stderr for the failure reason, report it to the developer, and stop — do not silently skip validation.
-5. **Teardown policy**. If *you* started the stack this session, kill it at the end of the self-QA workflow:
-   ```bash
-   pkill -f "Homestead.AppHost"
-   ```
-   If the developer started it (step 2), leave it running.
-
-Once ready, the app is at **http://localhost:4200** and Keycloak is at **http://localhost:8080**.
-
-### Log in
-
-Auth is OIDC-only, so the browser must complete a Keycloak login. Drive it with the MCP tools:
-
-1. `browser_navigate` to `http://localhost:4200` — Angular redirects to `/login`.
-2. `browser_click` the "Sign in with SSO" button. The tab redirects to Keycloak on `localhost:8080`.
-3. `browser_type` the dev email into the "Username or email" field: `admin@test.com`.
-4. `browser_type` the dev password: `admin123`.
-5. `browser_click` the Keycloak "Sign In" submit button. Wait for the redirect back to `/documents`.
-
-These credentials are **not secrets** — they are the imported realm's dev users from `KeycloakRealms/homestead-realm.json` and are already referenced openly in `Homestead.E2E/e2e.config.ts`. Use `user@test.com` / `user123` if you need a non-admin session. Never introduce other credentials into this workflow.
-
-### Self-QA checklist
-
-After any UI-affecting change, before declaring the task done:
-
-1. Navigate to the specific screen(s) your change affects and verify the change is visible and behaves as intended.
-2. Exercise the golden path for the feature (e.g., for a form change: open the form, fill it, submit, confirm the success state).
-3. Walk through at least one adjacent screen that imports the same component/service, to catch regressions.
-4. Check the browser console — any new errors or uncaught promise rejections count as a failure.
-5. If the change touches an API call, verify the network response in the MCP browser's activity, not just the UI.
-
-If MCP cannot reach the app, do not silently skip validation — report "UI validation not run: <reason>" in your final summary so the developer knows.
-
-### Out of scope
-
-Regression coverage lives in `Homestead.E2E/` and is maintained separately. Do not edit E2E tests, E2E config, or the `.auth/` storage-state directory during a self-QA session. If a gap in E2E coverage surfaces during self-QA, flag it for the developer — do not silently expand the suite.
+Before declaring a UI-affecting change complete, self-validate it by driving a real browser against the running Aspire stack via the `playwright` MCP server (registered in `.mcp.json`). The full workflow — probe, start, Keycloak login, checklist, teardown — is in the `self-qa` skill. This is ephemeral in-session validation; the durable regression suite in `Homestead.E2E/` is out of scope here.
 
 ---
 
