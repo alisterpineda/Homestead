@@ -239,3 +239,4 @@ jobs:
         with:
           name: coverage-report
           path: './CoverageReport'
+          retention-days: 3
