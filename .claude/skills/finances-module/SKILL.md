@@ -43,19 +43,16 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 ### Accounts
 
-Accounts are the units the user thinks about and manages. Each has a name, a type, and a home in an optional hierarchy (e.g. *Assets → Investments → RRSP*). There are two conceptual shapes, determined by what they hold:
+Accounts are the units the user thinks about and manages. Users pick from a closed set of user-facing **kinds** — Cash, Credit Card, Loan, Other Liability, Investment, Other Asset — which determine the underlying Asset/Liability classification and whether the account holds one commodity or many. Kind and reporting currency are immutable after creation; everything else (name, institution, parent, archived) is editable. An optional parent-child hierarchy exists for grouping (e.g. *Assets → Investments → RRSP*).
 
-- **Single-position accounts** hold one commodity, typically a currency. Chequing, savings, credit cards, mortgages.
-- **Multi-position accounts** hold an open set of commodities simultaneously. Registered and non-registered investment accounts holding cash in multiple currencies plus securities.
-
-This distinction exists for the UI's benefit. In the data model both shapes use the same account representation; a single-position account is a multi-position account that happens to only hold one thing, enforced by convention in the entry UI.
-
-Account types used by v1: `asset`, `liability`, `equity`. The model reserves `income` and `expense` for future use.
+Account types used at the model layer in v1: `asset`, `liability`, `equity`. The model reserves `income` and `expense` for future use.
 
 Two system-created equity accounts always exist for each household:
 
 - **Equity:Opening Balances** — the counterpart for wealth present before tracking began.
-- **Equity:Adjustments** — the counterpart for unexplained monthly reconciliation deltas. See *Balance entries*.
+- **Equity:Adjustments** — the counterpart for unexplained balance-entry deltas. See *Balance entries*.
+
+See [references/accounts.md](references/accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
 
 ### Commodities
 
@@ -112,9 +109,13 @@ There is no household-wide "base currency" at the data layer. A **display curren
 
 This is load-bearing for the household's relocation scenarios. Moving from Canada to another country must not require re-denominating historical data.
 
+### Beancount-style sign convention
+
+Stored split values follow the Beancount convention: asset splits are positive when the balance increases; liability and equity splits are negative when the balance increases; `SUM(split.Value) = 0` for every transaction except stock splits. This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) for worked examples.
+
 ### Single-position vs multi-position is UI-only
 
-The schema supports any account holding any set of commodities. The "single-position" constraint on chequing-like accounts is enforced by the UI's entry forms, not by the data layer. This keeps the model uniform and avoids a second set of tables for investment accounts.
+The schema supports any account holding any set of commodities. The "single-position" constraint on Cash / Credit Card / Loan / Other kinds is enforced by the UI — through the set of transaction shapes offered for each kind — not by the data layer. Only Investment accounts surface multi-commodity shapes. This keeps the model uniform and avoids a second set of tables for investment accounts.
 
 ### Categorisation is a v2 concern
 
@@ -136,7 +137,7 @@ The UI exposes a small, closed set of shapes. Each shape is a template that prod
 
 ### Opening balance
 
-Captured at onboarding per account. Creates a transaction with one split on the account and one split on Equity:Opening Balances. User sees this only during setup.
+Captures wealth that existed before tracking began. For single-position kinds (Cash, Credit Card, Loan, Other Liability, Other Asset) a single opening balance is captured at account creation. For Investment accounts an opening balance is captured per commodity via the *Add position* action on the account detail page — each position's opening balance is independent, one transaction per `(account, commodity)` pair. All opening balances produce a two-split transaction against `Equity:Opening Balances`. Opening-balance transactions are edited through dedicated per-account / per-position affordances, not through the generic transaction editor. See [references/accounts.md](references/accounts.md).
 
 ### Transfer
 
