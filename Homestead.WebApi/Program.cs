@@ -7,7 +7,9 @@ using Homestead.WebApi.Modules.Admin;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Modules.Finances;
 using Homestead.WebApi.Modules.Finances.Seeding;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Modules.Processing;
 using Homestead.WebApi.Modules.Status;
 using Homestead.WebApi.Processing;
@@ -75,8 +77,16 @@ void MapCsvEnvToConfigArray(string envVar, string configPrefix)
 builder.AddNpgsqlDbContext<AppDbContext>(
     connectionName: "postgresdb",
     configureDbContextOptions: opts => opts
-        .UseSeeding(CurrencySeeder.Seed)
-        .UseAsyncSeeding(CurrencySeeder.SeedAsync));
+        .UseSeeding((ctx, created) =>
+        {
+            CurrencySeeder.Seed(ctx, created);
+            SystemAccountSeeder.Seed(ctx, created);
+        })
+        .UseAsyncSeeding(async (ctx, created, ct) =>
+        {
+            await CurrencySeeder.SeedAsync(ctx, created, ct);
+            await SystemAccountSeeder.SeedAsync(ctx, created, ct);
+        }));
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).
@@ -96,6 +106,7 @@ builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
+builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>
@@ -238,6 +249,7 @@ var versionedApi = app.NewVersionedApi();
 versionedApi.MapDocumentsEndpoints();
 versionedApi.MapProcessingEndpoints();
 versionedApi.MapAdminEndpoints();
+versionedApi.MapFinancesEndpoints();
 
 if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
 {

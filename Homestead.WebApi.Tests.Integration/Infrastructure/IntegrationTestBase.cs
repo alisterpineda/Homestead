@@ -47,12 +47,15 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         }
 
         // Respawn clears all finances tables (including the ISO 4217 commodity
-        // seed) between tests. UseSeeding only fires on Migrate/EnsureCreated,
-        // not on Respawn's raw-SQL wipes, so restore the seed explicitly.
+        // seed and the system equity accounts) between tests. UseSeeding only
+        // fires on Migrate/EnsureCreated, not on Respawn's raw-SQL wipes, so
+        // restore the seeds explicitly. SystemAccountSeeder depends on the
+        // currency seed, so order matters.
         using (var scope = Factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             CurrencySeeder.Seed(db);
+            SystemAccountSeeder.Seed(db);
         }
 
         // Clean stored files to avoid duplicate-content errors across test classes

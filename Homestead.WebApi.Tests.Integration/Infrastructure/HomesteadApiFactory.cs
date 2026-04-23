@@ -71,8 +71,16 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
                 options.UseNpgsql(_connectionString);
                 // Re-register the seeding hooks — ConfigureServices above stripped the
                 // Aspire DbContext registration that originally carried them.
-                options.UseSeeding(CurrencySeeder.Seed);
-                options.UseAsyncSeeding(CurrencySeeder.SeedAsync);
+                options.UseSeeding((ctx, created) =>
+                {
+                    CurrencySeeder.Seed(ctx, created);
+                    SystemAccountSeeder.Seed(ctx, created);
+                });
+                options.UseAsyncSeeding(async (ctx, created, ct) =>
+                {
+                    await CurrencySeeder.SeedAsync(ctx, created, ct);
+                    await SystemAccountSeeder.SeedAsync(ctx, created, ct);
+                });
             });
         });
     }

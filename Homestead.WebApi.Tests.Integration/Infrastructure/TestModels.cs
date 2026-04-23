@@ -36,3 +36,17 @@ internal record DocumentSettingsItem(Guid? DefaultTextExtractionEngineId = null)
 internal record SystemSettingsItem();
 
 internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
+
+// Finances — enum fields are serialized as strings server-side, so use string here.
+internal record FinanceCommodityItem(Guid Id, string Symbol, string Name, string Kind, short DisplayPrecision);
+
+internal record FinanceAccountItem(
+    Guid Id, string Name, string AccountType, Guid? ParentId,
+    Guid DefaultCommodityId, bool IsMultiPosition, string? Institution,
+    bool IsSystem, bool IsArchived,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
+internal record FinancePriceItem(
+    Guid Id, Guid CommodityId, Guid QuoteCurrencyId, DateOnly PriceDate, decimal Rate);
+
+internal record FinanceSettingsItem(Guid? DisplayCurrencyId = null);
