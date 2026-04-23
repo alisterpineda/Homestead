@@ -18,18 +18,9 @@ public class DeleteAccountHandler(AppDbContext db, IAuditContext audit)
         if (account.IsSystem)
             throw new BusinessRuleException("System accounts cannot be deleted.");
 
-        var refs = await db.Accounts
-            .Where(a => a.Id == request.Id)
-            .Select(a => new
-            {
-                HasChildren = db.Accounts.Any(c => c.ParentId == a.Id),
-                HasSplits = db.AccountTransactionSplits.Any(s => s.AccountId == a.Id),
-            })
-            .SingleAsync(ct);
-
-        if (refs.HasChildren)
-            throw new BusinessRuleException("Account has child accounts and cannot be deleted.");
-        if (refs.HasSplits)
+        var hasSplits = await db.AccountTransactionSplits
+            .AnyAsync(s => s.AccountId == account.Id, ct);
+        if (hasSplits)
             throw new BusinessRuleException("Account has transactions and cannot be deleted.");
 
         db.Accounts.Remove(account);

@@ -137,6 +137,16 @@ export type { DeleteAccount$Params as DeleteAccount$Params } from './fn/finances
 export { deleteAccount as deleteAccount } from './fn/finances/delete-account';
 export type { PatchAccount$Params as PatchAccount$Params } from './fn/finances/patch-account';
 export { patchAccount as patchAccount } from './fn/finances/patch-account';
+export type { GetOpeningBalances$Params as GetOpeningBalances$Params } from './fn/finances/get-opening-balances';
+export { getOpeningBalances as getOpeningBalances } from './fn/finances/get-opening-balances';
+export type { CreateOpeningBalance$Params as CreateOpeningBalance$Params } from './fn/finances/create-opening-balance';
+export { createOpeningBalance as createOpeningBalance } from './fn/finances/create-opening-balance';
+export type { GetOpeningBalance$Params as GetOpeningBalance$Params } from './fn/finances/get-opening-balance';
+export { getOpeningBalance as getOpeningBalance } from './fn/finances/get-opening-balance';
+export type { DeleteOpeningBalance$Params as DeleteOpeningBalance$Params } from './fn/finances/delete-opening-balance';
+export { deleteOpeningBalance as deleteOpeningBalance } from './fn/finances/delete-opening-balance';
+export type { PatchOpeningBalance$Params as PatchOpeningBalance$Params } from './fn/finances/patch-opening-balance';
+export { patchOpeningBalance as patchOpeningBalance } from './fn/finances/patch-opening-balance';
 export type { GetCommodities$Params as GetCommodities$Params } from './fn/finances/get-commodities';
 export { getCommodities as getCommodities } from './fn/finances/get-commodities';
 export type { CreateCommodity$Params as CreateCommodity$Params } from './fn/finances/create-commodity';

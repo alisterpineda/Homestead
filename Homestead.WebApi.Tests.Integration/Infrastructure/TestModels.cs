@@ -41,8 +41,8 @@ internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
 internal record FinanceCommodityItem(Guid Id, string Symbol, string Name, string Kind, short DisplayPrecision);
 
 internal record FinanceAccountItem(
-    Guid Id, string Name, string AccountType, Guid? ParentId,
-    Guid DefaultCommodityId, bool IsMultiPosition, string? Institution,
+    Guid Id, string Name, string AccountType, string? Kind,
+    Guid ReportingCurrencyId, string? Institution,
     bool IsSystem, bool IsArchived,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 

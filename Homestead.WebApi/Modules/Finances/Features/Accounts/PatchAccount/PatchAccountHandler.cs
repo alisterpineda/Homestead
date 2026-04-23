@@ -29,7 +29,6 @@ public class PatchAccountHandler(
         var model = new PatchAccountModel
         {
             Name = account.Name,
-            ParentId = account.ParentId,
             Institution = account.Institution,
             IsArchived = account.IsArchived,
         };
@@ -43,18 +42,7 @@ public class PatchAccountHandler(
         if (model.Institution is not null && model.Institution.Length > 128)
             throw new BusinessRuleException("Institution must be 128 characters or fewer.");
 
-        if (model.ParentId == request.Id)
-            throw new BusinessRuleException("An account cannot be its own parent.");
-
-        if (model.ParentId is { } parentId)
-        {
-            var parentExists = await db.Accounts.AnyAsync(a => a.Id == parentId, ct);
-            if (!parentExists)
-                throw new BusinessRuleException("ParentId must reference an existing account.");
-        }
-
         account.Name = model.Name.Trim();
-        account.ParentId = model.ParentId;
         account.Institution = string.IsNullOrWhiteSpace(model.Institution) ? null : model.Institution.Trim();
         account.IsArchived = model.IsArchived;
         account.UpdatedAt = DateTimeOffset.UtcNow;
@@ -67,9 +55,8 @@ public class PatchAccountHandler(
             Id = account.Id,
             Name = account.Name,
             AccountType = account.AccountType,
-            ParentId = account.ParentId,
-            DefaultCommodityId = account.DefaultCommodityId,
-            IsMultiPosition = account.IsMultiPosition,
+            Kind = account.Kind,
+            ReportingCurrencyId = account.ReportingCurrencyId,
             Institution = account.Institution,
             IsSystem = account.IsSystem,
             IsArchived = account.IsArchived,

@@ -59,7 +59,7 @@ public static class SystemAccountSeeder
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static List<Account> BuildMissing(IEnumerable<string> missingNames, Guid defaultCommodityId)
+    private static List<Account> BuildMissing(IEnumerable<string> missingNames, Guid reportingCurrencyId)
     {
         var toAdd = new List<Account>();
         foreach (var name in missingNames)
@@ -69,8 +69,8 @@ public static class SystemAccountSeeder
                 Id = Guid.NewGuid(),
                 Name = name,
                 AccountType = AccountType.Equity,
-                DefaultCommodityId = defaultCommodityId,
-                IsMultiPosition = true,
+                Kind = null,
+                ReportingCurrencyId = reportingCurrencyId,
                 IsSystem = true,
                 IsArchived = false,
             });

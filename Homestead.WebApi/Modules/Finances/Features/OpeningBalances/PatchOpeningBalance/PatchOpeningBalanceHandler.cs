@@ -1,0 +1,34 @@
+using Homestead.WebApi.Common;
+using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Persistence;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
+
+public class PatchOpeningBalanceHandler(
+    AppDbContext db,
+    IOpeningBalanceService openingBalances,
+    ISystemAccountProvider systemAccounts)
+    : IRequestHandler<PatchOpeningBalanceCommand, OpeningBalanceResponse>
+{
+    public async Task<OpeningBalanceResponse> Handle(PatchOpeningBalanceCommand request, CancellationToken ct)
+    {
+        var existingTxnId = await db.OpeningBalancesFor(request.AccountId, request.CommodityId)
+            .Select(t => (Guid?)t.Id)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new EntityNotFoundException("Opening balance not found for this account and commodity.");
+
+        var transaction = await openingBalances.UpdateAsync(
+            existingTxnId, request.Quantity, request.ValuePerUnit, request.AsOfDate, ct);
+
+        await db.SaveChangesAsync(ct);
+
+        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == request.CommodityId, ct)
+            ?? throw new BusinessRuleException("Commodity not found.");
+        var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
+        var accountSplit = OpeningBalanceMapping.AccountSideSplit(transaction, openingBalancesAccount.Id);
+
+        return OpeningBalanceMapping.ToResponse(transaction, accountSplit, commodity);
+    }
+}

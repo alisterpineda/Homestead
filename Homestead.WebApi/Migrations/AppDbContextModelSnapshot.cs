@@ -346,9 +346,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DefaultCommodityId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Institution")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -356,18 +353,19 @@ namespace Homestead.WebApi.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsMultiPosition")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsSystem")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<Guid?>("ParentId")
+                    b.Property<Guid>("ReportingCurrencyId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -380,14 +378,12 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountType")
-                        .HasFilter("\"IsArchived\" = FALSE");
-
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("DefaultCommodityId");
+                    b.HasIndex("Kind")
+                        .HasFilter("\"IsArchived\" = FALSE");
 
-                    b.HasIndex("ParentId");
+                    b.HasIndex("ReportingCurrencyId");
 
                     b.HasIndex("UpdatedByUserId");
 
@@ -1093,16 +1089,11 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "DefaultCommodity")
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "ReportingCurrency")
                         .WithMany()
-                        .HasForeignKey("DefaultCommodityId")
+                        .HasForeignKey("ReportingCurrencyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("Homestead.WebApi.Domain.Finances.Account", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
                         .WithMany()
@@ -1111,9 +1102,7 @@ namespace Homestead.WebApi.Migrations
 
                     b.Navigation("CreatedByUser");
 
-                    b.Navigation("DefaultCommodity");
-
-                    b.Navigation("Parent");
+                    b.Navigation("ReportingCurrency");
 
                     b.Navigation("UpdatedByUser");
                 });
@@ -1359,11 +1348,6 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Children");
 
                     b.Navigation("DocumentTags");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.Account", b =>
-                {
-                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.AccountTransaction", b =>

@@ -7,12 +7,11 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { AccountType } from '../../models/account-type';
+import { AccountKind } from '../../models/account-kind';
 import { PaginatedResponseOfAccountResponse } from '../../models/paginated-response-of-account-response';
 
 export interface GetAccounts$Params {
-  AccountType?: AccountType;
-  ParentId?: string;
+  Kind?: AccountKind;
   IncludeArchived?: boolean;
   Page: (number | string);
   PageSize: (number | string);
@@ -21,8 +20,7 @@ export interface GetAccounts$Params {
 export function getAccounts(http: HttpClient, rootUrl: string, params: GetAccounts$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAccountResponse>> {
   const rb = new RequestBuilder(rootUrl, getAccounts.PATH, 'get');
   if (params) {
-    rb.query('AccountType', params.AccountType, {});
-    rb.query('ParentId', params.ParentId, {});
+    rb.query('Kind', params.Kind, {});
     rb.query('IncludeArchived', params.IncludeArchived, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});

@@ -19,7 +19,7 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
             .Where(c => c.Id == request.Id)
             .Select(c => new
             {
-                ByAccount = db.Accounts.Any(a => a.DefaultCommodityId == c.Id),
+                ByAccount = db.Accounts.Any(a => a.ReportingCurrencyId == c.Id),
                 ByTransactionCurrency = db.AccountTransactions.Any(t => t.CurrencyId == c.Id),
                 BySplit = db.AccountTransactionSplits.Any(s => s.CommodityId == c.Id),
                 ByPrice = db.CommodityPrices.Any(p => p.CommodityId == c.Id || p.QuoteCurrencyId == c.Id),
@@ -27,7 +27,7 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
             .SingleAsync(ct);
 
         if (refs.ByAccount)
-            throw new BusinessRuleException("Commodity is in use as an account's default commodity.");
+            throw new BusinessRuleException("Commodity is in use as an account's reporting currency.");
         if (refs.ByTransactionCurrency)
             throw new BusinessRuleException("Commodity is in use as a transaction currency.");
         if (refs.BySplit)

@@ -107,6 +107,8 @@ builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
+builder.Services.AddScoped<ISystemAccountProvider, SystemAccountProvider>();
+builder.Services.AddScoped<IOpeningBalanceService, OpeningBalanceService>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>

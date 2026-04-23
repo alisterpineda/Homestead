@@ -11,9 +11,8 @@ public class AccountSnapshotTests
         Id = Guid.NewGuid(),
         Name = "Chequing",
         AccountType = AccountType.Asset,
-        ParentId = null,
-        DefaultCommodityId = Guid.NewGuid(),
-        IsMultiPosition = false,
+        Kind = AccountKind.Cash,
+        ReportingCurrencyId = Guid.NewGuid(),
         Institution = "Big Bank",
         IsSystem = false,
         IsArchived = false,
@@ -27,7 +26,6 @@ public class AccountSnapshotTests
         var snapshot = AccountSnapshot.From(account);
 
         Assert.Equal(account.Name, snapshot.Name);
-        Assert.Equal(account.ParentId, snapshot.ParentId);
         Assert.Equal(account.Institution, snapshot.Institution);
         Assert.Equal(account.IsArchived, snapshot.IsArchived);
     }
@@ -60,17 +58,16 @@ public class AccountSnapshotTests
     }
 
     [Fact]
-    public void Diff_DetectsParentIdChange_FromNullToValue()
+    public void Diff_DetectsInstitutionChange()
     {
         var before = AccountSnapshot.From(CreateAccount());
-        var newParent = Guid.NewGuid();
-        var after = before with { ParentId = newParent };
+        var after = before with { Institution = "New Bank" };
 
         var changes = before.Diff(after);
 
         var change = Assert.IsType<ScalarFieldChange>(Assert.Single(changes));
-        Assert.Equal("ParentId", change.Field);
-        Assert.Null(change.OldValue);
-        Assert.Equal(newParent.ToString(), change.NewValue);
+        Assert.Equal("Institution", change.Field);
+        Assert.Equal("Big Bank", change.OldValue);
+        Assert.Equal("New Bank", change.NewValue);
     }
 }

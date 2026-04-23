@@ -21,10 +21,13 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasConversion<string>()
             .HasMaxLength(16);
 
+        builder.Property(a => a.Kind)
+            .HasConversion<string>()
+            .HasMaxLength(24);
+
         builder.Property(a => a.Institution)
             .HasMaxLength(128);
 
-        builder.Property(a => a.IsMultiPosition).IsRequired();
         builder.Property(a => a.IsSystem).IsRequired();
         builder.Property(a => a.IsArchived).IsRequired();
 
@@ -36,14 +39,9 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.HasOne(a => a.Parent)
-            .WithMany(a => a.Children)
-            .HasForeignKey(a => a.ParentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(a => a.DefaultCommodity)
+        builder.HasOne(a => a.ReportingCurrency)
             .WithMany()
-            .HasForeignKey(a => a.DefaultCommodityId)
+            .HasForeignKey(a => a.ReportingCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(a => a.CreatedByUser)
@@ -56,9 +54,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasForeignKey(a => a.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(a => a.ParentId);
-
-        builder.HasIndex(a => a.AccountType)
+        builder.HasIndex(a => a.Kind)
             .HasFilter("\"IsArchived\" = FALSE");
     }
 }

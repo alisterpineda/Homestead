@@ -14,6 +14,11 @@ using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodity
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrice;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.GetCommodityPrices;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommodityPrice;
+using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalances;
+using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
 
@@ -36,6 +41,13 @@ public static class FinancesModule
         CreateAccountEndpoint.Map(accounts);
         PatchAccountEndpoint.Map(accounts);
         DeleteAccountEndpoint.Map(accounts);
+
+        // Opening balances are sub-resources of accounts.
+        CreateOpeningBalanceEndpoint.Map(accounts);
+        GetOpeningBalancesEndpoint.Map(accounts);
+        GetOpeningBalanceEndpoint.Map(accounts);
+        PatchOpeningBalanceEndpoint.Map(accounts);
+        DeleteOpeningBalanceEndpoint.Map(accounts);
 
         var commodities = v1.MapGroup("/commodities");
         GetCommoditiesEndpoint.Map(commodities);

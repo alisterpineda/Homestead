@@ -159,13 +159,14 @@ public class AccountTransactionTphTests : IntegrationTestBase
         await db.SaveChangesAsync(CT); // should not throw
     }
 
-    private async Task<Account> CreateAccountAsync(AppDbContext db, Commodity defaultCommodity, string name = "Test account")
+    private async Task<Account> CreateAccountAsync(AppDbContext db, Commodity reportingCurrency, string name = "Test account")
     {
         var account = new Account
         {
             Name = name,
             AccountType = AccountType.Asset,
-            DefaultCommodityId = defaultCommodity.Id,
+            Kind = AccountKind.Cash,
+            ReportingCurrencyId = reportingCurrency.Id,
         };
         db.Accounts.Add(account);
         await db.SaveChangesAsync(CT);

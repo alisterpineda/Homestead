@@ -28,7 +28,7 @@ public class SystemAccountSeederTests : IntegrationTestBase
             Assert.Equal(AccountType.Equity, account.AccountType);
             Assert.True(account.IsSystem);
             Assert.False(account.IsArchived);
-            Assert.True(account.IsMultiPosition);
+            Assert.Null(account.Kind);
         }
     }
 

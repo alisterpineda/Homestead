@@ -2,6 +2,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -11,30 +12,26 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.CreateAccount;
 public class CreateAccountHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditContext audit)
+    IAuditContext audit,
+    IOpeningBalanceService openingBalances)
     : IRequestHandler<CreateAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken ct)
     {
-        var commodityExists = await db.Commodities.AnyAsync(c => c.Id == request.DefaultCommodityId, ct);
-        if (!commodityExists)
-            throw new BusinessRuleException("DefaultCommodityId must reference an existing commodity.");
-
-        if (request.ParentId is { } parentId)
-        {
-            var parentExists = await db.Accounts.AnyAsync(a => a.Id == parentId, ct);
-            if (!parentExists)
-                throw new BusinessRuleException("ParentId must reference an existing account.");
-        }
+        var reportingCurrency = await db.Commodities
+            .FirstOrDefaultAsync(c => c.Id == request.ReportingCurrencyId, ct);
+        if (reportingCurrency is null)
+            throw new BusinessRuleException("ReportingCurrencyId must reference an existing commodity.");
+        if (reportingCurrency.Kind != CommodityKind.Currency)
+            throw new BusinessRuleException("ReportingCurrencyId must reference a currency commodity.");
 
         var account = new Account
         {
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
-            AccountType = request.AccountType,
-            ParentId = request.ParentId,
-            DefaultCommodityId = request.DefaultCommodityId,
-            IsMultiPosition = request.IsMultiPosition,
+            AccountType = request.Kind.ToAccountType(),
+            Kind = request.Kind,
+            ReportingCurrencyId = request.ReportingCurrencyId,
             Institution = string.IsNullOrWhiteSpace(request.Institution) ? null : request.Institution.Trim(),
             IsSystem = false,
             IsArchived = false,
@@ -46,6 +43,14 @@ public class CreateAccountHandler(
 
         db.Accounts.Add(account);
         audit.Created("Account", account.Id);
+
+        if (request.InitialBalance is { Amount: > 0 } initial)
+        {
+            await openingBalances.CreateAsync(
+                account.Id, account.ReportingCurrencyId, initial.Amount,
+                valuePerUnit: null, initial.AsOfDate, ct);
+        }
+
         await db.SaveChangesAsync(ct);
 
         return ToResponse(account);
@@ -56,9 +61,8 @@ public class CreateAccountHandler(
         Id = a.Id,
         Name = a.Name,
         AccountType = a.AccountType,
-        ParentId = a.ParentId,
-        DefaultCommodityId = a.DefaultCommodityId,
-        IsMultiPosition = a.IsMultiPosition,
+        Kind = a.Kind,
+        ReportingCurrencyId = a.ReportingCurrencyId,
         Institution = a.Institution,
         IsSystem = a.IsSystem,
         IsArchived = a.IsArchived,

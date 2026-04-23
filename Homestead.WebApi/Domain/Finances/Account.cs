@@ -7,15 +7,11 @@ public class Account
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public AccountType AccountType { get; set; }
+    public AccountKind? Kind { get; set; }
 
-    public Guid? ParentId { get; set; }
-    public Account? Parent { get; set; }
-    public ICollection<Account> Children { get; set; } = [];
+    public Guid ReportingCurrencyId { get; set; }
+    public Commodity ReportingCurrency { get; set; } = null!;
 
-    public Guid DefaultCommodityId { get; set; }
-    public Commodity DefaultCommodity { get; set; } = null!;
-
-    public bool IsMultiPosition { get; set; }
     public string? Institution { get; set; }
     public bool IsSystem { get; set; }
     public bool IsArchived { get; set; }

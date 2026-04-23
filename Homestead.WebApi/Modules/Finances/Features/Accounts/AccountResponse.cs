@@ -7,9 +7,8 @@ public record AccountResponse
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required AccountType AccountType { get; init; }
-    public Guid? ParentId { get; init; }
-    public required Guid DefaultCommodityId { get; init; }
-    public required bool IsMultiPosition { get; init; }
+    public AccountKind? Kind { get; init; }
+    public required Guid ReportingCurrencyId { get; init; }
     public string? Institution { get; init; }
     public required bool IsSystem { get; init; }
     public required bool IsArchived { get; init; }
