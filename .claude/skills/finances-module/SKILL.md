@@ -43,7 +43,7 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 ### Accounts
 
-Accounts are the units the user thinks about and manages. Users pick from a closed set of user-facing **kinds** — Cash, Credit Card, Loan, Other Liability, Investment, Other Asset — which determine the underlying Asset/Liability classification and whether the account holds one commodity or many. Kind and reporting currency are immutable after creation; everything else (name, institution, parent, archived) is editable. An optional parent-child hierarchy exists for grouping (e.g. *Assets → Investments → RRSP*).
+Accounts are the units the user thinks about and manages. Users pick from a closed set of user-facing **kinds** — Cash, Credit Card, Loan, Other Liability, Investment, Other Asset — which determine the underlying Asset/Liability classification and whether the account holds one commodity or many. Kind and reporting currency are immutable after creation; everything else (name, institution, archived) is editable. Accounts are a flat list in v1 — the list groups by Kind, and Institution provides secondary grouping where users need it.
 
 Account types used at the model layer in v1: `asset`, `liability`, `equity`. The model reserves `income` and `expense` for future use.
 
@@ -189,7 +189,7 @@ All derived from splits and prices at read time. None are cached at the data lay
 
 The following must be addable later without rewriting history:
 
-- Income and expense accounts as categories; category reporting and drill-down.
+- Income and expense accounts as categories; category reporting and drill-down. This is also when a parent-child account hierarchy would be introduced (categories are naturally hierarchical, e.g. Food → Groceries → Produce).
 - Tags at the split level for cross-cutting labels (e.g. tax-relevant, trip-specific).
 - Adjusted cost basis and tax-lot tracking for non-registered accounts.
 - Automated price ingestion from external providers.

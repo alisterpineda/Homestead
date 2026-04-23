@@ -4,7 +4,7 @@ Detailed design for account management in the Finances module. Expands on the su
 
 ## Conceptual model
 
-Accounts are the units the user thinks about and manages. Each has a name, a user-facing **kind**, a reporting currency, an optional institution, and optional placement in a parent-child hierarchy.
+Accounts are the units the user thinks about and manages. Each has a name, a user-facing **kind**, a reporting currency, and an optional institution. Accounts form a flat list in v1; a parent-child hierarchy is deferred to v2 when income/expense categories are added (categories are the feature that actually needs hierarchy).
 
 There are two internal shapes, determined by kind:
 
@@ -28,7 +28,7 @@ Users never pick `Asset`/`Liability` or "multi-position" directly. They pick a *
 
 **Immutable after creation:** Kind, reporting currency. Both change the meaning of historical data; changing them is not supported in v1. A user who picks wrong archives the account and creates a new one.
 
-**Editable:** name, institution, parent group, archived flag.
+**Editable:** name, institution, archived flag.
 
 ## System accounts
 
@@ -69,8 +69,6 @@ A single modal, not a wizard. The kind picker plus the form body fits comfortabl
 
 - **Cash, Credit Card, Loan, Other Liability, Other Asset:** require an initial **amount** and **as-of date**. The user enters a positive number; the server applies sign conventions. Default as-of date is today; max is today. No "skip" affordance — users who don't know the current balance can enter 0 and edit later.
 - **Investment:** no initial balance field at creation. Positions are added afterward via the *Add position* action on the account detail page.
-
-**Advanced (collapsed by default):** parent group selector.
 
 **Post-submit:** navigate to the account detail page.
 
@@ -160,14 +158,14 @@ Route: `/finances/accounts/:id`.
 
 - **Activity** — unified chronological list of every transaction affecting this account, including opening balances and balance entries. Differentiated by icon / label, not by separation.
 - **Positions** — Investment accounts only. Table: commodity · quantity · native value · display value · share of account. Each row has an *Edit opening balance* action when one exists.
-- **Info** — kind, reporting currency, institution, parent group, created / updated timestamps.
+- **Info** — kind, reporting currency, institution, created / updated timestamps.
 
 Archived accounts render read-only. Primary actions disappear; Edit and Unarchive remain.
 
 ## Edit / Archive / Delete
 
 **Edit** (modal):
-- Editable fields: Name, Institution, Parent group, Archived flag.
+- Editable fields: Name, Institution, Archived flag.
 - Immutable fields: Kind, Reporting currency — shown but disabled.
 
 **Archive / Unarchive:** toggles the `IsArchived` flag. Archived accounts are read-only; balance-entry, transaction, and add-position actions are not offered.
