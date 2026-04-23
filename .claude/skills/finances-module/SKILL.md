@@ -35,7 +35,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Soft delete, audit log, change history, undo.
 - Multi-user permissions.
 - Adjusted cost basis, tax-lot tracking, realized and unrealized gains for tax reporting.
-- Backfill of historical prices before the user's tracking start date.
+- Backfill of historical prices for periods before the user actually held the commodity.
 
 These are excluded from v1 but the model must not block adding them later. See *Future-compatibility*.
 
@@ -82,11 +82,11 @@ Splits are an implementation concept. Users never see the word "split" in v1.
 
 ### Balance entries
 
-A balance entry is a user-provided assertion: *"the balance of this account, in this commodity, on this date, was this much."* The system reconciles the assertion by generating a plug transaction that brings the running balance to the asserted value. The plug is booked against **Equity:Adjustments**.
+A balance entry is a user-provided assertion: *"the balance of this account, in this commodity, on this date, was this much."* The system reconciles the assertion by automatically booking the delta between the previous running balance and the asserted value against **Equity:Adjustments** so that the running balance matches the assertion.
 
 Balance entries are the primary way the user records wealth changes in v1. A typical month's activity is a handful of balance entries — one per account from each statement — and a small number of explicit transfer/investment transactions for activity the user wants itemised.
 
-If the user later adds, edits, or removes a transaction dated on or before an existing balance entry, the system must re-reconcile affected balance entries and regenerate their plug transactions.
+If the user later adds, edits, or removes a transaction dated on or before an existing balance entry, the system must re-reconcile affected balance entries and recompute their reconciling deltas.
 
 ### Prices
 
@@ -94,7 +94,7 @@ Price data is required to express balances in the user's display currency. Each 
 
 v1 requires manual price entry. Missing prices on a given date resolve by carrying forward the most recently known price prior to that date. The UI must indicate staleness where relevant.
 
-Prices are only captured from the tracking start date forward. New commodities need a price entered on the day they first appear in any transaction.
+Prices are captured forward from when the user first tracks a commodity. New commodities need a price entered on the day they first appear in any transaction.
 
 ## Design principles
 
@@ -122,7 +122,7 @@ The model reserves `income` and `expense` account types and assumes categories w
 
 ### Accumulate prices and history from day one
 
-The tracking start date is a real event. Nothing before it is modeled. Net-worth charts begin from that date. New commodities' prices are captured on first appearance. There is no concept of "backfill history to give me a nicer chart."
+Net-worth charts begin from the user's earliest recorded event. New commodities' prices are captured on first appearance. There is no concept of "backfill history to give me a nicer chart" — the tracker reflects only what the user actually captured.
 
 ### Data integrity over audit trail
 
@@ -162,7 +162,7 @@ Corporate action that changes commodity quantities without changing value. Model
 
 ### Balance entry
 
-User asserts the balance of one account and commodity on a given date. System computes the delta, generates a plug transaction against Equity:Adjustments. See *Balance entries*.
+User asserts the balance of one account and commodity on a given date. System computes the delta and books it against Equity:Adjustments. See *Balance entries*.
 
 ## Core computed values
 

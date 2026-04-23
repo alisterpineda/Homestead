@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Domain.Parties;
@@ -28,6 +29,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<TextExtractionEngine> TextExtractionEngines { get; set; }
     public DbSet<AppSetting> AppSettings { get; set; }
+
+    public DbSet<Commodity> Commodities { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AccountTransaction> AccountTransactions { get; set; }
+    public DbSet<AccountTransactionSplit> AccountTransactionSplits { get; set; }
+    public DbSet<CommodityPrice> CommodityPrices { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -7,6 +7,7 @@ using Homestead.WebApi.Modules.Admin;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Processing;
 using Homestead.WebApi.Modules.Status;
 using Homestead.WebApi.Processing;
@@ -71,7 +72,11 @@ void MapCsvEnvToConfigArray(string envVar, string configPrefix)
         builder.Configuration[$"{configPrefix}:{i}"] = values[i];
 }
 
-builder.AddNpgsqlDbContext<AppDbContext>(connectionName: "postgresdb");
+builder.AddNpgsqlDbContext<AppDbContext>(
+    connectionName: "postgresdb",
+    configureDbContextOptions: opts => opts
+        .UseSeeding(CurrencySeeder.Seed)
+        .UseAsyncSeeding(CurrencySeeder.SeedAsync));
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).

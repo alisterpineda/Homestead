@@ -1,3 +1,4 @@
+using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -68,6 +69,10 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<AppDbContext>(options =>
             {
                 options.UseNpgsql(_connectionString);
+                // Re-register the seeding hooks — ConfigureServices above stripped the
+                // Aspire DbContext registration that originally carried them.
+                options.UseSeeding(CurrencySeeder.Seed);
+                options.UseAsyncSeeding(CurrencySeeder.SeedAsync);
             });
         });
     }

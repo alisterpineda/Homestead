@@ -32,7 +32,10 @@ public class PostgresFixture : IAsyncLifetime
         Respawner = await Respawner.CreateAsync(conn, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
-            SchemasToInclude = ["public", "identity", "auditing", "documents", "auth", "settings"],
+            // finances.commodities holds the ISO 4217 seed. Respawn will wipe it
+            // along with the rest of the schema; IntegrationTestBase restores the
+            // seed with CurrencySeeder.Seed() after each reset.
+            SchemasToInclude = ["public", "identity", "auditing", "documents", "auth", "settings", "finances"],
             TablesToIgnore = [
                 new Respawn.Graph.Table("identity", "roles"),
                 new Respawn.Graph.Table("public", "__EFMigrationsHistory")

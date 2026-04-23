@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +44,15 @@ public abstract class IntegrationTestBase : IAsyncLifetime
                     await Task.Delay(100);
                 }
             }
+        }
+
+        // Respawn clears all finances tables (including the ISO 4217 commodity
+        // seed) between tests. UseSeeding only fires on Migrate/EnsureCreated,
+        // not on Respawn's raw-SQL wipes, so restore the seed explicitly.
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            CurrencySeeder.Seed(db);
         }
 
         // Clean stored files to avoid duplicate-content errors across test classes
