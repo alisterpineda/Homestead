@@ -45,6 +45,7 @@ jobs:
         with:
           name: unit-test-coverage
           path: './TestResults/**/coverage.cobertura.xml'
+          retention-days: 1
 
   integration-test:
     runs-on: ubuntu-latest
@@ -87,6 +88,7 @@ jobs:
         with:
           name: integration-test-coverage
           path: './TestResults/**/coverage.cobertura.xml'
+          retention-days: 1
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -133,6 +135,7 @@ jobs:
         with:
           name: frontend-test-coverage
           path: 'Homestead.WebApp/coverage/**/cobertura-coverage.xml'
+          retention-days: 1
 
   build-image:
     uses: ./.github/workflows/docker-build.yml
@@ -191,6 +194,7 @@ jobs:
         with:
           name: playwright-report
           path: Homestead.E2E/playwright-report/
+          retention-days: 7
 
   coverage-report:
     runs-on: ubuntu-latest
