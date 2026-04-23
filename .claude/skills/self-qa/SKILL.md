@@ -59,12 +59,12 @@ Once both probes return up, the app is at `http://localhost:4200` and Keycloak i
 Auth is OIDC-only — the browser has to complete a Keycloak login before it can see any protected screen. Drive it with the Playwright MCP tools:
 
 1. `browser_navigate` to `http://localhost:4200`. Angular redirects to `/login`.
-2. `browser_click` the **Sign in with SSO** button. The tab redirects to Keycloak on `localhost:8080`.
+2. `browser_click` the **Sign in with …** button (the label ends with whatever `/api/status` reports as the OIDC display name — "SSO" initially, then usually "Keycloak" once the status call resolves; match on the "Sign in with" prefix, not the full label). The tab redirects to Keycloak on `localhost:8080`.
 3. `browser_type` the dev email into the **Username or email** field: `admin@test.com`.
 4. `browser_type` the dev password: `admin123`.
 5. `browser_click` the Keycloak **Sign In** submit button and wait for the redirect back to `/documents`.
 
-These credentials are **not secrets** — they are the imported dev users from `KeycloakRealms/homestead-realm.json` and are referenced openly in `Homestead.E2E/e2e.config.ts`. Use `user@test.com` / `user123` instead if the change needs a non-admin session (e.g., checking that an admin-only control is hidden). Never introduce other credentials into this workflow.
+These credentials are **not secrets** — they are the imported dev users from `Homestead.AppHost/KeycloakRealms/homestead-realm.json` and are referenced openly in `Homestead.E2E/e2e.config.ts`. Use `user@test.com` / `user123` instead if the change needs a non-admin session (e.g., checking that an admin-only control is hidden). Never introduce other credentials into this workflow.
 
 If login fails — for example, the SSO button doesn't render, the Keycloak page 500s, or the redirect never lands on `/documents` — stop and report the failure rather than guessing at new credentials or retrying forever.
 
