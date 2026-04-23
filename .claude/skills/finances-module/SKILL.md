@@ -32,7 +32,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Recurring or scheduled transactions.
 - Budgeting.
 - Automated price feeds.
-- Soft delete, audit log, change history, undo.
+- Soft delete, user-visible change history, undo. (Back-end audit logs *are* written — see *Data integrity and audit trail*.)
 - Multi-user permissions.
 - Adjusted cost basis, tax-lot tracking, realized and unrealized gains for tax reporting.
 - Backfill of historical prices for periods before the user actually held the commodity.
@@ -124,9 +124,11 @@ The model reserves `income` and `expense` account types and assumes categories w
 
 Net-worth charts begin from the user's earliest recorded event. New commodities' prices are captured on first appearance. There is no concept of "backfill history to give me a nicer chart" — the tracker reflects only what the user actually captured.
 
-### Data integrity over audit trail
+### Data integrity and audit trail
 
-v1 does not support soft delete, audit log, or change history. Edits and deletes are destructive. This is acceptable for a single-household tool where the user and the auditor are the same person. It is not acceptable for later multi-tenant or shared scenarios — those will need an audit strategy added before shipping.
+Edits and deletes are destructive from the user's perspective — there is no soft delete, no undo, and no user-visible change-history UI in v1. But every mutation *is* recorded to the shared `auditing.audit_logs` table (field-level diffs via `IAuditLogger`, matching the Documents module). Auditing is not exposed to the user; it is a back-end integrity net, cheap to keep and impossible to backfill if we ever want it later. A user-facing change-history view remains a future concern.
+
+This suits a single-household tool where the user and the auditor are the same person. Multi-tenant or shared scenarios will still need an access strategy layered on top before shipping.
 
 ## Transaction shapes (user-facing)
 
@@ -192,7 +194,7 @@ The following must be addable later without rewriting history:
 - Automated price ingestion from external providers.
 - Multi-commodity income/expense accounts (relevant post-relocation when expenses might naturally denominate in multiple currencies).
 - Scheduled and recurring transactions.
-- Soft delete and audit log.
+- Soft delete and user-facing change-history views (the back-end audit log already exists).
 - Shared/multi-user households with permissions.
 
 None of these should require re-migrating historical transaction data.
