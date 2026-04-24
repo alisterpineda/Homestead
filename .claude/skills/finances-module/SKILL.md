@@ -47,12 +47,14 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 Accounts are the units the user thinks about and manages. Users pick from a closed set of user-facing **kinds** — Cash, Credit Card, Loan, Other Liability, Investment, Other Asset — which determine the underlying Asset/Liability classification and whether the account holds one commodity or many. Kind and reporting currency are immutable after creation; everything else (name, institution, archived) is editable. Accounts are a flat list in v1 — the list groups by Kind, and Institution provides secondary grouping where users need it.
 
-Account types used at the model layer in v1: `asset`, `liability`, `equity`. The model reserves `income` and `expense` for future use.
+Account types used at the model layer in v1: `asset`, `liability`, `equity`, `income`, `expense`. v1 uses `income` and `expense` only for two hidden system accounts — user-creatable income/expense accounts (and the categorisation features they enable) are deferred to v2.
 
-Two system-created equity accounts always exist for each household:
+Four system accounts always exist per household, all hidden from user-facing lists:
 
-- **Equity:Opening Balances** — the counterpart for wealth present before tracking began.
-- **Equity:Adjustments** — the counterpart for unexplained balance-entry deltas. See *Balance entries*.
+- **Equity:Opening Balances** — counterpart for wealth present before tracking began.
+- **Equity:Adjustments** — counterpart for unexplained balance-entry deltas. See *Balance entries*.
+- **Income** — counterpart for cash dividends in v1. Subsumed by user-created income accounts in v2.
+- **Expense** — reserved; no v1 shape posts to it. Seeded so v2 doesn't have to backfill.
 
 See [references/accounts.md](references/accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
 
@@ -82,6 +84,8 @@ A split is the per-account leg of a transaction. It records:
 A transaction balances when the sum of its splits' values equals zero. This invariant is enforced by the data layer, not relied upon as a convention.
 
 Splits are an implementation concept. Users never see the word "split" in v1.
+
+See [references/transactions.md](references/transactions.md) for the full design: shape↔storage-type mapping, worked examples for every shape, balance-entry reconciliation, edit/delete semantics, validation rules, and time/ordering semantics.
 
 ### Balance entries
 
@@ -119,7 +123,7 @@ This is load-bearing for the household's relocation scenarios. Moving from Canad
 
 ### Beancount-style sign convention
 
-Stored split values follow the Beancount convention: asset splits are positive when the balance increases; liability and equity splits are negative when the balance increases; `SUM(split.Value) = 0` for every transaction except stock splits. This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) for worked examples.
+Stored split values follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases; `SUM(split.Value) = 0` for every transaction except stock splits. This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) and [references/transactions.md](references/transactions.md#sign-convention) for worked examples.
 
 ### Single-position vs multi-position is UI-only
 
@@ -127,7 +131,7 @@ The schema supports any account holding any set of commodities. The "single-posi
 
 ### Categorisation is a v2 concern
 
-The model reserves `income` and `expense` account types and assumes categories will eventually be implemented as accounts of those types. v1 neither creates those accounts nor exposes them to the user. When v2 arrives, its addition is purely additive — no data migration is required.
+The model reserves `income` and `expense` account types and assumes categories will eventually be implemented as user-creatable accounts of those types. v1 seeds two hidden system accounts (`Income`, `Expense`) for shapes that need a categorised counterpart (currently just Dividend → Income), but does not let users create their own and does not surface category reporting. When v2 arrives, the system accounts are renamed to "uncategorised" buckets and user-creatable categories slot in alongside — no historical data is rewritten.
 
 ### Accumulate prices and history from day one
 
@@ -141,7 +145,7 @@ This suits a single-household tool where the user and the auditor are the same p
 
 ## Transaction shapes (user-facing)
 
-The UI exposes a small, closed set of shapes. Each shape is a template that produces a specific transaction structure behind the scenes. The full set for v1:
+The UI exposes a small, closed set of shapes. Each shape is a template that produces a specific transaction structure behind the scenes. The full set for v1 is summarised below; see [references/transactions.md](references/transactions.md#transaction-shapes) for worked examples, validation rules, and the shape-availability matrix per account kind.
 
 ### Opening balance
 
@@ -161,15 +165,15 @@ Reverse of buy.
 
 ### Dividend
 
-Cash dividend received into an investment account. UI asks for the investment account, commodity the dividend was paid in, amount, and date. Produces a transaction crediting Income (reserved for v2; for v1, credits Equity:Adjustments so as not to surface the income account concept).
+Cash dividend received into an investment account. UI asks for the investment account, commodity the dividend was paid in, amount, and date. Produces a two-split transaction crediting the hidden system `Income` account. v2 categorised income accounts subsume this without rewriting history.
 
 ### DRIP / reinvestment
 
-Dividend-reinvestment variant that results in additional security units rather than cash. Modelled as either one combined transaction or two sequential transactions (dividend in cash, then cash used to buy more units). Product preference for v1: two sequential transactions, matching what brokerage statements show.
+Dividend-reinvestment variant that results in additional security units rather than cash. Modelled as two linked `NormalTransaction`s at the same `OccurredAt` — a Dividend half and a Buy half, paired via `RelatedTransactionId`. This matches brokerage statements and keeps each half an ordinary shape. The generic editor surfaces the pair as one logical event.
 
 ### Stock split
 
-Corporate action that changes commodity quantities without changing value. Modelled as a transaction with relaxed balance enforcement (a single split, value zero, quantity non-zero). Only `stock_split` transactions may skip the balance invariant.
+Corporate action that changes commodity quantities without changing value. Scoped **per commodity** — one transaction covers every account holding the security, with one split per holding account (all with `Value=0`, `Quantity≠0`). Only `StockSplit` transactions may skip the SUM-to-zero invariant (trivially satisfied because every value is zero).
 
 ### Balance entry
 

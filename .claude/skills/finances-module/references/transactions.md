@@ -1,0 +1,323 @@
+## Transactions & Splits — Reference
+
+Detailed design for transaction and split management in the Finances module. Expands on the summaries in [SKILL.md](../SKILL.md#transactions), [SKILL.md](../SKILL.md#splits), and [SKILL.md](../SKILL.md#transaction-shapes-user-facing). Read this before designing, implementing, or reviewing any transaction-shape, balance-entry, edit/delete, validation, or reconciliation work.
+
+Opening-balance creation, editing, and deletion live in [accounts.md](accounts.md#initial-balance-mechanics) — this document treats opening balances only where they intersect with general edit/delete rules. Transaction-linked price behaviour (lifecycle, collisions, carry-forward) lives in [commodities.md](commodities.md#prices--model) — this document only summarises which shapes create price rows.
+
+## Conceptual model
+
+A **transaction** is one event at one point in time, balanced in one currency. It carries an `OccurredAt` timestamp (`DateTimeOffset`, stored UTC), a description, a transaction currency, and one or more splits. A **split** is the per-account leg: account, commodity, quantity in the commodity's native units, and value in the transaction's currency.
+
+The data-layer invariant is `SUM(split.Value) = 0` per transaction, expressed in the transaction currency. Stock splits are the only exception (single-commodity quantity-only adjustments — see *Stock split* below).
+
+Users never create "transactions" directly. They pick a **shape** — Transfer, Investment Buy, Dividend, ... — which the server expands into the underlying balanced transaction. Users never see the words "split", "debit", or "credit" in v1. The shape catalogue is closed; new shapes require a deliberate change.
+
+## Storage shapes
+
+Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`; only balance entries and stock splits get their own subtype because they relax or extend the base contract.
+
+| Shape                 | Stored type              | Splits | Notes |
+|-----------------------|--------------------------|--------|-------|
+| Opening balance       | `NormalTransaction`      | 2      | Counterpart = `Equity:Opening Balances`. See [accounts.md](accounts.md#initial-balance-mechanics). |
+| Transfer (any)        | `NormalTransaction`      | 2      | Same- or cross-currency. |
+| Investment buy        | `NormalTransaction`      | 2      | Both splits on the investment account. |
+| Investment sell       | `NormalTransaction`      | 2      | Mirror of buy. |
+| Dividend (cash)       | `NormalTransaction`      | 2      | Counterpart = system `Income` account. |
+| DRIP / reinvestment   | `NormalTransaction` × 2  | 2 each | Two linked transactions sharing `OccurredAt` and `RelatedTransactionId`. |
+| Stock split           | `StockSplitTransaction`  | ≥1     | All splits same commodity, `Value=0`, `Quantity≠0`. |
+| Balance entry         | `BalanceEntryTransaction`| 2      | Carries `AssertedCommodityId` + `AssertedQuantity`; counterpart = `Equity:Adjustments`. |
+
+`AccountTransaction.RelatedTransactionId` is a nullable self-FK used in v1 only for DRIP pairing. `OnDelete(SetNull)` — handler logic decides whether the surviving half is kept or removed when its partner is deleted.
+
+## System accounts used as counterparts
+
+Four hidden system accounts exist per household (see [accounts.md](accounts.md#system-accounts) for `Equity:Opening Balances` and `Equity:Adjustments`). Two are added in v1 specifically to support the transaction shapes here:
+
+- **`Income`** — `AccountType=Income`, multi-position, hidden, system. Counterpart for cash dividends in v1. v2 introduces user-creatable categorised income accounts; this account is renamed to a v2-appropriate "uncategorised" bucket as part of that migration — no historical data is rewritten.
+- **`Expense`** — `AccountType=Expense`, multi-position, hidden, system. Reserved for symmetry; no v1 shape posts to it. Seeded so v2 doesn't have to backfill it.
+
+Both are seeded by `SystemAccountSeeder` alongside the equity accounts and never appear in user-facing lists or shape pickers.
+
+## Sign convention
+
+Stored split values follow the Beancount convention. Extending the table in [accounts.md](accounts.md#sign-convention-beancount-style) for the new account types:
+
+| Account type | Sign when balance increases |
+|--------------|-----------------------------|
+| Asset        | Positive                    |
+| Liability    | Negative                    |
+| Equity       | Negative                    |
+| Income       | Negative                    |
+| Expense      | Positive                    |
+
+`SUM(split.Value) = 0` per transaction (stock splits exempted). Net worth remains a flat sum of asset + liability balances; income/expense balances are not part of net worth in v1.
+
+The UI accepts positive numbers everywhere. The server applies sign flips when writing splits whose account type calls for it. Liability balances render as positive "amount owed."
+
+## Time semantics
+
+All timestamps stored UTC. Defaults per shape:
+
+| Shape                                    | Default time on chosen date | User-overridable? |
+|------------------------------------------|-----------------------------|-------------------|
+| Opening balance (non-Investment)         | `00:00 UTC`                 | No                |
+| Opening balance (Investment, Add position) | `12:00 UTC`               | Yes               |
+| Transfer (any)                           | `00:00 UTC`                 | No                |
+| Investment buy / sell / dividend / DRIP  | `12:00 UTC`                 | Yes               |
+| Stock split                              | `12:00 UTC`                 | Yes               |
+| Balance entry                            | `23:59:59 UTC`              | No                |
+
+Investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
+
+`OccurredAt` may be up to **one day past current UTC** to tolerate timezone drift between client and server (Homestead supports cross-timezone households). Further-future timestamps are rejected.
+
+**Same-instant ordering.** When multiple transactions share an `OccurredAt`, the secondary sort key is `(CreatedAt, Id)`. This is rarely user-visible in v1 (display lists already group by date) but matters for any future per-transaction running-balance computation, so the order is committed now.
+
+## Transaction shapes
+
+All examples use the format `Quantity / Value` (transaction currency for `Value`). System counterpart accounts are written as `<Income>`, `<Equity:Adjustments>`, etc. — these are the hidden system accounts.
+
+### Opening balance
+
+See [accounts.md](accounts.md#initial-balance-mechanics) for the full mechanics, edit/delete rules, and worked examples.
+
+### Transfer
+
+Movement between two of the household's own accounts. UI collects: source account, destination account, source amount, optional destination amount (cross-currency only — server infers single-currency case from matching reporting currencies), date, optional description.
+
+**Same-currency** ($200 CAD, chequing → savings, 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Transfer to Savings", OccurredAt=2026-04-23T00:00:00Z, Currency=CAD
+  Split 1: Account=<chequing>, Commodity=CAD, Quantity=-200, Value=-200
+  Split 2: Account=<savings>,  Commodity=CAD, Quantity=+200, Value=+200
+```
+
+No price row.
+
+**Cross-currency** ($100 USD → $135 CAD, 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Transfer to CAD chequing", OccurredAt=2026-04-23T00:00:00Z, Currency=USD
+  Split 1: Account=<USD chequing>, Commodity=USD, Quantity=-100, Value=-100
+  Split 2: Account=<CAD chequing>, Commodity=CAD, Quantity=+135, Value=+100
+```
+
+Transaction currency is the **source** currency. The destination split carries the destination commodity natively but values to the source-currency equivalent so the splits sum to zero. Also emits `CommodityPrice (USD, CAD, 2026-04-23T00:00:00Z, 1.35)` — read as "1 USD = 1.35 CAD."
+
+If the source is a liability (e.g. paying down a credit card from chequing), sign flips apply per the convention table.
+
+**Validation:** source ≠ destination; both writable (not archived, not system); both account commodities valid for their kinds; source amount > 0 and (cross-currency) destination amount > 0.
+
+### Investment buy
+
+Purchase of a security funded from a cash position **inside the same investment account**. To buy from external cash, the user does a Transfer first, then a Buy. UI collects: investment account, security, quantity, per-unit price, derived total (read-only), funding currency (defaults to the investment account's reporting currency), date, optional time.
+
+Example (Buy 2 VEQT @ 50.00 CAD on 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Buy 2 VEQT @ 50.00", OccurredAt=2026-04-23T12:00:00Z, Currency=CAD
+  Split 1: Account=<investment>, Commodity=CAD,  Quantity=-100, Value=-100
+  Split 2: Account=<investment>, Commodity=VEQT, Quantity=+2,   Value=+100
+```
+
+Emits `CommodityPrice (VEQT, CAD, 2026-04-23T12:00:00Z, 50.00)`.
+
+**Validation:** account is an Investment; security commodity is `Kind=Security`; funding commodity is `Kind=Currency`; quantity > 0; per-unit price > 0; both splits reference the same account.
+
+### Investment sell
+
+Mirror of Buy. Quantities and signs flip; emits a price row identically.
+
+### Dividend (cash)
+
+Cash dividend received into an investment account. UI collects: investment account, payment commodity (currency the dividend was paid in), amount, date, optional time, optional description (defaults to "Dividend").
+
+Example ($5 USD dividend from VFV on 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Dividend from VFV", OccurredAt=2026-04-23T12:00:00Z, Currency=USD
+  Split 1: Account=<investment>, Commodity=USD, Quantity=+5, Value=+5
+  Split 2: Account=<Income>,     Commodity=USD, Quantity=-5, Value=-5
+```
+
+The Income split is negative because income increases (Beancount-style — see *Sign convention*). No price row (cash event only).
+
+**Validation:** account is an Investment; payment commodity is `Kind=Currency`; amount > 0.
+
+### DRIP / reinvestment
+
+A dividend whose cash is immediately reinvested in additional units of the paying security (typically fractional). Modelled as **two linked `NormalTransaction`s** at the same `OccurredAt`, paired via `RelatedTransactionId`. This matches how brokerages report DRIP activity (cash dividend line + immediate buy line) and keeps the underlying shapes ordinary.
+
+UI collects: investment account, security, dividend amount (cash), units received (typically fractional), date, optional time. The per-unit reinvestment price is derived as `dividend / units`.
+
+Example ($5 USD dividend from VFV reinvested as 0.05 units @ 100 USD/unit, 2026-04-23):
+
+```
+Transaction A: Type=Normal, Description="Dividend from VFV", OccurredAt=2026-04-23T12:00:00Z, Currency=USD,
+               RelatedTransactionId=B
+  Split A1: Account=<investment>, Commodity=USD, Quantity=+5, Value=+5
+  Split A2: Account=<Income>,     Commodity=USD, Quantity=-5, Value=-5
+
+Transaction B: Type=Normal, Description="Reinvest VFV dividend", OccurredAt=2026-04-23T12:00:00Z, Currency=USD,
+               RelatedTransactionId=A
+  Split B1: Account=<investment>, Commodity=USD, Quantity=-5,    Value=-5
+  Split B2: Account=<investment>, Commodity=VFV, Quantity=+0.05, Value=+5
+```
+
+The Buy half emits `CommodityPrice (VFV, USD, 2026-04-23T12:00:00Z, 100)`.
+
+**Editing:** the generic editor surfaces the pair as a single logical event. Edits to amount/units/date apply to both halves atomically.
+
+**Deleting:** deleting either half prompts the user to delete both. If they decline, the survivor's `RelatedTransactionId` is cleared and it remains a valid standalone Dividend or Buy.
+
+**Validation:** as for Dividend + Investment buy combined; both halves must reference the same investment account and security; cash legs net to zero across the pair.
+
+### Stock split
+
+Corporate action that changes outstanding unit counts without changing value (typically `2-for-1`, `3-for-1`, `1-for-10` reverse). Scoped **per commodity, not per account** — a 2-for-1 AAPL split affects every account holding AAPL simultaneously.
+
+UI is a per-commodity action ("Apply stock split" on the commodity detail page or a dedicated affordance reachable from any account holding the security). User picks the security, enters new-units-per-old-unit (e.g. `2` for 2-for-1, `0.1` for 1-for-10 reverse), and a date. The server enumerates every account with a non-zero position in that commodity at the chosen date and emits one split per account with the additive delta.
+
+Example (2-for-1 AAPL split on 2026-04-23, with TFSA holding 10 shares and Taxable holding 5):
+
+```
+Transaction: Type=StockSplit, Description="AAPL 2-for-1 split", OccurredAt=2026-04-23T12:00:00Z, Currency=USD
+  Split 1: Account=<TFSA>,    Commodity=AAPL, Quantity=+10, Value=0
+  Split 2: Account=<Taxable>, Commodity=AAPL, Quantity=+5,  Value=0
+```
+
+Transaction `Currency` is recorded for completeness (typically the security's quote currency) but is not used by the validator — the SUM-to-zero invariant trivially holds because every value is zero.
+
+**Validation:** `Type=StockSplit` requires ≥1 split; every split has `Value=0`, `Quantity≠0`, and references the same commodity; that commodity is `Kind=Security`; quantities are computed by the server from positions and the user-entered ratio (the API does not accept raw split rows).
+
+No price row. The unit count changes; the per-share price is expected to halve (or scale by `1/ratio`) on the next observation, but Homestead does not synthesise that price — users enter the next price when they next reconcile.
+
+### Balance entry
+
+User assertion: *"the balance of this account, in this commodity, on this date, was this much."* The server computes the delta vs. the prior running balance and books it against `Equity:Adjustments`.
+
+UI collects: account, commodity (defaults to reporting currency for non-Investment kinds; required pick for Investments), asserted amount (positive for liabilities, server flips), date, optional note.
+
+Example (Cash account asserts $1500 CAD on 2026-04-30, prior running balance $1450 → delta +$50):
+
+```
+Transaction: Type=BalanceEntry, Description="Balance assertion", OccurredAt=2026-04-30T23:59:59Z, Currency=CAD
+  AssertedCommodityId=CAD, AssertedQuantity=+1500
+  Split 1: Account=<cash>,                Commodity=CAD, Quantity=+50, Value=+50
+  Split 2: Account=<Equity:Adjustments>,  Commodity=CAD, Quantity=-50, Value=-50
+```
+
+Example (Credit card asserts $500 owed on 2026-04-30, prior running balance -$450 → delta -$50):
+
+```
+Transaction: Type=BalanceEntry, Description="Balance assertion", OccurredAt=2026-04-30T23:59:59Z, Currency=CAD
+  AssertedCommodityId=CAD, AssertedQuantity=-500
+  Split 1: Account=<credit card>,         Commodity=CAD, Quantity=-50, Value=-50
+  Split 2: Account=<Equity:Adjustments>,  Commodity=CAD, Quantity=+50, Value=+50
+```
+
+`AssertedQuantity` is stored on the transaction itself (not just derivable from the splits) so the user's source-of-truth assertion survives any later edits to earlier transactions. Splits encode the **delta**; `AssertedQuantity` encodes the **target**; reconciliation derives splits from `(target − prior running)`.
+
+**Transaction currency = asserted commodity.** A USD assertion on a USD position in a CAD-reporting Investment account emits an Adjustments entry in USD natively — no FX baked in at the assertion layer.
+
+**Uniqueness:** one balance entry per `(account, asserted commodity, date)`. Enforced by a partial unique index on `(AccountId, AssertedCommodityId, OccurredAt)` filtered to `Type=BalanceEntry` (already in place — see `BalanceEntryTransactionConfiguration`). The 23:59:59 UTC time-of-day default makes per-instant uniqueness equivalent to per-day uniqueness.
+
+**Multi-position investment accounts:** one balance entry per commodity per date. A user reconciling an Investment account from a monthly statement enters N balance entries (one per security + one per cash currency).
+
+**Validation:** account writable; asserted commodity is held (or zero-held — first-time assertion of a fresh position is allowed); asserted quantity is finite; sign matches the user's positive-input contract per account type.
+
+## Balance-entry reconciliation
+
+The reconciliation pass that computes `delta = asserted − prior running` runs **synchronously** on every mutation that touches `(account, commodity)` at or before the affected balance entry's `OccurredAt`. The events that trigger a re-pass:
+
+1. Creating, editing, or deleting any transaction whose splits touch `(account, commodity)`.
+2. Creating, editing, or deleting a balance entry on `(account, commodity)` (a balance entry can sit between two others and shift the chain).
+
+For each affected balance entry, the handler recomputes the delta from current splits and rewrites the two splits in place (preserving split `Id`s for audit continuity). `AssertedQuantity` is never rewritten — only the reconciliation splits are.
+
+v1 households are tiny; the full re-pass per affected `(account, commodity)` chain runs inline within the same `SaveChangesAsync`. If chains ever grow large, a deferred/batched pass becomes a future optimisation without changing the data model.
+
+## Shape availability per account kind
+
+The "New Transaction" dropdown on each account's detail page surfaces only shapes that make sense for the account's `Kind`. This is a UI rule — the data layer accepts any valid balanced transaction.
+
+| Kind            | Transfer | Buy / Sell | Dividend | DRIP | Stock split            | Balance entry |
+|-----------------|----------|------------|----------|------|------------------------|---------------|
+| Cash            | ✓        |            |          |      |                        | ✓             |
+| Credit Card     | ✓        |            |          |      |                        | ✓             |
+| Loan            | ✓        |            |          |      |                        | ✓             |
+| Other Liability | ✓        |            |          |      |                        | ✓             |
+| Other Asset     | ✓        |            |          |      |                        | ✓             |
+| Investment      | ✓        | ✓          | ✓        | ✓    | ✓ (per-commodity entry)| ✓             |
+
+Stock split is also reachable from the commodity detail page under Settings, since it's a commodity-scoped operation. From an Investment account it appears in the dropdown when the account holds at least one security.
+
+The household-level "+ New Transaction" entry point (when added) offers the union of all shapes and asks the user to pick a target account first.
+
+## Editing transactions
+
+All shapes (other than opening balances, which use dedicated per-account / per-position editors — see [accounts.md](accounts.md#editing-opening-balances)) edit through a generic transaction editor. Rules:
+
+- **Shape (`TransactionType` and the underlying construction)** is immutable. A Transfer cannot become a Buy mid-edit. Convert by deleting and re-creating.
+- **All other fields are editable**: date/time, description, accounts, commodities, quantities/amounts, per-unit price (where applicable). The server re-validates the resulting splits against the shape's contract.
+- **Linked price rows move with the transaction**: rate edits update in place; date or commodity edits move the linked row, rejecting on collision with another `(commodity, quote, at)` triple. See [commodities.md](commodities.md#transaction-linked-price-lifecycle).
+- **DRIP pair edits** apply to both halves atomically (see *DRIP*).
+- **Opening-balance protection**: edits that move a non-OB transaction earlier than an existing opening balance for the same `(account, commodity)` are rejected — the OB must remain earliest. Same rule applies symmetrically when an OB date is moved (already enforced in `OpeningBalanceService`).
+- **Balance-entry re-reconciliation** fires for any balance entry on `(account, commodity)` at or after the edited transaction's effective date (see *Balance-entry reconciliation*).
+- **Audit**: every edit is field-level audited via `IAuditLogger.Updated(...)` against an `AccountTransactionSnapshot`. Split changes are captured as part of the transaction's snapshot diff.
+
+## Deleting transactions
+
+- **Splits** cascade via FK (`OnDelete(Cascade)`).
+- **Linked price rows** cascade via FK (`OnDelete(Cascade)` on `CommodityPrice.CreatedByTransactionId`). The handler emits an explicit `audit.Deleted("CommodityPrice", ...)` so the FK cascade isn't silent in the audit log (matching the pattern in `OpeningBalanceService.DeleteAsync`).
+- **Related transactions** (DRIP) — see *DRIP*.
+- **Opening balances** — only deletable when no other transactions reference `(account, commodity)`. Already enforced in `OpeningBalanceService`.
+- **Balance-entry re-reconciliation** fires for any balance entry on `(account, commodity)` at or after the deleted transaction's `OccurredAt`.
+- **Audit**: `IAuditLogger.Deleted(...)` for the transaction itself.
+
+## Validation summary
+
+Cross-shape constraints, beyond the per-shape rules above:
+
+- Every split's account is writable: `IsArchived=false`, and not a system account except for the specific counterparts noted (`Equity:Opening Balances`, `Equity:Adjustments`, `Income`, `Expense`).
+- Every split's commodity exists.
+- Quantities and values are finite decimals.
+- Transaction currency is `Kind=Currency`.
+- For non-stock-split transactions, `SUM(split.Value) = 0` exactly (no rounding tolerance — values store as `numeric`).
+- For balance entries, exactly two splits, both in the asserted commodity, one referencing the asserted account, the other referencing `Equity:Adjustments`.
+- For stock splits, all rules in *Stock split*.
+- For DRIP pairs, both halves persisted in the same `SaveChangesAsync` (no orphan creation).
+
+## Listing transactions
+
+Two surfaces:
+
+- **Account detail → Activity tab** — already specified in [accounts.md](accounts.md#account-detail). Per-account chronological list of every transaction touching that account.
+- **`/finances/transactions`** — household-wide filterable list. Reserved route for v1; full UI deferred. When implemented: filters for date range, account, kind, shape, commodity, description search, with cursor pagination.
+
+## Split memo
+
+`AccountTransactionSplit.Memo` (≤1024 chars, optional) is exposed in the generic transaction editor as an optional per-leg note. It is **not** rendered in v1's transaction lists or activity views — those show the transaction-level `Description` only. The field exists today so v2 surfaces (filters, exports, list-row annotations) can use it without a schema migration.
+
+The server is also free to populate `Memo` for system-generated context — for example, balance-entry reconciliation could write *"Delta vs prior balance entry on 2026-03-31"* on the Adjustments split. Whether to actually write such notes is a per-shape decision; the field accommodates it.
+
+## Audit
+
+Every transaction mutation writes an `auditing.audit_logs` entry via `IAuditLogger`:
+
+- **Create** — one entry per transaction, plus one per linked price row created.
+- **Update** — one entry per transaction with field-level diff against `AccountTransactionSnapshot` (which includes splits). Linked price row updates emit their own `CommodityPriceSnapshot` diffs.
+- **Delete** — one entry per transaction; FK-cascaded splits and linked price rows get explicit deletion entries from the handler.
+
+Background reconciliation passes (re-derived balance-entry splits) audit as transaction updates on the affected balance entries — no separate "reconciliation" event type.
+
+## Future-compatibility
+
+- **Categorised income/expense.** The system `Income` and `Expense` accounts are renamed to v2-appropriate "uncategorised" buckets when user-creatable income/expense accounts arrive. Historical splits referencing them remain valid; existing dividends keep posting to the renamed system account until the user re-categorises.
+- **Recurring / scheduled transactions.** A separate `TransactionTemplate` entity holds the shape + cadence; instances materialise as ordinary transactions on schedule. No change to the transaction model.
+- **Cost basis & tax lots.** Buy/sell splits already carry quantity and value per leg; a `TaxLot` entity references buy splits without modifying them.
+- **Tags at split level.** New `SplitTag` join table; no impact on existing data.
+- **Soft delete.** Adds `DeletedAt`/`DeletedByUserId` columns; reconciliation passes filter on `DeletedAt IS NULL`.
+- **Multi-step buys (external funding in one transaction).** A v2 "Buy from external" sugar shape can produce a 3-split atomic transaction without changing existing two-split buys.
+- **Cross-currency dividends with FX.** A USD dividend reinvested via DRIP into a CAD-reporting account can opt into emitting an FX price row alongside the security price row when the user supplies a settlement rate.
