@@ -79,7 +79,7 @@ Creating a non-Investment account with an initial balance emits one opening-bala
 **Cash account, $1,000 CAD on 2026-04-23:**
 
 ```
-Transaction: Type=Normal, Description="Opening balance", TxnDate=2026-04-23, Currency=CAD
+Transaction: Type=Normal, Description="Opening balance", OccurredAt=2026-04-23T00:00:00Z, Currency=CAD
   Split 1: Account=<cash>,      Commodity=CAD, Quantity=+1000, Value=+1000
   Split 2: Account=<Equity:OB>, Commodity=CAD, Quantity=-1000, Value=-1000
 ```
@@ -87,25 +87,25 @@ Transaction: Type=Normal, Description="Opening balance", TxnDate=2026-04-23, Cur
 **Credit Card, $500 CAD owed on 2026-04-23** — the server flips the sign because Kind is a liability:
 
 ```
-Transaction: Type=Normal, TxnDate=2026-04-23, Currency=CAD
+Transaction: Type=Normal, OccurredAt=2026-04-23T00:00:00Z, Currency=CAD
   Split 1: Account=<credit card>, Commodity=CAD, Quantity=-500, Value=-500
   Split 2: Account=<Equity:OB>,   Commodity=CAD, Quantity=+500, Value=+500
 ```
 
-**Investment *Add position* — 100 shares of VEQT @ $35.12 CAD on 2026-04-23:**
+**Investment *Add position* — 100 shares of VEQT @ $35.12 CAD on 2026-04-23** (investment shapes default to `12:00 UTC` on the chosen date — see [commodities.md](commodities.md#price-time-semantics)):
 
 ```
-Transaction: Type=Normal, TxnDate=2026-04-23, Currency=CAD
+Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z, Currency=CAD
   Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100,  Value=+3512
   Split 2: Account=<Equity:OB>,  Commodity=CAD,  Quantity=-3512, Value=-3512
 ```
 
-Also emits a `CommodityPrice` row: `(VEQT, CAD, 2026-04-23, 35.12)`.
+Also emits a `CommodityPrice` row: `(VEQT, CAD, 2026-04-23T12:00:00Z, 35.12)`.
 
 **Investment *Add position* — $5,000 USD cash on 2026-04-23** (foreign-currency cash in a CAD-reporting account):
 
 ```
-Transaction: Type=Normal, TxnDate=2026-04-23, Currency=USD
+Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z, Currency=USD
   Split 1: Account=<investment>, Commodity=USD, Quantity=+5000, Value=+5000
   Split 2: Account=<Equity:OB>,  Commodity=USD, Quantity=-5000, Value=-5000
 ```

@@ -36,6 +36,8 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Multi-user permissions.
 - Adjusted cost basis, tax-lot tracking, realized and unrealized gains for tax reporting.
 - Backfill of historical prices for periods before the user actually held the commodity.
+- Inline commodity creation from transaction flows — securities are created via `/finances/settings/commodities` first.
+- Configurable price-staleness thresholds — v1 renders staleness on a fixed heuristic.
 
 These are excluded from v1 but the model must not block adding them later. See *Future-compatibility*.
 
@@ -56,11 +58,15 @@ See [references/accounts.md](references/accounts.md) for the full account-manage
 
 ### Commodities
 
-Currencies (CAD, USD, GBP, ...) and securities (VEQT, VFV, AAPL, ...) are represented uniformly. A commodity has a symbol, a display name, a kind (`currency` or `security`), and a display precision. There is no distinction at the model level between a "cash" commodity and a "security" commodity — only behaviour in certain transaction shapes differs.
+Currencies (CAD, USD, GBP, ...) and securities (VEQT, VFV, AAPL, ...) are represented uniformly as **commodities**. Each has a symbol, a display name, a kind (`currency` or `security`), a display precision, and — for securities — an exchange qualifier (`NASDAQ`, `TSX`, `OTC`, ...). All ISO 4217 currencies are seeded on initialisation and fully read-only; users only create securities. Symbol, exchange, and kind are immutable after creation; name and display precision are editable.
+
+See [references/commodities.md](references/commodities.md) for the full design: seeding, creation flow, the exchange qualifier, edit/delete rules, and the list/detail UI.
 
 ### Transactions
 
-A transaction is one event at one point in time, balanced in one currency. It has a date, a description, a currency (the currency in which its splits sum to zero), and one or more splits.
+A transaction is one event at one point in time, balanced in one currency. It has an **occurred-at** timestamp (`DateTimeOffset`, stored UTC), a description, a currency (the currency in which its splits sum to zero), and one or more splits.
+
+Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date and expose an optional time input for users who want intra-day precision. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
 
 Users do not create "transactions" directly. They pick a transaction **shape** (see *Transaction shapes*) and fill in its fields. The system assembles the underlying transaction and its splits.
 
@@ -87,11 +93,13 @@ If the user later adds, edits, or removes a transaction dated on or before an ex
 
 ### Prices
 
-Price data is required to express balances in the user's display currency. Each price is a tuple of (commodity, quote currency, date, rate). For a USD cash holding viewed in CAD, the rate is the USD→CAD FX rate. For a VEQT holding viewed in CAD, the rate is VEQT's CAD price. The model treats these identically.
+Price data is required to express balances in the user's display currency. Each price is a tuple of `(commodity, quote currency, priceAt, rate)` — *"1 unit of commodity was worth rate units of quote currency at priceAt."* USD→CAD FX rates and VEQT-in-CAD security prices are represented identically. `priceAt` is a `DateTimeOffset` (stored UTC), giving stable same-day ordering and alignment with transaction timestamps.
 
-v1 requires manual price entry. Missing prices on a given date resolve by carrying forward the most recently known price prior to that date. The UI must indicate staleness where relevant.
+Prices come from two sources — **manual** entry and **transaction-linked** side-effects (buys, sells, DRIP, security opening balances, and cross-currency transfers). Transaction-linked prices are edited through the source transaction and are read-only in the prices UI; manual prices are editable directly (rate only). Missing prices on a given date resolve by carrying forward the most recently known price, with up to two-hop chaining through intermediary currencies. Holdings with no resolvable price render as *unpriced* — never silently zero.
 
 Prices are captured forward from when the user first tracks a commodity. New commodities need a price entered on the day they first appear in any transaction.
+
+See [references/commodities.md](references/commodities.md) for the full design: the source model, which transaction shapes create prices, carry-forward and chaining rules, collision handling, and the missing-price UX.
 
 ## Design principles
 
@@ -141,7 +149,7 @@ Captures wealth that existed before tracking began. For single-position kinds (C
 
 ### Transfer
 
-Movement between two of the household's own accounts. The UI asks for source account, destination account, amount, currency (inferred from source), date, and optional description. Cross-currency transfers also ask for the destination amount; the resulting two splits carry different commodities but balance in one of the two currencies.
+Movement between two of the household's own accounts. The UI asks for source account, destination account, amount, currency (inferred from source), date, and optional description. Cross-currency transfers also ask for the destination amount; the resulting two splits carry different commodities but balance in one of the two currencies. Cross-currency transfers also emit a `CommodityPrice` row capturing the implied FX rate between the two currencies.
 
 ### Investment buy
 
