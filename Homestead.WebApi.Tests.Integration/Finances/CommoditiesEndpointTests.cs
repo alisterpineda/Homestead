@@ -19,6 +19,8 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, currenciesResp.StatusCode);
         var currencies = await currenciesResp.Content.ReadFromJsonAsync<PaginatedResult<FinanceCommodityItem>>(CT);
         Assert.All(currencies!.Items, c => Assert.Equal("Currency", c.Kind));
+        Assert.All(currencies.Items, c => Assert.True(c.IsSystemManaged));
+        Assert.All(currencies.Items, c => Assert.Null(c.Exchange));
 
         var usdResp = await client.GetAsync("/api/v1/finances/commodities?page=1&pageSize=50&search=USD", CT);
         Assert.Equal(HttpStatusCode.OK, usdResp.StatusCode);
@@ -34,6 +36,7 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
             symbol = "VEQT",
+            exchange = "TSX",
             name = "Vanguard All-Equity",
             displayPrecision = 4
         }, CT);
@@ -41,17 +44,55 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
         Assert.Equal("VEQT", body!.Symbol);
+        Assert.Equal("TSX", body.Exchange);
         Assert.Equal("Security", body.Kind);
+        Assert.False(body.IsSystemManaged);
     }
 
     [Fact]
-    public async Task CreateCommodity_DuplicateSymbol_Returns409()
+    public async Task CreateCommodity_EmptyExchange_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "VFV",
+            exchange = "",
+            name = "Vanguard S&P 500 ETF",
+            displayPrecision = 4
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateCommodity_UppercasesSymbolAndExchange()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "googl",
+            exchange = "nasdaq",
+            name = "Alphabet",
+            displayPrecision = 4
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+        Assert.Equal("GOOGL", body!.Symbol);
+        Assert.Equal("NASDAQ", body.Exchange);
+    }
+
+    [Fact]
+    public async Task CreateCommodity_DuplicateSymbolAndExchange_Returns409()
     {
         var client = await CreateAdminClientAsync();
 
         var first = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
             symbol = "AAPL",
+            exchange = "NASDAQ",
             name = "Apple Inc.",
             displayPrecision = 4
         }, CT);
@@ -60,6 +101,7 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         var dup = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
             symbol = "AAPL",
+            exchange = "NASDAQ",
             name = "Apple Duplicate",
             displayPrecision = 4
         }, CT);
@@ -68,18 +110,28 @@ public class CommoditiesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateCommodity_DuplicateOfSeededCurrency_Returns409()
+    public async Task CreateCommodity_SameSymbolDifferentExchange_Succeeds()
     {
         var client = await CreateAdminClientAsync();
 
-        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        var first = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
-            symbol = "USD",
-            name = "Shadow USD",
-            displayPrecision = 2
+            symbol = "BRK",
+            exchange = "NYSE",
+            name = "Berkshire Hathaway",
+            displayPrecision = 4
+        }, CT);
+        first.EnsureSuccessStatusCode();
+
+        var second = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "BRK",
+            exchange = "OTHER",
+            name = "Berkshire Hathaway Other",
+            displayPrecision = 4
         }, CT);
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
     }
 
     [Fact]
@@ -90,6 +142,7 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
             symbol = "MSFT",
+            exchange = "NASDAQ",
             name = "Microsoft",
             displayPrecision = 4
         }, CT);
@@ -114,6 +167,25 @@ public class CommoditiesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task PatchCommodity_SeededCurrency_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cadId = await db.Commodities.Where(c => c.Symbol == "CAD").Select(c => c.Id).SingleAsync(CT);
+
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodities/{cadId}",
+            new[]
+            {
+                new { op = "replace", path = "/name", value = (object)"Custom CAD" }
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, patchResp.StatusCode);
+    }
+
+    [Fact]
     public async Task DeleteCommodity_UnusedSecurity_Succeeds()
     {
         var client = await CreateAdminClientAsync();
@@ -121,6 +193,7 @@ public class CommoditiesEndpointTests : IntegrationTestBase
         var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
         {
             symbol = "TSLA",
+            exchange = "NASDAQ",
             name = "Tesla",
             displayPrecision = 4
         }, CT);
@@ -130,6 +203,23 @@ public class CommoditiesEndpointTests : IntegrationTestBase
             $"/api/v1/finances/commodities/{created!.Id}", CT);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteCommodity_SeededCurrency_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Pick a currency that isn't referenced by any account (CAD is seeded but may be referenced).
+        // Use a less common code to keep this test isolated from the rest of the suite.
+        var xofId = await db.Commodities.Where(c => c.Symbol == "XOF").Select(c => c.Id).SingleAsync(CT);
+
+        var deleteResp = await client.DeleteAsync(
+            $"/api/v1/finances/commodities/{xofId}", CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResp.StatusCode);
     }
 
     [Fact]

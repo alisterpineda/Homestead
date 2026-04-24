@@ -16,9 +16,11 @@ public class GetCommodityHandler(AppDbContext db)
             {
                 Id = c.Id,
                 Symbol = c.Symbol,
+                Exchange = c.Exchange,
                 Name = c.Name,
                 Kind = c.Kind,
                 DisplayPrecision = c.DisplayPrecision,
+                IsSystemManaged = c.IsSystemManaged,
             })
             .FirstOrDefaultAsync(ct);
     }

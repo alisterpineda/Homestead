@@ -6,13 +6,20 @@ namespace Homestead.WebApi.Persistence.Configurations;
 
 public class CommodityPriceConfiguration : IEntityTypeConfiguration<CommodityPrice>
 {
+    private const string RatePositiveSql = "\"Rate\" > 0";
+    private const string NotSelfPriceSql = "\"CommodityId\" <> \"QuoteCurrencyId\"";
+
     public void Configure(EntityTypeBuilder<CommodityPrice> builder)
     {
-        builder.ToTable("commodity_prices", "finances");
+        builder.ToTable("commodity_prices", "finances", table =>
+        {
+            table.HasCheckConstraint("CK_commodity_prices_rate_positive", RatePositiveSql);
+            table.HasCheckConstraint("CK_commodity_prices_self_price", NotSelfPriceSql);
+        });
 
         builder.HasKey(p => p.Id);
 
-        builder.Property(p => p.PriceDate).IsRequired();
+        builder.Property(p => p.PriceAt).IsRequired();
 
         builder.Property(p => p.Rate).HasColumnType("numeric");
 
@@ -34,6 +41,12 @@ public class CommodityPriceConfiguration : IEntityTypeConfiguration<CommodityPri
             .HasForeignKey(p => p.QuoteCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Transaction-linked prices cascade with their source transaction.
+        builder.HasOne(p => p.CreatedByTransaction)
+            .WithMany()
+            .HasForeignKey(p => p.CreatedByTransactionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasOne(p => p.CreatedByUser)
             .WithMany()
             .HasForeignKey(p => p.CreatedByUserId)
@@ -44,7 +57,7 @@ public class CommodityPriceConfiguration : IEntityTypeConfiguration<CommodityPri
             .HasForeignKey(p => p.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(p => new { p.CommodityId, p.QuoteCurrencyId, p.PriceDate })
+        builder.HasIndex(p => new { p.CommodityId, p.QuoteCurrencyId, p.PriceAt })
             .IsUnique()
             .IsDescending(false, false, true);
     }

@@ -3,8 +3,9 @@
 
 export interface CommodityPriceResponse {
   commodityId: string;
+  createdByTransactionId: (string | null);
   id: string;
-  priceDate: string;
+  priceAt: string;
   quoteCurrencyId: string;
   rate: (number | string);
 }

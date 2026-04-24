@@ -3,6 +3,7 @@
 
 export interface CreateCommodityCommand {
   displayPrecision?: (number | string);
+  exchange: string;
   name: string;
   symbol: string;
 }

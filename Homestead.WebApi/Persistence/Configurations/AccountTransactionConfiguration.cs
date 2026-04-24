@@ -12,7 +12,7 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
 
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.TxnDate).IsRequired();
+        builder.Property(t => t.OccurredAt).IsRequired();
 
         builder.Property(t => t.Description)
             .IsRequired()
@@ -51,6 +51,6 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
             .HasForeignKey(t => t.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(t => t.TxnDate);
+        builder.HasIndex(t => t.OccurredAt);
     }
 }

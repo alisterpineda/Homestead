@@ -3,7 +3,7 @@
 
 export interface CreateCommodityPriceCommand {
   commodityId: string;
-  priceDate: string;
+  priceAt: string;
   quoteCurrencyId: string;
   rate: (number | string);
 }

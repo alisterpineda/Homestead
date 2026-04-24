@@ -10,6 +10,10 @@ public class CreateCommodityCommandValidator : AbstractValidator<CreateCommodity
             .Must(s => !string.IsNullOrWhiteSpace(s)).WithMessage("Symbol is required.")
             .MaximumLength(32).WithMessage("Symbol must be 32 characters or fewer.");
 
+        RuleFor(x => x.Exchange)
+            .Must(e => !string.IsNullOrWhiteSpace(e)).WithMessage("Exchange is required.")
+            .MaximumLength(16).WithMessage("Exchange must be 16 characters or fewer.");
+
         RuleFor(x => x.Name)
             .Must(n => !string.IsNullOrWhiteSpace(n)).WithMessage("Name is required.")
             .MaximumLength(256).WithMessage("Name must be 256 characters or fewer.");

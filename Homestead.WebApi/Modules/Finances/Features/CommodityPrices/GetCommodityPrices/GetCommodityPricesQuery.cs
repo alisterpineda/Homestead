@@ -7,6 +7,6 @@ public record GetCommodityPricesQuery : PaginatedRequest, IRequest<PaginatedResp
 {
     public Guid? CommodityId { get; init; }
     public Guid? QuoteCurrencyId { get; init; }
-    public DateOnly? FromDate { get; init; }
-    public DateOnly? ToDate { get; init; }
+    public DateTimeOffset? FromAt { get; init; }
+    public DateTimeOffset? ToAt { get; init; }
 }

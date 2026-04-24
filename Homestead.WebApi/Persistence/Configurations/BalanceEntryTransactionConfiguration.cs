@@ -24,13 +24,15 @@ public class BalanceEntryTransactionConfiguration : IEntityTypeConfiguration<Bal
             .HasForeignKey(b => b.AssertedCommodityId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // One balance assertion per (account, commodity, date). Filter scopes the
-        // uniqueness to balance-entry rows so it doesn't apply to the rest of TPH.
-        builder.HasIndex(b => new { b.AccountId, b.AssertedCommodityId, b.TxnDate })
+        // One balance assertion per (account, commodity, instant). Balance entries
+        // are always emitted at 23:59:59 UTC on asOfDate so per-instant uniqueness
+        // enforces per-day uniqueness. Filter scopes uniqueness to balance-entry rows
+        // so it doesn't apply to the rest of TPH.
+        builder.HasIndex(b => new { b.AccountId, b.AssertedCommodityId, b.OccurredAt })
             .IsUnique()
             .HasFilter($"\"Type\" = '{nameof(TransactionType.BalanceEntry)}'");
 
-        builder.HasIndex(b => new { b.AccountId, b.TxnDate })
+        builder.HasIndex(b => new { b.AccountId, b.OccurredAt })
             .HasFilter($"\"Type\" = '{nameof(TransactionType.BalanceEntry)}'");
     }
 }

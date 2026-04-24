@@ -11,8 +11,9 @@ public class CommodityPriceSnapshotTests
         Id = Guid.NewGuid(),
         CommodityId = Guid.NewGuid(),
         QuoteCurrencyId = Guid.NewGuid(),
-        PriceDate = new DateOnly(2026, 1, 31),
+        PriceAt = new DateTimeOffset(2026, 1, 31, 23, 59, 59, TimeSpan.Zero),
         Rate = 1.3456m,
+        CreatedByTransactionId = null,
     };
 
     [Fact]
@@ -24,8 +25,9 @@ public class CommodityPriceSnapshotTests
 
         Assert.Equal(price.CommodityId, snapshot.CommodityId);
         Assert.Equal(price.QuoteCurrencyId, snapshot.QuoteCurrencyId);
-        Assert.Equal(price.PriceDate, snapshot.PriceDate);
+        Assert.Equal(price.PriceAt, snapshot.PriceAt);
         Assert.Equal(price.Rate, snapshot.Rate);
+        Assert.Null(snapshot.CreatedByTransactionId);
     }
 
     [Fact]
@@ -47,5 +49,28 @@ public class CommodityPriceSnapshotTests
         Assert.Equal("Rate", change.Field);
         Assert.Equal("1.3456", change.OldValue);
         Assert.Equal("1.4000", change.NewValue);
+    }
+
+    [Fact]
+    public void Diff_DetectsCreatedByTransactionIdChange()
+    {
+        var before = CommodityPriceSnapshot.From(CreatePrice());
+        var txnId = Guid.NewGuid();
+        var after = before with { CreatedByTransactionId = txnId };
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("CreatedByTransactionId", change.Field);
+        Assert.Null(change.OldValue);
+        Assert.Equal(txnId.ToString(), change.NewValue);
+    }
+
+    [Fact]
+    public void Diff_DetectsPriceAtChange()
+    {
+        var before = CommodityPriceSnapshot.From(CreatePrice());
+        var after = before with { PriceAt = new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero) };
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("PriceAt", change.Field);
     }
 }

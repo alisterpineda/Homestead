@@ -4,7 +4,9 @@
 import { CommodityKind } from '../models/commodity-kind';
 export interface CommodityResponse {
   displayPrecision: (number | string);
+  exchange: (string | null);
   id: string;
+  isSystemManaged: boolean;
   kind: CommodityKind;
   name: string;
   symbol: string;

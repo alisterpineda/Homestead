@@ -6,9 +6,11 @@ public class Commodity
 {
     public Guid Id { get; set; }
     public required string Symbol { get; set; }
+    public string? Exchange { get; set; }
     public required string Name { get; set; }
     public CommodityKind Kind { get; set; }
     public short DisplayPrecision { get; set; }
+    public bool IsSystemManaged { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

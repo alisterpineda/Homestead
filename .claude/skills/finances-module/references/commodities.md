@@ -113,7 +113,9 @@ CommodityPrice {
 
 `PriceAt` is a `DateTimeOffset`, stored UTC. This gives well-defined ordering for same-day observations, alignment with transaction timestamps (see *Transaction time semantics* in SKILL.md), and a single axis for carry-forward lookups.
 
-Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date (time defaults to `23:59:59 UTC` on the entered date — latest possible instant, so a manually-entered price trumps same-date transaction prices during carry-forward). Users who need finer control can expand a time input.
+Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date with an optional time; the frontend defaults the time to `00:00 UTC` on the entered date when the user only picks a date. The API accepts a raw `PriceAt: DateTimeOffset` — the server does not default or normalise the time. On a day that has both a 00:00-UTC manual price and a 12:00-UTC transaction-linked price, carry-forward at instants ≥ 12:00 UTC picks the transaction-linked row (most recent `PriceAt ≤ T`).
+
+`PriceAt` may be up to **one day ahead** of current UTC — the server rejects timestamps further in the future, which avoids accidentally staging prices for arbitrary dates.
 
 ## Price sources
 
@@ -126,13 +128,15 @@ Transaction-linked prices are **read-only** in the prices UI — the row is labe
 
 Manual prices: only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
 
+**Security** opening balances on an Investment account (via Add Position) *may* emit a transaction-linked price row at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, it's captured as a linked price row and the splits book (quantity × price) against Equity:Opening Balances in the reporting currency. If omitted, the position is captured unpriced: both splits are booked at `Value=0`, no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (no FX observation exists: single-currency accounts balance trivially, and a USD cash position on a CAD-reporting Investment account balances in USD with no implied rate). When a security opening balance is later updated, the linked row moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target instant); an update that first supplies a price to a previously-unpriced opening balance creates a new linked row. Deleting the opening balance cascades the linked row via FK.
+
 ## Which transaction shapes create price rows
 
 | Shape                       | Creates price? | Notes                                             |
 |-----------------------------|----------------|---------------------------------------------------|
 | Opening balance (cash)      | No             |                                                   |
-| Opening balance (security)  | Yes            | Via Add position.                                 |
-| Add position (security)     | Yes            | `(security, quote, at, per-unit price)`           |
+| Opening balance (security)  | Optional       | Via Add position — emitted only when the user supplies a per-unit price. If omitted, the position is captured unpriced. |
+| Add position (security)     | Optional       | `(security, quote, at, per-unit price)` when supplied. If omitted, position captured unpriced. |
 | Add position (cash)         | No             |                                                   |
 | Investment buy              | Yes            | `(security, quote, at, per-unit price)`           |
 | Investment sell             | Yes            | `(security, quote, at, per-unit price)`           |

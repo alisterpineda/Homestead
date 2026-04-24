@@ -38,7 +38,9 @@ internal record SystemSettingsItem();
 internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
 
 // Finances — enum fields are serialized as strings server-side, so use string here.
-internal record FinanceCommodityItem(Guid Id, string Symbol, string Name, string Kind, short DisplayPrecision);
+internal record FinanceCommodityItem(
+    Guid Id, string Symbol, string? Exchange, string Name, string Kind,
+    short DisplayPrecision, bool IsSystemManaged);
 
 internal record FinanceAccountItem(
     Guid Id, string Name, string AccountType, string? Kind,
@@ -47,6 +49,7 @@ internal record FinanceAccountItem(
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
 internal record FinancePriceItem(
-    Guid Id, Guid CommodityId, Guid QuoteCurrencyId, DateOnly PriceDate, decimal Rate);
+    Guid Id, Guid CommodityId, Guid QuoteCurrencyId, DateTimeOffset PriceAt,
+    decimal Rate, Guid? CreatedByTransactionId);
 
 internal record FinanceSettingsItem(Guid? DisplayCurrencyId = null);

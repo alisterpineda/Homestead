@@ -41,6 +41,20 @@ public class CurrencySeederTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Seeder_SeededCurrenciesAreSystemManaged_AndHaveNullExchange()
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var currencies = await db.Commodities
+            .Where(c => c.Kind == CommodityKind.Currency)
+            .ToListAsync(CT);
+
+        Assert.All(currencies, c => Assert.True(c.IsSystemManaged));
+        Assert.All(currencies, c => Assert.Null(c.Exchange));
+    }
+
+    [Fact]
     public async Task Seeder_IsIdempotent_OnRepeatedRuns()
     {
         using var scope = CreateScope();

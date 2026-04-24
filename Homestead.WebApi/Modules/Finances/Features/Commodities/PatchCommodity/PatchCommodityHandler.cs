@@ -21,6 +21,9 @@ public class PatchCommodityHandler(
         if (commodity is null)
             throw new EntityNotFoundException("Commodity not found.");
 
+        if (commodity.IsSystemManaged)
+            throw new BusinessRuleException("Seeded currencies are read-only.");
+
         audit.Track<CommoditySnapshot, Commodity>(commodity, "Commodity", commodity.Id);
 
         var model = new PatchCommodityModel
@@ -49,9 +52,11 @@ public class PatchCommodityHandler(
         {
             Id = commodity.Id,
             Symbol = commodity.Symbol,
+            Exchange = commodity.Exchange,
             Name = commodity.Name,
             Kind = commodity.Kind,
             DisplayPrecision = commodity.DisplayPrecision,
+            IsSystemManaged = commodity.IsSystemManaged,
         };
     }
 }

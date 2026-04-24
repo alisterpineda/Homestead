@@ -17,20 +17,21 @@ public class GetCommodityPricesHandler(AppDbContext db)
             query = query.Where(p => p.CommodityId == commodityId);
         if (request.QuoteCurrencyId is { } quoteId)
             query = query.Where(p => p.QuoteCurrencyId == quoteId);
-        if (request.FromDate is { } from)
-            query = query.Where(p => p.PriceDate >= from);
-        if (request.ToDate is { } to)
-            query = query.Where(p => p.PriceDate <= to);
+        if (request.FromAt is { } fromAt)
+            query = query.Where(p => p.PriceAt >= fromAt);
+        if (request.ToAt is { } toAt)
+            query = query.Where(p => p.PriceAt <= toAt);
 
         return await query
-            .OrderByDescending(p => p.PriceDate)
+            .OrderByDescending(p => p.PriceAt)
             .Select(p => new CommodityPriceResponse
             {
                 Id = p.Id,
                 CommodityId = p.CommodityId,
                 QuoteCurrencyId = p.QuoteCurrencyId,
-                PriceDate = p.PriceDate,
+                PriceAt = p.PriceAt,
                 Rate = p.Rate,
+                CreatedByTransactionId = p.CreatedByTransactionId,
             })
             .ToPaginatedAsync(request, ct);
     }

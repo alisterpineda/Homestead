@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Domain.Finances;
 public abstract class AccountTransaction
 {
     public Guid Id { get; set; }
-    public DateOnly TxnDate { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
     public required string Description { get; set; }
 
     public Guid CurrencyId { get; set; }

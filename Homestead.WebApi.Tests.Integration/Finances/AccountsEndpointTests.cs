@@ -216,6 +216,7 @@ public class AccountsEndpointTests : IntegrationTestBase
         {
             Id = Guid.NewGuid(),
             Symbol = "TEST-SEC",
+            Exchange = "OTHER",
             Name = "Test Security",
             Kind = CommodityKind.Security,
             DisplayPrecision = 2,

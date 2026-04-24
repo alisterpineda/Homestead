@@ -412,8 +412,8 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<DateOnly>("TxnDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -434,7 +434,7 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("CurrencyId");
 
-                    b.HasIndex("TxnDate");
+                    b.HasIndex("OccurredAt");
 
                     b.HasIndex("UpdatedByUserId");
 
@@ -518,6 +518,15 @@ namespace Homestead.WebApi.Migrations
                     b.Property<short>("DisplayPrecision")
                         .HasColumnType("smallint");
 
+                    b.Property<string>("Exchange")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<bool>("IsSystemManaged")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -546,11 +555,21 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("Symbol")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_commodities_Symbol_currency")
+                        .HasFilter("\"Exchange\" IS NULL");
 
                     b.HasIndex("UpdatedByUserId");
 
-                    b.ToTable("commodities", "finances");
+                    b.HasIndex("Symbol", "Exchange")
+                        .IsUnique()
+                        .HasDatabaseName("IX_commodities_Symbol_Exchange_security")
+                        .HasFilter("\"Exchange\" IS NOT NULL");
+
+                    b.ToTable("commodities", "finances", t =>
+                        {
+                            t.HasCheckConstraint("CK_commodities_exchange_matches_kind", "(\"Kind\" = 'Currency' AND \"Exchange\" IS NULL) OR (\"Kind\" = 'Security' AND \"Exchange\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.CommodityPrice", b =>
@@ -567,11 +586,14 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<Guid?>("CreatedByTransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateOnly>("PriceDate")
-                        .HasColumnType("date");
+                    b.Property<DateTimeOffset>("PriceAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("QuoteCurrencyId")
                         .HasColumnType("uuid");
@@ -589,17 +611,24 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByTransactionId");
+
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("QuoteCurrencyId");
 
                     b.HasIndex("UpdatedByUserId");
 
-                    b.HasIndex("CommodityId", "QuoteCurrencyId", "PriceDate")
+                    b.HasIndex("CommodityId", "QuoteCurrencyId", "PriceAt")
                         .IsUnique()
                         .IsDescending(false, false, true);
 
-                    b.ToTable("commodity_prices", "finances");
+                    b.ToTable("commodity_prices", "finances", t =>
+                        {
+                            t.HasCheckConstraint("CK_commodity_prices_rate_positive", "\"Rate\" > 0");
+
+                            t.HasCheckConstraint("CK_commodity_prices_self_price", "\"CommodityId\" <> \"QuoteCurrencyId\"");
+                        });
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Groups.Group", b =>
@@ -948,10 +977,10 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("AssertedCommodityId");
 
-                    b.HasIndex("AccountId", "TxnDate")
+                    b.HasIndex("AccountId", "OccurredAt")
                         .HasFilter("\"Type\" = 'BalanceEntry'");
 
-                    b.HasIndex("AccountId", "AssertedCommodityId", "TxnDate")
+                    b.HasIndex("AccountId", "AssertedCommodityId", "OccurredAt")
                         .IsUnique()
                         .HasFilter("\"Type\" = 'BalanceEntry'");
 
@@ -1198,6 +1227,11 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Homestead.WebApi.Domain.Finances.AccountTransaction", "CreatedByTransaction")
+                        .WithMany()
+                        .HasForeignKey("CreatedByTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
@@ -1215,6 +1249,8 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Commodity");
+
+                    b.Navigation("CreatedByTransaction");
 
                     b.Navigation("CreatedByUser");
 

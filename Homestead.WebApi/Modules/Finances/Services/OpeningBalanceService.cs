@@ -25,8 +25,11 @@ public class OpeningBalanceService(
 
         await EnsureNoExistingOpeningBalanceAsync(accountId, commodityId, ct);
 
+        var occurredAt = ResolveOccurredAt(account, asOfDate);
+        var transactionId = Guid.NewGuid();
+
         var (txnCurrencyId, effectiveRate) = await ResolveCreateRateAsync(
-            account, commodity, valuePerUnit, asOfDate, ct);
+            account, commodity, valuePerUnit, occurredAt, transactionId, ct);
 
         var (accountSplitQuantity, accountSplitValue) = ComputeSignedSplit(
             account, commodity, quantity, effectiveRate);
@@ -39,8 +42,8 @@ public class OpeningBalanceService(
 
         var transaction = new NormalTransaction
         {
-            Id = Guid.NewGuid(),
-            TxnDate = asOfDate,
+            Id = transactionId,
+            OccurredAt = occurredAt,
             Description = OpeningBalanceTransactions.Description,
             CurrencyId = txnCurrencyId,
             Type = TransactionType.Normal,
@@ -90,9 +93,11 @@ public class OpeningBalanceService(
         var account = await FindAccountAsync(accountSplit.AccountId, ct);
         ValidateAccountIsWritable(account);
 
-        if (asOfDate != transaction.TxnDate)
+        var newOccurredAt = ResolveOccurredAt(account, asOfDate);
+
+        if (newOccurredAt != transaction.OccurredAt)
             await EnsureOpeningBalanceRemainsEarliestAsync(account.Id, accountSplit.CommodityId,
-                transaction.Id, asOfDate, ct);
+                transaction.Id, newOccurredAt, ct);
 
         var commodity = await db.Commodities.FindAsync([accountSplit.CommodityId], ct)
             ?? throw new BusinessRuleException("Commodity not found.");
@@ -101,12 +106,12 @@ public class OpeningBalanceService(
             transaction, "AccountTransaction", transaction.Id);
 
         var (txnCurrencyId, effectiveRate) = await ResolveUpdateRateAsync(
-            account, commodity, oldDate: transaction.TxnDate, newDate: asOfDate, valuePerUnit, ct);
+            account, commodity, transaction, newOccurredAt, valuePerUnit, ct);
 
         var (newAccountQuantity, newAccountValue) = ComputeSignedSplit(
             account, commodity, quantity, effectiveRate);
 
-        transaction.TxnDate = asOfDate;
+        transaction.OccurredAt = newOccurredAt;
         transaction.CurrencyId = txnCurrencyId;
 
         accountSplit.Quantity = newAccountQuantity;
@@ -139,6 +144,14 @@ public class OpeningBalanceService(
         if (otherActivity)
             throw new BusinessRuleException(
                 "Opening balance cannot be deleted while other transactions reference this account and commodity.");
+
+        // Audit entry for the linked price row — otherwise the FK cascade delete is silent in the log.
+        var linkedPriceId = await db.CommodityPrices
+            .Where(p => p.CreatedByTransactionId == transactionId)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(ct);
+        if (linkedPriceId is Guid priceId)
+            audit.Deleted("CommodityPrice", priceId);
 
         db.AccountTransactions.Remove(transaction);
         audit.Deleted("AccountTransaction", transaction.Id, OpeningBalanceTransactions.Description);
@@ -176,7 +189,7 @@ public class OpeningBalanceService(
     }
 
     private async Task EnsureOpeningBalanceRemainsEarliestAsync(Guid accountId, Guid commodityId,
-        Guid openingBalanceTransactionId, DateOnly newDate, CancellationToken ct)
+        Guid openingBalanceTransactionId, DateTimeOffset newOccurredAt, CancellationToken ct)
     {
         var earliestOther = await db.AccountTransactionSplits
             .Where(s => s.AccountId == accountId && s.CommodityId == commodityId
@@ -184,105 +197,110 @@ public class OpeningBalanceService(
             .Join(db.AccountTransactions,
                 s => s.TransactionId,
                 t => t.Id,
-                (s, t) => (DateOnly?)t.TxnDate)
+                (s, t) => (DateTimeOffset?)t.OccurredAt)
             .MinAsync(ct);
 
-        if (earliestOther is not null && newDate > earliestOther.Value)
+        if (earliestOther is not null && newOccurredAt > earliestOther.Value)
             throw new BusinessRuleException(
                 $"Opening balance must remain the earliest transaction for this account and commodity "
-                + $"(earliest other activity is {earliestOther.Value:yyyy-MM-dd}).");
+                + $"(earliest other activity is {DateOnly.FromDateTime(earliestOther.Value.UtcDateTime):yyyy-MM-dd}).");
+    }
+
+    // Investment accounts collect opening balances through Add position (shape: 12:00 UTC).
+    // Non-Investment accounts collect a single opening balance at account creation (00:00 UTC).
+    private static DateTimeOffset ResolveOccurredAt(Account account, DateOnly asOfDate)
+    {
+        var time = account.Kind == AccountKind.Investment ? new TimeOnly(12, 0) : TimeOnly.MinValue;
+        return new DateTimeOffset(asOfDate.ToDateTime(time), TimeSpan.Zero);
     }
 
     private async Task<(Guid txnCurrencyId, decimal effectiveRate)> ResolveCreateRateAsync(
-        Account account, Commodity commodity, decimal? valuePerUnit, DateOnly asOfDate,
-        CancellationToken ct)
+        Account account, Commodity commodity, decimal? valuePerUnit, DateTimeOffset occurredAt,
+        Guid transactionId, CancellationToken ct)
     {
         if (commodity.Kind == CommodityKind.Currency)
             return (commodity.Id, 1m);
 
         var quoteCurrencyId = account.ReportingCurrencyId;
 
-        var existingPrice = await db.CommodityPrices
-            .FirstOrDefaultAsync(p => p.CommodityId == commodity.Id
-                                   && p.QuoteCurrencyId == quoteCurrencyId
-                                   && p.PriceDate == asOfDate, ct);
-
-        if (existingPrice is not null)
-            return (quoteCurrencyId, existingPrice.Rate);
-
+        // No price supplied: capture the position unpriced. Both splits book Value=0;
+        // net-worth rendering relies on carry-forward (or marks the position *unpriced*).
         if (valuePerUnit is null)
-            throw new BusinessRuleException(
-                "Price per unit is required for security positions with no existing price on the given date.");
+            return (quoteCurrencyId, 0m);
 
-        AddCommodityPrice(commodity.Id, quoteCurrencyId, asOfDate, valuePerUnit.Value);
+        await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, occurredAt, excludeId: null, ct);
+        AddCommodityPrice(commodity.Id, quoteCurrencyId, occurredAt, valuePerUnit.Value, transactionId);
         return (quoteCurrencyId, valuePerUnit.Value);
     }
 
-    // Skill: the old date's price row is left alone on date change (carry-forward). Only the
-    // target date's row is managed here — either updated in place (same date) or created fresh.
+    // The linked price row is tracked by CreatedByTransactionId: rate updates in place,
+    // date changes move PriceAt on the same row, and deletes cascade via FK.
     private async Task<(Guid txnCurrencyId, decimal effectiveRate)> ResolveUpdateRateAsync(
-        Account account, Commodity commodity, DateOnly oldDate, DateOnly newDate,
-        decimal? valuePerUnit, CancellationToken ct)
+        Account account, Commodity commodity, AccountTransaction transaction,
+        DateTimeOffset newOccurredAt, decimal? valuePerUnit, CancellationToken ct)
     {
         if (commodity.Kind == CommodityKind.Currency)
             return (commodity.Id, 1m);
 
         var quoteCurrencyId = account.ReportingCurrencyId;
 
-        if (oldDate == newDate)
+        var linkedPrice = await db.CommodityPrices
+            .FirstOrDefaultAsync(p => p.CreatedByTransactionId == transaction.Id, ct);
+
+        if (linkedPrice is null)
         {
-            var existing = await db.CommodityPrices
-                .FirstOrDefaultAsync(p => p.CommodityId == commodity.Id
-                                       && p.QuoteCurrencyId == quoteCurrencyId
-                                       && p.PriceDate == newDate, ct);
-
-            if (existing is not null)
-            {
-                if (valuePerUnit is decimal newRate && existing.Rate != newRate)
-                {
-                    audit.Track<CommodityPriceSnapshot, CommodityPrice>(
-                        existing, "CommodityPrice", existing.Id);
-                    existing.Rate = newRate;
-                    return (quoteCurrencyId, newRate);
-                }
-                return (quoteCurrencyId, existing.Rate);
-            }
-
             if (valuePerUnit is null)
-                throw new BusinessRuleException(
-                    "Price per unit is required — no price exists for this security on the given date.");
+                return (quoteCurrencyId, 0m);
 
-            AddCommodityPrice(commodity.Id, quoteCurrencyId, newDate, valuePerUnit.Value);
+            await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, newOccurredAt, excludeId: null, ct);
+            AddCommodityPrice(commodity.Id, quoteCurrencyId, newOccurredAt,
+                valuePerUnit.Value, transaction.Id);
             return (quoteCurrencyId, valuePerUnit.Value);
         }
 
-        // Date changed: target must be clear; old-date row is intentionally left alone.
-        var collision = await db.CommodityPrices
-            .AnyAsync(p => p.CommodityId == commodity.Id
-                        && p.QuoteCurrencyId == quoteCurrencyId
-                        && p.PriceDate == newDate, ct);
-        if (collision)
-            throw new BusinessRuleException(
-                $"A price for this security already exists on {newDate:yyyy-MM-dd}. "
-                + "Remove that price manually before moving the opening balance.");
+        audit.Track<CommodityPriceSnapshot, CommodityPrice>(
+            linkedPrice, "CommodityPrice", linkedPrice.Id);
 
-        if (valuePerUnit is null)
-            throw new BusinessRuleException(
-                "Price per unit is required when moving a security opening balance to a new date.");
+        if (newOccurredAt != linkedPrice.PriceAt)
+        {
+            await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, newOccurredAt,
+                excludeId: linkedPrice.Id, ct);
+            linkedPrice.PriceAt = newOccurredAt;
+        }
 
-        AddCommodityPrice(commodity.Id, quoteCurrencyId, newDate, valuePerUnit.Value);
-        return (quoteCurrencyId, valuePerUnit.Value);
+        if (valuePerUnit is decimal newRate)
+            linkedPrice.Rate = newRate;
+
+        return (quoteCurrencyId, linkedPrice.Rate);
     }
 
-    private void AddCommodityPrice(Guid commodityId, Guid quoteCurrencyId, DateOnly date, decimal rate)
+    private async Task ThrowIfPriceExistsAtAsync(Guid commodityId, Guid quoteCurrencyId,
+        DateTimeOffset priceAt, Guid? excludeId, CancellationToken ct)
+    {
+        var exists = await db.CommodityPrices
+            .AsNoTracking()
+            .AnyAsync(p => p.CommodityId == commodityId
+                        && p.QuoteCurrencyId == quoteCurrencyId
+                        && p.PriceAt == priceAt
+                        && (excludeId == null || p.Id != excludeId), ct);
+        if (!exists) return;
+
+        throw new BusinessRuleException(
+            $"A price for this security already exists at {DateOnly.FromDateTime(priceAt.UtcDateTime):yyyy-MM-dd}. "
+            + "Remove or move that price row before modifying the opening balance.");
+    }
+
+    private void AddCommodityPrice(Guid commodityId, Guid quoteCurrencyId, DateTimeOffset priceAt,
+        decimal rate, Guid createdByTransactionId)
     {
         var price = new CommodityPrice
         {
             Id = Guid.NewGuid(),
             CommodityId = commodityId,
             QuoteCurrencyId = quoteCurrencyId,
-            PriceDate = date,
+            PriceAt = priceAt,
             Rate = rate,
+            CreatedByTransactionId = createdByTransactionId,
         };
         db.CommodityPrices.Add(price);
         audit.Created("CommodityPrice", price.Id);

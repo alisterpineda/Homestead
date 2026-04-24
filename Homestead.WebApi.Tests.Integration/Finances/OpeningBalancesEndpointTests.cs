@@ -30,17 +30,19 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         return body!.Id;
     }
 
-    private async Task<Commodity> AddSecurityAsync(string symbol = "VEQT")
+    private async Task<Commodity> AddSecurityAsync(string symbol = "VEQT", string exchange = "TSX")
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var existing = await db.Commodities.FirstOrDefaultAsync(c => c.Symbol == symbol, CT);
+        var existing = await db.Commodities
+            .FirstOrDefaultAsync(c => c.Symbol == symbol && c.Exchange == exchange, CT);
         if (existing is not null) return existing;
 
         var security = new Commodity
         {
             Id = Guid.NewGuid(),
             Symbol = symbol,
+            Exchange = exchange,
             Name = symbol,
             Kind = CommodityKind.Security,
             DisplayPrecision = 4,
@@ -102,6 +104,9 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         var price = await db.CommodityPrices.SingleAsync(p =>
             p.CommodityId == veqt.Id && p.QuoteCurrencyId == usdId, CT);
         Assert.Equal(35.12m, price.Rate);
+        Assert.Equal(new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero), price.PriceAt);
+        Assert.NotNull(price.CreatedByTransactionId);
+        Assert.Equal(body.TransactionId, price.CreatedByTransactionId);
     }
 
     [Fact]

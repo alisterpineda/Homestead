@@ -27,13 +27,16 @@ public class GetCommoditiesHandler(AppDbContext db)
         return await query
             .OrderBy(c => c.Kind)
             .ThenBy(c => c.Symbol)
+            .ThenBy(c => c.Exchange)
             .Select(c => new CommodityResponse
             {
                 Id = c.Id,
                 Symbol = c.Symbol,
+                Exchange = c.Exchange,
                 Name = c.Name,
                 Kind = c.Kind,
                 DisplayPrecision = c.DisplayPrecision,
+                IsSystemManaged = c.IsSystemManaged,
             })
             .ToPaginatedAsync(request, ct);
     }

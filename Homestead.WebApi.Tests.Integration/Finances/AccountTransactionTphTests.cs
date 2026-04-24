@@ -11,6 +11,12 @@ public class AccountTransactionTphTests : IntegrationTestBase
 {
     public AccountTransactionTphTests(PostgresFixture fixture) : base(fixture) { }
 
+    private static DateTimeOffset BalanceEntryAt(DateOnly date) =>
+        new(date.ToDateTime(new TimeOnly(23, 59, 59)), TimeSpan.Zero);
+
+    private static DateTimeOffset StartOfDayUtc(DateOnly date) =>
+        new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
     [Fact]
     public async Task BalanceEntry_RoundTripsThroughTph()
     {
@@ -20,9 +26,10 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var usd = await db.Commodities.SingleAsync(c => c.Symbol == "USD", CT);
         var account = await CreateAccountAsync(db, usd);
 
+        var occurredAt = BalanceEntryAt(new DateOnly(2026, 1, 31));
         var balanceEntry = new BalanceEntryTransaction
         {
-            TxnDate = new DateOnly(2026, 1, 31),
+            OccurredAt = occurredAt,
             Description = "January statement",
             CurrencyId = usd.Id,
             AccountId = account.Id,
@@ -43,6 +50,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         Assert.Equal(usd.Id, loaded.AssertedCommodityId);
         Assert.Equal(1234.56m, loaded.AssertedQuantity);
         Assert.Equal("From statement PDF", loaded.Note);
+        Assert.Equal(occurredAt, loaded.OccurredAt);
 
         // Discriminator column persisted as the enum name, not its integer value.
         // Alias as "Value" because EF's SqlQuery<string> maps the unique column to that name.
@@ -60,11 +68,11 @@ public class AccountTransactionTphTests : IntegrationTestBase
 
         var usd = await db.Commodities.SingleAsync(c => c.Symbol == "USD", CT);
         var account = await CreateAccountAsync(db, usd);
-        var date = new DateOnly(2026, 1, 31);
+        var occurredAt = BalanceEntryAt(new DateOnly(2026, 1, 31));
 
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
-            TxnDate = date,
+            OccurredAt = occurredAt,
             Description = "First assertion",
             CurrencyId = usd.Id,
             AccountId = account.Id,
@@ -75,7 +83,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
 
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
-            TxnDate = date,
+            OccurredAt = occurredAt,
             Description = "Second, conflicting",
             CurrencyId = usd.Id,
             AccountId = account.Id,
@@ -95,12 +103,12 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var usd = await db.Commodities.SingleAsync(c => c.Symbol == "USD", CT);
         var accountA = await CreateAccountAsync(db, usd, name: "Chequing");
         var accountB = await CreateAccountAsync(db, usd, name: "Savings");
-        var date = new DateOnly(2026, 1, 31);
+        var occurredAt = BalanceEntryAt(new DateOnly(2026, 1, 31));
 
         db.AccountTransactions.AddRange(
             new BalanceEntryTransaction
             {
-                TxnDate = date,
+                OccurredAt = occurredAt,
                 Description = "Chequing balance",
                 CurrencyId = usd.Id,
                 AccountId = accountA.Id,
@@ -109,7 +117,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
             },
             new BalanceEntryTransaction
             {
-                TxnDate = date,
+                OccurredAt = occurredAt,
                 Description = "Savings balance",
                 CurrencyId = usd.Id,
                 AccountId = accountB.Id,
@@ -121,7 +129,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
 
         var count = await db.AccountTransactions
             .OfType<BalanceEntryTransaction>()
-            .CountAsync(t => t.TxnDate == date, CT);
+            .CountAsync(t => t.OccurredAt == occurredAt, CT);
         Assert.Equal(2, count);
     }
 
@@ -135,10 +143,10 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var account = await CreateAccountAsync(db, usd);
         var date = new DateOnly(2026, 1, 31);
 
-        // A balance entry establishes a filtered-index row on (account, usd, date).
+        // A balance entry establishes a filtered-index row on (account, usd, EOD-of-date).
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
-            TxnDate = date,
+            OccurredAt = BalanceEntryAt(date),
             Description = "Month-end balance",
             CurrencyId = usd.Id,
             AccountId = account.Id,
@@ -148,10 +156,11 @@ public class AccountTransactionTphTests : IntegrationTestBase
         await db.SaveChangesAsync(CT);
 
         // A NormalTransaction on the same date must not collide — it has no
-        // AccountId/AssertedCommodityId, so the filter excludes it.
+        // AccountId/AssertedCommodityId, so the filter excludes it. OccurredAt at
+        // 00:00 UTC on the same date is also a different instant.
         db.AccountTransactions.Add(new NormalTransaction
         {
-            TxnDate = date,
+            OccurredAt = StartOfDayUtc(date),
             Description = "Itemised transfer",
             CurrencyId = usd.Id,
         });

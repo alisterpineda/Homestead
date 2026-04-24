@@ -12,8 +12,8 @@ import { PaginatedResponseOfCommodityPriceResponse } from '../../models/paginate
 export interface GetCommodityPrices$Params {
   CommodityId?: string;
   QuoteCurrencyId?: string;
-  FromDate?: string;
-  ToDate?: string;
+  FromAt?: string;
+  ToAt?: string;
   Page: (number | string);
   PageSize: (number | string);
 }
@@ -23,8 +23,8 @@ export function getCommodityPrices(http: HttpClient, rootUrl: string, params: Ge
   if (params) {
     rb.query('CommodityId', params.CommodityId, {});
     rb.query('QuoteCurrencyId', params.QuoteCurrencyId, {});
-    rb.query('FromDate', params.FromDate, {});
-    rb.query('ToDate', params.ToDate, {});
+    rb.query('FromAt', params.FromAt, {});
+    rb.query('ToAt', params.ToAt, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

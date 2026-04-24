@@ -26,7 +26,7 @@ internal static class OpeningBalanceMapping
             Quantity = quantity,
             Value = value,
             ValuePerUnit = rate,
-            AsOfDate = transaction.TxnDate,
+            AsOfDate = DateOnly.FromDateTime(transaction.OccurredAt.UtcDateTime),
         };
     }
 

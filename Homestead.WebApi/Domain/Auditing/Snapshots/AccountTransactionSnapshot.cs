@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Domain.Auditing.Snapshots;
 
 public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnapshot, AccountTransaction>
 {
-    public required DateOnly TxnDate { get; init; }
+    public required DateTimeOffset OccurredAt { get; init; }
     public required string Description { get; init; }
     public required Guid CurrencyId { get; init; }
     public required TransactionType Type { get; init; }
@@ -13,7 +13,7 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
 
     public static AccountTransactionSnapshot From(AccountTransaction source) => new()
     {
-        TxnDate = source.TxnDate,
+        OccurredAt = source.OccurredAt,
         Description = source.Description,
         CurrencyId = source.CurrencyId,
         Type = source.Type,
@@ -28,10 +28,10 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
     {
         var changes = new List<FieldChange>();
 
-        if (TxnDate != other.TxnDate)
-            changes.Add(new ScalarFieldChange("TxnDate",
-                TxnDate.ToString("O", CultureInfo.InvariantCulture),
-                other.TxnDate.ToString("O", CultureInfo.InvariantCulture)));
+        if (OccurredAt != other.OccurredAt)
+            changes.Add(new ScalarFieldChange("OccurredAt",
+                OccurredAt.ToString("O", CultureInfo.InvariantCulture),
+                other.OccurredAt.ToString("O", CultureInfo.InvariantCulture)));
         if (Description != other.Description)
             changes.Add(new ScalarFieldChange("Description", Description, other.Description));
         if (CurrencyId != other.CurrencyId)

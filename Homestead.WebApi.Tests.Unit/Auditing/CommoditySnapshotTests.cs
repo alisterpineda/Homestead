@@ -10,9 +10,11 @@ public class CommoditySnapshotTests
     {
         Id = Guid.NewGuid(),
         Symbol = "VEQT",
+        Exchange = "TSX",
         Name = "Vanguard All-Equity",
         Kind = CommodityKind.Security,
         DisplayPrecision = 4,
+        IsSystemManaged = false,
     };
 
     [Fact]
@@ -23,9 +25,11 @@ public class CommoditySnapshotTests
         var snapshot = CommoditySnapshot.From(commodity);
 
         Assert.Equal("VEQT", snapshot.Symbol);
+        Assert.Equal("TSX", snapshot.Exchange);
         Assert.Equal("Vanguard All-Equity", snapshot.Name);
         Assert.Equal(CommodityKind.Security, snapshot.Kind);
         Assert.Equal((short)4, snapshot.DisplayPrecision);
+        Assert.False(snapshot.IsSystemManaged);
     }
 
     [Fact]
@@ -53,5 +57,29 @@ public class CommoditySnapshotTests
             Assert.Single(changes, c => c.Field == "DisplayPrecision"));
         Assert.Equal("4", precisionChange.OldValue);
         Assert.Equal("2", precisionChange.NewValue);
+    }
+
+    [Fact]
+    public void Diff_DetectsExchangeChange()
+    {
+        var before = CommoditySnapshot.From(CreateCommodity());
+        var after = before with { Exchange = "NASDAQ" };
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("Exchange", change.Field);
+        Assert.Equal("TSX", change.OldValue);
+        Assert.Equal("NASDAQ", change.NewValue);
+    }
+
+    [Fact]
+    public void Diff_DetectsIsSystemManagedChange()
+    {
+        var before = CommoditySnapshot.From(CreateCommodity());
+        var after = before with { IsSystemManaged = true };
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("IsSystemManaged", change.Field);
+        Assert.Equal("False", change.OldValue);
+        Assert.Equal("True", change.NewValue);
     }
 }

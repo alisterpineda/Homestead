@@ -7,15 +7,17 @@ public record CommodityPriceSnapshot : IAuditSnapshot<CommodityPriceSnapshot, Co
 {
     public required Guid CommodityId { get; init; }
     public required Guid QuoteCurrencyId { get; init; }
-    public required DateOnly PriceDate { get; init; }
+    public required DateTimeOffset PriceAt { get; init; }
     public required decimal Rate { get; init; }
+    public required Guid? CreatedByTransactionId { get; init; }
 
     public static CommodityPriceSnapshot From(CommodityPrice source) => new()
     {
         CommodityId = source.CommodityId,
         QuoteCurrencyId = source.QuoteCurrencyId,
-        PriceDate = source.PriceDate,
+        PriceAt = source.PriceAt,
         Rate = source.Rate,
+        CreatedByTransactionId = source.CreatedByTransactionId,
     };
 
     public List<FieldChange> Diff(CommodityPriceSnapshot other)
@@ -26,12 +28,18 @@ public record CommodityPriceSnapshot : IAuditSnapshot<CommodityPriceSnapshot, Co
             changes.Add(new ScalarFieldChange("CommodityId", CommodityId.ToString(), other.CommodityId.ToString()));
         if (QuoteCurrencyId != other.QuoteCurrencyId)
             changes.Add(new ScalarFieldChange("QuoteCurrencyId", QuoteCurrencyId.ToString(), other.QuoteCurrencyId.ToString()));
-        if (PriceDate != other.PriceDate)
-            changes.Add(new ScalarFieldChange("PriceDate", PriceDate.ToString("O"), other.PriceDate.ToString("O")));
+        if (PriceAt != other.PriceAt)
+            changes.Add(new ScalarFieldChange("PriceAt",
+                PriceAt.ToString("O", CultureInfo.InvariantCulture),
+                other.PriceAt.ToString("O", CultureInfo.InvariantCulture)));
         if (Rate != other.Rate)
             changes.Add(new ScalarFieldChange("Rate",
                 Rate.ToString(CultureInfo.InvariantCulture),
                 other.Rate.ToString(CultureInfo.InvariantCulture)));
+        if (CreatedByTransactionId != other.CreatedByTransactionId)
+            changes.Add(new ScalarFieldChange("CreatedByTransactionId",
+                CreatedByTransactionId?.ToString(),
+                other.CreatedByTransactionId?.ToString()));
 
         return changes;
     }

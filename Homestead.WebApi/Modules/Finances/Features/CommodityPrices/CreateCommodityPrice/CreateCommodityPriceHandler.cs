@@ -32,24 +32,38 @@ public class CreateCommodityPriceHandler(
         if (quote.Kind != CommodityKind.Currency)
             throw new BusinessRuleException("QuoteCurrencyId must reference a currency commodity.");
 
-        if (request.PriceDate > DateOnly.FromDateTime(DateTime.UtcNow))
-            throw new BusinessRuleException("PriceDate cannot be in the future.");
+        if (request.PriceAt > DateTimeOffset.UtcNow.AddDays(1))
+            throw new BusinessRuleException("PriceAt cannot be more than one day in the future.");
 
-        var duplicate = await db.CommodityPrices.AnyAsync(p =>
-            p.CommodityId == request.CommodityId &&
-            p.QuoteCurrencyId == request.QuoteCurrencyId &&
-            p.PriceDate == request.PriceDate, ct);
-        if (duplicate)
+        var priceAt = request.PriceAt.ToUniversalTime();
+
+        var existing = await db.CommodityPrices
+            .AsNoTracking()
+            .Where(p => p.CommodityId == request.CommodityId
+                     && p.QuoteCurrencyId == request.QuoteCurrencyId
+                     && p.PriceAt == priceAt)
+            .Select(p => new { p.Id, p.CreatedByTransactionId })
+            .FirstOrDefaultAsync(ct);
+
+        if (existing is not null)
+        {
+            if (existing.CreatedByTransactionId is Guid txnId)
+                throw new BusinessRuleException(
+                    $"A transaction-linked price already exists at this instant (transaction {txnId}). "
+                    + "Edit the source transaction instead.");
+
             throw new DuplicateEntityException(
-                "A price for this commodity, quote currency, and date already exists.");
+                "A price for this commodity, quote currency, and instant already exists.");
+        }
 
         var price = new CommodityPrice
         {
             Id = Guid.NewGuid(),
             CommodityId = request.CommodityId,
             QuoteCurrencyId = request.QuoteCurrencyId,
-            PriceDate = request.PriceDate,
+            PriceAt = priceAt,
             Rate = request.Rate,
+            CreatedByTransactionId = null,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = currentUser.UserId,
@@ -65,8 +79,9 @@ public class CreateCommodityPriceHandler(
             Id = price.Id,
             CommodityId = price.CommodityId,
             QuoteCurrencyId = price.QuoteCurrencyId,
-            PriceDate = price.PriceDate,
+            PriceAt = price.PriceAt,
             Rate = price.Rate,
+            CreatedByTransactionId = price.CreatedByTransactionId,
         };
     }
 }

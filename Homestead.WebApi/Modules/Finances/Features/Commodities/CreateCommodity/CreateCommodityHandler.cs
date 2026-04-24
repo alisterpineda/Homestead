@@ -16,20 +16,25 @@ public class CreateCommodityHandler(
 {
     public async Task<CommodityResponse> Handle(CreateCommodityCommand request, CancellationToken ct)
     {
-        var symbol = request.Symbol.Trim();
+        var symbol = request.Symbol.Trim().ToUpperInvariant();
+        var exchange = request.Exchange.Trim().ToUpperInvariant();
         var name = request.Name.Trim();
 
-        var exists = await db.Commodities.AnyAsync(c => c.Symbol == symbol, ct);
+        var exists = await db.Commodities.AnyAsync(c =>
+            c.Symbol == symbol && c.Exchange == exchange, ct);
         if (exists)
-            throw new DuplicateEntityException($"A commodity with symbol '{symbol}' already exists.");
+            throw new DuplicateEntityException(
+                $"A security with symbol '{symbol}' on exchange '{exchange}' already exists.");
 
         var commodity = new Commodity
         {
             Id = Guid.NewGuid(),
             Symbol = symbol,
+            Exchange = exchange,
             Name = name,
             Kind = CommodityKind.Security,
             DisplayPrecision = request.DisplayPrecision,
+            IsSystemManaged = false,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = currentUser.UserId,
@@ -44,9 +49,11 @@ public class CreateCommodityHandler(
         {
             Id = commodity.Id,
             Symbol = commodity.Symbol,
+            Exchange = commodity.Exchange,
             Name = commodity.Name,
             Kind = commodity.Kind,
             DisplayPrecision = commodity.DisplayPrecision,
+            IsSystemManaged = commodity.IsSystemManaged,
         };
     }
 }

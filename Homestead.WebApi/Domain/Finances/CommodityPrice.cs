@@ -12,8 +12,11 @@ public class CommodityPrice
     public Guid QuoteCurrencyId { get; set; }
     public Commodity QuoteCurrency { get; set; } = null!;
 
-    public DateOnly PriceDate { get; set; }
+    public DateTimeOffset PriceAt { get; set; }
     public decimal Rate { get; set; }
+
+    public Guid? CreatedByTransactionId { get; set; }
+    public AccountTransaction? CreatedByTransaction { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

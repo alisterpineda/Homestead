@@ -15,6 +15,9 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
         if (commodity is null)
             return false;
 
+        if (commodity.IsSystemManaged)
+            throw new BusinessRuleException("Seeded currencies cannot be deleted.");
+
         var refs = await db.Commodities
             .Where(c => c.Id == request.Id)
             .Select(c => new

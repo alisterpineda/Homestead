@@ -24,9 +24,9 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     {
         _db = TestAppDbContext.Create();
 
-        _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "US Dollar", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
-        _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "Canadian Dollar", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
-        _veqt = new Commodity { Id = Guid.NewGuid(), Symbol = "VEQT", Name = "Vanguard All-Equity", Kind = CommodityKind.Security, DisplayPrecision = 4 };
+        _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "US Dollar", Kind = CommodityKind.Currency, DisplayPrecision = 2, IsSystemManaged = true };
+        _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "Canadian Dollar", Kind = CommodityKind.Currency, DisplayPrecision = 2, IsSystemManaged = true };
+        _veqt = new Commodity { Id = Guid.NewGuid(), Symbol = "VEQT", Exchange = "TSX", Name = "Vanguard All-Equity", Kind = CommodityKind.Security, DisplayPrecision = 4 };
         _db.Commodities.AddRange(_usd, _cad, _veqt);
 
         _openingBalances = new Account
@@ -75,8 +75,14 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         return account;
     }
 
+    private static DateTimeOffset StartOfDayUtc(DateOnly date) =>
+        new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+    private static DateTimeOffset NoonUtc(DateOnly date) =>
+        new(date.ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero);
+
     [Fact]
-    public async Task Create_CashAccount_ProducesTwoBalancedSplits()
+    public async Task Create_CashAccount_ProducesTwoBalancedSplits_AtMidnightUtc()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
 
@@ -93,6 +99,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(-1000m, equitySplit.Quantity);
         Assert.Equal(-1000m, equitySplit.Value);
         Assert.Equal(_cad.Id, txn.CurrencyId);
+        Assert.Equal(StartOfDayUtc(new DateOnly(2026, 4, 23)), txn.OccurredAt);
     }
 
     [Fact]
@@ -122,7 +129,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_InvestmentAccount_WithForeignCashCommodity_BalancesInNativeCurrency()
+    public async Task Create_InvestmentAccount_WithForeignCashCommodity_BalancesInNativeCurrency_AtNoonUtc()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
 
@@ -138,10 +145,11 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(_usd.Id, equitySplit.CommodityId);
         Assert.Equal(5000m, accountSplit.Value);
         Assert.Equal(-5000m, equitySplit.Value);
+        Assert.Equal(NoonUtc(new DateOnly(2026, 4, 23)), txn.OccurredAt);
     }
 
     [Fact]
-    public async Task Create_InvestmentAccount_WithSecurity_EmitsPriceRow()
+    public async Task Create_InvestmentAccount_WithSecurity_EmitsLinkedPriceRow_AtNoonUtc()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
 
@@ -160,14 +168,45 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(-3512m, equitySplit.Quantity);
         Assert.Equal(-3512m, equitySplit.Value);
 
+        var expectedAt = NoonUtc(new DateOnly(2026, 4, 23));
+        Assert.Equal(expectedAt, txn.OccurredAt);
+
         var price = await _db.CommodityPrices.SingleAsync(p =>
             p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id);
         Assert.Equal(35.12m, price.Rate);
-        Assert.Equal(new DateOnly(2026, 4, 23), price.PriceDate);
+        Assert.Equal(expectedAt, price.PriceAt);
+        Assert.Equal(txn.Id, price.CreatedByTransactionId);
     }
 
     [Fact]
-    public async Task Create_InvestmentAccount_WithSecurity_ReusesExistingPrice()
+    public async Task Create_InvestmentAccount_WithSecurity_NoPrice_RecordsUnpricedPosition()
+    {
+        var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+
+        var txn = await _sut.CreateAsync(invest.Id, _veqt.Id, quantity: 100m,
+            valuePerUnit: null, asOfDate: new DateOnly(2026, 4, 23),
+            TestContext.Current.CancellationToken);
+
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
+        var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
+
+        // Position captured, but splits are valueless — carry-forward takes over at render time.
+        Assert.Equal(100m, accountSplit.Quantity);
+        Assert.Equal(0m, accountSplit.Value);
+        Assert.Equal(0m, equitySplit.Quantity);
+        Assert.Equal(0m, equitySplit.Value);
+
+        // No linked price row emitted.
+        var priceCount = await _db.CommodityPrices.CountAsync(p =>
+            p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, priceCount);
+    }
+
+    [Fact]
+    public async Task Create_InvestmentAccount_WithSecurity_CollidingPrice_Throws()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
         var date = new DateOnly(2026, 4, 23);
@@ -176,21 +215,13 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             CommodityId = _veqt.Id,
             QuoteCurrencyId = _cad.Id,
-            PriceDate = date,
+            PriceAt = NoonUtc(date),
             Rate = 40m,
         });
         await _db.SaveChangesAsync();
 
-        var txn = await _sut.CreateAsync(invest.Id, _veqt.Id, quantity: 100m,
-            valuePerUnit: 35.12m /* ignored because a price exists */, asOfDate: date, TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
-
-        var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
-        Assert.Equal(4000m, accountSplit.Value); // 100 × 40 (existing rate)
-
-        var priceCount = await _db.CommodityPrices.CountAsync(p =>
-            p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id && p.PriceDate == date);
-        Assert.Equal(1, priceCount);
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.CreateAsync(invest.Id, _veqt.Id, 100m, 35.12m, date, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -249,7 +280,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var laterTxn = new NormalTransaction
         {
             Id = Guid.NewGuid(),
-            TxnDate = new DateOnly(2026, 2, 15),
+            OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
             Description = "Transfer",
             CurrencyId = _cad.Id,
             Type = TransactionType.Normal,
@@ -267,7 +298,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Update_MovesDateOnSecurity_LeavesOldPriceRow()
+    public async Task Update_MovesDateOnSecurity_MovesLinkedPriceRow_InPlace()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
         var oldDate = new DateOnly(2026, 1, 1);
@@ -281,22 +312,21 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             asOfDate: newDate, TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync();
 
-        Assert.Equal(newDate, updated.TxnDate);
+        Assert.Equal(NoonUtc(newDate), updated.OccurredAt);
 
         var prices = await _db.CommodityPrices
             .Where(p => p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id)
-            .OrderBy(p => p.PriceDate)
             .ToListAsync();
 
-        Assert.Equal(2, prices.Count);
-        Assert.Equal(oldDate, prices[0].PriceDate);
-        Assert.Equal(30m, prices[0].Rate);
-        Assert.Equal(newDate, prices[1].PriceDate);
-        Assert.Equal(35m, prices[1].Rate);
+        // Single linked row moves with the transaction — no old row left behind.
+        var price = Assert.Single(prices);
+        Assert.Equal(NoonUtc(newDate), price.PriceAt);
+        Assert.Equal(35m, price.Rate);
+        Assert.Equal(created.Id, price.CreatedByTransactionId);
     }
 
     [Fact]
-    public async Task Update_MovesDateOnSecurity_WhenTargetDateHasPrice_Throws()
+    public async Task Update_MovesDateOnSecurity_WhenTargetInstantHasPrice_Throws()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
         var oldDate = new DateOnly(2026, 1, 1);
@@ -310,7 +340,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             CommodityId = _veqt.Id,
             QuoteCurrencyId = _cad.Id,
-            PriceDate = newDate,
+            PriceAt = NoonUtc(newDate),
             Rate = 42m,
         });
         await _db.SaveChangesAsync();
@@ -320,7 +350,55 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Update_ChangesRateOnSecurity_SameDate_UpdatesInPlace()
+    public async Task Update_UnpricedSecurity_AddPrice_CreatesLinkedRow()
+    {
+        var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+        var date = new DateOnly(2026, 1, 1);
+
+        var created = await _sut.CreateAsync(invest.Id, _veqt.Id, 100m, valuePerUnit: null,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var updated = await _sut.UpdateAsync(created.Id, 100m, valuePerUnit: 30m,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
+        Assert.Equal(3000m, accountSplit.Value);
+
+        var price = await _db.CommodityPrices.SingleAsync(p =>
+            p.CreatedByTransactionId == created.Id,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(30m, price.Rate);
+        Assert.Equal(NoonUtc(date), price.PriceAt);
+    }
+
+    [Fact]
+    public async Task Update_UnpricedSecurity_StaysUnpriced_WhenPriceNotProvided()
+    {
+        var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+        var date = new DateOnly(2026, 1, 1);
+
+        var created = await _sut.CreateAsync(invest.Id, _veqt.Id, 100m, valuePerUnit: null,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var updated = await _sut.UpdateAsync(created.Id, quantity: 150m, valuePerUnit: null,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
+        Assert.Equal(150m, accountSplit.Quantity);
+        Assert.Equal(0m, accountSplit.Value);
+
+        var priceCount = await _db.CommodityPrices.CountAsync(p =>
+            p.CreatedByTransactionId == created.Id,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, priceCount);
+    }
+
+    [Fact]
+    public async Task Update_ChangesRateOnSecurity_SameDate_UpdatesLinkedRowInPlace()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
         var date = new DateOnly(2026, 1, 1);
@@ -337,8 +415,9 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(4200m, accountSplit.Value);
 
         var price = await _db.CommodityPrices.SingleAsync(p =>
-            p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id && p.PriceDate == date);
+            p.CreatedByTransactionId == created.Id);
         Assert.Equal(42m, price.Rate);
+        Assert.Equal(NoonUtc(date), price.PriceAt);
     }
 
     [Fact]
@@ -363,7 +442,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var laterTxn = new NormalTransaction
         {
             Id = Guid.NewGuid(),
-            TxnDate = new DateOnly(2026, 2, 15),
+            OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
             Description = "Transfer",
             CurrencyId = _cad.Id,
             Type = TransactionType.Normal,

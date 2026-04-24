@@ -172,28 +172,38 @@ public static class CurrencySeeder
     // the DB was just created); we don't branch on it.
     public static void Seed(DbContext context, bool _ = false)
     {
-        var currencies = context.Set<Commodity>().Where(c => c.Kind == CommodityKind.Currency);
-        if (currencies.Count() == Iso4217Currencies.Count) return;
+        var set = context.Set<Commodity>();
 
-        var existingSymbols = currencies.Select(c => c.Symbol).ToHashSet(StringComparer.Ordinal);
+        // Idempotent backfill for dev DBs seeded before IsSystemManaged existed.
+        set.Where(c => c.Kind == CommodityKind.Currency && !c.IsSystemManaged)
+            .ExecuteUpdate(s => s.SetProperty(c => c.IsSystemManaged, true));
+
+        var existingSymbols = set.Where(c => c.Kind == CommodityKind.Currency)
+            .Select(c => c.Symbol)
+            .ToList()
+            .ToHashSet(StringComparer.Ordinal);
         var toAdd = BuildMissing(existingSymbols);
         if (toAdd.Count == 0) return;
 
-        context.Set<Commodity>().AddRange(toAdd);
+        set.AddRange(toAdd);
         context.SaveChanges();
     }
 
     public static async Task SeedAsync(DbContext context, bool _ = false, CancellationToken cancellationToken = default)
     {
-        var currencies = context.Set<Commodity>().Where(c => c.Kind == CommodityKind.Currency);
-        if (await currencies.CountAsync(cancellationToken) == Iso4217Currencies.Count) return;
+        var set = context.Set<Commodity>();
 
-        var existingSymbols = (await currencies.Select(c => c.Symbol).ToListAsync(cancellationToken))
+        await set.Where(c => c.Kind == CommodityKind.Currency && !c.IsSystemManaged)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsSystemManaged, true), cancellationToken);
+
+        var existingSymbols = (await set.Where(c => c.Kind == CommodityKind.Currency)
+            .Select(c => c.Symbol)
+            .ToListAsync(cancellationToken))
             .ToHashSet(StringComparer.Ordinal);
         var toAdd = BuildMissing(existingSymbols);
         if (toAdd.Count == 0) return;
 
-        await context.Set<Commodity>().AddRangeAsync(toAdd, cancellationToken);
+        await set.AddRangeAsync(toAdd, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
     }
 
@@ -207,9 +217,11 @@ public static class CurrencySeeder
             {
                 Id = Guid.NewGuid(),
                 Symbol = code,
+                Exchange = null,
                 Name = name,
                 Kind = CommodityKind.Currency,
                 DisplayPrecision = minorUnit,
+                IsSystemManaged = true,
             });
         }
         return toAdd;

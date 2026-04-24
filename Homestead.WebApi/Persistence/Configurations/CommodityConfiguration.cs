@@ -6,15 +6,25 @@ namespace Homestead.WebApi.Persistence.Configurations;
 
 public class CommodityConfiguration : IEntityTypeConfiguration<Commodity>
 {
+    private const string ExchangeMatchesKindSql =
+        "(\"Kind\" = 'Currency' AND \"Exchange\" IS NULL) OR "
+        + "(\"Kind\" = 'Security' AND \"Exchange\" IS NOT NULL)";
+
     public void Configure(EntityTypeBuilder<Commodity> builder)
     {
-        builder.ToTable("commodities", "finances");
+        builder.ToTable("commodities", "finances", table =>
+        {
+            table.HasCheckConstraint("CK_commodities_exchange_matches_kind", ExchangeMatchesKindSql);
+        });
 
         builder.HasKey(c => c.Id);
 
         builder.Property(c => c.Symbol)
             .IsRequired()
             .HasMaxLength(32);
+
+        builder.Property(c => c.Exchange)
+            .HasMaxLength(16);
 
         builder.Property(c => c.Name)
             .IsRequired()
@@ -27,6 +37,10 @@ public class CommodityConfiguration : IEntityTypeConfiguration<Commodity>
 
         builder.Property(c => c.DisplayPrecision)
             .IsRequired();
+
+        builder.Property(c => c.IsSystemManaged)
+            .IsRequired()
+            .HasDefaultValue(false);
 
         builder.Property(c => c.CreatedAt)
             .IsRequired()
@@ -46,6 +60,16 @@ public class CommodityConfiguration : IEntityTypeConfiguration<Commodity>
             .HasForeignKey(c => c.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(c => c.Symbol).IsUnique();
+        // Currencies: unique on Symbol alone (Exchange is always null).
+        builder.HasIndex(c => c.Symbol)
+            .IsUnique()
+            .HasFilter("\"Exchange\" IS NULL")
+            .HasDatabaseName("IX_commodities_Symbol_currency");
+
+        // Securities: unique on (Symbol, Exchange).
+        builder.HasIndex(c => new { c.Symbol, c.Exchange })
+            .IsUnique()
+            .HasFilter("\"Exchange\" IS NOT NULL")
+            .HasDatabaseName("IX_commodities_Symbol_Exchange_security");
     }
 }

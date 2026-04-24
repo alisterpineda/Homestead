@@ -22,6 +22,10 @@ public class PatchCommodityPriceHandler(
         if (price is null)
             throw new EntityNotFoundException("Commodity price not found.");
 
+        if (price.CreatedByTransactionId is not null)
+            throw new BusinessRuleException(
+                "Transaction-linked prices are edited through their source transaction.");
+
         audit.Track<CommodityPriceSnapshot, CommodityPrice>(price, "CommodityPrice", price.Id);
 
         var model = new PatchCommodityPriceModel
@@ -45,8 +49,9 @@ public class PatchCommodityPriceHandler(
             Id = price.Id,
             CommodityId = price.CommodityId,
             QuoteCurrencyId = price.QuoteCurrencyId,
-            PriceDate = price.PriceDate,
+            PriceAt = price.PriceAt,
             Rate = price.Rate,
+            CreatedByTransactionId = price.CreatedByTransactionId,
         };
     }
 }
