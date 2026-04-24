@@ -66,7 +66,7 @@ See [references/commodities.md](references/commodities.md) for the full design: 
 
 ### Transactions
 
-A transaction is one event at one point in time, balanced in one currency. It has an **occurred-at** timestamp (`DateTimeOffset`, stored UTC), a description, a currency (the currency in which its splits sum to zero), and one or more splits.
+A transaction is one event at one point in time. It has an **occurred-at** timestamp (`DateTimeOffset`, stored UTC), a description, and one or more splits. There is no transaction-level currency — a transaction balances per-commodity, with price annotations on individual splits bridging cross-commodity movements.
 
 Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date and expose an optional time input for users who want intra-day precision. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
 
@@ -79,11 +79,11 @@ A split is the per-account leg of a transaction. It records:
 - Which account it affects.
 - Which commodity moved.
 - The quantity that moved, in the commodity's native units.
-- The value of that movement in the transaction's currency.
+- Optionally, a **unit-price annotation** — a per-unit rate in a quote commodity — that bridges this leg into another commodity for balance purposes. Carried by legs that cross commodity boundaries (a Buy's security leg, a cross-currency Transfer's source leg, etc.); omitted for legs that balance per-commodity against another split.
 
-A transaction balances when the sum of its splits' values equals zero. This invariant is enforced by the data layer, not relied upon as a convention.
+A transaction balances when, for each commodity, the sum of split **weights** in that commodity is zero. A split's weight is `Quantity` in `Split.Commodity` if it has no price annotation, or `Quantity × Rate` in the annotation's quote commodity if it does. Same-commodity transactions balance trivially per-commodity; cross-commodity transactions rely on at least one annotation to bridge. This invariant is enforced by the data layer; stock splits are the sole declared exception.
 
-Splits are an implementation concept. Users never see the word "split" in v1.
+Splits are an implementation concept. Users never see the words "split" or "annotation" in v1.
 
 See [references/transactions.md](references/transactions.md) for the full design: shape↔storage-type mapping, worked examples for every shape, balance-entry reconciliation, edit/delete semantics, validation rules, and time/ordering semantics.
 
@@ -99,7 +99,7 @@ If the user later adds, edits, or removes a transaction dated on or before an ex
 
 Price data is required to express balances in the user's display currency. Each price is a tuple of `(commodity, quote currency, priceAt, rate)` — *"1 unit of commodity was worth rate units of quote currency at priceAt."* USD→CAD FX rates and VEQT-in-CAD security prices are represented identically. `priceAt` is a `DateTimeOffset` (stored UTC), giving stable same-day ordering and alignment with transaction timestamps.
 
-Prices come from two sources — **manual** entry and **transaction-linked** side-effects (buys, sells, DRIP, security opening balances, and cross-currency transfers). Transaction-linked prices are edited through the source transaction and are read-only in the prices UI; manual prices are editable directly (rate only). Missing prices on a given date resolve by carrying forward the most recently known price, with up to two-hop chaining through intermediary currencies. Holdings with no resolvable price render as *unpriced* — never silently zero.
+Prices come from two sources — **manual** entry and **transaction-linked** side-effects derived from split price annotations. Every cross-commodity split annotation (on a Buy's security leg, a cross-currency Transfer's source leg, a DRIP's buy half, an optionally-priced security opening balance) materialises one `CommodityPrice` row. Transaction-linked prices are edited through the source transaction and are read-only in the prices UI; manual prices are editable directly (rate only). Missing prices on a given date resolve by carrying forward the most recently known price, with up to two-hop chaining through intermediary currencies. Holdings with no resolvable price render as *unpriced* — never silently zero.
 
 Prices are captured forward from when the user first tracks a commodity. New commodities need a price entered on the day they first appear in any transaction.
 
@@ -115,7 +115,7 @@ But this implementation detail does not leak into the UI. Users do not see debit
 
 ### No base currency
 
-Transactions balance in whichever currency they naturally balance in. A USD-denominated transaction balances in USD. A CAD-denominated one balances in CAD. Storage records both the native quantity and the value in the transaction's currency.
+Transactions balance per-commodity, with price annotations on individual splits bridging cross-commodity legs. A same-currency transfer balances in that currency; a cross-currency transfer carries a price annotation on one leg that resolves the bridge. No split carries a "value in a transaction currency" field — the transaction has no privileged currency.
 
 There is no household-wide "base currency" at the data layer. A **display currency** is stored as a user preference and applied at read time. Changing the display currency re-values everything on read; it does not rewrite any data.
 
@@ -123,7 +123,7 @@ This is load-bearing for the household's relocation scenarios. Moving from Canad
 
 ### Beancount-style sign convention
 
-Stored split values follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases; `SUM(split.Value) = 0` for every transaction except stock splits. This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) and [references/transactions.md](references/transactions.md#sign-convention) for worked examples.
+Split quantities follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases. For each commodity, the sum of split weights is zero (stock splits exempted). This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) and [references/transactions.md](references/transactions.md#sign-convention) for worked examples.
 
 ### Single-position vs multi-position is UI-only
 
@@ -153,7 +153,7 @@ Captures wealth that existed before tracking began. For single-position kinds (C
 
 ### Transfer
 
-Movement between two of the household's own accounts. The UI asks for source account, destination account, amount, currency (inferred from source), date, and optional description. Cross-currency transfers also ask for the destination amount; the resulting two splits carry different commodities but balance in one of the two currencies. Cross-currency transfers also emit a `CommodityPrice` row capturing the implied FX rate between the two currencies.
+Movement between two of the household's own accounts. The UI asks for source account, destination account, amount, currency (inferred from source), date, and optional description. Cross-currency transfers also ask for the destination amount; the resulting two splits carry different commodities, and the source leg carries a price annotation giving the implied rate. That annotation also materialises as a `CommodityPrice` row.
 
 ### Investment buy
 
@@ -173,7 +173,7 @@ Dividend-reinvestment variant that results in additional security units rather t
 
 ### Stock split
 
-Corporate action that changes commodity quantities without changing value. Scoped **per commodity** — one transaction covers every account holding the security, with one split per holding account (all with `Value=0`, `Quantity≠0`). Only `StockSplit` transactions may skip the SUM-to-zero invariant (trivially satisfied because every value is zero).
+Corporate action that changes commodity quantities without changing value. Scoped **per commodity** — one transaction covers every account holding the security, with one split per holding account. Stock splits are the sole declared exception to the per-commodity balance invariant: quantities deliberately do not sum to zero (that is the point of the operation), and no price annotation is present.
 
 ### Balance entry
 

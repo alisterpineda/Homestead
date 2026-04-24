@@ -55,7 +55,7 @@ Inline creation from transaction flows (e.g., `Add position`) is deferred to v2 
 - Editable: Name, DisplayPrecision.
 - Immutable: Symbol, Exchange, Kind — shown but disabled.
 
-**Delete:** allowed only if the commodity has zero references anywhere — no account uses it as reporting currency, no transaction uses it as transaction currency, no split references it, no price references it (as commodity or quote). Otherwise delete is hidden. Seeded currencies are never deletable.
+**Delete:** allowed only if the commodity has zero references anywhere — no account uses it as reporting currency, no split references it (as `Commodity` or as `UnitPriceCommodity`), no price references it (as `Commodity` or `QuoteCurrency`). Otherwise delete is hidden. Seeded currencies are never deletable.
 
 ## List UI
 
@@ -122,30 +122,32 @@ Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual 
 Each price is either **manual** or **transaction-linked**:
 
 - **Manual:** `CreatedByTransactionId` is null. Created via *New manual price* on the commodity detail page, or (future) batch imports.
-- **Transaction-linked:** `CreatedByTransactionId` points to the transaction that created the row. Editing the transaction updates the row in place; deleting the transaction deletes the row.
+- **Transaction-linked:** `CreatedByTransactionId` points to the transaction that created the row. The row is materialised from a **split price annotation** (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) on the source transaction — every annotated split emits exactly one `CommodityPrice` row. Editing the annotation updates the row in place; deleting the transaction deletes the row.
 
 Transaction-linked prices are **read-only** in the prices UI — the row is labelled *Transaction* with a link to the source, and has no edit or delete affordance. To change a transaction-linked price the user edits the transaction.
 
 Manual prices: only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
 
-**Security** opening balances on an Investment account (via Add Position) *may* emit a transaction-linked price row at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, it's captured as a linked price row and the splits book (quantity × price) against Equity:Opening Balances in the reporting currency. If omitted, the position is captured unpriced: both splits are booked at `Value=0`, no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (no FX observation exists: single-currency accounts balance trivially, and a USD cash position on a CAD-reporting Investment account balances in USD with no implied rate). When a security opening balance is later updated, the linked row moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target instant); an update that first supplies a price to a previously-unpriced opening balance creates a new linked row. Deleting the opening balance cascades the linked row via FK.
+**Security** opening balances on an Investment account (via Add Position) *may* carry a price annotation on the security split at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, the security leg is annotated `@ price reportingCurrency` and the annotation materialises as a linked price row; the transaction balances per-currency via the annotation (asset +qty VEQT @ price ↔ equity -price×qty CAD). If omitted, the position is captured unpriced: both splits are in the security commodity, the transaction balances per-commodity (asset +qty VEQT ↔ equity -qty VEQT), no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (both splits same currency — per-commodity balance, no annotation). When a security opening balance is later updated, the annotation moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target instant); an update that first supplies a price to a previously-unpriced opening balance adds an annotation to the security leg and creates a new linked row (the opposite-side split's commodity flips from the security to the reporting currency as a consequence). Deleting the opening balance cascades the linked row via FK.
 
 ## Which transaction shapes create price rows
 
-| Shape                       | Creates price? | Notes                                             |
-|-----------------------------|----------------|---------------------------------------------------|
-| Opening balance (cash)      | No             |                                                   |
-| Opening balance (security)  | Optional       | Via Add position — emitted only when the user supplies a per-unit price. If omitted, the position is captured unpriced. |
-| Add position (security)     | Optional       | `(security, quote, at, per-unit price)` when supplied. If omitted, position captured unpriced. |
-| Add position (cash)         | No             |                                                   |
-| Investment buy              | Yes            | `(security, quote, at, per-unit price)`           |
-| Investment sell             | Yes            | `(security, quote, at, per-unit price)`           |
-| Dividend (cash)             | No             | No valuation event — just cash in.                |
-| DRIP / reinvestment         | Yes            | On the buy half of the pair.                      |
-| Stock split                 | No             | Quantity-only adjustment.                         |
-| Transfer (same-currency)    | No             |                                                   |
-| Transfer (cross-currency)   | Yes            | `(src currency, dst currency, at, implied rate)` — e.g. $100 USD → $135 CAD emits `(USD, CAD, at, 1.35)`. |
-| Balance entry               | No             |                                                   |
+A price row is created whenever a split carries a price annotation. The rule is one-to-one: every annotated split → one `CommodityPrice` row at `(Split.Commodity, Split.UnitPriceCommodityId, Transaction.OccurredAt, Split.UnitPriceRate)`. Shapes without any annotated splits never create price rows.
+
+| Shape                       | Annotated leg            | Notes                                             |
+|-----------------------------|--------------------------|---------------------------------------------------|
+| Opening balance (cash)      | None                     | Single-commodity transaction — per-commodity balance. |
+| Opening balance (security)  | Security leg (optional)  | Via Add position. Annotated only when the user supplies a per-unit price. Unpriced → both splits in the security, balances per-commodity. |
+| Add position (security)     | Security leg (optional)  | Same as above. |
+| Add position (cash)         | None                     | FX cash in a different-currency Investment account still balances per-commodity (same cash currency on both splits). |
+| Investment buy              | Security leg             | `(security, funding currency, at, per-unit price)` |
+| Investment sell             | Security leg             | `(security, funding currency, at, per-unit price)` |
+| Dividend (cash)             | None                     | Same-commodity event — no valuation. |
+| DRIP / reinvestment         | Buy half's security leg  | Dividend half is same-commodity; buy half annotates the security leg. |
+| Stock split                 | None (forbidden)         | Quantity-only adjustment. Annotation rejected. |
+| Transfer (same-currency)    | None                     | Same-commodity. |
+| Transfer (cross-currency)   | Source leg               | `(src currency, dst currency, at, implied rate)` — e.g. $100 USD → $135 CAD emits `(USD, CAD, at, 1.35)`. |
+| Balance entry               | None                     | Both splits in asserted commodity — per-commodity balance. |
 
 ## Price collision rules
 
@@ -155,10 +157,14 @@ Manual prices: only **Rate** is editable after creation. Changing Commodity, Quo
 
 ## Transaction-linked price lifecycle
 
-- **Transaction create:** the price row is created with `CreatedByTransactionId` set.
-- **Transaction edit (rate / quantity changed):** the linked price row's `Rate` is updated in place. The row's Id is preserved.
-- **Transaction edit (date / time / commodity / quote currency changed):** the linked price row's corresponding fields are updated in place, unless the new `(commodity, quote, at)` triple collides with an existing row — then the edit is rejected.
-- **Transaction delete:** the linked price row is deleted with it.
+Each linked price row is a materialised view of exactly one split's price annotation (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) at the transaction's `OccurredAt`.
+
+- **Transaction create:** for every annotated split, a price row is created with `CreatedByTransactionId` set to the transaction.
+- **Transaction edit (`UnitPriceRate` on an existing annotation changed):** the linked price row's `Rate` is updated in place. The row's Id is preserved.
+- **Transaction edit (`OccurredAt` / `Split.Commodity` / `Split.UnitPriceCommodityId` changed):** the linked price row's corresponding fields are updated in place, unless the new `(commodity, quote, at)` triple collides with an existing row — then the edit is rejected.
+- **Transaction edit (annotation added to a previously-unpriced split):** a new linked price row is created.
+- **Transaction edit (annotation removed from a split):** the linked price row is deleted.
+- **Transaction delete:** all linked price rows cascade.
 
 ## Lookup and carry-forward
 

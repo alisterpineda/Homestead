@@ -41,16 +41,16 @@ Both are multi-position (they must be able to hold opening balances and adjustme
 
 ## Sign convention (Beancount-style)
 
-Stored split values follow the Beancount convention:
+Stored split **quantities** follow the Beancount convention:
 
 - Asset splits: positive = increase.
 - Liability splits: negative = increase (more owed = more negative).
-- Equity splits: negative = increase (initial wealth is booked as a negative equity value).
-- `SUM(split.Value) = 0` for every transaction except stock splits.
+- Equity splits: negative = increase (initial wealth is booked as a negative equity quantity).
+- For every commodity in a transaction, the sum of split weights is zero (stock splits exempted). See [transactions.md](transactions.md#conceptual-model) for the weight-balance rule.
 
 Consequences:
 
-- Net worth = `SUM(asset balances) + SUM(liability balances)`, with no type-conditional arithmetic.
+- Net worth = `SUM(asset balances) + SUM(liability balances)` in display currency, with no type-conditional arithmetic.
 - The UI flips the sign for liability accounts when displaying balances, so users always see positive "amount owed."
 - The UI accepts positive numbers for every kind; the server applies the sign flip when writing splits for liability accounts.
 
@@ -79,38 +79,52 @@ Creating a non-Investment account with an initial balance emits one opening-bala
 **Cash account, $1,000 CAD on 2026-04-23:**
 
 ```
-Transaction: Type=Normal, Description="Opening balance", OccurredAt=2026-04-23T00:00:00Z, Currency=CAD
-  Split 1: Account=<cash>,      Commodity=CAD, Quantity=+1000, Value=+1000
-  Split 2: Account=<Equity:OB>, Commodity=CAD, Quantity=-1000, Value=-1000
+Transaction: Type=Normal, Description="Opening balance", OccurredAt=2026-04-23T00:00:00Z
+  Split 1: Account=<cash>,      Commodity=CAD, Quantity=+1000
+  Split 2: Account=<Equity:OB>, Commodity=CAD, Quantity=-1000
 ```
+
+Weight balance: CAD = +1000 − 1000 = 0 ✓. No annotation — both splits are in the same commodity.
 
 **Credit Card, $500 CAD owed on 2026-04-23** — the server flips the sign because Kind is a liability:
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T00:00:00Z, Currency=CAD
-  Split 1: Account=<credit card>, Commodity=CAD, Quantity=-500, Value=-500
-  Split 2: Account=<Equity:OB>,   Commodity=CAD, Quantity=+500, Value=+500
+Transaction: Type=Normal, OccurredAt=2026-04-23T00:00:00Z
+  Split 1: Account=<credit card>, Commodity=CAD, Quantity=-500
+  Split 2: Account=<Equity:OB>,   Commodity=CAD, Quantity=+500
 ```
+
+Weight balance: CAD = -500 + 500 = 0 ✓.
 
 **Investment *Add position* — 100 shares of VEQT @ $35.12 CAD on 2026-04-23** (investment shapes default to `12:00 UTC` on the chosen date — see [commodities.md](commodities.md#price-time-semantics)):
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z, Currency=CAD
-  Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100,  Value=+3512
-  Split 2: Account=<Equity:OB>,  Commodity=CAD,  Quantity=-3512, Value=-3512
+Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+  Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100 @ 35.12 CAD
+  Split 2: Account=<Equity:OB>,  Commodity=CAD,  Quantity=-3512
 ```
 
-Also emits a `CommodityPrice` row: `(VEQT, CAD, 2026-04-23T12:00:00Z, 35.12)`.
+Weight balance: CAD = (+100 × 35.12) + (-3512) = 0 ✓. The security leg's annotation bridges into CAD; the equity leg sits in CAD natively. Also emits a `CommodityPrice` row: `(VEQT, CAD, 2026-04-23T12:00:00Z, 35.12)`.
+
+**Investment *Add position* — 100 shares of VEQT on 2026-04-23 without a per-unit price** (unpriced — the user asserts holdings but hasn't pinned down historical value):
+
+```
+Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+  Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100
+  Split 2: Account=<Equity:OB>,  Commodity=VEQT, Quantity=-100
+```
+
+Weight balance: VEQT = +100 − 100 = 0 ✓. Both splits sit in VEQT; the transaction balances per-commodity and no price row is emitted. The holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves — see [commodities.md](commodities.md#missing-price-ux)).
 
 **Investment *Add position* — $5,000 USD cash on 2026-04-23** (foreign-currency cash in a CAD-reporting account):
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z, Currency=USD
-  Split 1: Account=<investment>, Commodity=USD, Quantity=+5000, Value=+5000
-  Split 2: Account=<Equity:OB>,  Commodity=USD, Quantity=-5000, Value=-5000
+Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+  Split 1: Account=<investment>, Commodity=USD, Quantity=+5000
+  Split 2: Account=<Equity:OB>,  Commodity=USD, Quantity=-5000
 ```
 
-Cash opening balances balance in their own currency — no price required. Security opening balances balance in the security's quote currency and require a price-per-unit input (which also creates a `CommodityPrice` row).
+Weight balance: USD = +5000 − 5000 = 0 ✓. Cash opening balances — even foreign-currency cash in a differently-reporting Investment account — always balance per-commodity: no annotation, no price row.
 
 **Invariant: one opening-balance transaction per `(account, commodity)` pair.** *Add position* for a commodity that already has an opening balance in that account becomes *Edit opening balance* instead.
 
