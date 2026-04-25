@@ -10,11 +10,15 @@ public class CommodityConfiguration : IEntityTypeConfiguration<Commodity>
         "(\"Kind\" = 'Currency' AND \"Exchange\" IS NULL) OR "
         + "(\"Kind\" = 'Security' AND \"Exchange\" IS NOT NULL)";
 
+    private const string DisplayPrecisionRangeSql =
+        "\"DisplayPrecision\" >= 0 AND \"DisplayPrecision\" <= 10";
+
     public void Configure(EntityTypeBuilder<Commodity> builder)
     {
         builder.ToTable("commodities", "finances", table =>
         {
             table.HasCheckConstraint("CK_commodities_exchange_matches_kind", ExchangeMatchesKindSql);
+            table.HasCheckConstraint("CK_commodities_display_precision_range", DisplayPrecisionRangeSql);
         });
 
         builder.HasKey(c => c.Id);

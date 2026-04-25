@@ -571,6 +571,8 @@ namespace Homestead.WebApi.Migrations
 
                     b.ToTable("commodities", "finances", t =>
                         {
+                            t.HasCheckConstraint("CK_commodities_display_precision_range", "\"DisplayPrecision\" >= 0 AND \"DisplayPrecision\" <= 10");
+
                             t.HasCheckConstraint("CK_commodities_exchange_matches_kind", "(\"Kind\" = 'Currency' AND \"Exchange\" IS NULL) OR (\"Kind\" = 'Security' AND \"Exchange\" IS NOT NULL)");
                         });
                 });

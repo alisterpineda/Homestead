@@ -85,6 +85,58 @@ public class CommoditiesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateCommodity_WhitespaceOnlySymbol_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "   ",
+            exchange = "NASDAQ",
+            name = "Whitespace symbol",
+            displayPrecision = 4
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateCommodity_WhitespaceOnlyExchange_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "WSEX",
+            exchange = "   ",
+            name = "Whitespace exchange",
+            displayPrecision = 4
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateCommodity_TrimsLeadingTrailingWhitespace()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "  vfv  ",
+            exchange = "  tsx  ",
+            name = "  Vanguard S&P 500 ETF  ",
+            displayPrecision = 4
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+        Assert.Equal("VFV", body!.Symbol);
+        Assert.Equal("TSX", body.Exchange);
+        Assert.Equal("Vanguard S&P 500 ETF", body.Name);
+    }
+
+    [Fact]
     public async Task CreateCommodity_DuplicateSymbolAndExchange_Returns409()
     {
         var client = await CreateAdminClientAsync();
