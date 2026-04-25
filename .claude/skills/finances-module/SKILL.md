@@ -188,6 +188,8 @@ All derived from splits and prices at read time. None are cached at the data lay
 - **Net worth** (as of a date, in display currency): sum of asset-account values, less sum of liability-account values.
 - **Equity:Adjustments balance** (in display currency): surfaced in the UI as *"Unrecorded wealth changes."* Useful both as a running total and as a tracking-quality signal — a growing balance relative to explicit transactions means the user is relying more on reconciliation and less on itemisation.
 
+See [references/valuation.md](references/valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
+
 ## Distinctive UX decisions worth preserving
 
 1. **Balance entries are first-class.** They are not a utility hidden behind a reconciliation menu. They are a primary way to record monthly activity and appear prominently in account detail views.
