@@ -13,7 +13,7 @@ public class SystemAccountSeederTests : IntegrationTestBase
     public SystemAccountSeederTests(PostgresFixture fixture) : base(fixture) { }
 
     [Fact]
-    public async Task Seeder_CreatesBothEquityAccounts_WithCorrectFlags()
+    public async Task Seeder_CreatesAllRequiredSystemAccounts_WithCorrectFlags()
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -22,10 +22,18 @@ public class SystemAccountSeederTests : IntegrationTestBase
             .SingleAsync(a => a.Name == SystemAccountSeeder.OpeningBalancesName, CT);
         var adjustments = await db.Accounts.AsNoTracking()
             .SingleAsync(a => a.Name == SystemAccountSeeder.AdjustmentsName, CT);
+        var income = await db.Accounts.AsNoTracking()
+            .SingleAsync(a => a.Name == SystemAccountSeeder.IncomeName, CT);
+        var expense = await db.Accounts.AsNoTracking()
+            .SingleAsync(a => a.Name == SystemAccountSeeder.ExpenseName, CT);
 
-        foreach (var account in new[] { openingBalances, adjustments })
+        Assert.Equal(AccountType.Equity, openingBalances.AccountType);
+        Assert.Equal(AccountType.Equity, adjustments.AccountType);
+        Assert.Equal(AccountType.Income, income.AccountType);
+        Assert.Equal(AccountType.Expense, expense.AccountType);
+
+        foreach (var account in new[] { openingBalances, adjustments, income, expense })
         {
-            Assert.Equal(AccountType.Equity, account.AccountType);
             Assert.True(account.IsSystem);
             Assert.False(account.IsArchived);
             Assert.Null(account.Kind);
@@ -57,6 +65,6 @@ public class SystemAccountSeederTests : IntegrationTestBase
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var systemCount = await db.Accounts.CountAsync(a => a.IsSystem, CT);
-        Assert.Equal(2, systemCount);
+        Assert.Equal(4, systemCount);
     }
 }

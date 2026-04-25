@@ -129,7 +129,7 @@ Transaction: Type=Normal, Description="Transfer to CAD chequing", OccurredAt=202
 
 Weight balance: CAD = (-100 × 1.35) + (+135) = 0 ✓. The source leg's annotation resolves into CAD; the destination leg is unpriced (native CAD). Emits `CommodityPrice (USD, CAD, 2026-04-23T00:00:00Z, 1.35)` — read as "1 USD = 1.35 CAD."
 
-If the source is a liability (e.g. paying down a credit card from chequing), sign flips apply per the convention table.
+Source and destination quantities are always `-amount` and `+amount` respectively, regardless of account type — no per-account-type sign flip is applied in transfer construction. The Beancount sign convention is satisfied automatically by the flow direction: for a liability destination (paying down a card), `+amount` stores as "less negative" (less owed); for a liability source (cash advance), `-amount` stores as "more negative" (more owed). This differs from opening balances and balance entries, where the user supplies a single positive amount and the server applies the sign flip per the convention table.
 
 **Validation:** source ≠ destination; both writable (not archived, not system); both account commodities valid for their kinds; source amount > 0 and (cross-currency) destination amount > 0; derived rate > 0.
 

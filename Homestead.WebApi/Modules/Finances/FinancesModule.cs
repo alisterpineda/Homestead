@@ -5,6 +5,10 @@ using Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
+using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.CreateBalanceEntry;
+using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntries;
+using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntry;
+using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.PatchBalanceEntry;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.DeleteCommodity;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodities;
@@ -21,6 +25,12 @@ using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalan
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.DeleteTransaction;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransactions;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
 
 namespace Homestead.WebApi.Modules.Finances;
 
@@ -49,6 +59,15 @@ public static class FinancesModule
         PatchOpeningBalanceEndpoint.Map(accounts);
         DeleteOpeningBalanceEndpoint.Map(accounts);
 
+        // Balance entries are sub-resources of accounts.
+        CreateBalanceEntryEndpoint.Map(accounts);
+        GetBalanceEntriesEndpoint.Map(accounts);
+        GetBalanceEntryEndpoint.Map(accounts);
+        PatchBalanceEntryEndpoint.Map(accounts);
+
+        // Per-account transaction list (Activity tab).
+        GetAccountTransactionsEndpoint.Map(accounts);
+
         var commodities = v1.MapGroup("/commodities");
         GetCommoditiesEndpoint.Map(commodities);
         GetCommodityEndpoint.Map(commodities);
@@ -61,6 +80,17 @@ public static class FinancesModule
         CreateCommodityPriceEndpoint.Map(prices);
         PatchCommodityPriceEndpoint.Map(prices);
         DeleteCommodityPriceEndpoint.Map(prices);
+
+        // Generic transactions surface (read + delete).
+        var transactions = v1.MapGroup("/transactions");
+        GetTransactionsEndpoint.Map(transactions);
+        GetTransactionEndpoint.Map(transactions);
+        DeleteTransactionEndpoint.Map(transactions);
+
+        // Per-shape transaction create/edit endpoints under /transactions/{shape}.
+        var transfers = transactions.MapGroup("/transfers");
+        CreateTransferEndpoint.Map(transfers);
+        PatchTransferEndpoint.Map(transfers);
 
         var settings = v1.MapGroup("/settings");
         GetFinanceSettingsEndpoint.Map(settings);

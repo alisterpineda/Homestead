@@ -46,6 +46,12 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
             .HasForeignKey(t => t.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(t => t.RelatedTransaction)
+            .WithMany()
+            .HasForeignKey(t => t.RelatedTransactionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(t => t.OccurredAt);
+        builder.HasIndex(t => t.RelatedTransactionId);
     }
 }

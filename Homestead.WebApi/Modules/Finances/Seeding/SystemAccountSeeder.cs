@@ -7,12 +7,19 @@ public static class SystemAccountSeeder
 {
     public const string OpeningBalancesName = "Equity:Opening Balances";
     public const string AdjustmentsName = "Equity:Adjustments";
+    public const string IncomeName = "Income";
+    public const string ExpenseName = "Expense";
 
     // Stored default only; user-facing balances always resolve through the chosen DisplayCurrency.
     private const string DefaultCommoditySymbol = "USD";
 
-    private static readonly IReadOnlyList<string> RequiredSystemAccounts =
-        [OpeningBalancesName, AdjustmentsName];
+    private static readonly IReadOnlyList<SystemAccountDefinition> RequiredSystemAccounts =
+    [
+        new(OpeningBalancesName, AccountType.Equity),
+        new(AdjustmentsName, AccountType.Equity),
+        new(IncomeName, AccountType.Income),
+        new(ExpenseName, AccountType.Expense),
+    ];
 
     public static void Seed(DbContext context, bool _ = false)
     {
@@ -22,7 +29,7 @@ public static class SystemAccountSeeder
             .Select(a => a.Name)
             .ToHashSet(StringComparer.Ordinal);
 
-        var missing = RequiredSystemAccounts.Where(n => !existingNames.Contains(n)).ToList();
+        var missing = RequiredSystemAccounts.Where(d => !existingNames.Contains(d.Name)).ToList();
         if (missing.Count == 0) return;
 
         var defaultCommodityId = context.Set<Commodity>()
@@ -45,7 +52,7 @@ public static class SystemAccountSeeder
             .ToListAsync(cancellationToken))
             .ToHashSet(StringComparer.Ordinal);
 
-        var missing = RequiredSystemAccounts.Where(n => !existingNames.Contains(n)).ToList();
+        var missing = RequiredSystemAccounts.Where(d => !existingNames.Contains(d.Name)).ToList();
         if (missing.Count == 0) return;
 
         var defaultCommodityId = await context.Set<Commodity>()
@@ -59,16 +66,17 @@ public static class SystemAccountSeeder
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static List<Account> BuildMissing(IEnumerable<string> missingNames, Guid reportingCurrencyId)
+    private static List<Account> BuildMissing(
+        IEnumerable<SystemAccountDefinition> missing, Guid reportingCurrencyId)
     {
         var toAdd = new List<Account>();
-        foreach (var name in missingNames)
+        foreach (var def in missing)
         {
             toAdd.Add(new Account
             {
                 Id = Guid.NewGuid(),
-                Name = name,
-                AccountType = AccountType.Equity,
+                Name = def.Name,
+                AccountType = def.Type,
                 Kind = null,
                 ReportingCurrencyId = reportingCurrencyId,
                 IsSystem = true,
@@ -77,4 +85,6 @@ public static class SystemAccountSeeder
         }
         return toAdd;
     }
+
+    private readonly record struct SystemAccountDefinition(string Name, AccountType Type);
 }

@@ -12,4 +12,11 @@ public static class AccountKindExtensions
         AccountKind.OtherLiability => AccountType.Liability,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, $"Unsupported account kind: {kind}"),
     };
+
+    // Beancount sign flip applied when storing user-positive input as a split quantity:
+    // a positive "owed" input on a liability account writes as a negative stored quantity
+    // (more owed = more negative). Used for opening balances and balance-entry assertions;
+    // transfers don't need this because flow direction (-amount/+amount) already does it.
+    public static decimal ApplySign(this AccountType type, decimal amount) =>
+        type == AccountType.Liability ? -amount : amount;
 }

@@ -10,6 +10,11 @@ public abstract class AccountTransaction
 
     public TransactionType Type { get; set; }
 
+    // v1 usage: DRIP pairing links the Dividend half to its Buy half (and vice versa).
+    // OnDelete(SetNull) — deleting one half leaves the survivor as a standalone transaction.
+    public Guid? RelatedTransactionId { get; set; }
+    public AccountTransaction? RelatedTransaction { get; set; }
+
     public ICollection<AccountTransactionSplit> Splits { get; set; } = [];
 
     public DateTimeOffset CreatedAt { get; set; }

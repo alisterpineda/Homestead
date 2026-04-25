@@ -250,16 +250,161 @@ public class TransactionValidatorTests
     }
 
     [Fact]
-    public void BalanceEntry_Throws_NotImplementedException_UntilFollowUp()
+    public void BalanceEntry_TwoSameCommodityUnpricedSplitsOnAccountAndCounterpart_Passes()
     {
+        var cad = Guid.NewGuid();
+        var account = Guid.NewGuid();
+        var adjustments = Guid.NewGuid();
+
         var txn = new BalanceEntryTransaction
         {
-            Description = "January close",
-            AccountId = Guid.NewGuid(),
-            AssertedCommodityId = Guid.NewGuid(),
-            AssertedQuantity = 100m,
+            Description = "Balance assertion",
+            AccountId = account,
+            AssertedCommodityId = cad,
+            AssertedQuantity = 1500m,
+            Splits =
+            [
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = account,
+                    CommodityId = cad,
+                    Quantity = 50m,
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = adjustments,
+                    CommodityId = cad,
+                    Quantity = -50m,
+                },
+            ],
         };
 
-        Assert.Throws<NotImplementedException>(() => _sut.Validate(txn));
+        _sut.Validate(txn);
+    }
+
+    [Fact]
+    public void BalanceEntry_WrongSplitCount_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var txn = new BalanceEntryTransaction
+        {
+            Description = "Balance assertion",
+            AccountId = Guid.NewGuid(),
+            AssertedCommodityId = cad,
+            AssertedQuantity = 100m,
+            Splits = [Split(cad, 100m)],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("exactly two splits", ex.Message);
+    }
+
+    [Fact]
+    public void BalanceEntry_SplitNotInAssertedCommodity_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var usd = Guid.NewGuid();
+        var account = Guid.NewGuid();
+        var adjustments = Guid.NewGuid();
+
+        var txn = new BalanceEntryTransaction
+        {
+            Description = "Balance assertion",
+            AccountId = account,
+            AssertedCommodityId = cad,
+            AssertedQuantity = 100m,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = account, CommodityId = usd, Quantity = 100m },
+                new() { Id = Guid.NewGuid(), AccountId = adjustments, CommodityId = cad, Quantity = -100m },
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("asserted commodity", ex.Message);
+    }
+
+    [Fact]
+    public void BalanceEntry_SplitWithAnnotation_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var usd = Guid.NewGuid();
+        var account = Guid.NewGuid();
+        var adjustments = Guid.NewGuid();
+
+        var txn = new BalanceEntryTransaction
+        {
+            Description = "Balance assertion",
+            AccountId = account,
+            AssertedCommodityId = cad,
+            AssertedQuantity = 100m,
+            Splits =
+            [
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = account,
+                    CommodityId = cad,
+                    Quantity = 100m,
+                    UnitPriceRate = 1m,
+                    UnitPriceCommodityId = usd,
+                },
+                new() { Id = Guid.NewGuid(), AccountId = adjustments, CommodityId = cad, Quantity = -100m },
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("price annotation", ex.Message);
+    }
+
+    [Fact]
+    public void BalanceEntry_NoSplitOnAssertedAccount_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var assertedAccount = Guid.NewGuid();
+        var elsewhere = Guid.NewGuid();
+        var adjustments = Guid.NewGuid();
+
+        var txn = new BalanceEntryTransaction
+        {
+            Description = "Balance assertion",
+            AccountId = assertedAccount,
+            AssertedCommodityId = cad,
+            AssertedQuantity = 100m,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = elsewhere, CommodityId = cad, Quantity = 50m },
+                new() { Id = Guid.NewGuid(), AccountId = adjustments, CommodityId = cad, Quantity = -50m },
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("asserted account", ex.Message);
+    }
+
+    [Fact]
+    public void BalanceEntry_UnbalancedDeltaSplits_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var account = Guid.NewGuid();
+        var adjustments = Guid.NewGuid();
+
+        var txn = new BalanceEntryTransaction
+        {
+            Description = "Balance assertion",
+            AccountId = account,
+            AssertedCommodityId = cad,
+            AssertedQuantity = 100m,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = account, CommodityId = cad, Quantity = 100m },
+                new() { Id = Guid.NewGuid(), AccountId = adjustments, CommodityId = cad, Quantity = -50m },
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("net to zero", ex.Message);
     }
 }

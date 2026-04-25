@@ -108,7 +108,11 @@ builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
 builder.Services.AddScoped<ISystemAccountProvider, SystemAccountProvider>();
+builder.Services.AddScoped<ILinkedPriceManager, LinkedPriceManager>();
+builder.Services.AddScoped<IBalanceEntryReconciler, BalanceEntryReconciler>();
 builder.Services.AddScoped<IOpeningBalanceService, OpeningBalanceService>();
+builder.Services.AddScoped<ITransferService, TransferService>();
+builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>

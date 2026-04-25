@@ -9,15 +9,15 @@ public class TransactionValidator : ITransactionValidator
     {
         switch (transaction)
         {
-            case NormalTransaction:
-                ValidateNormal(transaction);
+            case BalanceEntryTransaction be:
+                ValidateBalanceEntry(be);
                 break;
             case StockSplitTransaction:
                 ValidateStockSplit(transaction);
                 break;
-            case BalanceEntryTransaction:
-                throw new NotImplementedException(
-                    "BalanceEntryTransaction validation requires the reconciliation service, which is not yet wired.");
+            case NormalTransaction:
+                ValidateNormal(transaction);
+                break;
             default:
                 throw new InvalidOperationException(
                     $"Unknown transaction type: {transaction.GetType().Name}");
@@ -70,6 +70,33 @@ public class TransactionValidator : ITransactionValidator
             if (split.UnitPriceRate is not null || split.UnitPriceCommodityId is not null)
                 throw new BusinessRuleException("A stock-split transaction's splits must not carry a price annotation.");
         }
+    }
+
+    private static void ValidateBalanceEntry(BalanceEntryTransaction entry)
+    {
+        var splits = entry.Splits;
+
+        if (splits.Count != 2)
+            throw new BusinessRuleException("A balance entry must have exactly two splits.");
+
+        foreach (var split in splits)
+        {
+            if (split.CommodityId != entry.AssertedCommodityId)
+                throw new BusinessRuleException(
+                    "Both splits of a balance entry must be in the asserted commodity.");
+            if (split.UnitPriceRate is not null || split.UnitPriceCommodityId is not null)
+                throw new BusinessRuleException("Balance-entry splits cannot carry a price annotation.");
+        }
+
+        if (splits.Count(s => s.AccountId == entry.AccountId) != 1)
+            throw new BusinessRuleException(
+                "A balance entry must have exactly one split on the asserted account.");
+
+        // Same-commodity weight balance: split quantities must net to zero.
+        var sum = splits.Sum(s => s.Quantity);
+        if (sum != 0m)
+            throw new BusinessRuleException(
+                $"Balance-entry splits must net to zero in the asserted commodity (sum: {sum}).");
     }
 
     private static void ValidateAnnotationShape(AccountTransactionSplit split)

@@ -412,6 +412,9 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("RelatedTransactionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -430,6 +433,8 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("OccurredAt");
+
+                    b.HasIndex("RelatedTransactionId");
 
                     b.HasIndex("UpdatedByUserId");
 
@@ -1148,12 +1153,19 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Homestead.WebApi.Domain.Finances.AccountTransaction", "RelatedTransaction")
+                        .WithMany()
+                        .HasForeignKey("RelatedTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
                         .WithMany()
                         .HasForeignKey("UpdatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("RelatedTransaction");
 
                     b.Navigation("UpdatedByUser");
                 });

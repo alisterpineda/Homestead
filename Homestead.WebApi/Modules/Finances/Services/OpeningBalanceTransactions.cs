@@ -7,6 +7,9 @@ public static class OpeningBalanceTransactions
 {
     public const string Description = "Opening balance";
 
+    public static bool IsOpeningBalance(this AccountTransaction transaction) =>
+        transaction is NormalTransaction && transaction.Description == Description;
+
     public static IQueryable<AccountTransaction> OpeningBalancesFor(
         this AppDbContext db, Guid accountId, Guid commodityId)
     {
