@@ -13,9 +13,15 @@ public class AccountTransactionSplitConfiguration : IEntityTypeConfiguration<Acc
         builder.HasKey(s => s.Id);
 
         builder.Property(s => s.Quantity).HasColumnType("numeric");
-        builder.Property(s => s.Value).HasColumnType("numeric");
+        builder.Property(s => s.UnitPriceRate).HasColumnType("numeric");
 
         builder.Property(s => s.Memo).HasMaxLength(1024);
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_account_transaction_splits_unit_price",
+            "(\"UnitPriceRate\" IS NULL AND \"UnitPriceCommodityId\" IS NULL) OR " +
+            "(\"UnitPriceRate\" IS NOT NULL AND \"UnitPriceCommodityId\" IS NOT NULL " +
+            "AND \"UnitPriceRate\" > 0 AND \"UnitPriceCommodityId\" <> \"CommodityId\")"));
 
         builder.Property(s => s.CreatedAt)
             .IsRequired()
@@ -38,6 +44,11 @@ public class AccountTransactionSplitConfiguration : IEntityTypeConfiguration<Acc
         builder.HasOne(s => s.Commodity)
             .WithMany()
             .HasForeignKey(s => s.CommodityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.UnitPriceCommodity)
+            .WithMany()
+            .HasForeignKey(s => s.UnitPriceCommodityId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(s => s.CreatedByUser)

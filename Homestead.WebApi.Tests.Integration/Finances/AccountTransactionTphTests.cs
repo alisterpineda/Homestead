@@ -31,7 +31,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
         {
             OccurredAt = occurredAt,
             Description = "January statement",
-            CurrencyId = usd.Id,
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 1234.56m,
@@ -74,7 +73,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
         {
             OccurredAt = occurredAt,
             Description = "First assertion",
-            CurrencyId = usd.Id,
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 100m,
@@ -85,7 +83,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
         {
             OccurredAt = occurredAt,
             Description = "Second, conflicting",
-            CurrencyId = usd.Id,
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 200m,
@@ -110,7 +107,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
             {
                 OccurredAt = occurredAt,
                 Description = "Chequing balance",
-                CurrencyId = usd.Id,
                 AccountId = accountA.Id,
                 AssertedCommodityId = usd.Id,
                 AssertedQuantity = 500m,
@@ -119,7 +115,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
             {
                 OccurredAt = occurredAt,
                 Description = "Savings balance",
-                CurrencyId = usd.Id,
                 AccountId = accountB.Id,
                 AssertedCommodityId = usd.Id,
                 AssertedQuantity = 10_000m,
@@ -148,7 +143,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
         {
             OccurredAt = BalanceEntryAt(date),
             Description = "Month-end balance",
-            CurrencyId = usd.Id,
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 100m,
@@ -162,7 +156,6 @@ public class AccountTransactionTphTests : IntegrationTestBase
         {
             OccurredAt = StartOfDayUtc(date),
             Description = "Itemised transfer",
-            CurrencyId = usd.Id,
         });
 
         await db.SaveChangesAsync(CT); // should not throw

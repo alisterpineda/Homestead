@@ -71,7 +71,6 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
         Assert.Equal(5000m, body!.Quantity);
-        Assert.Equal(5000m, body.Value);
         Assert.Null(body.ValuePerUnit);
     }
 
@@ -96,7 +95,6 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
         Assert.Equal(100m, body!.Quantity);
-        Assert.Equal(3512m, body.Value);
         Assert.Equal(35.12m, body.ValuePerUnit);
 
         using var scope = CreateScope();
@@ -249,5 +247,5 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
 
     private record OpeningBalanceItem(
         Guid TransactionId, Guid AccountId, Guid CommodityId,
-        decimal Quantity, decimal Value, decimal? ValuePerUnit, DateOnly AsOfDate);
+        decimal Quantity, decimal? ValuePerUnit, DateOnly AsOfDate);
 }

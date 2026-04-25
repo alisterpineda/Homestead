@@ -139,7 +139,6 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
                 Description = "Seeded buy",
-                CurrencyId = cadId,
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);
@@ -226,7 +225,6 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
                 Description = "Seeded buy",
-                CurrencyId = cadId,
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);
@@ -267,7 +265,6 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
                 Description = "Seeded buy",
-                CurrencyId = cadId,
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);

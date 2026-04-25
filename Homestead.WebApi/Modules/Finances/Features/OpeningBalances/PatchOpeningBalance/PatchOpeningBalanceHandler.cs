@@ -24,11 +24,9 @@ public class PatchOpeningBalanceHandler(
 
         await db.SaveChangesAsync(ct);
 
-        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == request.CommodityId, ct)
-            ?? throw new BusinessRuleException("Commodity not found.");
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
         var accountSplit = OpeningBalanceMapping.AccountSideSplit(transaction, openingBalancesAccount.Id);
 
-        return OpeningBalanceMapping.ToResponse(transaction, accountSplit, commodity);
+        return OpeningBalanceMapping.ToResponse(transaction, accountSplit);
     }
 }

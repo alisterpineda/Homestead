@@ -8,9 +8,6 @@ public abstract class AccountTransaction
     public DateTimeOffset OccurredAt { get; set; }
     public required string Description { get; set; }
 
-    public Guid CurrencyId { get; set; }
-    public Commodity Currency { get; set; } = null!;
-
     public TransactionType Type { get; set; }
 
     public ICollection<AccountTransactionSplit> Splits { get; set; } = [];

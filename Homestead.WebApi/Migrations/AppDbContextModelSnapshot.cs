@@ -404,9 +404,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CurrencyId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -431,8 +428,6 @@ namespace Homestead.WebApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("OccurredAt");
 
@@ -475,6 +470,12 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid>("TransactionId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("UnitPriceCommodityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitPriceRate")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -482,9 +483,6 @@ namespace Homestead.WebApi.Migrations
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("Value")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -494,11 +492,16 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("TransactionId");
 
+                    b.HasIndex("UnitPriceCommodityId");
+
                     b.HasIndex("UpdatedByUserId");
 
                     b.HasIndex("AccountId", "CommodityId");
 
-                    b.ToTable("account_transaction_splits", "finances");
+                    b.ToTable("account_transaction_splits", "finances", t =>
+                        {
+                            t.HasCheckConstraint("ck_account_transaction_splits_unit_price", "(\"UnitPriceRate\" IS NULL AND \"UnitPriceCommodityId\" IS NULL) OR (\"UnitPriceRate\" IS NOT NULL AND \"UnitPriceCommodityId\" IS NOT NULL AND \"UnitPriceRate\" > 0 AND \"UnitPriceCommodityId\" <> \"CommodityId\")");
+                        });
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.Commodity", b =>
@@ -1143,20 +1146,12 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
                         .WithMany()
                         .HasForeignKey("UpdatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("UpdatedByUser");
                 });
@@ -1186,6 +1181,11 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "UnitPriceCommodity")
+                        .WithMany()
+                        .HasForeignKey("UnitPriceCommodityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
                         .WithMany()
                         .HasForeignKey("UpdatedByUserId")
@@ -1198,6 +1198,8 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Transaction");
+
+                    b.Navigation("UnitPriceCommodity");
 
                     b.Navigation("UpdatedByUser");
                 });

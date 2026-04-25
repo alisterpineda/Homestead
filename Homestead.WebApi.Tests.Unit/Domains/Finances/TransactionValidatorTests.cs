@@ -8,23 +8,29 @@ public class TransactionValidatorTests
 {
     private readonly TransactionValidator _sut = new();
 
-    private static AccountTransactionSplit Split(decimal quantity, decimal value)
+    private static AccountTransactionSplit Split(
+        Guid commodityId,
+        decimal quantity,
+        decimal? unitPriceRate = null,
+        Guid? unitPriceCommodityId = null)
         => new()
         {
             Id = Guid.NewGuid(),
             AccountId = Guid.NewGuid(),
-            CommodityId = Guid.NewGuid(),
+            CommodityId = commodityId,
             Quantity = quantity,
-            Value = value,
+            UnitPriceRate = unitPriceRate,
+            UnitPriceCommodityId = unitPriceCommodityId,
         };
 
     [Fact]
-    public void Normal_BalancedSplits_PassesValidation()
+    public void Normal_SameCommodityBalancedSplits_PassesValidation()
     {
+        var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
             Description = "Transfer",
-            Splits = [Split(100m, 100m), Split(-100m, -100m)],
+            Splits = [Split(cad, 100m), Split(cad, -100m)],
         };
 
         _sut.Validate(txn);
@@ -33,23 +39,25 @@ public class TransactionValidatorTests
     [Fact]
     public void Normal_UnbalancedSplits_ThrowsBusinessRule()
     {
+        var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
             Description = "Bad transfer",
-            Splits = [Split(100m, 100m), Split(-50m, -50m)],
+            Splits = [Split(cad, 100m), Split(cad, -50m)],
         };
 
         var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
-        Assert.Contains("sum to zero", ex.Message);
+        Assert.Contains("per commodity", ex.Message);
     }
 
     [Fact]
     public void Normal_SingleSplit_ThrowsBusinessRule()
     {
+        var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
             Description = "Incomplete",
-            Splits = [Split(100m, 100m)],
+            Splits = [Split(cad, 100m)],
         };
 
         var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
@@ -57,54 +65,188 @@ public class TransactionValidatorTests
     }
 
     [Fact]
-    public void StockSplit_OneSplit_ZeroValue_NonZeroQuantity_Passes()
+    public void Normal_CrossCurrencyPricedTransfer_BalancesViaAnnotation()
     {
-        var txn = new StockSplitTransaction
+        // USD chequing → CAD chequing: -100 USD @ 1.35 CAD ↔ +135 CAD
+        var usd = Guid.NewGuid();
+        var cad = Guid.NewGuid();
+
+        var txn = new NormalTransaction
         {
-            Description = "2-for-1",
-            Splits = [Split(100m, 0m)],
+            Description = "Cross-currency transfer",
+            Splits =
+            [
+                Split(usd, -100m, unitPriceRate: 1.35m, unitPriceCommodityId: cad),
+                Split(cad, 135m),
+            ],
         };
 
         _sut.Validate(txn);
     }
 
     [Fact]
-    public void StockSplit_NonZeroValue_Throws()
+    public void Normal_CrossCurrencyPricedTransfer_Unbalanced_Throws()
     {
-        var txn = new StockSplitTransaction
+        var usd = Guid.NewGuid();
+        var cad = Guid.NewGuid();
+
+        var txn = new NormalTransaction
         {
-            Description = "Invalid",
-            Splits = [Split(100m, 1m)],
+            Description = "Bad cross-currency transfer",
+            Splits =
+            [
+                Split(usd, -100m, unitPriceRate: 1.35m, unitPriceCommodityId: cad),
+                Split(cad, 140m),
+            ],
         };
 
         var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
-        Assert.Contains("value zero", ex.Message);
+        Assert.Contains("per commodity", ex.Message);
+    }
+
+    [Fact]
+    public void Normal_InvestmentBuy_SecurityLegAnnotatedInFundingCurrency_Balances()
+    {
+        var cad = Guid.NewGuid();
+        var veqt = Guid.NewGuid();
+
+        var txn = new NormalTransaction
+        {
+            Description = "Buy 2 VEQT @ 50",
+            Splits =
+            [
+                Split(cad, -100m),
+                Split(veqt, 2m, unitPriceRate: 50m, unitPriceCommodityId: cad),
+            ],
+        };
+
+        _sut.Validate(txn);
+    }
+
+    [Fact]
+    public void Normal_Annotation_MissingCommodity_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var usd = Guid.NewGuid();
+        var txn = new NormalTransaction
+        {
+            Description = "Invalid",
+            Splits =
+            [
+                Split(usd, -100m, unitPriceRate: 1.35m),
+                Split(cad, 135m),
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("both rate and commodity", ex.Message);
+    }
+
+    [Fact]
+    public void Normal_Annotation_SelfQuote_Throws()
+    {
+        var cad = Guid.NewGuid();
+        var txn = new NormalTransaction
+        {
+            Description = "Invalid",
+            Splits =
+            [
+                Split(cad, -100m, unitPriceRate: 1m, unitPriceCommodityId: cad),
+                Split(cad, 100m),
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("must differ", ex.Message);
+    }
+
+    [Fact]
+    public void Normal_Annotation_ZeroRate_Throws()
+    {
+        var usd = Guid.NewGuid();
+        var cad = Guid.NewGuid();
+        var txn = new NormalTransaction
+        {
+            Description = "Invalid",
+            Splits =
+            [
+                Split(usd, -100m, unitPriceRate: 0m, unitPriceCommodityId: cad),
+                Split(cad, 0m),
+            ],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("greater than zero", ex.Message);
+    }
+
+    [Fact]
+    public void StockSplit_SingleSplit_Passes()
+    {
+        var aapl = Guid.NewGuid();
+        var txn = new StockSplitTransaction
+        {
+            Description = "2-for-1",
+            Splits = [Split(aapl, 100m)],
+        };
+
+        _sut.Validate(txn);
+    }
+
+    [Fact]
+    public void StockSplit_MultipleAccountsSameCommodity_Passes()
+    {
+        var aapl = Guid.NewGuid();
+        var txn = new StockSplitTransaction
+        {
+            Description = "AAPL 2-for-1",
+            Splits = [Split(aapl, 10m), Split(aapl, 5m)],
+        };
+
+        _sut.Validate(txn);
+    }
+
+    [Fact]
+    public void StockSplit_MixedCommodities_Throws()
+    {
+        var aapl = Guid.NewGuid();
+        var msft = Guid.NewGuid();
+        var txn = new StockSplitTransaction
+        {
+            Description = "Invalid",
+            Splits = [Split(aapl, 10m), Split(msft, 5m)],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("same commodity", ex.Message);
+    }
+
+    [Fact]
+    public void StockSplit_WithAnnotation_Throws()
+    {
+        var aapl = Guid.NewGuid();
+        var cad = Guid.NewGuid();
+        var txn = new StockSplitTransaction
+        {
+            Description = "Invalid",
+            Splits = [Split(aapl, 10m, unitPriceRate: 100m, unitPriceCommodityId: cad)],
+        };
+
+        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
+        Assert.Contains("not carry a price annotation", ex.Message);
     }
 
     [Fact]
     public void StockSplit_ZeroQuantity_Throws()
     {
+        var aapl = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
             Description = "Invalid",
-            Splits = [Split(0m, 0m)],
+            Splits = [Split(aapl, 0m)],
         };
 
         var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
         Assert.Contains("non-zero quantity", ex.Message);
-    }
-
-    [Fact]
-    public void StockSplit_MultipleSplits_Throws()
-    {
-        var txn = new StockSplitTransaction
-        {
-            Description = "Invalid",
-            Splits = [Split(100m, 0m), Split(50m, 0m)],
-        };
-
-        var ex = Assert.Throws<BusinessRuleException>(() => _sut.Validate(txn));
-        Assert.Contains("exactly one split", ex.Message);
     }
 
     [Fact]

@@ -81,6 +81,9 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     private static DateTimeOffset NoonUtc(DateOnly date) =>
         new(date.ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero);
 
+    private static AccountTransactionSplit CashSplit(Guid accountId, Guid commodityId, decimal quantity) =>
+        new() { Id = Guid.NewGuid(), AccountId = accountId, CommodityId = commodityId, Quantity = quantity };
+
     [Fact]
     public async Task Create_CashAccount_ProducesTwoBalancedSplits_AtMidnightUtc()
     {
@@ -94,11 +97,12 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var accountSplit = txn.Splits.Single(s => s.AccountId == cash.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
 
+        Assert.Equal(_cad.Id, accountSplit.CommodityId);
+        Assert.Equal(_cad.Id, equitySplit.CommodityId);
         Assert.Equal(1000m, accountSplit.Quantity);
-        Assert.Equal(1000m, accountSplit.Value);
         Assert.Equal(-1000m, equitySplit.Quantity);
-        Assert.Equal(-1000m, equitySplit.Value);
-        Assert.Equal(_cad.Id, txn.CurrencyId);
+        Assert.Null(accountSplit.UnitPriceRate);
+        Assert.Null(equitySplit.UnitPriceRate);
         Assert.Equal(StartOfDayUtc(new DateOnly(2026, 4, 23)), txn.OccurredAt);
     }
 
@@ -115,8 +119,10 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var accountSplit = txn.Splits.Single(s => s.AccountId == cc.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
 
-        Assert.Equal(-500m, accountSplit.Value);
-        Assert.Equal(500m, equitySplit.Value);
+        Assert.Equal(-500m, accountSplit.Quantity);
+        Assert.Equal(500m, equitySplit.Quantity);
+        Assert.Equal(_cad.Id, accountSplit.CommodityId);
+        Assert.Equal(_cad.Id, equitySplit.CommodityId);
     }
 
     [Fact]
@@ -138,13 +144,14 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
 
         await _db.SaveChangesAsync();
 
-        Assert.Equal(_usd.Id, txn.CurrencyId);
         var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
         Assert.Equal(_usd.Id, accountSplit.CommodityId);
         Assert.Equal(_usd.Id, equitySplit.CommodityId);
-        Assert.Equal(5000m, accountSplit.Value);
-        Assert.Equal(-5000m, equitySplit.Value);
+        Assert.Equal(5000m, accountSplit.Quantity);
+        Assert.Equal(-5000m, equitySplit.Quantity);
+        Assert.Null(accountSplit.UnitPriceRate);
+        Assert.Null(equitySplit.UnitPriceRate);
         Assert.Equal(NoonUtc(new DateOnly(2026, 4, 23)), txn.OccurredAt);
     }
 
@@ -158,15 +165,15 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
 
         await _db.SaveChangesAsync();
 
-        Assert.Equal(_cad.Id, txn.CurrencyId);
         var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
         Assert.Equal(_veqt.Id, accountSplit.CommodityId);
         Assert.Equal(_cad.Id, equitySplit.CommodityId);
         Assert.Equal(100m, accountSplit.Quantity);
-        Assert.Equal(3512m, accountSplit.Value);
+        Assert.Equal(35.12m, accountSplit.UnitPriceRate);
+        Assert.Equal(_cad.Id, accountSplit.UnitPriceCommodityId);
         Assert.Equal(-3512m, equitySplit.Quantity);
-        Assert.Equal(-3512m, equitySplit.Value);
+        Assert.Null(equitySplit.UnitPriceRate);
 
         var expectedAt = NoonUtc(new DateOnly(2026, 4, 23));
         Assert.Equal(expectedAt, txn.OccurredAt);
@@ -192,13 +199,14 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
 
-        // Position captured, but splits are valueless — carry-forward takes over at render time.
+        // Both splits in the security — the transaction balances per-commodity (+100/-100 VEQT).
+        Assert.Equal(_veqt.Id, accountSplit.CommodityId);
+        Assert.Equal(_veqt.Id, equitySplit.CommodityId);
         Assert.Equal(100m, accountSplit.Quantity);
-        Assert.Equal(0m, accountSplit.Value);
-        Assert.Equal(0m, equitySplit.Quantity);
-        Assert.Equal(0m, equitySplit.Value);
+        Assert.Equal(-100m, equitySplit.Quantity);
+        Assert.Null(accountSplit.UnitPriceRate);
+        Assert.Null(equitySplit.UnitPriceRate);
 
-        // No linked price row emitted.
         var priceCount = await _db.CommodityPrices.CountAsync(p =>
             p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id,
             TestContext.Current.CancellationToken);
@@ -266,8 +274,8 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == cash.Id);
         var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
-        Assert.Equal(1500m, accountSplit.Value);
-        Assert.Equal(-1500m, equitySplit.Value);
+        Assert.Equal(1500m, accountSplit.Quantity);
+        Assert.Equal(-1500m, equitySplit.Quantity);
     }
 
     [Fact]
@@ -276,18 +284,16 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
         var ob = await _sut.CreateAsync(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 1, 1), TestContext.Current.CancellationToken);
 
-        // Simulate a later transaction touching the same (account, commodity).
         var laterTxn = new NormalTransaction
         {
             Id = Guid.NewGuid(),
             OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
             Description = "Transfer",
-            CurrencyId = _cad.Id,
             Type = TransactionType.Normal,
             Splits =
             [
-                new AccountTransactionSplit { Id = Guid.NewGuid(), AccountId = cash.Id, CommodityId = _cad.Id, Quantity = 100m, Value = 100m },
-                new AccountTransactionSplit { Id = Guid.NewGuid(), AccountId = _openingBalances.Id, CommodityId = _cad.Id, Quantity = -100m, Value = -100m },
+                CashSplit(cash.Id, _cad.Id, 100m),
+                CashSplit(_openingBalances.Id, _cad.Id, -100m),
             ],
         };
         _db.AccountTransactions.Add(laterTxn);
@@ -318,7 +324,6 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             .Where(p => p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id)
             .ToListAsync();
 
-        // Single linked row moves with the transaction — no old row left behind.
         var price = Assert.Single(prices);
         Assert.Equal(NoonUtc(newDate), price.PriceAt);
         Assert.Equal(35m, price.Rate);
@@ -350,7 +355,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Update_UnpricedSecurity_AddPrice_CreatesLinkedRow()
+    public async Task Update_UnpricedSecurity_AddPrice_CreatesLinkedRow_AndFlipsEquityCommodity()
     {
         var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
         var date = new DateOnly(2026, 1, 1);
@@ -364,13 +369,50 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
-        Assert.Equal(3000m, accountSplit.Value);
+        var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
+
+        Assert.Equal(_veqt.Id, accountSplit.CommodityId);
+        Assert.Equal(30m, accountSplit.UnitPriceRate);
+        Assert.Equal(_cad.Id, accountSplit.UnitPriceCommodityId);
+        // Equity leg's commodity flipped from the security to the reporting currency.
+        Assert.Equal(_cad.Id, equitySplit.CommodityId);
+        Assert.Equal(-3000m, equitySplit.Quantity);
+        Assert.Null(equitySplit.UnitPriceRate);
 
         var price = await _db.CommodityPrices.SingleAsync(p =>
             p.CreatedByTransactionId == created.Id,
             TestContext.Current.CancellationToken);
         Assert.Equal(30m, price.Rate);
         Assert.Equal(NoonUtc(date), price.PriceAt);
+    }
+
+    [Fact]
+    public async Task Update_PricedSecurity_RemovePrice_DeletesLinkedRow_AndFlipsEquityCommodityBack()
+    {
+        var invest = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+        var date = new DateOnly(2026, 1, 1);
+
+        var created = await _sut.CreateAsync(invest.Id, _veqt.Id, 100m, valuePerUnit: 30m,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var updated = await _sut.UpdateAsync(created.Id, 100m, valuePerUnit: null,
+            asOfDate: date, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
+        var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
+
+        Assert.Null(accountSplit.UnitPriceRate);
+        Assert.Null(accountSplit.UnitPriceCommodityId);
+        // Equity leg's commodity flipped back to the security.
+        Assert.Equal(_veqt.Id, equitySplit.CommodityId);
+        Assert.Equal(-100m, equitySplit.Quantity);
+
+        var priceCount = await _db.CommodityPrices.CountAsync(p =>
+            p.CreatedByTransactionId == created.Id,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, priceCount);
     }
 
     [Fact]
@@ -388,8 +430,11 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
+        var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
         Assert.Equal(150m, accountSplit.Quantity);
-        Assert.Equal(0m, accountSplit.Value);
+        Assert.Null(accountSplit.UnitPriceRate);
+        Assert.Equal(_veqt.Id, equitySplit.CommodityId);
+        Assert.Equal(-150m, equitySplit.Quantity);
 
         var priceCount = await _db.CommodityPrices.CountAsync(p =>
             p.CreatedByTransactionId == created.Id,
@@ -412,7 +457,9 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync();
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
-        Assert.Equal(4200m, accountSplit.Value);
+        var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
+        Assert.Equal(42m, accountSplit.UnitPriceRate);
+        Assert.Equal(-4200m, equitySplit.Quantity);
 
         var price = await _db.CommodityPrices.SingleAsync(p =>
             p.CreatedByTransactionId == created.Id);
@@ -444,12 +491,11 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             Id = Guid.NewGuid(),
             OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
             Description = "Transfer",
-            CurrencyId = _cad.Id,
             Type = TransactionType.Normal,
             Splits =
             [
-                new AccountTransactionSplit { Id = Guid.NewGuid(), AccountId = cash.Id, CommodityId = _cad.Id, Quantity = 100m, Value = 100m },
-                new AccountTransactionSplit { Id = Guid.NewGuid(), AccountId = _openingBalances.Id, CommodityId = _cad.Id, Quantity = -100m, Value = -100m },
+                CashSplit(cash.Id, _cad.Id, 100m),
+                CashSplit(_openingBalances.Id, _cad.Id, -100m),
             ],
         };
         _db.AccountTransactions.Add(laterTxn);

@@ -36,11 +36,6 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        builder.HasOne(t => t.Currency)
-            .WithMany()
-            .HasForeignKey(t => t.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(t => t.CreatedByUser)
             .WithMany()
             .HasForeignKey(t => t.CreatedByUserId)

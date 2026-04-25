@@ -23,18 +23,18 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
             .Select(c => new
             {
                 ByAccount = db.Accounts.Any(a => a.ReportingCurrencyId == c.Id),
-                ByTransactionCurrency = db.AccountTransactions.Any(t => t.CurrencyId == c.Id),
                 BySplit = db.AccountTransactionSplits.Any(s => s.CommodityId == c.Id),
+                BySplitAnnotation = db.AccountTransactionSplits.Any(s => s.UnitPriceCommodityId == c.Id),
                 ByPrice = db.CommodityPrices.Any(p => p.CommodityId == c.Id || p.QuoteCurrencyId == c.Id),
             })
             .SingleAsync(ct);
 
         if (refs.ByAccount)
             throw new BusinessRuleException("Commodity is in use as an account's reporting currency.");
-        if (refs.ByTransactionCurrency)
-            throw new BusinessRuleException("Commodity is in use as a transaction currency.");
         if (refs.BySplit)
             throw new BusinessRuleException("Commodity is in use on a transaction split.");
+        if (refs.BySplitAnnotation)
+            throw new BusinessRuleException("Commodity is referenced by a split's price annotation.");
         if (refs.ByPrice)
             throw new BusinessRuleException("Commodity is referenced by a price entry.");
 

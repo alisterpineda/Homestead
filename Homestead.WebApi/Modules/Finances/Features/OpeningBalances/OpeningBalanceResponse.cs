@@ -12,12 +12,8 @@ public record OpeningBalanceResponse
     public required decimal Quantity { get; init; }
 
     /// <summary>
-    /// User-facing value in the transaction currency (always positive).
-    /// </summary>
-    public required decimal Value { get; init; }
-
-    /// <summary>
-    /// Rate used to convert quantity to value. Null for currency commodities (where rate is always 1).
+    /// Per-unit price captured for this opening balance. Null for currencies (rate is always 1)
+    /// and for unpriced security positions.
     /// </summary>
     public decimal? ValuePerUnit { get; init; }
 

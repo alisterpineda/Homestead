@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -20,11 +19,8 @@ public class GetOpeningBalanceHandler(
 
         if (transaction is null) return null;
 
-        var commodity = await db.Commodities.FirstOrDefaultAsync(c => c.Id == request.CommodityId, ct)
-            ?? throw new BusinessRuleException("Commodity not found.");
-
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
         var accountSplit = OpeningBalanceMapping.AccountSideSplit(transaction, openingBalancesAccount.Id);
-        return OpeningBalanceMapping.ToResponse(transaction, accountSplit, commodity);
+        return OpeningBalanceMapping.ToResponse(transaction, accountSplit);
     }
 }

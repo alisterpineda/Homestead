@@ -7,25 +7,15 @@ internal static class OpeningBalanceMapping
 {
     public static OpeningBalanceResponse ToResponse(
         AccountTransaction transaction,
-        AccountTransactionSplit accountSplit,
-        Commodity commodity,
-        decimal? existingSecurityRate = null)
+        AccountTransactionSplit accountSplit)
     {
-        var quantity = Math.Abs(accountSplit.Quantity);
-        var value = Math.Abs(accountSplit.Value);
-
-        decimal? rate = null;
-        if (commodity.Kind == CommodityKind.Security && quantity != 0m)
-            rate = existingSecurityRate ?? Math.Abs(accountSplit.Value / accountSplit.Quantity);
-
         return new OpeningBalanceResponse
         {
             TransactionId = transaction.Id,
             AccountId = accountSplit.AccountId,
             CommodityId = accountSplit.CommodityId,
-            Quantity = quantity,
-            Value = value,
-            ValuePerUnit = rate,
+            Quantity = Math.Abs(accountSplit.Quantity),
+            ValuePerUnit = accountSplit.UnitPriceRate,
             AsOfDate = DateOnly.FromDateTime(transaction.OccurredAt.UtcDateTime),
         };
     }

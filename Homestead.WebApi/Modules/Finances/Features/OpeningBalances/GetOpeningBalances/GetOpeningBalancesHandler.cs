@@ -22,21 +22,11 @@ public class GetOpeningBalancesHandler(
             .Include(t => t.Splits)
             .ToListAsync(ct);
 
-        var commodityIds = transactions
-            .SelectMany(t => t.Splits)
-            .Select(s => s.CommodityId)
-            .Distinct()
-            .ToList();
-        var commodities = await db.Commodities
-            .AsNoTracking()
-            .Where(c => commodityIds.Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, ct);
-
         return transactions
             .Select(t =>
             {
                 var accountSplit = OpeningBalanceMapping.AccountSideSplit(t, openingBalancesAccount.Id);
-                return OpeningBalanceMapping.ToResponse(t, accountSplit, commodities[accountSplit.CommodityId]);
+                return OpeningBalanceMapping.ToResponse(t, accountSplit);
             })
             .OrderBy(r => r.CommodityId)
             .ToList();

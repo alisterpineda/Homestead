@@ -7,6 +7,5 @@ export interface OpeningBalanceResponse {
   commodityId: string;
   quantity: (number | string);
   transactionId: string;
-  value: (number | string);
   valuePerUnit?: (number | string | null);
 }

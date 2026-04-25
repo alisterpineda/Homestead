@@ -28,44 +28,33 @@ public class OpeningBalanceService(
         var occurredAt = ResolveOccurredAt(account, asOfDate);
         var transactionId = Guid.NewGuid();
 
-        var (txnCurrencyId, effectiveRate) = await ResolveCreateRateAsync(
-            account, commodity, valuePerUnit, occurredAt, transactionId, ct);
-
-        var (accountSplitQuantity, accountSplitValue) = ComputeSignedSplit(
-            account, commodity, quantity, effectiveRate);
-
-        var equitySplitCommodityId = commodity.Kind == CommodityKind.Currency
-            ? commodityId
-            : account.ReportingCurrencyId;
-
+        var signedQuantity = SignedQuantity(account, quantity);
         var openingBalances = await systemAccounts.GetOpeningBalancesAsync(ct);
+
+        var accountSplit = new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            AccountId = accountId,
+            CommodityId = commodityId,
+            Quantity = signedQuantity,
+        };
+        var equitySplit = new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            AccountId = openingBalances.Id,
+        };
+
+        await ApplyCreateShapeAsync(
+            account, commodity, valuePerUnit, occurredAt, transactionId,
+            accountSplit, equitySplit, ct);
 
         var transaction = new NormalTransaction
         {
             Id = transactionId,
             OccurredAt = occurredAt,
             Description = OpeningBalanceTransactions.Description,
-            CurrencyId = txnCurrencyId,
             Type = TransactionType.Normal,
-            Splits =
-            [
-                new AccountTransactionSplit
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = accountId,
-                    CommodityId = commodityId,
-                    Quantity = accountSplitQuantity,
-                    Value = accountSplitValue,
-                },
-                new AccountTransactionSplit
-                {
-                    Id = Guid.NewGuid(),
-                    AccountId = openingBalances.Id,
-                    CommodityId = equitySplitCommodityId,
-                    Quantity = -accountSplitValue,
-                    Value = -accountSplitValue,
-                },
-            ],
+            Splits = [accountSplit, equitySplit],
         };
 
         validator.Validate(transaction);
@@ -105,19 +94,14 @@ public class OpeningBalanceService(
         audit.Track<AccountTransactionSnapshot, AccountTransaction>(
             transaction, "AccountTransaction", transaction.Id);
 
-        var (txnCurrencyId, effectiveRate) = await ResolveUpdateRateAsync(
-            account, commodity, transaction, newOccurredAt, valuePerUnit, ct);
-
-        var (newAccountQuantity, newAccountValue) = ComputeSignedSplit(
-            account, commodity, quantity, effectiveRate);
-
         transaction.OccurredAt = newOccurredAt;
-        transaction.CurrencyId = txnCurrencyId;
 
-        accountSplit.Quantity = newAccountQuantity;
-        accountSplit.Value = newAccountValue;
-        equitySplit.Quantity = -newAccountValue;
-        equitySplit.Value = -newAccountValue;
+        var signedQuantity = SignedQuantity(account, quantity);
+        accountSplit.Quantity = signedQuantity;
+
+        await ApplyUpdateShapeAsync(
+            account, commodity, valuePerUnit, newOccurredAt, transaction.Id,
+            accountSplit, equitySplit, ct);
 
         validator.Validate(transaction);
 
@@ -214,64 +198,101 @@ public class OpeningBalanceService(
         return new DateTimeOffset(asOfDate.ToDateTime(time), TimeSpan.Zero);
     }
 
-    private async Task<(Guid txnCurrencyId, decimal effectiveRate)> ResolveCreateRateAsync(
+    private async Task ApplyCreateShapeAsync(
         Account account, Commodity commodity, decimal? valuePerUnit, DateTimeOffset occurredAt,
-        Guid transactionId, CancellationToken ct)
+        Guid transactionId, AccountTransactionSplit accountSplit, AccountTransactionSplit equitySplit,
+        CancellationToken ct)
     {
-        if (commodity.Kind == CommodityKind.Currency)
-            return (commodity.Id, 1m);
+        // Currency or unpriced security: both splits in the same commodity, no annotation, no price row.
+        if (commodity.Kind == CommodityKind.Currency || valuePerUnit is null)
+        {
+            SetUnpricedSplit(equitySplit, commodity.Id, -accountSplit.Quantity);
+            return;
+        }
 
+        // Priced security: annotation on the security leg, equity leg in reporting currency,
+        // linked CommodityPrice row emitted.
         var quoteCurrencyId = account.ReportingCurrencyId;
-
-        // No price supplied: capture the position unpriced. Both splits book Value=0;
-        // net-worth rendering relies on carry-forward (or marks the position *unpriced*).
-        if (valuePerUnit is null)
-            return (quoteCurrencyId, 0m);
-
         await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, occurredAt, excludeId: null, ct);
+
+        accountSplit.UnitPriceRate = valuePerUnit.Value;
+        accountSplit.UnitPriceCommodityId = quoteCurrencyId;
+        SetUnpricedSplit(equitySplit, quoteCurrencyId, -accountSplit.Quantity * valuePerUnit.Value);
+
         AddCommodityPrice(commodity.Id, quoteCurrencyId, occurredAt, valuePerUnit.Value, transactionId);
-        return (quoteCurrencyId, valuePerUnit.Value);
     }
 
-    // The linked price row is tracked by CreatedByTransactionId: rate updates in place,
-    // date changes move PriceAt on the same row, and deletes cascade via FK.
-    private async Task<(Guid txnCurrencyId, decimal effectiveRate)> ResolveUpdateRateAsync(
-        Account account, Commodity commodity, AccountTransaction transaction,
-        DateTimeOffset newOccurredAt, decimal? valuePerUnit, CancellationToken ct)
+    // Handles priced ↔ unpriced transitions: the equity leg's commodity flips between the
+    // security and the reporting currency, and the linked price row is created/removed.
+    private async Task ApplyUpdateShapeAsync(
+        Account account, Commodity commodity, decimal? valuePerUnit, DateTimeOffset newOccurredAt,
+        Guid transactionId, AccountTransactionSplit accountSplit, AccountTransactionSplit equitySplit,
+        CancellationToken ct)
     {
         if (commodity.Kind == CommodityKind.Currency)
-            return (commodity.Id, 1m);
+        {
+            ClearAnnotation(accountSplit);
+            SetUnpricedSplit(equitySplit, commodity.Id, -accountSplit.Quantity);
+            return;
+        }
 
         var quoteCurrencyId = account.ReportingCurrencyId;
-
         var linkedPrice = await db.CommodityPrices
-            .FirstOrDefaultAsync(p => p.CreatedByTransactionId == transaction.Id, ct);
+            .FirstOrDefaultAsync(p => p.CreatedByTransactionId == transactionId, ct);
+
+        if (valuePerUnit is null)
+        {
+            if (linkedPrice is not null)
+            {
+                audit.Track<CommodityPriceSnapshot, CommodityPrice>(
+                    linkedPrice, "CommodityPrice", linkedPrice.Id);
+                audit.Deleted("CommodityPrice", linkedPrice.Id);
+                db.CommodityPrices.Remove(linkedPrice);
+            }
+
+            ClearAnnotation(accountSplit);
+            SetUnpricedSplit(equitySplit, commodity.Id, -accountSplit.Quantity);
+            return;
+        }
 
         if (linkedPrice is null)
         {
-            if (valuePerUnit is null)
-                return (quoteCurrencyId, 0m);
-
             await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, newOccurredAt, excludeId: null, ct);
-            AddCommodityPrice(commodity.Id, quoteCurrencyId, newOccurredAt,
-                valuePerUnit.Value, transaction.Id);
-            return (quoteCurrencyId, valuePerUnit.Value);
+            AddCommodityPrice(commodity.Id, quoteCurrencyId, newOccurredAt, valuePerUnit.Value, transactionId);
         }
-
-        audit.Track<CommodityPriceSnapshot, CommodityPrice>(
-            linkedPrice, "CommodityPrice", linkedPrice.Id);
-
-        if (newOccurredAt != linkedPrice.PriceAt)
+        else
         {
-            await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, newOccurredAt,
-                excludeId: linkedPrice.Id, ct);
-            linkedPrice.PriceAt = newOccurredAt;
+            audit.Track<CommodityPriceSnapshot, CommodityPrice>(
+                linkedPrice, "CommodityPrice", linkedPrice.Id);
+
+            if (newOccurredAt != linkedPrice.PriceAt)
+            {
+                await ThrowIfPriceExistsAtAsync(commodity.Id, quoteCurrencyId, newOccurredAt,
+                    excludeId: linkedPrice.Id, ct);
+                linkedPrice.PriceAt = newOccurredAt;
+            }
+
+            linkedPrice.Rate = valuePerUnit.Value;
         }
 
-        if (valuePerUnit is decimal newRate)
-            linkedPrice.Rate = newRate;
+        accountSplit.UnitPriceRate = valuePerUnit.Value;
+        accountSplit.UnitPriceCommodityId = quoteCurrencyId;
+        SetUnpricedSplit(equitySplit, quoteCurrencyId, -accountSplit.Quantity * valuePerUnit.Value);
+    }
 
-        return (quoteCurrencyId, linkedPrice.Rate);
+    private static void SetUnpricedSplit(
+        AccountTransactionSplit split, Guid commodityId, decimal quantity)
+    {
+        split.CommodityId = commodityId;
+        split.Quantity = quantity;
+        split.UnitPriceRate = null;
+        split.UnitPriceCommodityId = null;
+    }
+
+    private static void ClearAnnotation(AccountTransactionSplit split)
+    {
+        split.UnitPriceRate = null;
+        split.UnitPriceCommodityId = null;
     }
 
     private async Task ThrowIfPriceExistsAtAsync(Guid commodityId, Guid quoteCurrencyId,
@@ -306,16 +327,8 @@ public class OpeningBalanceService(
         audit.Created("CommodityPrice", price.Id);
     }
 
-    private static (decimal quantity, decimal value) ComputeSignedSplit(
-        Account account, Commodity commodity, decimal quantity, decimal rate)
-    {
-        var value = commodity.Kind == CommodityKind.Currency ? quantity : quantity * rate;
-
-        if (account.AccountType == AccountType.Liability)
-            return (-quantity, -value);
-
-        return (quantity, value);
-    }
+    private static decimal SignedQuantity(Account account, decimal quantity) =>
+        account.AccountType == AccountType.Liability ? -quantity : quantity;
 
     private static (AccountTransactionSplit accountSplit, AccountTransactionSplit equitySplit)
         SplitOpeningBalance(AccountTransaction transaction, Guid openingBalancesAccountId)

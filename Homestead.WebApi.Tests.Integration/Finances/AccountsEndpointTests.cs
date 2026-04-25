@@ -91,7 +91,6 @@ public class AccountsEndpointTests : IntegrationTestBase
             .Where(s => s.AccountId == body!.Id)
             .ToListAsync(CT);
         Assert.Single(splits);
-        Assert.Equal(1000m, splits[0].Value);
         Assert.Equal(1000m, splits[0].Quantity);
     }
 
@@ -116,7 +115,7 @@ public class AccountsEndpointTests : IntegrationTestBase
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var split = await db.AccountTransactionSplits.SingleAsync(s => s.AccountId == body.Id, CT);
-        Assert.Equal(-500m, split.Value);
+        Assert.Equal(-500m, split.Quantity);
     }
 
     [Fact]

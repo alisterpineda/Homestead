@@ -16,7 +16,10 @@ public class AccountTransactionSplit
     public Commodity Commodity { get; set; } = null!;
 
     public decimal Quantity { get; set; }
-    public decimal Value { get; set; }
+
+    public decimal? UnitPriceRate { get; set; }
+    public Guid? UnitPriceCommodityId { get; set; }
+    public Commodity? UnitPriceCommodity { get; set; }
 
     public string? Memo { get; set; }
 

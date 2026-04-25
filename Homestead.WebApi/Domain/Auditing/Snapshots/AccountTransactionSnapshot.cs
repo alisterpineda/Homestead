@@ -7,7 +7,6 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
 {
     public required DateTimeOffset OccurredAt { get; init; }
     public required string Description { get; init; }
-    public required Guid CurrencyId { get; init; }
     public required TransactionType Type { get; init; }
     public required List<string> Splits { get; init; }
 
@@ -15,7 +14,6 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
     {
         OccurredAt = source.OccurredAt,
         Description = source.Description,
-        CurrencyId = source.CurrencyId,
         Type = source.Type,
         Splits = source.Splits
             .OrderBy(s => s.AccountId)
@@ -34,9 +32,6 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
                 other.OccurredAt.ToString("O", CultureInfo.InvariantCulture)));
         if (Description != other.Description)
             changes.Add(new ScalarFieldChange("Description", Description, other.Description));
-        if (CurrencyId != other.CurrencyId)
-            changes.Add(new ScalarFieldChange("CurrencyId",
-                CurrencyId.ToString(), other.CurrencyId.ToString()));
         if (Type != other.Type)
             changes.Add(new ScalarFieldChange("Type", Type.ToString(), other.Type.ToString()));
         if (!Splits.SequenceEqual(other.Splits))
@@ -45,7 +40,11 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
         return changes;
     }
 
-    private static string FormatSplit(AccountTransactionSplit s) =>
-        string.Create(CultureInfo.InvariantCulture,
-            $"account={s.AccountId}|commodity={s.CommodityId}|qty={s.Quantity}|val={s.Value}");
+    private static string FormatSplit(AccountTransactionSplit s)
+    {
+        var rate = s.UnitPriceRate?.ToString(CultureInfo.InvariantCulture) ?? "-";
+        var quote = s.UnitPriceCommodityId?.ToString() ?? "-";
+        return string.Create(CultureInfo.InvariantCulture,
+            $"account={s.AccountId}|commodity={s.CommodityId}|qty={s.Quantity}|unitPriceRate={rate}|unitPriceCommodity={quote}");
+    }
 }
