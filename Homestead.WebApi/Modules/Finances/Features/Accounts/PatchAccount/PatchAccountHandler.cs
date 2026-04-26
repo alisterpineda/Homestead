@@ -3,6 +3,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
 public class PatchAccountHandler(
     AppDbContext db,
     IAuditContext audit,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser,
+    IValuationService valuations)
     : IRequestHandler<PatchAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(PatchAccountCommand request, CancellationToken ct)
@@ -50,18 +52,8 @@ public class PatchAccountHandler(
 
         await db.SaveChangesAsync(ct);
 
-        return new AccountResponse
-        {
-            Id = account.Id,
-            Name = account.Name,
-            AccountType = account.AccountType,
-            Kind = account.Kind,
-            ReportingCurrencyId = account.ReportingCurrencyId,
-            Institution = account.Institution,
-            IsSystem = account.IsSystem,
-            IsArchived = account.IsArchived,
-            CreatedAt = account.CreatedAt,
-            UpdatedAt = account.UpdatedAt,
-        };
+        var ctx = await valuations.LoadContextAsync(ct);
+        var valuation = await valuations.ValueAccountAsync(account, ctx, ct);
+        return AccountResponseMapper.ToResponse(account, valuation);
     }
 }

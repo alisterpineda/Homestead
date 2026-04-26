@@ -13,7 +13,8 @@ public class CreateAccountHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
-    IOpeningBalanceService openingBalances)
+    IOpeningBalanceService openingBalances,
+    IValuationService valuations)
     : IRequestHandler<CreateAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken ct)
@@ -53,20 +54,8 @@ public class CreateAccountHandler(
 
         await db.SaveChangesAsync(ct);
 
-        return ToResponse(account);
+        var ctx = await valuations.LoadContextAsync(ct);
+        var valuation = await valuations.ValueAccountAsync(account, ctx, ct);
+        return AccountResponseMapper.ToResponse(account, valuation);
     }
-
-    private static AccountResponse ToResponse(Account a) => new()
-    {
-        Id = a.Id,
-        Name = a.Name,
-        AccountType = a.AccountType,
-        Kind = a.Kind,
-        ReportingCurrencyId = a.ReportingCurrencyId,
-        Institution = a.Institution,
-        IsSystem = a.IsSystem,
-        IsArchived = a.IsArchived,
-        CreatedAt = a.CreatedAt,
-        UpdatedAt = a.UpdatedAt,
-    };
 }

@@ -157,6 +157,8 @@ export type { PatchBalanceEntry$Params as PatchBalanceEntry$Params } from './fn/
 export { patchBalanceEntry as patchBalanceEntry } from './fn/finances/patch-balance-entry';
 export type { GetAccountTransactions$Params as GetAccountTransactions$Params } from './fn/finances/get-account-transactions';
 export { getAccountTransactions as getAccountTransactions } from './fn/finances/get-account-transactions';
+export type { GetAccountPositions$Params as GetAccountPositions$Params } from './fn/finances/get-account-positions';
+export { getAccountPositions as getAccountPositions } from './fn/finances/get-account-positions';
 export type { GetCommodities$Params as GetCommodities$Params } from './fn/finances/get-commodities';
 export { getCommodities as getCommodities } from './fn/finances/get-commodities';
 export type { CreateCommodity$Params as CreateCommodity$Params } from './fn/finances/create-commodity';

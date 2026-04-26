@@ -4,6 +4,7 @@ using Homestead.WebApi.Modules.Finances.Features.Accounts.CreateAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccount;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
+using Homestead.WebApi.Modules.Finances.Features.Accounts.GetPositions;
 using Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
 using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.CreateBalanceEntry;
 using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntries;
@@ -67,6 +68,9 @@ public static class FinancesModule
 
         // Per-account transaction list (Activity tab).
         GetAccountTransactionsEndpoint.Map(accounts);
+
+        // Per-account positions (Investment accounts only).
+        GetPositionsEndpoint.Map(accounts);
 
         var commodities = v1.MapGroup("/commodities");
         GetCommoditiesEndpoint.Map(commodities);

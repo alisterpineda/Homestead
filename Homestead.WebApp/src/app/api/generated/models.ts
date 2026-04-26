@@ -98,6 +98,7 @@ export type { PatchTagResponse } from './models/patch-tag-response';
 export type { PatchTransferCommand } from './models/patch-transfer-command';
 export type { PermanentlyDeleteDocumentsCommand } from './models/permanently-delete-documents-command';
 export type { PermanentlyDeleteDocumentsResponse } from './models/permanently-delete-documents-response';
+export type { PositionResponse } from './models/position-response';
 export type { ProblemDetails } from './models/problem-details';
 export type { ProcessingEntityType } from './models/processing-entity-type';
 export type { ProcessingJobStatus } from './models/processing-job-status';

@@ -1,11 +1,13 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.GetAccounts;
 
-public class GetAccountsHandler(AppDbContext db)
+public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
     : IRequestHandler<GetAccountsQuery, PaginatedResponse<AccountResponse>>
 {
     public async Task<PaginatedResponse<AccountResponse>> Handle(
@@ -19,22 +21,27 @@ public class GetAccountsHandler(AppDbContext db)
         if (request.Kind is { } kind)
             query = query.Where(a => a.Kind == kind);
 
-        return await query
-            .OrderBy(a => a.Kind)
-            .ThenBy(a => a.Name)
-            .Select(a => new AccountResponse
-            {
-                Id = a.Id,
-                Name = a.Name,
-                AccountType = a.AccountType,
-                Kind = a.Kind,
-                ReportingCurrencyId = a.ReportingCurrencyId,
-                Institution = a.Institution,
-                IsSystem = a.IsSystem,
-                IsArchived = a.IsArchived,
-                CreatedAt = a.CreatedAt,
-                UpdatedAt = a.UpdatedAt,
-            })
-            .ToPaginatedAsync(request, ct);
+        var ordered = query.OrderBy(a => a.Kind).ThenBy(a => a.Name);
+
+        var totalCount = await ordered.CountAsync(ct);
+        var pageItems = await ordered
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(ct);
+
+        var ctx = await valuations.LoadContextAsync(ct);
+        var values = await valuations.ValueAccountsAsync(pageItems, ctx, ct);
+
+        var responses = pageItems
+            .Select(a => AccountResponseMapper.ToResponse(a, values.GetValueOrDefault(a.Id)))
+            .ToList();
+
+        return new PaginatedResponse<AccountResponse>
+        {
+            Items = responses,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalCount = totalCount,
+        };
     }
 }

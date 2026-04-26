@@ -46,7 +46,13 @@ internal record FinanceAccountItem(
     Guid Id, string Name, string AccountType, string? Kind,
     Guid ReportingCurrencyId, string? Institution,
     bool IsSystem, bool IsArchived,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    decimal? DisplayValue = null, decimal? NativeBalance = null,
+    int UnpricedHoldingCount = 0);
+
+internal record FinancePositionItem(
+    Guid CommodityId, decimal Quantity,
+    decimal? DisplayValue, decimal? ShareOfAccount);
 
 internal record FinancePriceItem(
     Guid Id, Guid CommodityId, Guid QuoteCurrencyId, DateTimeOffset PriceAt,

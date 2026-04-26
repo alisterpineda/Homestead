@@ -6,12 +6,15 @@ import { AccountType } from '../models/account-type';
 export interface AccountResponse {
   accountType: AccountType;
   createdAt: string;
+  displayValue?: (number | string | null);
   id: string;
   institution?: (string | null);
   isArchived: boolean;
   isSystem: boolean;
   kind?: (null | AccountKind);
   name: string;
+  nativeBalance?: (number | string | null);
   reportingCurrencyId: string;
+  unpricedHoldingCount?: (number | string);
   updatedAt: string;
 }

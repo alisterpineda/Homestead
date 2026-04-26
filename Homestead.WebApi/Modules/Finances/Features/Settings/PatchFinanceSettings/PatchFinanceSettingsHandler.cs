@@ -23,9 +23,7 @@ public class PatchFinanceSettingsHandler(
     {
         var entity = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.FinancesModule, ct);
 
-        var settings = entity is not null
-            ? JsonSerializer.Deserialize<FinanceSettings>(entity.Value, FieldChange.JsonOptions) ?? new FinanceSettings()
-            : new FinanceSettings();
+        var settings = FinanceSettings.From(entity);
 
         AppSettingSnapshot? before = entity is not null ? AppSettingSnapshot.From(entity) : null;
 

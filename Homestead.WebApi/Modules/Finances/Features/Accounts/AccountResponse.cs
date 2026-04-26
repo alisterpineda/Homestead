@@ -14,4 +14,8 @@ public record AccountResponse
     public required bool IsArchived { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
+
+    public decimal? DisplayValue { get; init; }
+    public decimal? NativeBalance { get; init; }
+    public int UnpricedHoldingCount { get; init; }
 }

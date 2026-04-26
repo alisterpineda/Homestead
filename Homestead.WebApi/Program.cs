@@ -113,6 +113,7 @@ builder.Services.AddScoped<IBalanceEntryReconciler, BalanceEntryReconciler>();
 builder.Services.AddScoped<IOpeningBalanceService, OpeningBalanceService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
+builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>
