@@ -38,6 +38,11 @@ export const routes: Routes = [
         loadChildren: () => import('./modules/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
         canActivate: [adminGuard],
       },
+      {
+        path: 'finances',
+        loadChildren: () =>
+          import('./modules/finances/finances.routes').then((m) => m.FINANCES_ROUTES),
+      },
     ],
   },
 ];

@@ -4,3 +4,6 @@ export { DocumentApiService } from './document-api.service';
 export { DocumentVersionApiService } from './document-version-api.service';
 export { AdminApiService } from './admin-api.service';
 export { DownloadApiService } from './download-api.service';
+export { FinancesAccountApiService } from './finances-account-api.service';
+export { FinancesCommodityApiService } from './finances-commodity-api.service';
+export { FinancesSettingsApiService } from './finances-settings-api.service';
