@@ -5,6 +5,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommod
 
 public class PatchCommodityPriceModel
 {
+    public DateTimeOffset PriceAt { get; set; }
     public decimal Rate { get; set; }
 }
 

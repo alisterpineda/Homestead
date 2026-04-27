@@ -30,6 +30,9 @@ const veqt: CommodityResponse = {
   kind: 'Security',
   displayPrecision: 4,
   isSystemManaged: false,
+  canDelete: false,
+  latestPriceAt: null,
+  priceCount: 0,
 };
 
 const usd: CommodityResponse = {
@@ -40,6 +43,9 @@ const usd: CommodityResponse = {
   kind: 'Currency',
   displayPrecision: 2,
   isSystemManaged: true,
+  canDelete: false,
+  latestPriceAt: null,
+  priceCount: 0,
 };
 
 describe('AddPositionSheetComponent', () => {

@@ -10,6 +10,9 @@ const cad: CommodityResponse = {
   kind: 'Currency',
   displayPrecision: 2,
   isSystemManaged: true,
+  canDelete: false,
+  latestPriceAt: null,
+  priceCount: 0,
 };
 
 function account(overrides: Partial<AccountResponse>): AccountResponse {

@@ -211,6 +211,131 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task PatchPrice_UpdatesPriceAt_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan31,
+            rate = 1.3456m
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+
+        var newPriceAt = new DateTimeOffset(2026, 1, 31, 14, 30, 0, TimeSpan.Zero);
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodity-prices/{created!.Id}",
+            new[] { new { op = "replace", path = "/priceAt", value = (object)newPriceAt } });
+
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var patched = await patchResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+        Assert.Equal(newPriceAt, patched!.PriceAt);
+        Assert.Equal(1.3456m, patched.Rate);
+    }
+
+    [Fact]
+    public async Task PatchPrice_PriceAtCollidesWithExisting_Returns409()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var firstResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan15,
+            rate = 1.30m
+        }, CT);
+        firstResp.EnsureSuccessStatusCode();
+
+        var secondResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan31,
+            rate = 1.40m
+        }, CT);
+        var second = await secondResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodity-prices/{second!.Id}",
+            new[] { new { op = "replace", path = "/priceAt", value = (object)PriceAtJan15 } });
+
+        Assert.Equal(HttpStatusCode.Conflict, patchResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchPrice_PriceAtCollidesWithTransactionLinked_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var transaction = new NormalTransaction
+            {
+                Id = Guid.NewGuid(),
+                OccurredAt = PriceAtJan15,
+                Description = "Seeded buy",
+                Type = TransactionType.Normal,
+            };
+            db.AccountTransactions.Add(transaction);
+            db.CommodityPrices.Add(new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = usdId,
+                QuoteCurrencyId = cadId,
+                PriceAt = PriceAtJan15,
+                Rate = 1.30m,
+                CreatedByTransactionId = transaction.Id,
+            });
+            await db.SaveChangesAsync(CT);
+        }
+
+        var manualResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan31,
+            rate = 1.40m
+        }, CT);
+        var manual = await manualResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodity-prices/{manual!.Id}",
+            new[] { new { op = "replace", path = "/priceAt", value = (object)PriceAtJan15 } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, patchResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchPrice_PriceAtTooFarInFuture_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan31,
+            rate = 1.3456m
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+
+        var farFuture = DateTimeOffset.UtcNow.AddDays(5);
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodity-prices/{created!.Id}",
+            new[] { new { op = "replace", path = "/priceAt", value = (object)farFuture } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, patchResp.StatusCode);
+    }
+
+    [Fact]
     public async Task PatchPrice_TransactionLinked_Returns400()
     {
         var client = await CreateAdminClientAsync();

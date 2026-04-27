@@ -12,11 +12,17 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { replace } from '@/shared/json-patch';
 import { toast } from '@spartan-ng/brain/sonner';
+import {
+  combineDateAndTimeToIso,
+  startOfDayLocal,
+  timeHhMmLocal,
+} from '../../shared/date-time';
 import type { CommodityPriceResponse } from '@/api/generated/models/commodity-price-response';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -24,16 +30,39 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-edit-price-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, DatePickerComponent],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
-      <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[420px]">
+      <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[480px]">
         <div hlmDialogHeader>
           <h2 hlmDialogTitle>Edit price</h2>
-          <p hlmDialogDescription>Only the rate can be changed. Other fields require a new price.</p>
+          <p hlmDialogDescription>Adjust the rate or the recorded instant. Other fields require a new price.</p>
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel>Date</label>
+              <app-date-picker
+                [date]="dateValue()"
+                (dateChange)="dateValue.set($event)"
+                ariaLabel="Price date"
+              />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="edit-price-time">Time</label>
+              <input
+                hlmInput
+                id="edit-price-time"
+                type="time"
+                step="60"
+                class="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                [value]="timeInput()"
+                (input)="timeInput.set(asValue($event))"
+              />
+            </div>
+          </div>
+
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="edit-price-rate">Rate</label>
             <input
@@ -68,6 +97,8 @@ export class EditPriceDialogComponent {
   saved = output<CommodityPriceResponse>();
   closed = output<void>();
 
+  dateValue = signal<Date | null>(null);
+  timeInput = signal('');
   rateInput = signal('');
   saving = signal(false);
   saveError = signal('');
@@ -75,18 +106,31 @@ export class EditPriceDialogComponent {
   private priceApi = inject(FinancesCommodityPriceApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  private combinedIso = computed(() => {
+    const date = this.dateValue();
+    if (!date) return null;
+    return combineDateAndTimeToIso(date, this.timeInput());
+  });
+
   canSubmit = computed(() => {
     const p = this.price();
     if (!p) return false;
     const rate = Number(this.rateInput());
     if (!Number.isFinite(rate) || rate <= 0) return false;
-    return rate !== p.rate;
+    const iso = this.combinedIso();
+    if (!iso) return false;
+    const rateChanged = rate !== p.rate;
+    const priceAtChanged = iso !== p.priceAt;
+    return rateChanged || priceAtChanged;
   });
 
   constructor() {
     effect(() => {
       const p = this.price();
       if (p && this.state() === 'open') {
+        const d = new Date(p.priceAt);
+        this.dateValue.set(startOfDayLocal(d));
+        this.timeInput.set(timeHhMmLocal(d));
         this.rateInput.set(String(p.rate));
         this.saving.set(false);
         this.saveError.set('');
@@ -103,7 +147,16 @@ export class EditPriceDialogComponent {
     const p = this.price();
     if (!p || !this.canSubmit()) return;
 
-    const ops: JsonPatchDocument = [replace('/rate', Number(this.rateInput()))];
+    const ops: JsonPatchDocument = [];
+    const newRate = Number(this.rateInput());
+    if (newRate !== p.rate) {
+      ops.push(replace('/rate', newRate));
+    }
+    const iso = this.combinedIso()!;
+    if (iso !== p.priceAt) {
+      ops.push(replace('/priceAt', iso));
+    }
+
     this.saving.set(true);
     this.saveError.set('');
 

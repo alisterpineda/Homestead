@@ -30,6 +30,7 @@ public class PatchCommodityPriceHandler(
 
         var model = new PatchCommodityPriceModel
         {
+            PriceAt = price.PriceAt,
             Rate = price.Rate,
         };
 
@@ -37,6 +38,36 @@ public class PatchCommodityPriceHandler(
 
         if (model.Rate <= 0m)
             throw new BusinessRuleException("Rate must be greater than zero.");
+
+        if (model.PriceAt != price.PriceAt)
+        {
+            if (model.PriceAt > DateTimeOffset.UtcNow.AddDays(1))
+                throw new BusinessRuleException("PriceAt cannot be more than one day in the future.");
+
+            var newPriceAt = model.PriceAt.ToUniversalTime();
+
+            var collision = await db.CommodityPrices
+                .AsNoTracking()
+                .Where(p => p.Id != price.Id
+                         && p.CommodityId == price.CommodityId
+                         && p.QuoteCurrencyId == price.QuoteCurrencyId
+                         && p.PriceAt == newPriceAt)
+                .Select(p => new { p.CreatedByTransactionId })
+                .FirstOrDefaultAsync(ct);
+
+            if (collision is not null)
+            {
+                if (collision.CreatedByTransactionId is Guid txnId)
+                    throw new BusinessRuleException(
+                        $"A transaction-linked price already exists at this instant (transaction {txnId}). "
+                        + "Edit the source transaction instead.");
+
+                throw new DuplicateEntityException(
+                    "A price for this commodity, quote currency, and instant already exists.");
+            }
+
+            price.PriceAt = newPriceAt;
+        }
 
         price.Rate = model.Rate;
         price.UpdatedAt = DateTimeOffset.UtcNow;
