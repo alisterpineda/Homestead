@@ -223,4 +223,66 @@ public class AccountsValuationEndpointTests : IntegrationTestBase
         Assert.Null(body.DisplayValue);              // no display currency configured
         Assert.Equal(1, body.UnpricedHoldingCount);
     }
+
+    private async Task PostBalanceEntryAsync(HttpClient client, Guid accountId, Guid commodityId,
+        decimal assertedAmount, DateOnly date)
+    {
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/balance-entries",
+            new
+            {
+                commodityId,
+                assertedAmount,
+                date = date.ToString("yyyy-MM-dd"),
+            }, CT);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task GetAccount_BalanceEntryToday_ImmediatelyReflectedInDisplayValue()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        await SetDisplayCurrencyAsync(client, cad);
+
+        var cash = await CreateCashAccountAsync(client, cad, "Cash-BE-Today", 1000m);
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        await PostBalanceEntryAsync(client, cash, cad, 1250m, today);
+
+        var body = await GetAccountAsync(client, cash);
+        Assert.Equal(1250m, body.NativeBalance);
+        Assert.Equal(1250m, body.DisplayValue);
+    }
+
+    [Fact]
+    public async Task GetAccount_BalanceEntryYesterday_ReflectedInDisplayValue()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        await SetDisplayCurrencyAsync(client, cad);
+
+        var cash = await CreateCashAccountAsync(client, cad, "Cash-BE-Yesterday", 1000m);
+        var yesterday = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime).AddDays(-1);
+        await PostBalanceEntryAsync(client, cash, cad, 900m, yesterday);
+
+        var body = await GetAccountAsync(client, cash);
+        Assert.Equal(900m, body.NativeBalance);
+        Assert.Equal(900m, body.DisplayValue);
+    }
+
+    [Fact]
+    public async Task GetAccount_BalanceEntryTomorrow_NotReflectedInDisplayValue()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        await SetDisplayCurrencyAsync(client, cad);
+
+        var cash = await CreateCashAccountAsync(client, cad, "Cash-BE-Tomorrow", 1000m);
+        var tomorrow = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime).AddDays(1);
+        await PostBalanceEntryAsync(client, cash, cad, 1500m, tomorrow);
+
+        var body = await GetAccountAsync(client, cash);
+        Assert.Equal(1000m, body.NativeBalance);
+        Assert.Equal(1000m, body.DisplayValue);
+    }
 }

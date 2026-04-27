@@ -7,4 +7,7 @@ public static class DateOnlyExtensions
 
     public static DateTimeOffset ToStartOfDayUtc(this DateOnly date) =>
         date.ToUtc(TimeOnly.MinValue);
+
+    public static DateTimeOffset ToEndOfDayUtc(this DateOnly date) =>
+        date.ToUtc(new TimeOnly(23, 59, 59));
 }

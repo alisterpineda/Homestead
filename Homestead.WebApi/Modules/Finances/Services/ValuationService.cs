@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Persistence;
@@ -11,11 +12,11 @@ public class ValuationService(AppDbContext db) : IValuationService
     {
         var settings = await FinanceSettings.LoadAsync(db, ct);
         var displayCurrencyId = settings.DisplayCurrencyId;
-        var now = DateTimeOffset.UtcNow;
+        var cutoff = CurrentDayCutoffUtc();
 
         var prices = await db.CommodityPrices
             .AsNoTracking()
-            .Where(p => p.PriceAt <= now)
+            .Where(p => p.PriceAt <= cutoff)
             .OrderBy(p => p.PriceAt)
             .ToListAsync(ct);
 
@@ -36,10 +37,10 @@ public class ValuationService(AppDbContext db) : IValuationService
     public async Task<AccountValuation> ValueAccountAsync(
         Account account, ValuationContext ctx, CancellationToken ct)
     {
-        var now = DateTimeOffset.UtcNow;
+        var cutoff = CurrentDayCutoffUtc();
         var rows = await db.AccountTransactionSplits
             .AsNoTracking()
-            .Where(s => s.AccountId == account.Id && s.Transaction.OccurredAt <= now)
+            .Where(s => s.AccountId == account.Id && s.Transaction.OccurredAt <= cutoff)
             .GroupBy(s => s.CommodityId)
             .Select(g => new
             {
@@ -61,11 +62,11 @@ public class ValuationService(AppDbContext db) : IValuationService
             return new Dictionary<Guid, AccountValuation>();
 
         var ids = accounts.Select(a => a.Id).ToHashSet();
-        var now = DateTimeOffset.UtcNow;
+        var cutoff = CurrentDayCutoffUtc();
 
         var rows = await db.AccountTransactionSplits
             .AsNoTracking()
-            .Where(s => ids.Contains(s.AccountId) && s.Transaction.OccurredAt <= now)
+            .Where(s => ids.Contains(s.AccountId) && s.Transaction.OccurredAt <= cutoff)
             .GroupBy(s => new { s.AccountId, s.CommodityId })
             .Select(g => new
             {
@@ -134,4 +135,10 @@ public class ValuationService(AppDbContext db) : IValuationService
     }
 
     private readonly record struct RawPosition(Guid CommodityId, decimal Quantity);
+
+    // Day-grain cutoff so same-date balance entries (stored at 23:59:59 UTC) are
+    // reflected immediately. v1 valuation is "as of now" at day resolution; a future
+    // ?asOf= parameter would replace this with the caller's instant.
+    private static DateTimeOffset CurrentDayCutoffUtc() =>
+        DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime).ToEndOfDayUtc();
 }

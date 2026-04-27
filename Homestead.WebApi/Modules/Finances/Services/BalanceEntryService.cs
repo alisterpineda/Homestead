@@ -201,9 +201,8 @@ public class BalanceEntryService(
             .SumAsync(s => (decimal?)s.Quantity, ct) ?? 0m;
     }
 
-    // Balance entries always land at 23:59:59 UTC so per-instant uniqueness is per-day uniqueness.
-    private static DateTimeOffset ResolveOccurredAt(DateOnly date) =>
-        date.ToUtc(new TimeOnly(23, 59, 59));
+    // Balance entries always land at end-of-day UTC so per-instant uniqueness is per-day uniqueness.
+    private static DateTimeOffset ResolveOccurredAt(DateOnly date) => date.ToEndOfDayUtc();
 
     private static DateTimeOffset MinInstant(DateTimeOffset a, DateTimeOffset b) =>
         a < b ? a : b;
