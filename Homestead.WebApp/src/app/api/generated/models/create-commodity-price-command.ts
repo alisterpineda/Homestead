@@ -5,5 +5,5 @@ export interface CreateCommodityPriceCommand {
   commodityId: string;
   priceAt: string;
   quoteCurrencyId: string;
-  rate: (number | string);
+  rate: number;
 }

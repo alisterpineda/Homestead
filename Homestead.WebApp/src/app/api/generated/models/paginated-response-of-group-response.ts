@@ -4,8 +4,8 @@
 import { GroupResponse } from '../models/group-response';
 export interface PaginatedResponseOfGroupResponse {
   items: Array<GroupResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

@@ -14,8 +14,8 @@ export interface GetCommodityPrices$Params {
   QuoteCurrencyId?: string;
   FromAt?: string;
   ToAt?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getCommodityPrices(http: HttpClient, rootUrl: string, params: GetCommodityPrices$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfCommodityPriceResponse>> {

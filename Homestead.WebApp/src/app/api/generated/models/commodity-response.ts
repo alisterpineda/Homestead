@@ -3,7 +3,7 @@
 
 import { CommodityKind } from '../models/commodity-kind';
 export interface CommodityResponse {
-  displayPrecision: (number | string);
+  displayPrecision: number;
   exchange: (string | null);
   id: string;
   isSystemManaged: boolean;

@@ -1,5 +1,4 @@
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
-import { toNumberOrNull } from './sign';
 
 // Format a numeric value using a commodity as the unit. For ISO currencies we use
 // Intl currency formatting with the symbol; for securities we fall back to a plain
@@ -10,7 +9,7 @@ export function formatCurrency(
   commodity: CommodityResponse,
   locale?: string,
 ): string {
-  const precision = toNumberOrNull(commodity.displayPrecision) ?? 2;
+  const precision = commodity.displayPrecision ?? 2;
   if (commodity.kind === 'Currency') {
     try {
       return new Intl.NumberFormat(locale, {

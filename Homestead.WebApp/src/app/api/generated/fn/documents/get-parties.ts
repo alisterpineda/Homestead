@@ -15,8 +15,8 @@ export interface GetParties$Params {
   Search?: string;
   SortBy?: PartySortBy;
   SortDir?: SortDirection;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getParties(http: HttpClient, rootUrl: string, params: GetParties$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetPartiesResponse>> {

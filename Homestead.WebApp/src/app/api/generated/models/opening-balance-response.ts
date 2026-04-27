@@ -5,7 +5,7 @@ export interface OpeningBalanceResponse {
   accountId: string;
   asOfDate: string;
   commodityId: string;
-  quantity: (number | string);
+  quantity: number;
   transactionId: string;
-  valuePerUnit?: (number | string | null);
+  valuePerUnit?: (number | null);
 }

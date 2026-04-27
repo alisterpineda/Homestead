@@ -14,7 +14,7 @@ export interface GetDocumentsResponse {
   documentDate?: (string | null);
   expiryDate?: (string | null);
   fileExtension: string;
-  fileSize: (number | string);
+  fileSize: number;
   groupId?: (string | null);
   groupName?: (string | null);
   hasThumbnail?: boolean;
@@ -27,5 +27,5 @@ export interface GetDocumentsResponse {
   updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
-  versionCount?: (number | string);
+  versionCount?: number;
 }

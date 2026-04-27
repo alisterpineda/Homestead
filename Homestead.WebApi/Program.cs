@@ -90,8 +90,12 @@ builder.AddNpgsqlDbContext<AppDbContext>(
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).
+// NumberHandling.Strict makes numeric fields appear as `type: number` (not `[number, string]`)
+// in the generated OpenAPI spec — the generator reflects whatever the HTTP JSON pipeline
+// will accept, and the framework default (AllowReadingFromString) widens the schema.
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
+    options.SerializerOptions.NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.Strict;
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 

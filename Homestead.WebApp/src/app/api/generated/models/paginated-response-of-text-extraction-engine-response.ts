@@ -4,8 +4,8 @@
 import { TextExtractionEngineResponse } from '../models/text-extraction-engine-response';
 export interface PaginatedResponseOfTextExtractionEngineResponse {
   items: Array<TextExtractionEngineResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

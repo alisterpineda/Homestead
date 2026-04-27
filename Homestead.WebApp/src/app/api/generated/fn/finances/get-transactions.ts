@@ -17,8 +17,8 @@ export interface GetTransactions$Params {
   DateFrom?: string;
   DateTo?: string;
   DescriptionContains?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getTransactions(http: HttpClient, rootUrl: string, params: GetTransactions$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTransactionResponse>> {

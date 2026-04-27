@@ -3,7 +3,7 @@
 
 export interface TransactionDetailsBalanceEntryDetails {
   accountId: string;
-  assertedAmount: (number | string);
+  assertedAmount: number;
   assertedCommodityId: string;
   kind?: 'balanceEntry';
   note: (string | null);

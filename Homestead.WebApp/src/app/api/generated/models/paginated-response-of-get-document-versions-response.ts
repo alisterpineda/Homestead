@@ -4,8 +4,8 @@
 import { GetDocumentVersionsResponse } from '../models/get-document-versions-response';
 export interface PaginatedResponseOfGetDocumentVersionsResponse {
   items: Array<GetDocumentVersionsResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

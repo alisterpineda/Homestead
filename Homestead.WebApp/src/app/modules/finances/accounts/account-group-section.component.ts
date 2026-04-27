@@ -7,12 +7,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { AccountRowActionsComponent } from './account-row-actions.component';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
-import {
-  formatAccountBalance,
-  formatNativeBalance,
-  toNumberOrNull,
-  netWorth,
-} from '../shared/sign';
+import { formatAccountBalance, formatNativeBalance, netWorth } from '../shared/sign';
 import { formatCurrency } from '../shared/format-currency';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -134,10 +129,10 @@ export class AccountGroupSectionComponent {
     if (account.kind === 'Investment') return false;
     const dc = this.settingsService.displayCurrency();
     if (!dc || dc.id === account.reportingCurrencyId) return false;
-    return toNumberOrNull(account.nativeBalance ?? null) !== null;
+    return account.nativeBalance != null;
   }
 
   unpricedCount(account: AccountResponse): number {
-    return Number(account.unpricedHoldingCount ?? 0);
+    return account.unpricedHoldingCount ?? 0;
   }
 }

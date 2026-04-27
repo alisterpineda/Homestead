@@ -7,7 +7,7 @@ export interface GroupResponse {
   createdByUserName?: (string | null);
   description?: (string | null);
   id: string;
-  memberCount?: (number | string);
+  memberCount?: number;
   name: string;
   updatedAt: string;
   updatedByUserId?: (string | null);

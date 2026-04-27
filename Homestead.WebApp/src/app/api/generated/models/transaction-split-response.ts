@@ -6,7 +6,7 @@ export interface TransactionSplitResponse {
   commodityId: string;
   id: string;
   memo?: (string | null);
-  quantity: (number | string);
+  quantity: number;
   unitPriceCommodityId?: (string | null);
-  unitPriceRate?: (number | string | null);
+  unitPriceRate?: (number | null);
 }

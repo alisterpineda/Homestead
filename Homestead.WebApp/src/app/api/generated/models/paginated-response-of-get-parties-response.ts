@@ -4,8 +4,8 @@
 import { GetPartiesResponse } from '../models/get-parties-response';
 export interface PaginatedResponseOfGetPartiesResponse {
   items: Array<GetPartiesResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

@@ -4,8 +4,8 @@
 import { GetTagsResponse } from '../models/get-tags-response';
 export interface PaginatedResponseOfGetTagsResponse {
   items: Array<GetTagsResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

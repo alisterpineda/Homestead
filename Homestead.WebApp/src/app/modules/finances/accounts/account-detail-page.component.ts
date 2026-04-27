@@ -26,7 +26,7 @@ import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { KindBadgeComponent } from '../shared/kind-badge.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
 import { AccountInfoTabComponent } from './account-info-tab.component';
-import { formatAccountBalance, formatNativeBalance, toNumberOrNull } from '../shared/sign';
+import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -187,7 +187,7 @@ export class AccountDetailPageComponent implements OnDestroy {
     const dc = this.settingsService.displayCurrency();
     if (!dc) return false;
     if (dc.id === a.reportingCurrencyId) return false;
-    return toNumberOrNull(a.nativeBalance ?? null) !== null;
+    return a.nativeBalance != null;
   });
 
   nativeText(): string | null {

@@ -11,8 +11,8 @@ import { PaginatedResponseOfTextExtractionEngineResponse } from '../../models/pa
 
 export interface GetTextExtractionEngines$Params {
   Search?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getTextExtractionEngines(http: HttpClient, rootUrl: string, params: GetTextExtractionEngines$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTextExtractionEngineResponse>> {

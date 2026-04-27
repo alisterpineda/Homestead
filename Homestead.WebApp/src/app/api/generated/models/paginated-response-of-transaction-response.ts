@@ -4,8 +4,8 @@
 import { TransactionResponse } from '../models/transaction-response';
 export interface PaginatedResponseOfTransactionResponse {
   items: Array<TransactionResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

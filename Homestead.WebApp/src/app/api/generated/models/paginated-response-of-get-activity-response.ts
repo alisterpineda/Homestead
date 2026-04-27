@@ -4,8 +4,8 @@
 import { GetActivityResponse } from '../models/get-activity-response';
 export interface PaginatedResponseOfGetActivityResponse {
   items: Array<GetActivityResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

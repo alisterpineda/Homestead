@@ -12,7 +12,7 @@ export interface PatchDocumentResponse {
   expiryDate?: (string | null);
   fileExtension: string;
   fileHash: string;
-  fileSize: (number | string);
+  fileSize: number;
   groupId?: (string | null);
   groupName?: (string | null);
   id: string;

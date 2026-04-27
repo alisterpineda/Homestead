@@ -5,9 +5,9 @@ export interface PatchDocumentVersionResponse {
   contentType: string;
   createdAt: string;
   fileExtension: string;
-  fileSize: (number | string);
+  fileSize: number;
   id: string;
   label?: (string | null);
   updatedAt: string;
-  versionNumber: (number | string);
+  versionNumber: number;
 }

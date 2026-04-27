@@ -1,4 +1,4 @@
-import { displaySign, toUserAmount, toNumberOrNull, netWorth, formatAccountBalance } from './sign';
+import { displaySign, toUserAmount, netWorth, formatAccountBalance } from './sign';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
@@ -30,24 +30,6 @@ function account(overrides: Partial<AccountResponse>): AccountResponse {
     ...overrides,
   };
 }
-
-describe('toNumberOrNull', () => {
-  it('passes numbers through', () => {
-    expect(toNumberOrNull(1.5)).toBe(1.5);
-    expect(toNumberOrNull(0)).toBe(0);
-  });
-  it('parses numeric strings', () => {
-    expect(toNumberOrNull('1.5')).toBe(1.5);
-    expect(toNumberOrNull('-100')).toBe(-100);
-  });
-  it('returns null for null/undefined', () => {
-    expect(toNumberOrNull(null)).toBeNull();
-    expect(toNumberOrNull(undefined)).toBeNull();
-  });
-  it('returns null for non-numeric strings', () => {
-    expect(toNumberOrNull('abc')).toBeNull();
-  });
-});
 
 describe('displaySign', () => {
   it('returns -1 for liabilities', () => {

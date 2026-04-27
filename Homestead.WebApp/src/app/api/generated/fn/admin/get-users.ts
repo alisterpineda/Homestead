@@ -11,8 +11,8 @@ import { PaginatedResponseOfUserResponse } from '../../models/paginated-response
 
 export interface GetUsers$Params {
   Search?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getUsers(http: HttpClient, rootUrl: string, params: GetUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfUserResponse>> {

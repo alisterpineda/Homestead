@@ -7,5 +7,5 @@ export interface CommodityPriceResponse {
   id: string;
   priceAt: string;
   quoteCurrencyId: string;
-  rate: (number | string);
+  rate: number;
 }

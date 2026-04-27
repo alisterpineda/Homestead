@@ -4,8 +4,8 @@
 import { GetProcessingJobsResponse } from '../models/get-processing-jobs-response';
 export interface PaginatedResponseOfGetProcessingJobsResponse {
   items: Array<GetProcessingJobsResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

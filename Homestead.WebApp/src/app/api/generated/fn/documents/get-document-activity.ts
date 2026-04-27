@@ -11,8 +11,8 @@ import { PaginatedResponseOfGetActivityResponse } from '../../models/paginated-r
 
 export interface GetDocumentActivity$Params {
   documentId: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getDocumentActivity(http: HttpClient, rootUrl: string, params: GetDocumentActivity$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetActivityResponse>> {

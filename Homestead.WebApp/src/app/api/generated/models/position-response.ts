@@ -3,7 +3,7 @@
 
 export interface PositionResponse {
   commodityId: string;
-  displayValue?: (number | string | null);
-  quantity: (number | string);
-  shareOfAccount?: (number | string | null);
+  displayValue?: (number | null);
+  quantity: number;
+  shareOfAccount?: (number | null);
 }

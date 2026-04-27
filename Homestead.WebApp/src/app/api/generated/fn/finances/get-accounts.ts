@@ -13,8 +13,8 @@ import { PaginatedResponseOfAccountResponse } from '../../models/paginated-respo
 export interface GetAccounts$Params {
   Kind?: AccountKind;
   IncludeArchived?: boolean;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getAccounts(http: HttpClient, rootUrl: string, params: GetAccounts$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAccountResponse>> {

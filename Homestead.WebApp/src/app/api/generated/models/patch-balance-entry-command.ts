@@ -3,7 +3,7 @@
 
 export interface PatchBalanceEntryCommand {
   accountId?: string;
-  assertedAmount: (number | string);
+  assertedAmount: number;
   commodityId: string;
   date: string;
   note?: (string | null);

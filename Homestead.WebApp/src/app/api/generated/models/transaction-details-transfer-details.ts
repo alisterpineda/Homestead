@@ -3,10 +3,10 @@
 
 export interface TransactionDetailsTransferDetails {
   destinationAccountId: string;
-  destinationAmount: (number | string);
+  destinationAmount: number;
   destinationCurrencyId: string;
   kind?: 'transfer';
   sourceAccountId: string;
-  sourceAmount: (number | string);
+  sourceAmount: number;
   sourceCurrencyId: string;
 }

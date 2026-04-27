@@ -11,8 +11,8 @@ import { PaginatedResponseOfGroupResponse } from '../../models/paginated-respons
 
 export interface GetGroups$Params {
   Search?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getGroups(http: HttpClient, rootUrl: string, params: GetGroups$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGroupResponse>> {

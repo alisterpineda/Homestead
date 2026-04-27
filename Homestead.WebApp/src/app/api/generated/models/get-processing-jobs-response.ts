@@ -6,18 +6,18 @@ import { ProcessingJobStatus } from '../models/processing-job-status';
 import { ProcessingJobType } from '../models/processing-job-type';
 export interface GetProcessingJobsResponse {
   completedAt?: (string | null);
-  completedChildCount?: (number | string);
+  completedChildCount?: number;
   createdAt: string;
   createdByUserId?: (string | null);
   entityId?: (string | null);
   entityType?: (null | ProcessingEntityType);
   error?: (string | null);
-  failedChildCount?: (number | string);
+  failedChildCount?: number;
   id: string;
   parentJobId?: (string | null);
-  priority?: (number | string);
+  priority?: number;
   startedAt?: (string | null);
   status: ProcessingJobStatus;
-  totalChildCount?: (number | string);
+  totalChildCount?: number;
   type: ProcessingJobType;
 }

@@ -14,7 +14,7 @@ export interface GetDocumentResponse {
   extractedText?: (string | null);
   fileExtension: string;
   fileHash: string;
-  fileSize: (number | string);
+  fileSize: number;
   groupId?: (string | null);
   groupName?: (string | null);
   id: string;
@@ -27,6 +27,6 @@ export interface GetDocumentResponse {
   updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);
-  versionCount?: (number | string);
+  versionCount?: number;
   versions: Array<GetDocumentVersionDto>;
 }

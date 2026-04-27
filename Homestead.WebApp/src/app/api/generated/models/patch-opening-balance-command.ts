@@ -5,6 +5,6 @@ export interface PatchOpeningBalanceCommand {
   accountId?: string;
   asOfDate: string;
   commodityId?: string;
-  quantity: (number | string);
-  valuePerUnit?: (number | string | null);
+  quantity: number;
+  valuePerUnit?: (number | null);
 }

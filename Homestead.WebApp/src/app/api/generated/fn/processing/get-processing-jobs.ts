@@ -16,8 +16,8 @@ export interface GetProcessingJobs$Params {
   EntityType?: ProcessingEntityType;
   Status?: ProcessingJobStatus;
   ParentJobId?: string;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getProcessingJobs(http: HttpClient, rootUrl: string, params: GetProcessingJobs$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetProcessingJobsResponse>> {

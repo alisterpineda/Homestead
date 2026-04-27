@@ -4,8 +4,8 @@
 import { CommodityPriceResponse } from '../models/commodity-price-response';
 export interface PaginatedResponseOfCommodityPriceResponse {
   items: Array<CommodityPriceResponse>;
-  page: (number | string);
-  pageSize: (number | string);
-  totalCount: (number | string);
-  totalPages?: (number | string);
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages?: number;
 }

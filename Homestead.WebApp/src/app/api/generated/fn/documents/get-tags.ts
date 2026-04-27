@@ -17,8 +17,8 @@ export interface GetTags$Params {
   Search?: string;
   SortBy?: TagSortBy;
   SortDir?: SortDirection;
-  Page: (number | string);
-  PageSize: (number | string);
+  Page: number;
+  PageSize: number;
 }
 
 export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetTagsResponse>> {

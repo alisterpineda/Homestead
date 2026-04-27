@@ -4,7 +4,7 @@
 export interface GetPartiesResponse {
   createdAt: string;
   description?: (string | null);
-  documentCount: (number | string);
+  documentCount: number;
   id: string;
   name: string;
   updatedAt: string;

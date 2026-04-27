@@ -7,9 +7,9 @@ export interface GetDocumentVersionResponse {
   extractedText?: (string | null);
   fileExtension: string;
   fileHash: string;
-  fileSize: (number | string);
+  fileSize: number;
   id: string;
   label?: (string | null);
   updatedAt: string;
-  versionNumber: (number | string);
+  versionNumber: number;
 }

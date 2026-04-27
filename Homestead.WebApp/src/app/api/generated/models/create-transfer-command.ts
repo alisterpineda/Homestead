@@ -5,7 +5,7 @@ export interface CreateTransferCommand {
   date: string;
   description?: (string | null);
   destinationAccountId: string;
-  destinationAmount?: (number | string | null);
+  destinationAmount?: (number | null);
   sourceAccountId: string;
-  sourceAmount: (number | string);
+  sourceAmount: number;
 }

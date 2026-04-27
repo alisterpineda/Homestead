@@ -3,12 +3,6 @@ import type { AccountType } from '@/api/generated/models/account-type';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import { formatCurrency } from './format-currency';
 
-export function toNumberOrNull(v: number | string | null | undefined): number | null {
-  if (v === null || v === undefined) return null;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
 // Beancount-style stored sign convention:
 // - Asset/Expense: positive on increase
 // - Liability/Equity/Income: negative on increase
@@ -32,7 +26,7 @@ export function formatAccountBalance(
   displayCurrency: CommodityResponse | null,
 ): string | null {
   if (!displayCurrency) return null;
-  const raw = toNumberOrNull(account.displayValue ?? null);
+  const raw = account.displayValue ?? null;
   if (raw === null) return null;
   return formatCurrency(toUserAmount(raw, account.accountType) ?? 0, displayCurrency);
 }
@@ -44,7 +38,7 @@ export function formatNativeBalance(
   reportingCurrency: CommodityResponse | null,
 ): string | null {
   if (!reportingCurrency) return null;
-  const raw = toNumberOrNull(account.nativeBalance ?? null);
+  const raw = account.nativeBalance ?? null;
   if (raw === null) return null;
   return formatCurrency(toUserAmount(raw, account.accountType) ?? 0, reportingCurrency);
 }
@@ -57,8 +51,7 @@ export function netWorth(
 ): number {
   let total = 0;
   for (const a of accounts) {
-    const v = toNumberOrNull(a.displayValue ?? null);
-    if (v !== null) total += v;
+    if (a.displayValue != null) total += a.displayValue;
   }
   return total;
 }

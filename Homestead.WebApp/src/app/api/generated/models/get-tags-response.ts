@@ -5,7 +5,7 @@ export interface GetTagsResponse {
   color?: (string | null);
   createdAt: string;
   description?: (string | null);
-  documentCount: (number | string);
+  documentCount: number;
   effectiveColor?: (string | null);
   id: string;
   name: string;
