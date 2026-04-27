@@ -91,6 +91,24 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb class="min-w-0">
+        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
+          <li hlmBreadcrumbItem>
+            <a hlmBreadcrumbLink link="/finances/accounts">Accounts</a>
+          </li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem class="min-w-0">
+            <span hlmBreadcrumbPage
+                  [title]="account()?.name ?? 'Account'"
+                  class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
+              {{ account()?.name ?? 'Account' }}
+            </span>
+          </li>
+        </ol>
+      </nav>
+    </ng-template>
+
     <ng-template #headerActions>
       @if (account(); as a) {
         @if (!a.isArchived) {
@@ -166,18 +184,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
         </div>
       } @else if (account(); as a) {
-        <nav>
-          <ol hlmBreadcrumbList>
-            <li hlmBreadcrumbItem>
-              <a hlmBreadcrumbLink link="/finances/accounts">Accounts</a>
-            </li>
-            <li hlmBreadcrumbSeparator></li>
-            <li hlmBreadcrumbItem>
-              <span hlmBreadcrumbPage>{{ a.name }}</span>
-            </li>
-          </ol>
-        </nav>
-
         <header class="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground sm:flex-row sm:items-start sm:justify-between">
           <div class="flex flex-col gap-2 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
@@ -311,6 +317,7 @@ export class AccountDetailPageComponent implements OnDestroy {
   reportingCurrency = signal<CommodityResponse | null>(null);
 
   private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   private accountId = toSignal(
     this.route.paramMap.pipe(map(p => p.get('id'))),
@@ -362,12 +369,14 @@ export class AccountDetailPageComponent implements OnDestroy {
   constructor() {
     afterNextRender(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd),
       takeUntilDestroyed(),
     ).subscribe(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
 
     // Resolve reporting currency commodity when the account loads.
@@ -380,6 +389,7 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.pageHeaderService.clearActions();
+    this.pageHeaderService.clearTitle();
   }
 
   // ─── Header actions ──────────────────────────────────────────────────────

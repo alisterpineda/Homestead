@@ -49,6 +49,22 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   providers: [provideIcons({ lucidePencil, lucideCircleAlert })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb class="min-w-0">
+        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
+          <li hlmBreadcrumbItem>
+            <a hlmBreadcrumbLink link="/finances/commodities">Commodities</a>
+          </li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem class="min-w-0">
+            <span hlmBreadcrumbPage class="truncate">
+              {{ commodity()?.symbol ?? 'Commodity' }}
+            </span>
+          </li>
+        </ol>
+      </nav>
+    </ng-template>
+
     <ng-template #headerActions>
       @if (commodity(); as c) {
         @if (!c.isSystemManaged) {
@@ -62,18 +78,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       @if (commodity(); as c) {
-        <nav>
-          <ol hlmBreadcrumbList>
-            <li hlmBreadcrumbItem>
-              <a hlmBreadcrumbLink link="/finances/commodities">Commodities</a>
-            </li>
-            <li hlmBreadcrumbSeparator></li>
-            <li hlmBreadcrumbItem>
-              <span hlmBreadcrumbPage>{{ c.symbol }}</span>
-            </li>
-          </ol>
-        </nav>
-
         <header class="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground">
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="text-2xl font-semibold">{{ c.symbol }}</h1>
@@ -136,6 +140,7 @@ export class CommodityDetailPageComponent implements OnDestroy {
   sheetState = signal<BrnDialogState>('closed');
 
   private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   private id = toSignal(
     this.route.paramMap.pipe(map(p => p.get('id') ?? '')),
@@ -163,17 +168,20 @@ export class CommodityDetailPageComponent implements OnDestroy {
   constructor() {
     afterNextRender(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd),
       takeUntilDestroyed(),
     ).subscribe(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
   }
 
   ngOnDestroy(): void {
     this.pageHeaderService.clearActions();
+    this.pageHeaderService.clearTitle();
   }
 
   openEdit(): void {

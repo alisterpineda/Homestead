@@ -16,7 +16,7 @@ export const FINANCES_ROUTES: Routes = [
       { path: 'accounts/:id', component: AccountDetailPageComponent, data: { title: 'Account' } },
       { path: 'commodities', component: CommodityListPageComponent, data: { title: 'Commodities' } },
       { path: 'commodities/:id', component: CommodityDetailPageComponent, data: { title: 'Commodity' } },
-      { path: 'settings', component: FinanceSettingsPageComponent, data: { title: 'Finance settings' } },
+      { path: 'settings', component: FinanceSettingsPageComponent, data: { title: 'Settings' } },
     ],
   },
 ];
