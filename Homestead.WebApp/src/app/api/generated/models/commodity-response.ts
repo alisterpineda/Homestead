@@ -3,11 +3,14 @@
 
 import { CommodityKind } from '../models/commodity-kind';
 export interface CommodityResponse {
+  canDelete: boolean;
   displayPrecision: number;
   exchange: (string | null);
   id: string;
   isSystemManaged: boolean;
   kind: CommodityKind;
+  latestPriceAt: (string | null);
   name: string;
+  priceCount: number;
   symbol: string;
 }

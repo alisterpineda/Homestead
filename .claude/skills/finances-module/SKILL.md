@@ -36,7 +36,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Multi-user permissions.
 - Adjusted cost basis, tax-lot tracking, realized and unrealized gains for tax reporting.
 - Backfill of historical prices for periods before the user actually held the commodity.
-- Inline commodity creation from transaction flows — securities are created via `/finances/settings/commodities` first.
+- Inline commodity creation from transaction flows — securities are created via `/finances/commodities` first.
 - Configurable price-staleness thresholds — v1 renders staleness on a fixed heuristic.
 
 These are excluded from v1 but the model must not block adding them later. See *Future-compatibility*.

@@ -40,7 +40,8 @@ internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
 // Finances — enum fields are serialized as strings server-side, so use string here.
 internal record FinanceCommodityItem(
     Guid Id, string Symbol, string? Exchange, string Name, string Kind,
-    short DisplayPrecision, bool IsSystemManaged);
+    short DisplayPrecision, bool IsSystemManaged,
+    int PriceCount = 0, DateTimeOffset? LatestPriceAt = null, bool CanDelete = false);
 
 internal record FinanceAccountItem(
     Guid Id, string Name, string AccountType, string? Kind,

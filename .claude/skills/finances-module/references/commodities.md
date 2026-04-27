@@ -40,7 +40,7 @@ The same symbol on different exchanges is two different commodities (e.g., `AAPL
 
 ## Creation flow (securities only)
 
-Single modal opened from `/finances/settings/commodities`. Kind is always `Security` — currencies are never user-created. Fields:
+Single modal opened from `/finances/commodities` (Securities tab). Kind is always `Security` — currencies are never user-created. Fields:
 
 1. **Symbol** — required, ≤32 chars, uppercase, trimmed.
 2. **Exchange** — required, ≤16 chars, uppercase, trimmed.
@@ -59,7 +59,7 @@ Inline creation from transaction flows (e.g., `Add position`) is deferred to v2 
 
 ## List UI
 
-Route: `/finances/settings/commodities`.
+Route: `/finances/commodities` (top-level under `/finances/`, sibling of `/finances/accounts` and `/finances/settings`).
 
 Two tabs: **Securities** | **Currencies**. Currencies drown out the few securities a household tracks, so they're separated.
 
@@ -74,16 +74,18 @@ Two tabs: **Securities** | **Currencies**. Currencies drown out the few securiti
 - Read-only — no row actions.
 - Search: matches Symbol or Name.
 
+The list endpoint projects the per-row aggregates the table needs — `PriceCount`, `LatestPriceAt`, and `CanDelete` — onto `CommodityResponse` so the table renders in a single round-trip. `CanDelete` mirrors the same reference predicate `DeleteCommodityHandler` enforces (account reporting currency, splits, split price annotations, price rows on either side); the row's Delete affordance hides when it's false. Seeded currencies always have `CanDelete=false`.
+
 ## Commodity detail
 
-Route: `/finances/settings/commodities/:id`.
+Route: `/finances/commodities/:id`.
 
 **Header:** breadcrumb · symbol · exchange badge (securities only) · name · kind.
 
 **Tabs:**
 
-- **Info** — metadata, created/updated timestamps.
-- **Prices** — chronological list of price observations with source labels. Header action: *New manual price*.
+- **Info** — metadata: symbol, exchange (securities only), name, kind, display precision, system-managed badge.
+- **Prices** — chronological list of price observations with source labels. Section header above the table carries the *New manual price* action (rendered with the table body, not in the page-header strip, so the header stays stable as the user toggles tabs).
 
 Seeded currencies render read-only throughout.
 
@@ -124,7 +126,7 @@ Each price is either **manual** or **transaction-linked**:
 - **Manual:** `CreatedByTransactionId` is null. Created via *New manual price* on the commodity detail page, or (future) batch imports.
 - **Transaction-linked:** `CreatedByTransactionId` points to the transaction that created the row. The row is materialised from a **split price annotation** (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) on the source transaction — every annotated split emits exactly one `CommodityPrice` row. Editing the annotation updates the row in place; deleting the transaction deletes the row.
 
-Transaction-linked prices are **read-only** in the prices UI — the row is labelled *Transaction* with a link to the source, and has no edit or delete affordance. To change a transaction-linked price the user edits the transaction.
+Transaction-linked prices are **read-only** in the prices UI — the row is labelled *Transaction* and has no edit or delete affordance. The label carries a tooltip explaining that the price is edited via its source transaction. (A clickable deep-link to the originating transaction is deferred to a later pass — there is no per-transaction route today, and resolving the price's account context for navigation needs an extra fetch the v1 prices tab does not perform.) To change a transaction-linked price the user edits the transaction.
 
 Manual prices: only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
 
@@ -192,7 +194,7 @@ Never default an unpriced holding to zero or NaN — silent holes in net worth d
 
 **Storage:** PostgreSQL `numeric` (variable precision). EF maps `decimal` to `numeric` without `HasPrecision` configuration.
 
-**Display:** `max(quoteCurrency.DisplayPrecision, 4)`. CAD balances display at 2 decimals, but a per-share price of VEQT in CAD displays at 4. Prices needing more precision (e.g., BTC pairs) render at up to `commodity.DisplayPrecision` if higher.
+**Display:** `max(quoteCurrency.DisplayPrecision, 4)`. CAD balances display at 2 decimals, but a per-share price of VEQT in CAD displays at 4. Prices needing more precision (e.g., BTC pairs) should render at up to `commodity.DisplayPrecision` if higher; the v1 prices tab implements only the `max(quote, 4)` half and renders the high-precision case at 4 decimals — bumping for `commodity.DisplayPrecision` is a follow-up.
 
 ## Audit
 

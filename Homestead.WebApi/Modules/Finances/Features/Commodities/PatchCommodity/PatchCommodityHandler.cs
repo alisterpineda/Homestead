@@ -48,15 +48,10 @@ public class PatchCommodityHandler(
 
         await db.SaveChangesAsync(ct);
 
-        return new CommodityResponse
-        {
-            Id = commodity.Id,
-            Symbol = commodity.Symbol,
-            Exchange = commodity.Exchange,
-            Name = commodity.Name,
-            Kind = commodity.Kind,
-            DisplayPrecision = commodity.DisplayPrecision,
-            IsSystemManaged = commodity.IsSystemManaged,
-        };
+        return await db.Commodities
+            .AsNoTracking()
+            .Where(c => c.Id == commodity.Id)
+            .Select(CommodityProjections.ToResponse(db))
+            .SingleAsync(ct);
     }
 }

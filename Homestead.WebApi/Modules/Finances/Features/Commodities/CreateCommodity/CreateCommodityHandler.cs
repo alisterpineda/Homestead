@@ -54,6 +54,9 @@ public class CreateCommodityHandler(
             Kind = commodity.Kind,
             DisplayPrecision = commodity.DisplayPrecision,
             IsSystemManaged = commodity.IsSystemManaged,
+            PriceCount = 0,
+            LatestPriceAt = null,
+            CanDelete = true,
         };
     }
 }

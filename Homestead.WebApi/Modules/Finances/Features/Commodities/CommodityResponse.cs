@@ -11,4 +11,7 @@ public record CommodityResponse
     public required CommodityKind Kind { get; init; }
     public required short DisplayPrecision { get; init; }
     public required bool IsSystemManaged { get; init; }
+    public required int PriceCount { get; init; }
+    public required DateTimeOffset? LatestPriceAt { get; init; }
+    public required bool CanDelete { get; init; }
 }

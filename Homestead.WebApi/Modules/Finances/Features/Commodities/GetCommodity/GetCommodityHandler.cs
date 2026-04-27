@@ -12,16 +12,7 @@ public class GetCommodityHandler(AppDbContext db)
         return await db.Commodities
             .AsNoTracking()
             .Where(c => c.Id == request.Id)
-            .Select(c => new CommodityResponse
-            {
-                Id = c.Id,
-                Symbol = c.Symbol,
-                Exchange = c.Exchange,
-                Name = c.Name,
-                Kind = c.Kind,
-                DisplayPrecision = c.DisplayPrecision,
-                IsSystemManaged = c.IsSystemManaged,
-            })
+            .Select(CommodityProjections.ToResponse(db))
             .FirstOrDefaultAsync(ct);
     }
 }

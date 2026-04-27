@@ -288,4 +288,103 @@ public class CommoditiesEndpointTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResp.StatusCode);
     }
+
+    [Fact]
+    public async Task GetCommodity_NewSecurity_ExposesZeroPricesAndCanDelete()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "NVDA",
+            exchange = "NASDAQ",
+            name = "Nvidia",
+            displayPrecision = 4
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+
+        var getResp = await client.GetAsync($"/api/v1/finances/commodities/{created!.Id}", CT);
+        Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
+        var fetched = await getResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+        Assert.Equal(0, fetched!.PriceCount);
+        Assert.Null(fetched.LatestPriceAt);
+        Assert.True(fetched.CanDelete);
+    }
+
+    [Fact]
+    public async Task GetCommodity_SecurityWithPrices_ExposesCountAndLatestAndCanNotDelete()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cadId = await db.Commodities.Where(c => c.Symbol == "CAD").Select(c => c.Id).SingleAsync(CT);
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "AMD",
+            exchange = "NASDAQ",
+            name = "AMD",
+            displayPrecision = 4
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+
+        var older = new DateTimeOffset(2026, 1, 5, 0, 0, 0, TimeSpan.Zero);
+        var newer = new DateTimeOffset(2026, 2, 12, 0, 0, 0, TimeSpan.Zero);
+
+        var p1 = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = created!.Id, quoteCurrencyId = cadId, priceAt = older, rate = 110.5m
+        }, CT);
+        p1.EnsureSuccessStatusCode();
+        var p2 = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = created.Id, quoteCurrencyId = cadId, priceAt = newer, rate = 142.25m
+        }, CT);
+        p2.EnsureSuccessStatusCode();
+
+        var getResp = await client.GetAsync($"/api/v1/finances/commodities/{created.Id}", CT);
+        var fetched = await getResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+        Assert.Equal(2, fetched!.PriceCount);
+        Assert.Equal(newer, fetched.LatestPriceAt);
+        Assert.False(fetched.CanDelete);
+    }
+
+    [Fact]
+    public async Task GetCommodity_SeededCurrency_HasCanDeleteFalse()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cadId = await db.Commodities.Where(c => c.Symbol == "CAD").Select(c => c.Id).SingleAsync(CT);
+
+        var getResp = await client.GetAsync($"/api/v1/finances/commodities/{cadId}", CT);
+        var fetched = await getResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+        Assert.True(fetched!.IsSystemManaged);
+        Assert.False(fetched.CanDelete);
+    }
+
+    [Fact]
+    public async Task GetCommodities_ListIncludesNewFieldsForSecurity()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodities", new
+        {
+            symbol = "META",
+            exchange = "NASDAQ",
+            name = "Meta",
+            displayPrecision = 4
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinanceCommodityItem>(CT);
+
+        var listResp = await client.GetAsync(
+            $"/api/v1/finances/commodities?page=1&pageSize=200&kind=Security&search=META", CT);
+        var list = await listResp.Content.ReadFromJsonAsync<PaginatedResult<FinanceCommodityItem>>(CT);
+        var row = Assert.Single(list!.Items, c => c.Id == created!.Id);
+        Assert.Equal(0, row.PriceCount);
+        Assert.Null(row.LatestPriceAt);
+        Assert.True(row.CanDelete);
+    }
 }
