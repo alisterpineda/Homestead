@@ -1,4 +1,6 @@
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Seeding;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -243,6 +245,54 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         var getResp = await client.GetAsync(
             $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}", CT);
         Assert.Equal(HttpStatusCode.NotFound, getResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_WithDownstreamBalanceEntry_ReconcilesAgainstEquityAdjustments()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        var cashResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Cash-Reconcile",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = new { amount = 1000m, asOfDate = "2026-01-01" },
+        }, CT);
+        Assert.Equal(HttpStatusCode.Created, cashResp.StatusCode);
+        var cash = (await cashResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+
+        var balanceResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/balance-entries",
+            new { commodityId = usdId, assertedAmount = 1500m, date = "2026-02-15" }, CT);
+        Assert.Equal(HttpStatusCode.Created, balanceResp.StatusCode);
+
+        var beforeGet = await client.GetAsync($"/api/v1/finances/accounts/{cash.Id}", CT);
+        var before = (await beforeGet.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+        Assert.Equal(1500m, before.NativeBalance);
+
+        var delResp = await client.DeleteAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/opening-balances/{usdId}", CT);
+        Assert.Equal(HttpStatusCode.NoContent, delResp.StatusCode);
+
+        var afterGet = await client.GetAsync($"/api/v1/finances/accounts/{cash.Id}", CT);
+        var after = (await afterGet.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+        Assert.Equal(1500m, after.NativeBalance);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var openingBalanceCount = await db.AccountTransactions
+            .CountAsync(t => t.Description == OpeningBalanceTransactions.Description
+                          && t.Splits.Any(s => s.AccountId == cash.Id), CT);
+        Assert.Equal(0, openingBalanceCount);
+
+        var adjustments = await db.Accounts.SingleAsync(
+            a => a.IsSystem && a.Name == SystemAccountSeeder.AdjustmentsName, CT);
+        var adjustmentsBalance = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == adjustments.Id && s.CommodityId == usdId)
+            .SumAsync(s => s.Quantity, CT);
+        Assert.Equal(-1500m, adjustmentsBalance);
     }
 
     private record OpeningBalanceItem(

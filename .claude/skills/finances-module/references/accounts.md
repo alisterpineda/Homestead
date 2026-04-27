@@ -137,7 +137,7 @@ Rules:
 - **Amount / quantity** — always editable.
 - **Price per unit** (securities only) — editable; updates the associated `CommodityPrice` row on the same date.
 - **As-of date** — editable only if it remains the earliest transaction for its `(account, commodity)` pair. Moving it past later transactions is blocked with a clear error.
-- **Delete** — allowed only if no other transactions reference `(account, commodity)`. For a non-Investment account this means "no activity at all." For an Investment position this means "no buys, sells, dividends, or splits touching that commodity."
+- **Delete** — always allowed. Behaves like editing the opening balance to zero, then removing the now-empty entry. Removing the opening balance retroactively shifts the account's running balance by the deleted quantity; any downstream balance entries on that `(account, commodity)` automatically re-reconcile, with the difference absorbed into `Equity:Adjustments` (the same mechanism that handles any other transaction edit/delete).
 - **Re-add after delete** — Investment: use *Add position* again. Non-Investment: the detail page exposes an *Add opening balance* action when none exists.
 
 ## Add position (Investment only)

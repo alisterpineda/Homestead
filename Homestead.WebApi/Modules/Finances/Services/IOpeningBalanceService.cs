@@ -19,6 +19,9 @@ public interface IOpeningBalanceService
 
     /// <summary>
     /// Deletes an opening-balance transaction. Does NOT call SaveChangesAsync.
+    /// Returns the set of <c>(account, commodity)</c> pairs the caller must pass to
+    /// <see cref="IBalanceEntryReconciler"/> after the delete has been flushed, so any
+    /// downstream balance entries on those chains re-reconcile against Equity:Adjustments.
     /// </summary>
-    Task DeleteAsync(Guid transactionId, CancellationToken ct);
+    Task<IReadOnlyCollection<TouchedPair>> DeleteAsync(Guid transactionId, CancellationToken ct);
 }

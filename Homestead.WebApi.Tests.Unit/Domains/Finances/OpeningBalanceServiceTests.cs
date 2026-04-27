@@ -475,14 +475,15 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var ob = await _sut.CreateAsync(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 4, 23), TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync();
 
-        await _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken);
+        var touched = await _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync();
 
         Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id));
+        Assert.Contains(touched, t => t.AccountId == cash.Id && t.CommodityId == _cad.Id);
     }
 
     [Fact]
-    public async Task Delete_WithOtherActivity_Throws()
+    public async Task Delete_WithOtherActivity_RemovesOpeningBalance_AndLeavesOtherTransactionsIntact()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
         var ob = await _sut.CreateAsync(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 1, 1), TestContext.Current.CancellationToken);
@@ -502,7 +503,11 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         _db.AccountTransactions.Add(laterTxn);
         await _db.SaveChangesAsync();
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken));
+        var touched = await _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync();
+
+        Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id));
+        Assert.Equal(2, await _db.AccountTransactionSplits.CountAsync(s => s.TransactionId == laterTxn.Id));
+        Assert.Contains(touched, t => t.AccountId == cash.Id && t.CommodityId == _cad.Id);
     }
 }

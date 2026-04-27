@@ -7,7 +7,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeni
 
 public class DeleteOpeningBalanceHandler(
     AppDbContext db,
-    IOpeningBalanceService openingBalances)
+    IOpeningBalanceService openingBalances,
+    IBalanceEntryReconciler reconciler)
     : IRequestHandler<DeleteOpeningBalanceCommand, bool>
 {
     public async Task<bool> Handle(DeleteOpeningBalanceCommand request, CancellationToken ct)
@@ -18,8 +19,11 @@ public class DeleteOpeningBalanceHandler(
 
         if (txnId is null) return false;
 
-        await openingBalances.DeleteAsync(txnId.Value, ct);
+        var touched = await openingBalances.DeleteAsync(txnId.Value, ct);
         await db.SaveChangesAsync(ct);
+
+        await reconciler.ReconcileAsync(touched, ct);
+
         return true;
     }
 }

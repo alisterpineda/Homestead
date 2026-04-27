@@ -108,7 +108,7 @@ public class OpeningBalanceService(
         return transaction;
     }
 
-    public async Task DeleteAsync(Guid transactionId, CancellationToken ct)
+    public async Task<IReadOnlyCollection<TouchedPair>> DeleteAsync(Guid transactionId, CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
             .Include(t => t.Splits)
@@ -118,21 +118,16 @@ public class OpeningBalanceService(
         if (!transaction.IsOpeningBalance())
             throw new BusinessRuleException("Transaction is not an opening balance.");
 
-        var openingBalances = await systemAccounts.GetOpeningBalancesAsync(ct);
-        var (accountSplit, _) = SplitOpeningBalance(transaction, openingBalances.Id);
-
-        var otherActivity = await db.AccountTransactionSplits
-            .AnyAsync(s => s.AccountId == accountSplit.AccountId
-                        && s.CommodityId == accountSplit.CommodityId
-                        && s.TransactionId != transactionId, ct);
-        if (otherActivity)
-            throw new BusinessRuleException(
-                "Opening balance cannot be deleted while other transactions reference this account and commodity.");
+        var touched = transaction.Splits
+            .Select(s => new TouchedPair(s.AccountId, s.CommodityId, transaction.OccurredAt))
+            .ToArray();
 
         await linkedPrices.AuditCascadeDeletesAsync(transactionId, ct);
 
         db.AccountTransactions.Remove(transaction);
         audit.Deleted("AccountTransaction", transaction.Id, OpeningBalanceTransactions.Description);
+
+        return touched;
     }
 
     private async Task<Account> FindAccountAsync(Guid accountId, CancellationToken ct)
