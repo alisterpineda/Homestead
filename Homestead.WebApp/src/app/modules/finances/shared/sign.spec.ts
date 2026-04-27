@@ -27,6 +27,7 @@ function account(overrides: Partial<AccountResponse>): AccountResponse {
     displayValue: 0,
     nativeBalance: 0,
     unpricedHoldingCount: 0,
+    hasTransactions: false,
     ...overrides,
   };
 }

@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Accounts;
 
 internal static class AccountResponseMapper
 {
-    public static AccountResponse ToResponse(Account a, AccountValuation? valuation) => new()
+    public static AccountResponse ToResponse(Account a, AccountValuation? valuation, bool hasTransactions) => new()
     {
         Id = a.Id,
         Name = a.Name,
@@ -20,5 +20,6 @@ internal static class AccountResponseMapper
         DisplayValue = valuation?.DisplayValue,
         NativeBalance = valuation?.NativeBalance,
         UnpricedHoldingCount = valuation?.UnpricedHoldingCount ?? 0,
+        HasTransactions = hasTransactions,
     };
 }

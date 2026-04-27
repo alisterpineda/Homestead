@@ -309,9 +309,14 @@ public class AccountsEndpointTests : IntegrationTestBase
             initialBalance = CashInitialBalance(0m),
         }, CT);
         var created = await createResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+        Assert.False(created!.HasTransactions);
+
+        var getResp = await client.GetAsync($"/api/v1/finances/accounts/{created.Id}", CT);
+        var fetched = await getResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+        Assert.False(fetched!.HasTransactions);
 
         var deleteResp = await client.DeleteAsync(
-            $"/api/v1/finances/accounts/{created!.Id}", CT);
+            $"/api/v1/finances/accounts/{created.Id}", CT);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
     }
@@ -330,9 +335,14 @@ public class AccountsEndpointTests : IntegrationTestBase
             initialBalance = CashInitialBalance(100m),
         }, CT);
         var created = await createResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+        Assert.True(created!.HasTransactions);
+
+        var getResp = await client.GetAsync($"/api/v1/finances/accounts/{created.Id}", CT);
+        var fetched = await getResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+        Assert.True(fetched!.HasTransactions);
 
         var deleteResp = await client.DeleteAsync(
-            $"/api/v1/finances/accounts/{created!.Id}", CT);
+            $"/api/v1/finances/accounts/{created.Id}", CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, deleteResp.StatusCode);
     }

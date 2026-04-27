@@ -54,6 +54,9 @@ public class PatchAccountHandler(
 
         var ctx = await valuations.LoadContextAsync(ct);
         var valuation = await valuations.ValueAccountAsync(account, ctx, ct);
-        return AccountResponseMapper.ToResponse(account, valuation);
+        var hasTransactions = await db.AccountTransactionSplits
+            .AsNoTracking()
+            .AnyAsync(s => s.AccountId == account.Id, ct);
+        return AccountResponseMapper.ToResponse(account, valuation, hasTransactions);
     }
 }

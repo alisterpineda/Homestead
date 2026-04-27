@@ -34,7 +34,13 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
             {{ account().isArchived ? 'Unarchive' : 'Archive' }}
           </button>
           <hlm-dropdown-menu-separator />
-          <button hlmDropdownMenuItem variant="destructive" (triggered)="delete.emit(account())">
+          <button
+            hlmDropdownMenuItem
+            variant="destructive"
+            [disabled]="account().hasTransactions"
+            [title]="account().hasTransactions ? 'Accounts with transactions cannot be deleted — archive them instead.' : null"
+            (triggered)="delete.emit(account())"
+          >
             <ng-icon hlm name="lucideTrash2" size="sm" />
             Delete
           </button>

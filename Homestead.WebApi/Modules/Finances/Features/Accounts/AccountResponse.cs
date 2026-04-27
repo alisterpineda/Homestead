@@ -18,4 +18,5 @@ public record AccountResponse
     public decimal? DisplayValue { get; init; }
     public decimal? NativeBalance { get; init; }
     public int UnpricedHoldingCount { get; init; }
+    public required bool HasTransactions { get; init; }
 }

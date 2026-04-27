@@ -7,6 +7,7 @@ export interface AccountResponse {
   accountType: AccountType;
   createdAt: string;
   displayValue?: (number | null);
+  hasTransactions: boolean;
   id: string;
   institution?: (string | null);
   isArchived: boolean;

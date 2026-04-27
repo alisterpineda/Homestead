@@ -32,8 +32,18 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
         var ctx = await valuations.LoadContextAsync(ct);
         var values = await valuations.ValueAccountsAsync(pageItems, ctx, ct);
 
+        var pageIds = pageItems.Select(a => a.Id).ToHashSet();
+        var withTransactions = (await db.AccountTransactionSplits
+            .AsNoTracking()
+            .Where(s => pageIds.Contains(s.AccountId))
+            .Select(s => s.AccountId)
+            .Distinct()
+            .ToListAsync(ct))
+            .ToHashSet();
+
         var responses = pageItems
-            .Select(a => AccountResponseMapper.ToResponse(a, values.GetValueOrDefault(a.Id)))
+            .Select(a => AccountResponseMapper.ToResponse(
+                a, values.GetValueOrDefault(a.Id), withTransactions.Contains(a.Id)))
             .ToList();
 
         return new PaginatedResponse<AccountResponse>
