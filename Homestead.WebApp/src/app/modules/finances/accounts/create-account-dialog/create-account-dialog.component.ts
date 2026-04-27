@@ -22,6 +22,7 @@ import type { UserAccountKind } from '../../shared/account-kind-meta';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { todayIso, tomorrowIso } from '../../shared/date';
 
 @Component({
   selector: 'app-create-account-dialog',
@@ -237,14 +238,4 @@ export class CreateAccountDialogComponent {
       },
     });
   }
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function tomorrowIso(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
 }

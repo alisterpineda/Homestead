@@ -7,3 +7,4 @@ export { DownloadApiService } from './download-api.service';
 export { FinancesAccountApiService } from './finances-account-api.service';
 export { FinancesCommodityApiService } from './finances-commodity-api.service';
 export { FinancesSettingsApiService } from './finances-settings-api.service';
+export { FinancesTransactionApiService } from './finances-transaction-api.service';

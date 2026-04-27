@@ -13,23 +13,49 @@ import { ActivatedRoute, RouterLink, Router, NavigationEnd } from '@angular/rout
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, catchError, map, filter, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePencil, lucideCircleAlert } from '@ng-icons/lucide';
+import {
+  lucidePencil,
+  lucideCircleAlert,
+  lucidePlus,
+  lucideScale,
+  lucideArrowRightLeft,
+  lucideEllipsisVertical,
+  lucideArchive,
+  lucideArchiveRestore,
+  lucideChevronDown,
+} from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
+import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { replace } from '@/shared/json-patch';
+import { toast } from '@spartan-ng/brain/sonner';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { KindBadgeComponent } from '../shared/kind-badge.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
 import { AccountInfoTabComponent } from './account-info-tab.component';
+import { AccountActivityTabComponent } from './account-activity-tab.component';
+import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balance-entry-sheet/balance-entry-sheet.component';
+import { TransferSheetComponent, type TransferSheetMode } from './transfer-sheet/transfer-sheet.component';
+import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
+import { toDateOnly } from '../shared/date';
+import { isDetailsOfKind } from '../transactions/transaction-display';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+import type { TransactionResponse } from '@/api/generated/models/transaction-response';
+import type { TransactionDetailsBalanceEntryDetails } from '@/api/generated/models/transaction-details-balance-entry-details';
+import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
+import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({
@@ -44,19 +70,63 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmEmptyImports,
     HlmBreadCrumbImports,
     HlmTabsImports,
+    HlmDropdownMenuImports,
     KindBadgeComponent,
     AccountInfoTabComponent,
+    AccountActivityTabComponent,
     EditAccountSheetComponent,
+    BalanceEntrySheetComponent,
+    TransferSheetComponent,
+    OpeningBalanceSheetComponent,
   ],
-  providers: [provideIcons({ lucidePencil, lucideCircleAlert })],
+  providers: [provideIcons({
+    lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
+    lucideEllipsisVertical, lucideArchive, lucideArchiveRestore, lucideChevronDown,
+  })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerActions>
       @if (account(); as a) {
-        <button hlmBtn variant="outline" size="sm" (click)="openEdit()">
-          <ng-icon hlm name="lucidePencil" size="sm" />
-          Edit
+        @if (!a.isArchived) {
+          <button hlmBtn size="sm" (click)="openRecordBalance()">
+            <ng-icon hlm name="lucideScale" size="sm" />
+            Record balance
+          </button>
+
+          <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
+            <ng-icon hlm name="lucidePlus" size="sm" />
+            New transaction
+            <ng-icon hlm name="lucideChevronDown" size="sm" />
+          </button>
+          <ng-template #newTxMenu>
+            <hlm-dropdown-menu class="w-48">
+              <hlm-dropdown-menu-group>
+                <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
+                  <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
+                  Transfer
+                </button>
+              </hlm-dropdown-menu-group>
+            </hlm-dropdown-menu>
+          </ng-template>
+        }
+
+        <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
+          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
         </button>
+        <ng-template #accountMenu>
+          <hlm-dropdown-menu class="w-44">
+            <hlm-dropdown-menu-group>
+              <button hlmDropdownMenuItem (triggered)="openEdit()">
+                <ng-icon hlm name="lucidePencil" size="sm" />
+                Edit
+              </button>
+              <button hlmDropdownMenuItem (triggered)="toggleArchive()">
+                <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                {{ a.isArchived ? 'Unarchive' : 'Archive' }}
+              </button>
+            </hlm-dropdown-menu-group>
+          </hlm-dropdown-menu>
+        </ng-template>
       }
     </ng-template>
 
@@ -113,10 +183,18 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
         </header>
 
-        <hlm-tabs tab="info" class="flex flex-1 flex-col">
+        <hlm-tabs tab="activity" class="flex flex-1 flex-col">
           <hlm-tabs-list variant="line">
+            <button hlmTabsTrigger="activity">Activity</button>
             <button hlmTabsTrigger="info">Info</button>
           </hlm-tabs-list>
+          <div hlmTabsContent="activity" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
+            <app-account-activity-tab
+              [account]="a"
+              [refreshKey]="refreshTrigger()"
+              (transactionClicked)="onTransactionClicked($event)"
+            />
+          </div>
           <div hlmTabsContent="info" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
             <app-account-info-tab [account]="a" [reportingCurrency]="reportingCurrency()" />
           </div>
@@ -126,9 +204,39 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
     <app-edit-account-sheet
       [account]="account()"
-      [state]="sheetState()"
-      (saved)="onSheetSaved($event)"
-      (closed)="onSheetClosed()"
+      [state]="editSheetState()"
+      (saved)="onAccountSaved($event)"
+      (closed)="onAccountSheetClosed()"
+    />
+
+    <app-balance-entry-sheet
+      [account]="account()"
+      [state]="balanceSheetState()"
+      [mode]="balanceSheetMode()"
+      [existing]="balanceSheetExisting()"
+      (saved)="onBalanceEntrySaved()"
+      (deleted)="onBalanceEntryDeleted()"
+      (closed)="onBalanceSheetClosed()"
+    />
+
+    <app-transfer-sheet
+      [account]="account()"
+      [state]="transferSheetState()"
+      [mode]="transferSheetMode()"
+      [existing]="transferSheetExisting()"
+      (saved)="onTransferSaved()"
+      (deleted)="onTransferDeleted()"
+      (closed)="onTransferSheetClosed()"
+    />
+
+    <app-opening-balance-sheet
+      [account]="account()"
+      [state]="openingBalanceSheetState()"
+      [mode]="openingBalanceSheetMode()"
+      [existing]="openingBalanceSheetExisting()"
+      (saved)="onOpeningBalanceSaved()"
+      (deleted)="onOpeningBalanceDeleted()"
+      (closed)="onOpeningBalanceSheetClosed()"
     />
   `,
 })
@@ -136,6 +244,8 @@ export class AccountDetailPageComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
+  private txApi = inject(FinancesTransactionApiService);
+  private errorHandler = inject(ErrorHandlerService);
   protected settingsService = inject(FinanceSettingsService);
   private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
@@ -143,7 +253,22 @@ export class AccountDetailPageComponent implements OnDestroy {
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
-  sheetState = signal<BrnDialogState>('closed');
+
+  editSheetState = signal<BrnDialogState>('closed');
+
+  balanceSheetState = signal<BrnDialogState>('closed');
+  balanceSheetMode = signal<BalanceEntrySheetMode>('create');
+  balanceSheetExisting = signal<BalanceEntryResponse | null>(null);
+
+  transferSheetState = signal<BrnDialogState>('closed');
+  transferSheetMode = signal<TransferSheetMode>('create');
+  transferSheetExisting = signal<TransactionResponse | null>(null);
+
+  openingBalanceSheetState = signal<BrnDialogState>('closed');
+  openingBalanceSheetMode = signal<OpeningBalanceSheetMode>('edit');
+  openingBalanceSheetExisting = signal<OpeningBalanceResponse | null>(null);
+
+  archiving = signal(false);
 
   reportingCurrency = signal<CommodityResponse | null>(null);
 
@@ -219,16 +344,145 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.pageHeaderService.clearActions();
   }
 
+  // ─── Header actions ──────────────────────────────────────────────────────
+
   openEdit(): void {
-    this.sheetState.set('open');
+    this.editSheetState.set('open');
   }
 
-  onSheetSaved(_: AccountResponse): void {
-    this.sheetState.set('closed');
+  openRecordBalance(): void {
+    this.balanceSheetMode.set('create');
+    this.balanceSheetExisting.set(null);
+    this.balanceSheetState.set('open');
+  }
+
+  openNewTransfer(): void {
+    this.transferSheetMode.set('create');
+    this.transferSheetExisting.set(null);
+    this.transferSheetState.set('open');
+  }
+
+  toggleArchive(): void {
+    const a = this.account();
+    if (!a) return;
+    this.archiving.set(true);
+    this.accountApi.patchAccount({
+      id: a.id,
+      body: [replace('/isArchived', !a.isArchived)],
+    }).pipe(
+      handleMutationError(this.errorHandler, this.archiving, 'Failed to update account.'),
+    ).subscribe({
+      next: () => {
+        this.archiving.set(false);
+        toast.success(a.isArchived ? 'Account unarchived.' : 'Account archived.');
+        this.refreshTrigger.update(v => v + 1);
+      },
+    });
+  }
+
+  // ─── Activity-row clicks ─────────────────────────────────────────────────
+
+  onTransactionClicked(tx: TransactionResponse): void {
+    const a = this.account();
+    if (!a) return;
+    switch (tx.shape) {
+      case 'BalanceEntry':
+        this.openBalanceEntryEditor(tx);
+        break;
+      case 'Transfer':
+        this.openTransferEditor(tx);
+        break;
+      case 'OpeningBalance':
+        this.openOpeningBalanceEditor(tx);
+        break;
+      // StockSplit and 'Other' are read-only on single-position account surfaces.
+    }
+  }
+
+  private openBalanceEntryEditor(tx: TransactionResponse): void {
+    const details = tx.details;
+    if (!isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(details, 'balanceEntry')) return;
+    const existing: BalanceEntryResponse = {
+      transactionId: tx.id,
+      accountId: details.accountId,
+      commodityId: details.assertedCommodityId,
+      assertedAmount: details.assertedAmount,
+      date: toDateOnly(tx.occurredAt),
+      note: details.note ?? null,
+    };
+    this.balanceSheetMode.set('edit');
+    this.balanceSheetExisting.set(existing);
+    this.balanceSheetState.set('open');
+  }
+
+  private openTransferEditor(tx: TransactionResponse): void {
+    this.transferSheetMode.set('edit');
+    this.transferSheetExisting.set(tx);
+    this.transferSheetState.set('open');
+  }
+
+  private openOpeningBalanceEditor(tx: TransactionResponse): void {
+    const a = this.account();
+    if (!a) return;
+    // Single-position accounts always have OB on reporting currency. Fetch the
+    // dedicated OB representation (signs already abs'd) before opening.
+    const accountSplit = tx.splits.find(s => s.accountId === a.id);
+    const commodityId = accountSplit?.commodityId ?? a.reportingCurrencyId;
+    this.txApi.getOpeningBalance({ accountId: a.id, commodityId }).subscribe({
+      next: ob => {
+        this.openingBalanceSheetMode.set('edit');
+        this.openingBalanceSheetExisting.set(ob);
+        this.openingBalanceSheetState.set('open');
+      },
+      error: () => {
+        toast.error('Couldn\'t load opening balance.');
+      },
+    });
+  }
+
+  // ─── Sheet event handlers ────────────────────────────────────────────────
+
+  onAccountSaved(_: AccountResponse): void {
+    this.editSheetState.set('closed');
     this.refreshTrigger.update(v => v + 1);
   }
+  onAccountSheetClosed(): void {
+    this.editSheetState.set('closed');
+  }
 
-  onSheetClosed(): void {
-    this.sheetState.set('closed');
+  onBalanceEntrySaved(): void {
+    this.balanceSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onBalanceEntryDeleted(): void {
+    this.balanceSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onBalanceSheetClosed(): void {
+    this.balanceSheetState.set('closed');
+  }
+
+  onTransferSaved(): void {
+    this.transferSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onTransferDeleted(): void {
+    this.transferSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onTransferSheetClosed(): void {
+    this.transferSheetState.set('closed');
+  }
+
+  onOpeningBalanceSaved(): void {
+    this.openingBalanceSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onOpeningBalanceDeleted(): void {
+    this.openingBalanceSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onOpeningBalanceSheetClosed(): void {
+    this.openingBalanceSheetState.set('closed');
   }
 }

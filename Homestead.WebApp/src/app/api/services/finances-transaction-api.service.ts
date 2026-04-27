@@ -1,0 +1,100 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { getAccountTransactions } from '@/api/generated/fn/finances/get-account-transactions';
+import { getTransaction } from '@/api/generated/fn/finances/get-transaction';
+import { deleteTransaction } from '@/api/generated/fn/finances/delete-transaction';
+import { createTransfer } from '@/api/generated/fn/finances/create-transfer';
+import { patchTransfer } from '@/api/generated/fn/finances/patch-transfer';
+import { createBalanceEntry } from '@/api/generated/fn/finances/create-balance-entry';
+import { patchBalanceEntry } from '@/api/generated/fn/finances/patch-balance-entry';
+import { getBalanceEntry } from '@/api/generated/fn/finances/get-balance-entry';
+import { getBalanceEntries } from '@/api/generated/fn/finances/get-balance-entries';
+import { createOpeningBalance } from '@/api/generated/fn/finances/create-opening-balance';
+import { patchOpeningBalance } from '@/api/generated/fn/finances/patch-opening-balance';
+import { deleteOpeningBalance } from '@/api/generated/fn/finances/delete-opening-balance';
+import { getOpeningBalance } from '@/api/generated/fn/finances/get-opening-balance';
+import { getOpeningBalances } from '@/api/generated/fn/finances/get-opening-balances';
+import type { PaginatedResponseOfTransactionResponse } from '@/api/generated/models/paginated-response-of-transaction-response';
+import type { TransactionResponse } from '@/api/generated/models/transaction-response';
+import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
+import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
+
+export type { GetAccountTransactions$Params } from '@/api/generated/fn/finances/get-account-transactions';
+export type { GetTransaction$Params } from '@/api/generated/fn/finances/get-transaction';
+export type { DeleteTransaction$Params } from '@/api/generated/fn/finances/delete-transaction';
+export type { CreateTransfer$Params } from '@/api/generated/fn/finances/create-transfer';
+export type { PatchTransfer$Params } from '@/api/generated/fn/finances/patch-transfer';
+export type { CreateBalanceEntry$Params } from '@/api/generated/fn/finances/create-balance-entry';
+export type { PatchBalanceEntry$Params } from '@/api/generated/fn/finances/patch-balance-entry';
+export type { GetBalanceEntry$Params } from '@/api/generated/fn/finances/get-balance-entry';
+export type { GetBalanceEntries$Params } from '@/api/generated/fn/finances/get-balance-entries';
+export type { CreateOpeningBalance$Params } from '@/api/generated/fn/finances/create-opening-balance';
+export type { PatchOpeningBalance$Params } from '@/api/generated/fn/finances/patch-opening-balance';
+export type { DeleteOpeningBalance$Params } from '@/api/generated/fn/finances/delete-opening-balance';
+export type { GetOpeningBalance$Params } from '@/api/generated/fn/finances/get-opening-balance';
+export type { GetOpeningBalances$Params } from '@/api/generated/fn/finances/get-opening-balances';
+
+@Injectable({ providedIn: 'root' })
+export class FinancesTransactionApiService {
+  private http = inject(HttpClient);
+  private config = inject(ApiConfiguration);
+
+  getAccountTransactions(params: Parameters<typeof getAccountTransactions>[2]): Observable<PaginatedResponseOfTransactionResponse> {
+    return getAccountTransactions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getTransaction(params: Parameters<typeof getTransaction>[2]): Observable<TransactionResponse> {
+    return getTransaction(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  deleteTransaction(params: Parameters<typeof deleteTransaction>[2]): Observable<void> {
+    return deleteTransaction(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createTransfer(params: Parameters<typeof createTransfer>[2]): Observable<TransactionResponse> {
+    return createTransfer(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchTransfer(params: Parameters<typeof patchTransfer>[2]): Observable<TransactionResponse> {
+    return patchTransfer(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createBalanceEntry(params: Parameters<typeof createBalanceEntry>[2]): Observable<BalanceEntryResponse> {
+    return createBalanceEntry(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchBalanceEntry(params: Parameters<typeof patchBalanceEntry>[2]): Observable<BalanceEntryResponse> {
+    return patchBalanceEntry(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getBalanceEntry(params: Parameters<typeof getBalanceEntry>[2]): Observable<BalanceEntryResponse> {
+    return getBalanceEntry(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getBalanceEntries(params: Parameters<typeof getBalanceEntries>[2]): Observable<Array<BalanceEntryResponse>> {
+    return getBalanceEntries(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createOpeningBalance(params: Parameters<typeof createOpeningBalance>[2]): Observable<OpeningBalanceResponse> {
+    return createOpeningBalance(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchOpeningBalance(params: Parameters<typeof patchOpeningBalance>[2]): Observable<OpeningBalanceResponse> {
+    return patchOpeningBalance(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  deleteOpeningBalance(params: Parameters<typeof deleteOpeningBalance>[2]): Observable<void> {
+    return deleteOpeningBalance(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getOpeningBalance(params: Parameters<typeof getOpeningBalance>[2]): Observable<OpeningBalanceResponse> {
+    return getOpeningBalance(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getOpeningBalances(params: Parameters<typeof getOpeningBalances>[2]): Observable<Array<OpeningBalanceResponse>> {
+    return getOpeningBalances(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+}
