@@ -23,6 +23,7 @@ import {
   lucideArchive,
   lucideArchiveRestore,
   lucideChevronDown,
+  lucidePackagePlus,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -43,9 +44,11 @@ import { KindBadgeComponent } from '../shared/kind-badge.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
 import { AccountInfoTabComponent } from './account-info-tab.component';
 import { AccountActivityTabComponent } from './account-activity-tab.component';
+import { AccountPositionsTabComponent } from './account-positions-tab.component';
 import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balance-entry-sheet/balance-entry-sheet.component';
 import { TransferSheetComponent, type TransferSheetMode } from './transfer-sheet/transfer-sheet.component';
 import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
+import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { toDateOnly } from '../shared/date';
 import { isDetailsOfKind } from '../transactions/transaction-display';
@@ -74,24 +77,38 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     KindBadgeComponent,
     AccountInfoTabComponent,
     AccountActivityTabComponent,
+    AccountPositionsTabComponent,
     EditAccountSheetComponent,
     BalanceEntrySheetComponent,
     TransferSheetComponent,
     OpeningBalanceSheetComponent,
+    AddPositionSheetComponent,
   ],
   providers: [provideIcons({
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
     lucideEllipsisVertical, lucideArchive, lucideArchiveRestore, lucideChevronDown,
+    lucidePackagePlus,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerActions>
       @if (account(); as a) {
         @if (!a.isArchived) {
-          <button hlmBtn size="sm" (click)="openRecordBalance()">
-            <ng-icon hlm name="lucideScale" size="sm" />
-            Record balance
-          </button>
+          @if (a.kind === 'Investment') {
+            <button hlmBtn size="sm" (click)="openAddPosition()">
+              <ng-icon hlm name="lucidePackagePlus" size="sm" />
+              Add position
+            </button>
+            <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
+              <ng-icon hlm name="lucideScale" size="sm" />
+              Record balance
+            </button>
+          } @else {
+            <button hlmBtn size="sm" (click)="openRecordBalance()">
+              <ng-icon hlm name="lucideScale" size="sm" />
+              Record balance
+            </button>
+          }
 
           <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
             <ng-icon hlm name="lucidePlus" size="sm" />
@@ -186,6 +203,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         <hlm-tabs tab="activity" class="flex flex-1 flex-col">
           <hlm-tabs-list variant="line">
             <button hlmTabsTrigger="activity">Activity</button>
+            @if (a.kind === 'Investment') {
+              <button hlmTabsTrigger="positions">Positions</button>
+            }
             <button hlmTabsTrigger="info">Info</button>
           </hlm-tabs-list>
           <div hlmTabsContent="activity" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
@@ -195,6 +215,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               (transactionClicked)="onTransactionClicked($event)"
             />
           </div>
+          @if (a.kind === 'Investment') {
+            <div hlmTabsContent="positions" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
+              <app-account-positions-tab
+                [account]="a"
+                [refreshKey]="refreshTrigger()"
+                (editOpeningBalance)="onPositionEditRequested($event.commodityId)"
+              />
+            </div>
+          }
           <div hlmTabsContent="info" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
             <app-account-info-tab [account]="a" [reportingCurrency]="reportingCurrency()" />
           </div>
@@ -238,6 +267,13 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (deleted)="onOpeningBalanceDeleted()"
       (closed)="onOpeningBalanceSheetClosed()"
     />
+
+    <app-add-position-sheet
+      [account]="account()"
+      [state]="addPositionSheetState()"
+      (saved)="onAddPositionSaved()"
+      (closed)="onAddPositionSheetClosed()"
+    />
   `,
 })
 export class AccountDetailPageComponent implements OnDestroy {
@@ -267,6 +303,8 @@ export class AccountDetailPageComponent implements OnDestroy {
   openingBalanceSheetState = signal<BrnDialogState>('closed');
   openingBalanceSheetMode = signal<OpeningBalanceSheetMode>('edit');
   openingBalanceSheetExisting = signal<OpeningBalanceResponse | null>(null);
+
+  addPositionSheetState = signal<BrnDialogState>('closed');
 
   archiving = signal(false);
 
@@ -362,6 +400,10 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.transferSheetState.set('open');
   }
 
+  openAddPosition(): void {
+    this.addPositionSheetState.set('open');
+  }
+
   toggleArchive(): void {
     const a = this.account();
     if (!a) return;
@@ -424,10 +466,21 @@ export class AccountDetailPageComponent implements OnDestroy {
   private openOpeningBalanceEditor(tx: TransactionResponse): void {
     const a = this.account();
     if (!a) return;
-    // Single-position accounts always have OB on reporting currency. Fetch the
-    // dedicated OB representation (signs already abs'd) before opening.
+    // The account-side split's commodity identifies which (account, commodity)
+    // pair the opening balance lives at — works for both single-position kinds
+    // (always reporting currency) and per-position Investment OBs.
     const accountSplit = tx.splits.find(s => s.accountId === a.id);
     const commodityId = accountSplit?.commodityId ?? a.reportingCurrencyId;
+    this.openOpeningBalanceForCommodity(commodityId);
+  }
+
+  onPositionEditRequested(commodityId: string): void {
+    this.openOpeningBalanceForCommodity(commodityId);
+  }
+
+  private openOpeningBalanceForCommodity(commodityId: string): void {
+    const a = this.account();
+    if (!a) return;
     this.txApi.getOpeningBalance({ accountId: a.id, commodityId }).subscribe({
       next: ob => {
         this.openingBalanceSheetMode.set('edit');
@@ -484,5 +537,13 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
   onOpeningBalanceSheetClosed(): void {
     this.openingBalanceSheetState.set('closed');
+  }
+
+  onAddPositionSaved(): void {
+    this.addPositionSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onAddPositionSheetClosed(): void {
+    this.addPositionSheetState.set('closed');
   }
 }

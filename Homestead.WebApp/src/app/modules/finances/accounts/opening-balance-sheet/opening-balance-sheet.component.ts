@@ -18,6 +18,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
+import { commodityStep } from '../../shared/format-currency';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -52,13 +53,13 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="opening-balance-quantity">Amount</label>
+              <label hlmLabel for="opening-balance-quantity">{{ isSecurity() ? 'Quantity' : 'Amount' }}</label>
               <input
                 hlmInput
                 id="opening-balance-quantity"
                 class="w-full"
                 type="number"
-                step="0.01"
+                [step]="quantityStep()"
                 min="0"
                 placeholder="0.00"
                 [value]="quantity()"
@@ -66,8 +67,33 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
               />
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount initially owed (positive).</p>
+              } @else if (isSecurity()) {
+                <p class="text-xs text-muted-foreground">Number of units held in {{ commodity()!.symbol }}.</p>
               }
             </div>
+
+            @if (isSecurity()) {
+              <div class="space-y-2">
+                <label hlmLabel for="opening-balance-unit-price">
+                  Per-unit price (optional)
+                </label>
+                <input
+                  hlmInput
+                  id="opening-balance-unit-price"
+                  class="w-full"
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  placeholder="0.00"
+                  [value]="unitPrice()"
+                  (input)="unitPrice.set(asValue($event))"
+                />
+                <p class="text-xs text-muted-foreground">
+                  Records a price observation in the account's reporting currency on the as-of date.
+                  Leave blank to capture the position without a historical price.
+                </p>
+              </div>
+            }
 
             <div class="space-y-2">
               <label hlmLabel for="opening-balance-date">As-of date</label>
@@ -119,6 +145,7 @@ export class OpeningBalanceSheetComponent {
   closed = output<void>();
 
   quantity = signal('');
+  unitPrice = signal('');
   asOfDate = signal(todayIso());
   saving = signal(false);
   deleting = signal(false);
@@ -136,12 +163,20 @@ export class OpeningBalanceSheetComponent {
     return c ? `${c.symbol} — ${c.name}` : null;
   });
 
+  isSecurity = computed(() => this.commodity()?.kind === 'Security');
+
+  quantityStep = computed(() => commodityStep(this.commodity()));
+
   canSubmit = computed(() => {
     if (!this.account()) return false;
     if (!this.asOfDate()) return false;
     if (this.quantity() === '') return false;
     const q = Number(this.quantity());
     if (!Number.isFinite(q) || q < 0) return false;
+    if (this.isSecurity() && this.unitPrice() !== '') {
+      const p = Number(this.unitPrice());
+      if (!Number.isFinite(p) || p <= 0) return false;
+    }
     return true;
   });
 
@@ -149,23 +184,30 @@ export class OpeningBalanceSheetComponent {
     effect(() => {
       const a = this.account();
       if (!a || this.state() !== 'open') return;
-      this.commodity.set(null);
-      this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
-        next: c => this.commodity.set(c),
-        error: () => this.commodity.set(null),
-      });
 
       this.saving.set(false);
       this.deleting.set(false);
       this.formError.set('');
 
       const ex = this.existing();
+      // Per-position OB on Investment accounts is keyed by the existing entry's
+      // commodityId; non-Investment kinds always use the reporting currency.
+      const commodityId = (this.mode() === 'edit' && ex) ? ex.commodityId : a.reportingCurrencyId;
+
+      this.commodity.set(null);
+      this.commodityApi.getCommodity({ id: commodityId }).subscribe({
+        next: c => this.commodity.set(c),
+        error: () => this.commodity.set(null),
+      });
+
       if (this.mode() === 'edit' && ex) {
         this.quantity.set(String(ex.quantity));
         this.asOfDate.set(ex.asOfDate);
+        this.unitPrice.set(ex.valuePerUnit != null ? String(ex.valuePerUnit) : '');
       } else {
         this.quantity.set('');
         this.asOfDate.set(todayIso());
+        this.unitPrice.set('');
       }
     });
   }
@@ -182,12 +224,17 @@ export class OpeningBalanceSheetComponent {
     this.formError.set('');
 
     const ex = this.existing();
+    const valuePerUnit = this.isSecurity() && this.unitPrice() !== ''
+      ? Number(this.unitPrice())
+      : null;
+
     const obs = this.mode() === 'edit' && ex
       ? this.txApi.patchOpeningBalance({
           accountId: a.id,
           commodityId: ex.commodityId,
           body: {
             quantity: Number(this.quantity()),
+            valuePerUnit,
             asOfDate: this.asOfDate(),
           },
         })

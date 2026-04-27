@@ -18,6 +18,8 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
+import { commodityStep } from '../../shared/format-currency';
+import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -28,7 +30,7 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
 @Component({
   selector: 'app-balance-entry-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, CommodityPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -49,7 +51,17 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
 
             <div class="space-y-2">
               <label hlmLabel>Commodity</label>
-              <p class="text-sm text-muted-foreground">{{ commodityLabel() ?? '—' }}</p>
+              @if (a.kind === 'Investment' && mode() === 'create') {
+                <app-commodity-picker
+                  ariaLabel="Select commodity"
+                  placeholder="Pick a currency or security"
+                  [value]="commodityId()"
+                  [selectedCommodity]="commodity()"
+                  (commodityChange)="onCommodityChange($event)"
+                />
+              } @else {
+                <p class="text-sm text-muted-foreground">{{ commodityLabel() ?? '—' }}</p>
+              }
             </div>
 
             <div class="space-y-2">
@@ -59,7 +71,7 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
                 id="balance-entry-amount"
                 class="w-full"
                 type="number"
-                step="0.01"
+                [step]="amountStep()"
                 min="0"
                 placeholder="0.00"
                 [value]="amount()"
@@ -67,6 +79,8 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
               />
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount currently owed (positive).</p>
+              } @else if (commodity()?.kind === 'Security') {
+                <p class="text-xs text-muted-foreground">Total units held of {{ commodity()!.symbol }}.</p>
               }
             </div>
 
@@ -139,6 +153,7 @@ export class BalanceEntrySheetComponent {
   deleting = signal(false);
   formError = signal('');
   commodity = signal<CommodityResponse | null>(null);
+  commodityId = signal<string | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
@@ -151,8 +166,11 @@ export class BalanceEntrySheetComponent {
     return c ? `${c.symbol} — ${c.name}` : null;
   });
 
+  amountStep = computed(() => commodityStep(this.commodity()));
+
   canSubmit = computed(() => {
     if (!this.account()) return false;
+    if (!this.commodityId()) return false;
     if (!this.date()) return false;
     if (this.amount() === '') return false;
     const amt = Number(this.amount());
@@ -164,27 +182,40 @@ export class BalanceEntrySheetComponent {
     effect(() => {
       const a = this.account();
       if (!a || this.state() !== 'open') return;
-      // Resolve the locked commodity (account's reporting currency) for display.
-      this.commodity.set(null);
-      this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
-        next: c => this.commodity.set(c),
-        error: () => this.commodity.set(null),
-      });
-      // Seed form values from existing (edit) or defaults (create).
+
       this.saving.set(false);
       this.deleting.set(false);
       this.formError.set('');
+
+      // Seed form values from existing (edit) or defaults (create). Compute the
+      // active commodity locally so we don't read commodityId() back into the
+      // effect — that would make user-driven commodity picks (which write to
+      // commodityId) re-trigger the effect and overwrite the picked value.
       const ex = this.existing();
+      let activeCommodityId: string;
       if (this.mode() === 'edit' && ex) {
         this.amount.set(String(ex.assertedAmount));
         this.date.set(ex.date);
         this.note.set(ex.note ?? '');
+        activeCommodityId = ex.commodityId;
       } else {
         this.amount.set('');
         this.date.set(todayIso());
         this.note.set('');
+        activeCommodityId = a.reportingCurrencyId;
       }
+      this.commodityId.set(activeCommodityId);
+      this.commodity.set(null);
+      this.commodityApi.getCommodity({ id: activeCommodityId }).subscribe({
+        next: c => this.commodity.set(c),
+        error: () => this.commodity.set(null),
+      });
     });
+  }
+
+  onCommodityChange(commodity: CommodityResponse): void {
+    this.commodityId.set(commodity.id);
+    this.commodity.set(commodity);
   }
 
   asValue(event: Event): string {
@@ -193,11 +224,12 @@ export class BalanceEntrySheetComponent {
 
   handleSave(): void {
     const a = this.account();
-    if (!a || !this.canSubmit()) return;
+    const commodityId = this.commodityId();
+    if (!a || !commodityId || !this.canSubmit()) return;
     this.saving.set(true);
     this.formError.set('');
     const body = {
-      commodityId: a.reportingCurrencyId,
+      commodityId,
       assertedAmount: Number(this.amount()),
       date: this.date(),
       note: this.note().trim() ? this.note().trim() : null,

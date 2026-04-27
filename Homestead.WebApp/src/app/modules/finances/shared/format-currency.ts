@@ -28,3 +28,11 @@ export function formatCurrency(
   }).format(value);
   return `${formatted} ${commodity.symbol}`;
 }
+
+// HTML <input type="number"> step matching a commodity's display precision.
+// CAD (precision 2) → "0.01"; VEQT (precision 4) → "0.0001"; integer → "1".
+export function commodityStep(commodity: CommodityResponse | null): string {
+  if (!commodity) return '0.01';
+  const precision = Math.max(0, commodity.displayPrecision ?? 2);
+  return precision === 0 ? '1' : `0.${'0'.repeat(precision - 1)}1`;
+}

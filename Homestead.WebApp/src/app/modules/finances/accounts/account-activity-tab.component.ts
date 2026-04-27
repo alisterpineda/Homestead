@@ -243,9 +243,15 @@ export class AccountActivityTabComponent {
     const dc = this.settingsService.displayCurrency();
     const signed = signedAmountForAccount(tx, account.id) * displaySign(account.accountType);
 
-    const reportingCommodity = this.commodities()[account.reportingCurrencyId] ?? null;
-    const amountText = reportingCommodity
-      ? formatCurrency(signed, reportingCommodity)
+    // The account-side leg's commodity is the right unit for the row amount —
+    // crucial for Investment accounts where balance entries / opening balances
+    // can be denominated in any held commodity (currency or security).
+    const accountSplit = tx.splits.find(s => s.accountId === account.id);
+    const commodityForAmount = accountSplit
+      ? this.commodities()[accountSplit.commodityId] ?? null
+      : this.commodities()[account.reportingCurrencyId] ?? null;
+    const amountText = commodityForAmount
+      ? formatCurrency(signed, commodityForAmount)
       : (dc ? formatCurrency(signed, dc) : null);
 
     const dateText = toDateOnly(tx.occurredAt);
