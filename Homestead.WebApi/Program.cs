@@ -194,6 +194,7 @@ builder.Services.AddOpenApi("v1", options =>
     });
 
     options.AddOperationTransformer<ProblemDetailsResponseTransformer>();
+    options.AddSchemaTransformer<NullableEnumSchemaTransformer>();
 });
 
 // Hosted service (not a service-registration check) so build-time OpenAPI

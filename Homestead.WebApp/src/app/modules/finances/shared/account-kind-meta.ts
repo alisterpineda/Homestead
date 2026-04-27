@@ -1,10 +1,6 @@
 import type { AccountKind } from '@/api/generated/models/account-kind';
 
-// The generated AccountKind union literally includes the string 'null'
-// (an ng-openapi-gen artifact from the C# AccountKind? nullability). We never
-// surface that value in the UI — this constant is the source of truth for
-// "real" user-creatable kinds.
-export type UserAccountKind = Exclude<AccountKind, 'null'>;
+export type UserAccountKind = AccountKind;
 
 export const USER_ACCOUNT_KINDS: readonly UserAccountKind[] = [
   'Cash',
@@ -57,5 +53,5 @@ export const KIND_GROUPS: ReadonlyArray<{
 ];
 
 export function isUserAccountKind(kind: AccountKind | null | undefined): kind is UserAccountKind {
-  return kind !== null && kind !== undefined && kind !== 'null' && USER_ACCOUNT_KINDS.includes(kind as UserAccountKind);
+  return kind != null && USER_ACCOUNT_KINDS.includes(kind);
 }
