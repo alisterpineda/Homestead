@@ -1,6 +1,6 @@
 # Commodities & Prices — Reference
 
-Detailed design for commodity and price management in the Finances module. Expands on the summaries in [SKILL.md](../SKILL.md#commodities) and [SKILL.md](../SKILL.md#prices). Read this before designing, implementing, or reviewing any commodity- or price-related functionality — commodity creation/editing, the ISO 4217 currency seed, the exchange qualifier, price sources, carry-forward rules, FX chaining, or the commodity/price UI.
+Detailed design for commodity and price management in the Finances module. Expands on the summaries in [overview.md](overview.md#commodities) and [overview.md](overview.md#prices). Read this before designing, implementing, or reviewing any commodity- or price-related functionality — commodity creation/editing, the ISO 4217 currency seed, the exchange qualifier, price sources, carry-forward rules, FX chaining, or the commodity/price UI.
 
 ## Conceptual model
 
@@ -113,7 +113,7 @@ CommodityPrice {
 
 ## Price time semantics
 
-`PriceAt` is a `DateTimeOffset`, stored UTC. This gives well-defined ordering for same-day observations, alignment with transaction timestamps (see *Transaction time semantics* in SKILL.md), and a single axis for carry-forward lookups.
+`PriceAt` is a `DateTimeOffset`, stored UTC. This gives well-defined ordering for same-day observations, alignment with transaction timestamps (see the *Transactions* section in [overview.md](overview.md#transactions)), and a single axis for carry-forward lookups.
 
 Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date with an optional time; the frontend defaults the time to `00:00 UTC` on the entered date when the user only picks a date. The API accepts a raw `PriceAt: DateTimeOffset` — the server does not default or normalise the time. On a day that has both a 00:00-UTC manual price and a 12:00-UTC transaction-linked price, carry-forward at instants ≥ 12:00 UTC picks the transaction-linked row (most recent `PriceAt ≤ T`).
 

@@ -1,6 +1,6 @@
 # Accounts — Reference
 
-Detailed design for account management in the Finances module. Expands on the summary in [SKILL.md](../SKILL.md#accounts). Read this before designing, implementing, or reviewing any account-related functionality — account kinds, creation, initial balances, opening-balance edits, add-position flow for investments, archive/delete rules, or the list/detail UI.
+Detailed design for account management in the Finances module. Expands on the summary in [overview.md](overview.md#accounts). Read this before designing, implementing, or reviewing any account-related functionality — account kinds, creation, initial balances, opening-balance edits, add-position flow for investments, archive/delete rules, or the list/detail UI.
 
 ## Conceptual model
 

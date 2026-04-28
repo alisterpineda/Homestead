@@ -1,6 +1,6 @@
 # Valuation — Reference
 
-Detailed design for how computed balances and positions are exposed to the frontend. Expands on the *Core computed values* summary in [SKILL.md](../SKILL.md#core-computed-values). Read this before designing, implementing, or reviewing any read-side endpoint that returns an account balance, a position, or any number expressed in the household display currency.
+Detailed design for how computed balances and positions are exposed to the frontend. Expands on the *Core computed values* summary in [overview.md](overview.md#core-computed-values). Read this before designing, implementing, or reviewing any read-side endpoint that returns an account balance, a position, or any number expressed in the household display currency.
 
 This document scopes only the **API contract for valuations**. The mechanics of how a value is computed (split summation, carry-forward price lookup, FX chaining) live in [commodities.md](commodities.md#lookup-and-carry-forward); the user-facing surfaces that consume these values (account list, account detail, Positions tab) live in [accounts.md](accounts.md#account-list).
 
@@ -66,7 +66,7 @@ The "share of priced total" rule means the percentages always add up to 100% fro
 
 ## Performance posture
 
-Per [SKILL.md](../SKILL.md#core-computed-values), all valuations are computed at read time; nothing is cached at the data layer in v1.
+Per [overview.md](overview.md#core-computed-values), all valuations are computed at read time; nothing is cached at the data layer in v1.
 
 - **Account list** (`GET /finances/accounts`) is the hot path. The handler walks each account's splits, collapses them per commodity, looks up the carry-forward price, and sums. At household scale (tens of accounts, hundreds of transactions per year) this is well within request-time budgets.
 - **Single-account read** (`GET /finances/accounts/{id}`) is the same work scoped to one account.
@@ -79,7 +79,7 @@ If profiling later shows the list endpoint is too slow, options in priority orde
 - **No historical-balance endpoint.** The only v1 surface that needs point-in-time per-account valuation is the net-worth chart, which has its own time-series endpoint (specced separately). Endpoints like `GET /finances/balances?asOf=...` or an `?asOf=` parameter on the account / positions endpoints are deliberately not added — they would expand the contract for no v1 caller.
 - **No per-account historical positions.** Same reasoning. The Positions tab is "as of now" only per [accounts.md](accounts.md#account-detail).
 - **No server-computed rollups.** Kind subtotals, asset / liability totals, and household net worth are frontend rollups over the inline values. The dashboard's net-worth headline pulls from the time-series endpoint instead (most-recent point).
-- **No per-commodity Equity:Adjustments breakdown.** The Adjustments balance is surfaced as a single display-currency total — see SKILL.md *Distinctive UX decisions*. A per-commodity decomposition is a v2 affordance.
+- **No per-commodity Equity:Adjustments breakdown.** The Adjustments balance is surfaced as a single display-currency total — see [overview.md](overview.md#distinctive-ux-decisions-worth-preserving). A per-commodity decomposition is a v2 affordance.
 
 ## Future-compatibility
 

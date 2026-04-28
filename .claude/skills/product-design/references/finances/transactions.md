@@ -1,6 +1,6 @@
 ## Transactions & Splits — Reference
 
-Detailed design for transaction and split management in the Finances module. Expands on the summaries in [SKILL.md](../SKILL.md#transactions), [SKILL.md](../SKILL.md#splits), and [SKILL.md](../SKILL.md#transaction-shapes-user-facing). Read this before designing, implementing, or reviewing any transaction-shape, balance-entry, edit/delete, validation, or reconciliation work.
+Detailed design for transaction and split management in the Finances module. Expands on the summaries in [overview.md](overview.md#transactions), [overview.md](overview.md#splits), and [overview.md](overview.md#transaction-shapes-user-facing). Read this before designing, implementing, or reviewing any transaction-shape, balance-entry, edit/delete, validation, or reconciliation work.
 
 Opening-balance creation, editing, and deletion live in [accounts.md](accounts.md#initial-balance-mechanics) — this document treats opening balances only where they intersect with general edit/delete rules. Transaction-linked price behaviour (lifecycle, collisions, carry-forward) lives in [commodities.md](commodities.md#prices--model) — this document only summarises which shapes create price rows.
 

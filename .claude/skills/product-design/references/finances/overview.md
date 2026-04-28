@@ -1,13 +1,8 @@
----
-name: finances-module
-description: Product-level requirements and design decisions for the Homestead Finances module — the household net-worth tracking subsystem covering accounts, commodities, transactions, balance assertions, investment positions, and net-worth computation. Consult this whenever designing, implementing, modifying, or reviewing any functionality related to personal finance tracking, account modelling, investment positions, balance reconciliation, multi-currency handling, or net-worth reporting in Homestead, including API design, database schema, UI flows, and naming conventions. Use this even when the work seems adjacent — changes to account structure, currency display, transaction shapes, or equity plug handling should all be reconciled against this document first.
----
+# Finances — Requirements
 
-# Finances Module — Requirements
+This document describes the Finances module within Homestead: what it is, what it does, what it does not do, and the design decisions that shape it. It is product-level, not implementation-level. Technology choices (language, framework, database) are elsewhere — see the repo's CLAUDE.md files for those.
 
-This document describes the Finances module within Homestead: what it is, what it does, what it does not do, and the design decisions that shape it. It is product-level, not implementation-level. Technology choices (language, framework, database) are elsewhere.
-
-Homestead started as a document-management tool and is growing into a broader household suite; Finances sits alongside the existing Documents, Identity, Admin, Processing, and Status modules. Backend code belongs under `Homestead.WebApi/Modules/Finances/` and `Homestead.WebApi/Domain/Finances/`, following the conventions already in use for the other modules; the frontend lives under `Homestead.WebApp/src/app/modules/finances/`. This file governs *what* that module should do, not *how* it is wired up — defer to existing module patterns in the codebase for structure.
+Finances sits alongside Documents and the cross-cutting infrastructure modules listed in the top-level [SKILL.md](../../SKILL.md). This file governs *what* the module should do; defer to existing module patterns in the codebase for *how* it is wired up.
 
 ## Purpose
 
@@ -56,13 +51,13 @@ Four system accounts always exist per household, all hidden from user-facing lis
 - **Income** — counterpart for cash dividends in v1. Subsumed by user-created income accounts in v2.
 - **Expense** — reserved; no v1 shape posts to it. Seeded so v2 doesn't have to backfill.
 
-See [references/accounts.md](references/accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
+See [accounts.md](accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
 
 ### Commodities
 
 Currencies (CAD, USD, GBP, ...) and securities (VEQT, VFV, AAPL, ...) are represented uniformly as **commodities**. Each has a symbol, a display name, a kind (`currency` or `security`), a display precision, and — for securities — an exchange qualifier (`NASDAQ`, `TSX`, `OTC`, ...). All ISO 4217 currencies are seeded on initialisation and fully read-only; users only create securities. Symbol, exchange, and kind are immutable after creation; name and display precision are editable.
 
-See [references/commodities.md](references/commodities.md) for the full design: seeding, creation flow, the exchange qualifier, edit/delete rules, and the list/detail UI.
+See [commodities.md](commodities.md) for the full design: seeding, creation flow, the exchange qualifier, edit/delete rules, and the list/detail UI.
 
 ### Transactions
 
@@ -85,7 +80,7 @@ A transaction balances when, for each commodity, the sum of split **weights** in
 
 Splits are an implementation concept. Users never see the words "split" or "annotation" in v1.
 
-See [references/transactions.md](references/transactions.md) for the full design: shape↔storage-type mapping, worked examples for every shape, balance-entry reconciliation, edit/delete semantics, validation rules, and time/ordering semantics.
+See [transactions.md](transactions.md) for the full design: shape↔storage-type mapping, worked examples for every shape, balance-entry reconciliation, edit/delete semantics, validation rules, and time/ordering semantics.
 
 ### Balance entries
 
@@ -103,7 +98,7 @@ Prices come from two sources — **manual** entry and **transaction-linked** sid
 
 Prices are captured forward from when the user first tracks a commodity. New commodities need a price entered on the day they first appear in any transaction.
 
-See [references/commodities.md](references/commodities.md) for the full design: the source model, which transaction shapes create prices, carry-forward and chaining rules, collision handling, and the missing-price UX.
+See [commodities.md](commodities.md) for the full design: the source model, which transaction shapes create prices, carry-forward and chaining rules, collision handling, and the missing-price UX.
 
 ## Design principles
 
@@ -123,7 +118,7 @@ This is load-bearing for the household's relocation scenarios. Moving from Canad
 
 ### Beancount-style sign convention
 
-Split quantities follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases. For each commodity, the sum of split weights is zero (stock splits exempted). This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [references/accounts.md](references/accounts.md) and [references/transactions.md](references/transactions.md#sign-convention) for worked examples.
+Split quantities follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases. For each commodity, the sum of split weights is zero (stock splits exempted). This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [accounts.md](accounts.md) and [transactions.md](transactions.md#sign-convention) for worked examples.
 
 ### Single-position vs multi-position is UI-only
 
@@ -145,11 +140,11 @@ This suits a single-household tool where the user and the auditor are the same p
 
 ## Transaction shapes (user-facing)
 
-The UI exposes a small, closed set of shapes. Each shape is a template that produces a specific transaction structure behind the scenes. The full set for v1 is summarised below; see [references/transactions.md](references/transactions.md#transaction-shapes) for worked examples, validation rules, and the shape-availability matrix per account kind.
+The UI exposes a small, closed set of shapes. Each shape is a template that produces a specific transaction structure behind the scenes. The full set for v1 is summarised below; see [transactions.md](transactions.md#transaction-shapes) for worked examples, validation rules, and the shape-availability matrix per account kind.
 
 ### Opening balance
 
-Captures wealth that existed before tracking began. For single-position kinds (Cash, Credit Card, Loan, Other Liability, Other Asset) a single opening balance is captured at account creation. For Investment accounts an opening balance is captured per commodity via the *Add position* action on the account detail page — each position's opening balance is independent, one transaction per `(account, commodity)` pair. All opening balances produce a two-split transaction against `Equity:Opening Balances`. Opening-balance transactions are edited through dedicated per-account / per-position affordances, not through the generic transaction editor. See [references/accounts.md](references/accounts.md).
+Captures wealth that existed before tracking began. For single-position kinds (Cash, Credit Card, Loan, Other Liability, Other Asset) a single opening balance is captured at account creation. For Investment accounts an opening balance is captured per commodity via the *Add position* action on the account detail page — each position's opening balance is independent, one transaction per `(account, commodity)` pair. All opening balances produce a two-split transaction against `Equity:Opening Balances`. Opening-balance transactions are edited through dedicated per-account / per-position affordances, not through the generic transaction editor. See [accounts.md](accounts.md).
 
 ### Transfer
 
@@ -188,7 +183,7 @@ All derived from splits and prices at read time. None are cached at the data lay
 - **Net worth** (as of a date, in display currency): sum of asset-account values, less sum of liability-account values.
 - **Equity:Adjustments balance** (in display currency): surfaced in the UI as *"Unrecorded wealth changes."* Useful both as a running total and as a tracking-quality signal — a growing balance relative to explicit transactions means the user is relying more on reconciliation and less on itemisation.
 
-See [references/valuation.md](references/valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
+See [valuation.md](valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
 
 ## Distinctive UX decisions worth preserving
 
