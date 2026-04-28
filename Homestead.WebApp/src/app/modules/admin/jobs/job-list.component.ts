@@ -360,6 +360,7 @@ export class JobListComponent {
       case 'ReprocessDocumentVersion': return 'Reprocess Version';
       case 'BulkReprocessDocuments': return 'Bulk Reprocess';
       case 'DownloadDocuments': return 'Download Documents';
+      case 'NoOp': return 'No-op';
       default: return type;
     }
   }

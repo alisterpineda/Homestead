@@ -21,10 +21,10 @@ The module is a **job-execution engine** plus a **cron-style schedule emitter** 
 - One in-process worker (the WebApi itself) that claims pending jobs, runs them with bounded concurrency, and writes their terminal status back to the database.
 - A small, closed set of job **types** known to the worker, each backed by a handler class (see *Job catalog*).
 - A two-level **parent/child** hierarchy for fan-out work, with the parent's status derived from the aggregate of its children.
-- A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules can be system-attributed (no `CreatedByUserId`).
+- A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules can be system-attributed (no `CreatedByUserId`). Admins can create and delete schedules via `POST` / `DELETE /api/v1/admin/schedules`; the create endpoint is generic over `JobType` but currently allow-lists `NoOp` only.
 - Per-user, per-job real-time notifications over a SignalR hub. System-initiated runs (schedules with no creator) emit no SignalR — failures surface only in the admin job list.
 - A read-only HTTP endpoint that lists jobs, scoped to the caller's identity (admins see all jobs; non-admins see only their own).
-- An admin-only HTTP endpoint that lists schedules.
+- Admin-only HTTP endpoints to list, create, and delete schedules.
 - A best-effort orphaned-job recovery sweep at process startup.
 - Programmatic pause for tests and migrations: `IJobProcessorControl.PauseAsync()` returns an `IAsyncDisposable` that drains all worker permits. **Pause does not stop the scheduler** — schedules can still fire during a pause; jobs accumulate as Pending and drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false` via config.
 
@@ -191,7 +191,7 @@ This exists for **tests and for any future operation that needs the queue quiesc
 
 ## Job catalog
 
-The five v1 job types are all initiated by the Documents module. Each has a handler under `Modules/Documents/Processing/`.
+The v1 domain job types are all initiated by the Documents module. Each has a handler under `Modules/Documents/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
 
 ### `UploadDocument`
 
@@ -232,6 +232,10 @@ The only parent-job handler in v1. Triggered by the bulk-reprocess action on the
 Packages a set of documents into a ZIP for download. The handler reads metadata (document name, tag paths, party names, latest version's file path), builds an archive with collision-resolved entry paths via `IDownloadPathBuilder`, and writes the ZIP to a temp location keyed by `job.Id`. On success, the handler **rewrites the job's payload** to `DownloadResultPayload(zipFileSize, documentCount, expiresAt)` so the API can serve the result. Sets `EntityType = Download`. The ZIP expires after a fixed window; expired files are swept on the next download job.
 
 This is the only v1 job type whose `Payload` carries result data after completion — most jobs use `EntityId` to point back to the produced entity.
+
+### `NoOp`
+
+A trivial handler that returns immediately. Exists so the queue + scheduler pipelines can be smoke-tested end-to-end (cron tick → enqueue → worker dispatch → terminal status) without depending on any real domain handler — particularly useful for integration / E2E test scaffolding and for an admin verifying a deployment. Reads no payload, writes no DB rows, emits no SignalR. The processor still flips the row to `Completed` automatically, so admins see it land in the read-only job list. Lives at `Homestead.WebApi/Processing/NoOpJobHandler.cs` rather than under a module — it has no domain coupling.
 
 ## Design principles
 
@@ -286,7 +290,7 @@ A second `BackgroundService` (`JobSchedulerService`) ticks once per minute (conf
 
 **Pause behaviour:** `IJobProcessorControl.PauseAsync()` only pauses the *worker*. The scheduler keeps ticking and may queue Pending jobs during a pause; they drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false`.
 
-Schedules in v1 are populated only by migrations or future per-module endpoints. There is no public create/edit endpoint yet — the admin list is read-only.
+Schedules can be created and deleted via admin endpoints: `POST /api/v1/admin/schedules` and `DELETE /api/v1/admin/schedules/{id}`. The create endpoint is shaped generically over `JobType` but currently allow-lists `NoOp` only — relaxing this is additive when other recurring handlers come online. There is no update endpoint yet (toggling `IsEnabled` requires delete + recreate). Per-module CRUD with richer module-specific UX remains a future option (see *Future-compatibility*).
 
 ## Future-compatibility
 
@@ -295,7 +299,7 @@ The following must be addable without rewriting the tables or breaking existing 
 - **Retries with backoff** as an opt-in property of a job type. The `Error` column already stores the latest failure; adding `Attempt` / `MaxAttempts` / `NextAttemptAt` columns is the natural extension.
 - **Per-schedule retry/backoff for failed runs** — today a failed scheduled run is terminal; the next tick fires at the next normal occurrence. Adding a `RetryPolicy` column on `processing.schedules` (or job-type-level) is the natural place.
 - **Scheduled one-off jobs** (`RunAt` on `processing.jobs`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`. Distinct from recurring schedules: this would be "remind me in 10 minutes" semantics.
-- **Per-module schedule CRUD endpoints** — the admin list is the only schedule endpoint in v1. Per-module endpoints (e.g., `/api/v1/finances/schedules`) filter the same shared table by `JobType`, render module-friendly forms, and can manage their own seeded singletons.
+- **Per-module schedule CRUD endpoints** — the admin endpoints (`GET`/`POST`/`DELETE /api/v1/admin/schedules`) are the generic surface in v1; per-module endpoints (e.g., `/api/v1/finances/schedules`) would filter the same shared table by `JobType`, render module-friendly forms, and manage their own seeded singletons. The admin endpoint is intentionally minimal — schedule update / `IsEnabled` toggle and a `Payload` field on create are deliberate omissions to be added when there is a consumer that needs them.
 - **Per-schedule timezone honour** — `TimeZone` column already exists; v1 always treats it as `Etc/UTC`. Honouring it changes only the Cronos `GetNextOccurrence` call.
 - **Per-job-type concurrency caps** (e.g., one OCR at a time, but ten ZIPs at a time). Today's single semaphore would split into per-type semaphores.
 - **Cancel from the admin UI** — the worker would need to expose a per-job cancellation token, and the API would set a `CancelRequested` flag the worker checks.

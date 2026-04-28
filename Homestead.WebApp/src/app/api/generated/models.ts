@@ -36,6 +36,8 @@ export type { CreateGroupCommand } from './models/create-group-command';
 export type { CreateOpeningBalanceCommand } from './models/create-opening-balance-command';
 export type { CreatePartyCommand } from './models/create-party-command';
 export type { CreatePartyResponse } from './models/create-party-response';
+export type { CreateProcessingScheduleCommand } from './models/create-processing-schedule-command';
+export type { CreateProcessingScheduleResponse } from './models/create-processing-schedule-response';
 export type { CreateTagCommand } from './models/create-tag-command';
 export type { CreateTagResponse } from './models/create-tag-response';
 export type { CreateTextExtractionEngineCommand } from './models/create-text-extraction-engine-command';

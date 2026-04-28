@@ -129,6 +129,10 @@ export type { PatchSystemSettings$Params as PatchSystemSettings$Params } from '.
 export { patchSystemSettings as patchSystemSettings } from './fn/admin/patch-system-settings';
 export type { GetProcessingSchedules$Params as GetProcessingSchedules$Params } from './fn/admin/get-processing-schedules';
 export { getProcessingSchedules as getProcessingSchedules } from './fn/admin/get-processing-schedules';
+export type { CreateProcessingSchedule$Params as CreateProcessingSchedule$Params } from './fn/admin/create-processing-schedule';
+export { createProcessingSchedule as createProcessingSchedule } from './fn/admin/create-processing-schedule';
+export type { DeleteProcessingSchedule$Params as DeleteProcessingSchedule$Params } from './fn/admin/delete-processing-schedule';
+export { deleteProcessingSchedule as deleteProcessingSchedule } from './fn/admin/delete-processing-schedule';
 export type { GetAccounts$Params as GetAccounts$Params } from './fn/finances/get-accounts';
 export { getAccounts as getAccounts } from './fn/finances/get-accounts';
 export type { CreateAccount$Params as CreateAccount$Params } from './fn/finances/create-account';

@@ -6,5 +6,6 @@ public enum ProcessingJobType
     UploadDocumentVersion,
     ReprocessDocumentVersion,
     DownloadDocuments,
-    BulkReprocessDocuments
+    BulkReprocessDocuments,
+    NoOp
 }
