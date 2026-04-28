@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -16,8 +17,8 @@ public class GetOpeningBalancesHandler(
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
 
         var transactions = await db.AccountTransactions
+            .OfType<OpeningBalanceTransaction>()
             .AsNoTracking()
-            .Where(t => t.Description == OpeningBalanceTransactions.Description)
             .Where(t => t.Splits.Any(s => s.AccountId == request.AccountId))
             .Include(t => t.Splits)
             .ToListAsync(ct);

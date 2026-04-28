@@ -47,14 +47,30 @@ public class BalanceEntriesEndpointTests : IntegrationTestBase
                 commodityId = cad,
                 assertedAmount = 1500m,
                 date = "2026-04-25",
-                note = "End-of-month statement",
+                description = "End-of-month statement",
             }, CT);
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<BalanceEntryItem>(CT);
         Assert.Equal(1500m, body!.AssertedAmount);
         Assert.Equal(new DateOnly(2026, 4, 25), body.Date);
-        Assert.Equal("End-of-month statement", body.Note);
+        Assert.Equal("End-of-month statement", body.Description);
+    }
+
+    [Fact]
+    public async Task Create_BlankDescription_DefaultsToBalanceAssertion()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var cash = await CreateCashAccountAsync(client, cad, "Cash-BE-Default");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash}/balance-entries",
+            new { commodityId = cad, assertedAmount = 100m, date = "2026-04-25" }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<BalanceEntryItem>(CT);
+        Assert.Equal("Balance assertion", body!.Description);
     }
 
     [Fact]
@@ -197,5 +213,5 @@ public class BalanceEntriesEndpointTests : IntegrationTestBase
 
     private record BalanceEntryItem(
         Guid TransactionId, Guid AccountId, Guid CommodityId,
-        decimal AssertedAmount, DateOnly Date, string? Note);
+        decimal AssertedAmount, DateOnly Date, string Description);
 }

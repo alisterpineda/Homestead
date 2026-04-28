@@ -59,5 +59,4 @@ public record TransferDetails(
 public record BalanceEntryDetails(
     Guid AccountId,
     Guid AssertedCommodityId,
-    decimal AssertedAmount,
-    string? Note) : TransactionDetails;
+    decimal AssertedAmount) : TransactionDetails;

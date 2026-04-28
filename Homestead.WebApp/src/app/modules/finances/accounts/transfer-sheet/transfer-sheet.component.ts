@@ -19,6 +19,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso, toDateOnly } from '../../shared/date';
+import { trimToNull } from '../../shared/trim-to-null';
 import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { AccountPickerComponent } from '../../shared/account-picker/account-picker.component';
 import { of, catchError, switchMap } from 'rxjs';
@@ -332,7 +333,7 @@ export class TransferSheetComponent {
       sourceAmount,
       destinationAmount,
       date: this.date(),
-      description: this.description().trim() ? this.description().trim() : null,
+      description: trimToNull(this.description()),
     };
 
     const ex = this.existing();

@@ -20,7 +20,10 @@ public class PatchOpeningBalanceHandler(
             ?? throw new EntityNotFoundException("Opening balance not found for this account and commodity.");
 
         var transaction = await openingBalances.UpdateAsync(
-            existingTxnId, request.Quantity, request.ValuePerUnit, request.AsOfDate, ct);
+            existingTxnId,
+            new UpdateOpeningBalanceRequest(
+                request.Quantity, request.ValuePerUnit, request.AsOfDate, request.Description),
+            ct);
 
         await db.SaveChangesAsync(ct);
 

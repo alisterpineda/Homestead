@@ -15,6 +15,7 @@ public class TransactionValidator : ITransactionValidator
             case StockSplitTransaction:
                 ValidateStockSplit(transaction);
                 break;
+            case OpeningBalanceTransaction:
             case NormalTransaction:
                 ValidateNormal(transaction);
                 break;

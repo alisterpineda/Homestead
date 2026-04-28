@@ -19,6 +19,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
+import { trimToNull } from '../../shared/trim-to-null';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -108,6 +109,19 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
               />
             </div>
 
+            <div class="space-y-2">
+              <label hlmLabel for="opening-balance-description">Description (optional)</label>
+              <input
+                hlmInput
+                id="opening-balance-description"
+                class="w-full"
+                maxlength="512"
+                placeholder="e.g. Imported from prior tracker"
+                [value]="description()"
+                (input)="description.set(asValue($event))"
+              />
+            </div>
+
             @if (formError()) {
               <p class="text-sm text-destructive">{{ formError() }}</p>
             }
@@ -147,6 +161,7 @@ export class OpeningBalanceSheetComponent {
   quantity = signal('');
   unitPrice = signal('');
   asOfDate = signal(todayIso());
+  description = signal('');
   saving = signal(false);
   deleting = signal(false);
   formError = signal('');
@@ -204,10 +219,12 @@ export class OpeningBalanceSheetComponent {
         this.quantity.set(String(ex.quantity));
         this.asOfDate.set(ex.asOfDate);
         this.unitPrice.set(ex.valuePerUnit != null ? String(ex.valuePerUnit) : '');
+        this.description.set(ex.description);
       } else {
         this.quantity.set('');
         this.asOfDate.set(todayIso());
         this.unitPrice.set('');
+        this.description.set('');
       }
     });
   }
@@ -228,6 +245,8 @@ export class OpeningBalanceSheetComponent {
       ? Number(this.unitPrice())
       : null;
 
+    const trimmedDescription = trimToNull(this.description());
+
     const obs = this.mode() === 'edit' && ex
       ? this.txApi.patchOpeningBalance({
           accountId: a.id,
@@ -236,6 +255,7 @@ export class OpeningBalanceSheetComponent {
             quantity: Number(this.quantity()),
             valuePerUnit,
             asOfDate: this.asOfDate(),
+            description: trimmedDescription,
           },
         })
       : this.txApi.createOpeningBalance({
@@ -244,6 +264,7 @@ export class OpeningBalanceSheetComponent {
             commodityId: a.reportingCurrencyId,
             quantity: Number(this.quantity()),
             asOfDate: this.asOfDate(),
+            description: trimmedDescription,
           },
         });
 

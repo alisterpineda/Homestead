@@ -8,14 +8,13 @@ public interface IOpeningBalanceService
     /// Creates an opening-balance transaction for the given account-commodity pair.
     /// Does NOT call SaveChangesAsync; the caller owns the unit of work.
     /// </summary>
-    Task<AccountTransaction> CreateAsync(Guid accountId, Guid commodityId, decimal quantity,
-        decimal? valuePerUnit, DateOnly asOfDate, CancellationToken ct);
+    Task<AccountTransaction> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct);
 
     /// <summary>
     /// Updates an existing opening-balance transaction. Does NOT call SaveChangesAsync.
     /// </summary>
-    Task<AccountTransaction> UpdateAsync(Guid transactionId, decimal quantity,
-        decimal? valuePerUnit, DateOnly asOfDate, CancellationToken ct);
+    Task<AccountTransaction> UpdateAsync(Guid transactionId, UpdateOpeningBalanceRequest request,
+        CancellationToken ct);
 
     /// <summary>
     /// Deletes an opening-balance transaction. Does NOT call SaveChangesAsync.
@@ -25,3 +24,17 @@ public interface IOpeningBalanceService
     /// </summary>
     Task<IReadOnlyCollection<TouchedPair>> DeleteAsync(Guid transactionId, CancellationToken ct);
 }
+
+public record CreateOpeningBalanceRequest(
+    Guid AccountId,
+    Guid CommodityId,
+    decimal Quantity,
+    decimal? ValuePerUnit,
+    DateOnly AsOfDate,
+    string? Description = null);
+
+public record UpdateOpeningBalanceRequest(
+    decimal Quantity,
+    decimal? ValuePerUnit,
+    DateOnly AsOfDate,
+    string? Description = null);

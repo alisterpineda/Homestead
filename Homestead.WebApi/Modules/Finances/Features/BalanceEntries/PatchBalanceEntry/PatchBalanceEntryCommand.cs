@@ -9,5 +9,5 @@ public record PatchBalanceEntryCommand : IRequest<BalanceEntryResponse>
     public required Guid CommodityId { get; init; }
     public required decimal AssertedAmount { get; init; }
     public required DateOnly Date { get; init; }
-    public string? Note { get; init; }
+    public string? Description { get; init; }
 }

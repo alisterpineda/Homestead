@@ -30,11 +30,10 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var balanceEntry = new BalanceEntryTransaction
         {
             OccurredAt = occurredAt,
-            Description = "January statement",
+            Description = "From statement PDF",
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 1234.56m,
-            Note = "From statement PDF",
         };
         db.AccountTransactions.Add(balanceEntry);
         await db.SaveChangesAsync(CT);
@@ -48,7 +47,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         Assert.Equal(account.Id, loaded.AccountId);
         Assert.Equal(usd.Id, loaded.AssertedCommodityId);
         Assert.Equal(1234.56m, loaded.AssertedQuantity);
-        Assert.Equal("From statement PDF", loaded.Note);
+        Assert.Equal("From statement PDF", loaded.Description);
         Assert.Equal(occurredAt, loaded.OccurredAt);
 
         // Discriminator column persisted as the enum name, not its integer value.
@@ -57,6 +56,45 @@ public class AccountTransactionTphTests : IntegrationTestBase
             .SqlQuery<string>($"SELECT \"Type\" AS \"Value\" FROM finances.account_transactions WHERE \"Id\" = {balanceEntry.Id}")
             .SingleAsync(CT);
         Assert.Equal("BalanceEntry", storedType);
+    }
+
+    [Fact]
+    public async Task OpeningBalance_RoundTripsThroughTph()
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var usd = await db.Commodities.SingleAsync(c => c.Symbol == "USD", CT);
+        var account = await CreateAccountAsync(db, usd);
+
+        var openingBalance = new OpeningBalanceTransaction
+        {
+            OccurredAt = StartOfDayUtc(new DateOnly(2026, 1, 1)),
+            Description = "Imported from old tracker",
+        };
+        db.AccountTransactions.Add(openingBalance);
+        await db.SaveChangesAsync(CT);
+
+        // Round-trip via OfType<> on the base DbSet.
+        var loaded = await db.AccountTransactions
+            .OfType<OpeningBalanceTransaction>()
+            .SingleAsync(t => t.Id == openingBalance.Id, CT);
+
+        Assert.Equal(TransactionType.OpeningBalance, loaded.Type);
+        Assert.Equal("Imported from old tracker", loaded.Description);
+
+        // OpeningBalance is a sibling of NormalTransaction (not a subclass), so it must NOT
+        // be returned when the base DbSet is filtered to NormalTransaction.
+        var normalCount = await db.AccountTransactions
+            .OfType<NormalTransaction>()
+            .CountAsync(t => t.Id == openingBalance.Id, CT);
+        Assert.Equal(0, normalCount);
+
+        // Discriminator column persisted as the enum name.
+        var storedType = await db.Database
+            .SqlQuery<string>($"SELECT \"Type\" AS \"Value\" FROM finances.account_transactions WHERE \"Id\" = {openingBalance.Id}")
+            .SingleAsync(CT);
+        Assert.Equal("OpeningBalance", storedType);
     }
 
     [Fact]

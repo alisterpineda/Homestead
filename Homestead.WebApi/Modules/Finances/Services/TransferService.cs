@@ -126,10 +126,6 @@ public class TransferService(
         if (transaction is not NormalTransaction normal || normal.Splits.Count != 2)
             throw new BusinessRuleException("Transaction is not a transfer.");
 
-        if (normal.IsOpeningBalance())
-            throw new BusinessRuleException(
-                "Opening-balance transactions are edited via the opening-balance endpoints.");
-
         return normal;
     }
 
@@ -244,11 +240,8 @@ public class TransferService(
 
     private static DateTimeOffset ResolveOccurredAt(DateOnly date) => date.ToStartOfDayUtc();
 
-    private static string NormalizeDescription(string? description)
-    {
-        var trimmed = description?.Trim();
-        return string.IsNullOrEmpty(trimmed) ? DefaultDescription : trimmed;
-    }
+    private static string NormalizeDescription(string? description) =>
+        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
 
     private static IEnumerable<TouchedPair> TouchedFor(AccountTransaction transaction)
     {

@@ -11,9 +11,6 @@ public class BalanceEntryTransactionConfiguration : IEntityTypeConfiguration<Bal
         builder.Property(b => b.AssertedQuantity)
             .HasColumnType("numeric");
 
-        builder.Property(b => b.Note)
-            .HasMaxLength(1024);
-
         builder.HasOne(b => b.Account)
             .WithMany()
             .HasForeignKey(b => b.AccountId)

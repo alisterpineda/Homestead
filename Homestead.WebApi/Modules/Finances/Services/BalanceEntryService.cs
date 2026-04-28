@@ -13,7 +13,7 @@ public class BalanceEntryService(
     ITransactionValidator validator,
     IAuditContext audit) : IBalanceEntryService
 {
-    public const string DefaultDescription = "Balance assertion";
+    private const string DefaultDescription = "Balance assertion";
 
     public async Task<BalanceEntryMutationResult> CreateAsync(
         CreateBalanceEntryRequest request, CancellationToken ct)
@@ -38,12 +38,11 @@ public class BalanceEntryService(
         {
             Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
-            Description = DefaultDescription,
+            Description = NormalizeDescription(request.Description),
             Type = TransactionType.BalanceEntry,
             AccountId = account.Id,
             AssertedCommodityId = commodity.Id,
             AssertedQuantity = signedAsserted,
-            Note = NullIfBlank(request.Note),
             Splits =
             [
                 new AccountTransactionSplit
@@ -102,7 +101,7 @@ public class BalanceEntryService(
         entry.OccurredAt = newOccurredAt;
         entry.AssertedCommodityId = newCommodity.Id;
         entry.AssertedQuantity = signedAsserted;
-        entry.Note = NullIfBlank(request.Note);
+        entry.Description = NormalizeDescription(request.Description);
 
         // Re-bind splits to the (possibly-new) commodity. Reconciliation rewrites quantities.
         var adjustments = await systemAccounts.GetAdjustmentsAsync(ct);
@@ -207,9 +206,6 @@ public class BalanceEntryService(
     private static DateTimeOffset MinInstant(DateTimeOffset a, DateTimeOffset b) =>
         a < b ? a : b;
 
-    private static string? NullIfBlank(string? value)
-    {
-        var trimmed = value?.Trim();
-        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
-    }
+    private static string NormalizeDescription(string? description) =>
+        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
 }

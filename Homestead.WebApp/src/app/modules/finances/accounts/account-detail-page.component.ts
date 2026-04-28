@@ -460,7 +460,7 @@ export class AccountDetailPageComponent implements OnDestroy {
       commodityId: details.assertedCommodityId,
       assertedAmount: details.assertedAmount,
       date: toDateOnly(tx.occurredAt),
-      note: details.note ?? null,
+      description: tx.description,
     };
     this.balanceSheetMode.set('edit');
     this.balanceSheetExisting.set(existing);

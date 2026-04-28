@@ -7,6 +7,7 @@ public class PatchOpeningBalanceCommandValidator : AbstractValidator<PatchOpenin
 {
     public PatchOpeningBalanceCommandValidator()
     {
+        RuleFor(x => x.Description).MaximumLength(512);
         RuleFor(x => x.Quantity).GreaterThan(0m).WithMessage("Quantity must be positive.");
         RuleFor(x => x.ValuePerUnit).GreaterThan(0m)
             .When(x => x.ValuePerUnit.HasValue)

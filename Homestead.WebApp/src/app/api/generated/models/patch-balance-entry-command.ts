@@ -6,6 +6,6 @@ export interface PatchBalanceEntryCommand {
   assertedAmount: number;
   commodityId: string;
   date: string;
-  note?: (string | null);
+  description?: (string | null);
   transactionId?: string;
 }

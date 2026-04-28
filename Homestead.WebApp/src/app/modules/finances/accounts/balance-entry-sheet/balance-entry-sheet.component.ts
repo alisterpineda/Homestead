@@ -19,6 +19,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
+import { trimToNull } from '../../shared/trim-to-null';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
@@ -98,15 +99,15 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="balance-entry-note">Note (optional)</label>
+              <label hlmLabel for="balance-entry-description">Description (optional)</label>
               <input
                 hlmInput
-                id="balance-entry-note"
+                id="balance-entry-description"
                 class="w-full"
-                maxlength="1024"
+                maxlength="512"
                 placeholder="e.g. April statement"
-                [value]="note()"
-                (input)="note.set(asValue($event))"
+                [value]="description()"
+                (input)="description.set(asValue($event))"
               />
             </div>
 
@@ -148,7 +149,7 @@ export class BalanceEntrySheetComponent {
 
   amount = signal('');
   date = signal(todayIso());
-  note = signal('');
+  description = signal('');
   saving = signal(false);
   deleting = signal(false);
   formError = signal('');
@@ -196,12 +197,12 @@ export class BalanceEntrySheetComponent {
       if (this.mode() === 'edit' && ex) {
         this.amount.set(String(ex.assertedAmount));
         this.date.set(ex.date);
-        this.note.set(ex.note ?? '');
+        this.description.set(ex.description);
         activeCommodityId = ex.commodityId;
       } else {
         this.amount.set('');
         this.date.set(todayIso());
-        this.note.set('');
+        this.description.set('');
         activeCommodityId = a.reportingCurrencyId;
       }
       this.commodityId.set(activeCommodityId);
@@ -232,7 +233,7 @@ export class BalanceEntrySheetComponent {
       commodityId,
       assertedAmount: Number(this.amount()),
       date: this.date(),
-      note: this.note().trim() ? this.note().trim() : null,
+      description: trimToNull(this.description()),
     };
 
     const ex = this.existing();

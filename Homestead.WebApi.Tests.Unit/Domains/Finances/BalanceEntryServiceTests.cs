@@ -172,6 +172,53 @@ public class BalanceEntryServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Create_BlankDescription_FallsBackToBalanceAssertionDefault()
+    {
+        var cash = await AddAccountAsync(AccountKind.Cash);
+
+        var result = await _sut.CreateAsync(
+            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30), Description: null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("Balance assertion", result.Entry!.Description);
+    }
+
+    [Fact]
+    public async Task Create_NonBlankDescription_PersistsTrimmedValue()
+    {
+        var cash = await AddAccountAsync(AccountKind.Cash);
+
+        var result = await _sut.CreateAsync(
+            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30),
+                Description: "  March statement  "),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("March statement", result.Entry!.Description);
+    }
+
+    [Fact]
+    public async Task Update_ReplacesDescription()
+    {
+        var cash = await AddAccountAsync(AccountKind.Cash);
+
+        var created = await _sut.CreateAsync(
+            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30),
+                Description: "Initial"),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var updated = await _sut.UpdateAsync(created.Entry!.Id, cash.Id,
+            new UpdateBalanceEntryRequest(_cad.Id, 100m, new DateOnly(2026, 4, 30),
+                Description: "Updated"),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("Updated", updated.Entry!.Description);
+    }
+
+    [Fact]
     public async Task Reconciler_AfterMidChainTransferEdit_UpdatesDownstreamBalanceEntries()
     {
         var cash = await AddAccountAsync(AccountKind.Cash);

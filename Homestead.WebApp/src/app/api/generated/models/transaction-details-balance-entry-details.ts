@@ -6,5 +6,4 @@ export interface TransactionDetailsBalanceEntryDetails {
   assertedAmount: number;
   assertedCommodityId: string;
   kind?: 'balanceEntry';
-  note: (string | null);
 }

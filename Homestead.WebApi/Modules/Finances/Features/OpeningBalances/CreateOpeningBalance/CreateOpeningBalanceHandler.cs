@@ -13,8 +13,10 @@ public class CreateOpeningBalanceHandler(
     public async Task<OpeningBalanceResponse> Handle(CreateOpeningBalanceCommand request, CancellationToken ct)
     {
         var transaction = await openingBalances.CreateAsync(
-            request.AccountId, request.CommodityId, request.Quantity,
-            request.ValuePerUnit, request.AsOfDate, ct);
+            new CreateOpeningBalanceRequest(
+                request.AccountId, request.CommodityId, request.Quantity,
+                request.ValuePerUnit, request.AsOfDate, request.Description),
+            ct);
 
         await db.SaveChangesAsync(ct);
 

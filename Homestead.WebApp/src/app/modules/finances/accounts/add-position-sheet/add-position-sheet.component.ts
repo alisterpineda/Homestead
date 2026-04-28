@@ -19,6 +19,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
+import { trimToNull } from '../../shared/trim-to-null';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
@@ -113,6 +114,19 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               />
             </div>
 
+            <div class="space-y-2">
+              <label hlmLabel for="add-position-description">Description (optional)</label>
+              <input
+                hlmInput
+                id="add-position-description"
+                class="w-full"
+                maxlength="512"
+                placeholder="e.g. Carried over from old broker"
+                [value]="description()"
+                (input)="description.set(asValue($event))"
+              />
+            </div>
+
             @if (formError()) {
               <p class="text-sm text-destructive">{{ formError() }}</p>
             }
@@ -143,6 +157,7 @@ export class AddPositionSheetComponent {
   quantity = signal('');
   unitPrice = signal('');
   asOfDate = signal(todayIso());
+  description = signal('');
   saving = signal(false);
   formError = signal('');
 
@@ -178,6 +193,7 @@ export class AddPositionSheetComponent {
       this.quantity.set('');
       this.unitPrice.set('');
       this.asOfDate.set(todayIso());
+      this.description.set('');
       this.saving.set(false);
       this.formError.set('');
     });
@@ -206,6 +222,8 @@ export class AddPositionSheetComponent {
       ? Number(this.unitPrice())
       : null;
 
+    const trimmedDescription = trimToNull(this.description());
+
     this.txApi.createOpeningBalance({
       accountId: a.id,
       body: {
@@ -213,6 +231,7 @@ export class AddPositionSheetComponent {
         quantity: Number(this.quantity()),
         valuePerUnit,
         asOfDate: this.asOfDate(),
+        description: trimmedDescription,
       },
     }).pipe(
       handleMutationError(this.errorHandler, this.saving, 'Failed to add position.'),

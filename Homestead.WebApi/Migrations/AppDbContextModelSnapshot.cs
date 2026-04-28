@@ -981,10 +981,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<decimal>("AssertedQuantity")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("Note")
-                        .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
-
                     b.HasIndex("AssertedCommodityId");
 
                     b.HasIndex("AccountId", "OccurredAt")
@@ -1002,6 +998,13 @@ namespace Homestead.WebApi.Migrations
                     b.HasBaseType("Homestead.WebApi.Domain.Finances.AccountTransaction");
 
                     b.HasDiscriminator().HasValue("Normal");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.OpeningBalanceTransaction", b =>
+                {
+                    b.HasBaseType("Homestead.WebApi.Domain.Finances.AccountTransaction");
+
+                    b.HasDiscriminator().HasValue("OpeningBalance");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.StockSplitTransaction", b =>

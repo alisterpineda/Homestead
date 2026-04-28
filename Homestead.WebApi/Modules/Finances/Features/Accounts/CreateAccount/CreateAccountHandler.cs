@@ -48,8 +48,10 @@ public class CreateAccountHandler(
         if (request.InitialBalance is { Amount: > 0 } initial)
         {
             await openingBalances.CreateAsync(
-                account.Id, account.ReportingCurrencyId, initial.Amount,
-                valuePerUnit: null, initial.AsOfDate, ct);
+                new CreateOpeningBalanceRequest(
+                    account.Id, account.ReportingCurrencyId, initial.Amount,
+                    ValuePerUnit: null, initial.AsOfDate),
+                ct);
         }
 
         await db.SaveChangesAsync(ct);

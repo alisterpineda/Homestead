@@ -283,8 +283,8 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var openingBalanceCount = await db.AccountTransactions
-            .CountAsync(t => t.Description == OpeningBalanceTransactions.Description
-                          && t.Splits.Any(s => s.AccountId == cash.Id), CT);
+            .OfType<OpeningBalanceTransaction>()
+            .CountAsync(t => t.Splits.Any(s => s.AccountId == cash.Id), CT);
         Assert.Equal(0, openingBalanceCount);
 
         var adjustments = await db.Accounts.SingleAsync(
@@ -295,7 +295,131 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         Assert.Equal(-1500m, adjustmentsBalance);
     }
 
+    [Fact]
+    public async Task Create_WithDescription_RoundTripsThroughResponse()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+        var accountId = await CreateInvestmentAccountAsync(client, usdId, "Desc-create");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new
+            {
+                commodityId = usdId,
+                quantity = 1000m,
+                asOfDate = "2026-04-23",
+                description = "Imported from old tracker",
+            }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
+        Assert.Equal("Imported from old tracker", body!.Description);
+    }
+
+    [Fact]
+    public async Task Create_BlankDescription_DefaultsToOpeningBalance()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+        var accountId = await CreateInvestmentAccountAsync(client, usdId, "Desc-default");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new { commodityId = usdId, quantity = 1000m, asOfDate = "2026-04-23" }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
+        Assert.Equal("Opening balance", body!.Description);
+    }
+
+    [Fact]
+    public async Task Patch_UpdatesDescription()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+        var accountId = await CreateInvestmentAccountAsync(client, usdId, "Desc-patch");
+
+        await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new { commodityId = usdId, quantity = 1000m, asOfDate = "2026-04-23" }, CT);
+
+        var patchResp = await client.PatchAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}",
+            new
+            {
+                quantity = 1000m,
+                asOfDate = "2026-04-23",
+                description = "Edited via PATCH",
+            }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var body = await patchResp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
+        Assert.Equal("Edited via PATCH", body!.Description);
+    }
+
+    // Discriminator regression: before the TPH refactor, opening balances were identified by
+    // the literal description string "Opening balance". Editing the description to anything
+    // else would have broken Get / Patch / Delete and made the row vanish from shape filters.
+    // This test pins the new behavior where TPH (Type column / OfType<OpeningBalanceTransaction>)
+    // is the structural identifier.
+    [Fact]
+    public async Task EditDescription_DoesNotBreakDiscriminatorLookups()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+        var accountId = await CreateInvestmentAccountAsync(client, usdId, "Desc-discriminator");
+
+        await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new { commodityId = usdId, quantity = 1000m, asOfDate = "2026-04-23" }, CT);
+
+        var patchResp = await client.PatchAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}",
+            new
+            {
+                quantity = 1000m,
+                asOfDate = "2026-04-23",
+                description = "Renamed to something arbitrary",
+            }, CT);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+
+        // The single-position GET still locates the row.
+        var getResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}", CT);
+        Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
+        var got = await getResp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
+        Assert.Equal("Renamed to something arbitrary", got!.Description);
+
+        // Listing the account's opening balances still includes the renamed row.
+        var listResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances", CT);
+        Assert.Equal(HttpStatusCode.OK, listResp.StatusCode);
+        var items = await listResp.Content.ReadFromJsonAsync<List<OpeningBalanceItem>>(CT);
+        Assert.Single(items!);
+        Assert.Equal("Renamed to something arbitrary", items![0].Description);
+
+        // Filtering the generic transactions endpoint by TransactionShape.OpeningBalance still
+        // returns it — proving the shape filter is type-driven, not description-driven.
+        var shapeResp = await client.GetAsync(
+            $"/api/v1/finances/transactions?accountId={accountId}&shape=OpeningBalance&page=1&pageSize=25", CT);
+        Assert.Equal(HttpStatusCode.OK, shapeResp.StatusCode);
+        var shapeBody = await shapeResp.Content.ReadFromJsonAsync<TransactionPage>(CT);
+        Assert.Equal(1, shapeBody!.TotalCount);
+        Assert.Equal("Renamed to something arbitrary", shapeBody.Items[0].Description);
+        Assert.Equal("OpeningBalance", shapeBody.Items[0].Shape);
+
+        // Delete still finds the row by (account, commodity).
+        var delResp = await client.DeleteAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}", CT);
+        Assert.Equal(HttpStatusCode.NoContent, delResp.StatusCode);
+    }
+
     private record OpeningBalanceItem(
-        Guid TransactionId, Guid AccountId, Guid CommodityId,
+        Guid TransactionId, Guid AccountId, Guid CommodityId, string Description,
         decimal Quantity, decimal? ValuePerUnit, DateOnly AsOfDate);
+
+    private record TransactionPage(int Page, int PageSize, int TotalCount, List<TransactionItem> Items);
+
+    private record TransactionItem(Guid Id, string Shape, string Description);
 }

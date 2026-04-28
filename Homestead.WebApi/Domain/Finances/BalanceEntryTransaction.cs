@@ -9,6 +9,4 @@ public class BalanceEntryTransaction : AccountTransaction
     public Commodity AssertedCommodity { get; set; } = null!;
 
     public decimal AssertedQuantity { get; set; }
-
-    public string? Note { get; set; }
 }

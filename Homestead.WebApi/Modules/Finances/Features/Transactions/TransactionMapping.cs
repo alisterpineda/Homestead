@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Finances;
-using Homestead.WebApi.Modules.Finances.Services;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions;
 
@@ -37,7 +36,7 @@ internal static class TransactionMapping
     {
         BalanceEntryTransaction => TransactionShape.BalanceEntry,
         StockSplitTransaction => TransactionShape.StockSplit,
-        NormalTransaction normal when normal.IsOpeningBalance() => TransactionShape.OpeningBalance,
+        OpeningBalanceTransaction => TransactionShape.OpeningBalance,
         NormalTransaction { Splits.Count: 2 } => TransactionShape.Transfer,
         _ => TransactionShape.Other,
     };
@@ -48,8 +47,7 @@ internal static class TransactionMapping
             BalanceEntryTransaction be => new BalanceEntryDetails(
                 be.AccountId,
                 be.AssertedCommodityId,
-                be.AssertedQuantity,
-                be.Note),
+                be.AssertedQuantity),
             NormalTransaction normal when shape == TransactionShape.Transfer =>
                 BuildTransferDetails(normal),
             _ => null,

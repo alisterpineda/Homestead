@@ -1,6 +1,5 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
-using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -63,22 +62,14 @@ public class GetTransactionsHandler(AppDbContext db)
     }
 
     private static IQueryable<AccountTransaction> ApplyShapeFilter(
-        IQueryable<AccountTransaction> query, TransactionShape shape)
+        IQueryable<AccountTransaction> query, TransactionShape shape) => shape switch
     {
-        // Use the literal description here rather than the IsOpeningBalance helper because EF
-        // can translate a direct equality comparison but not the helper method.
-        var openingBalance = OpeningBalanceTransactions.Description;
-        return shape switch
-        {
-            TransactionShape.BalanceEntry => query.OfType<BalanceEntryTransaction>(),
-            TransactionShape.StockSplit => query.OfType<StockSplitTransaction>(),
-            TransactionShape.OpeningBalance => query
-                .OfType<NormalTransaction>()
-                .Where(t => t.Description == openingBalance),
-            TransactionShape.Transfer => query
-                .OfType<NormalTransaction>()
-                .Where(t => t.Description != openingBalance),
-            _ => query,
-        };
-    }
+        TransactionShape.BalanceEntry => query.OfType<BalanceEntryTransaction>(),
+        TransactionShape.StockSplit => query.OfType<StockSplitTransaction>(),
+        TransactionShape.OpeningBalance => query.OfType<OpeningBalanceTransaction>(),
+        // Mirrors TransactionMapping.ResolveShape: a NormalTransaction is only classified as
+        // Transfer when it has exactly two splits. Any other split count maps to Other.
+        TransactionShape.Transfer => query.OfType<NormalTransaction>().Where(t => t.Splits.Count == 2),
+        _ => query,
+    };
 }

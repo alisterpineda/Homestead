@@ -14,29 +14,30 @@ public class OpeningBalanceService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : IOpeningBalanceService
 {
-    public async Task<AccountTransaction> CreateAsync(Guid accountId, Guid commodityId, decimal quantity,
-        decimal? valuePerUnit, DateOnly asOfDate, CancellationToken ct)
-    {
-        var account = await FindAccountAsync(accountId, ct);
-        AccountWritability.EnsureUserWritable(account);
-        ValidateCommodityForAccount(account, commodityId);
+    private const string DefaultDescription = "Opening balance";
 
-        var commodity = await db.Commodities.FindAsync([commodityId], ct)
+    public async Task<AccountTransaction> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct)
+    {
+        var account = await FindAccountAsync(request.AccountId, ct);
+        AccountWritability.EnsureUserWritable(account);
+        ValidateCommodityForAccount(account, request.CommodityId);
+
+        var commodity = await db.Commodities.FindAsync([request.CommodityId], ct)
             ?? throw new BusinessRuleException("Commodity not found.");
 
-        await EnsureNoExistingOpeningBalanceAsync(accountId, commodityId, ct);
+        await EnsureNoExistingOpeningBalanceAsync(request.AccountId, request.CommodityId, ct);
 
-        var occurredAt = ResolveOccurredAt(account, asOfDate);
+        var occurredAt = ResolveOccurredAt(account, request.AsOfDate);
         var transactionId = Guid.NewGuid();
 
-        var signedQuantity = account.AccountType.ApplySign(quantity);
+        var signedQuantity = account.AccountType.ApplySign(request.Quantity);
         var openingBalances = await systemAccounts.GetOpeningBalancesAsync(ct);
 
         var accountSplit = new AccountTransactionSplit
         {
             Id = Guid.NewGuid(),
-            AccountId = accountId,
-            CommodityId = commodityId,
+            AccountId = request.AccountId,
+            CommodityId = request.CommodityId,
             Quantity = signedQuantity,
         };
         var equitySplit = new AccountTransactionSplit
@@ -45,14 +46,14 @@ public class OpeningBalanceService(
             AccountId = openingBalances.Id,
         };
 
-        ApplyShape(account, commodity, valuePerUnit, accountSplit, equitySplit);
+        ApplyShape(account, commodity, request.ValuePerUnit, accountSplit, equitySplit);
 
-        var transaction = new NormalTransaction
+        var transaction = new OpeningBalanceTransaction
         {
             Id = transactionId,
             OccurredAt = occurredAt,
-            Description = OpeningBalanceTransactions.Description,
-            Type = TransactionType.Normal,
+            Description = NormalizeDescription(request.Description),
+            Type = TransactionType.OpeningBalance,
             Splits = [accountSplit, equitySplit],
         };
 
@@ -66,16 +67,14 @@ public class OpeningBalanceService(
         return transaction;
     }
 
-    public async Task<AccountTransaction> UpdateAsync(Guid transactionId, decimal quantity,
-        decimal? valuePerUnit, DateOnly asOfDate, CancellationToken ct)
+    public async Task<AccountTransaction> UpdateAsync(Guid transactionId, UpdateOpeningBalanceRequest request,
+        CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
+            .OfType<OpeningBalanceTransaction>()
             .Include(t => t.Splits)
             .FirstOrDefaultAsync(t => t.Id == transactionId, ct)
             ?? throw new EntityNotFoundException("Opening-balance transaction not found.");
-
-        if (!transaction.IsOpeningBalance())
-            throw new BusinessRuleException("Transaction is not an opening balance.");
 
         var openingBalances = await systemAccounts.GetOpeningBalancesAsync(ct);
         var (accountSplit, equitySplit) = SplitOpeningBalance(transaction, openingBalances.Id);
@@ -83,7 +82,7 @@ public class OpeningBalanceService(
         var account = await FindAccountAsync(accountSplit.AccountId, ct);
         AccountWritability.EnsureUserWritable(account);
 
-        var newOccurredAt = ResolveOccurredAt(account, asOfDate);
+        var newOccurredAt = ResolveOccurredAt(account, request.AsOfDate);
 
         if (newOccurredAt != transaction.OccurredAt)
             await EnsureOpeningBalanceRemainsEarliestAsync(account.Id, accountSplit.CommodityId,
@@ -96,10 +95,11 @@ public class OpeningBalanceService(
             transaction, "AccountTransaction", transaction.Id);
 
         transaction.OccurredAt = newOccurredAt;
+        transaction.Description = NormalizeDescription(request.Description);
 
-        accountSplit.Quantity = account.AccountType.ApplySign(quantity);
+        accountSplit.Quantity = account.AccountType.ApplySign(request.Quantity);
 
-        ApplyShape(account, commodity, valuePerUnit, accountSplit, equitySplit);
+        ApplyShape(account, commodity, request.ValuePerUnit, accountSplit, equitySplit);
 
         validator.Validate(transaction);
 
@@ -111,12 +111,10 @@ public class OpeningBalanceService(
     public async Task<IReadOnlyCollection<TouchedPair>> DeleteAsync(Guid transactionId, CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
+            .OfType<OpeningBalanceTransaction>()
             .Include(t => t.Splits)
             .FirstOrDefaultAsync(t => t.Id == transactionId, ct)
             ?? throw new EntityNotFoundException("Opening-balance transaction not found.");
-
-        if (!transaction.IsOpeningBalance())
-            throw new BusinessRuleException("Transaction is not an opening balance.");
 
         var touched = transaction.Splits
             .Select(s => new TouchedPair(s.AccountId, s.CommodityId, transaction.OccurredAt))
@@ -125,7 +123,7 @@ public class OpeningBalanceService(
         await linkedPrices.AuditCascadeDeletesAsync(transactionId, ct);
 
         db.AccountTransactions.Remove(transaction);
-        audit.Deleted("AccountTransaction", transaction.Id, OpeningBalanceTransactions.Description);
+        audit.Deleted("AccountTransaction", transaction.Id, transaction.Description);
 
         return touched;
     }
@@ -152,6 +150,9 @@ public class OpeningBalanceService(
             throw new BusinessRuleException(
                 "An opening balance already exists for this account and commodity. Edit it instead.");
     }
+
+    private static string NormalizeDescription(string? description) =>
+        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
 
     private async Task EnsureOpeningBalanceRemainsEarliestAsync(Guid accountId, Guid commodityId,
         Guid openingBalanceTransactionId, DateTimeOffset newOccurredAt, CancellationToken ct)

@@ -6,6 +6,6 @@ export interface BalanceEntryResponse {
   assertedAmount: number;
   commodityId: string;
   date: string;
-  note?: (string | null);
+  description: string;
   transactionId: string;
 }

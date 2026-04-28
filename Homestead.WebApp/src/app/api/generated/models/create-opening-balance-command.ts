@@ -5,6 +5,7 @@ export interface CreateOpeningBalanceCommand {
   accountId?: string;
   asOfDate: string;
   commodityId: string;
+  description?: (string | null);
   quantity: number;
   valuePerUnit?: (number | null);
 }

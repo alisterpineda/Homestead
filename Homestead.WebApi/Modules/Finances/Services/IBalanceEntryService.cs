@@ -31,13 +31,13 @@ public record CreateBalanceEntryRequest(
     Guid CommodityId,
     decimal AssertedAmount,
     DateOnly Date,
-    string? Note);
+    string? Description);
 
 public record UpdateBalanceEntryRequest(
     Guid CommodityId,
     decimal AssertedAmount,
     DateOnly Date,
-    string? Note);
+    string? Description);
 
 public record BalanceEntryMutationResult(
     BalanceEntryTransaction? Entry,
