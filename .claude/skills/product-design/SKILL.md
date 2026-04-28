@@ -1,6 +1,11 @@
 ---
 name: product-design
-description: Product-level requirements and design decisions for Homestead — a self-hosted single-household suite covering the Documents and Finances user-facing modules plus the cross-cutting Processing (background-job) infrastructure. Consult this before designing, implementing, modifying, or reviewing any user-facing functionality, API contract, schema, UX flow in those modules, or any change that touches the background-job queue (new job types, handlers, parent/child fan-out, SignalR notification semantics). The top-level file routes to per-module references; load the module overview plus any deep-dive that matches the area you are touching. Use this even when the work seems adjacent — naming conventions, scope boundaries, sign conventions, audit behaviour, queue guarantees, and forward-compatibility guarantees should all be reconciled against the module reference first.
+# Editor note: keep this description concise and generic. Do NOT expand it with
+# module-specific details, lists, or examples when adding content to the body or
+# new module references — the description is for skill-matching, not summarising
+# the skill's contents. Prefer rewriting over appending. Module specifics belong
+# in the body and references, not here.
+description: Product-level requirements and design decisions for Homestead's modules — what each should do and the constraints that shape it. Consult before designing, implementing, modifying, or reviewing module functionality, API contracts, schemas, UX flows, or cross-module behaviour. The top-level file routes to per-module references — load the module overview plus any deep-dive matching the area you're touching.
 ---
 
 # Homestead — Product Design
