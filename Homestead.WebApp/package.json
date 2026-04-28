@@ -41,6 +41,8 @@
     "@tanstack/angular-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "echarts": "^6.0.0",
+    "ngx-echarts": "^21.0.0",
     "ngx-scrollbar": "^19.1.4",
     "rxjs": "~7.8.0",
     "tailwind-merge": "^3.5.0",

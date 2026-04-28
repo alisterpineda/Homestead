@@ -121,7 +121,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             </p>
             @if (settingsService.hasDisplayCurrency()) {
               <p class="text-xs text-muted-foreground">
-                In {{ settingsService.displayCurrency()?.symbol }}, computed across {{ visibleAccounts().length }} active account{{ visibleAccounts().length === 1 ? '' : 's' }}.
+                In {{ settingsService.displayCurrency()?.symbol }}, computed across {{ nonSystemAccounts().length }} account{{ nonSystemAccounts().length === 1 ? '' : 's' }}.
               </p>
             }
           </section>
@@ -219,6 +219,7 @@ export class AccountListPageComponent implements OnDestroy {
   );
 
   visibleAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem && !a.isArchived));
+  nonSystemAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem));
   archivedCount = computed(() => (this.data() ?? []).filter(a => !a.isSystem && a.isArchived).length);
 
   accountsByKind = computed<Partial<Record<string, AccountResponse[]>>>(() => {
@@ -235,7 +236,7 @@ export class AccountListPageComponent implements OnDestroy {
   netWorthText = computed(() => {
     const dc = this.settingsService.displayCurrency();
     if (!dc) return null;
-    return formatCurrency(netWorth(this.visibleAccounts()), dc);
+    return formatCurrency(netWorth(this.nonSystemAccounts()), dc);
   });
 
   constructor() {

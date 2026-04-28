@@ -24,6 +24,7 @@ using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBa
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalances;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.DeleteTransaction;
@@ -99,6 +100,9 @@ public static class FinancesModule
         var settings = v1.MapGroup("/settings");
         GetFinanceSettingsEndpoint.Map(settings);
         PatchFinanceSettingsEndpoint.Map(settings);
+
+        var reports = v1.MapGroup("/reports");
+        GetNetWorthHistoryEndpoint.Map(reports);
 
         return app;
     }

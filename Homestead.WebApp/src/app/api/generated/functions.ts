@@ -191,3 +191,5 @@ export type { GetFinanceSettings$Params as GetFinanceSettings$Params } from './f
 export { getFinanceSettings as getFinanceSettings } from './fn/finances/get-finance-settings';
 export type { PatchFinanceSettings$Params as PatchFinanceSettings$Params } from './fn/finances/patch-finance-settings';
 export { patchFinanceSettings as patchFinanceSettings } from './fn/finances/patch-finance-settings';
+export type { GetNetWorthHistory$Params as GetNetWorthHistory$Params } from './fn/finances/get-net-worth-history';
+export { getNetWorthHistory as getNetWorthHistory } from './fn/finances/get-net-worth-history';

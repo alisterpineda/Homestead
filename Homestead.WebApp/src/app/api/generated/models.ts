@@ -58,6 +58,7 @@ export type { GetDocumentVersionDto } from './models/get-document-version-dto';
 export type { GetDocumentVersionResponse } from './models/get-document-version-response';
 export type { GetDocumentVersionsResponse } from './models/get-document-versions-response';
 export type { GetMyGroupsResponse } from './models/get-my-groups-response';
+export type { GetNetWorthHistoryResponse } from './models/get-net-worth-history-response';
 export type { GetPartiesResponse } from './models/get-parties-response';
 export type { GetPartyResponse } from './models/get-party-response';
 export type { GetProcessingJobsResponse } from './models/get-processing-jobs-response';
@@ -72,6 +73,9 @@ export type { HttpValidationProblemDetails } from './models/http-validation-prob
 export type { IFormFile } from './models/i-form-file';
 export type { InitialBalanceInput } from './models/initial-balance-input';
 export type { JsonPatchDocument } from './models/json-patch-document';
+export type { NetWorthGranularity } from './models/net-worth-granularity';
+export type { NetWorthHistoryPoint } from './models/net-worth-history-point';
+export type { NetWorthRange } from './models/net-worth-range';
 export type { OpeningBalanceResponse } from './models/opening-balance-response';
 export type { OperationAuthorizationRequirement } from './models/operation-authorization-requirement';
 export type { PaginatedResponseOfAccountResponse } from './models/paginated-response-of-account-response';

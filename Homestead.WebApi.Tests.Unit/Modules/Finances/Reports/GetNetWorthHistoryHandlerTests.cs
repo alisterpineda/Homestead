@@ -1,0 +1,342 @@
+using System.Text.Json;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
+using Homestead.WebApi.Modules.Finances.Features.Settings;
+using Homestead.WebApi.Modules.Finances.Services;
+
+namespace Homestead.WebApi.Tests.Unit.Modules.Finances.Reports;
+
+public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
+{
+    private TestAppDbContext _db = null!;
+    private ValuationService _valuations = null!;
+    private GetNetWorthHistoryHandler _sut = null!;
+
+    private Commodity _cad = null!;
+    private Commodity _usd = null!;
+    private Commodity _veqt = null!;
+
+    public async ValueTask InitializeAsync()
+    {
+        _db = TestAppDbContext.Create();
+        _cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "CAD", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
+        _usd = new Commodity { Id = Guid.NewGuid(), Symbol = "USD", Name = "USD", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
+        _veqt = new Commodity { Id = Guid.NewGuid(), Symbol = "VEQT", Exchange = "TSX", Name = "VEQT", Kind = CommodityKind.Security, DisplayPrecision = 4 };
+        _db.Commodities.AddRange(_cad, _usd, _veqt);
+        await _db.SaveChangesAsync();
+
+        _valuations = new ValuationService(_db);
+        _sut = new GetNetWorthHistoryHandler(_db, _valuations);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _db.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private async Task SetDisplayCurrencyAsync(Guid commodityId)
+    {
+        var json = JsonSerializer.Serialize(new FinanceSettings { DisplayCurrencyId = commodityId }, FieldChange.JsonOptions);
+        _db.AppSettings.Add(new AppSetting
+        {
+            Key = AppSetting.FinancesModule,
+            Value = json,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    private async Task AddPriceAsync(Guid commodityId, Guid quoteId, decimal rate, DateTimeOffset priceAt)
+    {
+        _db.CommodityPrices.Add(new CommodityPrice
+        {
+            Id = Guid.NewGuid(),
+            CommodityId = commodityId,
+            QuoteCurrencyId = quoteId,
+            Rate = rate,
+            PriceAt = priceAt,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    private async Task<Account> AddAccountAsync(
+        AccountKind kind, Guid reportingCurrencyId, string name = "Acct", bool archived = false, bool system = false)
+    {
+        var account = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            AccountType = system ? AccountType.Equity : kind.ToAccountType(),
+            Kind = system ? null : kind,
+            ReportingCurrencyId = reportingCurrencyId,
+            IsSystem = system,
+            IsArchived = archived,
+        };
+        _db.Accounts.Add(account);
+        await _db.SaveChangesAsync();
+        return account;
+    }
+
+    private async Task AddSplitAsync(
+        Guid accountId, Guid commodityId, decimal quantity, DateTimeOffset occurredAt,
+        TransactionType type = TransactionType.Normal)
+    {
+        AccountTransaction txn = type switch
+        {
+            TransactionType.OpeningBalance => new OpeningBalanceTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "ob", Type = type },
+            TransactionType.BalanceEntry => new BalanceEntryTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "be", Type = type, AssertedQuantity = 0m, AssertedCommodityId = commodityId },
+            TransactionType.StockSplit => new StockSplitTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "ss", Type = type },
+            _ => new NormalTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "txn", Type = type },
+        };
+        _db.AccountTransactions.Add(txn);
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = txn.Id,
+            AccountId = accountId,
+            CommodityId = commodityId,
+            Quantity = quantity,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task EmptyDb_ReturnsNoTransactionsReason()
+    {
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(new GetNetWorthHistoryQuery(), Ct);
+
+        Assert.Equal("no_transactions", resp.Reason);
+        Assert.Empty(resp.Points);
+        Assert.Null(resp.From);
+        Assert.False(resp.HasUnpriced);
+        Assert.Equal(_cad.Id, resp.DisplayCurrencyId);
+        Assert.Equal("CAD", resp.DisplayCurrencySymbol);
+    }
+
+    [Fact]
+    public async Task NoDisplayCurrency_ReturnsNoDisplayCurrencyReason()
+    {
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, DateTimeOffset.UtcNow.AddDays(-1));
+
+        var resp = await _sut.Handle(new GetNetWorthHistoryQuery(), Ct);
+
+        Assert.Equal("no_display_currency", resp.Reason);
+        Assert.Empty(resp.Points);
+        Assert.Null(resp.DisplayCurrencyId);
+        Assert.Null(resp.DisplayCurrencySymbol);
+    }
+
+    [Fact]
+    public async Task SingleAccountDailyRange_BucketsReflectRunningBalance()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        // Three deposits across the range.
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 15, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 25m, new DateTimeOffset(2026, 4, 25, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        Assert.Null(resp.Reason);
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+        // Last point reflects the full running total.
+        Assert.Equal(175m, resp.Points[^1].Value);
+        // 1M range clamps `from` to the earliest activity (2026-04-05) per the design-doc
+        // rule that charts begin from the user's earliest recorded event.
+        Assert.Equal(new DateTime(2026, 4, 5), resp.Points[0].AsOf.UtcDateTime.Date);
+        Assert.Equal(100m, resp.Points[0].Value);
+        // Point on 2026-04-20 reflects first two splits.
+        var apr20 = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 20));
+        Assert.Equal(150m, apr20.Value);
+    }
+
+    [Fact]
+    public async Task MultiCurrencyAccounts_ConvertsToDisplayCurrency()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cad = await AddAccountAsync(AccountKind.Cash, _cad.Id, "CADcash");
+        var usd = await AddAccountAsync(AccountKind.Cash, _usd.Id, "USDcash");
+        await AddSplitAsync(cad.Id, _cad.Id, 1000m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(usd.Id, _usd.Id, 500m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.30m, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        // 1000 CAD + 500 USD * 1.30 = 1650 CAD
+        Assert.Equal(1650m, resp.Points[^1].Value);
+        Assert.False(resp.HasUnpriced);
+    }
+
+    [Fact]
+    public async Task ArchivedAccount_StillContributesToHistory()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var archived = await AddAccountAsync(AccountKind.Cash, _cad.Id, "OldCash", archived: true);
+        await AddSplitAsync(archived.Id, _cad.Id, 500m, new DateTimeOffset(2026, 4, 10, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        Assert.Equal(500m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task SystemAccounts_DoNotContribute()
+    {
+        // BalanceEntry-style scenario: user account gets +100, system Adjustments gets -100.
+        // Net worth should reflect +100 on the user account; the system counterpart drops out.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        var adjustments = await AddAccountAsync(AccountKind.Cash, _cad.Id, "Equity:Adjustments", system: true);
+        var be = new DateTimeOffset(2026, 4, 15, 23, 59, 59, TimeSpan.Zero);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, be, TransactionType.BalanceEntry);
+        await AddSplitAsync(adjustments.Id, _cad.Id, -100m, be, TransactionType.BalanceEntry);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        Assert.Equal(100m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task OpeningBalanceAtNoonUtc_ReflectedInSameDayBucket()
+    {
+        // OpeningBalances are stored at 12:00 UTC; daily buckets close at 23:59:59 UTC.
+        // The bucket for the OB date should already include the OB.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(
+            cash.Id, _cad.Id, 750m,
+            new DateTimeOffset(2026, 4, 10, 12, 0, 0, TimeSpan.Zero),
+            TransactionType.OpeningBalance);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        var openingDay = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
+        Assert.Equal(750m, openingDay.Value);
+    }
+
+    [Fact]
+    public async Task StockSplit_DoesNotMoveNetWorth_WhenBothCommoditiesPriced()
+    {
+        // 1:2 split: -1 of pre-split, +2 of post-split. With matching prices on both,
+        // the converted display value is unchanged.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var preSplit = new Commodity { Id = Guid.NewGuid(), Symbol = "OLD", Exchange = "NASDAQ", Name = "Old", Kind = CommodityKind.Security, DisplayPrecision = 4 };
+        var postSplit = new Commodity { Id = Guid.NewGuid(), Symbol = "NEW", Exchange = "NASDAQ", Name = "New", Kind = CommodityKind.Security, DisplayPrecision = 4 };
+        _db.Commodities.AddRange(preSplit, postSplit);
+        await _db.SaveChangesAsync();
+
+        var inv = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+        // Acquire 10 of preSplit at 2 CAD each.
+        await AddSplitAsync(inv.Id, preSplit.Id, 10m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddPriceAsync(preSplit.Id, _cad.Id, 2m, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
+        // Stock split: -10 OLD, +20 NEW (priced at 1 CAD).
+        var splitDate = new DateTimeOffset(2026, 4, 15, 12, 0, 0, TimeSpan.Zero);
+        await AddSplitAsync(inv.Id, preSplit.Id, -10m, splitDate, TransactionType.StockSplit);
+        await AddSplitAsync(inv.Id, postSplit.Id, 20m, splitDate, TransactionType.StockSplit);
+        await AddPriceAsync(postSplit.Id, _cad.Id, 1m, new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        // Before split: 10 × 2 = 20 CAD. After split: 20 × 1 = 20 CAD.
+        var beforeSplit = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 14));
+        Assert.Equal(20m, beforeSplit.Value);
+        Assert.Equal(20m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task UnpricedCommodity_BucketIsNullAndHasUnpricedFlagSet()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var inv = await AddAccountAsync(AccountKind.Investment, _cad.Id);
+        // VEQT has no price recorded; the position is unpriced.
+        await AddSplitAsync(inv.Id, _veqt.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        Assert.True(resp.HasUnpriced);
+        // After the split, every bucket has a non-zero unpriced position → null value.
+        var afterSplit = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 5));
+        Assert.Null(afterSplit.Value);
+    }
+
+    [Fact]
+    public async Task AllRangeOverOneYear_UsesMonthlyGranularity()
+    {
+        // Activity 18 months ago → "All" range spans > 365 days → monthly granularity.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 1000m, to.AddMonths(-18));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.All, AsOf = to }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Monthly, resp.Granularity);
+        Assert.True(resp.Points.Count <= 24, $"Expected at most ~24 monthly points, got {resp.Points.Count}");
+        Assert.Equal(1000m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task AllRangeUnderOneYear_UsesDailyGranularity()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, to.AddDays(-30));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.All, AsOf = to }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+    }
+
+    [Fact]
+    public async Task PriceChangesOverTime_AreReflectedInHistoricalBuckets()
+    {
+        // FX rate changes between buckets: USD/CAD 1.20 in early April, 1.40 in late April.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var usdAcct = await AddAccountAsync(AccountKind.Cash, _usd.Id);
+        await AddSplitAsync(usdAcct.Id, _usd.Id, 100m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.20m, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.40m, new DateTimeOffset(2026, 4, 20, 0, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+
+        // April 10 → uses 1.20 rate → 120 CAD
+        var early = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
+        Assert.Equal(120m, early.Value);
+        // April 25 → uses 1.40 rate → 140 CAD
+        var late = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 25));
+        Assert.Equal(140m, late.Value);
+    }
+}

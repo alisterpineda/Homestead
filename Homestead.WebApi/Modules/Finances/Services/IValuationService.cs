@@ -18,6 +18,8 @@ public interface IValuationService
 {
     Task<ValuationContext> LoadContextAsync(CancellationToken ct);
 
+    Task<ValuationContext> LoadContextAsync(DateTimeOffset asOf, CancellationToken ct);
+
     Task<AccountValuation> ValueAccountAsync(Account account, ValuationContext ctx, CancellationToken ct);
 
     Task<IReadOnlyDictionary<Guid, AccountValuation>> ValueAccountsAsync(

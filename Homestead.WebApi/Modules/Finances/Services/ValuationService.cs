@@ -8,24 +8,29 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 
 public class ValuationService(AppDbContext db) : IValuationService
 {
-    public async Task<ValuationContext> LoadContextAsync(CancellationToken ct)
+    public Task<ValuationContext> LoadContextAsync(CancellationToken ct) =>
+        LoadContextAsync(CurrentDayCutoffUtc(), ct);
+
+    public async Task<ValuationContext> LoadContextAsync(DateTimeOffset asOf, CancellationToken ct)
     {
         var settings = await FinanceSettings.LoadAsync(db, ct);
         var displayCurrencyId = settings.DisplayCurrencyId;
-        var cutoff = CurrentDayCutoffUtc();
 
         var prices = await db.CommodityPrices
             .AsNoTracking()
-            .Where(p => p.PriceAt <= cutoff)
+            .Where(p => p.PriceAt <= asOf)
             .OrderBy(p => p.PriceAt)
             .ToListAsync(ct);
 
-        var table = new Dictionary<(Guid, Guid), CommodityPrice>(prices.Count);
+        var table = new Dictionary<(Guid, Guid), IReadOnlyList<CommodityPrice>>();
         var ids = new HashSet<Guid>();
+        foreach (var group in prices.GroupBy(p => (p.CommodityId, p.QuoteCurrencyId)))
+        {
+            // Already ordered ascending by PriceAt from the query.
+            table[group.Key] = group.ToList();
+        }
         foreach (var p in prices)
         {
-            // Last write wins; the asc-by-PriceAt order makes that the most recent.
-            table[(p.CommodityId, p.QuoteCurrencyId)] = p;
             ids.Add(p.CommodityId);
             ids.Add(p.QuoteCurrencyId);
         }
@@ -93,6 +98,17 @@ public class ValuationService(AppDbContext db) : IValuationService
         return result;
     }
 
+    // Combines priced sum and unpriced presence into the aggregate display value
+    // following the SKILL.md null-vs-zero rule: any priced positions ⇒ priced sum;
+    // all unpriced and any non-zero ⇒ null; otherwise zero.
+    public static decimal? AggregateDisplayValue(decimal pricedSum, bool anyPriced, bool anyUnpriced) =>
+        (anyPriced, anyUnpriced) switch
+        {
+            (true, _) => pricedSum,
+            (false, true) => null,
+            _ => 0m,
+        };
+
     private static AccountValuation BuildValuation(
         Account account, IReadOnlyList<RawPosition> rawPositions, ValuationContext ctx)
     {
@@ -118,12 +134,7 @@ public class ValuationService(AppDbContext db) : IValuationService
             }
         }
 
-        decimal? aggregateDisplay = (anyPriced, unpricedCount > 0) switch
-        {
-            (true, _) => pricedSum,
-            (false, true) => null,
-            _ => 0m,
-        };
+        var aggregateDisplay = AggregateDisplayValue(pricedSum, anyPriced, unpricedCount > 0);
 
         var nativeBalance = account.Kind == AccountKind.Investment
             ? (decimal?)null
@@ -137,8 +148,8 @@ public class ValuationService(AppDbContext db) : IValuationService
     private readonly record struct RawPosition(Guid CommodityId, decimal Quantity);
 
     // Day-grain cutoff so same-date balance entries (stored at 23:59:59 UTC) are
-    // reflected immediately. v1 valuation is "as of now" at day resolution; a future
-    // ?asOf= parameter would replace this with the caller's instant.
+    // reflected immediately. Default for "as of now" callers; historical reads pass
+    // their own cutoff via the LoadContextAsync(asOf,...) overload.
     private static DateTimeOffset CurrentDayCutoffUtc() =>
         DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime).ToEndOfDayUtc();
 }

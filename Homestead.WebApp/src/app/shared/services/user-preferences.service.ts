@@ -4,6 +4,9 @@ import { persistedSignal } from '../utils/persisted-signal';
 
 const OLD_VIEW_MODE_KEY = 'document-view-mode';
 
+const NET_WORTH_RANGES = ['OneMonth', 'ThreeMonths', 'SixMonths', 'OneYear', 'All'] as const;
+type NetWorthRangePref = typeof NET_WORTH_RANGES[number];
+
 function isVisibilityState(v: unknown): v is VisibilityState {
   return typeof v === 'object' && v !== null && !Array.isArray(v) &&
     Object.values(v as Record<string, unknown>).every(val => typeof val === 'boolean');
@@ -39,6 +42,13 @@ export class UserPreferencesService {
     key: 'homestead-tag-columns',
     defaultValue: {},
     validate: isVisibilityState,
+  });
+
+  readonly netWorthRange = persistedSignal<NetWorthRangePref>({
+    key: 'homestead-finances-net-worth-range',
+    defaultValue: 'All',
+    validate: (v): v is NetWorthRangePref =>
+      typeof v === 'string' && (NET_WORTH_RANGES as readonly string[]).includes(v),
   });
 
   constructor() {
