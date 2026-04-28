@@ -22,7 +22,8 @@ public class JobQueue(AppDbContext db, IJobSignal signal) : IJobQueue
             Priority = options.Priority,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = options.CreatedByUserId,
-            ParentJobId = options.ParentJobId
+            ParentJobId = options.ParentJobId,
+            ScheduleId = options.ScheduleId
         };
 
         db.ProcessingJobs.Add(job);

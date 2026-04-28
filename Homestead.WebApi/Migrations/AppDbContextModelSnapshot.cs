@@ -847,6 +847,9 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -871,6 +874,8 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("ParentJobId");
 
+                    b.HasIndex("ScheduleId");
+
                     b.HasIndex("Type");
 
                     b.HasIndex("ParentJobId", "Status");
@@ -878,6 +883,76 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("Status", "Priority");
 
                     b.ToTable("jobs", "processing");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Processing.ProcessingSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CronExpression")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("JobType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("LastJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("NextRunAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Etc/UTC");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("JobType");
+
+                    b.HasIndex("LastJobId");
+
+                    b.HasIndex("IsEnabled", "NextRunAt");
+
+                    b.ToTable("schedules", "processing");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Settings.AppSetting", b =>
@@ -1356,6 +1431,19 @@ namespace Homestead.WebApi.Migrations
                         .WithMany()
                         .HasForeignKey("ParentJobId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Homestead.WebApi.Domain.Processing.ProcessingSchedule", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Processing.ProcessingSchedule", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Processing.ProcessingJob", null)
+                        .WithMany()
+                        .HasForeignKey("LastJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Settings.TextExtractionEngine", b =>

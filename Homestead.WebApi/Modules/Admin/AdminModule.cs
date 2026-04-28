@@ -16,6 +16,7 @@ using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTe
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.GetTextExtractionEngines;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.UpdateTextExtractionEngine;
+using Homestead.WebApi.Modules.Admin.Features.Schedules.GetProcessingSchedules;
 using Homestead.WebApi.Modules.Admin.Features.Settings.GetSystemSettings;
 using Homestead.WebApi.Modules.Admin.Features.Settings.PatchSystemSettings;
 using Homestead.WebApi.Modules.Admin.Features.Users.UpdateUser;
@@ -73,6 +74,14 @@ public static class AdminModule
 
         GetSystemSettingsEndpoint.Map(settings);
         PatchSystemSettingsEndpoint.Map(settings);
+
+        var schedules = app.MapGroup("/api/v{version:apiVersion}/admin/schedules")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetProcessingSchedulesEndpoint.Map(schedules);
 
         return app;
     }

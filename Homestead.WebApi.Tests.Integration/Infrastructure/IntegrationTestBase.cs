@@ -202,6 +202,32 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         response.EnsureSuccessStatusCode();
     }
 
+    protected async Task<Guid> SeedScheduleAsync(
+        string? name = null,
+        ProcessingJobType jobType = ProcessingJobType.UploadDocument,
+        bool isEnabled = true,
+        DateTimeOffset? nextRunAt = null,
+        string cron = "0 5 * * *",
+        Guid? createdByUserId = null)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var schedule = new ProcessingSchedule
+        {
+            Id = Guid.NewGuid(),
+            Name = name ?? $"Test {Guid.NewGuid():N}",
+            JobType = jobType,
+            CronExpression = cron,
+            IsEnabled = isEnabled,
+            NextRunAt = nextRunAt ?? DateTimeOffset.UtcNow.AddHours(1),
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedByUserId = createdByUserId,
+        };
+        db.ProcessingSchedules.Add(schedule);
+        await db.SaveChangesAsync(CT);
+        return schedule.Id;
+    }
+
     protected async Task<Guid> GetUserIdAsync(HttpClient client)
     {
         var response = await client.GetAsync("/api/auth/user-info", CT);

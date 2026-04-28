@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Party> Parties { get; set; }
     public DbSet<DocumentParty> DocumentParties { get; set; }
     public DbSet<ProcessingJob> ProcessingJobs { get; set; }
+    public DbSet<ProcessingSchedule> ProcessingSchedules { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }

@@ -45,6 +45,10 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Oidc:ClientId", "test-client");
         builder.UseSetting("Oidc:ClientSecret", "test-secret");
 
+        // Disable the autonomous scheduler tick so tests can drive it deterministically
+        // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
+        builder.UseSetting("Processing:Scheduling:Enabled", "false");
+
         builder.ConfigureServices(services =>
         {
             // Register test-only force-login endpoint for inactive user authentication

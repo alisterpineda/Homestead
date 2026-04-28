@@ -62,6 +62,7 @@ export type { GetNetWorthHistoryResponse } from './models/get-net-worth-history-
 export type { GetPartiesResponse } from './models/get-parties-response';
 export type { GetPartyResponse } from './models/get-party-response';
 export type { GetProcessingJobsResponse } from './models/get-processing-jobs-response';
+export type { GetProcessingSchedulesResponse } from './models/get-processing-schedules-response';
 export type { GetStatusResponse } from './models/get-status-response';
 export type { GetTagsResponse } from './models/get-tags-response';
 export type { GetUserInfoResponse } from './models/get-user-info-response';
@@ -86,6 +87,7 @@ export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
+export type { PaginatedResponseOfGetProcessingSchedulesResponse } from './models/paginated-response-of-get-processing-schedules-response';
 export type { PaginatedResponseOfGetTagsResponse } from './models/paginated-response-of-get-tags-response';
 export type { PaginatedResponseOfGroupResponse } from './models/paginated-response-of-group-response';
 export type { PaginatedResponseOfTextExtractionEngineResponse } from './models/paginated-response-of-text-extraction-engine-response';

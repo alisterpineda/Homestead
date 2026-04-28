@@ -51,11 +51,17 @@ public class ProcessingJobConfiguration : IEntityTypeConfiguration<ProcessingJob
             .HasForeignKey(j => j.ParentJobId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne<ProcessingSchedule>()
+            .WithMany()
+            .HasForeignKey(j => j.ScheduleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(j => j.Type);
         builder.HasIndex(j => j.EntityId);
         builder.HasIndex(j => new { j.Status, j.Priority });
         builder.HasIndex(j => j.CreatedByUserId);
         builder.HasIndex(j => j.ParentJobId);
         builder.HasIndex(j => new { j.ParentJobId, j.Status });
+        builder.HasIndex(j => j.ScheduleId);
     }
 }

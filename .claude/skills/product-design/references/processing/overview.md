@@ -1,8 +1,8 @@
 # Processing — Architecture
 
-This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list and SignalR-driven toasts. Every job in the system today is initiated by another module (currently only Documents) on the user's behalf, runs asynchronously in the same WebApi process, and reports completion back through SignalR.
+This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list, an admin schedules list, and SignalR-driven toasts. Most jobs today are initiated by another module (currently Documents) on the user's behalf; some can be issued by a recurring schedule (system-attributed). Every job runs asynchronously in the same WebApi process and reports completion back through SignalR (when it has a user creator).
 
-This file lives under `references/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, and downloads all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
+This file lives under `references/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, downloads, and any recurring work all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ Processing exists so user-initiated work that does not need to complete inline (
 3. The user receives a real-time status update when the job finishes (success, failure, or partial completion), without polling.
 4. Failures and progress are visible after the fact in an admin job list.
 
-The module is not a general task-scheduling system. It does not run cron jobs, recurring tasks, or work that does not have a user as its initiator. There is no concept of "system jobs" in v1.
+The module is a **job-execution engine** plus a **cron-style schedule emitter** that feeds it. It is not a workflow engine, has no DAG semantics, and does not run user-defined scripts.
 
 ## In scope for v1
 
@@ -21,15 +21,16 @@ The module is not a general task-scheduling system. It does not run cron jobs, r
 - One in-process worker (the WebApi itself) that claims pending jobs, runs them with bounded concurrency, and writes their terminal status back to the database.
 - A small, closed set of job **types** known to the worker, each backed by a handler class (see *Job catalog*).
 - A two-level **parent/child** hierarchy for fan-out work, with the parent's status derived from the aggregate of its children.
-- Per-user, per-job real-time notifications over a SignalR hub.
+- A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules can be system-attributed (no `CreatedByUserId`).
+- Per-user, per-job real-time notifications over a SignalR hub. System-initiated runs (schedules with no creator) emit no SignalR — failures surface only in the admin job list.
 - A read-only HTTP endpoint that lists jobs, scoped to the caller's identity (admins see all jobs; non-admins see only their own).
+- An admin-only HTTP endpoint that lists schedules.
 - A best-effort orphaned-job recovery sweep at process startup.
-- Programmatic pause for tests and migrations: `IJobProcessorControl.PauseAsync()` returns an `IAsyncDisposable` that drains all worker permits.
+- Programmatic pause for tests and migrations: `IJobProcessorControl.PauseAsync()` returns an `IAsyncDisposable` that drains all worker permits. **Pause does not stop the scheduler** — schedules can still fire during a pause; jobs accumulate as Pending and drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false` via config.
 
 ## Out of scope for v1
 
-- **Retries.** A failure is terminal. The user (or an admin) re-issues the work if they want it retried.
-- **Scheduling and recurring jobs.** All jobs are run as soon as a worker permit is available. There is no `RunAt`, no cron, no fixed-rate trigger.
+- **Retries.** A failure is terminal. The user (or an admin) re-issues the work if they want it retried. A schedule that fires a job that fails will fire its next scheduled run at the normal cadence — there is no per-failure backoff.
 - **External brokers.** No Redis, RabbitMQ, Hangfire, or background-process worker. The queue lives in the same database the rest of the app uses, and the worker is a `BackgroundService` in the WebApi.
 - **Multi-process workers.** Concurrency is bounded by `JobProcessingOptions.MaxConcurrency` within a single process. Running multiple WebApi instances is not supported (the claim is atomic, but no other coordination exists).
 - **Cancellation from the API surface.** A running job cannot be cancelled by the user. A 5-minute per-job timeout exists as a backstop, but there is no "cancel job" endpoint.
@@ -42,20 +43,42 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 ## Data model
 
-A single table — `processing.jobs` — backs the entire subsystem. One row per job. The columns the rest of the system depends on:
+Two tables back the subsystem: `processing.jobs` (the queue) and `processing.schedules` (the cron emitter).
+
+### `processing.jobs`
+
+One row per job. The columns the rest of the system depends on:
 
 - **Identity:** `Id` (Guid PK).
 - **What:** `Type` (enum, stored as string), `Payload` (jsonb — handler-defined shape), `EntityType` + `EntityId` (optional pointer to a domain entity the job concerns; used by the UI to link from a job back to its document/download). The job catalog below describes which handler reads which payload shape.
 - **Status:** `Status` (enum), `Error` (free-form string from the failure exception's message), `Priority` (int, higher first).
 - **Timing:** `CreatedAt`, `StartedAt`, `CompletedAt`.
-- **Attribution:** `CreatedByUserId`. Audit logs written by the handler are attributed to this user, not the worker.
+- **Attribution:** `CreatedByUserId`. Audit logs written by the handler are attributed to this user, not the worker. Null for system-initiated jobs (those produced by a schedule with no creator).
 - **Hierarchy:** `ParentJobId`, `TotalChildCount`, `CompletedChildCount`, `FailedChildCount`. See *Parent/child jobs*.
+- **Origin:** `ScheduleId` (nullable FK → `processing.schedules`, ON DELETE SET NULL). Set when the job was created by the scheduler; null for ad-hoc enqueues. Lets the admin trace a job back to the schedule that produced it.
 
 Indexes worth knowing:
 
 - `(Status, Priority)` — supports the claim query.
 - `EntityId`, `CreatedByUserId`, `ParentJobId`, `(ParentJobId, Status)` — support the list endpoint and parent-progress aggregation.
 - `Type` — admin filtering.
+- `ScheduleId` — admin "all jobs from schedule X" lookups.
+
+### `processing.schedules`
+
+One row per recurring trigger. Owned by the Processing module but populated by other modules (via migrations or future per-module endpoints). The columns:
+
+- **Identity:** `Id` (Guid PK), `Name` (display string), `Description` (optional admin note).
+- **What to enqueue:** `JobType` (same enum as `processing.jobs.Type`), `Payload` (jsonb, opaque to the scheduler), `Priority` (int, copied to the spawned job).
+- **When:** `CronExpression` (5-field, parsed by Cronos), `TimeZone` (IANA name, column reserved but only `Etc/UTC` honoured in v1).
+- **Toggle:** `IsEnabled` (bool).
+- **Attribution:** `CreatedByUserId` (nullable; null = system-attributed; the spawned job inherits this).
+- **Tick state:** `LastRunAt`, `NextRunAt` (precomputed, the basis of the claim query), `LastJobId` (nullable FK → `processing.jobs`, denormalised for click-through; cleared on job delete).
+- **Created:** `CreatedAt`.
+
+Indexes: `(IsEnabled, NextRunAt)` for the claim query, `JobType` for admin filtering, `CreatedByUserId` for future per-user filtering.
+
+The schedule table and the jobs table reference each other via `ON DELETE SET NULL` on both sides — they are loosely coupled through best-effort denormalisation, not invariants the queue depends on.
 
 The `ParentJobId` foreign key cascades on delete so deleting a parent removes its children. Nothing else references `processing.jobs` by FK; jobs are not part of the audit graph.
 
@@ -244,18 +267,40 @@ Background-job handlers that write to the audit log use `auditLogger.ForUser(job
 4. **Job notifications are scoped per user.** Two users in the same household uploading concurrently do not see each other's toasts.
 5. **The list view groups by parent.** Children only appear when their parent is expanded. The default view is "what work the user kicked off," not "every individual operation."
 
+## The scheduler
+
+A second `BackgroundService` (`JobSchedulerService`) ticks once per minute (configurable via `JobSchedulingOptions.PollIntervalSeconds`) and emits Pending jobs from the `processing.schedules` table. The loop:
+
+1. Read the most overdue enabled schedule (`WHERE IsEnabled AND NextRunAt <= now()` ordered by `NextRunAt`).
+2. Compute the schedule's next future occurrence via Cronos.
+3. Atomically claim it: `WHERE Id = X AND IsEnabled AND NextRunAt = <captured>` `ExecuteUpdateAsync` to set `LastRunAt = now()` and `NextRunAt = <next-future-occurrence>`. If 0 rows updated, skip — another tick won.
+4. Enqueue a `processing.jobs` row via the same `IJobQueue` ad-hoc enqueues use, with `ScheduleId = schedule.Id`. This calls `IJobSignal.Signal()`, so the worker dispatches immediately.
+5. Update `LastJobId` on the schedule (best-effort denormalisation; not load-bearing).
+6. Loop back; drain everything else currently due before sleeping.
+
+**Catch-up policy:** *fire once per due schedule, then advance `NextRunAt` to the next future occurrence past `now()`*. If the host was down for two days, a daily schedule fires once on resume — handlers that need real backfill compute it themselves from `LastRunAt`. There is no per-tick replay.
+
+**Crash recovery:** none. The (`LastRunAt`, `NextRunAt`) pair is the single source of truth; a crash mid-fire either persisted the advance (the job runs whenever the worker wakes) or didn't (the schedule fires on the next tick).
+
+**Invalid cron:** if a schedule's `CronExpression` fails to parse, the scheduler logs an error and disables the schedule (`IsEnabled = false`). The admin sees a disabled schedule in the list and can investigate.
+
+**Pause behaviour:** `IJobProcessorControl.PauseAsync()` only pauses the *worker*. The scheduler keeps ticking and may queue Pending jobs during a pause; they drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false`.
+
+Schedules in v1 are populated only by migrations or future per-module endpoints. There is no public create/edit endpoint yet — the admin list is read-only.
+
 ## Future-compatibility
 
-The following must be addable without rewriting the table or breaking existing job types:
+The following must be addable without rewriting the tables or breaking existing job types:
 
 - **Retries with backoff** as an opt-in property of a job type. The `Error` column already stores the latest failure; adding `Attempt` / `MaxAttempts` / `NextAttemptAt` columns is the natural extension.
-- **Scheduled jobs** (`RunAt`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`.
-- **Recurring jobs** — a separate "schedule" table emits a Pending job at each tick; the queue itself stays event-sourced.
-- **System-initiated jobs** — `CreatedByUserId` becomes nullable-with-meaning ("system"); notification routing learns to skip user-targeted SignalR for those.
+- **Per-schedule retry/backoff for failed runs** — today a failed scheduled run is terminal; the next tick fires at the next normal occurrence. Adding a `RetryPolicy` column on `processing.schedules` (or job-type-level) is the natural place.
+- **Scheduled one-off jobs** (`RunAt` on `processing.jobs`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`. Distinct from recurring schedules: this would be "remind me in 10 minutes" semantics.
+- **Per-module schedule CRUD endpoints** — the admin list is the only schedule endpoint in v1. Per-module endpoints (e.g., `/api/v1/finances/schedules`) filter the same shared table by `JobType`, render module-friendly forms, and can manage their own seeded singletons.
+- **Per-schedule timezone honour** — `TimeZone` column already exists; v1 always treats it as `Etc/UTC`. Honouring it changes only the Cronos `GetNextOccurrence` call.
 - **Per-job-type concurrency caps** (e.g., one OCR at a time, but ten ZIPs at a time). Today's single semaphore would split into per-type semaphores.
 - **Cancel from the admin UI** — the worker would need to expose a per-job cancellation token, and the API would set a `CancelRequested` flag the worker checks.
 - **External worker process** — the in-process `BackgroundService` is replaced by a separate executable that talks to the same table. The atomic-claim primitive already supports this.
 - **Multi-process WebApi** — beyond the queue, this needs a coordinated answer for SignalR (a backplane) and startup recovery (only one node should sweep). Not a queue concern in isolation.
 - **Deeper hierarchies / DAG workflows** — would not extend `ParentJobId`; build a domain-level state machine that issues fresh top-level jobs and reads their results.
 
-None of these should require re-migrating historical job rows. The current schema's nullable `EntityType`, `EntityId`, `Payload`, `CreatedByUserId`, and `ParentJobId` are deliberately permissive so future job types can fit without an ALTER TABLE.
+None of these should require re-migrating historical rows. The current schemas' nullable `EntityType`, `EntityId`, `Payload`, `CreatedByUserId`, `ParentJobId`, and `ScheduleId` are deliberately permissive so future job and schedule types can fit without an ALTER TABLE.

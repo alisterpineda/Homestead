@@ -10,4 +10,5 @@ public class EnqueueJobRequest
     public int Priority { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? ParentJobId { get; set; }
+    public Guid? ScheduleId { get; set; }
 }

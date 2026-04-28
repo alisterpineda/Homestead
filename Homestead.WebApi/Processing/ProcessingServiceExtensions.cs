@@ -7,6 +7,7 @@ public static class ProcessingServiceExtensions
     public static IServiceCollection AddProcessing(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<JobProcessingOptions>(configuration.GetSection(JobProcessingOptions.SectionName));
+        services.Configure<JobSchedulingOptions>(configuration.GetSection(JobSchedulingOptions.SectionName));
 
         var assembly = typeof(Program).Assembly;
 
@@ -24,6 +25,10 @@ public static class ProcessingServiceExtensions
         services.AddHostedService(sp => sp.GetRequiredService<JobProcessorService>());
         services.AddSingleton<IJobProcessorControl>(sp => sp.GetRequiredService<JobProcessorService>());
         services.AddSingleton<IJobSignal>(sp => sp.GetRequiredService<JobProcessorService>());
+
+        services.AddSingleton<JobSchedulerService>();
+        services.AddHostedService(sp => sp.GetRequiredService<JobSchedulerService>());
+        services.AddSingleton<IJobSchedulerControl>(sp => sp.GetRequiredService<JobSchedulerService>());
 
         return services;
     }
