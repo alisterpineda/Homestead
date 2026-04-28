@@ -242,7 +242,7 @@ export class AccountActivityTabComponent {
       id: 'date',
       accessorFn: r => r.dateText,
       header: 'Date',
-      cell: info => `<span class="tabular-nums text-muted-foreground">${info.getValue<string>()}</span>`,
+      cell: info => info.getValue<string>(),
       enableSorting: false,
     },
     {
