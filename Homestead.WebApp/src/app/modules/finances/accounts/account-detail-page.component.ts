@@ -207,14 +207,14 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         </header>
 
         <hlm-tabs tab="activity" class="flex flex-1 flex-col">
-          <hlm-tabs-list variant="line">
+          <hlm-tabs-list>
             <button hlmTabsTrigger="activity">Activity</button>
             @if (a.kind === 'Investment') {
               <button hlmTabsTrigger="positions">Positions</button>
             }
             <button hlmTabsTrigger="info">Info</button>
           </hlm-tabs-list>
-          <div hlmTabsContent="activity" class="mt-3">
+          <div hlmTabsContent="activity">
             <app-account-activity-tab
               [account]="a"
               [refreshKey]="refreshTrigger()"
