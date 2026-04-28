@@ -1,0 +1,261 @@
+# Processing — Architecture
+
+This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list and SignalR-driven toasts. Every job in the system today is initiated by another module (currently only Documents) on the user's behalf, runs asynchronously in the same WebApi process, and reports completion back through SignalR.
+
+This file lives under `references/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, and downloads all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
+
+## Purpose
+
+Processing exists so user-initiated work that does not need to complete inline (text extraction, hashing, ZIP packaging, fan-out reprocessing) can be deferred to a background worker without losing the user's view of progress. The primary outcomes:
+
+1. The HTTP request that initiates the work returns immediately with a job ID.
+2. The work runs durably — surviving process restarts — against state stored in the application database.
+3. The user receives a real-time status update when the job finishes (success, failure, or partial completion), without polling.
+4. Failures and progress are visible after the fact in an admin job list.
+
+The module is not a general task-scheduling system. It does not run cron jobs, recurring tasks, or work that does not have a user as its initiator. There is no concept of "system jobs" in v1.
+
+## In scope for v1
+
+- A single durable, FIFO-with-priority queue stored in PostgreSQL (`processing.jobs` table).
+- One in-process worker (the WebApi itself) that claims pending jobs, runs them with bounded concurrency, and writes their terminal status back to the database.
+- A small, closed set of job **types** known to the worker, each backed by a handler class (see *Job catalog*).
+- A two-level **parent/child** hierarchy for fan-out work, with the parent's status derived from the aggregate of its children.
+- Per-user, per-job real-time notifications over a SignalR hub.
+- A read-only HTTP endpoint that lists jobs, scoped to the caller's identity (admins see all jobs; non-admins see only their own).
+- A best-effort orphaned-job recovery sweep at process startup.
+- Programmatic pause for tests and migrations: `IJobProcessorControl.PauseAsync()` returns an `IAsyncDisposable` that drains all worker permits.
+
+## Out of scope for v1
+
+- **Retries.** A failure is terminal. The user (or an admin) re-issues the work if they want it retried.
+- **Scheduling and recurring jobs.** All jobs are run as soon as a worker permit is available. There is no `RunAt`, no cron, no fixed-rate trigger.
+- **External brokers.** No Redis, RabbitMQ, Hangfire, or background-process worker. The queue lives in the same database the rest of the app uses, and the worker is a `BackgroundService` in the WebApi.
+- **Multi-process workers.** Concurrency is bounded by `JobProcessingOptions.MaxConcurrency` within a single process. Running multiple WebApi instances is not supported (the claim is atomic, but no other coordination exists).
+- **Cancellation from the API surface.** A running job cannot be cancelled by the user. A 5-minute per-job timeout exists as a backstop, but there is no "cancel job" endpoint.
+- **Per-job dead-lettering or quarantine.** Failed jobs stay in the table with their error string; there is no separate dead-letter table or replay tooling.
+- **User-issued retries through the queue.** Reprocessing a single document version *is* available as a job type, but it is conceptually a fresh action initiated by the user, not a retry of a previous job.
+- **Visibility into per-job progress beyond child counts.** Within a single non-parent job, the UI sees `Pending → InProgress → terminal` with no intermediate progress. Parent jobs expose `(completed + failed) / total` only.
+- **Configurable timeouts or priorities at runtime.** Both are compile-time constants today (timeout) or set on enqueue (priority).
+
+These are excluded from v1 but the model must not block adding them later. See *Future-compatibility*.
+
+## Data model
+
+A single table — `processing.jobs` — backs the entire subsystem. One row per job. The columns the rest of the system depends on:
+
+- **Identity:** `Id` (Guid PK).
+- **What:** `Type` (enum, stored as string), `Payload` (jsonb — handler-defined shape), `EntityType` + `EntityId` (optional pointer to a domain entity the job concerns; used by the UI to link from a job back to its document/download). The job catalog below describes which handler reads which payload shape.
+- **Status:** `Status` (enum), `Error` (free-form string from the failure exception's message), `Priority` (int, higher first).
+- **Timing:** `CreatedAt`, `StartedAt`, `CompletedAt`.
+- **Attribution:** `CreatedByUserId`. Audit logs written by the handler are attributed to this user, not the worker.
+- **Hierarchy:** `ParentJobId`, `TotalChildCount`, `CompletedChildCount`, `FailedChildCount`. See *Parent/child jobs*.
+
+Indexes worth knowing:
+
+- `(Status, Priority)` — supports the claim query.
+- `EntityId`, `CreatedByUserId`, `ParentJobId`, `(ParentJobId, Status)` — support the list endpoint and parent-progress aggregation.
+- `Type` — admin filtering.
+
+The `ParentJobId` foreign key cascades on delete so deleting a parent removes its children. Nothing else references `processing.jobs` by FK; jobs are not part of the audit graph.
+
+## Status lifecycle
+
+```
+Pending ──┬─► InProgress ──► Completed
+          │                  Failed
+          │                  PartiallyCompleted   (parent jobs only)
+          │
+          └─► (recovered to Pending at startup if InProgress with no children)
+```
+
+- **Pending** — enqueued, not yet claimed.
+- **InProgress** — atomically claimed by a worker (handler is running), or for parent jobs, the handler has returned and we are waiting on children.
+- **Completed** — terminal success. For non-parent jobs, the handler returned without throwing. For parent jobs, every child completed successfully.
+- **Failed** — terminal failure. For non-parent jobs, the handler threw. For parent jobs, every child failed.
+- **PartiallyCompleted** — terminal. **Parent jobs only.** Some children completed, some failed.
+
+A non-parent job will never enter `PartiallyCompleted`. A parent job that successfully spawned zero children would terminate as `Completed` immediately on the next progress update, since `0 finished ≥ 0 total` and `failed == 0`.
+
+`CompletedAt` is set on every terminal transition (success or failure). `StartedAt` is set when the job is claimed, regardless of outcome. Recovered jobs (see *Crash recovery*) have their `StartedAt` cleared when transitioned back to `Pending`.
+
+## The processor loop
+
+The worker is a single `BackgroundService` (`JobProcessorService`) that also implements `IJobSignal` (a wake-up channel) and `IJobProcessorControl` (pause). Its loop:
+
+1. **At startup**, sweep orphaned jobs (see *Crash recovery*).
+2. **Wait** for either a wake-up signal or a 30-second poll timeout.
+3. **Drain pending jobs**: while there is at least one available worker permit and at least one Pending job, atomically claim the highest-priority oldest one and dispatch the handler on a background `Task`.
+4. **Loop.**
+
+A few details that matter:
+
+- **Atomic claim.** The claim is a `WHERE Status = Pending` `ExecuteUpdateAsync` that flips the row to `InProgress` and stamps `StartedAt`. If another path stole it, the update affects 0 rows and the loop tries the next candidate. This is what makes concurrent dispatch safe.
+- **Ordering.** Highest `Priority` first (descending), with `CreatedAt` as a stable FIFO tiebreaker. The default priority is `0` — anything higher jumps the queue.
+- **Bounded concurrency.** A `SemaphoreSlim` of size `JobProcessingOptions.MaxConcurrency` (default `1`) gates dispatch. The default of 1 keeps text-extraction and disk-bound work serialized; raising it is a deliberate, deployment-level choice.
+- **Wake-up channel.** `JobQueue.EnqueueAsync` calls `IJobSignal.Signal()` after committing the row, which releases a permit on a `SemaphoreSlim(0)` the worker awaits. This makes the queue *latency-free for the common case* without polling. The 30-second poll exists as a safety net.
+- **Per-job timeout.** Each handler runs against a linked `CancellationTokenSource` that cancels after 5 minutes. A timed-out job throws `TimeoutException` and lands in `Failed`. The application shutdown token also propagates — but a graceful shutdown awaits dispatched tasks before returning.
+- **Handler resolution.** Handlers are auto-registered as scoped `IJobHandler` instances by assembly scan (`ProcessingServiceExtensions`). A job's `Type` is matched to the first handler with `handler.Type == job.Type`. Missing handler ⇒ the job lands in `Failed` with a "no handler registered" error and never blocks the queue.
+- **Each handler runs in its own DI scope.** The processor creates a new `AsyncScope` per dispatched job, gets the scope's `AppDbContext` and `IEnumerable<IJobHandler>`, and the handler is free to `await db.SaveChangesAsync` directly. The processor does **not** wrap the handler in a transaction.
+
+## Crash recovery
+
+A job that was `InProgress` when the process died is **orphaned** — no worker is going to finish it. At startup, the processor runs:
+
+```
+UPDATE processing.jobs
+SET Status = Pending, StartedAt = NULL
+WHERE Status = InProgress AND TotalChildCount = 0
+```
+
+The `TotalChildCount = 0` filter is load-bearing: a parent job with children spawned is *legitimately* `InProgress` (it is waiting for children to terminate, which `UpdateParentProgressAsync` will do as each child finishes). Recovering such a parent would re-run its handler, double-spawn children, and corrupt the count.
+
+This recovery is best-effort — a failure here is logged but does not prevent the worker from starting.
+
+There is no recovery for failed jobs, no exponential-backoff retry, and no "stuck job" detection beyond the per-job 5-minute timeout. A handler that hangs without responding to its `CancellationToken` will not be killed before the timeout fires.
+
+## Parent/child jobs
+
+Some work fans out: bulk reprocessing N documents is N jobs, but the user issued one action and wants a single completion notification. The queue models this with a two-level hierarchy:
+
+- A handler that intends to spawn children implements the marker interface `IParentJobHandler` (e.g. `BulkReprocessDocumentsJobHandler`).
+- Inside `HandleAsync`, the parent inserts child jobs (with `ParentJobId = job.Id`), sets `job.TotalChildCount = N`, and saves. It does *not* set its own status to `Completed`.
+- The processor recognises `IParentJobHandler` and leaves the parent in `InProgress` after the handler returns.
+- As each child terminates, `UpdateParentProgressAsync` recomputes `(Completed, Failed)` from `processing.jobs WHERE ParentJobId = parent.Id`, updates the parent's counters, and — when `Completed + Failed >= TotalChildCount` — atomically transitions the parent to its terminal status:
+  - all completed → `Completed`
+  - all failed → `Failed`
+  - mixed → `PartiallyCompleted`
+- The terminal transition uses the same `WHERE Status = InProgress` guard as the claim, so only one concurrent caller wins. After it wins, the parent's user receives a single SignalR message with the terminal status and final counts.
+
+Hierarchy is **flat**: children of a parent cannot themselves spawn children. There is no enforcement of this in the data layer — it is a convention. Any deeper nesting would break the progress-aggregation logic, which only walks one level up.
+
+A parent handler must be **idempotent on restart**: if the process crashes after spawning children but before saving, the recovery sweep will not requeue it (because `TotalChildCount` was set as part of that save). If it crashes after writing the rows but before committing the count, the saved transaction is atomic so children either all exist or none do. The handler also defends against re-entry by checking whether children already exist for this parent ID (`existingChildCount > 0`) and short-circuiting.
+
+## Notifications
+
+A SignalR hub at `/hubs/processing` (`ProcessingHub`, `[Authorize]`) carries job status updates to the originating user. The hub is keyed by user ID — a job's notification only reaches the user named in `CreatedByUserId`. Jobs with no `CreatedByUserId` send no notification.
+
+Each notification carries the `JobStatusChangedMessage`:
+
+- `JobId`, `Status`, `EntityType`, `EntityId`, `DocumentName` (denormalised for client convenience).
+- `Error`, `ErrorCode`, `ErrorData` — populated on failure. Structured error metadata is sourced from the thrown exception when it implements `IStructuredJobError`; otherwise only the free-form `Error` is set. This is how `DuplicateDocumentException` carries the duplicate's ID and name to the client without parsing the message string.
+- `TotalChildCount`, `CompletedChildCount`, `FailedChildCount` — set on parent-job notifications only.
+
+**When the worker emits a notification:**
+
+- **Non-parent, success:** the handler itself emits the notification. (It is the handler's responsibility, not the processor's, because handlers vary in *when* "complete enough to tell the user" happens. The upload handlers, for instance, send the notification before generating thumbnails, treating thumbnail generation as a non-critical post-step.)
+- **Non-parent, failure:** the processor emits the notification from its catch block, with the structured error if applicable.
+- **Child of a parent, success:** the child handler **suppresses** its own notification (`if (job.ParentJobId is null)`). The user only sees the rolled-up parent notification.
+- **Child of a parent, failure:** the processor's catch block emits the failure notification. The user therefore sees per-child error toasts plus a parent summary. This is deliberate — individual child errors carry actionable detail (which document failed, why) that is lost in the aggregate.
+- **Parent, terminal or progress update:** `UpdateParentProgressAsync` emits one notification per child terminating, with the parent's running counts. The terminal transition emits the final one.
+
+The frontend hub client (`ProcessingHubService`) distinguishes **managed** jobs (the initiator awaits `waitForJob(jobId)` because it is going to handle the result inline — e.g., a dialog waiting on the document upload) from **unmanaged** jobs (background work whose completion should surface as a generic toast). Managed jobs suppress the generic toast; unmanaged ones receive `toast.success`, `toast.warning`, or `toast.error` based on the terminal status.
+
+## Authorization and visibility
+
+- **Enqueue** is gated by whichever endpoint accepts the user's request. The queue itself does not check authorization — the calling feature's handler does, and `CreatedByUserId` is filled from the current user. There are no "system" jobs without a creator.
+- **Listing** is gated by `AuthPolicies.RequireContributor` (the standard authenticated-user policy). The `GetProcessingJobs` handler then narrows the result set:
+  - Non-admin users see only jobs where `CreatedByUserId == currentUser.UserId`.
+  - Admins see all jobs.
+  - By default the list returns top-level jobs only (`ParentJobId IS NULL`); pass `ParentJobId=<guid>` to drill into a parent's children.
+- **Receiving notifications** is gated at the hub layer by the same auth policy and at the message routing layer by `Clients.User(userId)`. Non-creators do not receive a job's events, even if they could see the job in the admin list.
+
+## The pause control
+
+`IJobProcessorControl.PauseAsync()` waits to acquire all `MaxConcurrency` semaphore permits, then returns an `IAsyncDisposable` that releases them on dispose. While a pause handle is held, no new jobs can be claimed.
+
+This exists for **tests and for any future operation that needs the queue quiescent** (a migration, a maintenance task, etc.). It is the only mechanism for stopping the worker without shutting the host down. There is no UI or admin endpoint for it in v1 — it is purely an in-process API.
+
+## Job catalog
+
+The five v1 job types are all initiated by the Documents module. Each has a handler under `Modules/Documents/Processing/`.
+
+### `UploadDocument`
+
+Triggered when a new document is uploaded. The HTTP endpoint stages the file under `media/<UploadsSubroot>/<UploadId><ext>` and enqueues this job. The handler:
+
+1. Reads the staged file, runs text extraction (best-effort — failure logs a warning but the upload proceeds).
+2. Computes the SHA-256 hash; rejects the upload as a duplicate if any other version (including in trashed documents) shares the hash. The duplicate exception is `IStructuredJobError` so the client can offer "view the existing document".
+3. Moves the file from staging to its hash-addressed final location (copy + delete to be safe across filesystems).
+4. Creates the `Document` and its first `DocumentVersion` in the same transaction; rolls back the file move on DB failure.
+5. Updates the search vector.
+6. Sends the SignalR completion notification.
+7. Generates a thumbnail (post-notification, best-effort).
+
+Sets `EntityType = Document`, `EntityId = documentId`.
+
+### `UploadDocumentVersion`
+
+Triggered when a new version of an existing document is uploaded. Same shape as `UploadDocument`, but creates only a `DocumentVersion` (with `VersionNumber = max(existing) + 1`) attached to the existing document. Sets `EntityId` to the *parent* document.
+
+### `ReprocessDocumentVersion`
+
+Re-runs text extraction on an existing document version (e.g., after the user changes the OCR engine). The handler reads the file from its hash-addressed location, re-extracts text, writes the diff to the audit log via `auditLogger.ForUser(job.CreatedByUserId)`, and updates the search vector.
+
+Failures here are loud: text extraction failure throws `TextExtractionFailedException` (no graceful "proceed without text" path, unlike upload). When run as a child of a `BulkReprocessDocuments` parent, this handler suppresses its own success notification — the parent's progress updates are the sole channel.
+
+### `BulkReprocessDocuments` *(parent)*
+
+The only parent-job handler in v1. Triggered by the bulk-reprocess action on the documents list. The handler:
+
+1. Idempotency check: if children already exist for this parent ID (crash recovery), restore `TotalChildCount` and return.
+2. Resolve the latest version per supplied document ID.
+3. Insert one `ReprocessDocumentVersion` child per `(documentId, latestVersionId)` with `ParentJobId = job.Id`.
+4. Set `TotalChildCount = N`, save, and signal the worker.
+5. Return — the parent is left `InProgress`; child completions drive the rest.
+
+### `DownloadDocuments`
+
+Packages a set of documents into a ZIP for download. The handler reads metadata (document name, tag paths, party names, latest version's file path), builds an archive with collision-resolved entry paths via `IDownloadPathBuilder`, and writes the ZIP to a temp location keyed by `job.Id`. On success, the handler **rewrites the job's payload** to `DownloadResultPayload(zipFileSize, documentCount, expiresAt)` so the API can serve the result. Sets `EntityType = Download`. The ZIP expires after a fixed window; expired files are swept on the next download job.
+
+This is the only v1 job type whose `Payload` carries result data after completion — most jobs use `EntityId` to point back to the produced entity.
+
+## Design principles
+
+### One process, one queue, one database
+
+The queue is a table in the same PostgreSQL the rest of the app uses. The worker is a `BackgroundService` in the same WebApi process. There are no external dependencies. This is the right shape for a self-hosted single-household deployment: one process to run, one database to back up, no extra moving parts. It is **not** the right shape for horizontal scale-out — running two WebApi instances would have them race to claim jobs, which the atomic claim handles, but no other coordination (e.g., scheduled work, leader election) exists. The product is single-instance and that is intentional.
+
+### Handlers own their domain transactions
+
+The processor does not open a transaction around `HandleAsync`. Each handler manages its own `SaveChangesAsync`, its own audit logging, its own file-system compensation. This keeps the processor agnostic to handler complexity and makes it natural for a handler to mix DB writes with side-effects (file moves, search-vector updates) and decide when "complete enough to notify the user" is. The price is that a handler crashing mid-transaction must clean up after itself; the upload handlers do this by deleting the placed file on save failure.
+
+### No retries — failures are user-visible
+
+A failed job stays failed. The user sees the failure message in real time and decides what to do. This is the right default for this product because most jobs are user-initiated (an upload, a reprocess); silently retrying would either succeed surprisingly late or pile up duplicate effort. If retry semantics are needed later — for a job class where the user does *not* want to be told about transient failures — that becomes an opt-in attribute of the job type, not a queue-wide policy.
+
+### Notifications are the handler's responsibility, except on failure
+
+Success notifications come from the handler because only the handler knows when "user-visible done" has happened (e.g., after the DB commit but before optional thumbnail generation). Failure notifications come from the processor because by the time it has caught an exception, the handler is no longer in a position to publish a coherent message. Structured error data (`IStructuredJobError`) bridges the gap so the processor's catch block can still surface domain-specific detail.
+
+### Parent jobs are flat fan-out, not a workflow engine
+
+The hierarchy supports exactly one shape: a parent that creates N independent children at once and waits for them all. There is no chain-of-jobs, no DAG, no conditional next-step. If a future feature needs that, it should be built explicitly on top of the queue (a state machine in a domain handler), not by extending the hierarchy depth.
+
+### The audit attribution rule
+
+Background-job handlers that write to the audit log use `auditLogger.ForUser(job.CreatedByUserId)` — never the current request's user (there is none) and never anonymous. This keeps the audit log honest about *who caused* a change, even when the change ran asynchronously from a job queue. Any new handler that mutates auditable state must follow this pattern.
+
+## Distinctive UX decisions worth preserving
+
+1. **The job ID returned from enqueue is the contract.** Every async-initiating endpoint returns `{ jobId }`. Frontends decide whether to await the SignalR completion (managed jobs) or fire-and-forget with a generic toast on completion (unmanaged jobs).
+2. **The admin job list is read-only.** No retry button, no cancel button, no force-fail. If a job needs intervention, the user re-issues the action.
+3. **Bulk operations show *partial* failure as a first-class outcome.** `PartiallyCompleted` is not a degenerate `Failed`; the toast wording (`"Processing completed with N failed item(s)"`) tells the user some items succeeded and which did not.
+4. **Job notifications are scoped per user.** Two users in the same household uploading concurrently do not see each other's toasts.
+5. **The list view groups by parent.** Children only appear when their parent is expanded. The default view is "what work the user kicked off," not "every individual operation."
+
+## Future-compatibility
+
+The following must be addable without rewriting the table or breaking existing job types:
+
+- **Retries with backoff** as an opt-in property of a job type. The `Error` column already stores the latest failure; adding `Attempt` / `MaxAttempts` / `NextAttemptAt` columns is the natural extension.
+- **Scheduled jobs** (`RunAt`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`.
+- **Recurring jobs** — a separate "schedule" table emits a Pending job at each tick; the queue itself stays event-sourced.
+- **System-initiated jobs** — `CreatedByUserId` becomes nullable-with-meaning ("system"); notification routing learns to skip user-targeted SignalR for those.
+- **Per-job-type concurrency caps** (e.g., one OCR at a time, but ten ZIPs at a time). Today's single semaphore would split into per-type semaphores.
+- **Cancel from the admin UI** — the worker would need to expose a per-job cancellation token, and the API would set a `CancelRequested` flag the worker checks.
+- **External worker process** — the in-process `BackgroundService` is replaced by a separate executable that talks to the same table. The atomic-claim primitive already supports this.
+- **Multi-process WebApi** — beyond the queue, this needs a coordinated answer for SignalR (a backplane) and startup recovery (only one node should sweep). Not a queue concern in isolation.
+- **Deeper hierarchies / DAG workflows** — would not extend `ParentJobId`; build a domain-level state machine that issues fresh top-level jobs and reads their results.
+
+None of these should require re-migrating historical job rows. The current schema's nullable `EntityType`, `EntityId`, `Payload`, `CreatedByUserId`, and `ParentJobId` are deliberately permissive so future job types can fit without an ALTER TABLE.
