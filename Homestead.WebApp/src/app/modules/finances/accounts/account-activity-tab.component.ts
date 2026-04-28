@@ -273,12 +273,10 @@ export class AccountActivityTabComponent {
   }));
 
   private readonly TH_CLASSES: Record<string, string> = {
-    date: 'hidden sm:table-cell',
     amount: 'text-right',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
-    date: 'hidden sm:table-cell',
     description: 'min-w-0',
     amount: 'text-right',
   };
