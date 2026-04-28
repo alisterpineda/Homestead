@@ -12,12 +12,12 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { statusBadgeVariant as _statusBadgeVariant, statusLabel as _statusLabel } from '@/shared/utils/processing-status.utils';
+import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { GetProcessingJobsResponse } from '@/api/generated/models/get-processing-jobs-response';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
-import type { ProcessingJobType } from '@/api/generated/models/processing-job-type';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
 @Component({
@@ -353,17 +353,7 @@ export class JobListComponent {
     });
   }
 
-  humanizeType(type: ProcessingJobType): string {
-    switch (type) {
-      case 'UploadDocument': return 'Upload Document';
-      case 'UploadDocumentVersion': return 'Upload Version';
-      case 'ReprocessDocumentVersion': return 'Reprocess Version';
-      case 'BulkReprocessDocuments': return 'Bulk Reprocess';
-      case 'DownloadDocuments': return 'Download Documents';
-      case 'NoOp': return 'No-op';
-      default: return type;
-    }
-  }
+  humanizeType = processingJobTypeLabel;
 
   statusBadgeVariant = _statusBadgeVariant;
   statusLabel = _statusLabel;
