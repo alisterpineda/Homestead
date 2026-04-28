@@ -26,6 +26,16 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
+import { HlmTableImports } from '@/shared/components/spartan/table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createAngularTable,
+  flexRenderComponent,
+  FlexRenderDirective,
+  getCoreRowModel,
+  injectFlexRenderContext,
+} from '@tanstack/angular-table';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -50,15 +60,68 @@ interface ActivityRowViewModel {
   title: string;
   subtitle: string;
   iconName: string;
+  shapeLabel: string;
   signed: number;
   amountText: string | null;
   dateText: string;
 }
 
 @Component({
+  selector: 'app-activity-shape-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({
+    lucideArrowRightLeft, lucideScale, lucideFlag, lucideSplit, lucideCircleDashed,
+  })],
+  template: `
+    <div class="flex items-center gap-2">
+      <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <ng-icon hlm [name]="context.row.original.iconName" size="sm" />
+      </span>
+      <span class="text-sm">{{ context.row.original.shapeLabel }}</span>
+    </div>
+  `,
+})
+class ActivityShapeCell {
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+}
+
+@Component({
+  selector: 'app-activity-description-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="flex min-w-0 flex-col">
+      <span class="truncate text-sm font-medium">{{ context.row.original.title }}</span>
+      @if (context.row.original.subtitle) {
+        <span class="truncate text-xs text-muted-foreground">{{ context.row.original.subtitle }}</span>
+      }
+    </div>
+  `,
+})
+class ActivityDescriptionCell {
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+}
+
+@Component({
+  selector: 'app-activity-amount-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <span
+      class="text-sm font-medium tabular-nums"
+      [class.text-destructive]="context.row.original.signed < 0"
+    >
+      {{ context.row.original.amountText ?? '—' }}
+    </span>
+  `,
+})
+class ActivityAmountCell {
+  protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+}
+
+@Component({
   selector: 'app-account-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports],
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, FlexRenderDirective],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideSplit, lucideCircleDashed,
     lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideListTodo,
@@ -89,31 +152,46 @@ interface ActivityRowViewModel {
         </div>
       </div>
     } @else {
-      <ul role="list" class="divide-y divide-border">
-        @for (item of items(); track item.tx.id) {
-          <li>
-            <button
-              type="button"
-              class="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-              (click)="onClick(item.tx)"
-            >
-              <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <ng-icon hlm [name]="item.iconName" size="sm" />
-              </span>
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium truncate">{{ item.title }}</p>
-                <p class="text-xs text-muted-foreground truncate">{{ item.subtitle }}</p>
-              </div>
-              <div class="text-right tabular-nums shrink-0">
-                <p class="text-sm font-medium" [class.text-destructive]="item.signed < 0">
-                  {{ item.amountText ?? '—' }}
-                </p>
-                <p class="text-xs text-muted-foreground">{{ item.dateText }}</p>
-              </div>
-            </button>
-          </li>
-        }
-      </ul>
+      <div class="overflow-clip rounded-md border">
+        <div hlmTableContainer>
+          <table hlmTable>
+          <thead hlmTHead>
+            @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
+              <tr hlmTr>
+                @for (header of headerGroup.headers; track header.id) {
+                  <th hlmTh [class]="getThClass(header.column.id)">
+                    @if (!header.isPlaceholder) {
+                      <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
+                        <span>{{ h }}</span>
+                      </ng-container>
+                    }
+                  </th>
+                }
+              </tr>
+            }
+          </thead>
+          <tbody hlmTBody>
+            @for (row of table.getRowModel().rows; track row.id) {
+              <tr
+                hlmTr
+                tabindex="0"
+                class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                (click)="onClick(row.original.tx)"
+                (keydown.enter)="onClick(row.original.tx)"
+              >
+                @for (cell of row.getVisibleCells(); track cell.id) {
+                  <td hlmTd [class]="getTdClass(cell.column.id)">
+                    <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
+                      <div [innerHTML]="c"></div>
+                    </ng-container>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+        </div>
+      </div>
 
       <div class="mt-4 flex items-center justify-between text-sm">
         <p class="text-muted-foreground">
@@ -160,6 +238,60 @@ export class AccountActivityTabComponent {
     const txs = this.rawItems();
     return txs.map(tx => this.toViewModel(tx, a));
   });
+
+  private readonly _columns: ColumnDef<ActivityRowViewModel>[] = [
+    {
+      id: 'date',
+      accessorFn: r => r.dateText,
+      header: 'Date',
+      cell: info => `<span class="tabular-nums text-muted-foreground">${info.getValue<string>()}</span>`,
+      enableSorting: false,
+    },
+    {
+      id: 'type',
+      header: 'Type',
+      cell: () => flexRenderComponent(ActivityShapeCell),
+      enableSorting: false,
+    },
+    {
+      id: 'description',
+      header: 'Description',
+      cell: () => flexRenderComponent(ActivityDescriptionCell),
+      enableSorting: false,
+    },
+    {
+      id: 'amount',
+      header: 'Amount',
+      cell: () => flexRenderComponent(ActivityAmountCell),
+      enableSorting: false,
+    },
+  ];
+
+  protected readonly table = createAngularTable<ActivityRowViewModel>(() => ({
+    data: this.items(),
+    columns: this._columns,
+    getRowId: r => r.tx.id,
+    getCoreRowModel: getCoreRowModel(),
+  }));
+
+  private readonly TH_CLASSES: Record<string, string> = {
+    date: 'hidden sm:table-cell',
+    amount: 'text-right',
+  };
+
+  private readonly TD_CLASSES: Record<string, string> = {
+    date: 'hidden sm:table-cell',
+    description: 'min-w-0',
+    amount: 'text-right',
+  };
+
+  protected getThClass(columnId: string): string {
+    return this.TH_CLASSES[columnId] ?? '';
+  }
+
+  protected getTdClass(columnId: string): string {
+    return this.TD_CLASSES[columnId] ?? '';
+  }
 
   constructor() {
     // Reset to page 1 whenever the account changes.
@@ -284,6 +416,7 @@ export class AccountActivityTabComponent {
       title,
       subtitle,
       iconName: shapeIconName(tx.shape),
+      shapeLabel: shapeLabel(tx.shape),
       signed,
       amountText,
       dateText,

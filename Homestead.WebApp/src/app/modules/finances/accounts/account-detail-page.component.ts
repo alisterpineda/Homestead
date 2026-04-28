@@ -214,7 +214,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             }
             <button hlmTabsTrigger="info">Info</button>
           </hlm-tabs-list>
-          <div hlmTabsContent="activity" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
+          <div hlmTabsContent="activity" class="mt-3">
             <app-account-activity-tab
               [account]="a"
               [refreshKey]="refreshTrigger()"
