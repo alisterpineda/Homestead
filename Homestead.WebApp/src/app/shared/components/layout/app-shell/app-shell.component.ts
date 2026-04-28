@@ -152,7 +152,7 @@ import { getModuleByPath } from '@/modules/registry';
           </div>
         </header>
 
-        <div class="flex flex-1 flex-col overflow-y-auto p-4">
+        <div class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4">
           <router-outlet />
         </div>
       </main>

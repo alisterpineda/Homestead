@@ -140,19 +140,11 @@ function toRgb(value: string, fallback: string): string {
 }
 
 function formatAxis(value: number, symbol: string | null): string {
-  const abs = Math.abs(value);
-  let scaled = value;
-  let suffix = '';
-  if (abs >= 1_000_000) {
-    scaled = value / 1_000_000;
-    suffix = 'M';
-  } else if (abs >= 1_000) {
-    scaled = value / 1_000;
-    suffix = 'k';
-  }
-  const formatted = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(scaled);
-  const symbolPart = symbol ? `${symbol} ` : '';
-  return `${symbolPart}${formatted}${suffix}`;
+  return new Intl.NumberFormat(undefined, {
+    style: symbol ? 'currency' : 'decimal',
+    currency: symbol ?? undefined,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 interface AxisTooltipParam {
