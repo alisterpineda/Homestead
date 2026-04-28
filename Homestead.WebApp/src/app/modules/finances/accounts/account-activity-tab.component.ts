@@ -57,10 +57,9 @@ const PAGE_SIZE = 25;
 
 interface ActivityRowViewModel {
   tx: TransactionResponse;
-  title: string;
-  subtitle: string;
   iconName: string;
   shapeLabel: string;
+  typeSubtitle: string;
   signed: number;
   amountText: string | null;
   dateText: string;
@@ -78,7 +77,12 @@ interface ActivityRowViewModel {
       <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <ng-icon hlm [name]="context.row.original.iconName" size="sm" />
       </span>
-      <span class="text-sm">{{ context.row.original.shapeLabel }}</span>
+      <div class="flex min-w-0 flex-col">
+        <span class="text-sm">{{ context.row.original.shapeLabel }}</span>
+        @if (context.row.original.typeSubtitle) {
+          <span class="truncate text-xs text-muted-foreground">{{ context.row.original.typeSubtitle }}</span>
+        }
+      </div>
     </div>
   `,
 })
@@ -90,12 +94,7 @@ class ActivityShapeCell {
   selector: 'app-activity-description-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex min-w-0 flex-col">
-      <span class="truncate text-sm font-medium">{{ context.row.original.title }}</span>
-      @if (context.row.original.subtitle) {
-        <span class="truncate text-xs text-muted-foreground">{{ context.row.original.subtitle }}</span>
-      }
-    </div>
+    <span class="block truncate text-sm">{{ context.row.original.tx.description }}</span>
   `,
 })
 class ActivityDescriptionCell {
@@ -222,7 +221,6 @@ export class AccountActivityTabComponent {
   error = signal(false);
   totalCount = signal(0);
   rawItems = signal<TransactionResponse[]>([]);
-  // Cache resolved counterparty / commodity for row rendering.
   accountNames = signal<Record<string, string>>({});
   commodities = signal<Record<string, CommodityResponse>>({});
 
@@ -347,12 +345,16 @@ export class AccountActivityTabComponent {
   }
 
   private resolveLookups(txs: TransactionResponse[]): void {
+    const accountId = this.account()?.id;
     const accountIds = new Set<string>();
     const commodityIds = new Set<string>();
     for (const tx of txs) {
       for (const s of tx.splits) {
-        accountIds.add(s.accountId);
         commodityIds.add(s.commodityId);
+      }
+      if (tx.shape === 'Transfer' && accountId) {
+        const cp = transferCounterparty(tx, accountId);
+        if (cp) accountIds.add(cp.accountId);
       }
     }
     const knownA = this.accountNames();
@@ -388,35 +390,20 @@ export class AccountActivityTabComponent {
 
     const dateText = toDateOnly(tx.occurredAt);
 
-    const title = tx.description?.trim() || shapeLabel(tx.shape);
-    let subtitle = '';
-    switch (tx.shape) {
-      case 'Transfer': {
-        const cp = transferCounterparty(tx, account.id);
-        const cpName = cp ? (this.accountNames()[cp.accountId] ?? '...') : '';
-        subtitle = signed < 0 ? `To ${cpName}` : `From ${cpName}`;
-        break;
+    let typeSubtitle = '';
+    if (tx.shape === 'Transfer') {
+      const cp = transferCounterparty(tx, account.id);
+      const cpName = cp ? this.accountNames()[cp.accountId] : null;
+      if (cpName) {
+        typeSubtitle = signed < 0 ? `To ${cpName}` : `From ${cpName}`;
       }
-      case 'BalanceEntry':
-        subtitle = 'Balance assertion';
-        break;
-      case 'OpeningBalance':
-        subtitle = 'Account opening balance';
-        break;
-      case 'StockSplit':
-        subtitle = 'Stock split';
-        break;
-      case 'Other':
-        subtitle = '';
-        break;
     }
 
     return {
       tx,
-      title,
-      subtitle,
       iconName: shapeIconName(tx.shape),
       shapeLabel: shapeLabel(tx.shape),
+      typeSubtitle,
       signed,
       amountText,
       dateText,
