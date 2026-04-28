@@ -109,62 +109,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       </nav>
     </ng-template>
 
-    <ng-template #headerActions>
-      @if (account(); as a) {
-        @if (!a.isArchived) {
-          @if (a.kind === 'Investment') {
-            <button hlmBtn size="sm" (click)="openAddPosition()">
-              <ng-icon hlm name="lucidePackagePlus" size="sm" />
-              Add position
-            </button>
-            <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
-              <ng-icon hlm name="lucideScale" size="sm" />
-              Record balance
-            </button>
-          } @else {
-            <button hlmBtn size="sm" (click)="openRecordBalance()">
-              <ng-icon hlm name="lucideScale" size="sm" />
-              Record balance
-            </button>
-          }
-
-          <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
-            <ng-icon hlm name="lucidePlus" size="sm" />
-            New transaction
-            <ng-icon hlm name="lucideChevronDown" size="sm" />
-          </button>
-          <ng-template #newTxMenu>
-            <hlm-dropdown-menu class="w-48">
-              <hlm-dropdown-menu-group>
-                <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
-                  <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
-                  Transfer
-                </button>
-              </hlm-dropdown-menu-group>
-            </hlm-dropdown-menu>
-          </ng-template>
-        }
-
-        <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
-          <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
-        </button>
-        <ng-template #accountMenu>
-          <hlm-dropdown-menu class="w-44">
-            <hlm-dropdown-menu-group>
-              <button hlmDropdownMenuItem (triggered)="openEdit()">
-                <ng-icon hlm name="lucidePencil" size="sm" />
-                Edit
-              </button>
-              <button hlmDropdownMenuItem (triggered)="toggleArchive()">
-                <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
-                {{ a.isArchived ? 'Unarchive' : 'Archive' }}
-              </button>
-            </hlm-dropdown-menu-group>
-          </hlm-dropdown-menu>
-        </ng-template>
-      }
-    </ng-template>
-
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       @if (loading()) {
         <div class="flex justify-center py-16">
@@ -207,13 +151,69 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         </header>
 
         <hlm-tabs tab="activity" class="flex flex-1 flex-col">
-          <hlm-tabs-list>
-            <button hlmTabsTrigger="activity">Activity</button>
-            @if (a.kind === 'Investment') {
-              <button hlmTabsTrigger="positions">Positions</button>
-            }
-            <button hlmTabsTrigger="info">Info</button>
-          </hlm-tabs-list>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <hlm-tabs-list>
+              <button hlmTabsTrigger="activity">Activity</button>
+              @if (a.kind === 'Investment') {
+                <button hlmTabsTrigger="positions">Positions</button>
+              }
+              <button hlmTabsTrigger="info">Info</button>
+            </hlm-tabs-list>
+
+            <div class="flex flex-wrap items-center gap-2">
+              @if (!a.isArchived) {
+                @if (a.kind === 'Investment') {
+                  <button hlmBtn size="sm" (click)="openAddPosition()">
+                    <ng-icon hlm name="lucidePackagePlus" size="sm" />
+                    Add position
+                  </button>
+                  <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
+                    <ng-icon hlm name="lucideScale" size="sm" />
+                    Record balance
+                  </button>
+                } @else {
+                  <button hlmBtn size="sm" (click)="openRecordBalance()">
+                    <ng-icon hlm name="lucideScale" size="sm" />
+                    Record balance
+                  </button>
+                }
+
+                <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
+                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  New transaction
+                  <ng-icon hlm name="lucideChevronDown" size="sm" />
+                </button>
+                <ng-template #newTxMenu>
+                  <hlm-dropdown-menu class="w-48">
+                    <hlm-dropdown-menu-group>
+                      <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
+                        <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
+                        Transfer
+                      </button>
+                    </hlm-dropdown-menu-group>
+                  </hlm-dropdown-menu>
+                </ng-template>
+              }
+
+              <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
+                <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+              </button>
+              <ng-template #accountMenu>
+                <hlm-dropdown-menu class="w-44">
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuItem (triggered)="openEdit()">
+                      <ng-icon hlm name="lucidePencil" size="sm" />
+                      Edit
+                    </button>
+                    <button hlmDropdownMenuItem (triggered)="toggleArchive()">
+                      <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                      {{ a.isArchived ? 'Unarchive' : 'Archive' }}
+                    </button>
+                  </hlm-dropdown-menu-group>
+                </hlm-dropdown-menu>
+              </ng-template>
+            </div>
+          </div>
           <div hlmTabsContent="activity">
             <app-account-activity-tab
               [account]="a"
@@ -316,7 +316,6 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   reportingCurrency = signal<CommodityResponse | null>(null);
 
-  private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
   private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   private accountId = toSignal(
@@ -368,14 +367,12 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   constructor() {
     afterNextRender(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
       this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd),
       takeUntilDestroyed(),
     ).subscribe(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
       this.pageHeaderService.setTitle(this.headerTitleTpl());
     });
 
@@ -388,11 +385,10 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.pageHeaderService.clearActions();
     this.pageHeaderService.clearTitle();
   }
 
-  // ─── Header actions ──────────────────────────────────────────────────────
+  // ─── Action handlers ─────────────────────────────────────────────────────
 
   openEdit(): void {
     this.editSheetState.set('open');
