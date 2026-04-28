@@ -32,6 +32,8 @@ export class NetWorthChartComponent {
   readonly points = input.required<readonly NetWorthHistoryPoint[]>();
   readonly granularity = input.required<NetWorthGranularity>();
   readonly displayCurrencySymbol = input<string | null>(null);
+  readonly xAxisMin = input<string | null>(null);
+  readonly xAxisMax = input<string | null>(null);
 
   protected readonly ariaLabel = computed(() =>
     `Net worth over time, ${this.points().length} data points in ${this.displayCurrencySymbol() ?? 'display currency'}.`,
@@ -48,7 +50,7 @@ export class NetWorthChartComponent {
     const data = this.points().map(p => [p.asOf, p.value ?? null]);
 
     return {
-      grid: { left: 64, right: 16, top: 16, bottom: 32, containLabel: true },
+      grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: colors.popover,
@@ -58,6 +60,8 @@ export class NetWorthChartComponent {
       },
       xAxis: {
         type: 'time',
+        min: this.xAxisMin() ?? undefined,
+        max: this.xAxisMax() ?? undefined,
         axisLine: { lineStyle: { color: colors.border } },
         axisLabel: { color: colors.mutedFg, hideOverlap: true },
         splitLine: { show: false },

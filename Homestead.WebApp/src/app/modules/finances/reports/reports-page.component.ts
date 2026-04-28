@@ -19,6 +19,13 @@ import type { NetWorthEmptyReason } from './net-worth-empty-state.component';
 import type { GetNetWorthHistoryResponse } from '@/api/generated/models/get-net-worth-history-response';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
 
+const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
+  OneMonth: 1,
+  ThreeMonths: 3,
+  SixMonths: 6,
+  OneYear: 12,
+};
+
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -96,6 +103,8 @@ import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
               [points]="response.points"
               [granularity]="response.granularity"
               [displayCurrencySymbol]="response.displayCurrencySymbol ?? null"
+              [xAxisMin]="xAxisMin()"
+              [xAxisMax]="xAxisMax()"
             />
           </section>
         }
@@ -131,6 +140,20 @@ export class ReportsPageComponent {
   protected readonly emptyReason = computed<NetWorthEmptyReason | null>(() => {
     const r = this.data()?.reason;
     return r === 'no_transactions' || r === 'no_display_currency' ? r : null;
+  });
+
+  // Pin the x-axis to the requested range window so the axis spans 1M/3M/6M/1Y
+  // even when activity only fills part of it. "All" stays auto-fit so the line
+  // hugs the user's actual history.
+  protected readonly xAxisMax = computed(() => this.data()?.to ?? null);
+  protected readonly xAxisMin = computed(() => {
+    const response = this.data();
+    if (!response?.to) return null;
+    const months = RANGE_MONTHS[this.range()];
+    if (months == null) return null;
+    const min = new Date(response.to);
+    min.setMonth(min.getMonth() - months);
+    return min.toISOString();
   });
 
   protected readonly headlineText = computed(() => {
