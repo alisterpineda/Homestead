@@ -1,4 +1,13 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  viewChild,
+  TemplateRef,
+  afterNextRender,
+  OnDestroy,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -8,10 +17,11 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
+import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import type { GetPriceSourcesResponse } from '@/api/generated/models/get-price-sources-response';
 import type { PriceSourceSummary } from '@/api/generated/models/price-source-summary';
-import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
 type StatusPill = { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' };
@@ -19,10 +29,29 @@ type StatusPill = { label: string; variant: 'default' | 'destructive' | 'seconda
 @Component({
   selector: 'app-price-source-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmBadge],
+  imports: [
+    DatePipe,
+    NgIcon,
+    HlmIconImports,
+    HlmSpinner,
+    HlmEmptyImports,
+    HlmTableImports,
+    HlmBadge,
+    HlmBreadCrumbImports,
+  ],
   providers: [provideIcons({ lucideRss })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb>
+        <ol hlmBreadcrumbList>
+          <li hlmBreadcrumbItem><span>Settings</span></li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem><span hlmBreadcrumbPage>Price sources</span></li>
+        </ol>
+      </nav>
+    </ng-template>
+
     <div class="flex min-h-0 flex-1 flex-col gap-2">
       @if (loading()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
@@ -87,22 +116,29 @@ type StatusPill = { label: string; variant: 'default' | 'destructive' | 'seconda
     </div>
   `,
 })
-export class PriceSourceListComponent {
+export class PriceSourceListComponent implements OnDestroy {
   private api = inject(FinancesPriceSourcesApiService);
   private router = inject(Router);
-  private errorHandler = inject(ErrorHandlerService);
+  private pageHeader = inject(PageHeaderService);
 
   loading = signal(true);
   error = signal(false);
   data = signal<GetPriceSourcesResponse | null>(null);
 
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
+
   constructor() {
+    afterNextRender(() => this.pageHeader.setTitle(this.headerTitleTpl()));
     this.api.list()
       .pipe(handleQueryError(this.loading, this.error, null))
       .subscribe(r => {
         this.loading.set(false);
         if (r) this.data.set(r);
       });
+  }
+
+  ngOnDestroy(): void {
+    this.pageHeader.clearTitle();
   }
 
   goTo(item: PriceSourceSummary): void {

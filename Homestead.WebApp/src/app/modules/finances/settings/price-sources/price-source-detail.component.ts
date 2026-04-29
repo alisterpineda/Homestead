@@ -1,19 +1,28 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  computed,
+  viewChild,
+  TemplateRef,
+  afterNextRender,
+  OnDestroy,
+} from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { toast } from '@spartan-ng/brain/sonner';
-import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideArrowLeft } from '@ng-icons/lucide';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
-import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
+import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { GetPriceSourceResponse } from '@/api/generated/models/get-price-source-response';
 import type { CommodityPriceSource } from '@/api/generated/models/commodity-price-source';
@@ -23,19 +32,30 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
   selector: 'app-price-source-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule, DatePipe, NgIcon, HlmIconImports, HlmSpinner,
+    FormsModule, DatePipe, HlmSpinner,
     HlmButton, HlmInput, HlmLabel, HlmBadge, HlmCheckbox,
+    HlmBreadCrumbImports,
     PriceSourceConfigFormComponent,
   ],
-  providers: [provideIcons({ lucideArrowLeft })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div class="flex min-h-0 flex-1 flex-col gap-4 max-w-3xl">
-      <button hlmBtn variant="ghost" size="sm" class="self-start" (click)="back()">
-        <ng-icon hlm name="lucideArrowLeft" size="sm" class="mr-1" />
-        Back
-      </button>
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb class="min-w-0">
+        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
+          <li hlmBreadcrumbItem><span>Settings</span></li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem>
+            <a hlmBreadcrumbLink link="/finances/settings/price-sources">Price sources</a>
+          </li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem class="min-w-0">
+            <span hlmBreadcrumbPage class="truncate">{{ leafLabel() }}</span>
+          </li>
+        </ol>
+      </nav>
+    </ng-template>
 
+    <div class="flex min-h-0 flex-1 flex-col gap-4 max-w-3xl">
       @if (loading()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
       } @else if (error()) {
@@ -167,11 +187,11 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
     </div>
   `,
 })
-export class PriceSourceDetailComponent {
+export class PriceSourceDetailComponent implements OnDestroy {
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
   private api = inject(FinancesPriceSourcesApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private pageHeader = inject(PageHeaderService);
 
   source = signal<CommodityPriceSource>('BankOfCanada');
   loading = signal(true);
@@ -192,10 +212,19 @@ export class PriceSourceDetailComponent {
 
   enabledDirty = computed(() => this.isEnabled() !== (this.data()?.isEnabled ?? false));
 
+  protected leafLabel = computed(() => this.data()?.displayName ?? 'Price source');
+
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
+
   constructor() {
+    afterNextRender(() => this.pageHeader.setTitle(this.headerTitleTpl()));
     const sourceParam = this.route.snapshot.paramMap.get('source') as CommodityPriceSource | null;
     if (sourceParam) this.source.set(sourceParam);
     this.refresh();
+  }
+
+  ngOnDestroy(): void {
+    this.pageHeader.clearTitle();
   }
 
   private refresh(): void {
@@ -285,9 +314,5 @@ export class PriceSourceDetailComponent {
         toast.success('Job enqueued — see Jobs page for progress.');
         this.refresh();
       });
-  }
-
-  back(): void {
-    void this.router.navigate(['/finances/settings/price-sources']);
   }
 }

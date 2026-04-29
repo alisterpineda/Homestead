@@ -1,18 +1,19 @@
-import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, signal, effect } from '@angular/core';
 import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp } from '@ng-icons/lucide';
+import { lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
+import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { isNavItemActive } from '@/shared/utils';
 
 @Component({
   selector: 'app-finances-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports],
-  providers: [provideIcons({ lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp })],
+  imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports, HlmCollapsibleImports],
+  providers: [provideIcons({ lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupLabel>Finances</div>
@@ -37,10 +38,41 @@ import { isNavItemActive } from '@/shared/utils';
             </a>
           </li>
           <li hlmSidebarMenuItem>
-            <a hlmSidebarMenuButton routerLink="/finances/settings" [isActive]="isActive('/finances/settings')">
-              <ng-icon hlm name="lucideSettings" size="sm" />
-              <span>Settings</span>
-            </a>
+            <div hlmCollapsible [(expanded)]="settingsExpanded">
+              <button hlmCollapsibleTrigger hlmSidebarMenuButton [isActive]="isAnySettingsActive()">
+                <ng-icon hlm name="lucideSettings" size="sm" />
+                <span>Settings</span>
+                <ng-icon
+                  hlm
+                  name="lucideChevronRight"
+                  size="sm"
+                  class="ml-auto transition-transform"
+                  [class.rotate-90]="settingsExpanded()"
+                />
+              </button>
+              <div hlmCollapsibleContent>
+                <ul hlmSidebarMenuSub>
+                  <li hlmSidebarMenuSubItem>
+                    <a
+                      hlmSidebarMenuSubButton
+                      routerLink="/finances/settings/general"
+                      [isActive]="isActive('/finances/settings/general')"
+                    >
+                      <span>General</span>
+                    </a>
+                  </li>
+                  <li hlmSidebarMenuSubItem>
+                    <a
+                      hlmSidebarMenuSubButton
+                      routerLink="/finances/settings/price-sources"
+                      [isActive]="isActive('/finances/settings/price-sources')"
+                    >
+                      <span>Price sources</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </li>
         </ul>
       </div>
@@ -60,7 +92,27 @@ export class FinancesSidebarComponent {
 
   private urlPath = computed(() => this.url().split('?')[0]);
 
-  private readonly navPaths = ['/finances/accounts', '/finances/commodities', '/finances/reports', '/finances/settings'];
+  private readonly navPaths = [
+    '/finances/accounts',
+    '/finances/commodities',
+    '/finances/reports',
+    '/finances/settings/general',
+    '/finances/settings/price-sources',
+  ];
+
+  settingsExpanded = signal(false);
+
+  isAnySettingsActive = computed(() =>
+    this.isActive('/finances/settings/general') || this.isActive('/finances/settings/price-sources'),
+  );
+
+  constructor() {
+    effect(() => {
+      if (this.isAnySettingsActive() && !this.settingsExpanded()) {
+        this.settingsExpanded.set(true);
+      }
+    });
+  }
 
   isActive(path: string): boolean {
     return isNavItemActive(this.urlPath(), path, this.navPaths);

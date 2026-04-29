@@ -1,9 +1,22 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, effect } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  signal,
+  computed,
+  effect,
+  viewChild,
+  TemplateRef,
+  afterNextRender,
+  OnDestroy,
+} from '@angular/core';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
 import { FinanceSettingsService } from '../../shared/finance-settings.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -11,9 +24,19 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
 @Component({
   selector: 'app-general-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, HlmLabel, CurrencyPickerComponent],
+  imports: [HlmButton, HlmLabel, HlmBreadCrumbImports, CurrencyPickerComponent],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb>
+        <ol hlmBreadcrumbList>
+          <li hlmBreadcrumbItem><span>Settings</span></li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem><span hlmBreadcrumbPage>General</span></li>
+        </ol>
+      </nav>
+    </ng-template>
+
     <div class="flex min-h-0 flex-1 flex-col gap-4 max-w-2xl">
       <header>
         <h2 class="text-xl font-semibold">General</h2>
@@ -47,13 +70,16 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
     </div>
   `,
 })
-export class GeneralSettingsComponent {
+export class GeneralSettingsComponent implements OnDestroy {
   private settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
+  private pageHeader = inject(PageHeaderService);
 
   selectedId = signal<string | null>(null);
   selectedCommodity = signal<CommodityResponse | null>(null);
   saving = signal(false);
+
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   canSave = computed(() => {
     const id = this.selectedId();
@@ -61,6 +87,7 @@ export class GeneralSettingsComponent {
   });
 
   constructor() {
+    afterNextRender(() => this.pageHeader.setTitle(this.headerTitleTpl()));
     effect(() => {
       if (this.settingsService.loaded()) {
         const id = this.settingsService.displayCurrencyId();
@@ -71,6 +98,10 @@ export class GeneralSettingsComponent {
         }
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    this.pageHeader.clearTitle();
   }
 
   save(): void {
