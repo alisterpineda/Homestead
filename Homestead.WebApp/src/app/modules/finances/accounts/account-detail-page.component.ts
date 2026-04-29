@@ -141,12 +141,18 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <p class="text-sm text-muted-foreground">{{ a.institution }}</p>
             }
           </div>
-          <div class="text-right shrink-0 tabular-nums">
-            <p class="text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
-            <p class="text-3xl font-semibold">{{ displayText() ?? '—' }}</p>
-            @if (showNative() && nativeText(); as nt) {
-              <p class="text-sm text-muted-foreground">{{ nt }}</p>
-            }
+          <div class="flex flex-col items-end gap-6 shrink-0">
+            <button hlmBtn variant="outline" size="sm" (click)="openEdit()">
+              <ng-icon hlm name="lucidePencil" size="sm" />
+              Edit account
+            </button>
+            <div class="text-right tabular-nums">
+              <p class="text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
+              <p class="text-3xl font-semibold">{{ displayText() ?? '—' }}</p>
+              @if (showNative() && nativeText(); as nt) {
+                <p class="text-sm text-muted-foreground">{{ nt }}</p>
+              }
+            </div>
           </div>
         </header>
 
@@ -201,10 +207,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <ng-template #accountMenu>
                 <hlm-dropdown-menu class="w-44">
                   <hlm-dropdown-menu-group>
-                    <button hlmDropdownMenuItem (triggered)="openEdit()">
-                      <ng-icon hlm name="lucidePencil" size="sm" />
-                      Edit
-                    </button>
                     <button hlmDropdownMenuItem (triggered)="toggleArchive()">
                       <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
                       {{ a.isArchived ? 'Unarchive' : 'Archive' }}
