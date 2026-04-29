@@ -4,10 +4,6 @@ import {
   inject,
   signal,
   computed,
-  viewChild,
-  TemplateRef,
-  afterNextRender,
-  OnDestroy,
 } from '@angular/core';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -27,7 +23,6 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from '@spartan-ng/brain/sonner';
 import { CreateCommodityDialogComponent } from './create-commodity-dialog/create-commodity-dialog.component';
 import { EditCommoditySheetComponent } from './edit-commodity-sheet/edit-commodity-sheet.component';
@@ -69,28 +64,22 @@ const COMMODITY_TOTAL_GUARD = 1000;
   providers: [provideIcons({ lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch, lucideListFilter })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <ng-template #headerActions>
-      <app-create-commodity-dialog triggerSize="sm" (created)="onChanged()">
-        <ng-icon hlm name="lucidePlus" size="sm" />
-        New security
-      </app-create-commodity-dialog>
-    </ng-template>
-
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
-      <div class="flex items-center gap-2">
-        <div class="relative max-w-sm flex-1 min-w-0">
-          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            hlmInput
-            class="pl-9"
-            type="search"
-            placeholder="Search by symbol or name"
-            aria-label="Search commodities"
-            [value]="searchInput()"
-            (input)="searchInput.set(asValue($event))"
-          />
-        </div>
-        <div hlmPopover>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-1 min-w-0">
+          <div class="relative max-w-sm flex-1 min-w-0">
+            <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              hlmInput
+              class="pl-9"
+              type="search"
+              placeholder="Search by symbol or name"
+              aria-label="Search commodities"
+              [value]="searchInput()"
+              (input)="searchInput.set(asValue($event))"
+            />
+          </div>
+          <div hlmPopover>
             <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
               <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
               {{ filterTriggerLabel() }}
@@ -133,6 +122,11 @@ const COMMODITY_TOTAL_GUARD = 1000;
             </div>
           </div>
         </div>
+        <app-create-commodity-dialog triggerSize="sm" (created)="onChanged()">
+          <ng-icon hlm name="lucidePlus" size="sm" />
+          New security
+        </app-create-commodity-dialog>
+      </div>
 
       @if (loading() && !data()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
@@ -197,10 +191,9 @@ const COMMODITY_TOTAL_GUARD = 1000;
     </hlm-alert-dialog>
   `,
 })
-export class CommodityListPageComponent implements OnDestroy {
+export class CommodityListPageComponent {
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
-  private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private listState = inject(CommodityListStateService);
@@ -265,8 +258,6 @@ export class CommodityListPageComponent implements OnDestroy {
   pendingDelete = signal<CommodityResponse | null>(null);
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
-
-  private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
 
   data = toSignal<CommodityResponse[] | null, CommodityResponse[] | null>(
     combineLatest([
@@ -346,10 +337,6 @@ export class CommodityListPageComponent implements OnDestroy {
   });
 
   constructor() {
-    afterNextRender(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
-    });
-
     const initialParams = this.route.snapshot.queryParams;
     const hasInitialParams = Object.keys(initialParams).length > 0;
     if (!hasInitialParams && this.listState.hasParams) {
@@ -389,10 +376,6 @@ export class CommodityListPageComponent implements OnDestroy {
         replaceUrl: true,
       });
     });
-  }
-
-  ngOnDestroy(): void {
-    this.pageHeaderService.clearActions();
   }
 
   asValue(event: Event): string {
