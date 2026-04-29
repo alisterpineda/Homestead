@@ -6,7 +6,7 @@ Detailed design for commodity and price management in the Finances module. Expan
 
 A **commodity** is anything that has a quantity and can be held in an account — a currency (CAD, USD, GBP, ...) or a security (VEQT, AAPL, ...). Currencies and securities live in one table; only behaviour in certain transaction shapes differs.
 
-A **price** is a single observation of a commodity's value expressed in a currency at a specific instant: the tuple `(commodity, quote currency, priceAt, rate)`, read as *"1 unit of `commodity` was worth `rate` units of `quote currency` at `priceAt`."* Prices are point observations, not intervals. Missing points resolve via carry-forward (see *Lookup and carry-forward*).
+A **price** is a single observation of a commodity's value at a specific instant, attributed to a **source**: the tuple `(commodity, quote currency, priceAt, source, rate)`, read as *"according to `source`, 1 unit of `commodity` was worth `rate` units of `quote currency` at `priceAt`."* Prices are point observations, not intervals. Missing points resolve via carry-forward (see *Lookup and carry-forward*).
 
 Prices are captured forward from the user's earliest recorded activity. There is no backfill for dates before the user began tracking.
 
@@ -85,7 +85,7 @@ Route: `/finances/commodities/:id`.
 **Tabs:**
 
 - **Info** — metadata: symbol, exchange (securities only), name, kind, display precision, system-managed badge.
-- **Prices** — chronological list of price observations with source labels. Section header above the table carries the *New manual price* action (rendered with the table body, not in the page-header strip, so the header stays stable as the user toggles tabs).
+- **Prices** — chronological list of price observations across all sources. The table has a `Source` column (filterable) so the user can inspect what each provider has contributed; the row currently winning the lookup at "now" gets a subtle marker. Section header above the table carries the *New manual price* action (which always writes a `Manual`-source row), rendered with the table body — not in the page-header strip — so the header stays stable as the user toggles tabs.
 
 Seeded currencies render read-only throughout.
 
@@ -98,18 +98,65 @@ CommodityPrice {
   QuoteCurrencyId: Guid          -> Commodity (must be Kind=Currency)
   PriceAt: DateTimeOffset        (stored UTC; uniqueness axis)
   Rate: numeric                  (> 0)
-  CreatedByTransactionId: Guid?  -> AccountTransaction (null = manual)
+  Source: CommodityPriceSource   (enum; stored as string)
+  CreatedByTransactionId: Guid?  -> AccountTransaction (set iff Source == Transaction)
   audit fields
 }
 ```
 
-**Uniqueness:** `UNIQUE(CommodityId, QuoteCurrencyId, PriceAt)` — enforced by the database.
+**Uniqueness:** `UNIQUE(CommodityId, QuoteCurrencyId, PriceAt, Source)` — enforced by the database. Two sources observing the same pair at the same instant is allowed; the lookup resolves the tie (see *Lookup and carry-forward*).
 
 **Rate validation:** `Rate > 0` — enforced at the API layer and by database constraint.
 
 **Self-prices:** rejected. A row with `CommodityId == QuoteCurrencyId` is meaningless and fails validation.
 
 **Quote must be a currency:** `QuoteCurrency.Kind == Currency`. Securities can be quoted in any currency, but only currencies can serve as the quote side.
+
+## Price sources — model
+
+A **source** identifies the origin of a price observation. Sources are a code-defined enum — adding a new source is a code release (a new enum value plus an `IPriceProvider` implementation registered against it). The runtime model is just the enum value on each `CommodityPrice` row, plus a per-source settings row for the external sources that have configurable knobs.
+
+```csharp
+public enum CommodityPriceSource
+{
+    Transaction,    // system; always-on; no settings row
+    Manual,         // system; always-on; no settings row
+    BankOfCanada,   // external
+    CoinGecko,      // external
+    // future provider keys added here
+}
+```
+
+Each enum value falls into one of three **kinds** (a property of the value, not a stored column):
+
+| Kind | Values | How rows are created |
+|---|---|---|
+| `Transaction` | `Transaction` | Auto-emitted from annotated splits — see *Which transaction shapes create price rows*. Rows have `CreatedByTransactionId` set. |
+| `Manual` | `Manual` | Created via *New manual price* on the commodity detail page. `CreatedByTransactionId` is null. |
+| `External` | everything else | Imported by a background job — see *Background import jobs*. |
+
+**System values** (`Transaction`, `Manual`) are always enabled, never disable-able, and have no configuration. They have **no settings row** — the lookup just always considers them in scope.
+
+**External values** carry their configurable knobs in a settings table:
+
+```
+CommodityPriceSourceSettings {
+  Source: CommodityPriceSource    (PK; one row per External enum value)
+  IsEnabled: bool                 (default false on seed)
+  Config: jsonb?                  (provider-specific; schema declared by the IPriceProvider impl)
+  PairAllowList: jsonb?           (opt-in fixed list — see Import scope)
+  LastImportAt: DateTimeOffset?
+  LastImportStatus: string?       (Success | Failed | NeverRun)
+  LastImportError: string?        (free-form on failed runs)
+  audit fields
+}
+```
+
+**Seeding.** On startup, the application ensures a settings row exists for every External enum value not already in the table — defaulting to `IsEnabled=false`. New providers added in code are picked up on next startup. Enum values that have been removed from code but still have orphan settings rows are ignored (no foreign key, so they don't block anything); a maintenance migration prunes them when convenient.
+
+**Disabling an external source** (`IsEnabled=false` on its settings row) hides all of its prices from valuation lookup *and* stops new imports. Re-enabling restores its rows to the lookup pool — the rows themselves stay in storage while disabled. Enable/disable is the lever for "treat this source as if it weren't here." There is no separate "pause imports but keep prices live" mode — that would silently widen carry-forward gaps without the admin noticing.
+
+**There is no "delete source" action.** A source exists as long as its enum value exists in code. To stop using a source, disable it. Removing an enum value is a deploy-time decision, paired with a migration that decides what to do with its historical rows (typically: leave them in place, since they remain valid observations even after the provider stops being maintained).
 
 ## Price time semantics
 
@@ -119,18 +166,17 @@ Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual 
 
 `PriceAt` may be up to **one day ahead** of current UTC — the server rejects timestamps further in the future, which avoids accidentally staging prices for arbitrary dates.
 
-## Price sources
+## Per-row source semantics
 
-Each price is either **manual** or **transaction-linked**:
+A row's source determines its edit/delete affordances in the prices UI.
 
-- **Manual:** `CreatedByTransactionId` is null. Created via *New manual price* on the commodity detail page, or (future) batch imports.
-- **Transaction-linked:** `CreatedByTransactionId` points to the transaction that created the row. The row is materialised from a **split price annotation** (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) on the source transaction — every annotated split emits exactly one `CommodityPrice` row. Editing the annotation updates the row in place; deleting the transaction deletes the row.
+**Transaction-source rows** (`Source == Transaction`) are **read-only**. The row is labelled with the source name and has no edit or delete affordance. The label carries a tooltip explaining that the price is edited via its source transaction. (A clickable deep-link to the originating transaction is deferred to a later pass — there is no per-transaction route today, and resolving the price's account context for navigation needs an extra fetch the v1 prices tab does not perform.) The row is materialised from a **split price annotation** (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) on the source transaction — every annotated split emits exactly one `CommodityPrice` row. Editing the annotation updates the row in place; deleting the transaction deletes the row.
 
-Transaction-linked prices are **read-only** in the prices UI — the row is labelled *Transaction* and has no edit or delete affordance. The label carries a tooltip explaining that the price is edited via its source transaction. (A clickable deep-link to the originating transaction is deferred to a later pass — there is no per-transaction route today, and resolving the price's account context for navigation needs an extra fetch the v1 prices tab does not perform.) To change a transaction-linked price the user edits the transaction.
+**Manual-source rows** (`Source == Manual`): only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
 
-Manual prices: only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
+**External-source rows** (`Source` is any External enum value) are **read-only** in the prices UI. They are managed via the source's settings row (see *Source management UI*) — the user does not edit individual imported observations. To override an imported price the user adds a `Manual` row at the same instant; same-instant cross-source rows are allowed and the lookup tiebreaker prefers `Manual` (see *Lookup and carry-forward*).
 
-**Security** opening balances on an Investment account (via Add Position) *may* carry a price annotation on the security split at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, the security leg is annotated `@ price reportingCurrency` and the annotation materialises as a linked price row; the transaction balances per-currency via the annotation (asset +qty VEQT @ price ↔ equity -price×qty CAD). If omitted, the position is captured unpriced: both splits are in the security commodity, the transaction balances per-commodity (asset +qty VEQT ↔ equity -qty VEQT), no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (both splits same currency — per-commodity balance, no annotation). When a security opening balance is later updated, the annotation moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target instant); an update that first supplies a price to a previously-unpriced opening balance adds an annotation to the security leg and creates a new linked row (the opposite-side split's commodity flips from the security to the reporting currency as a consequence). Deleting the opening balance cascades the linked row via FK.
+**Security** opening balances on an Investment account (via Add Position) *may* carry a price annotation on the security split at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, the security leg is annotated `@ price reportingCurrency` and the annotation materialises as a linked price row; the transaction balances per-currency via the annotation (asset +qty VEQT @ price ↔ equity -price×qty CAD). If omitted, the position is captured unpriced: both splits are in the security commodity, the transaction balances per-commodity (asset +qty VEQT ↔ equity -qty VEQT), no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (both splits same currency — per-commodity balance, no annotation). When a security opening balance is later updated, the annotation moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target `(commodity, quote, at, source)` slot); an update that first supplies a price to a previously-unpriced opening balance adds an annotation to the security leg and creates a new linked row (the opposite-side split's commodity flips from the security to the reporting currency as a consequence). Deleting the opening balance cascades the linked row via FK.
 
 ## Which transaction shapes create price rows
 
@@ -153,9 +199,15 @@ A price row is created whenever a split carries a price annotation. The rule is 
 
 ## Price collision rules
 
-**Manual price colliding with a transaction-created price at the same `PriceAt`:** rejected at both the API layer (returning a Problem Details response directing the user to resolve the existing row first) and the database layer (via the uniqueness constraint). Applies in both directions — a manual write is rejected when a transaction-linked row already exists at that instant, and a transaction write is rejected when a manual row exists.
+**Within a single source at the same `PriceAt`:** rejected at both API and DB layers. The DB constraint enforces it; the API surfaces a Problem Details directing the user to resolve the existing row.
 
-**Transaction edited to collide with another price row:** same rejection. The user resolves by changing the transaction's time or deleting the blocking row.
+**Across different external sources at the same `PriceAt`:** allowed. Two providers that both publish at 16:00 UTC daily close are normal — the lookup tiebreaker resolves them.
+
+**`Manual` and `Transaction` collision at the same `PriceAt` — special case.** Even though `Manual` and `Transaction` are distinct sources, a `Manual` write at an instant already occupied by a `Transaction` row (or vice versa) is **rejected**. A user-typed assertion and a transaction-derived assertion disagreeing about the same instant is a real conflict to be reconciled, not silently picked. The user resolves by changing the time or deleting the blocking row. (External-source rows do not participate in this rejection — the user can layer a `Manual` override on top of an imported row at the same instant; that is the override mechanism.)
+
+**Transaction edited to collide with an existing same-source row at the same instant:** rejected. The user resolves by changing the transaction's time or deleting the blocking row.
+
+**Importer fetching a row that already exists for that source:** upsert the `Rate` in place, never duplicate. Providers correcting historical observations is the normal case.
 
 ## Transaction-linked price lifecycle
 
@@ -173,12 +225,18 @@ Each linked price row is a materialised view of exactly one split's price annota
 To value a holding `(commodity C, quantity Q)` in display currency `D` at instant `T`:
 
 1. **Same-currency case** — if `C == D`, value is `Q`; no price lookup.
-2. **Direct lookup** — find the most recent price row with `(C, D, PriceAt ≤ T)`. If present, value is `Q × rate`.
-3. **Inverted direct lookup** — find the most recent price with `(D, C, PriceAt ≤ T)`. If present, value is `Q × (1 / rate)`.
-4. **One-hop chain** — for each currency `X`, find `(C, X)` and `(X, D)` both ≤ `T`. Combine as `rate(C,X) × rate(X,D)`. Inverted hops count. When multiple intermediaries are available, pick the one whose older leg has the most recent `PriceAt`.
+2. **Direct lookup** — find the most recent price row with `(C, D, PriceAt ≤ T)` across all enabled sources. If present, value is `Q × rate`.
+3. **Inverted direct lookup** — find the most recent price with `(D, C, PriceAt ≤ T)` across all enabled sources. If present, value is `Q × (1 / rate)`.
+4. **One-hop chain** — for each currency `X`, resolve `(C, X)` and `(X, D)` independently using steps 2–3 (each leg picks its own most-recent observation across sources). Combine as `rate(C,X) × rate(X,D)`. Inverted hops count. When multiple intermediaries are available, pick the one whose older leg has the most recent `PriceAt`.
 5. **No path** — holding is **unpriced**. See *Missing-price UX*.
 
 Chains deeper than two hops are not attempted. In practice USD is the usual intermediary for non-USD display currencies.
+
+**Source identity does not affect ranking** — the lookup is pure freshness across all enabled sources. A `Manual` row from yesterday outranks a `Bank of Canada` row from a week ago not because `Manual` is preferred, but because it is more recent. If a household needs to suppress a source whose data has gone stale or wrong, the lever is to disable (or delete) the source, not to outrank it.
+
+**Tiebreaker — same `PriceAt` from multiple enabled sources.** When two enabled sources have a row at exactly the same `PriceAt` for the same pair, rank by source `Kind` (`Manual` > `Transaction` > External), then by `CommodityPrice.CreatedAt` desc. A user-typed assertion still trumps automation in the rare tie; otherwise the most-recently-inserted row wins. Deterministic; no priority/staleness configuration needed.
+
+**Disabled sources are excluded** from every step above. Their rows remain in storage (so re-enabling restores them without re-import) but are invisible to valuation while disabled.
 
 ## Missing-price UX
 
@@ -196,13 +254,66 @@ Never default an unpriced holding to zero or NaN — silent holes in net worth d
 
 **Display:** `max(quoteCurrency.DisplayPrecision, 4)`. CAD balances display at 2 decimals, but a per-share price of VEQT in CAD displays at 4. Prices needing more precision (e.g., BTC pairs) should render at up to `commodity.DisplayPrecision` if higher; the v1 prices tab implements only the `max(quote, 4)` half and renders the high-precision case at 4 decimals — bumping for `commodity.DisplayPrecision` is a follow-up.
 
+## Source management UI
+
+Route: `/finances/settings/price-sources` (under the existing Finances settings area, sibling of any other finance-wide settings).
+
+**List view** shows every registered source — system and external — with: display name · kind · IsEnabled · `LastImportAt` · last-import-status pill · # prices contributed. The status pill is the at-a-glance health indicator (success / failed / never-run / disabled). Display names come from a per-enum-value localisation entry in code, not a stored column.
+
+The list is statically the set of registered enum values — there is no "create source" affordance. New providers come in through code releases.
+
+**Edit** (external sources only): IsEnabled, Config, PairAllowList. Kind is rendered but immutable — it *is* the enum value. The Config form is rendered from a per-provider schema declared by the `IPriceProvider` implementation. The endpoint upserts the corresponding `CommodityPriceSourceSettings` row (creates one on first edit if seeding hasn't yet covered it).
+
+**System sources** (`Transaction`, `Manual`) appear in the list for visibility — clicking opens a read-only detail page showing their prices and aggregate stats but offering no edit/disable actions. There is no settings row to edit.
+
+**Per-source detail page** (external only) also hosts the source's recurring schedule (a single cron expression, optional) and a *Run now* button that enqueues an ad-hoc import attributed to the admin who clicked it. Schedule edits write through to the existing `processing.schedules` table — the schedule's identity is `(JobType=ImportCommodityPrices, Payload.Source=<enum value>)`, at most one schedule per source. The page is the user-friendly facade over that table for finance-specific schedules. The central admin schedules list (`/admin/schedules`) still shows the same rows as a fallback view.
+
+## Background import jobs
+
+A new `ProcessingJobType.ImportCommodityPrices`. Payload: `{ Source, FromAt?, ToAt?, CommodityIds? }` where `Source` is the enum value. Handler:
+
+1. Loads the source's settings row. If the enum value is a system value (Kind=Transaction or Manual), fails with `IStructuredJobError` ("source is system-managed"). If no settings row exists or `IsEnabled=false`, fails with "source disabled".
+2. Resolves the provider strategy by enum value. Each External enum value is registered with exactly one `IPriceProvider` implementation via DI.
+3. Computes the target commodity set — see *Import scope*.
+4. Fetches observations from the provider for the target commodities over `[FromAt, ToAt]`.
+5. Upserts rows under the source enum value, keyed by `(CommodityId, QuoteCurrencyId, PriceAt, Source)`. Existing rows have their `Rate` updated; new rows are inserted. On success, updates the settings row's `LastImportAt = now()`, `LastImportStatus = Success`, `LastImportError = null`.
+6. Audit-logs the upserts via `auditLogger.ForUser(job.CreatedByUserId)`. A scheduled run is system-attributed → no creator → audit entries are anonymous (matching existing system-attributed convention in `processing/overview.md`). A *Run now* run is attributed to the admin who triggered it.
+
+On failure, the handler updates the settings row's `LastImportStatus = Failed` / `LastImportError = <message>` before re-throwing — so the source list status pill reflects the latest run regardless of how the job terminated.
+
+**Idempotency.** Re-running an import for an overlapping date window updates rates in place, never duplicates. Providers correcting historical observations is the normal case; the upsert preserves that. The handler is also re-entry safe: a crash mid-run leaves a partial set of upserts already committed, and the next run re-fetches and re-upserts those rows without harm.
+
+**Recurring imports** use the existing `processing.schedules` table — at most one schedule per source. The schedule's `Payload` carries the `Source` enum value; `JobType = ImportCommodityPrices`. The admin schedules endpoint's `JobType` allow-list expands to include this type. Per-source schedule UX lives on the source detail page (see *Source management UI*).
+
+**Notifications: always silent in v1.** Both scheduled (system-attributed) and *Run now* (admin-attributed) runs surface only in the admin job list and through the source-list "last import status" pill. No SignalR toast, even for *Run now*. The admin job list carries the full error string for failed runs. Per-user toasts can be added later as an opt-in if it turns out admins miss failures.
+
+**v1 providers.** Bank of Canada Valet (FX, free, no API key) and CoinGecko (crypto, free, no API key). Both register a `Kind` value and an `IPriceProvider` implementation; both declare their supported pairs so import scope can intersect with the household's holdings.
+
+## Import scope
+
+Each import asks the provider for the **commodities the household actually holds** — the set of commodities referenced by any non-archived account split — intersected with the provider's supported pairs. This keeps the per-run network cost small (one AlphaVantage call per held security, not the entire NASDAQ universe) and avoids accumulating prices for commodities the household will never need.
+
+**Opt-in `PairAllowList`** on the source's settings row lets users track an instrument they don't yet hold (e.g., watching VEQT before buying). The handler unions the held set with `PairAllowList` before calling the provider.
+
+**Securities are fetched in their primary quote currency only** — e.g., VEQT in CAD because it trades on TSX, AAPL in USD because it trades on NASDAQ. Other display currencies resolve via FX chaining at lookup time (a held VEQT viewed in USD chains through `(VEQT, CAD)` × `(CAD, USD)`). The provider declares each security's primary quote; if the household holds the same security on different `Exchange` qualifiers (e.g., `AAPL · NASDAQ` vs `AAPL · OTHER`), each is treated as a separate commodity per the existing exchange-qualifier rules, and each has its own primary quote.
+
+**Backfill window.** First run for a new source backfills from the household's earliest user activity (the existing rule — see the conceptual model). Subsequent scheduled runs use `FromAt = settings.LastImportAt`, `ToAt = now()`. *Run now* lets the admin override `FromAt`/`ToAt` for narrower one-off backfills (e.g., "re-fetch the last 30 days because the provider corrected its data").
+
+This honours the existing rule: *Prices are captured forward from the user's earliest recorded activity. There is no backfill for dates before the user began tracking.*
+
 ## Audit
 
-`CommodityPrice` is audit-logged like every other entity — `Created` / `Updated` / `Deleted` entries via `IAuditLogger` on every mutation, regardless of source. Transaction-linked rows get their own audit entries; the `CreatedByTransactionId` FK provides correlation.
+`CommodityPrice` is audit-logged like every other entity — `Created` / `Updated` / `Deleted` entries via `IAuditLogger` on every mutation, regardless of source. Transaction-linked rows get their own audit entries; the `CreatedByTransactionId` FK provides correlation. Imported rows are audit-logged under the importing job's attribution (system-attributed for scheduled, admin-attributed for *Run now*).
+
+`CommodityPriceSourceSettings` mutations (edit, enable/disable) are audit-logged the same way.
 
 ## Future-compatibility
 
-- **External imports.** The data model accommodates bulk price ingestion (CSV, broker APIs, exchange-rate providers). Importers emit manual price rows at scale; no schema change required. Deduplication uses the `(commodity, quote, at)` uniqueness constraint.
-- **Configurable staleness thresholds.** v2 adds per-kind `StaleCurrencyPriceDays` and `StaleSecurityPriceDays` to `FinanceSettings`. The UI reads these when rendering staleness indicators.
+- **More providers.** Add an enum value, implement `IPriceProvider`, register it against the new value, optionally declare a config schema for the source-edit form. No schema change.
+- **Source priority.** v1 picks the most recent observation across all enabled sources (with a Kind-based tiebreaker). If a household ever wants "trust X over Y even when Y is fresher" — e.g., a paid Bloomberg feed should outrank a free fallback — add a `Priority` column to `CommodityPriceSourceSettings` and adjust the lookup to a priority-then-freshness pick. Additive; no migration of existing rows.
+- **Per-pair source overrides.** "BoC for FX, AlphaVantage for stocks" via a `CommodityPriceSourcePairOverride` table keyed by `(Source, CommodityId, QuoteCurrencyId)`. Out of scope for v1 — global enable/disable + per-source `PairAllowList` covers the early use cases.
+- **Configurable staleness thresholds.** Per-kind `StaleCurrencyPriceDays` and `StaleSecurityPriceDays` on `FinanceSettings`, used by staleness indicators on the commodity list and source list. Schema-only; UI follows.
+- **Per-user import notifications.** v1 is silent (admin job list only). If admins start missing failures, add an opt-in toast/email path keyed off the settings row's `LastImportStatus`.
+- **CSV import as a built-in source.** A `CsvUpload` enum value plus a provider impl reading from a designated upload location lets users one-shot historical pricing for instruments no built-in provider covers. If users need multiple distinct CSVs (one per statement, one per broker export), the natural extension is a per-upload-id sub-table whose rows reference `Source = CsvUpload`; that lift is additive when the use case materialises.
 - **Inline commodity creation.** v2 adds *+ Create new security* shortcuts inside `Add position`, `Investment buy`, and other security-picking flows.
 - **Deeper FX chaining.** If 2-hop coverage proves insufficient, breadth-first search over the pair graph can be implemented without schema changes.
