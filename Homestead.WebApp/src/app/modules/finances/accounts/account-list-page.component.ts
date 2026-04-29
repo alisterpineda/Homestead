@@ -4,17 +4,12 @@ import {
   inject,
   signal,
   computed,
-  viewChild,
-  TemplateRef,
-  afterNextRender,
-  OnDestroy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Router, NavigationEnd } from '@angular/router';
-import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, filter, firstValueFrom } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { switchMap, map, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert, lucideListFilter } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
@@ -22,6 +17,8 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmPopoverImports } from '@/shared/components/spartan/popover';
+import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { AccountTableComponent } from './account-table.component';
@@ -30,7 +27,6 @@ import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-she
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -48,20 +44,15 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmAlertDialogImports,
     HlmCheckboxImports,
     HlmLabel,
+    HlmPopoverImports,
+    HlmSeparatorImports,
     AccountTableComponent,
     CreateAccountDialogComponent,
     EditAccountSheetComponent,
   ],
-  providers: [provideIcons({ lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert })],
+  providers: [provideIcons({ lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert, lucideListFilter })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <ng-template #headerActions>
-      <app-create-account-dialog triggerSize="sm" (created)="onChanged()">
-        <ng-icon hlm name="lucidePlus" size="sm" />
-        New account
-      </app-create-account-dialog>
-    </ng-template>
-
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       @if (loading() && !data()) {
         <div class="flex justify-center py-16">
@@ -112,16 +103,47 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
           </div>
         } @else {
-          @if (archivedCount() > 0) {
-            <label class="flex items-center gap-2" hlmLabel>
-              <hlm-checkbox
-                [checked]="showArchived()"
-                (checkedChange)="showArchived.set($event === true)"
-                aria-label="Show archived accounts"
-              />
-              <span>Show archived ({{ archivedCount() }})</span>
-            </label>
-          }
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              @if (archivedCount() > 0) {
+                <div hlmPopover>
+                  <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+                    <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+                    {{ showArchived() ? 'Filter: Archived' : 'Filter' }}
+                  </button>
+                  <div hlmPopoverContent *hlmPopoverPortal class="w-[240px] p-0" align="start">
+                    <div class="flex items-center justify-between px-3 py-2">
+                      <span class="text-sm font-medium">Filters</span>
+                      @if (showArchived()) {
+                        <button
+                          hlmBtn
+                          variant="ghost"
+                          size="sm"
+                          class="h-auto px-2 py-0.5 text-xs"
+                          (click)="showArchived.set(false)"
+                        >Reset</button>
+                      }
+                    </div>
+                    <span hlmSeparator></span>
+                    <div class="p-2">
+                      <label class="flex items-center gap-2 px-1 py-1.5 text-sm cursor-pointer" hlmLabel>
+                        <hlm-checkbox
+                          [checked]="showArchived()"
+                          (checkedChange)="showArchived.set($event === true)"
+                          [aria-label]="'Show archived accounts'"
+                        />
+                        <span>Show archived accounts ({{ archivedCount() }})</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+            <app-create-account-dialog triggerSize="sm" (created)="onChanged()">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              New account
+            </app-create-account-dialog>
+          </div>
 
           <app-account-table
             [accounts]="visibleAccounts()"
@@ -165,12 +187,10 @@ import { toast } from '@spartan-ng/brain/sonner';
     </hlm-alert-dialog>
   `,
 })
-export class AccountListPageComponent implements OnDestroy {
+export class AccountListPageComponent {
   private accountApi = inject(FinancesAccountApiService);
   protected settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
-  private pageHeaderService = inject(PageHeaderService);
-  private router = inject(Router);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -184,8 +204,6 @@ export class AccountListPageComponent implements OnDestroy {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
   archiving = signal(false);
-
-  private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
 
   data = toSignal<AccountResponse[] | null, AccountResponse[] | null>(
     toObservable(this.refreshTrigger).pipe(
@@ -214,22 +232,6 @@ export class AccountListPageComponent implements OnDestroy {
     const all = this.userAccounts();
     return this.showArchived() ? all : all.filter(a => !a.isArchived);
   });
-
-  constructor() {
-    afterNextRender(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
-    });
-    this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
-      takeUntilDestroyed(),
-    ).subscribe(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.pageHeaderService.clearActions();
-  }
 
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);
