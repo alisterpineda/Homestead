@@ -12,6 +12,7 @@ function makePrice(overrides: Partial<CommodityPriceResponse> = {}): CommodityPr
     quoteCurrencyId: 'cad',
     priceAt: '2026-04-27T14:30:00.000Z',
     rate: 35.42,
+    source: 'Manual',
     createdByTransactionId: null,
     ...overrides,
   };

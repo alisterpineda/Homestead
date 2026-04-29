@@ -39,4 +39,11 @@ public static class CommodityPriceSourceExtensions
             throw new BusinessRuleException(
                 $"Price source '{source}' is system-managed and cannot be {operation}.");
     }
+
+    public static void RequireManual(this CommodityPriceSource source, string operation)
+    {
+        if (source != CommodityPriceSource.Manual)
+            throw new BusinessRuleException(
+                $"Only manually entered prices can be {operation}.");
+    }
 }

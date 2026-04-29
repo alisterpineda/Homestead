@@ -74,6 +74,7 @@ public class CreateCommodityPriceHandler(
             QuoteCurrencyId = price.QuoteCurrencyId,
             PriceAt = price.PriceAt,
             Rate = price.Rate,
+            Source = price.Source,
             CreatedByTransactionId = price.CreatedByTransactionId,
         };
     }

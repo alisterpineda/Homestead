@@ -52,7 +52,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-2">
         <p class="text-sm text-muted-foreground">
-          Manual entries are editable. Prices created by transactions are read-only here — edit the source transaction to change them.
+          Manual entries are editable. Prices from transactions or imported sources are read-only — edit them at their source.
         </p>
         <app-new-price-dialog [commodity]="commodity()" (created)="onChanged()">
           <ng-icon hlm name="lucidePlus" size="sm" />
@@ -95,14 +95,20 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                   <td hlmTd>{{ quoteSymbol(row.quoteCurrencyId) }}</td>
                   <td hlmTd class="text-right tabular-nums">{{ formatRate(row) }}</td>
                   <td hlmTd>
-                    @if (row.createdByTransactionId) {
-                      <span hlmBadge variant="secondary" title="Edited via the source transaction.">Transaction</span>
-                    } @else {
-                      <span hlmBadge variant="outline">Manual</span>
+                    @switch (row.source) {
+                      @case ('Manual') {
+                        <span hlmBadge variant="outline">Manual</span>
+                      }
+                      @case ('Transaction') {
+                        <span hlmBadge variant="secondary" title="Edited via the source transaction.">Transaction</span>
+                      }
+                      @case ('BankOfCanada') {
+                        <span hlmBadge variant="secondary" title="Imported from the Bank of Canada.">Bank of Canada</span>
+                      }
                     }
                   </td>
                   <td hlmTd class="w-12">
-                    @if (!row.createdByTransactionId) {
+                    @if (row.source === 'Manual') {
                       <button
                         hlmBtn
                         variant="ghost"

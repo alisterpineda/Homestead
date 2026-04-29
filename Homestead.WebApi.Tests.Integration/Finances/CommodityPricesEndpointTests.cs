@@ -35,6 +35,27 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
         return (usdId, cadId, veqt!.Id);
     }
 
+    private async Task<Guid> SeedPriceAsync(
+        Guid commodityId, Guid quoteCurrencyId, DateTimeOffset priceAt, decimal rate,
+        CommodityPriceSource source, Guid? createdByTransactionId = null)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var price = new CommodityPrice
+        {
+            Id = Guid.NewGuid(),
+            CommodityId = commodityId,
+            QuoteCurrencyId = quoteCurrencyId,
+            PriceAt = priceAt,
+            Rate = rate,
+            Source = source,
+            CreatedByTransactionId = createdByTransactionId,
+        };
+        db.CommodityPrices.Add(price);
+        await db.SaveChangesAsync(CT);
+        return price.Id;
+    }
+
     [Fact]
     public async Task CreatePrice_ValidUsdToCad_Succeeds()
     {
@@ -52,6 +73,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
         Assert.Equal(PriceAtJan31, body!.PriceAt);
+        Assert.Equal("Manual", body.Source);
         Assert.Null(body.CreatedByTransactionId);
     }
 
@@ -458,5 +480,52 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
         Assert.Equal(3, body!.TotalCount);
         Assert.Equal(PriceAtJan31, body.Items[0].PriceAt);
         Assert.Equal(PriceAtJan01, body.Items[2].PriceAt);
+        Assert.All(body.Items, item => Assert.Equal("Manual", item.Source));
+    }
+
+    [Fact]
+    public async Task GetPrices_BankOfCanadaSource_ReturnsSourceField()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        await SeedPriceAsync(usdId, cadId, PriceAtJan15, 1.3456m, CommodityPriceSource.BankOfCanada);
+
+        var response = await client.GetAsync(
+            $"/api/v1/finances/commodity-prices?page=1&pageSize=10&commodityId={usdId}&quoteCurrencyId={cadId}", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<FinancePriceItem>>(CT);
+        var row = Assert.Single(body!.Items);
+        Assert.Equal("BankOfCanada", row.Source);
+        Assert.Null(row.CreatedByTransactionId);
+    }
+
+    [Fact]
+    public async Task PatchPrice_BankOfCanadaSource_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var bocPriceId = await SeedPriceAsync(usdId, cadId, PriceAtJan31, 1.3456m, CommodityPriceSource.BankOfCanada);
+
+        var patchResp = await SendJsonPatchAsync(client,
+            $"/api/v1/finances/commodity-prices/{bocPriceId}",
+            new[] { new { op = "replace", path = "/rate", value = (object)1.4000m } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, patchResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeletePrice_BankOfCanadaSource_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var bocPriceId = await SeedPriceAsync(usdId, cadId, PriceAtJan31, 1.3456m, CommodityPriceSource.BankOfCanada);
+
+        var deleteResp = await client.DeleteAsync(
+            $"/api/v1/finances/commodity-prices/{bocPriceId}", CT);
+        Assert.Equal(HttpStatusCode.BadRequest, deleteResp.StatusCode);
     }
 }

@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -15,9 +16,7 @@ public class DeleteCommodityPriceHandler(AppDbContext db, IAuditContext audit)
         if (price is null)
             return false;
 
-        if (price.CreatedByTransactionId is not null)
-            throw new BusinessRuleException(
-                "Transaction-linked prices are deleted through their source transaction.");
+        price.Source.RequireManual("deleted");
 
         db.CommodityPrices.Remove(price);
         audit.Deleted("CommodityPrice", price.Id);

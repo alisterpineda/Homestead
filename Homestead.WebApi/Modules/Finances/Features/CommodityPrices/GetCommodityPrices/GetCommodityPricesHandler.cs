@@ -31,6 +31,7 @@ public class GetCommodityPricesHandler(AppDbContext db)
                 QuoteCurrencyId = p.QuoteCurrencyId,
                 PriceAt = p.PriceAt,
                 Rate = p.Rate,
+                Source = p.Source,
                 CreatedByTransactionId = p.CreatedByTransactionId,
             })
             .ToPaginatedAsync(request, ct);

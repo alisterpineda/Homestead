@@ -57,6 +57,6 @@ internal record FinancePositionItem(
 
 internal record FinancePriceItem(
     Guid Id, Guid CommodityId, Guid QuoteCurrencyId, DateTimeOffset PriceAt,
-    decimal Rate, Guid? CreatedByTransactionId);
+    decimal Rate, string Source, Guid? CreatedByTransactionId);
 
 internal record FinanceSettingsItem(Guid? DisplayCurrencyId = null);
