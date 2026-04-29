@@ -30,7 +30,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
-import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -42,7 +41,6 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { KindBadgeComponent } from '../shared/kind-badge.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
-import { AccountInfoTabComponent } from './account-info-tab.component';
 import { AccountActivityTabComponent } from './account-activity-tab.component';
 import { AccountPositionsTabComponent } from './account-positions-tab.component';
 import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balance-entry-sheet/balance-entry-sheet.component';
@@ -72,10 +70,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmSpinner,
     HlmEmptyImports,
     HlmBreadCrumbImports,
-    HlmTabsImports,
     HlmDropdownMenuImports,
     KindBadgeComponent,
-    AccountInfoTabComponent,
     AccountActivityTabComponent,
     AccountPositionsTabComponent,
     EditAccountSheetComponent,
@@ -156,86 +152,71 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
         </header>
 
-        <hlm-tabs tab="activity" class="flex flex-1 flex-col">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <hlm-tabs-list>
-              <button hlmTabsTrigger="activity">Activity</button>
-              @if (a.kind === 'Investment') {
-                <button hlmTabsTrigger="positions">Positions</button>
-              }
-              <button hlmTabsTrigger="info">Info</button>
-            </hlm-tabs-list>
-
-            <div class="flex flex-wrap items-center gap-2">
-              @if (!a.isArchived) {
-                @if (a.kind === 'Investment') {
-                  <button hlmBtn size="sm" (click)="openAddPosition()">
-                    <ng-icon hlm name="lucidePackagePlus" size="sm" />
-                    Add position
-                  </button>
-                  <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
-                    <ng-icon hlm name="lucideScale" size="sm" />
-                    Record balance
-                  </button>
-                } @else {
-                  <button hlmBtn size="sm" (click)="openRecordBalance()">
-                    <ng-icon hlm name="lucideScale" size="sm" />
-                    Record balance
-                  </button>
-                }
-
-                <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
-                  <ng-icon hlm name="lucidePlus" size="sm" />
-                  New transaction
-                  <ng-icon hlm name="lucideChevronDown" size="sm" />
-                </button>
-                <ng-template #newTxMenu>
-                  <hlm-dropdown-menu class="w-48">
-                    <hlm-dropdown-menu-group>
-                      <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
-                        <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
-                        Transfer
-                      </button>
-                    </hlm-dropdown-menu-group>
-                  </hlm-dropdown-menu>
-                </ng-template>
-              }
-
-              <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
-                <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          @if (!a.isArchived) {
+            @if (a.kind === 'Investment') {
+              <button hlmBtn size="sm" (click)="openAddPosition()">
+                <ng-icon hlm name="lucidePackagePlus" size="sm" />
+                Add position
               </button>
-              <ng-template #accountMenu>
-                <hlm-dropdown-menu class="w-44">
-                  <hlm-dropdown-menu-group>
-                    <button hlmDropdownMenuItem (triggered)="toggleArchive()">
-                      <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
-                      {{ a.isArchived ? 'Unarchive' : 'Archive' }}
-                    </button>
-                  </hlm-dropdown-menu-group>
-                </hlm-dropdown-menu>
-              </ng-template>
-            </div>
-          </div>
-          <div hlmTabsContent="activity">
-            <app-account-activity-tab
+              <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
+                <ng-icon hlm name="lucideScale" size="sm" />
+                Record balance
+              </button>
+            } @else {
+              <button hlmBtn size="sm" (click)="openRecordBalance()">
+                <ng-icon hlm name="lucideScale" size="sm" />
+                Record balance
+              </button>
+            }
+
+            <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              New transaction
+              <ng-icon hlm name="lucideChevronDown" size="sm" />
+            </button>
+            <ng-template #newTxMenu>
+              <hlm-dropdown-menu class="w-48">
+                <hlm-dropdown-menu-group>
+                  <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
+                    <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
+                    Transfer
+                  </button>
+                </hlm-dropdown-menu-group>
+              </hlm-dropdown-menu>
+            </ng-template>
+          }
+
+          <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
+            <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+          </button>
+          <ng-template #accountMenu>
+            <hlm-dropdown-menu class="w-44">
+              <hlm-dropdown-menu-group>
+                <button hlmDropdownMenuItem (triggered)="toggleArchive()">
+                  <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                  {{ a.isArchived ? 'Unarchive' : 'Archive' }}
+                </button>
+              </hlm-dropdown-menu-group>
+            </hlm-dropdown-menu>
+          </ng-template>
+        </div>
+
+        @if (a.kind === 'Investment') {
+          <div class="rounded-lg border border-border bg-card p-4 text-card-foreground">
+            <app-account-positions-tab
               [account]="a"
               [refreshKey]="refreshTrigger()"
-              (transactionClicked)="onTransactionClicked($event)"
+              (editOpeningBalance)="onPositionEditRequested($event.commodityId)"
             />
           </div>
-          @if (a.kind === 'Investment') {
-            <div hlmTabsContent="positions" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
-              <app-account-positions-tab
-                [account]="a"
-                [refreshKey]="refreshTrigger()"
-                (editOpeningBalance)="onPositionEditRequested($event.commodityId)"
-              />
-            </div>
-          }
-          <div hlmTabsContent="info" class="rounded-lg border border-border bg-card p-4 text-card-foreground">
-            <app-account-info-tab [account]="a" [reportingCurrency]="reportingCurrency()" />
-          </div>
-        </hlm-tabs>
+        }
+
+        <app-account-activity-tab
+          [account]="a"
+          [refreshKey]="refreshTrigger()"
+          (transactionClicked)="onTransactionClicked($event)"
+        />
       }
     </div>
 
