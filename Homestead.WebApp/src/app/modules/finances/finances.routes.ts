@@ -5,7 +5,10 @@ import { AccountDetailPageComponent } from './accounts/account-detail-page.compo
 import { CommodityListPageComponent } from './commodities/commodity-list-page.component';
 import { CommodityDetailPageComponent } from './commodities/commodity-detail-page.component';
 import { ReportsPageComponent } from './reports/reports-page.component';
-import { FinanceSettingsPageComponent } from './settings/finance-settings-page.component';
+import { FinanceSettingsLayoutComponent } from './settings/finance-settings-layout.component';
+import { GeneralSettingsComponent } from './settings/general/general-settings.component';
+import { PriceSourceListComponent } from './settings/price-sources/price-source-list.component';
+import { PriceSourceDetailComponent } from './settings/price-sources/price-source-detail.component';
 
 export const FINANCES_ROUTES: Routes = [
   {
@@ -18,7 +21,17 @@ export const FINANCES_ROUTES: Routes = [
       { path: 'commodities', component: CommodityListPageComponent, data: { title: 'Commodities' } },
       { path: 'commodities/:id', component: CommodityDetailPageComponent, data: { title: 'Commodity' } },
       { path: 'reports', component: ReportsPageComponent, data: { title: 'Reports' } },
-      { path: 'settings', component: FinanceSettingsPageComponent, data: { title: 'Settings' } },
+      {
+        path: 'settings',
+        component: FinanceSettingsLayoutComponent,
+        data: { title: 'Settings' },
+        children: [
+          { path: '', redirectTo: 'general', pathMatch: 'full' },
+          { path: 'general', component: GeneralSettingsComponent, data: { title: 'Finance settings' } },
+          { path: 'price-sources', component: PriceSourceListComponent, data: { title: 'Price sources' } },
+          { path: 'price-sources/:source', component: PriceSourceDetailComponent, data: { title: 'Price source' } },
+        ],
+      },
     ],
   },
 ];

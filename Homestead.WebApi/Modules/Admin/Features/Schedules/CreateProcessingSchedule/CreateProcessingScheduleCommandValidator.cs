@@ -1,11 +1,17 @@
-using Cronos;
 using FluentValidation;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.CreateProcessingSchedule;
 
 public class CreateProcessingScheduleCommandValidator : AbstractValidator<CreateProcessingScheduleCommand>
 {
+    private static readonly HashSet<ProcessingJobType> _allowedJobTypes =
+    [
+        ProcessingJobType.NoOp,
+        ProcessingJobType.ImportCommodityPrices,
+    ];
+
     public CreateProcessingScheduleCommandValidator()
     {
         RuleFor(x => x.Name)
@@ -21,27 +27,15 @@ public class CreateProcessingScheduleCommandValidator : AbstractValidator<Create
         RuleFor(x => x.CronExpression)
             .Must(expr => !string.IsNullOrWhiteSpace(expr))
             .WithMessage("Cron expression is required.")
-            .Must(BeAParseableCronExpression)
+            .Must(CronSchedule.IsValid)
             .WithMessage("Cron expression is not valid.");
 
         RuleFor(x => x.JobType)
-            .Must(t => t == ProcessingJobType.NoOp)
-            .WithMessage("Only the NoOp job type is currently supported for admin-created schedules.");
-    }
+            .Must(t => _allowedJobTypes.Contains(t))
+            .WithMessage("This job type cannot be scheduled from the admin endpoint.");
 
-    private static bool BeAParseableCronExpression(string expression)
-    {
-        if (string.IsNullOrWhiteSpace(expression))
-            return false;
-
-        try
-        {
-            CronExpression.Parse(expression);
-            return true;
-        }
-        catch (CronFormatException)
-        {
-            return false;
-        }
+        RuleFor(x => x.JobType)
+            .Must(t => t != ProcessingJobType.ImportCommodityPrices)
+            .WithMessage("Use /api/v1/finances/settings/price-sources/{source}/schedule to manage commodity-price import schedules.");
     }
 }

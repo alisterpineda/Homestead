@@ -9,4 +9,5 @@ export { FinancesCommodityApiService } from './finances-commodity-api.service';
 export { FinancesCommodityPriceApiService } from './finances-commodity-price-api.service';
 export { FinancesReportsApiService } from './finances-reports-api.service';
 export { FinancesSettingsApiService } from './finances-settings-api.service';
+export { FinancesPriceSourcesApiService } from './finances-price-sources-api.service';
 export { FinancesTransactionApiService } from './finances-transaction-api.service';

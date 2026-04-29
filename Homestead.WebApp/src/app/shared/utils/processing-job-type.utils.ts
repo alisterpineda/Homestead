@@ -8,6 +8,7 @@ export function processingJobTypeLabel(type: ProcessingJobType): string {
     case 'BulkReprocessDocuments': return 'Bulk Reprocess';
     case 'DownloadDocuments': return 'Download Documents';
     case 'NoOp': return 'No-op';
+    case 'ImportCommodityPrices': return 'Import commodity prices';
     default: return type;
   }
 }

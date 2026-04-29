@@ -8,6 +8,7 @@ using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances;
+using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Modules.Processing;
@@ -120,6 +121,7 @@ builder.Services.AddScoped<IOpeningBalanceService, OpeningBalanceService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
+builder.Services.AddScoped<IPriceSourceScheduleStore, PriceSourceScheduleStore>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>
@@ -132,6 +134,7 @@ builder.Services.AddMediatR(cfg =>
 });
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
 builder.Services.AddProcessing(builder.Configuration);
+builder.Services.AddPriceProviders(builder.Configuration);
 builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddThumbnails();

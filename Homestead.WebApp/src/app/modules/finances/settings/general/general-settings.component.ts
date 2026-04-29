@@ -1,22 +1,22 @@
 import { Component, ChangeDetectionStrategy, inject, signal, computed, effect } from '@angular/core';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { CurrencyPickerComponent } from '../shared/currency-picker/currency-picker.component';
-import { FinanceSettingsService } from '../shared/finance-settings.service';
+import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
+import { FinanceSettingsService } from '../../shared/finance-settings.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
 @Component({
-  selector: 'app-finance-settings-page',
+  selector: 'app-general-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButton, HlmLabel, CurrencyPickerComponent],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6 max-w-2xl">
+    <div class="flex min-h-0 flex-1 flex-col gap-4 max-w-2xl">
       <header>
-        <h1 class="text-2xl font-semibold">Finance settings</h1>
+        <h2 class="text-xl font-semibold">General</h2>
         <p class="text-sm text-muted-foreground">
           Pick the currency Homestead uses to display balances and net worth.
         </p>
@@ -47,7 +47,7 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
     </div>
   `,
 })
-export class FinanceSettingsPageComponent {
+export class GeneralSettingsComponent {
   private settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
 
@@ -62,7 +62,6 @@ export class FinanceSettingsPageComponent {
 
   constructor() {
     effect(() => {
-      // Seed picker from current settings when they land.
       if (this.settingsService.loaded()) {
         const id = this.settingsService.displayCurrencyId();
         if (this.selectedId() === null && id !== null) {

@@ -1,5 +1,5 @@
-using Cronos;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -13,7 +13,7 @@ public class CreateProcessingScheduleHandler(AppDbContext db, ICurrentUserAccess
         CreateProcessingScheduleCommand request, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var nextRunAt = ComputeNextOccurrence(request.CronExpression, now);
+        var nextRunAt = CronSchedule.NextOccurrence(request.CronExpression, now);
 
         var schedule = new ProcessingSchedule
         {
@@ -22,7 +22,7 @@ public class CreateProcessingScheduleHandler(AppDbContext db, ICurrentUserAccess
             Description = request.Description?.Trim(),
             JobType = request.JobType,
             CronExpression = request.CronExpression,
-            TimeZone = "Etc/UTC",
+            TimeZone = CronSchedule.DefaultTimeZone,
             Priority = request.Priority,
             IsEnabled = request.IsEnabled,
             CreatedAt = now,
@@ -38,14 +38,5 @@ public class CreateProcessingScheduleHandler(AppDbContext db, ICurrentUserAccess
             Id = schedule.Id,
             NextRunAt = schedule.NextRunAt,
         };
-    }
-
-    private static DateTimeOffset ComputeNextOccurrence(string cronExpression, DateTimeOffset from)
-    {
-        var expr = CronExpression.Parse(cronExpression);
-        var next = expr.GetNextOccurrence(from, TimeZoneInfo.Utc)
-            ?? throw new InvalidOperationException(
-                $"Cron expression '{cronExpression}' has no future occurrences after {from:O}");
-        return next;
     }
 }

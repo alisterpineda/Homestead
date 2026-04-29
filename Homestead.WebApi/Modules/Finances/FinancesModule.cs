@@ -24,6 +24,12 @@ using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBa
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalances;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.DeletePriceSourceSchedule;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSource;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSources;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.PatchPriceSource;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.RunPriceSourceImportNow;
+using Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceSchedule;
 using Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
@@ -100,6 +106,15 @@ public static class FinancesModule
         var settings = v1.MapGroup("/settings");
         GetFinanceSettingsEndpoint.Map(settings);
         PatchFinanceSettingsEndpoint.Map(settings);
+
+        var priceSources = v1.MapGroup("/settings/price-sources")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+        GetPriceSourcesEndpoint.Map(priceSources);
+        GetPriceSourceEndpoint.Map(priceSources);
+        PatchPriceSourceEndpoint.Map(priceSources);
+        UpsertPriceSourceScheduleEndpoint.Map(priceSources);
+        DeletePriceSourceScheduleEndpoint.Map(priceSources);
+        RunPriceSourceImportNowEndpoint.Map(priceSources);
 
         var reports = v1.MapGroup("/reports");
         GetNetWorthHistoryEndpoint.Map(reports);

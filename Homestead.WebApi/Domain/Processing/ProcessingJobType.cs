@@ -7,5 +7,6 @@ public enum ProcessingJobType
     ReprocessDocumentVersion,
     DownloadDocuments,
     BulkReprocessDocuments,
-    NoOp
+    NoOp,
+    ImportCommodityPrices,
 }

@@ -70,11 +70,22 @@ public class CreateProcessingScheduleCommandValidatorTests
     [InlineData(ProcessingJobType.UploadDocument)]
     [InlineData(ProcessingJobType.DownloadDocuments)]
     [InlineData(ProcessingJobType.BulkReprocessDocuments)]
-    public async Task NonNoOpJobType_IsInvalid(ProcessingJobType jobType)
+    public async Task NonAllowedJobType_IsInvalid(ProcessingJobType jobType)
     {
         var cmd = Valid() with { JobType = jobType };
         var result = await _sut.ValidateAsync(cmd, TestContext.Current.CancellationToken);
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateProcessingScheduleCommand.JobType));
+    }
+
+    [Fact]
+    public async Task ImportCommodityPrices_FromAdminEndpoint_IsRejected()
+    {
+        var cmd = Valid() with { JobType = ProcessingJobType.ImportCommodityPrices };
+        var result = await _sut.ValidateAsync(cmd, TestContext.Current.CancellationToken);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.PropertyName == nameof(CreateProcessingScheduleCommand.JobType)
+            && e.ErrorMessage.Contains("price-sources"));
     }
 }
