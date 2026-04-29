@@ -122,7 +122,6 @@ public enum CommodityPriceSource
     Transaction,    // system; always-on; no settings row
     Manual,         // system; always-on; no settings row
     BankOfCanada,   // external
-    CoinGecko,      // external
     // future provider keys added here
 }
 ```
@@ -174,7 +173,7 @@ A row's source determines its edit/delete affordances in the prices UI.
 
 **Manual-source rows** (`Source == Manual`): only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
 
-**External-source rows** (`Source` is any External enum value) are **read-only** in the prices UI. They are managed via the source's settings row (see *Source management UI*) — the user does not edit individual imported observations. To override an imported price the user adds a `Manual` row at the same instant; same-instant cross-source rows are allowed and the lookup tiebreaker prefers `Manual` (see *Lookup and carry-forward*).
+**External-source rows** (`Source` is any External enum value) are **read-only** in the prices UI. They are managed via the source's settings row (see *Source management UI*) — the user does not edit individual imported observations. To override an imported (or transaction-derived) price the user adds a `Manual` row at the same instant; cross-source rows at the same `PriceAt` are allowed everywhere and the lookup tiebreaker prefers `Manual` (see *Lookup and carry-forward*).
 
 **Security** opening balances on an Investment account (via Add Position) *may* carry a price annotation on the security split at `OccurredAt` = asOfDate @ 12:00 UTC — the per-unit price is **optional**. If supplied, the security leg is annotated `@ price reportingCurrency` and the annotation materialises as a linked price row; the transaction balances per-currency via the annotation (asset +qty VEQT @ price ↔ equity -price×qty CAD). If omitted, the position is captured unpriced: both splits are in the security commodity, the transaction balances per-commodity (asset +qty VEQT ↔ equity -qty VEQT), no price row is emitted, and the holding renders via carry-forward at net-worth time (or as *unpriced* if no price ever resolves). This lets users assert "I had 100 VEQT on this date" without forcing them to pin down a historical per-share price; pricing is a separable concern. Cash opening balances never emit a price row (both splits same currency — per-commodity balance, no annotation). When a security opening balance is later updated, the annotation moves with it (rate in place, or `PriceAt` on date change — rejecting if another row already occupies the target `(commodity, quote, at, source)` slot); an update that first supplies a price to a previously-unpriced opening balance adds an annotation to the security leg and creates a new linked row (the opposite-side split's commodity flips from the security to the reporting currency as a consequence). Deleting the opening balance cascades the linked row via FK.
 
@@ -201,9 +200,7 @@ A price row is created whenever a split carries a price annotation. The rule is 
 
 **Within a single source at the same `PriceAt`:** rejected at both API and DB layers. The DB constraint enforces it; the API surfaces a Problem Details directing the user to resolve the existing row.
 
-**Across different external sources at the same `PriceAt`:** allowed. Two providers that both publish at 16:00 UTC daily close are normal — the lookup tiebreaker resolves them.
-
-**`Manual` and `Transaction` collision at the same `PriceAt` — special case.** Even though `Manual` and `Transaction` are distinct sources, a `Manual` write at an instant already occupied by a `Transaction` row (or vice versa) is **rejected**. A user-typed assertion and a transaction-derived assertion disagreeing about the same instant is a real conflict to be reconciled, not silently picked. The user resolves by changing the time or deleting the blocking row. (External-source rows do not participate in this rejection — the user can layer a `Manual` override on top of an imported row at the same instant; that is the override mechanism.)
+**Across different sources at the same `PriceAt`:** allowed. Two providers that both publish at 16:00 UTC daily close are normal, and a user-typed `Manual` row may coexist with a `Transaction`-derived row or any external-source row at the same instant. The lookup tiebreaker resolves which one wins (see *Lookup and carry-forward*) — `Manual` outranks `Transaction` outranks External, so a manual override always takes precedence over an automated assertion at the same instant.
 
 **Transaction edited to collide with an existing same-source row at the same instant:** rejected. The user resolves by changing the transaction's time or deleting the blocking row.
 
@@ -287,7 +284,7 @@ On failure, the handler updates the settings row's `LastImportStatus = Failed` /
 
 **Notifications: always silent in v1.** Both scheduled (system-attributed) and *Run now* (admin-attributed) runs surface only in the admin job list and through the source-list "last import status" pill. No SignalR toast, even for *Run now*. The admin job list carries the full error string for failed runs. Per-user toasts can be added later as an opt-in if it turns out admins miss failures.
 
-**v1 providers.** Bank of Canada Valet (FX, free, no API key) and CoinGecko (crypto, free, no API key). Both register a `Kind` value and an `IPriceProvider` implementation; both declare their supported pairs so import scope can intersect with the household's holdings.
+**v1 providers.** Bank of Canada Valet (FX, free, no API key). Registers an enum value and an `IPriceProvider` implementation, and declares its supported pairs so import scope can intersect with the household's holdings.
 
 ## Import scope
 

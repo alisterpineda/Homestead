@@ -81,11 +81,13 @@ builder.AddNpgsqlDbContext<AppDbContext>(
         {
             CurrencySeeder.Seed(ctx, created);
             SystemAccountSeeder.Seed(ctx, created);
+            CommodityPriceSourceSettingsSeeder.Seed(ctx, created);
         })
         .UseAsyncSeeding(async (ctx, created, ct) =>
         {
             await CurrencySeeder.SeedAsync(ctx, created, ct);
             await SystemAccountSeeder.SeedAsync(ctx, created, ct);
+            await CommodityPriceSourceSettingsSeeder.SeedAsync(ctx, created, ct);
         }));
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,

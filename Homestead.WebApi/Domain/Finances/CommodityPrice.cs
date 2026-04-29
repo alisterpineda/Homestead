@@ -15,6 +15,8 @@ public class CommodityPrice
     public DateTimeOffset PriceAt { get; set; }
     public decimal Rate { get; set; }
 
+    public CommodityPriceSource Source { get; set; }
+
     public Guid? CreatedByTransactionId { get; set; }
     public AccountTransaction? CreatedByTransaction { get; set; }
 

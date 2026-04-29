@@ -13,6 +13,7 @@ public class CommodityPriceSnapshotTests
         QuoteCurrencyId = Guid.NewGuid(),
         PriceAt = new DateTimeOffset(2026, 1, 31, 23, 59, 59, TimeSpan.Zero),
         Rate = 1.3456m,
+        Source = CommodityPriceSource.Manual,
         CreatedByTransactionId = null,
     };
 
@@ -27,7 +28,20 @@ public class CommodityPriceSnapshotTests
         Assert.Equal(price.QuoteCurrencyId, snapshot.QuoteCurrencyId);
         Assert.Equal(price.PriceAt, snapshot.PriceAt);
         Assert.Equal(price.Rate, snapshot.Rate);
+        Assert.Equal(price.Source, snapshot.Source);
         Assert.Null(snapshot.CreatedByTransactionId);
+    }
+
+    [Fact]
+    public void Diff_DetectsSourceChange()
+    {
+        var before = CommodityPriceSnapshot.From(CreatePrice());
+        var after = before with { Source = CommodityPriceSource.BankOfCanada };
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("Source", change.Field);
+        Assert.Equal("Manual", change.OldValue);
+        Assert.Equal("BankOfCanada", change.NewValue);
     }
 
     [Fact]

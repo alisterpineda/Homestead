@@ -77,6 +77,7 @@ public class LinkedPriceManagerTests : IAsyncLifetime
         Assert.Equal(_cad.Id, price.QuoteCurrencyId);
         Assert.Equal(1.35m, price.Rate);
         Assert.Equal(at, price.PriceAt);
+        Assert.Equal(CommodityPriceSource.Transaction, price.Source);
         Assert.Equal(txn.Id, price.CreatedByTransactionId);
 
         _audit.Received(1).Created("CommodityPrice", Arg.Any<Guid>());
@@ -141,7 +142,7 @@ public class LinkedPriceManagerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SyncForTransaction_CollidingRow_Throws()
+    public async Task SyncForTransaction_CollidingTransactionRow_Throws()
     {
         var at = new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero);
         _db.CommodityPrices.Add(new CommodityPrice
@@ -151,6 +152,7 @@ public class LinkedPriceManagerTests : IAsyncLifetime
             QuoteCurrencyId = _cad.Id,
             PriceAt = at,
             Rate = 99m,
+            Source = CommodityPriceSource.Transaction,
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -160,5 +162,38 @@ public class LinkedPriceManagerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.SyncForTransactionAsync(txn, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task SyncForTransaction_ManualRowAtSameInstant_Coexists()
+    {
+        var at = new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero);
+        var manualId = Guid.NewGuid();
+        _db.CommodityPrices.Add(new CommodityPrice
+        {
+            Id = manualId,
+            CommodityId = _veqt.Id,
+            QuoteCurrencyId = _cad.Id,
+            PriceAt = at,
+            Rate = 99m,
+            Source = CommodityPriceSource.Manual,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var txn = TxnWithSplits(at,
+            Split(_veqt.Id, 100m, 30m, _cad.Id),
+            Split(_cad.Id, -3000m));
+
+        await _sut.SyncForTransactionAsync(txn, TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var prices = await _db.CommodityPrices
+            .Where(p => p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id && p.PriceAt == at)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, prices.Count);
+        Assert.Contains(prices, p => p.Id == manualId && p.Source == CommodityPriceSource.Manual);
+        Assert.Contains(prices, p => p.Source == CommodityPriceSource.Transaction
+                                  && p.CreatedByTransactionId == txn.Id);
     }
 }

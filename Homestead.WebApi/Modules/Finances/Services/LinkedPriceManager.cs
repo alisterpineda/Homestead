@@ -35,7 +35,7 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
 
             if (existing is null)
             {
-                await EnsureNoCollisionAsync(split.CommodityId, quoteId, transaction.OccurredAt, excludeId: null, ct);
+                await EnsureNoTransactionCollisionAsync(split.CommodityId, quoteId, transaction.OccurredAt, excludeId: null, ct);
 
                 var created = new CommodityPrice
                 {
@@ -44,6 +44,7 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
                     QuoteCurrencyId = quoteId,
                     PriceAt = transaction.OccurredAt,
                     Rate = rate,
+                    Source = CommodityPriceSource.Transaction,
                     CreatedByTransactionId = transaction.Id,
                 };
                 db.CommodityPrices.Add(created);
@@ -60,7 +61,7 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
 
             if (existing.PriceAt != transaction.OccurredAt)
             {
-                await EnsureNoCollisionAsync(split.CommodityId, quoteId, transaction.OccurredAt,
+                await EnsureNoTransactionCollisionAsync(split.CommodityId, quoteId, transaction.OccurredAt,
                     excludeId: existing.Id, ct);
                 existing.PriceAt = transaction.OccurredAt;
             }
@@ -100,7 +101,7 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
         }
     }
 
-    private async Task EnsureNoCollisionAsync(Guid commodityId, Guid quoteCurrencyId,
+    private async Task EnsureNoTransactionCollisionAsync(Guid commodityId, Guid quoteCurrencyId,
         DateTimeOffset priceAt, Guid? excludeId, CancellationToken ct)
     {
         var exists = await db.CommodityPrices
@@ -108,11 +109,12 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
             .AnyAsync(p => p.CommodityId == commodityId
                         && p.QuoteCurrencyId == quoteCurrencyId
                         && p.PriceAt == priceAt
+                        && p.Source == CommodityPriceSource.Transaction
                         && (excludeId == null || p.Id != excludeId), ct);
 
         if (exists)
             throw new BusinessRuleException(
-                $"A price for this commodity already exists at {priceAt:u}. "
+                $"A transaction-linked price for this commodity already exists at {priceAt:u}. "
                 + "Resolve the existing price row before proceeding.");
     }
 }

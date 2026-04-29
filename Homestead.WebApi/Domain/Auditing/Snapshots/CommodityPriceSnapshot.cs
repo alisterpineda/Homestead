@@ -9,6 +9,7 @@ public record CommodityPriceSnapshot : IAuditSnapshot<CommodityPriceSnapshot, Co
     public required Guid QuoteCurrencyId { get; init; }
     public required DateTimeOffset PriceAt { get; init; }
     public required decimal Rate { get; init; }
+    public required CommodityPriceSource Source { get; init; }
     public required Guid? CreatedByTransactionId { get; init; }
 
     public static CommodityPriceSnapshot From(CommodityPrice source) => new()
@@ -17,6 +18,7 @@ public record CommodityPriceSnapshot : IAuditSnapshot<CommodityPriceSnapshot, Co
         QuoteCurrencyId = source.QuoteCurrencyId,
         PriceAt = source.PriceAt,
         Rate = source.Rate,
+        Source = source.Source,
         CreatedByTransactionId = source.CreatedByTransactionId,
     };
 
@@ -36,6 +38,8 @@ public record CommodityPriceSnapshot : IAuditSnapshot<CommodityPriceSnapshot, Co
             changes.Add(new ScalarFieldChange("Rate",
                 Rate.ToString(CultureInfo.InvariantCulture),
                 other.Rate.ToString(CultureInfo.InvariantCulture)));
+        if (Source != other.Source)
+            changes.Add(new ScalarFieldChange("Source", Source.ToString(), other.Source.ToString()));
         if (CreatedByTransactionId != other.CreatedByTransactionId)
             changes.Add(new ScalarFieldChange("CreatedByTransactionId",
                 CreatedByTransactionId?.ToString(),

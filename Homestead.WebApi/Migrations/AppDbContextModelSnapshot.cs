@@ -611,6 +611,10 @@ namespace Homestead.WebApi.Migrations
                     b.Property<decimal>("Rate")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -629,15 +633,68 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("UpdatedByUserId");
 
-                    b.HasIndex("CommodityId", "QuoteCurrencyId", "PriceAt")
+                    b.HasIndex("CommodityId", "QuoteCurrencyId", "PriceAt", "Source")
                         .IsUnique()
-                        .IsDescending(false, false, true);
+                        .IsDescending(false, false, true, false);
 
                     b.ToTable("commodity_prices", "finances", t =>
                         {
                             t.HasCheckConstraint("CK_commodity_prices_rate_positive", "\"Rate\" > 0");
 
                             t.HasCheckConstraint("CK_commodity_prices_self_price", "\"CommodityId\" <> \"QuoteCurrencyId\"");
+                        });
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.CommodityPriceSourceSettings", b =>
+                {
+                    b.Property<string>("Source")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Config")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset?>("LastImportAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastImportError")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastImportStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PairAllowList")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Source");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("commodity_price_source_settings", "finances", t =>
+                        {
+                            t.HasCheckConstraint("CK_commodity_price_source_settings_source_kind", "\"Source\" NOT IN ('Transaction', 'Manual')");
                         });
                 });
 
@@ -1349,6 +1406,23 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("QuoteCurrency");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.CommodityPriceSourceSettings", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
 
                     b.Navigation("UpdatedByUser");
                 });

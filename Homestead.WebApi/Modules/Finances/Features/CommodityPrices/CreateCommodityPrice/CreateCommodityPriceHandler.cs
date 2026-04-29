@@ -37,24 +37,16 @@ public class CreateCommodityPriceHandler(
 
         var priceAt = request.PriceAt.ToUniversalTime();
 
-        var existing = await db.CommodityPrices
+        var existingManual = await db.CommodityPrices
             .AsNoTracking()
-            .Where(p => p.CommodityId == request.CommodityId
-                     && p.QuoteCurrencyId == request.QuoteCurrencyId
-                     && p.PriceAt == priceAt)
-            .Select(p => new { p.Id, p.CreatedByTransactionId })
-            .FirstOrDefaultAsync(ct);
+            .AnyAsync(p => p.CommodityId == request.CommodityId
+                        && p.QuoteCurrencyId == request.QuoteCurrencyId
+                        && p.PriceAt == priceAt
+                        && p.Source == CommodityPriceSource.Manual, ct);
 
-        if (existing is not null)
-        {
-            if (existing.CreatedByTransactionId is Guid txnId)
-                throw new BusinessRuleException(
-                    $"A transaction-linked price already exists at this instant (transaction {txnId}). "
-                    + "Edit the source transaction instead.");
-
+        if (existingManual)
             throw new DuplicateEntityException(
-                "A price for this commodity, quote currency, and instant already exists.");
-        }
+                "A manual price for this commodity, quote currency, and instant already exists.");
 
         var price = new CommodityPrice
         {
@@ -63,6 +55,7 @@ public class CreateCommodityPriceHandler(
             QuoteCurrencyId = request.QuoteCurrencyId,
             PriceAt = priceAt,
             Rate = request.Rate,
+            Source = CommodityPriceSource.Manual,
             CreatedByTransactionId = null,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,

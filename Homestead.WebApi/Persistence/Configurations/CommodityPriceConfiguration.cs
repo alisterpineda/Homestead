@@ -23,6 +23,10 @@ public class CommodityPriceConfiguration : IEntityTypeConfiguration<CommodityPri
 
         builder.Property(p => p.Rate).HasColumnType("numeric");
 
+        builder.Property(p => p.Source)
+            .IsRequired()
+            .HasConversion<string>();
+
         builder.Property(p => p.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -57,8 +61,8 @@ public class CommodityPriceConfiguration : IEntityTypeConfiguration<CommodityPri
             .HasForeignKey(p => p.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(p => new { p.CommodityId, p.QuoteCurrencyId, p.PriceAt })
+        builder.HasIndex(p => new { p.CommodityId, p.QuoteCurrencyId, p.PriceAt, p.Source })
             .IsUnique()
-            .IsDescending(false, false, true);
+            .IsDescending(false, false, true, false);
     }
 }

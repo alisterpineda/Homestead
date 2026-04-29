@@ -123,7 +123,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreatePrice_CollidesWithTransactionLinked_Returns400()
+    public async Task CreatePrice_ManualCoexistsWithTransactionLinkedAtSameInstant()
     {
         var client = await CreateAdminClientAsync();
         var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
@@ -150,6 +150,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 QuoteCurrencyId = cadId,
                 PriceAt = PriceAtJan31,
                 Rate = 1.3456m,
+                Source = CommodityPriceSource.Transaction,
                 CreatedByTransactionId = transaction.Id,
             };
             db.CommodityPrices.Add(price);
@@ -165,8 +166,17 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             rate = 1.5000m
         }, CT);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.NotEqual(Guid.Empty, linkedPriceId);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var rows = await verifyDb.CommodityPrices
+            .Where(p => p.CommodityId == usdId && p.QuoteCurrencyId == cadId && p.PriceAt == PriceAtJan31)
+            .ToListAsync(CT);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, r => r.Id == linkedPriceId && r.Source == CommodityPriceSource.Transaction);
+        Assert.Contains(rows, r => r.Source == CommodityPriceSource.Manual && r.Rate == 1.5000m);
     }
 
     [Fact]
@@ -268,7 +278,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task PatchPrice_PriceAtCollidesWithTransactionLinked_Returns400()
+    public async Task PatchPrice_PriceAtMovesOverTransactionLinkedInstant_Succeeds()
     {
         var client = await CreateAdminClientAsync();
         var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
@@ -291,6 +301,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 QuoteCurrencyId = cadId,
                 PriceAt = PriceAtJan15,
                 Rate = 1.30m,
+                Source = CommodityPriceSource.Transaction,
                 CreatedByTransactionId = transaction.Id,
             });
             await db.SaveChangesAsync(CT);
@@ -309,7 +320,9 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             $"/api/v1/finances/commodity-prices/{manual!.Id}",
             new[] { new { op = "replace", path = "/priceAt", value = (object)PriceAtJan15 } });
 
-        Assert.Equal(HttpStatusCode.BadRequest, patchResp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var patched = await patchResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+        Assert.Equal(PriceAtJan15, patched!.PriceAt);
     }
 
     [Fact]
@@ -361,6 +374,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 QuoteCurrencyId = cadId,
                 PriceAt = PriceAtJan31,
                 Rate = 1.3456m,
+                Source = CommodityPriceSource.Transaction,
                 CreatedByTransactionId = transaction.Id,
             };
             db.CommodityPrices.Add(price);
@@ -401,6 +415,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
                 QuoteCurrencyId = cadId,
                 PriceAt = PriceAtJan31,
                 Rate = 1.3456m,
+                Source = CommodityPriceSource.Transaction,
                 CreatedByTransactionId = transaction.Id,
             };
             db.CommodityPrices.Add(price);

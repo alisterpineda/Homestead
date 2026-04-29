@@ -36,6 +36,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AccountTransaction> AccountTransactions { get; set; }
     public DbSet<AccountTransactionSplit> AccountTransactionSplits { get; set; }
     public DbSet<CommodityPrice> CommodityPrices { get; set; }
+    public DbSet<CommodityPriceSourceSettings> CommodityPriceSourceSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

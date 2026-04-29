@@ -48,23 +48,15 @@ public class PatchCommodityPriceHandler(
 
             var collision = await db.CommodityPrices
                 .AsNoTracking()
-                .Where(p => p.Id != price.Id
-                         && p.CommodityId == price.CommodityId
-                         && p.QuoteCurrencyId == price.QuoteCurrencyId
-                         && p.PriceAt == newPriceAt)
-                .Select(p => new { p.CreatedByTransactionId })
-                .FirstOrDefaultAsync(ct);
+                .AnyAsync(p => p.Id != price.Id
+                            && p.CommodityId == price.CommodityId
+                            && p.QuoteCurrencyId == price.QuoteCurrencyId
+                            && p.PriceAt == newPriceAt
+                            && p.Source == price.Source, ct);
 
-            if (collision is not null)
-            {
-                if (collision.CreatedByTransactionId is Guid txnId)
-                    throw new BusinessRuleException(
-                        $"A transaction-linked price already exists at this instant (transaction {txnId}). "
-                        + "Edit the source transaction instead.");
-
+            if (collision)
                 throw new DuplicateEntityException(
                     "A price for this commodity, quote currency, and instant already exists.");
-            }
 
             price.PriceAt = newPriceAt;
         }
