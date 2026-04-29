@@ -13,6 +13,7 @@ export interface AccountResponse {
   isArchived: boolean;
   isSystem: boolean;
   kind?: (null | AccountKind);
+  latestTransactionDate?: (string | null);
   name: string;
   nativeBalance?: (number | null);
   reportingCurrencyId: string;

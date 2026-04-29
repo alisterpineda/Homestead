@@ -4,7 +4,6 @@ import {
   inject,
   signal,
   computed,
-  effect,
   viewChild,
   TemplateRef,
   afterNextRender,
@@ -13,7 +12,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { Router, NavigationEnd } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, filter, forkJoin, firstValueFrom } from 'rxjs';
+import { switchMap, map, filter, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -21,21 +20,18 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
-import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
-import { AccountGroupSectionComponent } from './account-group-section.component';
+import { AccountTableComponent } from './account-table.component';
 import { CreateAccountDialogComponent } from './create-account-dialog/create-account-dialog.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
-import { KIND_GROUPS, isUserAccountKind } from '../shared/account-kind-meta';
-import { netWorth } from '../shared/sign';
-import { formatCurrency } from '../shared/format-currency';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
-import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -50,7 +46,9 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
-    AccountGroupSectionComponent,
+    HlmCheckboxImports,
+    HlmLabel,
+    AccountTableComponent,
     CreateAccountDialogComponent,
     EditAccountSheetComponent,
   ],
@@ -90,14 +88,14 @@ import { toast } from '@spartan-ng/brain/sonner';
             <div class="flex-1">
               <p class="font-medium">Display currency not set</p>
               <p class="text-amber-900/80 dark:text-amber-100/80">
-                Pick a display currency on the Settings page so balances and net worth render correctly.
+                Pick a display currency on the Settings page so balances render correctly.
               </p>
             </div>
             <a hlmBtn variant="outline" size="sm" routerLink="/finances/settings">Open settings</a>
           </div>
         }
 
-        @if (visibleAccounts().length === 0 && archivedCount() === 0) {
+        @if (userAccounts().length === 0) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
@@ -114,28 +112,24 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
           </div>
         } @else {
-          <section class="rounded-lg border border-border bg-card p-4 text-card-foreground">
-            <p class="text-xs uppercase tracking-wide text-muted-foreground">Net worth</p>
-            <p class="mt-1 text-3xl font-semibold tabular-nums">
-              {{ netWorthText() ?? '—' }}
-            </p>
-            @if (settingsService.hasDisplayCurrency()) {
-              <p class="text-xs text-muted-foreground">
-                In {{ settingsService.displayCurrency()?.symbol }}, computed across {{ nonSystemAccounts().length }} account{{ nonSystemAccounts().length === 1 ? '' : 's' }}.
-              </p>
-            }
-          </section>
-
-          @for (group of groups; track group.kind) {
-            <app-account-group-section
-              [label]="group.sectionLabel"
-              [accounts]="accountsByKind()[group.kind] ?? []"
-              [reportingCurrencies]="reportingCurrencies()"
-              (edit)="onEdit($event)"
-              (archiveToggle)="onArchiveToggle($event)"
-              (delete)="onDeleteRequest($event)"
-            />
+          @if (archivedCount() > 0) {
+            <label class="flex items-center gap-2" hlmLabel>
+              <hlm-checkbox
+                [checked]="showArchived()"
+                (checkedChange)="showArchived.set($event === true)"
+                aria-label="Show archived accounts"
+              />
+              <span>Show archived ({{ archivedCount() }})</span>
+            </label>
           }
+
+          <app-account-table
+            [accounts]="visibleAccounts()"
+            [displayCurrency]="settingsService.displayCurrency()"
+            (edit)="onEdit($event)"
+            (archiveToggle)="onArchiveToggle($event)"
+            (delete)="onDeleteRequest($event)"
+          />
         }
       }
     </div>
@@ -173,7 +167,6 @@ import { toast } from '@spartan-ng/brain/sonner';
 })
 export class AccountListPageComponent implements OnDestroy {
   private accountApi = inject(FinancesAccountApiService);
-  private commodityApi = inject(FinancesCommodityApiService);
   protected settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
   private pageHeaderService = inject(PageHeaderService);
@@ -182,6 +175,7 @@ export class AccountListPageComponent implements OnDestroy {
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
+  showArchived = signal(false);
 
   selectedAccount = signal<AccountResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
@@ -190,10 +184,6 @@ export class AccountListPageComponent implements OnDestroy {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
   archiving = signal(false);
-
-  reportingCurrencies = signal<Record<string, CommodityResponse>>({});
-
-  readonly groups = KIND_GROUPS;
 
   private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
 
@@ -218,25 +208,11 @@ export class AccountListPageComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  visibleAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem && !a.isArchived));
-  nonSystemAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem));
-  archivedCount = computed(() => (this.data() ?? []).filter(a => !a.isSystem && a.isArchived).length);
-
-  accountsByKind = computed<Partial<Record<string, AccountResponse[]>>>(() => {
-    const map: Partial<Record<string, AccountResponse[]>> = {};
-    for (const a of this.data() ?? []) {
-      if (a.isSystem) continue;
-      if (!isUserAccountKind(a.kind)) continue;
-      if (!map[a.kind]) map[a.kind] = [];
-      map[a.kind]!.push(a);
-    }
-    return map;
-  });
-
-  netWorthText = computed(() => {
-    const dc = this.settingsService.displayCurrency();
-    if (!dc) return null;
-    return formatCurrency(netWorth(this.nonSystemAccounts()), dc);
+  userAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem));
+  archivedCount = computed(() => this.userAccounts().filter(a => a.isArchived).length);
+  visibleAccounts = computed(() => {
+    const all = this.userAccounts();
+    return this.showArchived() ? all : all.filter(a => !a.isArchived);
   });
 
   constructor() {
@@ -248,22 +224,6 @@ export class AccountListPageComponent implements OnDestroy {
       takeUntilDestroyed(),
     ).subscribe(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
-    });
-
-    // Whenever data lands, fetch any reporting-currency commodities not already cached.
-    effect(() => {
-      const accounts = this.data();
-      if (!accounts || accounts.length === 0) return;
-      const known = this.reportingCurrencies();
-      const missing = Array.from(new Set(accounts.map(a => a.reportingCurrencyId)))
-        .filter(id => !known[id]);
-      if (missing.length === 0) return;
-      forkJoin(missing.map(id => this.commodityApi.getCommodity({ id }).pipe(catchError(() => of(null)))))
-        .subscribe(commodities => {
-          const update = { ...this.reportingCurrencies() };
-          commodities.forEach(c => { if (c) update[c.id] = c; });
-          this.reportingCurrencies.set(update);
-        });
     });
   }
 

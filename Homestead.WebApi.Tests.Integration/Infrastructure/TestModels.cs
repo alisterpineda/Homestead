@@ -49,7 +49,8 @@ internal record FinanceAccountItem(
     bool IsSystem, bool IsArchived,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     decimal? DisplayValue = null, decimal? NativeBalance = null,
-    int UnpricedHoldingCount = 0, bool HasTransactions = false);
+    int UnpricedHoldingCount = 0, bool HasTransactions = false,
+    DateTimeOffset? LatestTransactionDate = null);
 
 internal record FinancePositionItem(
     Guid CommodityId, decimal Quantity,

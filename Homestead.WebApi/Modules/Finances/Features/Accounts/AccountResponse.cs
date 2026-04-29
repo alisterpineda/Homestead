@@ -19,4 +19,5 @@ public record AccountResponse
     public decimal? NativeBalance { get; init; }
     public int UnpricedHoldingCount { get; init; }
     public required bool HasTransactions { get; init; }
+    public DateTimeOffset? LatestTransactionDate { get; init; }
 }

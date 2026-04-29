@@ -348,6 +348,50 @@ public class AccountsEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetAccounts_PopulatesLatestTransactionDate()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        var withTxResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Has-Tx",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = CashInitialBalance(250m),
+        }, CT);
+        var withTx = await withTxResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+
+        var emptyResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "No-Tx",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = CashInitialBalance(0m),
+        }, CT);
+        var empty = await emptyResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT);
+
+        var listResp = await client.GetAsync("/api/v1/finances/accounts?page=1&pageSize=200&includeArchived=true", CT);
+        Assert.Equal(HttpStatusCode.OK, listResp.StatusCode);
+        var list = await listResp.Content.ReadFromJsonAsync<PaginatedResult<FinanceAccountItem>>(CT);
+
+        var withTxItem = list!.Items.Single(a => a.Id == withTx!.Id);
+        Assert.NotNull(withTxItem.LatestTransactionDate);
+
+        var emptyItem = list.Items.Single(a => a.Id == empty!.Id);
+        Assert.Null(emptyItem.LatestTransactionDate);
+
+        // Look up the actual transaction date from the DB and confirm the response matches.
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var expectedDate = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == withTx!.Id)
+            .Select(s => s.Transaction.OccurredAt)
+            .MaxAsync(CT);
+        Assert.Equal(expectedDate, withTxItem.LatestTransactionDate);
+    }
+
+    [Fact]
     public async Task GetAccounts_FilterByKind_WorksForUserAccounts()
     {
         var client = await CreateAdminClientAsync();

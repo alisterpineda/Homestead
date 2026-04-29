@@ -33,17 +33,19 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
         var values = await valuations.ValueAccountsAsync(pageItems, ctx, ct);
 
         var pageIds = pageItems.Select(a => a.Id).ToHashSet();
-        var withTransactions = (await db.AccountTransactionSplits
+        var txStatsByAccount = await db.AccountTransactionSplits
             .AsNoTracking()
             .Where(s => pageIds.Contains(s.AccountId))
-            .Select(s => s.AccountId)
-            .Distinct()
-            .ToListAsync(ct))
-            .ToHashSet();
+            .GroupBy(s => s.AccountId)
+            .Select(g => new { AccountId = g.Key, LatestDate = g.Max(s => s.Transaction.OccurredAt) })
+            .ToDictionaryAsync(x => x.AccountId, x => (DateTimeOffset?)x.LatestDate, ct);
 
         var responses = pageItems
             .Select(a => AccountResponseMapper.ToResponse(
-                a, values.GetValueOrDefault(a.Id), withTransactions.Contains(a.Id)))
+                a,
+                values.GetValueOrDefault(a.Id),
+                txStatsByAccount.ContainsKey(a.Id),
+                txStatsByAccount.GetValueOrDefault(a.Id)))
             .ToList();
 
         return new PaginatedResponse<AccountResponse>
