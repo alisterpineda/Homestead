@@ -40,7 +40,7 @@ The same symbol on different exchanges is two different commodities (e.g., `AAPL
 
 ## Creation flow (securities only)
 
-Single modal opened from `/finances/commodities` (Securities tab). Kind is always `Security` — currencies are never user-created. Fields:
+Single modal opened from `/finances/commodities` via the persistent `+ New security` toolbar CTA. Kind is always `Security` — currencies are never user-created. Fields:
 
 1. **Symbol** — required, ≤32 chars, uppercase, trimmed.
 2. **Exchange** — required, ≤16 chars, uppercase, trimmed.
@@ -61,20 +61,35 @@ Inline creation from transaction flows (e.g., `Add position`) is deferred to v2 
 
 Route: `/finances/commodities` (top-level under `/finances/`, sibling of `/finances/accounts` and `/finances/settings`).
 
-Two tabs: **Securities** | **Currencies**. Currencies drown out the few securities a household tracks, so they're separated.
+Single sortable table following the cross-cutting `table-ux.md` toolbar pattern: leading search + Filter popover, trailing persistent `+ New security` CTA.
 
-**Securities tab:**
-- Columns: Symbol · Exchange · Name · Display precision · # prices · latest-price staleness indicator.
-- Row actions: Edit, Delete (when unreferenced).
-- Header action: *New Security*.
-- Search: matches Symbol or Name. Exchange displayed but not a primary search target.
+**Toolbar:**
+- **Leading:** debounced search (Symbol or Name, 300ms) and a Filter popover.
+- **Filter popover** carries a single `Kind` facet — checkbox group with `Security` and `Currency`. The trigger label transforms with the active selection: `Filter: Securities` (default), `Filter: Currencies`, `Filter: All kinds`, or bare `Filter` if neither is checked (treated as show-all). A Reset button in the popover header restores the default.
+- **Default Kind filter = `Security`.** Preserves the original "currencies drown out the few securities a household tracks" rationale; currencies remain one click away through the popover. The `Filter: Securities` trigger label is the discoverability mitigation — it tells the user the view is scoped without making them open the popover to find out.
+- **Trailing:** persistent `+ New security` CTA, visible regardless of the active Kind filter (currencies are never user-creatable, so the CTA semantics never depend on what's currently shown).
 
-**Currencies tab:**
-- Columns: Symbol · Name · Display precision.
-- Read-only — no row actions.
-- Search: matches Symbol or Name.
+**Columns** (always present — no adaptive hiding when Kind toggles, to avoid layout reflow):
 
-The list endpoint projects the per-row aggregates the table needs — `PriceCount`, `LatestPriceAt`, and `CanDelete` — onto `CommodityResponse` so the table renders in a single round-trip. `CanDelete` mirrors the same reference predicate `DeleteCommodityHandler` enforces (account reporting currency, splits, split price annotations, price rows on either side); the row's Delete affordance hides when it's false. Seeded currencies always have `CanDelete=false`.
+| Column | Sortable | Currency rendering |
+|---|---|---|
+| Symbol | yes | as-is |
+| Kind | yes | `Security` / `Currency` badge |
+| Exchange | yes | `—` (sortUndefined: 'last') |
+| Name | yes | as-is |
+| Display precision | yes | as-is |
+| # prices | yes | `—` (sortUndefined: 'last') |
+| Latest price | yes | `—` (sortUndefined: 'last') — relative-age formatter for securities |
+
+Every column uses `Symbol asc` as a stable secondary sort axis so row order stays deterministic across re-fetches.
+
+**Row interaction.** Clicking a row navigates to `/finances/commodities/:id`. The row-actions cell stops propagation. Row actions are Edit and Delete (when `canDelete`); both are hidden entirely on system-managed (seeded) rows.
+
+**State.** Filter, sort, and search are URL-encoded — `?kind=Security|Currency|all|none&search=…&sortBy=…&sortDir=…` — and a per-route `CommodityListStateService` restores the last-used params when the user returns from a detail page.
+
+**Fetch shape.** With ~150 active ISO 4217 currencies plus a handful of securities, the full set fits in a single client-side fetch (no `Kind` parameter sent; client-side filter and TanStack sort). A runtime guard logs a warning if `totalCount` exceeds the page size so we catch growth before users do.
+
+The list endpoint projects the per-row aggregates the table needs — `PriceCount`, `LatestPriceAt`, and `CanDelete` — onto `CommodityResponse` so the table renders in a single round-trip. `CanDelete` mirrors the same reference predicate `DeleteCommodityHandler` enforces (account reporting currency, splits, split price annotations, price rows on either side); the row's Delete affordance hides when it's false. Seeded currencies always have `CanDelete=false` and `IsSystemManaged=true`, so they render with no row-actions kebab at all.
 
 ## Commodity detail
 

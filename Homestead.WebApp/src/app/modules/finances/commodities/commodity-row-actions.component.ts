@@ -25,10 +25,12 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="edit.emit(commodity())">
-            <ng-icon hlm name="lucidePencil" size="sm" />
-            Edit
-          </button>
+          @if (!commodity().isSystemManaged) {
+            <button hlmDropdownMenuItem (triggered)="edit.emit(commodity())">
+              <ng-icon hlm name="lucidePencil" size="sm" />
+              Edit
+            </button>
+          }
           @if (commodity().canDelete) {
             <hlm-dropdown-menu-separator />
             <button

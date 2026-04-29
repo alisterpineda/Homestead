@@ -9,34 +9,43 @@ import {
   afterNextRender,
   OnDestroy,
 } from '@angular/core';
-import { Router, NavigationEnd } from '@angular/router';
+import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, debounceTime, distinctUntilChanged, combineLatest, filter, firstValueFrom } from 'rxjs';
+import { switchMap, map, debounceTime, distinctUntilChanged, combineLatest, filter, take, firstValueFrom, forkJoin, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch } from '@ng-icons/lucide';
+import { lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch, lucideListFilter } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
-import { HlmTabsImports } from '@/shared/components/spartan/tabs';
-import { HlmTableImports } from '@/shared/components/spartan/table';
-import { HlmBadgeImports } from '@/shared/components/spartan/badge';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmPopoverImports } from '@/shared/components/spartan/popover';
+import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { toast } from '@spartan-ng/brain/sonner';
-import { CommodityRowActionsComponent } from './commodity-row-actions.component';
 import { CreateCommodityDialogComponent } from './create-commodity-dialog/create-commodity-dialog.component';
 import { EditCommoditySheetComponent } from './edit-commodity-sheet/edit-commodity-sheet.component';
-import { formatRelativeAge } from './relative-age';
+import { CommodityTableComponent, type CommoditySortBy, type CommoditySortDir } from './commodity-table.component';
+import { CommodityListStateService } from './commodity-list-state.service';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { CommodityKind } from '@/api/generated/models/commodity-kind';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
-type TabKey = 'securities' | 'currencies';
+type KindFilter = CommodityKind | 'all' | 'none';
+const isKindFilter = (v: string | null): v is KindFilter =>
+  v === 'Security' || v === 'Currency' || v === 'all' || v === 'none';
+const isCommoditySortBy = (v: string | null): v is CommoditySortBy =>
+  v === 'symbol' || v === 'kind' || v === 'exchange' || v === 'name'
+    || v === 'displayPrecision' || v === 'priceCount' || v === 'latestPriceAt';
+const isCommoditySortDir = (v: string | null): v is CommoditySortDir => v === 'asc' || v === 'desc';
+const COMMODITY_PAGE_SIZE = 100;
+const COMMODITY_TOTAL_GUARD = 1000;
 
 @Component({
   selector: 'app-commodity-list-page',
@@ -49,153 +58,113 @@ type TabKey = 'securities' | 'currencies';
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
-    HlmTabsImports,
-    HlmTableImports,
-    HlmBadgeImports,
-    CommodityRowActionsComponent,
+    HlmCheckboxImports,
+    HlmLabel,
+    HlmPopoverImports,
+    HlmSeparatorImports,
+    CommodityTableComponent,
     CreateCommodityDialogComponent,
     EditCommoditySheetComponent,
   ],
-  providers: [provideIcons({ lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch })],
+  providers: [provideIcons({ lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch, lucideListFilter })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerActions>
-      @if (activeTab() === 'securities') {
-        <app-create-commodity-dialog triggerSize="sm" (created)="onChanged()">
-          <ng-icon hlm name="lucidePlus" size="sm" />
-          New security
-        </app-create-commodity-dialog>
-      }
+      <app-create-commodity-dialog triggerSize="sm" (created)="onChanged()">
+        <ng-icon hlm name="lucidePlus" size="sm" />
+        New security
+      </app-create-commodity-dialog>
     </ng-template>
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
-      <hlm-tabs [tab]="activeTab()" (tabActivated)="onTabChange($event)" class="flex flex-1 flex-col gap-4">
-        <hlm-tabs-list variant="line">
-          <button hlmTabsTrigger="securities">Securities</button>
-          <button hlmTabsTrigger="currencies">Currencies</button>
-        </hlm-tabs-list>
-
-        <div class="relative max-w-sm">
+      <div class="flex items-center gap-2">
+        <div class="relative max-w-sm flex-1 min-w-0">
           <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             hlmInput
             class="pl-9"
             type="search"
-            [placeholder]="activeTab() === 'securities' ? 'Search by symbol or name' : 'Search currencies'"
+            placeholder="Search by symbol or name"
+            aria-label="Search commodities"
             [value]="searchInput()"
             (input)="searchInput.set(asValue($event))"
           />
         </div>
-
-        <div hlmTabsContent="securities" class="flex-1">
-          @if (loading() && !data()) {
-            <div class="flex justify-center py-16"><hlm-spinner /></div>
-          } @else if (error()) {
-            <div hlmEmpty>
-              <div hlmEmptyHeader>
-                <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
-                <div hlmEmptyTitle>Failed to load commodities</div>
-              </div>
-            </div>
-          } @else {
-            @if (rows().length === 0) {
-              <div hlmEmpty>
-                <div hlmEmptyHeader>
-                  <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCoins" /></div>
-                  <div hlmEmptyTitle>{{ searchTerm() ? 'No matches' : 'No securities yet' }}</div>
-                  <div hlmEmptyDescription>
-                    {{ searchTerm() ? 'Try a different symbol or name.' : 'Add a security to start tracking its price.' }}
-                  </div>
-                </div>
-                @if (!searchTerm()) {
-                  <div hlmEmptyContent>
-                    <app-create-commodity-dialog (created)="onChanged()">
-                      <ng-icon hlm name="lucidePlus" size="sm" />
-                      New security
-                    </app-create-commodity-dialog>
-                  </div>
+        <div hlmPopover>
+            <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+              <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
+              {{ filterTriggerLabel() }}
+            </button>
+            <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
+              <div class="flex items-center justify-between px-3 py-2">
+                <span class="text-sm font-medium">Filters</span>
+                @if (kindFilter() !== 'Security') {
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="sm"
+                    class="h-auto px-2 py-0.5 text-xs"
+                    (click)="resetKindFilter()"
+                  >Reset</button>
                 }
               </div>
-            } @else {
-              <div class="overflow-x-auto rounded-md border border-border">
-                <table hlmTable class="w-full">
-                  <thead hlmTHead>
-                    <tr hlmTr>
-                      <th hlmTh>Symbol</th>
-                      <th hlmTh>Exchange</th>
-                      <th hlmTh>Name</th>
-                      <th hlmTh class="text-right">Precision</th>
-                      <th hlmTh class="text-right"># prices</th>
-                      <th hlmTh>Latest price</th>
-                      <th hlmTh class="w-12"></th>
-                    </tr>
-                  </thead>
-                  <tbody hlmTBody>
-                    @for (row of rows(); track row.id) {
-                      <tr hlmTr class="cursor-pointer" (click)="openDetail(row)">
-                        <td hlmTd class="font-medium">{{ row.symbol }}</td>
-                        <td hlmTd>
-                          @if (row.exchange) {
-                            <span hlmBadge variant="outline">{{ row.exchange }}</span>
-                          }
-                        </td>
-                        <td hlmTd class="text-muted-foreground">{{ row.name }}</td>
-                        <td hlmTd class="text-right tabular-nums">{{ row.displayPrecision }}</td>
-                        <td hlmTd class="text-right tabular-nums">{{ row.priceCount }}</td>
-                        <td hlmTd class="text-muted-foreground">{{ formatLatest(row.latestPriceAt) }}</td>
-                        <td hlmTd class="w-12">
-                          <app-commodity-row-actions
-                            [commodity]="row"
-                            (edit)="onEdit($event)"
-                            (delete)="onDeleteRequest($event)"
-                          />
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          }
-        </div>
-
-        <div hlmTabsContent="currencies" class="flex-1">
-          @if (loading() && !data()) {
-            <div class="flex justify-center py-16"><hlm-spinner /></div>
-          } @else {
-            @if (rows().length === 0) {
-              <div hlmEmpty>
-                <div hlmEmptyHeader>
-                  <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCoins" /></div>
-                  <div hlmEmptyTitle>No matches</div>
-                  <div hlmEmptyDescription>Try a different symbol or name.</div>
+              <span hlmSeparator></span>
+              <div role="group" aria-labelledby="commodity-kind-filter-label" class="p-3">
+                <div id="commodity-kind-filter-label" class="text-xs font-medium text-muted-foreground mb-2">Kind</div>
+                <div class="flex flex-col gap-2">
+                  <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
+                    <hlm-checkbox
+                      [checked]="showSecurities()"
+                      (checkedChange)="onKindToggle('Security', $event === true)"
+                      [aria-label]="'Show securities'"
+                    />
+                    <span>Security</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
+                    <hlm-checkbox
+                      [checked]="showCurrencies()"
+                      (checkedChange)="onKindToggle('Currency', $event === true)"
+                      [aria-label]="'Show currencies'"
+                    />
+                    <span>Currency</span>
+                  </label>
                 </div>
               </div>
-            } @else {
-              <div class="overflow-x-auto rounded-md border border-border">
-                <table hlmTable class="w-full">
-                  <thead hlmTHead>
-                    <tr hlmTr>
-                      <th hlmTh>Symbol</th>
-                      <th hlmTh>Name</th>
-                      <th hlmTh class="text-right">Precision</th>
-                    </tr>
-                  </thead>
-                  <tbody hlmTBody>
-                    @for (row of rows(); track row.id) {
-                      <tr hlmTr class="cursor-pointer" (click)="openDetail(row)">
-                        <td hlmTd class="font-medium">{{ row.symbol }}</td>
-                        <td hlmTd class="text-muted-foreground">{{ row.name }}</td>
-                        <td hlmTd class="text-right tabular-nums">{{ row.displayPrecision }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          }
+            </div>
+          </div>
         </div>
-      </hlm-tabs>
+
+      @if (loading() && !data()) {
+        <div class="flex justify-center py-16"><hlm-spinner /></div>
+      } @else if (error()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
+            <div hlmEmptyTitle>Failed to load commodities</div>
+            <div hlmEmptyDescription>There was an error loading commodities. Please try again.</div>
+          </div>
+        </div>
+      } @else {
+        @if (rows().length === 0) {
+          <div hlmEmpty>
+            <div hlmEmptyHeader>
+              <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCoins" /></div>
+              <div hlmEmptyTitle>{{ emptyTitle() }}</div>
+              <div hlmEmptyDescription>{{ emptyDescription() }}</div>
+            </div>
+          </div>
+        } @else {
+          <app-commodity-table
+            [commodities]="rows()"
+            [sortBy]="sortBy()"
+            [sortDir]="sortDir()"
+            (rowClick)="openDetail($event)"
+            (edit)="onEdit($event)"
+            (delete)="onDeleteRequest($event)"
+            (sortChange)="onSortChange($event)"
+          />
+        }
+      }
     </div>
 
     <app-edit-commodity-sheet
@@ -233,12 +202,62 @@ export class CommodityListPageComponent implements OnDestroy {
   private errorHandler = inject(ErrorHandlerService);
   private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private listState = inject(CommodityListStateService);
 
-  activeTab = signal<TabKey>('securities');
-  searchInput = signal('');
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
+  ready = signal(false);
+
+  searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
+
+  searchTerm = toSignal(
+    this.route.queryParamMap.pipe(map(p => (p.get('search') ?? '').trim())),
+    { initialValue: (this.route.snapshot.queryParamMap.get('search') ?? '').trim() },
+  );
+
+  kindFilter = toSignal(
+    this.route.queryParamMap.pipe(map((p): KindFilter => {
+      const raw = p.get('kind');
+      return isKindFilter(raw) ? raw : 'Security';
+    })),
+    { initialValue: 'Security' as KindFilter },
+  );
+
+  sortBy = toSignal(
+    this.route.queryParamMap.pipe(map((p): CommoditySortBy | null => {
+      const raw = p.get('sortBy');
+      return isCommoditySortBy(raw) ? raw : null;
+    })),
+    { initialValue: null as CommoditySortBy | null },
+  );
+
+  sortDir = toSignal(
+    this.route.queryParamMap.pipe(map((p): CommoditySortDir | null => {
+      const raw = p.get('sortDir');
+      return isCommoditySortDir(raw) ? raw : null;
+    })),
+    { initialValue: null as CommoditySortDir | null },
+  );
+
+  showSecurities = computed(() => {
+    const k = this.kindFilter();
+    return k === 'Security' || k === 'all';
+  });
+
+  showCurrencies = computed(() => {
+    const k = this.kindFilter();
+    return k === 'Currency' || k === 'all';
+  });
+
+  filterTriggerLabel = computed(() => {
+    const k = this.kindFilter();
+    if (k === 'Security') return 'Filter: Securities';
+    if (k === 'Currency') return 'Filter: Currencies';
+    if (k === 'all') return 'Filter: All kinds';
+    return 'Filter'; // 'none' — treated as show-all but no commitment recorded
+  });
 
   selectedCommodity = signal<CommodityResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
@@ -247,36 +266,49 @@ export class CommodityListPageComponent implements OnDestroy {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
 
-  searchTerm = toSignal(
-    toObservable(this.searchInput).pipe(
-      debounceTime(300),
-      map(s => s.trim()),
-      distinctUntilChanged(),
-    ),
-    { initialValue: '' },
-  );
-
   private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
 
   data = toSignal<CommodityResponse[] | null, CommodityResponse[] | null>(
     combineLatest([
-      toObservable(this.activeTab),
-      toObservable(this.searchTerm),
       toObservable(this.refreshTrigger),
+      toObservable(this.searchTerm),
+      toObservable(this.ready),
     ]).pipe(
-      switchMap(([tab, search]) => {
+      filter(([, , ready]) => ready),
+      switchMap(([, search]) => {
         this.loading.set(true);
         this.error.set(false);
-        const kind: CommodityKind = tab === 'securities' ? 'Security' : 'Currency';
         return this.commodityApi.getCommodities({
           Page: 1,
-          PageSize: tab === 'currencies' ? 300 : 200,
-          Kind: kind,
+          PageSize: COMMODITY_PAGE_SIZE,
           Search: search || undefined,
         }).pipe(
-          map(r => {
+          switchMap(first => {
+            const total = first.totalCount;
+            if (total > COMMODITY_TOTAL_GUARD) {
+              console.warn(
+                `[CommodityListPage] Commodity total count (${total}) exceeds guard (${COMMODITY_TOTAL_GUARD}); list is truncated.`,
+              );
+            }
+            const totalPages = Math.min(
+              Math.ceil(total / COMMODITY_PAGE_SIZE),
+              Math.ceil(COMMODITY_TOTAL_GUARD / COMMODITY_PAGE_SIZE),
+            );
+            if (totalPages <= 1) return of(first.items ?? []);
+            const tail$ = forkJoin(
+              Array.from({ length: totalPages - 1 }, (_, i) =>
+                this.commodityApi.getCommodities({
+                  Page: i + 2,
+                  PageSize: COMMODITY_PAGE_SIZE,
+                  Search: search || undefined,
+                }).pipe(map(r => r.items ?? [])),
+              ),
+            );
+            return tail$.pipe(map(pages => [...(first.items ?? []), ...pages.flat()]));
+          }),
+          map(items => {
             this.loading.set(false);
-            return (r.items ?? []) as CommodityResponse[] | null;
+            return items as CommodityResponse[] | null;
           }),
           handleQueryError(this.loading, this.error, null),
         );
@@ -285,17 +317,77 @@ export class CommodityListPageComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  rows = computed(() => this.data() ?? []);
+  rows = computed(() => {
+    const all = this.data() ?? [];
+    const k = this.kindFilter();
+    if (k === 'all' || k === 'none') return all;
+    return all.filter(c => c.kind === k);
+  });
+
+  emptyTitle = computed(() => {
+    if (this.searchTerm()) return 'No matches';
+    const k = this.kindFilter();
+    if (k === 'Security') return 'No securities yet';
+    if (k === 'Currency') return 'No currencies';
+    return 'No commodities';
+  });
+
+  emptyDescription = computed(() => {
+    const search = this.searchTerm();
+    const k = this.kindFilter();
+    if (search) {
+      if (k === 'Security') return `No securities matching "${search}". Try a different symbol or name.`;
+      if (k === 'Currency') return `No currencies matching "${search}". Try a different symbol or name.`;
+      return `No commodities matching "${search}". Try a different symbol or name.`;
+    }
+    if (k === 'Security') return 'Add a security to start tracking its price.';
+    if (k === 'Currency') return 'Currencies are seeded automatically.';
+    return 'Adjust the filter to see commodities.';
+  });
 
   constructor() {
     afterNextRender(() => {
       this.pageHeaderService.setActions(this.headerActionsTpl());
     });
-    this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
+
+    const initialParams = this.route.snapshot.queryParams;
+    const hasInitialParams = Object.keys(initialParams).length > 0;
+    if (!hasInitialParams && this.listState.hasParams) {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: this.listState.getSavedParams(),
+        replaceUrl: true,
+      });
+      this.router.events.pipe(
+        filter(e => e instanceof NavigationEnd || e instanceof NavigationCancel || e instanceof NavigationError),
+        take(1),
+        takeUntilDestroyed(),
+      ).subscribe(() => {
+        this.searchInput.set(this.route.snapshot.queryParamMap.get('search') ?? '');
+        this.ready.set(true);
+      });
+    } else {
+      this.ready.set(true);
+    }
+
+    this.route.queryParams.pipe(takeUntilDestroyed()).subscribe(params => {
+      if (Object.keys(params).length > 0) {
+        this.listState.saveParams(params);
+      }
+    });
+
+    toObservable(this.searchInput).pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
       takeUntilDestroyed(),
-    ).subscribe(() => {
-      this.pageHeaderService.setActions(this.headerActionsTpl());
+    ).subscribe(value => {
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { search: value || null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
     });
   }
 
@@ -307,13 +399,42 @@ export class CommodityListPageComponent implements OnDestroy {
     return (event.target as HTMLInputElement).value;
   }
 
-  onTabChange(tab: string): void {
-    this.activeTab.set(tab as TabKey);
-    this.searchInput.set('');
-  }
-
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);
+  }
+
+  onKindToggle(kind: CommodityKind, checked: boolean): void {
+    const sec = kind === 'Security' ? checked : this.showSecurities();
+    const cur = kind === 'Currency' ? checked : this.showCurrencies();
+    let next: KindFilter;
+    if (sec && cur) next = 'all';
+    else if (sec) next = 'Security';
+    else if (cur) next = 'Currency';
+    else next = 'none';
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { kind: next },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  resetKindFilter(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { kind: 'Security' },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  onSortChange(event: { sortBy: CommoditySortBy; sortDir: CommoditySortDir }): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { sortBy: event.sortBy, sortDir: event.sortDir },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   openDetail(commodity: CommodityResponse): void {
@@ -356,9 +477,5 @@ export class CommodityListPageComponent implements OnDestroy {
     }).catch(() => {
       this.deleting.set(false);
     });
-  }
-
-  formatLatest(at: string | null): string {
-    return at ? formatRelativeAge(at) : '—';
   }
 }
