@@ -45,22 +45,21 @@ const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       <section class="rounded-lg border border-border bg-card p-4 text-card-foreground">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="text-xs uppercase tracking-wide text-muted-foreground">Net worth</p>
-            <p class="mt-1 text-3xl font-semibold tabular-nums">
-              {{ headlineText() }}
-            </p>
-            <p class="text-xs text-muted-foreground">
-              {{ subtitleText() }}
-            </p>
-          </div>
-          <app-net-worth-range-toggle
-            [value]="range()"
-            (valueChange)="range.set($event)"
-          />
-        </div>
+        <p class="text-xs uppercase tracking-wide text-muted-foreground">Net worth</p>
+        <p class="mt-1 text-3xl font-semibold tabular-nums">
+          {{ headlineText() }}
+        </p>
+        <p class="text-xs text-muted-foreground">
+          {{ subtitleText() }}
+        </p>
       </section>
+
+      <div class="flex items-center gap-2">
+        <app-net-worth-range-toggle
+          [value]="range()"
+          (valueChange)="range.set($event)"
+        />
+      </div>
 
       @if (loading() && !data()) {
         <div class="flex justify-center py-16">
