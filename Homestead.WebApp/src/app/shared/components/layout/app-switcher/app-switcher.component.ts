@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLayoutGrid, lucideSettings, lucideFileText } from '@ng-icons/lucide';
+import { lucideLayoutGrid, lucideSettings, lucideFileText, lucideWallet } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -12,7 +12,7 @@ import { AuthService } from '@/shared/services/auth.service';
   selector: 'app-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgIcon, HlmIconImports, HlmDropdownMenuImports, HlmButton],
-  providers: [provideIcons({ lucideLayoutGrid, lucideSettings, lucideFileText })],
+  providers: [provideIcons({ lucideLayoutGrid, lucideSettings, lucideFileText, lucideWallet })],
   template: `
     <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="menu">
       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
