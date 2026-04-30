@@ -19,9 +19,6 @@ import {
   lucidePlus,
   lucideScale,
   lucideArrowRightLeft,
-  lucideEllipsisVertical,
-  lucideArchive,
-  lucideArchiveRestore,
   lucideChevronDown,
   lucidePackagePlus,
 } from '@ng-icons/lucide';
@@ -34,9 +31,6 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
-import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
-import { replace } from '@/shared/json-patch';
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { KindBadgeComponent } from '../shared/kind-badge.component';
@@ -82,8 +76,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   ],
   providers: [provideIcons({
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
-    lucideEllipsisVertical, lucideArchive, lucideArchiveRestore, lucideChevronDown,
-    lucidePackagePlus,
+    lucideChevronDown, lucidePackagePlus,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -152,25 +145,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
         </header>
 
-        <div class="flex flex-wrap items-center justify-end gap-2">
-          @if (!a.isArchived) {
+        @if (!a.isArchived) {
+          <div class="flex flex-wrap items-center justify-end gap-2">
             @if (a.kind === 'Investment') {
               <button hlmBtn size="sm" (click)="openAddPosition()">
                 <ng-icon hlm name="lucidePackagePlus" size="sm" />
                 Add position
               </button>
-              <button hlmBtn variant="outline" size="sm" (click)="openRecordBalance()">
-                <ng-icon hlm name="lucideScale" size="sm" />
-                Record balance
-              </button>
-            } @else {
-              <button hlmBtn size="sm" (click)="openRecordBalance()">
-                <ng-icon hlm name="lucideScale" size="sm" />
-                Record balance
-              </button>
             }
 
-            <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
+            <button hlmBtn size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New transaction
               <ng-icon hlm name="lucideChevronDown" size="sm" />
@@ -182,25 +166,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                     <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
                     Transfer
                   </button>
+                  <button hlmDropdownMenuItem (triggered)="openRecordBalance()">
+                    <ng-icon hlm name="lucideScale" size="sm" />
+                    Record balance
+                  </button>
                 </hlm-dropdown-menu-group>
               </hlm-dropdown-menu>
             </ng-template>
-          }
-
-          <button hlmBtn variant="ghost" size="icon-sm" [hlmDropdownMenuTrigger]="accountMenu" aria-label="Account actions">
-            <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
-          </button>
-          <ng-template #accountMenu>
-            <hlm-dropdown-menu class="w-44">
-              <hlm-dropdown-menu-group>
-                <button hlmDropdownMenuItem (triggered)="toggleArchive()">
-                  <ng-icon hlm [name]="a.isArchived ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
-                  {{ a.isArchived ? 'Unarchive' : 'Archive' }}
-                </button>
-              </hlm-dropdown-menu-group>
-            </hlm-dropdown-menu>
-          </ng-template>
-        </div>
+          </div>
+        }
 
         @if (a.kind === 'Investment') {
           <div class="rounded-lg border border-border bg-card p-4 text-card-foreground">
@@ -270,7 +244,6 @@ export class AccountDetailPageComponent implements OnDestroy {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private txApi = inject(FinancesTransactionApiService);
-  private errorHandler = inject(ErrorHandlerService);
   protected settingsService = inject(FinanceSettingsService);
   private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
@@ -294,8 +267,6 @@ export class AccountDetailPageComponent implements OnDestroy {
   openingBalanceSheetExisting = signal<OpeningBalanceResponse | null>(null);
 
   addPositionSheetState = signal<BrnDialogState>('closed');
-
-  archiving = signal(false);
 
   reportingCurrency = signal<CommodityResponse | null>(null);
 
@@ -391,24 +362,6 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   openAddPosition(): void {
     this.addPositionSheetState.set('open');
-  }
-
-  toggleArchive(): void {
-    const a = this.account();
-    if (!a) return;
-    this.archiving.set(true);
-    this.accountApi.patchAccount({
-      id: a.id,
-      body: [replace('/isArchived', !a.isArchived)],
-    }).pipe(
-      handleMutationError(this.errorHandler, this.archiving, 'Failed to update account.'),
-    ).subscribe({
-      next: () => {
-        this.archiving.set(false);
-        toast.success(a.isArchived ? 'Account unarchived.' : 'Account archived.');
-        this.refreshTrigger.update(v => v + 1);
-      },
-    });
   }
 
   // ─── Activity-row clicks ─────────────────────────────────────────────────
