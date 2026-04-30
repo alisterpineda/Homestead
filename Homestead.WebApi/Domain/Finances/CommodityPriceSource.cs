@@ -5,4 +5,5 @@ public enum CommodityPriceSource
     Transaction,
     Manual,
     BankOfCanada,
+    AlphaVantage,
 }

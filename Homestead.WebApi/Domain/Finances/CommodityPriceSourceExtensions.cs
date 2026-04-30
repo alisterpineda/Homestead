@@ -16,6 +16,7 @@ public static class CommodityPriceSourceExtensions
         CommodityPriceSource.Transaction => CommodityPriceSourceKind.Transaction,
         CommodityPriceSource.Manual => CommodityPriceSourceKind.Manual,
         CommodityPriceSource.BankOfCanada => CommodityPriceSourceKind.External,
+        CommodityPriceSource.AlphaVantage => CommodityPriceSourceKind.External,
         _ => throw new ArgumentOutOfRangeException(nameof(source), source, $"Unsupported price source: {source}"),
     };
 
@@ -24,6 +25,7 @@ public static class CommodityPriceSourceExtensions
         CommodityPriceSource.Transaction => "Transaction",
         CommodityPriceSource.Manual => "Manual",
         CommodityPriceSource.BankOfCanada => "Bank of Canada",
+        CommodityPriceSource.AlphaVantage => "Alpha Vantage",
         _ => throw new ArgumentOutOfRangeException(nameof(source), source, $"Unsupported price source: {source}"),
     };
 
