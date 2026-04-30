@@ -66,4 +66,15 @@ describe('PriceSourceListComponent', () => {
     };
     expect(fixture.componentInstance.statusPill(item)).toEqual({ label: 'Never run', variant: 'outline' });
   });
+
+  it('maps PartialSuccess status to secondary variant', () => {
+    const fixture = TestBed.createComponent(PriceSourceListComponent);
+    const item: PriceSourceSummary = {
+      source: 'BankOfCanada', displayName: 'Bank of Canada', kind: 'External',
+      isEnabled: true, priceCount: 0,
+      lastImportAt: '2026-04-28T10:00:00Z',
+      lastImportStatus: 'PartialSuccess',
+    };
+    expect(fixture.componentInstance.statusPill(item)).toEqual({ label: 'Partial', variant: 'secondary' });
+  });
 });

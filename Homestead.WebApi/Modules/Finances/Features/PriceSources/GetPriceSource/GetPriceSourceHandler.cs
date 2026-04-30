@@ -31,6 +31,7 @@ public class GetPriceSourceHandler(
 
         var provider = serviceProvider.GetKeyedService<IPriceProvider>(request.Source);
         var kind = request.Source.Kind();
+        var configJson = JsonSecretConfig.Mask(settings?.Config, SecretKeys(provider?.ConfigSchema));
 
         PriceSourceScheduleSummary? scheduleSummary = null;
         if (kind == CommodityPriceSourceKind.External)
@@ -66,15 +67,19 @@ public class GetPriceSourceHandler(
             DisplayName = request.Source.DisplayName(),
             Kind = kind,
             IsEnabled = kind == CommodityPriceSourceKind.External ? settings?.IsEnabled ?? false : true,
-            Config = settings?.Config,
+            Config = configJson,
             PairAllowList = pairAllowList,
             LastImportAt = settings?.LastImportAt,
             LastImportStatus = settings?.LastImportStatus,
-            LastImportError = settings?.LastImportError,
+            LastImportMessage = settings?.LastImportMessage,
             ConfigSchema = provider?.ConfigSchema ?? PriceProviderConfigSchema.Empty,
             SupportedPairs = provider?.SupportedPairs ?? Array.Empty<PriceProviderSupportedPair>(),
             Schedule = scheduleSummary,
             PriceCount = priceCount,
         };
     }
+
+    private static IEnumerable<string> SecretKeys(PriceProviderConfigSchema? schema) =>
+        schema?.Fields.Where(f => f.Type == PriceProviderConfigFieldType.Secret).Select(f => f.Key)
+            ?? Array.Empty<string>();
 }

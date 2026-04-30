@@ -13,7 +13,7 @@ export interface GetPriceSourceResponse {
   isEnabled: boolean;
   kind: CommodityPriceSourceKind;
   lastImportAt?: (string | null);
-  lastImportError?: (string | null);
+  lastImportMessage?: (string | null);
   lastImportStatus?: (string | null);
   pairAllowList?: (Array<string> | null);
   priceCount: number;

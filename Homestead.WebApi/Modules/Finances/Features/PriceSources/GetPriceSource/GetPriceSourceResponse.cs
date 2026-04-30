@@ -23,7 +23,7 @@ public record GetPriceSourceResponse
     public IReadOnlyList<string>? PairAllowList { get; init; }
     public DateTimeOffset? LastImportAt { get; init; }
     public string? LastImportStatus { get; init; }
-    public string? LastImportError { get; init; }
+    public string? LastImportMessage { get; init; }
     public required PriceProviderConfigSchema ConfigSchema { get; init; }
     public required IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; init; }
     public PriceSourceScheduleSummary? Schedule { get; init; }

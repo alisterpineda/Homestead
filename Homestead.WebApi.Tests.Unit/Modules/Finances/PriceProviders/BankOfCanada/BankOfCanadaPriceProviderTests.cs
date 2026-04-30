@@ -39,7 +39,8 @@ public class BankOfCanadaPriceProviderTests
             new PriceImportRequest(Array.Empty<Commodity>(),
                 DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow, null),
             TestContext.Current.CancellationToken);
-        Assert.Empty(result);
+        Assert.Empty(result.Observations);
+        Assert.Null(result.Warning);
         Assert.Equal(0, handler.CallCount);
     }
 
@@ -65,7 +66,7 @@ public class BankOfCanadaPriceProviderTests
                 null),
             TestContext.Current.CancellationToken);
 
-        var obs = Assert.Single(result);
+        var obs = Assert.Single(result.Observations);
         Assert.Equal(usd.Id, obs.CommodityId);
         Assert.Equal(cad.Id, obs.QuoteCurrencyId);
         Assert.Equal(new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero), obs.PriceAt);
@@ -88,7 +89,7 @@ public class BankOfCanadaPriceProviderTests
                 DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow, null),
             TestContext.Current.CancellationToken);
 
-        Assert.Empty(result);
+        Assert.Empty(result.Observations);
         Assert.Equal(0, handler.CallCount); // CAD alone yields no series → no call
     }
 

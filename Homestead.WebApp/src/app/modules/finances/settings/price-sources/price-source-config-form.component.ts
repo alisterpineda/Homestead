@@ -31,7 +31,7 @@ import type { PriceProviderConfigSchema } from '@/api/generated/models/price-pro
               <input
                 hlmInput
                 [id]="'cfg-' + field.key"
-                [type]="field.type === 'Integer' ? 'number' : 'text'"
+                [type]="inputType(field.type)"
                 [ngModel]="stringValue(field.key)"
                 (ngModelChange)="setValue(field.key, $event)"
               />
@@ -91,6 +91,16 @@ export class PriceSourceConfigFormComponent {
     return false;
   });
 
+  inputType(fieldType: string): 'number' | 'password' | 'text' {
+    if (fieldType === 'Integer') return 'number';
+    if (fieldType === 'Secret') return 'password';
+    return 'text';
+  }
+
+  private secretKeys(): Set<string> {
+    return new Set(this.schema().fields.filter(f => f.type === 'Secret').map(f => f.key));
+  }
+
   stringValue(key: string): string {
     const v = this.values()[key];
     return typeof v === 'string' ? v : '';
@@ -106,7 +116,14 @@ export class PriceSourceConfigFormComponent {
   }
 
   emitSave(): void {
-    const json = JSON.stringify(this.values());
-    this.saved.emit(json);
+    const current = this.values();
+    const initial = this.initial();
+    const secrets = this.secretKeys();
+    const payload: Record<string, string | boolean> = {};
+    for (const [key, value] of Object.entries(current)) {
+      if (secrets.has(key) && value === initial[key]) continue;
+      payload[key] = value;
+    }
+    this.saved.emit(JSON.stringify(payload));
   }
 }

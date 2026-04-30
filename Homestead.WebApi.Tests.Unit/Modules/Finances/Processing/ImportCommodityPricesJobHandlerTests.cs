@@ -30,6 +30,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         _provider = Substitute.For<IPriceProvider>();
         _provider.Source.Returns(CommodityPriceSource.BankOfCanada);
         _provider.SupportedPairs.Returns(new[] { new PriceProviderSupportedPair("USD", null, "CAD") });
+        _provider.CoveredSecurityExchanges.Returns(Array.Empty<string>());
 
         var sc = new ServiceCollection();
         sc.AddKeyedSingleton(CommodityPriceSource.BankOfCanada, _provider);
@@ -156,11 +157,11 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new[]
+            .Returns(PriceImportResult.Success(new[]
             {
                 new PriceObservation(_usd.Id, _cad.Id, existingAt, 1.36m),
                 new PriceObservation(_usd.Id, _cad.Id, newAt, 1.37m),
-            });
+            }));
 
         var job = MakeJob(
             new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada),
@@ -189,10 +190,10 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new[]
+            .Returns(PriceImportResult.Success(new[]
             {
                 new PriceObservation(_usd.Id, _cad.Id, DateTimeOffset.UtcNow, 1.30m),
-            });
+            }));
 
         var creator = Guid.NewGuid();
         var job = MakeJob(
@@ -216,10 +217,10 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new[]
+            .Returns(PriceImportResult.Success(new[]
             {
                 new PriceObservation(_usd.Id, _cad.Id, DateTimeOffset.UtcNow, 1.30m),
-            });
+            }));
 
         var job = MakeJob(
             new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada),
@@ -242,14 +243,14 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<PriceObservation>());
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
 
         var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
         await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
 
         var settings = _db.CommodityPriceSourceSettings.Single(s => s.Source == CommodityPriceSource.BankOfCanada);
         Assert.Equal("Success", settings.LastImportStatus);
-        Assert.Null(settings.LastImportError);
+        Assert.Null(settings.LastImportMessage);
         Assert.NotNull(settings.LastImportAt);
     }
 
@@ -266,7 +267,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         IReadOnlyCollection<Commodity>? captured = null;
         _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r.Commodities), Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<PriceObservation>());
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
 
         var job = MakeJob(
             new ImportCommodityPricesPayload(
@@ -277,6 +278,97 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         Assert.NotNull(captured);
         Assert.All(captured!, c => Assert.Equal(_cad.Id, c.Id));
+    }
+
+    [Fact]
+    public async Task CoveredSecurityExchanges_IncludesHeldSecurityNotInSupportedPairs()
+    {
+        var nasdaq = new Commodity
+        {
+            Id = Guid.NewGuid(),
+            Symbol = "AAPL",
+            Exchange = "NASDAQ",
+            Name = "Apple",
+            Kind = CommodityKind.Security,
+        };
+        _db.Commodities.Add(nasdaq);
+
+        var account = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "Brokerage",
+            AccountType = AccountType.Asset,
+            ReportingCurrencyId = _cad.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Accounts.Add(account);
+
+        var tx = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = DateTimeOffset.UtcNow.AddDays(-2),
+            Memo = "buy",
+            Type = TransactionType.Normal,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.AccountTransactions.Add(tx);
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = tx.Id,
+            AccountId = account.Id,
+            CommodityId = nasdaq.Id,
+            Quantity = 10m,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        _provider.CoveredSecurityExchanges.Returns(new[] { "NASDAQ" });
+
+        IReadOnlyCollection<Commodity>? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r.Commodities), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Contains(captured!, c => c.Id == nasdaq.Id);
+    }
+
+    [Fact]
+    public async Task PartialSuccess_WritesWarningAndUpsertsObservations()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var priceAt = new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero);
+        _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Partial(
+                new[] { new PriceObservation(_usd.Id, _cad.Id, priceAt, 1.40m) },
+                "Throttled by upstream after 5 calls."));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        var settings = _db.CommodityPriceSourceSettings.Single(s => s.Source == CommodityPriceSource.BankOfCanada);
+        Assert.Equal("PartialSuccess", settings.LastImportStatus);
+        Assert.Equal("Throttled by upstream after 5 calls.", settings.LastImportMessage);
+
+        Assert.Single(_db.CommodityPrices.Where(p => p.Source == CommodityPriceSource.BankOfCanada));
     }
 
     private async Task SeedHeldUsdAccountAsync()

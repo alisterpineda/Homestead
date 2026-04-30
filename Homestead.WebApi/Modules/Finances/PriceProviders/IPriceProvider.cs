@@ -7,5 +7,6 @@ public interface IPriceProvider
     CommodityPriceSource Source { get; }
     PriceProviderConfigSchema ConfigSchema { get; }
     IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; }
-    Task<IReadOnlyList<PriceObservation>> ImportAsync(PriceImportRequest request, CancellationToken ct);
+    IReadOnlyList<string> CoveredSecurityExchanges { get; }
+    Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct);
 }

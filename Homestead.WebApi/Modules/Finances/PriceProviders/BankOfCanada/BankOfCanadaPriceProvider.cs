@@ -30,10 +30,12 @@ public class BankOfCanadaPriceProvider(BankOfCanadaValetClient client) : IPriceP
     public IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; } =
         _supportedSymbols.Select(s => new PriceProviderSupportedPair(s, null, "CAD")).ToArray();
 
-    public async Task<IReadOnlyList<PriceObservation>> ImportAsync(PriceImportRequest request, CancellationToken ct)
+    public IReadOnlyList<string> CoveredSecurityExchanges { get; } = Array.Empty<string>();
+
+    public async Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct)
     {
         if (request.Commodities.Count == 0)
-            return Array.Empty<PriceObservation>();
+            return PriceImportResult.Success(Array.Empty<PriceObservation>());
 
         var config = ParseConfig(request.Config);
         var baseUri = new Uri(config.BaseUrl, UriKind.Absolute);
@@ -59,7 +61,7 @@ public class BankOfCanadaPriceProvider(BankOfCanadaValetClient client) : IPriceP
         }
 
         if (seriesToCommodity.Count == 0 || cad is null)
-            return Array.Empty<PriceObservation>();
+            return PriceImportResult.Success(Array.Empty<PriceObservation>());
 
         var fromDate = DateOnly.FromDateTime(request.FromAt.UtcDateTime);
         var toDate = DateOnly.FromDateTime(request.ToAt.UtcDateTime);
@@ -74,7 +76,7 @@ public class BankOfCanadaPriceProvider(BankOfCanadaValetClient client) : IPriceP
             observations.Add(new PriceObservation(commodity.Id, cad.Id, item.PriceAt, item.Value));
         }
 
-        return observations;
+        return PriceImportResult.Success(observations);
     }
 
     private static BankOfCanadaConfig ParseConfig(string? rawConfig)

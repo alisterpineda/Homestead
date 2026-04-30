@@ -93,4 +93,101 @@ public class PatchPriceSourceHandlerTests : IDisposable
         var entity = _db.CommodityPriceSourceSettings.Single();
         Assert.True(entity.IsEnabled);
     }
+
+    [Fact]
+    public async Task SecretField_BlankSubmission_PreservesStoredValue()
+    {
+        ConfigureSecretSchema();
+        var entity = _db.CommodityPriceSourceSettings.Single();
+        entity.Config = """{"ApiKey":"super-secret-key-1234"}""";
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Sut().Handle(
+            new PatchPriceSourceCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                Config = """{"ApiKey":""}""",
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains("super-secret-key-1234", _db.CommodityPriceSourceSettings.Single().Config);
+    }
+
+    [Fact]
+    public async Task SecretField_MaskedSubmission_PreservesStoredValue()
+    {
+        ConfigureSecretSchema();
+        var entity = _db.CommodityPriceSourceSettings.Single();
+        entity.Config = """{"ApiKey":"super-secret-key-1234"}""";
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var masked = SecretMasker.Mask("super-secret-key-1234");
+
+        await Sut().Handle(
+            new PatchPriceSourceCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                Config = $$"""{"ApiKey":"{{masked}}"}""",
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains("super-secret-key-1234", _db.CommodityPriceSourceSettings.Single().Config);
+    }
+
+    [Fact]
+    public async Task SecretField_AbsentInPayload_PreservesStoredValueAndPassesValidation()
+    {
+        _provider.ConfigSchema.Returns(new PriceProviderConfigSchema(new[]
+        {
+            new PriceProviderConfigField("ApiKey", "API key", PriceProviderConfigFieldType.Secret, IsRequired: true),
+            new PriceProviderConfigField("BaseUrl", "Base", PriceProviderConfigFieldType.String, IsRequired: false),
+        }));
+        var entity = _db.CommodityPriceSourceSettings.Single();
+        entity.Config = """{"ApiKey":"super-secret-key-1234","BaseUrl":"https://old"}""";
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Sut().Handle(
+            new PatchPriceSourceCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                Config = """{"BaseUrl":"https://new"}""",
+            },
+            TestContext.Current.CancellationToken);
+
+        var saved = _db.CommodityPriceSourceSettings.Single().Config!;
+        Assert.Contains("super-secret-key-1234", saved);
+        Assert.Contains("https://new", saved);
+    }
+
+    [Fact]
+    public async Task SecretField_NewValue_Updates()
+    {
+        ConfigureSecretSchema();
+        var entity = _db.CommodityPriceSourceSettings.Single();
+        entity.Config = """{"ApiKey":"old-key-value-1234"}""";
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Sut().Handle(
+            new PatchPriceSourceCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                Config = """{"ApiKey":"new-key-value-5678"}""",
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains("new-key-value-5678", _db.CommodityPriceSourceSettings.Single().Config);
+        Assert.DoesNotContain("old-key-value-1234", _db.CommodityPriceSourceSettings.Single().Config);
+    }
+
+    private void ConfigureSecretSchema()
+    {
+        _provider.ConfigSchema.Returns(new PriceProviderConfigSchema(new[]
+        {
+            new PriceProviderConfigField(
+                Key: "ApiKey",
+                Label: "API key",
+                Type: PriceProviderConfigFieldType.Secret,
+                IsRequired: true),
+        }));
+    }
 }

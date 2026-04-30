@@ -669,7 +669,7 @@ namespace Homestead.WebApi.Migrations
                     b.Property<DateTimeOffset?>("LastImportAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("LastImportError")
+                    b.Property<string>("LastImportMessage")
                         .HasColumnType("text");
 
                     b.Property<string>("LastImportStatus")

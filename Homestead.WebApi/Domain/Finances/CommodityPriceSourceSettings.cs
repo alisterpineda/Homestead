@@ -16,7 +16,7 @@ public class CommodityPriceSourceSettings
 
     public string? LastImportStatus { get; set; }
 
-    public string? LastImportError { get; set; }
+    public string? LastImportMessage { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

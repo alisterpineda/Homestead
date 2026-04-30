@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
 namespace Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -11,10 +12,15 @@ public record CommodityPriceSourceSettingsSnapshot
     public required string? Config { get; init; }
     public required string? PairAllowList { get; init; }
 
-    public static CommodityPriceSourceSettingsSnapshot From(CommodityPriceSourceSettings source) => new()
+    public static CommodityPriceSourceSettingsSnapshot From(CommodityPriceSourceSettings source) =>
+        From(source, Array.Empty<string>());
+
+    public static CommodityPriceSourceSettingsSnapshot From(
+        CommodityPriceSourceSettings source,
+        IEnumerable<string> secretKeys) => new()
     {
         IsEnabled = source.IsEnabled,
-        Config = source.Config,
+        Config = JsonSecretConfig.Mask(source.Config, secretKeys),
         PairAllowList = source.PairAllowList,
     };
 

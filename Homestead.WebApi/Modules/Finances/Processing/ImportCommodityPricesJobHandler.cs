@@ -67,14 +67,14 @@ public class ImportCommodityPricesJobHandler(
         var fromAt = payload.FromAt ?? settings.LastImportAt ?? await ResolveEarliestActivityAsync(now, ct);
         var toAt = payload.ToAt ?? now;
 
-        var observations = await provider.ImportAsync(
+        var result = await provider.ImportAsync(
             new PriceImportRequest(commodities, fromAt, toAt, settings.Config), ct);
 
-        await UpsertObservationsAsync(payload.Source, observations, job, now, ct);
+        await UpsertObservationsAsync(payload.Source, result.Observations, job, now, ct);
 
         settings.LastImportAt = now;
-        settings.LastImportStatus = ImportStatus.Success;
-        settings.LastImportError = null;
+        settings.LastImportStatus = result.Warning is null ? ImportStatus.Success : ImportStatus.PartialSuccess;
+        settings.LastImportMessage = Truncate(result.Warning);
         settings.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
     }
@@ -108,10 +108,15 @@ public class ImportCommodityPricesJobHandler(
             .Select(p => (p.CommoditySymbol, p.Exchange))
             .ToHashSet();
         var quoteSymbols = provider.SupportedPairs.Select(p => p.QuoteCurrencySymbol).ToHashSet();
+        var coveredExchanges = provider.CoveredSecurityExchanges
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var filtered = heldCommodities
             .Where(c => supportedSymbols.Contains((c.Symbol, c.Exchange))
-                || quoteSymbols.Contains(c.Symbol));
+                || quoteSymbols.Contains(c.Symbol)
+                || (c.Kind == CommodityKind.Security
+                    && c.Exchange is not null
+                    && coveredExchanges.Contains(c.Exchange)));
 
         if (payload.CommodityIds is { Count: > 0 })
         {
@@ -203,12 +208,8 @@ public class ImportCommodityPricesJobHandler(
                 .FirstOrDefaultAsync(s => s.Source == source, ct);
             if (settings is null) return;
 
-            var message = ex.Message;
-            if (message.Length > MaxErrorLength)
-                message = message[..MaxErrorLength];
-
             settings.LastImportStatus = ImportStatus.Failed;
-            settings.LastImportError = message;
+            settings.LastImportMessage = Truncate(ex.Message);
             settings.UpdatedAt = DateTimeOffset.UtcNow;
             await freshDb.SaveChangesAsync(ct);
         }
@@ -217,6 +218,9 @@ public class ImportCommodityPricesJobHandler(
             logger.LogError(inner, "Failed to record import failure for source {Source}", source);
         }
     }
+
+    private static string? Truncate(string? message) =>
+        message is { Length: > MaxErrorLength } ? message[..MaxErrorLength] : message;
 
     private static HashSet<string> ParseAllowList(string? rawList)
     {

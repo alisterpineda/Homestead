@@ -5,6 +5,7 @@ public enum PriceProviderConfigFieldType
     String,
     Boolean,
     Integer,
+    Secret,
 }
 
 public record PriceProviderConfigField(

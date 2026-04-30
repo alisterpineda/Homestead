@@ -149,6 +149,7 @@ export class PriceSourceListComponent implements OnDestroy {
     if (!item.lastImportAt) return { label: 'Never run', variant: 'outline' };
     if (item.lastImportStatus === 'Failed') return { label: 'Failed', variant: 'destructive' };
     if (item.lastImportStatus === 'Success') return { label: 'Success', variant: 'default' };
+    if (item.lastImportStatus === 'PartialSuccess') return { label: 'Partial', variant: 'secondary' };
     return { label: item.lastImportStatus ?? 'Never run', variant: 'secondary' };
   }
 }

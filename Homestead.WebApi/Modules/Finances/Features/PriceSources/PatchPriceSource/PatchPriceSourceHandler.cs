@@ -27,15 +27,22 @@ public class PatchPriceSourceHandler(
             .FirstOrDefaultAsync(s => s.Source == request.Source, ct)
             ?? throw new EntityNotFoundException("Price source settings not found.");
 
-        var before = CommodityPriceSourceSettingsSnapshot.From(entity);
+        var schema = serviceProvider.GetKeyedService<IPriceProvider>(request.Source)?.ConfigSchema
+            ?? PriceProviderConfigSchema.Empty;
+        var secretKeys = schema.Fields
+            .Where(f => f.Type == PriceProviderConfigFieldType.Secret)
+            .Select(f => f.Key)
+            .ToList();
+        var before = CommodityPriceSourceSettingsSnapshot.From(entity, secretKeys);
 
         if (request.IsEnabled is { } isEnabled)
             entity.IsEnabled = isEnabled;
 
         if (request.Config is not null)
         {
-            ValidateConfig(request.Source, request.Config);
-            entity.Config = request.Config;
+            var merged = JsonSecretConfig.Merge(request.Config, entity.Config, secretKeys);
+            ValidateConfig(schema, request.Source, merged);
+            entity.Config = merged;
         }
 
         if (request.PairAllowList is not null)
@@ -48,7 +55,7 @@ public class PatchPriceSourceHandler(
         entity.UpdatedAt = now;
         entity.UpdatedByUserId = currentUser.UserId;
 
-        var after = CommodityPriceSourceSettingsSnapshot.From(entity);
+        var after = CommodityPriceSourceSettingsSnapshot.From(entity, secretKeys);
         var changes = before.Diff(after);
         if (changes.Count > 0)
         {
@@ -63,11 +70,8 @@ public class PatchPriceSourceHandler(
         return new PatchPriceSourceResponse(entity.Source, entity.IsEnabled);
     }
 
-    private void ValidateConfig(CommodityPriceSource source, string configJson)
+    private static void ValidateConfig(PriceProviderConfigSchema schema, CommodityPriceSource source, string configJson)
     {
-        var provider = serviceProvider.GetKeyedService<IPriceProvider>(source);
-        var schema = provider?.ConfigSchema ?? PriceProviderConfigSchema.Empty;
-
         if (string.IsNullOrWhiteSpace(configJson))
             return;
 

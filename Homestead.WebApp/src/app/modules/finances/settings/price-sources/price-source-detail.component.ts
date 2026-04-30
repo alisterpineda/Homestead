@@ -102,15 +102,17 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
                     <span hlmBadge variant="outline">Never run</span>
                   } @else if (d.lastImportStatus === 'Failed') {
                     <span hlmBadge variant="destructive">Failed</span>
+                  } @else if (d.lastImportStatus === 'PartialSuccess') {
+                    <span hlmBadge variant="secondary">Partial</span>
                   } @else {
                     <span hlmBadge variant="default">Success</span>
                   }
                 </div>
               </div>
-              @if (d.lastImportError) {
+              @if (d.lastImportMessage) {
                 <div class="col-span-2">
-                  <div class="text-xs uppercase tracking-wide text-muted-foreground">Last error</div>
-                  <pre class="whitespace-pre-wrap break-words text-xs bg-muted text-muted-foreground p-2 rounded">{{ d.lastImportError }}</pre>
+                  <div class="text-xs uppercase tracking-wide text-muted-foreground">Last message</div>
+                  <pre class="whitespace-pre-wrap break-words text-xs bg-muted text-muted-foreground p-2 rounded">{{ d.lastImportMessage }}</pre>
                 </div>
               }
             </div>

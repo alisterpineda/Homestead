@@ -227,7 +227,7 @@ public class PriceSourcesEndpointTests : IntegrationTestBase
         IReadOnlyList<string>? PairAllowList,
         DateTimeOffset? LastImportAt,
         string? LastImportStatus,
-        string? LastImportError,
+        string? LastImportMessage,
         ConfigSchema ConfigSchema,
         IReadOnlyList<SupportedPair> SupportedPairs,
         ScheduleSummary? Schedule,
