@@ -31,6 +31,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         _provider.Source.Returns(CommodityPriceSource.BankOfCanada);
         _provider.SupportedPairs.Returns(new[] { new PriceProviderSupportedPair("USD", null, "CAD") });
         _provider.CoveredSecurityExchanges.Returns(Array.Empty<string>());
+        _provider.CoveredQuoteCurrencies.Returns(Array.Empty<string>());
 
         var sc = new ServiceCollection();
         sc.AddKeyedSingleton(CommodityPriceSource.BankOfCanada, _provider);
@@ -342,6 +343,83 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
 
         Assert.NotNull(captured);
         Assert.Contains(captured!, c => c.Id == nasdaq.Id);
+    }
+
+    [Fact]
+    public async Task CoveredQuoteCurrencies_IncludesHeldQuoteCurrencyForUnboundedProvider()
+    {
+        var nyseSec = new Commodity
+        {
+            Id = Guid.NewGuid(),
+            Symbol = "GME",
+            Exchange = "NYSE",
+            Name = "GameStop",
+            Kind = CommodityKind.Security,
+        };
+        _db.Commodities.Add(nyseSec);
+
+        var account = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "Brokerage",
+            AccountType = AccountType.Asset,
+            ReportingCurrencyId = _usd.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Accounts.Add(account);
+
+        var tx = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = DateTimeOffset.UtcNow.AddDays(-2),
+            Memo = "buy",
+            Type = TransactionType.Normal,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.AccountTransactions.Add(tx);
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = tx.Id,
+            AccountId = account.Id,
+            CommodityId = nyseSec.Id,
+            Quantity = 10m,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = tx.Id,
+            AccountId = account.Id,
+            CommodityId = _usd.Id,
+            Quantity = -1500m,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        _provider.SupportedPairs.Returns(Array.Empty<PriceProviderSupportedPair>());
+        _provider.CoveredSecurityExchanges.Returns(new[] { "NYSE" });
+        _provider.CoveredQuoteCurrencies.Returns(new[] { "USD" });
+
+        IReadOnlyCollection<Commodity>? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r.Commodities), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Contains(captured!, c => c.Id == nyseSec.Id);
+        Assert.Contains(captured!, c => c.Id == _usd.Id);
     }
 
     [Fact]

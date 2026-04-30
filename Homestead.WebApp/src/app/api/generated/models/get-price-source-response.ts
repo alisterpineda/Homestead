@@ -9,6 +9,8 @@ import { PriceSourceScheduleSummary } from '../models/price-source-schedule-summ
 export interface GetPriceSourceResponse {
   config?: (string | null);
   configSchema: PriceProviderConfigSchema;
+  coveredQuoteCurrencies: Array<string>;
+  coveredSecurityExchanges: Array<string>;
   displayName: string;
   isEnabled: boolean;
   kind: CommodityPriceSourceKind;

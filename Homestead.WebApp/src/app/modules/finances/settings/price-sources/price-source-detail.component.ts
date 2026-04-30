@@ -133,6 +133,38 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
           </section>
         }
 
+        @if (d.supportedPairs.length > 0) {
+          <section data-testid="coverage-section" class="rounded-lg border border-border bg-card p-4 text-card-foreground space-y-3">
+            <h3 class="text-base font-semibold">Supported pairs</h3>
+            <div class="flex flex-wrap gap-2">
+              @for (pair of d.supportedPairs; track $index) {
+                <span hlmBadge variant="outline">
+                  {{ pair.commoditySymbol }} → {{ pair.quoteCurrencySymbol }}@if (pair.exchange) { · {{ pair.exchange }} }
+                </span>
+              }
+            </div>
+          </section>
+        } @else if (d.coveredSecurityExchanges.length > 0) {
+          <section data-testid="coverage-section" class="rounded-lg border border-border bg-card p-4 text-card-foreground space-y-3">
+            <h3 class="text-base font-semibold">Covered exchanges</h3>
+            @if (d.coveredQuoteCurrencies.length > 0) {
+              <p class="text-sm text-muted-foreground">
+                Daily prices for held securities on the exchanges below, priced in
+                @for (currency of d.coveredQuoteCurrencies; track currency; let last = $last) {
+                  <span hlmBadge variant="outline">{{ currency }}</span>@if (!last) {<span> </span>}
+                }.
+              </p>
+            } @else {
+              <p class="text-sm text-muted-foreground">Daily prices for held securities on the exchanges below.</p>
+            }
+            <div class="flex flex-wrap gap-2">
+              @for (exchange of d.coveredSecurityExchanges; track exchange) {
+                <span hlmBadge variant="outline">{{ exchange }}</span>
+              }
+            </div>
+          </section>
+        }
+
         @if (d.kind === 'External') {
           <section class="rounded-lg border border-border bg-card p-4 text-card-foreground space-y-3">
             <h3 class="text-base font-semibold">Schedule</h3>

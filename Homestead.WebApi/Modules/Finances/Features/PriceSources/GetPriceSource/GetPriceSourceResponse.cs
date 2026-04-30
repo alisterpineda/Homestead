@@ -26,6 +26,8 @@ public record GetPriceSourceResponse
     public string? LastImportMessage { get; init; }
     public required PriceProviderConfigSchema ConfigSchema { get; init; }
     public required IReadOnlyList<PriceProviderSupportedPair> SupportedPairs { get; init; }
+    public required IReadOnlyList<string> CoveredSecurityExchanges { get; init; }
+    public required IReadOnlyList<string> CoveredQuoteCurrencies { get; init; }
     public PriceSourceScheduleSummary? Schedule { get; init; }
     public required int PriceCount { get; init; }
 }

@@ -76,11 +76,18 @@ public class AlphaVantagePriceProviderTests
     }
 
     [Fact]
-    public void CoveredSecurityExchanges_AreUsExchanges()
+    public void CoveredSecurityExchanges_IncludeUsExchangesAndTsx()
     {
         var (provider, _, _) = CreateSut();
-        Assert.Equal(new[] { "NASDAQ", "NYSE", "AMEX" }, provider.CoveredSecurityExchanges);
+        Assert.Equal(new[] { "NASDAQ", "NYSE", "AMEX", "TSX" }, provider.CoveredSecurityExchanges);
         Assert.Empty(provider.SupportedPairs);
+    }
+
+    [Fact]
+    public void CoveredQuoteCurrencies_IncludeUsdAndCad()
+    {
+        var (provider, _, _) = CreateSut();
+        Assert.Equal(new[] { "USD", "CAD" }, provider.CoveredQuoteCurrencies);
     }
 
     [Fact]
@@ -146,6 +153,74 @@ public class AlphaVantagePriceProviderTests
 
         Assert.Equal(1, handler.CallCount);
         Assert.Contains("symbol=AAPL", handler.LastRequestUrl);
+    }
+
+    [Fact]
+    public async Task ImportAsync_TsxSecurity_AppendsTrtSuffixAndQuotesInCad()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.ResponseBody = DailyJson(("2026-04-29", "32.10"));
+
+        var cad = Currency("CAD");
+        var veqt = Security("VEQT", "TSX");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { cad, veqt },
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        var obs = Assert.Single(result.Observations);
+        Assert.Equal(veqt.Id, obs.CommodityId);
+        Assert.Equal(cad.Id, obs.QuoteCurrencyId);
+        Assert.Equal(32.10m, obs.Rate);
+        Assert.Contains("symbol=VEQT.TRT", handler.LastRequestUrl);
+    }
+
+    [Fact]
+    public async Task ImportAsync_MixedExchanges_RoutesPerSecurityQuoteCurrency()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.QueueResponse(DailyJson(("2026-04-29", "172.34")));
+        handler.QueueResponse(DailyJson(("2026-04-29", "32.10")));
+
+        var usd = Currency("USD");
+        var cad = Currency("CAD");
+        var aapl = Security("AAPL", "NASDAQ");
+        var veqt = Security("VEQT", "TSX");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, cad, aapl, veqt },
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, result.Observations.Count);
+        Assert.Contains(result.Observations, o => o.CommodityId == aapl.Id && o.QuoteCurrencyId == usd.Id);
+        Assert.Contains(result.Observations, o => o.CommodityId == veqt.Id && o.QuoteCurrencyId == cad.Id);
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task ImportAsync_TsxSecurityWithoutHeldCad_SkipsSilently()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.ResponseBody = DailyJson(("2026-04-29", "32.10"));
+
+        var usd = Currency("USD");
+        var veqt = Security("VEQT", "TSX");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, veqt },
+                DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Observations);
+        Assert.Null(result.Warning);
+        Assert.Equal(0, handler.CallCount);
     }
 
     [Fact]

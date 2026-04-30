@@ -74,6 +74,8 @@ public class GetPriceSourceHandler(
             LastImportMessage = settings?.LastImportMessage,
             ConfigSchema = provider?.ConfigSchema ?? PriceProviderConfigSchema.Empty,
             SupportedPairs = provider?.SupportedPairs ?? Array.Empty<PriceProviderSupportedPair>(),
+            CoveredSecurityExchanges = provider?.CoveredSecurityExchanges ?? Array.Empty<string>(),
+            CoveredQuoteCurrencies = provider?.CoveredQuoteCurrencies ?? Array.Empty<string>(),
             Schedule = scheduleSummary,
             PriceCount = priceCount,
         };

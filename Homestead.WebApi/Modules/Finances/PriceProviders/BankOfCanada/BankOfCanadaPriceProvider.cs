@@ -32,6 +32,8 @@ public class BankOfCanadaPriceProvider(BankOfCanadaValetClient client) : IPriceP
 
     public IReadOnlyList<string> CoveredSecurityExchanges { get; } = Array.Empty<string>();
 
+    public IReadOnlyList<string> CoveredQuoteCurrencies { get; } = Array.Empty<string>();
+
     public async Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct)
     {
         if (request.Commodities.Count == 0)

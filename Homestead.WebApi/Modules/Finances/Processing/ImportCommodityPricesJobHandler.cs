@@ -107,7 +107,9 @@ public class ImportCommodityPricesJobHandler(
         var supportedSymbols = provider.SupportedPairs
             .Select(p => (p.CommoditySymbol, p.Exchange))
             .ToHashSet();
-        var quoteSymbols = provider.SupportedPairs.Select(p => p.QuoteCurrencySymbol).ToHashSet();
+        var quoteSymbols = provider.SupportedPairs.Select(p => p.QuoteCurrencySymbol)
+            .Concat(provider.CoveredQuoteCurrencies)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var coveredExchanges = provider.CoveredSecurityExchanges
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

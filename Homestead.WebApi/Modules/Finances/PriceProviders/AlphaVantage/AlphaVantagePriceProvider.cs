@@ -16,6 +16,13 @@ public class AlphaVantagePriceProvider : IPriceProvider
             ["NASDAQ"] = "USD",
             ["NYSE"] = "USD",
             ["AMEX"] = "USD",
+            ["TSX"] = "CAD",
+        };
+
+    private static readonly IReadOnlyDictionary<string, string> _exchangeToApiSuffix =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["TSX"] = ".TRT",
         };
 
     private readonly AlphaVantageClient _client;
@@ -54,6 +61,9 @@ public class AlphaVantagePriceProvider : IPriceProvider
     public IReadOnlyList<string> CoveredSecurityExchanges { get; } =
         _exchangeToQuote.Keys.ToArray();
 
+    public IReadOnlyList<string> CoveredQuoteCurrencies { get; } =
+        _exchangeToQuote.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
     public async Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct)
     {
         if (request.Commodities.Count == 0)
@@ -65,14 +75,13 @@ public class AlphaVantagePriceProvider : IPriceProvider
 
         var baseUri = new Uri(config.BaseUrl, UriKind.Absolute);
 
-        Commodity? usd = null;
-        var securities = new List<Commodity>();
+        var quoteCurrenciesBySymbol = new Dictionary<string, Commodity>(StringComparer.OrdinalIgnoreCase);
+        var candidateSecurities = new List<Commodity>();
         foreach (var commodity in request.Commodities)
         {
-            if (commodity.Kind == CommodityKind.Currency
-                && string.Equals(commodity.Symbol, "USD", StringComparison.OrdinalIgnoreCase))
+            if (commodity.Kind == CommodityKind.Currency)
             {
-                usd = commodity;
+                quoteCurrenciesBySymbol[commodity.Symbol] = commodity;
                 continue;
             }
             if (commodity.Kind != CommodityKind.Security)
@@ -81,10 +90,18 @@ public class AlphaVantagePriceProvider : IPriceProvider
                 continue;
             if (!_exchangeToQuote.ContainsKey(commodity.Exchange))
                 continue;
-            securities.Add(commodity);
+            candidateSecurities.Add(commodity);
         }
 
-        if (usd is null || securities.Count == 0)
+        var resolved = new List<(Commodity Security, Commodity Quote)>();
+        foreach (var security in candidateSecurities)
+        {
+            var quoteSymbol = _exchangeToQuote[security.Exchange!];
+            if (quoteCurrenciesBySymbol.TryGetValue(quoteSymbol, out var quote))
+                resolved.Add((security, quote));
+        }
+
+        if (resolved.Count == 0)
             return PriceImportResult.Success(Array.Empty<PriceObservation>());
 
         var now = DateTimeOffset.UtcNow;
@@ -94,14 +111,15 @@ public class AlphaVantagePriceProvider : IPriceProvider
         var failed = new List<string>();
         var successCount = 0;
 
-        for (var i = 0; i < securities.Count; i++)
+        for (var i = 0; i < resolved.Count; i++)
         {
             if (i > 0)
                 await _delay(_interCallDelay, ct);
 
-            var security = securities[i];
+            var (security, quote) = resolved[i];
+            var apiSymbol = ToApiSymbol(security);
             var response = await _client.GetDailyTimeSeriesAsync(
-                baseUri, security.Symbol, config.ApiKey!, outputsize, ct);
+                baseUri, apiSymbol, config.ApiKey!, outputsize, ct);
 
             if (response is null)
             {
@@ -111,7 +129,7 @@ public class AlphaVantagePriceProvider : IPriceProvider
 
             if (!string.IsNullOrEmpty(response.Information) || !string.IsNullOrEmpty(response.Note))
             {
-                var warning = $"Rate limit reached after {successCount} of {securities.Count} securities; remaining will retry next run.";
+                var warning = $"Rate limit reached after {successCount} of {resolved.Count} securities; remaining will retry next run.";
                 return PriceImportResult.Partial(observations, warning);
             }
 
@@ -125,7 +143,7 @@ public class AlphaVantagePriceProvider : IPriceProvider
             {
                 foreach (var (dateStr, dayEl) in response.TimeSeriesDaily)
                 {
-                    var observation = TryParseObservation(security.Id, usd.Id, dateStr, dayEl, request.FromAt, request.ToAt);
+                    var observation = TryParseObservation(security.Id, quote.Id, dateStr, dayEl, request.FromAt, request.ToAt);
                     if (observation is not null)
                         observations.Add(observation);
                 }
@@ -139,6 +157,11 @@ public class AlphaVantagePriceProvider : IPriceProvider
 
         return PriceImportResult.Success(observations);
     }
+
+    private static string ToApiSymbol(Commodity security) =>
+        security.Exchange is { } ex && _exchangeToApiSuffix.TryGetValue(ex, out var suffix)
+            ? security.Symbol + suffix
+            : security.Symbol;
 
     private static PriceObservation? TryParseObservation(
         Guid securityId,
