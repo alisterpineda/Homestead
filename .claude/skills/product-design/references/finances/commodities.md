@@ -160,8 +160,8 @@ CommodityPriceSourceSettings {
   Config: jsonb?                  (provider-specific; schema declared by the IPriceProvider impl)
   PairAllowList: jsonb?           (opt-in fixed list — see Import scope)
   LastImportAt: DateTimeOffset?
-  LastImportStatus: string?       (Success | Failed | NeverRun)
-  LastImportError: string?        (free-form on failed runs)
+  LastImportStatus: string?       (Success | PartialSuccess | Failed | NeverRun)
+  LastImportMessage: string?      (free-form on failed or partially-successful runs; null on Success)
   audit fields
 }
 ```
@@ -177,6 +177,8 @@ CommodityPriceSourceSettings {
 `PriceAt` is a `DateTimeOffset`, stored UTC. This gives well-defined ordering for same-day observations, alignment with transaction timestamps (see the *Transactions* section in [overview.md](overview.md#transactions)), and a single axis for carry-forward lookups.
 
 Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date with an optional time; the frontend defaults the time to `00:00 UTC` on the entered date when the user only picks a date. The API accepts a raw `PriceAt: DateTimeOffset` — the server does not default or normalise the time. On a day that has both a 00:00-UTC manual price and a 12:00-UTC transaction-linked price, carry-forward at instants ≥ 12:00 UTC picks the transaction-linked row (most recent `PriceAt ≤ T`).
+
+Daily-resolution providers (e.g., end-of-day FX or stock close) store `PriceAt` as **midnight UTC of the trade date**. Carry-forward semantics make the exact instant largely irrelevant — anything in the trade-day window resolves to that day's observation — and the convention keeps providers from having to know each exchange's local close time and timezone.
 
 `PriceAt` may be up to **one day ahead** of current UTC — the server rejects timestamps further in the future, which avoids accidentally staging prices for arbitrary dates.
 
@@ -276,6 +278,8 @@ The list is statically the set of registered enum values — there is no "create
 
 **Edit** (external sources only): IsEnabled, Config, PairAllowList. Kind is rendered but immutable — it *is* the enum value. The Config form is rendered from a per-provider schema declared by the `IPriceProvider` implementation. The endpoint upserts the corresponding `CommodityPriceSourceSettings` row (creates one on first edit if seeding hasn't yet covered it).
 
+**Config field types.** The schema supports four field types: `String`, `Integer`, `Boolean`, and `Secret`. `Secret` fields (e.g., API keys) are rendered as `type="password"` in the form, masked in the source-detail GET response (`••••` plus the last 4 chars when long enough), and treated as no-op on PATCH when the submitted value is empty or matches the masked form — so an admin saving the form without re-entering the key keeps the existing value.
+
 **System sources** (`Transaction`, `Manual`) appear in the list for visibility — clicking opens a read-only detail page showing their prices and aggregate stats but offering no edit/disable actions. There is no settings row to edit.
 
 **Per-source detail page** (external only) also hosts the source's recurring schedule (a single cron expression, optional) and a *Run now* button that enqueues an ad-hoc import attributed to the admin who clicked it. Schedule edits write through to the existing `processing.schedules` table — the schedule's identity is `(JobType=ImportCommodityPrices, Payload.Source=<enum value>)`, at most one schedule per source. The page is the user-friendly facade over that table for finance-specific schedules. The central admin schedules list (`/admin/schedules`) still shows the same rows as a fallback view.
@@ -288,12 +292,14 @@ A new `ProcessingJobType.ImportCommodityPrices`. Payload: `{ Source, FromAt?, To
 2. Resolves the provider strategy by enum value. Each External enum value is registered with exactly one `IPriceProvider` implementation via DI.
 3. Computes the target commodity set — see *Import scope*.
 4. Fetches observations from the provider for the target commodities over `[FromAt, ToAt]`.
-5. Upserts rows under the source enum value, keyed by `(CommodityId, QuoteCurrencyId, PriceAt, Source)`. Existing rows have their `Rate` updated; new rows are inserted. On success, updates the settings row's `LastImportAt = now()`, `LastImportStatus = Success`, `LastImportError = null`.
+5. Upserts rows under the source enum value, keyed by `(CommodityId, QuoteCurrencyId, PriceAt, Source)`. Existing rows have their `Rate` updated; new rows are inserted. On success, updates the settings row's `LastImportAt = now()`, `LastImportStatus = Success`, `LastImportMessage = null`. On partial success (see below), `LastImportStatus = PartialSuccess`, `LastImportMessage = <provider-supplied warning>`.
 6. Audit-logs the upserts via `auditLogger.ForUser(job.CreatedByUserId)`. A scheduled run is system-attributed → no creator → audit entries are anonymous (matching existing system-attributed convention in `processing/overview.md`). A *Run now* run is attributed to the admin who triggered it.
 
-On failure, the handler updates the settings row's `LastImportStatus = Failed` / `LastImportError = <message>` before re-throwing — so the source list status pill reflects the latest run regardless of how the job terminated.
+On failure, the handler updates the settings row's `LastImportStatus = Failed` / `LastImportMessage = <message>` before re-throwing — so the source list status pill reflects the latest run regardless of how the job terminated.
 
 **Idempotency.** Re-running an import for an overlapping date window updates rates in place, never duplicates. Providers correcting historical observations is the normal case; the upsert preserves that. The handler is also re-entry safe: a crash mid-run leaves a partial set of upserts already committed, and the next run re-fetches and re-upserts those rows without harm.
+
+**Partial success.** A provider that hits a recoverable limit mid-run (rate-limit throttling, transient single-symbol errors) returns whatever observations it gathered before the limit and surfaces a warning string. The handler commits the partial set as normal, sets `LastImportStatus = PartialSuccess`, and stores the warning in `LastImportMessage`. The next scheduled run re-fetches with `FromAt = settings.LastImportAt` exactly as for a clean Success run — so the unfetched window is naturally retried. The source list distinguishes partial success from clean success in the status pill, but otherwise treats both as the source being healthy enough to keep auto-running.
 
 **Recurring imports** use the existing `processing.schedules` table — at most one schedule per source. The schedule's `Payload` carries the `Source` enum value; `JobType = ImportCommodityPrices`. The admin schedules endpoint's `JobType` allow-list expands to include this type. Per-source schedule UX lives on the source detail page (see *Source management UI*).
 
@@ -301,13 +307,24 @@ On failure, the handler updates the settings row's `LastImportStatus = Failed` /
 
 **v1 providers.** Bank of Canada Valet (FX, free, no API key). Registers an enum value and an `IPriceProvider` implementation, and declares its supported pairs so import scope can intersect with the household's holdings.
 
+## Provider coverage model
+
+Each `IPriceProvider` declares what it covers via two complementary properties:
+
+- **`SupportedPairs`** — explicit `(symbol, exchange?, quoteCurrency)` tuples. Used by providers with an enumerable universe (e.g., Bank of Canada's fixed currency list).
+- **`CoveredSecurityExchanges`** — exchange codes for which the provider claims to price *any* security listed there. Used by providers with an unbounded universe (e.g., AlphaVantage covering every NASDAQ-listed equity).
+
+The handler accepts a held commodity into the import set if `(Symbol, Exchange) ∈ SupportedPairs` **OR** `Kind == Security` AND `Exchange ∈ CoveredSecurityExchanges`. A provider may use both — e.g., a future provider that covers all NASDAQ stocks plus a curated list of OTC names. Both properties default to empty; a provider with both empty would never be invoked.
+
 ## Import scope
 
 Each import asks the provider for the **commodities the household actually holds** — the set of commodities referenced by any non-archived account split — intersected with the provider's supported pairs. This keeps the per-run network cost small (one AlphaVantage call per held security, not the entire NASDAQ universe) and avoids accumulating prices for commodities the household will never need.
 
 **Opt-in `PairAllowList`** on the source's settings row lets users track an instrument they don't yet hold (e.g., watching VEQT before buying). The handler unions the held set with `PairAllowList` before calling the provider.
 
-**Securities are fetched in their primary quote currency only** — e.g., VEQT in CAD because it trades on TSX, AAPL in USD because it trades on NASDAQ. Other display currencies resolve via FX chaining at lookup time (a held VEQT viewed in USD chains through `(VEQT, CAD)` × `(CAD, USD)`). The provider declares each security's primary quote; if the household holds the same security on different `Exchange` qualifiers (e.g., `AAPL · NASDAQ` vs `AAPL · OTHER`), each is treated as a separate commodity per the existing exchange-qualifier rules, and each has its own primary quote.
+**Securities are fetched in their primary quote currency only** — e.g., VEQT in CAD because it trades on TSX, AAPL in USD because it trades on NASDAQ. Other display currencies resolve via FX chaining at lookup time (a held VEQT viewed in USD chains through `(VEQT, CAD)` × `(CAD, USD)`). The primary quote is **derived from the security's `Exchange` by the provider** — there is no `PrimaryQuoteCurrency` column on `Commodity`. Each provider owns its `Exchange → quote currency` table; an exchange the provider doesn't recognise puts the security outside its coverage and it is silently skipped. If the household holds the same security on different `Exchange` qualifiers (e.g., `AAPL · NASDAQ` vs `AAPL · OTHER`), each is treated as a separate commodity per the existing exchange-qualifier rules, and each gets its own primary quote.
+
+**Exchange-code translation.** Homestead's `Commodity.Exchange` is a free-text user-entered string (see *Exchange qualifier (securities)*). When a provider's external API uses a different code system (suffixes, MIC codes, vendor-specific tickers), the provider owns the translation table from Homestead codes to its own format. Recommended common Homestead codes for clarity: `NASDAQ`, `NYSE`, `NYSEARCA`, `TSX`, `TSXV`, `LSE`, `XETRA`, `JPX`, `HKEX`, `ASX`. Users are not constrained to these — any string works — but a provider that doesn't recognise the user's exchange code will skip that security.
 
 **Backfill window.** First run for a new source backfills from the household's earliest user activity (the existing rule — see the conceptual model). Subsequent scheduled runs use `FromAt = settings.LastImportAt`, `ToAt = now()`. *Run now* lets the admin override `FromAt`/`ToAt` for narrower one-off backfills (e.g., "re-fetch the last 30 days because the provider corrected its data").
 
