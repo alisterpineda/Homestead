@@ -14,7 +14,7 @@ public class OpeningBalanceService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : IOpeningBalanceService
 {
-    private const string DefaultDescription = "Opening balance";
+    private const string DefaultMemo = "Opening balance";
 
     public async Task<AccountTransaction> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct)
     {
@@ -52,7 +52,7 @@ public class OpeningBalanceService(
         {
             Id = transactionId,
             OccurredAt = occurredAt,
-            Description = NormalizeDescription(request.Description),
+            Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.OpeningBalance,
             Splits = [accountSplit, equitySplit],
         };
@@ -95,7 +95,7 @@ public class OpeningBalanceService(
             transaction, "AccountTransaction", transaction.Id);
 
         transaction.OccurredAt = newOccurredAt;
-        transaction.Description = NormalizeDescription(request.Description);
+        transaction.Memo = NormalizeMemo(request.Memo);
 
         accountSplit.Quantity = account.AccountType.ApplySign(request.Quantity);
 
@@ -123,7 +123,7 @@ public class OpeningBalanceService(
         await linkedPrices.AuditCascadeDeletesAsync(transactionId, ct);
 
         db.AccountTransactions.Remove(transaction);
-        audit.Deleted("AccountTransaction", transaction.Id, transaction.Description);
+        audit.Deleted("AccountTransaction", transaction.Id, transaction.Memo);
 
         return touched;
     }
@@ -151,8 +151,8 @@ public class OpeningBalanceService(
                 "An opening balance already exists for this account and commodity. Edit it instead.");
     }
 
-    private static string NormalizeDescription(string? description) =>
-        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
+    private static string NormalizeMemo(string? memo) =>
+        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
 
     private async Task EnsureOpeningBalanceRemainsEarliestAsync(Guid accountId, Guid commodityId,
         Guid openingBalanceTransactionId, DateTimeOffset newOccurredAt, CancellationToken ct)

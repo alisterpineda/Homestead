@@ -39,10 +39,10 @@ public class GetTransactionsHandler(AppDbContext db)
         if (request.Shape is TransactionShape shape)
             query = ApplyShapeFilter(query, shape);
 
-        if (!string.IsNullOrWhiteSpace(request.DescriptionContains))
+        if (!string.IsNullOrWhiteSpace(request.MemoContains))
         {
-            var needle = request.DescriptionContains.Trim();
-            query = query.Where(t => EF.Functions.ILike(t.Description, $"%{needle}%"));
+            var needle = request.MemoContains.Trim();
+            query = query.Where(t => EF.Functions.ILike(t.Memo, $"%{needle}%"));
         }
 
         var orderedQuery = query

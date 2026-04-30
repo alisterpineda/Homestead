@@ -8,7 +8,7 @@ public class CreateOpeningBalanceCommandValidator : AbstractValidator<CreateOpen
     public CreateOpeningBalanceCommandValidator()
     {
         RuleFor(x => x.CommodityId).NotEqual(Guid.Empty).WithMessage("CommodityId is required.");
-        RuleFor(x => x.Description).MaximumLength(512);
+        RuleFor(x => x.Memo).MaximumLength(512);
         RuleFor(x => x.Quantity).GreaterThan(0m).WithMessage("Quantity must be positive.");
         RuleFor(x => x.ValuePerUnit).GreaterThan(0m)
             .When(x => x.ValuePerUnit.HasValue)

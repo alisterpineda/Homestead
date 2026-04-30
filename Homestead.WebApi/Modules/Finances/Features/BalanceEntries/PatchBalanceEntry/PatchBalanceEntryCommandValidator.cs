@@ -11,6 +11,6 @@ public class PatchBalanceEntryCommandValidator : AbstractValidator<PatchBalanceE
         RuleFor(x => x.CommodityId).NotEqual(Guid.Empty);
         RuleFor(x => x.AssertedAmount).GreaterThanOrEqualTo(0m);
         RuleFor(x => x.Date).NotInFuture();
-        RuleFor(x => x.Description).MaximumLength(512);
+        RuleFor(x => x.Memo).MaximumLength(512);
     }
 }

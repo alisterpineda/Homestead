@@ -13,7 +13,7 @@ public class TransferService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : ITransferService
 {
-    private const string DefaultDescription = "Transfer";
+    private const string DefaultMemo = "Transfer";
 
     public async Task<TransferMutationResult> CreateAsync(
         CreateTransferRequest request, CancellationToken ct)
@@ -34,7 +34,7 @@ public class TransferService(
         {
             Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
-            Description = NormalizeDescription(request.Description),
+            Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.Normal,
             Splits = [sourceSplit, destSplit],
         };
@@ -69,7 +69,7 @@ public class TransferService(
 
         var newOccurredAt = ResolveOccurredAt(request.Date);
         transaction.OccurredAt = newOccurredAt;
-        transaction.Description = NormalizeDescription(request.Description);
+        transaction.Memo = NormalizeMemo(request.Memo);
 
         var existing = transaction.Splits.ToList();
         var sourceSlot = existing[0];
@@ -111,7 +111,7 @@ public class TransferService(
         await linkedPrices.AuditCascadeDeletesAsync(transactionId, ct);
 
         db.AccountTransactions.Remove(transaction);
-        audit.Deleted("AccountTransaction", transaction.Id, transaction.Description);
+        audit.Deleted("AccountTransaction", transaction.Id, transaction.Memo);
 
         return new TransferMutationResult(null, touched);
     }
@@ -240,8 +240,8 @@ public class TransferService(
 
     private static DateTimeOffset ResolveOccurredAt(DateOnly date) => date.ToStartOfDayUtc();
 
-    private static string NormalizeDescription(string? description) =>
-        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
+    private static string NormalizeMemo(string? memo) =>
+        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
 
     private static IEnumerable<TouchedPair> TouchedFor(AccountTransaction transaction)
     {

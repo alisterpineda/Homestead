@@ -99,15 +99,15 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="balance-entry-description">Description (optional)</label>
+              <label hlmLabel for="balance-entry-memo">Memo (optional)</label>
               <input
                 hlmInput
-                id="balance-entry-description"
+                id="balance-entry-memo"
                 class="w-full"
                 maxlength="512"
                 placeholder="e.g. April statement"
-                [value]="description()"
-                (input)="description.set(asValue($event))"
+                [value]="memo()"
+                (input)="memo.set(asValue($event))"
               />
             </div>
 
@@ -149,7 +149,7 @@ export class BalanceEntrySheetComponent {
 
   amount = signal('');
   date = signal(todayIso());
-  description = signal('');
+  memo = signal('');
   saving = signal(false);
   deleting = signal(false);
   formError = signal('');
@@ -197,12 +197,12 @@ export class BalanceEntrySheetComponent {
       if (this.mode() === 'edit' && ex) {
         this.amount.set(String(ex.assertedAmount));
         this.date.set(ex.date);
-        this.description.set(ex.description);
+        this.memo.set(ex.memo);
         activeCommodityId = ex.commodityId;
       } else {
         this.amount.set('');
         this.date.set(todayIso());
-        this.description.set('');
+        this.memo.set('');
         activeCommodityId = a.reportingCurrencyId;
       }
       this.commodityId.set(activeCommodityId);
@@ -233,7 +233,7 @@ export class BalanceEntrySheetComponent {
       commodityId,
       assertedAmount: Number(this.amount()),
       date: this.date(),
-      description: trimToNull(this.description()),
+      memo: trimToNull(this.memo()),
     };
 
     const ex = this.existing();

@@ -32,7 +32,7 @@ public record TransactionResponse
     public required Guid Id { get; init; }
     public required TransactionShape Shape { get; init; }
     public required DateTimeOffset OccurredAt { get; init; }
-    public required string Description { get; init; }
+    public required string Memo { get; init; }
     public Guid? RelatedTransactionId { get; init; }
     public required IReadOnlyList<TransactionSplitResponse> Splits { get; init; }
 

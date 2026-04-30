@@ -11,6 +11,6 @@ public class CreateBalanceEntryCommandValidator : AbstractValidator<CreateBalanc
         RuleFor(x => x.AssertedAmount).GreaterThanOrEqualTo(0m)
             .WithMessage("AssertedAmount must be non-negative (use 0 for emptied accounts).");
         RuleFor(x => x.Date).NotInFuture();
-        RuleFor(x => x.Description).MaximumLength(512);
+        RuleFor(x => x.Memo).MaximumLength(512);
     }
 }

@@ -110,15 +110,15 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="opening-balance-description">Description (optional)</label>
+              <label hlmLabel for="opening-balance-memo">Memo (optional)</label>
               <input
                 hlmInput
-                id="opening-balance-description"
+                id="opening-balance-memo"
                 class="w-full"
                 maxlength="512"
                 placeholder="e.g. Imported from prior tracker"
-                [value]="description()"
-                (input)="description.set(asValue($event))"
+                [value]="memo()"
+                (input)="memo.set(asValue($event))"
               />
             </div>
 
@@ -161,7 +161,7 @@ export class OpeningBalanceSheetComponent {
   quantity = signal('');
   unitPrice = signal('');
   asOfDate = signal(todayIso());
-  description = signal('');
+  memo = signal('');
   saving = signal(false);
   deleting = signal(false);
   formError = signal('');
@@ -219,12 +219,12 @@ export class OpeningBalanceSheetComponent {
         this.quantity.set(String(ex.quantity));
         this.asOfDate.set(ex.asOfDate);
         this.unitPrice.set(ex.valuePerUnit != null ? String(ex.valuePerUnit) : '');
-        this.description.set(ex.description);
+        this.memo.set(ex.memo);
       } else {
         this.quantity.set('');
         this.asOfDate.set(todayIso());
         this.unitPrice.set('');
-        this.description.set('');
+        this.memo.set('');
       }
     });
   }
@@ -245,7 +245,7 @@ export class OpeningBalanceSheetComponent {
       ? Number(this.unitPrice())
       : null;
 
-    const trimmedDescription = trimToNull(this.description());
+    const trimmedMemo = trimToNull(this.memo());
 
     const obs = this.mode() === 'edit' && ex
       ? this.txApi.patchOpeningBalance({
@@ -255,7 +255,7 @@ export class OpeningBalanceSheetComponent {
             quantity: Number(this.quantity()),
             valuePerUnit,
             asOfDate: this.asOfDate(),
-            description: trimmedDescription,
+            memo: trimmedMemo,
           },
         })
       : this.txApi.createOpeningBalance({
@@ -264,7 +264,7 @@ export class OpeningBalanceSheetComponent {
             commodityId: a.reportingCurrencyId,
             quantity: Number(this.quantity()),
             asOfDate: this.asOfDate(),
-            description: trimmedDescription,
+            memo: trimmedMemo,
           },
         });
 

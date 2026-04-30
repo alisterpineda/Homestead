@@ -22,7 +22,7 @@ public class PatchOpeningBalanceHandler(
         var transaction = await openingBalances.UpdateAsync(
             existingTxnId,
             new UpdateOpeningBalanceRequest(
-                request.Quantity, request.ValuePerUnit, request.AsOfDate, request.Description),
+                request.Quantity, request.ValuePerUnit, request.AsOfDate, request.Memo),
             ct);
 
         await db.SaveChangesAsync(ct);

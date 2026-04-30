@@ -310,7 +310,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
-            Description = "Transfer",
+            Memo = "Transfer",
             Type = TransactionType.Normal,
             Splits =
             [
@@ -505,7 +505,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_BlankDescription_FallsBackToOpeningBalanceDefault()
+    public async Task Create_BlankMemo_FallsBackToOpeningBalanceDefault()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
 
@@ -514,39 +514,39 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Opening balance", txn.Description);
+        Assert.Equal("Opening balance", txn.Memo);
     }
 
     [Fact]
-    public async Task Create_NonBlankDescription_PersistsTrimmedValue()
+    public async Task Create_NonBlankMemo_PersistsTrimmedValue()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
 
         var txn = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 100m, null, new DateOnly(2026, 4, 23),
-                Description: "  Carried from old tracker  "),
+                Memo: "  Carried from old tracker  "),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Carried from old tracker", txn.Description);
+        Assert.Equal("Carried from old tracker", txn.Memo);
     }
 
     [Fact]
-    public async Task Update_ReplacesDescription()
+    public async Task Update_ReplacesMemo()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
         var date = new DateOnly(2026, 4, 23);
         var created = await _sut.CreateAsync(
-            new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 100m, null, date, Description: "Initial"),
+            new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 100m, null, date, Memo: "Initial"),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync();
 
         var updated = await _sut.UpdateAsync(created.Id,
-            new UpdateOpeningBalanceRequest(100m, null, date, Description: "Updated"),
+            new UpdateOpeningBalanceRequest(100m, null, date, Memo: "Updated"),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync();
 
-        Assert.Equal("Updated", updated.Description);
+        Assert.Equal("Updated", updated.Memo);
     }
 
     [Fact]
@@ -577,7 +577,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = StartOfDayUtc(new DateOnly(2026, 2, 15)),
-            Description = "Transfer",
+            Memo = "Transfer",
             Type = TransactionType.Normal,
             Splits =
             [

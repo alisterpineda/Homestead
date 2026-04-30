@@ -30,7 +30,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var balanceEntry = new BalanceEntryTransaction
         {
             OccurredAt = occurredAt,
-            Description = "From statement PDF",
+            Memo = "From statement PDF",
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 1234.56m,
@@ -47,7 +47,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         Assert.Equal(account.Id, loaded.AccountId);
         Assert.Equal(usd.Id, loaded.AssertedCommodityId);
         Assert.Equal(1234.56m, loaded.AssertedQuantity);
-        Assert.Equal("From statement PDF", loaded.Description);
+        Assert.Equal("From statement PDF", loaded.Memo);
         Assert.Equal(occurredAt, loaded.OccurredAt);
 
         // Discriminator column persisted as the enum name, not its integer value.
@@ -70,7 +70,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         var openingBalance = new OpeningBalanceTransaction
         {
             OccurredAt = StartOfDayUtc(new DateOnly(2026, 1, 1)),
-            Description = "Imported from old tracker",
+            Memo = "Imported from old tracker",
         };
         db.AccountTransactions.Add(openingBalance);
         await db.SaveChangesAsync(CT);
@@ -81,7 +81,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
             .SingleAsync(t => t.Id == openingBalance.Id, CT);
 
         Assert.Equal(TransactionType.OpeningBalance, loaded.Type);
-        Assert.Equal("Imported from old tracker", loaded.Description);
+        Assert.Equal("Imported from old tracker", loaded.Memo);
 
         // OpeningBalance is a sibling of NormalTransaction (not a subclass), so it must NOT
         // be returned when the base DbSet is filtered to NormalTransaction.
@@ -110,7 +110,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
             OccurredAt = occurredAt,
-            Description = "First assertion",
+            Memo = "First assertion",
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 100m,
@@ -120,7 +120,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
             OccurredAt = occurredAt,
-            Description = "Second, conflicting",
+            Memo = "Second, conflicting",
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 200m,
@@ -144,7 +144,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
             new BalanceEntryTransaction
             {
                 OccurredAt = occurredAt,
-                Description = "Chequing balance",
+                Memo = "Chequing balance",
                 AccountId = accountA.Id,
                 AssertedCommodityId = usd.Id,
                 AssertedQuantity = 500m,
@@ -152,7 +152,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
             new BalanceEntryTransaction
             {
                 OccurredAt = occurredAt,
-                Description = "Savings balance",
+                Memo = "Savings balance",
                 AccountId = accountB.Id,
                 AssertedCommodityId = usd.Id,
                 AssertedQuantity = 10_000m,
@@ -180,7 +180,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         db.AccountTransactions.Add(new BalanceEntryTransaction
         {
             OccurredAt = BalanceEntryAt(date),
-            Description = "Month-end balance",
+            Memo = "Month-end balance",
             AccountId = account.Id,
             AssertedCommodityId = usd.Id,
             AssertedQuantity = 100m,
@@ -193,7 +193,7 @@ public class AccountTransactionTphTests : IntegrationTestBase
         db.AccountTransactions.Add(new NormalTransaction
         {
             OccurredAt = StartOfDayUtc(date),
-            Description = "Itemised transfer",
+            Memo = "Itemised transfer",
         });
 
         await db.SaveChangesAsync(CT); // should not throw

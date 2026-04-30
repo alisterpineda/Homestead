@@ -160,7 +160,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             {
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
-                Description = "Seeded buy",
+                Memo = "Seeded buy",
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);
@@ -312,7 +312,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             {
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan15,
-                Description = "Seeded buy",
+                Memo = "Seeded buy",
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);
@@ -384,7 +384,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             {
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
-                Description = "Seeded buy",
+                Memo = "Seeded buy",
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);
@@ -425,7 +425,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
             {
                 Id = Guid.NewGuid(),
                 OccurredAt = PriceAtJan31,
-                Description = "Seeded buy",
+                Memo = "Seeded buy",
                 Type = TransactionType.Normal,
             };
             db.AccountTransactions.Add(transaction);

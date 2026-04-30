@@ -4,7 +4,7 @@ import type { TransactionResponse } from '@/api/generated/models/transaction-res
 function tx(splits: Array<{ accountId: string; quantity: number; commodityId?: string }>): TransactionResponse {
   return {
     id: 'tx-1',
-    description: '',
+    memo: '',
     occurredAt: '2026-04-23T00:00:00Z',
     shape: 'Transfer',
     splits: splits.map((s, i) => ({

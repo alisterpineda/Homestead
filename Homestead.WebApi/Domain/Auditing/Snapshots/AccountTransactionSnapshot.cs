@@ -6,14 +6,14 @@ namespace Homestead.WebApi.Domain.Auditing.Snapshots;
 public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnapshot, AccountTransaction>
 {
     public required DateTimeOffset OccurredAt { get; init; }
-    public required string Description { get; init; }
+    public required string Memo { get; init; }
     public required TransactionType Type { get; init; }
     public required List<string> Splits { get; init; }
 
     public static AccountTransactionSnapshot From(AccountTransaction source) => new()
     {
         OccurredAt = source.OccurredAt,
-        Description = source.Description,
+        Memo = source.Memo,
         Type = source.Type,
         Splits = source.Splits
             .OrderBy(s => s.AccountId)
@@ -30,8 +30,8 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
             changes.Add(new ScalarFieldChange("OccurredAt",
                 OccurredAt.ToString("O", CultureInfo.InvariantCulture),
                 other.OccurredAt.ToString("O", CultureInfo.InvariantCulture)));
-        if (Description != other.Description)
-            changes.Add(new ScalarFieldChange("Description", Description, other.Description));
+        if (Memo != other.Memo)
+            changes.Add(new ScalarFieldChange("Memo", Memo, other.Memo));
         if (Type != other.Type)
             changes.Add(new ScalarFieldChange("Type", Type.ToString(), other.Type.ToString()));
         if (!Splits.SequenceEqual(other.Splits))

@@ -29,7 +29,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Transfer",
+            Memo = "Transfer",
             Splits = [Split(cad, 100m), Split(cad, -100m)],
         };
 
@@ -42,7 +42,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Bad transfer",
+            Memo = "Bad transfer",
             Splits = [Split(cad, 100m), Split(cad, -50m)],
         };
 
@@ -56,7 +56,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Incomplete",
+            Memo = "Incomplete",
             Splits = [Split(cad, 100m)],
         };
 
@@ -73,7 +73,7 @@ public class TransactionValidatorTests
 
         var txn = new NormalTransaction
         {
-            Description = "Cross-currency transfer",
+            Memo = "Cross-currency transfer",
             Splits =
             [
                 Split(usd, -100m, unitPriceRate: 1.35m, unitPriceCommodityId: cad),
@@ -92,7 +92,7 @@ public class TransactionValidatorTests
 
         var txn = new NormalTransaction
         {
-            Description = "Bad cross-currency transfer",
+            Memo = "Bad cross-currency transfer",
             Splits =
             [
                 Split(usd, -100m, unitPriceRate: 1.35m, unitPriceCommodityId: cad),
@@ -112,7 +112,7 @@ public class TransactionValidatorTests
 
         var txn = new NormalTransaction
         {
-            Description = "Buy 2 VEQT @ 50",
+            Memo = "Buy 2 VEQT @ 50",
             Splits =
             [
                 Split(cad, -100m),
@@ -130,7 +130,7 @@ public class TransactionValidatorTests
         var usd = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits =
             [
                 Split(usd, -100m, unitPriceRate: 1.35m),
@@ -148,7 +148,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits =
             [
                 Split(cad, -100m, unitPriceRate: 1m, unitPriceCommodityId: cad),
@@ -167,7 +167,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new NormalTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits =
             [
                 Split(usd, -100m, unitPriceRate: 0m, unitPriceCommodityId: cad),
@@ -185,7 +185,7 @@ public class TransactionValidatorTests
         var aapl = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
-            Description = "2-for-1",
+            Memo = "2-for-1",
             Splits = [Split(aapl, 100m)],
         };
 
@@ -198,7 +198,7 @@ public class TransactionValidatorTests
         var aapl = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
-            Description = "AAPL 2-for-1",
+            Memo = "AAPL 2-for-1",
             Splits = [Split(aapl, 10m), Split(aapl, 5m)],
         };
 
@@ -212,7 +212,7 @@ public class TransactionValidatorTests
         var msft = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits = [Split(aapl, 10m), Split(msft, 5m)],
         };
 
@@ -227,7 +227,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits = [Split(aapl, 10m, unitPriceRate: 100m, unitPriceCommodityId: cad)],
         };
 
@@ -241,7 +241,7 @@ public class TransactionValidatorTests
         var aapl = Guid.NewGuid();
         var txn = new StockSplitTransaction
         {
-            Description = "Invalid",
+            Memo = "Invalid",
             Splits = [Split(aapl, 0m)],
         };
 
@@ -258,7 +258,7 @@ public class TransactionValidatorTests
 
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = account,
             AssertedCommodityId = cad,
             AssertedQuantity = 1500m,
@@ -290,7 +290,7 @@ public class TransactionValidatorTests
         var cad = Guid.NewGuid();
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = Guid.NewGuid(),
             AssertedCommodityId = cad,
             AssertedQuantity = 100m,
@@ -311,7 +311,7 @@ public class TransactionValidatorTests
 
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = account,
             AssertedCommodityId = cad,
             AssertedQuantity = 100m,
@@ -336,7 +336,7 @@ public class TransactionValidatorTests
 
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = account,
             AssertedCommodityId = cad,
             AssertedQuantity = 100m,
@@ -369,7 +369,7 @@ public class TransactionValidatorTests
 
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = assertedAccount,
             AssertedCommodityId = cad,
             AssertedQuantity = 100m,
@@ -393,7 +393,7 @@ public class TransactionValidatorTests
 
         var txn = new BalanceEntryTransaction
         {
-            Description = "Balance assertion",
+            Memo = "Balance assertion",
             AccountId = account,
             AssertedCommodityId = cad,
             AssertedQuantity = 100m,

@@ -14,7 +14,7 @@ public class PatchTransferCommandValidator : AbstractValidator<PatchTransferComm
         RuleFor(x => x.DestinationAmount).GreaterThan(0m)
             .When(x => x.DestinationAmount.HasValue);
         RuleFor(x => x.Date).NotInFuture();
-        RuleFor(x => x.Description).MaximumLength(512)
-            .When(x => x.Description is not null);
+        RuleFor(x => x.Memo).MaximumLength(512)
+            .When(x => x.Memo is not null);
     }
 }

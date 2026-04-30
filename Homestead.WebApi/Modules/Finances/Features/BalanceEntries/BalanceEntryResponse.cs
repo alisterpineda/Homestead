@@ -10,5 +10,5 @@ public record BalanceEntryResponse
     public required decimal AssertedAmount { get; init; }
 
     public required DateOnly Date { get; init; }
-    public required string Description { get; init; }
+    public required string Memo { get; init; }
 }

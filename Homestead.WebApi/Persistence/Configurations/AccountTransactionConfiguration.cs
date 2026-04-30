@@ -14,7 +14,7 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
 
         builder.Property(t => t.OccurredAt).IsRequired();
 
-        builder.Property(t => t.Description)
+        builder.Property(t => t.Memo)
             .IsRequired()
             .HasMaxLength(512);
 

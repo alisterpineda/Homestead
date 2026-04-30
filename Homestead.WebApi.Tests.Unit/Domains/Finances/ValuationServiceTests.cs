@@ -89,7 +89,7 @@ public class ValuationServiceTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = occurredAt ?? DateTimeOffset.UtcNow.AddDays(-1),
-            Description = "test",
+            Memo = "test",
             Type = TransactionType.Normal,
         };
         _db.AccountTransactions.Add(txn);

@@ -13,7 +13,7 @@ public class BalanceEntryService(
     ITransactionValidator validator,
     IAuditContext audit) : IBalanceEntryService
 {
-    private const string DefaultDescription = "Balance assertion";
+    private const string DefaultMemo = "Balance assertion";
 
     public async Task<BalanceEntryMutationResult> CreateAsync(
         CreateBalanceEntryRequest request, CancellationToken ct)
@@ -38,7 +38,7 @@ public class BalanceEntryService(
         {
             Id = Guid.NewGuid(),
             OccurredAt = occurredAt,
-            Description = NormalizeDescription(request.Description),
+            Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.BalanceEntry,
             AccountId = account.Id,
             AssertedCommodityId = commodity.Id,
@@ -101,7 +101,7 @@ public class BalanceEntryService(
         entry.OccurredAt = newOccurredAt;
         entry.AssertedCommodityId = newCommodity.Id;
         entry.AssertedQuantity = signedAsserted;
-        entry.Description = NormalizeDescription(request.Description);
+        entry.Memo = NormalizeMemo(request.Memo);
 
         // Re-bind splits to the (possibly-new) commodity. Reconciliation rewrites quantities.
         var adjustments = await systemAccounts.GetAdjustmentsAsync(ct);
@@ -137,7 +137,7 @@ public class BalanceEntryService(
         };
 
         db.AccountTransactions.Remove(entry);
-        audit.Deleted("AccountTransaction", entry.Id, entry.Description);
+        audit.Deleted("AccountTransaction", entry.Id, entry.Memo);
 
         return new BalanceEntryMutationResult(null, touched);
     }
@@ -206,6 +206,6 @@ public class BalanceEntryService(
     private static DateTimeOffset MinInstant(DateTimeOffset a, DateTimeOffset b) =>
         a < b ? a : b;
 
-    private static string NormalizeDescription(string? description) =>
-        TransactionDescriptions.NormalizeOrDefault(description, DefaultDescription);
+    private static string NormalizeMemo(string? memo) =>
+        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
 }

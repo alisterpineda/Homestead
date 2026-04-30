@@ -3,9 +3,9 @@
 
 export interface CreateTransferCommand {
   date: string;
-  description?: (string | null);
   destinationAccountId: string;
   destinationAmount?: (number | null);
+  memo?: (string | null);
   sourceAccountId: string;
   sourceAmount: number;
 }

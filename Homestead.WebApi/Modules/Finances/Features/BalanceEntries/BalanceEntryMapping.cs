@@ -11,6 +11,6 @@ internal static class BalanceEntryMapping
         CommodityId = entry.AssertedCommodityId,
         AssertedAmount = Math.Abs(entry.AssertedQuantity),
         Date = DateOnly.FromDateTime(entry.OccurredAt.UtcDateTime),
-        Description = entry.Description,
+        Memo = entry.Memo,
     };
 }

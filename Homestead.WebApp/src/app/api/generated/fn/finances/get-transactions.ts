@@ -16,7 +16,7 @@ export interface GetTransactions$Params {
   Shape?: TransactionShape;
   DateFrom?: string;
   DateTo?: string;
-  DescriptionContains?: string;
+  MemoContains?: string;
   Page: number;
   PageSize: number;
 }
@@ -29,7 +29,7 @@ export function getTransactions(http: HttpClient, rootUrl: string, params: GetTr
     rb.query('Shape', params.Shape, {});
     rb.query('DateFrom', params.DateFrom, {});
     rb.query('DateTo', params.DateTo, {});
-    rb.query('DescriptionContains', params.DescriptionContains, {});
+    rb.query('MemoContains', params.MemoContains, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

@@ -31,10 +31,10 @@ public record CreateOpeningBalanceRequest(
     decimal Quantity,
     decimal? ValuePerUnit,
     DateOnly AsOfDate,
-    string? Description = null);
+    string? Memo = null);
 
 public record UpdateOpeningBalanceRequest(
     decimal Quantity,
     decimal? ValuePerUnit,
     DateOnly AsOfDate,
-    string? Description = null);
+    string? Memo = null);

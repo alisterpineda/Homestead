@@ -5,7 +5,7 @@ export interface OpeningBalanceResponse {
   accountId: string;
   asOfDate: string;
   commodityId: string;
-  description: string;
+  memo: string;
   quantity: number;
   transactionId: string;
   valuePerUnit?: (number | null);

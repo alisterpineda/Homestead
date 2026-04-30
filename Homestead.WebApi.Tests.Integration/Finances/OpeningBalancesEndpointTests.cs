@@ -296,7 +296,7 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Create_WithDescription_RoundTripsThroughResponse()
+    public async Task Create_WithMemo_RoundTripsThroughResponse()
     {
         var client = await CreateAdminClientAsync();
         var usdId = await GetUsdIdAsync();
@@ -309,16 +309,16 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
                 commodityId = usdId,
                 quantity = 1000m,
                 asOfDate = "2026-04-23",
-                description = "Imported from old tracker",
+                memo = "Imported from old tracker",
             }, CT);
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
-        Assert.Equal("Imported from old tracker", body!.Description);
+        Assert.Equal("Imported from old tracker", body!.Memo);
     }
 
     [Fact]
-    public async Task Create_BlankDescription_DefaultsToOpeningBalance()
+    public async Task Create_BlankMemo_DefaultsToOpeningBalance()
     {
         var client = await CreateAdminClientAsync();
         var usdId = await GetUsdIdAsync();
@@ -330,11 +330,11 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
-        Assert.Equal("Opening balance", body!.Description);
+        Assert.Equal("Opening balance", body!.Memo);
     }
 
     [Fact]
-    public async Task Patch_UpdatesDescription()
+    public async Task Patch_UpdatesMemo()
     {
         var client = await CreateAdminClientAsync();
         var usdId = await GetUsdIdAsync();
@@ -350,21 +350,21 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
             {
                 quantity = 1000m,
                 asOfDate = "2026-04-23",
-                description = "Edited via PATCH",
+                memo = "Edited via PATCH",
             }, CT);
 
         Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
         var body = await patchResp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
-        Assert.Equal("Edited via PATCH", body!.Description);
+        Assert.Equal("Edited via PATCH", body!.Memo);
     }
 
     // Discriminator regression: before the TPH refactor, opening balances were identified by
-    // the literal description string "Opening balance". Editing the description to anything
+    // the literal memo string "Opening balance". Editing the memo to anything
     // else would have broken Get / Patch / Delete and made the row vanish from shape filters.
     // This test pins the new behavior where TPH (Type column / OfType<OpeningBalanceTransaction>)
     // is the structural identifier.
     [Fact]
-    public async Task EditDescription_DoesNotBreakDiscriminatorLookups()
+    public async Task EditMemo_DoesNotBreakDiscriminatorLookups()
     {
         var client = await CreateAdminClientAsync();
         var usdId = await GetUsdIdAsync();
@@ -380,7 +380,7 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
             {
                 quantity = 1000m,
                 asOfDate = "2026-04-23",
-                description = "Renamed to something arbitrary",
+                memo = "Renamed to something arbitrary",
             }, CT);
         Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
 
@@ -389,7 +389,7 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
             $"/api/v1/finances/accounts/{accountId}/opening-balances/{usdId}", CT);
         Assert.Equal(HttpStatusCode.OK, getResp.StatusCode);
         var got = await getResp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
-        Assert.Equal("Renamed to something arbitrary", got!.Description);
+        Assert.Equal("Renamed to something arbitrary", got!.Memo);
 
         // Listing the account's opening balances still includes the renamed row.
         var listResp = await client.GetAsync(
@@ -397,16 +397,16 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, listResp.StatusCode);
         var items = await listResp.Content.ReadFromJsonAsync<List<OpeningBalanceItem>>(CT);
         Assert.Single(items!);
-        Assert.Equal("Renamed to something arbitrary", items![0].Description);
+        Assert.Equal("Renamed to something arbitrary", items![0].Memo);
 
         // Filtering the generic transactions endpoint by TransactionShape.OpeningBalance still
-        // returns it — proving the shape filter is type-driven, not description-driven.
+        // returns it — proving the shape filter is type-driven, not memo-driven.
         var shapeResp = await client.GetAsync(
             $"/api/v1/finances/transactions?accountId={accountId}&shape=OpeningBalance&page=1&pageSize=25", CT);
         Assert.Equal(HttpStatusCode.OK, shapeResp.StatusCode);
         var shapeBody = await shapeResp.Content.ReadFromJsonAsync<TransactionPage>(CT);
         Assert.Equal(1, shapeBody!.TotalCount);
-        Assert.Equal("Renamed to something arbitrary", shapeBody.Items[0].Description);
+        Assert.Equal("Renamed to something arbitrary", shapeBody.Items[0].Memo);
         Assert.Equal("OpeningBalance", shapeBody.Items[0].Shape);
 
         // Delete still finds the row by (account, commodity).
@@ -416,10 +416,10 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
     }
 
     private record OpeningBalanceItem(
-        Guid TransactionId, Guid AccountId, Guid CommodityId, string Description,
+        Guid TransactionId, Guid AccountId, Guid CommodityId, string Memo,
         decimal Quantity, decimal? ValuePerUnit, DateOnly AsOfDate);
 
     private record TransactionPage(int Page, int PageSize, int TotalCount, List<TransactionItem> Items);
 
-    private record TransactionItem(Guid Id, string Shape, string Description);
+    private record TransactionItem(Guid Id, string Shape, string Memo);
 }

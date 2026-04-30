@@ -15,7 +15,7 @@ public class CreateOpeningBalanceHandler(
         var transaction = await openingBalances.CreateAsync(
             new CreateOpeningBalanceRequest(
                 request.AccountId, request.CommodityId, request.Quantity,
-                request.ValuePerUnit, request.AsOfDate, request.Description),
+                request.ValuePerUnit, request.AsOfDate, request.Memo),
             ct);
 
         await db.SaveChangesAsync(ct);

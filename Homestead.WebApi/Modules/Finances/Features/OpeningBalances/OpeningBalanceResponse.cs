@@ -5,7 +5,7 @@ public record OpeningBalanceResponse
     public required Guid TransactionId { get; init; }
     public required Guid AccountId { get; init; }
     public required Guid CommodityId { get; init; }
-    public required string Description { get; init; }
+    public required string Memo { get; init; }
 
     /// <summary>
     /// User-facing quantity (always positive). Internal sign conventions are hidden from clients.

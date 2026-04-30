@@ -27,7 +27,7 @@ public record CreateTransferRequest(
     decimal SourceAmount,
     decimal? DestinationAmount,
     DateOnly Date,
-    string? Description);
+    string? Memo);
 
 public record UpdateTransferRequest(
     Guid SourceAccountId,
@@ -35,7 +35,7 @@ public record UpdateTransferRequest(
     decimal SourceAmount,
     decimal? DestinationAmount,
     DateOnly Date,
-    string? Description);
+    string? Memo);
 
 public record TransferMutationResult(
     AccountTransaction? Transaction,

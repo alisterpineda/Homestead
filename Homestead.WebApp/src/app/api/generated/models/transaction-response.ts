@@ -5,9 +5,9 @@ import { TransactionDetails } from '../models/transaction-details';
 import { TransactionShape } from '../models/transaction-shape';
 import { TransactionSplitResponse } from '../models/transaction-split-response';
 export interface TransactionResponse {
-  description: string;
   details?: (null | TransactionDetails);
   id: string;
+  memo: string;
   occurredAt: string;
   relatedTransactionId?: (string | null);
   shape: TransactionShape;

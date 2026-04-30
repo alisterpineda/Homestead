@@ -19,7 +19,7 @@ public class PatchBalanceEntryHandler(
                 request.CommodityId,
                 request.AssertedAmount,
                 request.Date,
-                request.Description),
+                request.Memo),
             ct);
 
         await db.SaveChangesAsync(ct);

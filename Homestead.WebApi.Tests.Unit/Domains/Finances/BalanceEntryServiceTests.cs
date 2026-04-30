@@ -98,7 +98,7 @@ public class BalanceEntryServiceTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            Description = "Transfer",
+            Memo = "Transfer",
             Type = TransactionType.Normal,
             Splits =
             [
@@ -172,50 +172,50 @@ public class BalanceEntryServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_BlankDescription_FallsBackToBalanceAssertionDefault()
+    public async Task Create_BlankMemo_FallsBackToBalanceAssertionDefault()
     {
         var cash = await AddAccountAsync(AccountKind.Cash);
 
         var result = await _sut.CreateAsync(
-            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30), Description: null),
+            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30), Memo: null),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Balance assertion", result.Entry!.Description);
+        Assert.Equal("Balance assertion", result.Entry!.Memo);
     }
 
     [Fact]
-    public async Task Create_NonBlankDescription_PersistsTrimmedValue()
+    public async Task Create_NonBlankMemo_PersistsTrimmedValue()
     {
         var cash = await AddAccountAsync(AccountKind.Cash);
 
         var result = await _sut.CreateAsync(
             new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30),
-                Description: "  March statement  "),
+                Memo: "  March statement  "),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("March statement", result.Entry!.Description);
+        Assert.Equal("March statement", result.Entry!.Memo);
     }
 
     [Fact]
-    public async Task Update_ReplacesDescription()
+    public async Task Update_ReplacesMemo()
     {
         var cash = await AddAccountAsync(AccountKind.Cash);
 
         var created = await _sut.CreateAsync(
             new CreateBalanceEntryRequest(cash.Id, _cad.Id, 100m, new DateOnly(2026, 4, 30),
-                Description: "Initial"),
+                Memo: "Initial"),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var updated = await _sut.UpdateAsync(created.Entry!.Id, cash.Id,
             new UpdateBalanceEntryRequest(_cad.Id, 100m, new DateOnly(2026, 4, 30),
-                Description: "Updated"),
+                Memo: "Updated"),
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Updated", updated.Entry!.Description);
+        Assert.Equal("Updated", updated.Entry!.Memo);
     }
 
     [Fact]
@@ -241,7 +241,7 @@ public class BalanceEntryServiceTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero),
-            Description = "Transfer",
+            Memo = "Transfer",
             Type = TransactionType.Normal,
             Splits =
             [

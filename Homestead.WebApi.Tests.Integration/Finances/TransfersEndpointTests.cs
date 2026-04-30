@@ -46,13 +46,13 @@ public class TransfersEndpointTests : IntegrationTestBase
             destinationAccountId = savings,
             sourceAmount = 200m,
             date = "2026-04-23",
-            description = "April rent transfer",
+            memo = "April rent transfer",
         }, CT);
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<TransactionItem>(CT);
         Assert.Equal("Transfer", body!.Shape);
-        Assert.Equal("April rent transfer", body.Description);
+        Assert.Equal("April rent transfer", body.Memo);
         Assert.Equal(2, body.Splits.Count);
 
         // No linked price for same-currency.
@@ -201,7 +201,7 @@ public class TransfersEndpointTests : IntegrationTestBase
 }
 
 internal record TransactionItem(
-    Guid Id, string Shape, DateTimeOffset OccurredAt, string Description,
+    Guid Id, string Shape, DateTimeOffset OccurredAt, string Memo,
     Guid? RelatedTransactionId,
     IReadOnlyList<TransactionSplitItem> Splits);
 

@@ -25,7 +25,7 @@ internal static class TransactionMapping
             Id = transaction.Id,
             Shape = shape,
             OccurredAt = transaction.OccurredAt,
-            Description = transaction.Description,
+            Memo = transaction.Memo,
             RelatedTransactionId = transaction.RelatedTransactionId,
             Splits = splits,
             Details = ResolveDetails(transaction, shape),

@@ -91,13 +91,13 @@ class ActivityShapeCell {
 }
 
 @Component({
-  selector: 'app-activity-description-cell',
+  selector: 'app-activity-memo-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span class="block truncate text-sm">{{ context.row.original.tx.description }}</span>
+    <span class="block truncate text-sm">{{ context.row.original.tx.memo }}</span>
   `,
 })
-class ActivityDescriptionCell {
+class ActivityMemoCell {
   protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
 }
 
@@ -252,9 +252,9 @@ export class AccountActivityTabComponent {
       enableSorting: false,
     },
     {
-      id: 'description',
-      header: 'Description',
-      cell: () => flexRenderComponent(ActivityDescriptionCell),
+      id: 'memo',
+      header: 'Memo',
+      cell: () => flexRenderComponent(ActivityMemoCell),
       enableSorting: false,
     },
     {
@@ -277,7 +277,7 @@ export class AccountActivityTabComponent {
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
-    description: 'min-w-0',
+    memo: 'min-w-0',
     amount: 'text-right',
   };
 

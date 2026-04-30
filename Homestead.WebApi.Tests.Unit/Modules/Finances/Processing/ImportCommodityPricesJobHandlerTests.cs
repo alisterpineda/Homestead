@@ -297,7 +297,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OccurredAt = DateTimeOffset.UtcNow.AddDays(-10),
-            Description = "seed",
+            Memo = "seed",
             Type = TransactionType.Normal,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,

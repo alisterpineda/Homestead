@@ -6,7 +6,7 @@ public abstract class AccountTransaction
 {
     public Guid Id { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
-    public required string Description { get; set; }
+    public required string Memo { get; set; }
 
     public TransactionType Type { get; set; }
 

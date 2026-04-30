@@ -42,7 +42,7 @@ public class LinkedPriceManagerTests : IAsyncLifetime
         {
             Id = Guid.NewGuid(),
             OccurredAt = at,
-            Description = "Test",
+            Memo = "Test",
             Type = TransactionType.Normal,
             Splits = splits.ToList(),
         };

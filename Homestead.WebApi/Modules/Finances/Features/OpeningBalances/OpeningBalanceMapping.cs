@@ -14,7 +14,7 @@ internal static class OpeningBalanceMapping
             TransactionId = transaction.Id,
             AccountId = accountSplit.AccountId,
             CommodityId = accountSplit.CommodityId,
-            Description = transaction.Description,
+            Memo = transaction.Memo,
             Quantity = Math.Abs(accountSplit.Quantity),
             ValuePerUnit = accountSplit.UnitPriceRate,
             AsOfDate = DateOnly.FromDateTime(transaction.OccurredAt.UtcDateTime),

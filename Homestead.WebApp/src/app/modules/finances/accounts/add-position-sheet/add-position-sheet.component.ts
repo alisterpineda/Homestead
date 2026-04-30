@@ -115,15 +115,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="add-position-description">Description (optional)</label>
+              <label hlmLabel for="add-position-memo">Memo (optional)</label>
               <input
                 hlmInput
-                id="add-position-description"
+                id="add-position-memo"
                 class="w-full"
                 maxlength="512"
                 placeholder="e.g. Carried over from old broker"
-                [value]="description()"
-                (input)="description.set(asValue($event))"
+                [value]="memo()"
+                (input)="memo.set(asValue($event))"
               />
             </div>
 
@@ -157,7 +157,7 @@ export class AddPositionSheetComponent {
   quantity = signal('');
   unitPrice = signal('');
   asOfDate = signal(todayIso());
-  description = signal('');
+  memo = signal('');
   saving = signal(false);
   formError = signal('');
 
@@ -193,7 +193,7 @@ export class AddPositionSheetComponent {
       this.quantity.set('');
       this.unitPrice.set('');
       this.asOfDate.set(todayIso());
-      this.description.set('');
+      this.memo.set('');
       this.saving.set(false);
       this.formError.set('');
     });
@@ -222,7 +222,7 @@ export class AddPositionSheetComponent {
       ? Number(this.unitPrice())
       : null;
 
-    const trimmedDescription = trimToNull(this.description());
+    const trimmedMemo = trimToNull(this.memo());
 
     this.txApi.createOpeningBalance({
       accountId: a.id,
@@ -231,7 +231,7 @@ export class AddPositionSheetComponent {
         quantity: Number(this.quantity()),
         valuePerUnit,
         asOfDate: this.asOfDate(),
-        description: trimmedDescription,
+        memo: trimmedMemo,
       },
     }).pipe(
       handleMutationError(this.errorHandler, this.saving, 'Failed to add position.'),

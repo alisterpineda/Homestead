@@ -91,10 +91,10 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
     {
         AccountTransaction txn = type switch
         {
-            TransactionType.OpeningBalance => new OpeningBalanceTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "ob", Type = type },
-            TransactionType.BalanceEntry => new BalanceEntryTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "be", Type = type, AssertedQuantity = 0m, AssertedCommodityId = commodityId },
-            TransactionType.StockSplit => new StockSplitTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "ss", Type = type },
-            _ => new NormalTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Description = "txn", Type = type },
+            TransactionType.OpeningBalance => new OpeningBalanceTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "ob", Type = type },
+            TransactionType.BalanceEntry => new BalanceEntryTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "be", Type = type, AssertedQuantity = 0m, AssertedCommodityId = commodityId },
+            TransactionType.StockSplit => new StockSplitTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "ss", Type = type },
+            _ => new NormalTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "txn", Type = type },
         };
         _db.AccountTransactions.Add(txn);
         _db.AccountTransactionSplits.Add(new AccountTransactionSplit

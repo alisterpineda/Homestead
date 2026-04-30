@@ -144,15 +144,15 @@ export type TransferDirection = 'outgoing' | 'incoming';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="transfer-description">Description (optional)</label>
+              <label hlmLabel for="transfer-memo">Memo (optional)</label>
               <input
                 hlmInput
-                id="transfer-description"
+                id="transfer-memo"
                 class="w-full"
                 maxlength="512"
                 placeholder="e.g. April rent transfer"
-                [value]="description()"
-                (input)="description.set(asValue($event))"
+                [value]="memo()"
+                (input)="memo.set(asValue($event))"
               />
             </div>
 
@@ -198,7 +198,7 @@ export class TransferSheetComponent {
   sourceAmount = signal('');
   destinationAmount = signal('');
   date = signal(todayIso());
-  description = signal('');
+  memo = signal('');
   saving = signal(false);
   deleting = signal(false);
   formError = signal('');
@@ -285,7 +285,7 @@ export class TransferSheetComponent {
             : '',
         );
         this.date.set(toDateOnly(ex.occurredAt));
-        this.description.set(ex.description ?? '');
+        this.memo.set(ex.memo ?? '');
       } else {
         this.direction.set('outgoing');
         this.counterpartyId.set(null);
@@ -294,7 +294,7 @@ export class TransferSheetComponent {
         this.sourceAmount.set('');
         this.destinationAmount.set('');
         this.date.set(todayIso());
-        this.description.set('');
+        this.memo.set('');
       }
     });
   }
@@ -333,7 +333,7 @@ export class TransferSheetComponent {
       sourceAmount,
       destinationAmount,
       date: this.date(),
-      description: trimToNull(this.description()),
+      memo: trimToNull(this.memo()),
     };
 
     const ex = this.existing();

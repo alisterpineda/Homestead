@@ -19,7 +19,7 @@ public class CreateTransferHandler(
                 request.SourceAmount,
                 request.DestinationAmount,
                 request.Date,
-                request.Description),
+                request.Memo),
             ct);
 
         // Flush the primary change so the reconciler's DB queries see the new transfer.

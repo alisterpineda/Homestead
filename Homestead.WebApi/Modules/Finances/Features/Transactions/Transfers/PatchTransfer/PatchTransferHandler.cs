@@ -20,7 +20,7 @@ public class PatchTransferHandler(
                 request.SourceAmount,
                 request.DestinationAmount,
                 request.Date,
-                request.Description),
+                request.Memo),
             ct);
 
         await db.SaveChangesAsync(ct);

@@ -404,7 +404,7 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("Memo")
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");

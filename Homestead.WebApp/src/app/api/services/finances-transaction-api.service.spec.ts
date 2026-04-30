@@ -33,7 +33,7 @@ describe('FinancesTransactionApiService', () => {
   });
 
   it('createTransfer sends POST', () => {
-    const mockBody = { id: 'tx-1', shape: 'Transfer', splits: [], description: '', occurredAt: '' };
+    const mockBody = { id: 'tx-1', shape: 'Transfer', splits: [], memo: '', occurredAt: '' };
     service.createTransfer({
       body: { sourceAccountId: 'a', destinationAccountId: 'b', sourceAmount: 100, date: '2026-04-23' },
     }).subscribe(r => expect(r).toEqual(mockBody));
@@ -43,7 +43,7 @@ describe('FinancesTransactionApiService', () => {
   });
 
   it('patchTransfer sends PATCH with path id', () => {
-    const mockBody = { id: 'tx-1', shape: 'Transfer', splits: [], description: '', occurredAt: '' };
+    const mockBody = { id: 'tx-1', shape: 'Transfer', splits: [], memo: '', occurredAt: '' };
     service.patchTransfer({
       transactionId: 'tx-1',
       body: { sourceAccountId: 'a', destinationAccountId: 'b', sourceAmount: 100, date: '2026-04-23' },

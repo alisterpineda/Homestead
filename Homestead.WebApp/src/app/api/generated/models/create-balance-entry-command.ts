@@ -6,5 +6,5 @@ export interface CreateBalanceEntryCommand {
   assertedAmount: number;
   commodityId: string;
   date: string;
-  description?: (string | null);
+  memo?: (string | null);
 }
