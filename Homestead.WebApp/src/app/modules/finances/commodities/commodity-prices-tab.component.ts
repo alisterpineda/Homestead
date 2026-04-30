@@ -105,6 +105,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                       @case ('BankOfCanada') {
                         <span hlmBadge variant="secondary" title="Imported from the Bank of Canada.">Bank of Canada</span>
                       }
+                      @case ('AlphaVantage') {
+                        <span hlmBadge variant="secondary" title="Imported from Alpha Vantage.">Alpha Vantage</span>
+                      }
+                      @default {
+                        <span hlmBadge variant="secondary">{{ row.source }}</span>
+                      }
                     }
                   </td>
                   <td hlmTd class="w-12">
