@@ -16,6 +16,8 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
     public async Task<GetNetWorthHistoryResponse> Handle(
         GetNetWorthHistoryQuery request, CancellationToken ct)
     {
+        ValidateCustomRange(request);
+
         var to = request.AsOf ?? CurrentDayCutoffUtc();
 
         var settings = await FinanceSettings.LoadAsync(db, ct);
@@ -44,7 +46,9 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
                 reason: "no_transactions");
         }
 
-        var (from, granularity) = ResolveRange(request.Range, to, firstAt.Value);
+        var (from, resolvedTo, granularity) = ResolveRange(
+            request.Range, request.FromDate, request.ToDate, to, firstAt.Value);
+        to = resolvedTo;
         var cutoffs = GenerateCutoffs(from, to, granularity);
 
         var ctx = await valuations.LoadContextAsync(to, ct);
@@ -147,25 +151,91 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
             Reason = reason,
         };
 
-    private static (DateTimeOffset From, NetWorthGranularity Granularity) ResolveRange(
-        NetWorthRange range, DateTimeOffset to, DateTimeOffset earliestActivity)
+    private static (DateTimeOffset From, DateTimeOffset To, NetWorthGranularity Granularity) ResolveRange(
+        NetWorthRange range, DateOnly? customFrom, DateOnly? customTo,
+        DateTimeOffset to, DateTimeOffset earliestActivity)
     {
         DateTimeOffset Clamp(DateTimeOffset candidate) =>
             candidate < earliestActivity ? earliestActivity : candidate;
 
-        return range switch
+        NetWorthGranularity GranularityForSpan(DateTimeOffset from, DateTimeOffset upper) =>
+            (upper - from).TotalDays > DailyAllRangeThresholdDays
+                ? NetWorthGranularity.Monthly
+                : NetWorthGranularity.Daily;
+
+        switch (range)
         {
-            NetWorthRange.OneMonth => (Clamp(to.AddMonths(-1)), NetWorthGranularity.Daily),
-            NetWorthRange.ThreeMonths => (Clamp(to.AddMonths(-3)), NetWorthGranularity.Daily),
-            NetWorthRange.SixMonths => (Clamp(to.AddMonths(-6)), NetWorthGranularity.Daily),
-            NetWorthRange.OneYear => (Clamp(to.AddYears(-1)), NetWorthGranularity.Daily),
-            NetWorthRange.All => (
-                earliestActivity,
-                (to - earliestActivity).TotalDays > DailyAllRangeThresholdDays
-                    ? NetWorthGranularity.Monthly
-                    : NetWorthGranularity.Daily),
-            _ => throw new ArgumentOutOfRangeException(nameof(range), range, null),
-        };
+            case NetWorthRange.ThisMonth:
+            {
+                var firstOfMonth = new DateOnly(to.UtcDateTime.Year, to.UtcDateTime.Month, 1)
+                    .ToStartOfDayUtc();
+                return (Clamp(firstOfMonth), to, NetWorthGranularity.Daily);
+            }
+            case NetWorthRange.ThreeMonths:
+            {
+                var (from, end) = PriorCalendarMonthsWindow(to, 3);
+                return (Clamp(from), end, GranularityForSpan(from, end));
+            }
+            case NetWorthRange.SixMonths:
+            {
+                var (from, end) = PriorCalendarMonthsWindow(to, 6);
+                return (Clamp(from), end, GranularityForSpan(from, end));
+            }
+            case NetWorthRange.TwelveMonths:
+            {
+                var (from, end) = PriorCalendarMonthsWindow(to, 12);
+                return (Clamp(from), end, GranularityForSpan(from, end));
+            }
+            case NetWorthRange.YearToDate:
+            {
+                var jan1 = new DateOnly(to.UtcDateTime.Year, 1, 1).ToStartOfDayUtc();
+                return (Clamp(jan1), to, NetWorthGranularity.Daily);
+            }
+            case NetWorthRange.LastYear:
+            {
+                var year = to.UtcDateTime.Year - 1;
+                var from = new DateOnly(year, 1, 1).ToStartOfDayUtc();
+                var lastYearTo = new DateOnly(year, 12, 31).ToEndOfDayUtc();
+                return (Clamp(from), lastYearTo, GranularityForSpan(from, lastYearTo));
+            }
+            case NetWorthRange.All:
+                return (earliestActivity, to, GranularityForSpan(earliestActivity, to));
+            case NetWorthRange.Custom:
+            {
+                var from = customFrom!.Value.ToStartOfDayUtc();
+                var upper = customTo!.Value.ToEndOfDayUtc();
+                return (Clamp(from), upper, GranularityForSpan(from, upper));
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(range), range, null);
+        }
+    }
+
+    // Calendar-aligned window of the last N calendar months including the current
+    // month. Today's day-of-month is irrelevant — only which month `to` falls in.
+    private static (DateTimeOffset From, DateTimeOffset To) PriorCalendarMonthsWindow(
+        DateTimeOffset to, int months)
+    {
+        var firstOfCurrentMonth = new DateOnly(to.UtcDateTime.Year, to.UtcDateTime.Month, 1);
+        var startMonth = firstOfCurrentMonth.AddMonths(-(months - 1));
+        var endDay = new DateOnly(firstOfCurrentMonth.Year, firstOfCurrentMonth.Month,
+            DateTime.DaysInMonth(firstOfCurrentMonth.Year, firstOfCurrentMonth.Month));
+        return (startMonth.ToStartOfDayUtc(), endDay.ToEndOfDayUtc());
+    }
+
+    private static void ValidateCustomRange(GetNetWorthHistoryQuery request)
+    {
+        if (request.Range != NetWorthRange.Custom) return;
+        if (request.FromDate is null || request.ToDate is null)
+        {
+            throw new BusinessRuleException(
+                "FromDate and ToDate are required when Range is Custom.");
+        }
+        if (request.FromDate.Value > request.ToDate.Value)
+        {
+            throw new BusinessRuleException(
+                "FromDate must be on or before ToDate.");
+        }
     }
 
     private static List<DateTimeOffset> GenerateCutoffs(

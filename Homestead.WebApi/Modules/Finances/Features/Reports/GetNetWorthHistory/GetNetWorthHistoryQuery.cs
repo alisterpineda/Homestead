@@ -11,4 +11,16 @@ public record GetNetWorthHistoryQuery : IRequest<GetNetWorthHistoryResponse>
     /// deterministic tests and forward-compatibility with a future "compare-to" feature.
     /// </summary>
     public DateTimeOffset? AsOf { get; init; }
+
+    /// <summary>
+    /// Left edge of the window when <see cref="Range"/> is <see cref="NetWorthRange.Custom"/>.
+    /// Ignored otherwise. Required when Custom is selected.
+    /// </summary>
+    public DateOnly? FromDate { get; init; }
+
+    /// <summary>
+    /// Right edge of the window when <see cref="Range"/> is <see cref="NetWorthRange.Custom"/>.
+    /// Ignored otherwise. Required when Custom is selected.
+    /// </summary>
+    public DateOnly? ToDate { get; init; }
 }

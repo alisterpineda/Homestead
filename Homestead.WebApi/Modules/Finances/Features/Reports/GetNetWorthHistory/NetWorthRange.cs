@@ -2,11 +2,14 @@ namespace Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 
 public enum NetWorthRange
 {
-    OneMonth,
+    ThisMonth,
     ThreeMonths,
     SixMonths,
-    OneYear,
+    TwelveMonths,
+    YearToDate,
+    LastYear,
     All,
+    Custom,
 }
 
 public enum NetWorthGranularity

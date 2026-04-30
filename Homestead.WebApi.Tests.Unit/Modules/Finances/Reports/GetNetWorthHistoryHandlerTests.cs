@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Settings;
@@ -151,14 +152,14 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Null(resp.Reason);
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
         // Last point reflects the full running total.
         Assert.Equal(175m, resp.Points[^1].Value);
-        // 1M range clamps `from` to the earliest activity (2026-04-05) per the design-doc
-        // rule that charts begin from the user's earliest recorded event.
+        // ThisMonth would start at 2026-04-01 but clamps to the earliest activity (2026-04-05)
+        // per the design-doc rule that charts begin from the user's earliest recorded event.
         Assert.Equal(new DateTime(2026, 4, 5), resp.Points[0].AsOf.UtcDateTime.Date);
         Assert.Equal(100m, resp.Points[0].Value);
         // Point on 2026-04-20 reflects first two splits.
@@ -178,7 +179,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         // 1000 CAD + 500 USD * 1.30 = 1650 CAD
         Assert.Equal(1650m, resp.Points[^1].Value);
@@ -194,7 +195,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Equal(500m, resp.Points[^1].Value);
     }
@@ -213,7 +214,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.Equal(100m, resp.Points[^1].Value);
     }
@@ -232,7 +233,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         var openingDay = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
         Assert.Equal(750m, openingDay.Value);
@@ -261,7 +262,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         // Before split: 10 × 2 = 20 CAD. After split: 20 × 1 = 20 CAD.
         var beforeSplit = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 14));
@@ -279,7 +280,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         Assert.True(resp.HasUnpriced);
         // After the split, every bucket has a non-zero unpriced position → null value.
@@ -330,7 +331,7 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         await SetDisplayCurrencyAsync(_cad.Id);
 
         var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.OneMonth, AsOf = to }, Ct);
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
 
         // April 10 → uses 1.20 rate → 120 CAD
         var early = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
@@ -338,5 +339,189 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         // April 25 → uses 1.40 rate → 140 CAD
         var late = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 25));
         Assert.Equal(140m, late.Value);
+    }
+
+    [Fact]
+    public async Task ThreeMonths_IsCalendarAligned_IncludesCurrentMonth()
+    {
+        // On 2026-04-30, "Last 3 Months" spans Feb 1 – Apr 30 2026 — three calendar
+        // months ending with the current month.
+        var to = new DateTimeOffset(2026, 4, 30, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        // Pre-window deposit (carry-over from before Feb 1) — should appear in totals
+        // but not as a bucket inside the window.
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2025, 12, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 2, 15, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 25m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThreeMonths, AsOf = to }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+        Assert.Equal(new DateTime(2026, 2, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        Assert.Equal(new DateTime(2026, 4, 30), resp.Points[^1].AsOf.UtcDateTime.Date);
+        // Carry-over (100) + Feb deposit (50) + Apr deposit (25) = 175.
+        Assert.Equal(175m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task TwelveMonths_IsCalendarAligned_IncludesCurrentMonth()
+    {
+        var to = new DateTimeOffset(2026, 4, 30, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2025, 5, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.TwelveMonths, AsOf = to }, Ct);
+
+        Assert.Equal(new DateTime(2025, 5, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        Assert.Equal(new DateTime(2026, 4, 30), resp.Points[^1].AsOf.UtcDateTime.Date);
+    }
+
+    [Fact]
+    public async Task ThisMonth_StartsAtFirstOfMonth_WhenEarlierActivityExists()
+    {
+        // Activity on March 15 ensures earliestActivity precedes April 1, so the
+        // first-of-month boundary is the binding lower edge (no clamp shift).
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 200m, new DateTimeOffset(2026, 3, 15, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+        Assert.Equal(new DateTime(2026, 4, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        // Pre-month deposit is reflected from day 1.
+        Assert.Equal(200m, resp.Points[0].Value);
+        Assert.Equal(250m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task YearToDate_StartsAtJan1()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        // Historical deposit before YTD window establishes a running balance.
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2025, 6, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.YearToDate, AsOf = to }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+        Assert.Equal(new DateTime(2026, 1, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        // Jan 1 reflects the carried-over balance from 2025-06-01.
+        Assert.Equal(100m, resp.Points[0].Value);
+        Assert.Equal(150m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task LastYear_SpansJan1ToDec31OfPriorYear()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        // Pre-2025 activity ensures the from clamp does not push the window forward.
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2024, 11, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 300m, new DateTimeOffset(2025, 6, 15, 12, 0, 0, TimeSpan.Zero));
+        // 2026 activity must not bleed into the LastYear (2025) window.
+        await AddSplitAsync(cash.Id, _cad.Id, 9999m, new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.LastYear, AsOf = to }, Ct);
+
+        Assert.Equal(new DateTime(2025, 1, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        // Last bucket lands on the last day of 2025; cutoff is end-of-day UTC.
+        Assert.Equal(new DateTime(2025, 12, 31), resp.Points[^1].AsOf.UtcDateTime.Date);
+        // Carry-over (100) + 2025-06-15 deposit (300) = 400; 2026 deposit excluded.
+        Assert.Equal(400m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task Custom_UsesProvidedFromAndToDates()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2026, 1, 5, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 200m, new DateTimeOffset(2026, 2, 10, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                AsOf = to,
+                FromDate = new DateOnly(2026, 2, 1),
+                ToDate = new DateOnly(2026, 3, 31),
+            }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
+        Assert.Equal(new DateTime(2026, 2, 1), resp.Points[0].AsOf.UtcDateTime.Date);
+        Assert.Equal(new DateTime(2026, 3, 31), resp.Points[^1].AsOf.UtcDateTime.Date);
+        // Pre-window deposit (2026-01-05 = 100) carried forward; mid-window 2026-02-10 += 200.
+        Assert.Equal(100m, resp.Points[0].Value);
+        Assert.Equal(300m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task Custom_OverYearSpan_UsesMonthlyGranularity()
+    {
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 1000m, new DateTimeOffset(2024, 6, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                AsOf = to,
+                FromDate = new DateOnly(2024, 1, 1),
+                ToDate = new DateOnly(2026, 1, 1),
+            }, Ct);
+
+        Assert.Equal(NetWorthGranularity.Monthly, resp.Granularity);
+    }
+
+    [Fact]
+    public async Task Custom_MissingDates_Throws()
+    {
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.Custom }, Ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                FromDate = new DateOnly(2026, 1, 1),
+            }, Ct));
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                ToDate = new DateOnly(2026, 1, 1),
+            }, Ct));
+    }
+
+    [Fact]
+    public async Task Custom_InvertedRange_Throws()
+    {
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                FromDate = new DateOnly(2026, 4, 1),
+                ToDate = new DateOnly(2026, 1, 1),
+            }, Ct));
     }
 }

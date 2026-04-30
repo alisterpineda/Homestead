@@ -13,6 +13,8 @@ import { NetWorthRange } from '../../models/net-worth-range';
 export interface GetNetWorthHistory$Params {
   Range: NetWorthRange;
   AsOf?: string;
+  FromDate?: string;
+  ToDate?: string;
 }
 
 export function getNetWorthHistory(http: HttpClient, rootUrl: string, params: GetNetWorthHistory$Params, context?: HttpContext): Observable<StrictHttpResponse<GetNetWorthHistoryResponse>> {
@@ -20,6 +22,8 @@ export function getNetWorthHistory(http: HttpClient, rootUrl: string, params: Ge
   if (params) {
     rb.query('Range', params.Range, {});
     rb.query('AsOf', params.AsOf, {});
+    rb.query('FromDate', params.FromDate, {});
+    rb.query('ToDate', params.ToDate, {});
   }
 
   return http.request(

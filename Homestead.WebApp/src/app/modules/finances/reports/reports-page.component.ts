@@ -12,19 +12,11 @@ import { FinancesReportsApiService } from '@/api/services/finances-reports-api.s
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
-import { RangeToggleComponent } from './range-toggle.component';
+import { RangeSelectorComponent } from './range-selector.component';
 import { NetWorthChartComponent } from './net-worth-chart.component';
 import { NetWorthEmptyStateComponent } from './net-worth-empty-state.component';
 import type { NetWorthEmptyReason } from './net-worth-empty-state.component';
 import type { GetNetWorthHistoryResponse } from '@/api/generated/models/get-net-worth-history-response';
-import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
-
-const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
-  OneMonth: 1,
-  ThreeMonths: 3,
-  SixMonths: 6,
-  OneYear: 12,
-};
 
 @Component({
   selector: 'app-reports-page',
@@ -36,7 +28,7 @@ const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
     HlmSpinner,
     HlmEmptyImports,
     HlmButton,
-    RangeToggleComponent,
+    RangeSelectorComponent,
     NetWorthChartComponent,
     NetWorthEmptyStateComponent,
   ],
@@ -55,8 +47,10 @@ const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
       </section>
 
       <div class="flex items-center gap-2">
-        <app-net-worth-range-toggle
+        <app-net-worth-range-selector
           [value]="range()"
+          [responseFrom]="data()?.from ?? null"
+          [responseTo]="data()?.to ?? null"
           (valueChange)="range.set($event)"
         />
       </div>
@@ -102,8 +96,8 @@ const RANGE_MONTHS: Partial<Record<NetWorthRange, number>> = {
               [points]="response.points"
               [granularity]="response.granularity"
               [displayCurrencySymbol]="response.displayCurrencySymbol ?? null"
-              [xAxisMin]="xAxisMin()"
-              [xAxisMax]="xAxisMax()"
+              [xAxisMin]="response.from ?? null"
+              [xAxisMax]="response.to"
             />
           </section>
         }
@@ -126,8 +120,12 @@ export class ReportsPageComponent {
         this.loading.set(true);
         this.error.set(false);
       }),
-      switchMap((range: NetWorthRange) =>
-        this.reportsApi.getNetWorthHistory({ Range: range }).pipe(
+      switchMap(pref =>
+        this.reportsApi.getNetWorthHistory({
+          Range: pref.kind,
+          FromDate: pref.kind === 'Custom' ? pref.from : undefined,
+          ToDate: pref.kind === 'Custom' ? pref.to : undefined,
+        }).pipe(
           tap(() => this.loading.set(false)),
           handleQueryError(this.loading, this.error, null),
         ),
@@ -139,20 +137,6 @@ export class ReportsPageComponent {
   protected readonly emptyReason = computed<NetWorthEmptyReason | null>(() => {
     const r = this.data()?.reason;
     return r === 'no_transactions' || r === 'no_display_currency' ? r : null;
-  });
-
-  // Pin the x-axis to the requested range window so the axis spans 1M/3M/6M/1Y
-  // even when activity only fills part of it. "All" stays auto-fit so the line
-  // hugs the user's actual history.
-  protected readonly xAxisMax = computed(() => this.data()?.to ?? null);
-  protected readonly xAxisMin = computed(() => {
-    const response = this.data();
-    if (!response?.to) return null;
-    const months = RANGE_MONTHS[this.range()];
-    if (months == null) return null;
-    const min = new Date(response.to);
-    min.setMonth(min.getMonth() - months);
-    return min.toISOString();
   });
 
   protected readonly headlineText = computed(() => {

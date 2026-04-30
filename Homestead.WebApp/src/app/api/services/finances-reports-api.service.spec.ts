@@ -27,18 +27,18 @@ describe('FinancesReportsApiService', () => {
       displayCurrencyId: 'cad-id',
       displayCurrencySymbol: 'CAD',
       granularity: 'Daily',
-      range: 'OneMonth',
+      range: 'ThisMonth',
       from: '2026-04-01T23:59:59Z',
       to: '2026-04-28T23:59:59Z',
       points: [{ asOf: '2026-04-28T23:59:59Z', value: 1234.56 }],
       hasUnpriced: false,
       reason: null,
     };
-    service.getNetWorthHistory({ Range: 'OneMonth' }).subscribe(result => {
+    service.getNetWorthHistory({ Range: 'ThisMonth' }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
     const req = httpTesting.expectOne(
-      r => r.url === '/api/v1/finances/reports/net-worth-history' && r.params.get('Range') === 'OneMonth',
+      r => r.url === '/api/v1/finances/reports/net-worth-history' && r.params.get('Range') === 'ThisMonth',
     );
     expect(req.request.method).toBe('GET');
     req.flush(mockBody);
