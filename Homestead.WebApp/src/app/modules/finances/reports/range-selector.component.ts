@@ -61,6 +61,10 @@ function monthsBetween(a: MonthValue, b: MonthValue): number {
   return (b.year - a.year) * 12 + (b.month - a.month);
 }
 
+function currentMonthValue(today: Date): MonthValue {
+  return { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1 };
+}
+
 @Component({
   selector: 'app-net-worth-range-selector',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,7 +79,7 @@ function monthsBetween(a: MonthValue, b: MonthValue): number {
         size="icon"
         class="h-9 w-9 rounded-full"
         aria-label="Previous range"
-        [disabled]="cannotStep()"
+        [disabled]="cannotStepBack()"
         (click)="step(-1)"
       >
         <ng-icon hlm size="sm" name="lucideChevronLeft" />
@@ -129,6 +133,7 @@ function monthsBetween(a: MonthValue, b: MonthValue): number {
                     [value]="customTo()"
                     (valueChange)="setCustomTo($event)"
                     [min]="customFrom()"
+                    [max]="currentMonth"
                     ariaLabel="Custom range end month"
                   />
                 </label>
@@ -152,7 +157,7 @@ function monthsBetween(a: MonthValue, b: MonthValue): number {
         size="icon"
         class="h-9 w-9 rounded-full"
         aria-label="Next range"
-        [disabled]="cannotStep()"
+        [disabled]="cannotStepForward()"
         (click)="step(1)"
       >
         <ng-icon hlm size="sm" name="lucideChevronRight" />
@@ -172,7 +177,16 @@ export class RangeSelectorComponent {
   protected readonly customFrom = signal<MonthValue>({ year: new Date().getUTCFullYear(), month: 1 });
   protected readonly customTo = signal<MonthValue>(dateToMonthValue(new Date()));
 
-  protected readonly cannotStep = computed(() => this.value().kind === 'All');
+  protected readonly currentMonth: MonthValue = currentMonthValue(new Date());
+
+  protected readonly cannotStepBack = computed(() => this.value().kind === 'All');
+
+  protected readonly cannotStepForward = computed(() => {
+    const months = this.resolveMonthSpan();
+    if (!months) return true;
+    const nextToMonth = shiftMonthValue(months.toMonth, months.span);
+    return monthsBetween(nextToMonth, this.currentMonth) < 0;
+  });
 
   protected readonly rangeLabel = computed(() => {
     const pref = this.value();
@@ -232,25 +246,30 @@ export class RangeSelectorComponent {
   }
 
   protected step(direction: -1 | 1): void {
-    const pref = this.value();
-    if (pref.kind === 'All') return;
-    const today = new Date();
-    const window = pref.kind === 'Custom' && pref.from && pref.to
-      ? { from: parseIsoDate(pref.from), to: parseIsoDate(pref.to) }
-      : resolveWindow(pref, today);
-    if (!window?.from || !window.to) return;
-    // Snap to month boundaries before shifting so day-of-month overflow (e.g. Dec 31
-    // − 6 months → Jul 1 in raw Date math) cannot drift the window.
-    const fromMonth = dateToMonthValue(window.from);
-    const toMonth = dateToMonthValue(window.to);
-    const span = Math.max(1, monthsBetween(fromMonth, toMonth) + 1);
-    const nextFromMonth = shiftMonthValue(fromMonth, direction * span);
-    const nextToMonth = shiftMonthValue(toMonth, direction * span);
+    const months = this.resolveMonthSpan();
+    if (!months) return;
+    const nextFromMonth = shiftMonthValue(months.fromMonth, direction * months.span);
+    const nextToMonth = shiftMonthValue(months.toMonth, direction * months.span);
     this.valueChange.emit({
       kind: 'Custom',
       from: toIsoDate(monthValueToFromDate(nextFromMonth)),
       to: toIsoDate(monthValueToToDate(nextToMonth)),
     });
+  }
+
+  // Snap the active window to month boundaries before shifting so day-of-month
+  // overflow (e.g. Dec 31 − 6 months → Jul 1 in raw Date math) cannot drift it.
+  private resolveMonthSpan(): { fromMonth: MonthValue; toMonth: MonthValue; span: number } | null {
+    const pref = this.value();
+    if (pref.kind === 'All') return null;
+    const window = pref.kind === 'Custom' && pref.from && pref.to
+      ? { from: parseIsoDate(pref.from), to: parseIsoDate(pref.to) }
+      : resolveWindow(pref, new Date());
+    if (!window?.from || !window.to) return null;
+    const fromMonth = dateToMonthValue(window.from);
+    const toMonth = dateToMonthValue(window.to);
+    const span = Math.max(1, monthsBetween(fromMonth, toMonth) + 1);
+    return { fromMonth, toMonth, span };
   }
 
   private seedCustomEditFromValue(): void {

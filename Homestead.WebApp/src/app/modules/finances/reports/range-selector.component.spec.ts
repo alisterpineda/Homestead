@@ -131,20 +131,41 @@ describe('RangeSelectorComponent', () => {
     }
   });
 
-  it('chevron forward shifts ThreeMonths to the next calendar-aligned 3-month window', () => {
+  it('chevron forward is disabled for ThreeMonths because next window would be in the future', () => {
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.value.set({ kind: 'ThreeMonths' });
     fixture.detectChanges();
     const next = fixture.debugElement
       .queryAll(By.css('button'))
       .find(b => b.nativeElement.getAttribute('aria-label') === 'Next range')!;
+    expect(next.nativeElement.disabled).toBe(true);
+  });
+
+  it('chevron forward shifts a past Custom window to the next calendar-aligned window', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.componentInstance.value.set({ kind: 'Custom', from: '2025-01-01', to: '2025-03-31' });
+    fixture.detectChanges();
+    const next = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find(b => b.nativeElement.getAttribute('aria-label') === 'Next range')!;
+    expect(next.nativeElement.disabled).toBe(false);
     next.nativeElement.click();
     fixture.detectChanges();
     const emitted = fixture.componentInstance.lastEmitted!;
     expect(emitted.kind).toBe('Custom');
-    // Original window 2026-02-01 to 2026-04-30 → +3 months → 2026-05-01 to 2026-07-31.
-    expect(emitted.from).toBe('2026-05-01');
-    expect(emitted.to).toBe('2026-07-31');
+    expect(emitted.from).toBe('2025-04-01');
+    expect(emitted.to).toBe('2025-06-30');
+  });
+
+  it('chevron forward is disabled when the next stepped window would cross the current month', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    // Window ends Dec 2025; +12 → Dec 2026 which is past today (Apr 2026).
+    fixture.componentInstance.value.set({ kind: 'LastYear' });
+    fixture.detectChanges();
+    const next = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find(b => b.nativeElement.getAttribute('aria-label') === 'Next range')!;
+    expect(next.nativeElement.disabled).toBe(true);
   });
 
   it('chevron backward shifts ThreeMonths to the previous calendar-aligned 3-month window', () => {
