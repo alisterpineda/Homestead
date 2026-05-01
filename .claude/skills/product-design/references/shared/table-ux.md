@@ -104,11 +104,66 @@ Pseudo-code — exact APIs in `Homestead.WebApp/src/app/shared/components/sparta
 
 The shared `filterPanel` template means there is exactly one source of truth for the filter body across viewports.
 
+## Pagination — page-based numbered nav
+
+Standard pattern across Homestead tables: numbered pages with prev/next, in a footer row directly below the table. Not infinite scroll, not "load more", not cursor pagination (the latter is reserved for one specific high-volume case — see *Future considerations*).
+
+### Why this over alternatives
+
+- **vs infinite scroll.** Scroll position is fragile across navigation; browser back loses where you were; the footer can't carry progress chrome. Bad fit for "find a known record" tasks, which is most of what household members do in these tables.
+- **vs load-more.** No total to anchor expectations, no way to jump to the end, growing DOM penalises long sessions.
+- **vs cursor.** Cursor wins at very high volumes (millions of rows) by skipping the `COUNT(*)`. Household-scale tables don't reach those volumes — paying for a count is fine, and getting jump-to-page navigation in return is a clear win for findability.
+
+### Anatomy
+
+One footer row, three slots, all rendered by `<app-pagination>` (`shared/components/pagination/pagination.component.ts`). Don't roll a new pagination footer per page — extend the shared component if you need something it doesn't do.
+
+- **Leading — range indicator.** `Showing 1–50 of 327`, muted-foreground.
+- **Middle — page-size dropdown.** Options: `10 / page`, `20 / page`, `50 / page`, `100 / page`.
+- **Trailing — numbered nav.** `‹ prev`, page numbers (with `…` ellipses; strip caps at 7 items), `next ›`. Prev disabled on page 1; next disabled on last page.
+
+### State variants
+
+| State | Footer |
+|---|---|
+| Empty (`totalCount === 0`) | Hidden entirely. The empty canvas owns the screen — pagination chrome would just clutter it. |
+| Single page (`totalCount ≤ pageSize`) | Range indicator + page-size dropdown shown. Numbered nav hidden — there is nowhere to navigate to. |
+| Multi-page | Full footer. |
+| Selection active | Footer unchanged. Selection is a toolbar concern; bulk actions don't constrain navigation. |
+
+### Defaults & limits
+
+| | Value |
+|---|---|
+| Default page size | 50 |
+| Page-size options | 10 / 20 / 50 / 100 |
+| Backend max page size | 100 (clamped server-side in `PaginatedRequest`) |
+| Numbered-strip cap | 7 items including ellipses |
+
+### URL state & reset rule
+
+- **`page` and `pageSize` live in URL query params**, alongside filter/sort params. Same rationale as filters: shareable, refresh-safe, browser back/forward navigates pagination history.
+- **Filter and search changes reset `page=1`** while preserving `pageSize`. Don't strand the user on page 5 of a result set that no longer has 5 pages.
+- **Sort changes** preserve the page number — sorting a 50-row page is still a 50-row page; the user's reading position carries.
+
+### Page-size persistence
+
+The user's chosen page size persists across sessions via `UserPreferencesService.pageSize` (`homestead-page-size`). Treat the persisted value as the URL fallback when `?pageSize=` is absent — that way someone who prefers 100/page gets it on every table without re-selecting. The page number is *not* persisted; it always starts at 1 when the URL has no `?page=`.
+
+### Responsive behaviour
+
+The footer flex-wraps. On narrow viewports the numbered nav drops to a full-width row below the range/size row; the size dropdown stays compact. No icon-collapse — pagination chrome is small enough to coexist with mobile widths without progressive disclosure.
+
+### When NOT to paginate
+
+If a dataset is **intrinsically bounded** to fit comfortably in a single page (e.g., currencies — ~150 active ISO 4217 codes), fetch it all and sort client-side. Add a runtime guard that warns when `totalCount > pageSize` so you catch growth before users do. The canonical example is `finances/commodities.md`; copy that pattern rather than inventing a new one.
+
 ## Adopted patterns (already in place across the app)
 
 These are not future considerations — apply them in any new table.
 
 - **URL-encoded filter state.** Active filters and sort live in query params (`?tagIds=…&sortBy=…&sortDir=…`). Enables shareable filtered links, refresh-without-loss, and browser back/forward through filter history. .NET model binding handles this cleanly on the backend; on the frontend, read via `route.queryParamMap` and write via `router.navigate({ queryParamsHandling: 'merge' })`.
+- **URL-encoded pagination state.** `page` and `pageSize` live alongside filter/sort params. Filter/search changes reset `page=1`; sort changes preserve it. Page size also persists via `UserPreferencesService.pageSize` so the URL fallback respects user preference.
 - **Debounced search.** Search input is a writable signal; URL update is debounced 300ms. Don't fire on every keystroke.
 - **Persistent column visibility.** Use `persistedSignal()` (via `UserPreferencesService` for cross-cutting prefs) so column choices survive sessions.
 
@@ -117,6 +172,7 @@ These are not future considerations — apply them in any new table.
 - **Saved views.** Once a user lands on the same filter combination repeatedly, they want to save it (Linear Views, Airtable Views). Design any new toolbar with a slot for this — likely a tab strip above the toolbar — so adding it later doesn't force a layout rewrite. The existing per-list-state services that auto-restore last-used params (e.g. `DocumentListStateService`) are the seam this would extend.
 - **Filter presets.** Common queries become one-tap segmented controls above the toolbar (`All / Active / Archived`, `All / Cash / Investments`). Distinct from saved views — presets are app-level defaults, views are user-level.
 - **Chip-row pattern as an alternative.** Reserved for screens where filters change constantly and need permanent visibility (none in v1). If revisited: chip anatomy is `Property: Value ×`, multi-value collapses to count (`Tags: 3 ×`), always include the property name, `Clear all` at end of row, overflow handled by truncate-with-`+N more` popover (not wrap or scroll).
+- **Cursor pagination for unbounded tables.** The household-wide transactions list (`finances/transactions.md`) is the one identified case that may outgrow page-based numbered nav. When implemented, the cursor footer drops the total count and numbered strip in favour of `Showing X–Y` plus prev/next only — same shared component, swap the inputs. Treat this as a per-table override, not a replacement for the default.
 
 ## Quick reference
 
@@ -132,4 +188,11 @@ These are not future considerations — apply them in any new table.
 | Filter apply | Auto-apply on change |
 | Filter active indicator | Trigger label transforms (desktop) / count badge (mobile) |
 | Filter state location | URL query params |
+| Pagination type | Page-based numbered nav (cursor reserved for unbounded tables) |
+| Pagination location | Footer row below table (`<app-pagination>`) |
+| Default page size | 50 — options 10 / 20 / 50 / 100 |
+| Pagination state location | URL query params (`page`, `pageSize`) |
+| Page-size persistence | `UserPreferencesService.pageSize` — URL fallback |
+| Page reset rule | Filter/search → `page=1`; sort → preserve page |
+| Bounded datasets | Single fetch + client-side sort + runtime guard |
 | Mobile breakpoint | 768px (matches sidebar primitive) |
