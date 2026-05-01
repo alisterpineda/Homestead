@@ -16,7 +16,7 @@ public class DeleteCommodityPriceHandler(AppDbContext db, IAuditContext audit)
         if (price is null)
             return false;
 
-        price.Source.RequireManual("deleted");
+        price.Source.RequireDeletable();
 
         db.CommodityPrices.Remove(price);
         audit.Deleted("CommodityPrice", price.Id);

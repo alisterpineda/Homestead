@@ -48,4 +48,12 @@ public static class CommodityPriceSourceExtensions
             throw new BusinessRuleException(
                 $"Only manually entered prices can be {operation}.");
     }
+
+    public static void RequireDeletable(this CommodityPriceSource source)
+    {
+        if (source.Kind() == CommodityPriceSourceKind.Transaction)
+            throw new BusinessRuleException(
+                "Transaction-linked prices cannot be deleted directly. " +
+                "Edit or delete the source transaction instead.");
+    }
 }

@@ -517,7 +517,7 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task DeletePrice_BankOfCanadaSource_Returns400()
+    public async Task DeletePrice_BankOfCanadaSource_Returns204()
     {
         var client = await CreateAdminClientAsync();
         var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
@@ -526,6 +526,51 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
 
         var deleteResp = await client.DeleteAsync(
             $"/api/v1/finances/commodity-prices/{bocPriceId}", CT);
-        Assert.Equal(HttpStatusCode.BadRequest, deleteResp.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == bocPriceId, CT));
+    }
+
+    [Fact]
+    public async Task DeletePrice_AlphaVantageSource_Returns204()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var avPriceId = await SeedPriceAsync(usdId, cadId, PriceAtJan31, 1.3456m, CommodityPriceSource.AlphaVantage);
+
+        var deleteResp = await client.DeleteAsync(
+            $"/api/v1/finances/commodity-prices/{avPriceId}", CT);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == avPriceId, CT));
+    }
+
+    [Fact]
+    public async Task DeletePrice_ManualSource_Returns204()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices", new
+        {
+            commodityId = usdId,
+            quoteCurrencyId = cadId,
+            priceAt = PriceAtJan31,
+            rate = 1.3456m
+        }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<FinancePriceItem>(CT);
+
+        var deleteResp = await client.DeleteAsync(
+            $"/api/v1/finances/commodity-prices/{created!.Id}", CT);
+        Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == created.Id, CT));
     }
 }
