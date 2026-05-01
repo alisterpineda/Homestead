@@ -33,10 +33,16 @@ public class AlphaVantagePriceProviderTests
     private static Commodity Security(string symbol, string? exchange) =>
         new() { Id = Guid.NewGuid(), Symbol = symbol, Name = symbol, Kind = CommodityKind.Security, Exchange = exchange };
 
-    private static string DailyJson(params (string Date, string Close)[] rows)
+    private static string DailyJson(params (string Date, string Close)[] rows) =>
+        TimeSeriesJson("Time Series (Daily)", rows);
+
+    private static string WeeklyJson(params (string Date, string Close)[] rows) =>
+        TimeSeriesJson("Weekly Time Series", rows);
+
+    private static string TimeSeriesJson(string key, (string Date, string Close)[] rows)
     {
         var sb = new StringBuilder();
-        sb.Append("{ \"Time Series (Daily)\": {");
+        sb.Append("{ \"").Append(key).Append("\": {");
         for (var i = 0; i < rows.Length; i++)
         {
             if (i > 0) sb.Append(',');
@@ -139,7 +145,7 @@ public class AlphaVantagePriceProviderTests
     public async Task ImportAsync_SkipsCurrenciesAndNonSecurityKinds()
     {
         var (provider, handler, _) = CreateSut();
-        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"));
+        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"), ("2020-01-01", "95.00"));
 
         var usd = Currency("USD");
         var eur = Currency("EUR");
@@ -264,7 +270,8 @@ public class AlphaVantagePriceProviderTests
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
-        Assert.Contains("Rate limit reached after 1 of 3", result.Warning);
+        Assert.Contains("after 1 of 3", result.Warning);
+        Assert.Contains("rate limit is 25 requests per day", result.Warning);
         var obs = Assert.Single(result.Observations);
         Assert.Equal(aapl.Id, obs.CommodityId);
         Assert.Equal(2, handler.CallCount);
@@ -289,8 +296,31 @@ public class AlphaVantagePriceProviderTests
             TestContext.Current.CancellationToken);
 
         Assert.NotNull(result.Warning);
-        Assert.Contains("Rate limit reached after 1 of 2", result.Warning);
+        Assert.Contains("after 1 of 2", result.Warning);
+        Assert.Contains("Standard API call frequency exceeded", result.Warning);
         Assert.Single(result.Observations);
+    }
+
+    [Fact]
+    public async Task ImportAsync_PremiumGatedInformation_SurfacesActualApiMessage()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.QueueResponse("""{ "Information": "This is a premium endpoint. Subscribe to a paid plan." }""");
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl },
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.Warning);
+        Assert.Contains("premium endpoint", result.Warning);
+        Assert.DoesNotContain("Rate limit", result.Warning);
+        Assert.Empty(result.Observations);
     }
 
     [Fact]
@@ -348,7 +378,7 @@ public class AlphaVantagePriceProviderTests
     public async Task ImportAsync_ChoosesCompactOutputForRecentWindows()
     {
         var (provider, handler, _) = CreateSut();
-        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"));
+        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"), ("2020-01-01", "95.00"));
 
         var usd = Currency("USD");
         var aapl = Security("AAPL", "NASDAQ");
@@ -360,13 +390,16 @@ public class AlphaVantagePriceProviderTests
             TestContext.Current.CancellationToken);
 
         Assert.Contains("outputsize=compact", handler.LastRequestUrl);
+        Assert.Equal(1, handler.CallCount);
+        Assert.DoesNotContain(handler.RequestUrls, u => u.Contains("function=TIME_SERIES_WEEKLY"));
     }
 
     [Fact]
-    public async Task ImportAsync_ChoosesFullOutputForHistoricBackfill()
+    public async Task ImportAsync_HistoricBackfill_CallsWeeklyAfterDaily_NoOutputsizeOnWeekly()
     {
         var (provider, handler, _) = CreateSut();
-        handler.ResponseBody = DailyJson(("2020-01-02", "100.00"));
+        handler.QueueResponse(DailyJson(("2026-04-29", "100.00")));
+        handler.QueueResponse(WeeklyJson(("2025-08-15", "85.00")));
 
         var usd = Currency("USD");
         var aapl = Security("AAPL", "NASDAQ");
@@ -377,14 +410,142 @@ public class AlphaVantagePriceProviderTests
                 ConfigJson()),
             TestContext.Current.CancellationToken);
 
-        Assert.Contains("outputsize=full", handler.LastRequestUrl);
+        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(2, handler.RequestUrls.Count);
+        Assert.Contains("function=TIME_SERIES_DAILY", handler.RequestUrls[0]);
+        Assert.Contains("outputsize=compact", handler.RequestUrls[0]);
+        Assert.Contains("function=TIME_SERIES_WEEKLY", handler.RequestUrls[1]);
+        Assert.DoesNotContain("outputsize=", handler.RequestUrls[1]);
+    }
+
+    [Fact]
+    public async Task ImportAsync_HistoricRange_MergesDailyAndWeekly_NoDuplicatesOnOverlap()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.QueueResponse(DailyJson(
+            ("2026-04-29", "100.00"),
+            ("2026-03-27", "95.00"),
+            ("2026-02-13", "92.00"),
+            ("2026-01-30", "90.00"),
+            ("2026-01-15", "88.00")));
+        handler.QueueResponse(WeeklyJson(
+            ("2026-04-24", "100.00"),
+            ("2026-03-27", "95.00"),
+            ("2026-01-30", "90.00"),
+            ("2026-01-09", "87.00"),
+            ("2025-12-26", "84.00"),
+            ("2024-02-02", "70.00")));
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl },
+                new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        var dates = result.Observations.Select(o => o.PriceAt).ToList();
+
+        Assert.Contains(new DateTimeOffset(2026, 4, 29, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2026, 3, 27, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2026, 2, 13, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2026, 1, 30, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero), dates);
+
+        Assert.Contains(new DateTimeOffset(2026, 1, 9, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2025, 12, 26, 0, 0, 0, TimeSpan.Zero), dates);
+        Assert.Contains(new DateTimeOffset(2024, 2, 2, 0, 0, 0, TimeSpan.Zero), dates);
+
+        Assert.DoesNotContain(new DateTimeOffset(2026, 4, 24, 0, 0, 0, TimeSpan.Zero), dates);
+
+        Assert.Equal(dates.Count, dates.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task ImportAsync_HistoricRange_ClipsWeeklyToFromAt()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.QueueResponse(DailyJson(("2026-04-29", "100.00")));
+        handler.QueueResponse(WeeklyJson(
+            ("2025-08-15", "85.00"),
+            ("2024-12-27", "80.00"),
+            ("2024-02-02", "70.00"),
+            ("2018-03-30", "40.00"),
+            ("2010-05-07", "20.00"),
+            ("2006-01-06", "10.00")));
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+
+        var fromAt = new DateTimeOffset(2024, 5, 1, 0, 0, 0, TimeSpan.Zero);
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl },
+                fromAt,
+                new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.All(result.Observations, o => Assert.True(o.PriceAt >= fromAt,
+            $"observation at {o.PriceAt:O} predates FromAt {fromAt:O}"));
+
+        Assert.Contains(result.Observations, o => o.PriceAt == new DateTimeOffset(2025, 8, 15, 0, 0, 0, TimeSpan.Zero));
+        Assert.Contains(result.Observations, o => o.PriceAt == new DateTimeOffset(2024, 12, 27, 0, 0, 0, TimeSpan.Zero));
+        Assert.DoesNotContain(result.Observations, o => o.PriceAt == new DateTimeOffset(2024, 2, 2, 0, 0, 0, TimeSpan.Zero));
+        Assert.DoesNotContain(result.Observations, o => o.PriceAt == new DateTimeOffset(2018, 3, 30, 0, 0, 0, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public async Task ImportAsync_DailyEmpty_DoesNotCallWeekly()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.ResponseBody = "{}";
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl },
+                DateTimeOffset.UtcNow.AddYears(-2), DateTimeOffset.UtcNow,
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Observations);
+        Assert.Equal(1, handler.CallCount);
+        Assert.DoesNotContain(handler.RequestUrls, u => u.Contains("function=TIME_SERIES_WEEKLY"));
+    }
+
+    [Fact]
+    public async Task ImportAsync_RateLimitOnWeeklyCall_KeepsDailyAndReturnsPartial()
+    {
+        var (provider, handler, _) = CreateSut();
+        handler.QueueResponse(DailyJson(("2026-04-29", "172.34")));
+        handler.QueueResponse("""{ "Information": "Thank you for using Alpha Vantage! Our standard API rate limit is 25 requests per day." }""");
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+
+        var result = await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl },
+                new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.Warning);
+        Assert.Contains("rate limit is 25 requests per day", result.Warning);
+        var obs = Assert.Single(result.Observations);
+        Assert.Equal(aapl.Id, obs.CommodityId);
+        Assert.Equal(172.34m, obs.Rate);
+        Assert.Equal(2, handler.CallCount);
     }
 
     [Fact]
     public async Task ImportAsync_PacesCallsBetweenSymbols()
     {
         var (provider, handler, delays) = CreateSut();
-        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"));
+        handler.ResponseBody = DailyJson(("2026-04-29", "100.00"), ("2020-01-01", "95.00"));
 
         var usd = Currency("USD");
         var aapl = Security("AAPL", "NASDAQ");
@@ -400,6 +561,31 @@ public class AlphaVantagePriceProviderTests
         Assert.Equal(2, delays.Count);
         Assert.All(delays, d => Assert.Equal(TimeSpan.FromSeconds(12), d));
         Assert.Equal(3, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task ImportAsync_PacesCallsBetweenEveryRequest_HistoricRange()
+    {
+        var (provider, handler, delays) = CreateSut();
+        handler.QueueResponse(DailyJson(("2026-04-29", "100.00")));
+        handler.QueueResponse(WeeklyJson(("2025-08-15", "85.00")));
+        handler.QueueResponse(DailyJson(("2026-04-29", "200.00")));
+        handler.QueueResponse(WeeklyJson(("2025-08-15", "180.00")));
+
+        var usd = Currency("USD");
+        var aapl = Security("AAPL", "NASDAQ");
+        var msft = Security("MSFT", "NASDAQ");
+
+        await provider.ImportAsync(
+            new PriceImportRequest(new[] { usd, aapl, msft },
+                new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
+                ConfigJson()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, delays.Count);
+        Assert.All(delays, d => Assert.Equal(TimeSpan.FromSeconds(12), d));
+        Assert.Equal(4, handler.CallCount);
     }
 
     [Fact]
@@ -442,6 +628,7 @@ public class AlphaVantagePriceProviderTests
 
         public string ResponseBody { get; set; } = """{ "Time Series (Daily)": {} }""";
         public string LastRequestUrl { get; private set; } = string.Empty;
+        public List<string> RequestUrls { get; } = new();
         public int CallCount { get; private set; }
 
         public void QueueResponse(string body) => _queue.Enqueue(body);
@@ -449,7 +636,9 @@ public class AlphaVantagePriceProviderTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             CallCount++;
-            LastRequestUrl = request.RequestUri?.ToString() ?? string.Empty;
+            var url = request.RequestUri?.ToString() ?? string.Empty;
+            LastRequestUrl = url;
+            RequestUrls.Add(url);
             var body = _queue.Count > 0 ? _queue.Dequeue() : ResponseBody;
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {

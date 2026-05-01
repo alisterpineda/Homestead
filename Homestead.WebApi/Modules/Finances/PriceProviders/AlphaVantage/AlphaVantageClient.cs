@@ -26,4 +26,23 @@ public class AlphaVantageClient(HttpClient httpClient)
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
         return await JsonSerializer.DeserializeAsync<AlphaVantageDailyResponse>(stream, _jsonOptions, ct);
     }
+
+    public async Task<AlphaVantageWeeklyResponse?> GetWeeklyTimeSeriesAsync(
+        Uri baseUrl,
+        string symbol,
+        string apiKey,
+        CancellationToken ct)
+    {
+        var baseStr = baseUrl.ToString();
+        var separator = baseStr.Contains('?') ? '&' : '?';
+        var url = $"{baseStr}{separator}function=TIME_SERIES_WEEKLY"
+            + $"&symbol={Uri.EscapeDataString(symbol)}"
+            + $"&apikey={Uri.EscapeDataString(apiKey)}";
+
+        using var response = await httpClient.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        return await JsonSerializer.DeserializeAsync<AlphaVantageWeeklyResponse>(stream, _jsonOptions, ct);
+    }
 }

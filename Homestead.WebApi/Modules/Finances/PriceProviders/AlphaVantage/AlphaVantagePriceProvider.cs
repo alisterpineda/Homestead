@@ -104,48 +104,92 @@ public class AlphaVantagePriceProvider : IPriceProvider
         if (resolved.Count == 0)
             return PriceImportResult.Success(Array.Empty<PriceObservation>());
 
-        var now = DateTimeOffset.UtcNow;
-        var outputsize = request.FromAt >= now.AddDays(-100) ? "compact" : "full";
-
         var observations = new List<PriceObservation>();
         var failed = new List<string>();
         var successCount = 0;
 
         for (var i = 0; i < resolved.Count; i++)
         {
+            var (security, quote) = resolved[i];
+            var apiSymbol = ToApiSymbol(security);
+
             if (i > 0)
                 await _delay(_interCallDelay, ct);
 
-            var (security, quote) = resolved[i];
-            var apiSymbol = ToApiSymbol(security);
-            var response = await _client.GetDailyTimeSeriesAsync(
-                baseUri, apiSymbol, config.ApiKey!, outputsize, ct);
+            var dailyResponse = await _client.GetDailyTimeSeriesAsync(
+                baseUri, apiSymbol, config.ApiKey!, "compact", ct);
 
-            if (response is null)
+            if (dailyResponse is null)
             {
                 failed.Add(security.Symbol);
                 continue;
             }
 
-            if (!string.IsNullOrEmpty(response.Information) || !string.IsNullOrEmpty(response.Note))
+            if (TryGetApiBlockMessage(dailyResponse.Information, dailyResponse.Note) is { } dailyBlock)
             {
-                var warning = $"Rate limit reached after {successCount} of {resolved.Count} securities; remaining will retry next run.";
+                var warning = $"AlphaVantage stopped responding after {successCount} of {resolved.Count} securities: {dailyBlock}";
                 return PriceImportResult.Partial(observations, warning);
             }
 
-            if (!string.IsNullOrEmpty(response.ErrorMessage))
+            if (!string.IsNullOrEmpty(dailyResponse.ErrorMessage))
             {
                 failed.Add(security.Symbol);
                 continue;
             }
 
-            if (response.TimeSeriesDaily is not null)
+            DateTimeOffset? dailyEarliest = null;
+            if (dailyResponse.TimeSeriesDaily is not null)
             {
-                foreach (var (dateStr, dayEl) in response.TimeSeriesDaily)
+                foreach (var (dateStr, dayEl) in dailyResponse.TimeSeriesDaily)
                 {
-                    var observation = TryParseObservation(security.Id, quote.Id, dateStr, dayEl, request.FromAt, request.ToAt);
+                    if (TryParseDate(dateStr) is not { } priceAt)
+                        continue;
+                    if (dailyEarliest is null || priceAt < dailyEarliest.Value)
+                        dailyEarliest = priceAt;
+
+                    var observation = TryParseObservation(security.Id, quote.Id, priceAt, dayEl, request.FromAt, request.ToAt);
                     if (observation is not null)
                         observations.Add(observation);
+                }
+            }
+
+            if (dailyEarliest is { } earliest && request.FromAt < earliest)
+            {
+                await _delay(_interCallDelay, ct);
+
+                var weeklyResponse = await _client.GetWeeklyTimeSeriesAsync(
+                    baseUri, apiSymbol, config.ApiKey!, ct);
+
+                if (weeklyResponse is null)
+                {
+                    successCount++;
+                    continue;
+                }
+
+                if (TryGetApiBlockMessage(weeklyResponse.Information, weeklyResponse.Note) is { } weeklyBlock)
+                {
+                    var warning = $"AlphaVantage stopped responding after {successCount} of {resolved.Count} securities: {weeklyBlock}";
+                    return PriceImportResult.Partial(observations, warning);
+                }
+
+                if (!string.IsNullOrEmpty(weeklyResponse.ErrorMessage))
+                {
+                    successCount++;
+                    continue;
+                }
+
+                if (weeklyResponse.TimeSeriesWeekly is not null)
+                {
+                    foreach (var (dateStr, dayEl) in weeklyResponse.TimeSeriesWeekly)
+                    {
+                        if (TryParseDate(dateStr) is not { } priceAt)
+                            continue;
+                        if (priceAt >= earliest)
+                            continue;
+                        var observation = TryParseObservation(security.Id, quote.Id, priceAt, dayEl, request.FromAt, request.ToAt);
+                        if (observation is not null)
+                            observations.Add(observation);
+                    }
                 }
             }
 
@@ -158,24 +202,36 @@ public class AlphaVantagePriceProvider : IPriceProvider
         return PriceImportResult.Success(observations);
     }
 
+    private static string? TryGetApiBlockMessage(string? information, string? note)
+    {
+        if (!string.IsNullOrWhiteSpace(information))
+            return information.Trim();
+        if (!string.IsNullOrWhiteSpace(note))
+            return note.Trim();
+        return null;
+    }
+
     private static string ToApiSymbol(Commodity security) =>
         security.Exchange is { } ex && _exchangeToApiSuffix.TryGetValue(ex, out var suffix)
             ? security.Symbol + suffix
             : security.Symbol;
 
-    private static PriceObservation? TryParseObservation(
-        Guid securityId,
-        Guid quoteCurrencyId,
-        string dateStr,
-        JsonElement dayEl,
-        DateTimeOffset fromAt,
-        DateTimeOffset toAt)
+    private static DateTimeOffset? TryParseDate(string dateStr)
     {
         if (!DateOnly.TryParseExact(dateStr, "yyyy-MM-dd", CultureInfo.InvariantCulture,
                 DateTimeStyles.None, out var date))
             return null;
+        return new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+    }
 
-        var priceAt = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+    private static PriceObservation? TryParseObservation(
+        Guid securityId,
+        Guid quoteCurrencyId,
+        DateTimeOffset priceAt,
+        JsonElement dayEl,
+        DateTimeOffset fromAt,
+        DateTimeOffset toAt)
+    {
         if (priceAt < fromAt || priceAt > toAt)
             return null;
 

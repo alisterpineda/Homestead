@@ -17,3 +17,18 @@ public class AlphaVantageDailyResponse
     [JsonPropertyName("Error Message")]
     public string? ErrorMessage { get; set; }
 }
+
+public class AlphaVantageWeeklyResponse
+{
+    [JsonPropertyName("Weekly Time Series")]
+    public Dictionary<string, JsonElement>? TimeSeriesWeekly { get; set; }
+
+    [JsonPropertyName("Information")]
+    public string? Information { get; set; }
+
+    [JsonPropertyName("Note")]
+    public string? Note { get; set; }
+
+    [JsonPropertyName("Error Message")]
+    public string? ErrorMessage { get; set; }
+}
