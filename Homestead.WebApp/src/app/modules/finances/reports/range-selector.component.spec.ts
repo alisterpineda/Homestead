@@ -4,6 +4,7 @@ import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RangeSelectorComponent } from './range-selector.component';
 import { resolveWindow } from './resolve-window';
+import { localIsoDate } from '../shared/date';
 import type { NetWorthRangePref } from '@/shared/services/user-preferences.service';
 
 @Component({
@@ -29,42 +30,45 @@ class HostComponent {
   }
 }
 
-const FIXED_DATE = new Date('2026-04-30T12:00:00Z');
+// Local-constructed fixed date so date math is stable regardless of CI runner TZ.
+const FIXED_DATE = new Date(2026, 3, 30, 12, 0, 0);
+
+const iso = (d: Date | null | undefined): string | null => (d ? localIsoDate(d) : null);
 
 describe('resolveWindow', () => {
   it('ThisMonth runs from first-of-month to today', () => {
     const w = resolveWindow({ kind: 'ThisMonth' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2026-04-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2026-04-30');
+    expect(iso(w.from)).toBe('2026-04-01');
+    expect(iso(w.to)).toBe('2026-04-30');
   });
 
   it('ThreeMonths spans the last three calendar months including current', () => {
     const w = resolveWindow({ kind: 'ThreeMonths' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2026-02-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2026-04-30');
+    expect(iso(w.from)).toBe('2026-02-01');
+    expect(iso(w.to)).toBe('2026-04-30');
   });
 
   it('SixMonths spans the last six calendar months including current', () => {
     const w = resolveWindow({ kind: 'SixMonths' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2025-11-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2026-04-30');
+    expect(iso(w.from)).toBe('2025-11-01');
+    expect(iso(w.to)).toBe('2026-04-30');
   });
 
   it('TwelveMonths spans the last twelve calendar months including current', () => {
     const w = resolveWindow({ kind: 'TwelveMonths' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2025-05-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2026-04-30');
+    expect(iso(w.from)).toBe('2025-05-01');
+    expect(iso(w.to)).toBe('2026-04-30');
   });
 
   it('YearToDate starts at Jan 1', () => {
     const w = resolveWindow({ kind: 'YearToDate' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2026-01-01');
+    expect(iso(w.from)).toBe('2026-01-01');
   });
 
   it('LastYear spans Jan 1 to Dec 31 of prior year', () => {
     const w = resolveWindow({ kind: 'LastYear' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2025-01-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2025-12-31');
+    expect(iso(w.from)).toBe('2025-01-01');
+    expect(iso(w.to)).toBe('2025-12-31');
   });
 
   it('All returns nulls (caller falls back to server window)', () => {
@@ -75,8 +79,8 @@ describe('resolveWindow', () => {
 
   it('Custom passes through ISO bounds', () => {
     const w = resolveWindow({ kind: 'Custom', from: '2025-05-01', to: '2025-08-31' }, FIXED_DATE)!;
-    expect(w.from?.toISOString().slice(0, 10)).toBe('2025-05-01');
-    expect(w.to?.toISOString().slice(0, 10)).toBe('2025-08-31');
+    expect(iso(w.from)).toBe('2025-05-01');
+    expect(iso(w.to)).toBe('2025-08-31');
   });
 });
 

@@ -8,31 +8,33 @@ export interface ResolvedWindow {
 /**
  * Mirrors `GetNetWorthHistoryHandler.ResolveRange` so the selector can render the
  * label and chevron-step math without waiting for the server. `from`/`to` are
- * Date objects in UTC. For `All`, both are null — the caller falls back to the
- * server's response window.
+ * `Date`s pinned to local midnight — the formatter and ECharts both render in
+ * local TZ, so anchoring "today" to the user's wall clock keeps the label and
+ * axis bounds aligned with what they expect. For `All`, both are null — the
+ * caller falls back to the server's response window.
  */
 export function resolveWindow(pref: NetWorthRangePref, today: Date): ResolvedWindow | null {
-  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   switch (pref.kind) {
     case 'ThisMonth': {
-      const from = new Date(Date.UTC(todayUtc.getUTCFullYear(), todayUtc.getUTCMonth(), 1));
-      return { from, to: todayUtc };
+      const from = new Date(todayLocal.getFullYear(), todayLocal.getMonth(), 1);
+      return { from, to: todayLocal };
     }
     case 'ThreeMonths':
-      return priorCalendarMonthsWindow(todayUtc, 3);
+      return priorCalendarMonthsWindow(todayLocal, 3);
     case 'SixMonths':
-      return priorCalendarMonthsWindow(todayUtc, 6);
+      return priorCalendarMonthsWindow(todayLocal, 6);
     case 'TwelveMonths':
-      return priorCalendarMonthsWindow(todayUtc, 12);
+      return priorCalendarMonthsWindow(todayLocal, 12);
     case 'YearToDate': {
-      const from = new Date(Date.UTC(todayUtc.getUTCFullYear(), 0, 1));
-      return { from, to: todayUtc };
+      const from = new Date(todayLocal.getFullYear(), 0, 1);
+      return { from, to: todayLocal };
     }
     case 'LastYear': {
-      const year = todayUtc.getUTCFullYear() - 1;
+      const year = todayLocal.getFullYear() - 1;
       return {
-        from: new Date(Date.UTC(year, 0, 1)),
-        to: new Date(Date.UTC(year, 11, 31)),
+        from: new Date(year, 0, 1),
+        to: new Date(year, 11, 31),
       };
     }
     case 'All':
@@ -40,8 +42,8 @@ export function resolveWindow(pref: NetWorthRangePref, today: Date): ResolvedWin
     case 'Custom': {
       if (!pref.from || !pref.to) return null;
       return {
-        from: new Date(`${pref.from}T00:00:00Z`),
-        to: new Date(`${pref.to}T00:00:00Z`),
+        from: new Date(`${pref.from}T00:00:00`),
+        to: new Date(`${pref.to}T00:00:00`),
       };
     }
   }
@@ -50,10 +52,10 @@ export function resolveWindow(pref: NetWorthRangePref, today: Date): ResolvedWin
 // Calendar-aligned window of the last N calendar months including the current
 // month. Mirrors the backend's PriorCalendarMonthsWindow.
 function priorCalendarMonthsWindow(today: Date, months: number): ResolvedWindow {
-  const year = today.getUTCFullYear();
-  const month = today.getUTCMonth();
-  const from = new Date(Date.UTC(year, month - (months - 1), 1));
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const from = new Date(year, month - (months - 1), 1);
   // (year, month + 1, 0) → last day of current month
-  const to = new Date(Date.UTC(year, month + 1, 0));
+  const to = new Date(year, month + 1, 0);
   return { from, to };
 }

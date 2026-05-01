@@ -29,7 +29,9 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
             .Take(request.PageSize)
             .ToListAsync(ct);
 
-        var ctx = await valuations.LoadContextAsync(ct);
+        var ctx = request.AsOf is { } asOf
+            ? await valuations.LoadContextAsync(asOf, ct)
+            : await valuations.LoadContextAsync(ct);
         var values = await valuations.ValueAccountsAsync(pageItems, ctx, ct);
 
         var pageIds = pageItems.Select(a => a.Id).ToHashSet();

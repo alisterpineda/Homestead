@@ -116,6 +116,20 @@ public class ValuationServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LoadContextAsync_NormalizesNonUtcAsOfToUtc()
+    {
+        // Npgsql's `timestamp with time zone` requires offset 0 — local-offset values
+        // from the frontend (e.g. -06:00) must be normalized before any EF query runs.
+        await SetDisplayCurrencyAsync(_cad.Id);
+        var localOffset = new DateTimeOffset(2026, 5, 1, 23, 59, 59, 999, TimeSpan.FromHours(-6));
+
+        var ctx = await _sut.LoadContextAsync(localOffset, TestContext.Current.CancellationToken);
+
+        Assert.Equal(TimeSpan.Zero, ctx.AsOf.Offset);
+        Assert.Equal(localOffset.UtcDateTime, ctx.AsOf.UtcDateTime);
+    }
+
+    [Fact]
     public async Task ResolveRate_DirectLookup()
     {
         // 1 USD = 1.35 CAD

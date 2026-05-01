@@ -22,23 +22,25 @@ describe('FinancesAccountApiService', () => {
 
   afterEach(() => httpTesting.verify());
 
-  it('getAccounts sends GET and unwraps body', () => {
+  it('getAccounts sends GET with AsOf query and unwraps body', () => {
     const mockBody = { items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 };
     service.getAccounts({ Page: 1, PageSize: 50 }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
     const req = httpTesting.expectOne(r => r.url === '/api/v1/finances/accounts');
     expect(req.request.method).toBe('GET');
+    expect(req.request.params.has('AsOf')).toBe(true);
     req.flush(mockBody);
   });
 
-  it('getAccount sends GET with path param', () => {
+  it('getAccount sends GET with path param and AsOf query', () => {
     const mockBody = { id: 'abc', name: 'Chequing' };
     service.getAccount({ id: 'abc' }).subscribe(result => {
       expect(result).toEqual(mockBody);
     });
-    const req = httpTesting.expectOne('/api/v1/finances/accounts/abc');
+    const req = httpTesting.expectOne(r => r.url === '/api/v1/finances/accounts/abc');
     expect(req.request.method).toBe('GET');
+    expect(req.request.params.has('AsOf')).toBe(true);
     req.flush(mockBody);
   });
 

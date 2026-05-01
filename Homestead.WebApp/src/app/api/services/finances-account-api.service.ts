@@ -12,6 +12,7 @@ import { getAccountPositions } from '@/api/generated/fn/finances/get-account-pos
 import type { PaginatedResponseOfAccountResponse } from '@/api/generated/models/paginated-response-of-account-response';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { PositionResponse } from '@/api/generated/models/position-response';
+import { localEndOfTodayIso } from '@/modules/finances/shared/date';
 
 export type { GetAccounts$Params } from '@/api/generated/fn/finances/get-accounts';
 export type { GetAccount$Params } from '@/api/generated/fn/finances/get-account';
@@ -26,11 +27,13 @@ export class FinancesAccountApiService {
   private config = inject(ApiConfiguration);
 
   getAccounts(params: Parameters<typeof getAccounts>[2]): Observable<PaginatedResponseOfAccountResponse> {
-    return getAccounts(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+    const withAsOf = { AsOf: localEndOfTodayIso(), ...params };
+    return getAccounts(this.http, this.config.rootUrl, withAsOf).pipe(map(r => r.body));
   }
 
   getAccount(params: Parameters<typeof getAccount>[2]): Observable<AccountResponse> {
-    return getAccount(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+    const withAsOf = { AsOf: localEndOfTodayIso(), ...params };
+    return getAccount(this.http, this.config.rootUrl, withAsOf).pipe(map(r => r.body));
   }
 
   createAccount(params: Parameters<typeof createAccount>[2]): Observable<AccountResponse> {

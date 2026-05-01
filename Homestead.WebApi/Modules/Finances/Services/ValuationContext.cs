@@ -10,14 +10,22 @@ public sealed class ValuationContext
     internal ValuationContext(
         Guid? displayCurrencyId,
         Dictionary<(Guid Commodity, Guid Quote), IReadOnlyList<CommodityPrice>> prices,
-        HashSet<Guid> commodityIds)
+        HashSet<Guid> commodityIds,
+        DateTimeOffset asOf)
     {
         DisplayCurrencyId = displayCurrencyId;
         _prices = prices;
         _commodityIds = commodityIds;
+        AsOf = asOf;
     }
 
     public Guid? DisplayCurrencyId { get; }
+
+    /// <summary>
+    /// Cutoff used to load this context — transaction-inclusion queries should agree
+    /// with this so the price cutoff and the holdings cutoff are aligned.
+    /// </summary>
+    public DateTimeOffset AsOf { get; }
 
     public decimal? ConvertToDisplay(Guid commodityId, decimal quantity) =>
         ConvertToDisplayAsOf(commodityId, quantity, DateTimeOffset.MaxValue);

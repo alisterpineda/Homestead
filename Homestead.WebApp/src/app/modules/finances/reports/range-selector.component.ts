@@ -6,6 +6,7 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmButton } from '@/shared/components/spartan/button';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
 import type { NetWorthRangePref } from '@/shared/services/user-preferences.service';
+import { localIsoDate } from '../shared/date';
 import { MonthPickerComponent, type MonthValue } from './month-picker.component';
 import { resolveWindow } from './resolve-window';
 
@@ -27,29 +28,22 @@ const PRESETS: readonly PresetOption[] = [
 
 const RANGE_LABEL_FORMATTER = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
 
-function toIsoDate(d: Date): string {
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function parseIsoDate(iso: string): Date | null {
-  const parsed = new Date(`${iso}T00:00:00Z`);
+  const parsed = new Date(`${iso}T00:00:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function dateToMonthValue(d: Date): MonthValue {
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
 function monthValueToFromDate(v: MonthValue): Date {
-  return new Date(Date.UTC(v.year, v.month - 1, 1));
+  return new Date(v.year, v.month - 1, 1);
 }
 
 function monthValueToToDate(v: MonthValue): Date {
   // Last day of the month
-  return new Date(Date.UTC(v.year, v.month, 0));
+  return new Date(v.year, v.month, 0);
 }
 
 function shiftMonthValue(v: MonthValue, deltaMonths: number): MonthValue {
@@ -62,7 +56,7 @@ function monthsBetween(a: MonthValue, b: MonthValue): number {
 }
 
 function currentMonthValue(today: Date): MonthValue {
-  return { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1 };
+  return { year: today.getFullYear(), month: today.getMonth() + 1 };
 }
 
 @Component({
@@ -174,7 +168,7 @@ export class RangeSelectorComponent {
   protected readonly presets = PRESETS;
   protected readonly popoverState = signal<'open' | 'closed'>('closed');
   protected readonly isCustomMode = signal(false);
-  protected readonly customFrom = signal<MonthValue>({ year: new Date().getUTCFullYear(), month: 1 });
+  protected readonly customFrom = signal<MonthValue>({ year: new Date().getFullYear(), month: 1 });
   protected readonly customTo = signal<MonthValue>(dateToMonthValue(new Date()));
 
   protected readonly currentMonth: MonthValue = currentMonthValue(new Date());
@@ -241,7 +235,7 @@ export class RangeSelectorComponent {
     const from = monthValueToFromDate(this.customFrom());
     const to = monthValueToToDate(this.customTo());
     if (from > to) return;
-    this.valueChange.emit({ kind: 'Custom', from: toIsoDate(from), to: toIsoDate(to) });
+    this.valueChange.emit({ kind: 'Custom', from: localIsoDate(from), to: localIsoDate(to) });
     this.popoverState.set('closed');
   }
 
@@ -252,8 +246,8 @@ export class RangeSelectorComponent {
     const nextToMonth = shiftMonthValue(months.toMonth, direction * months.span);
     this.valueChange.emit({
       kind: 'Custom',
-      from: toIsoDate(monthValueToFromDate(nextFromMonth)),
-      to: toIsoDate(monthValueToToDate(nextToMonth)),
+      from: localIsoDate(monthValueToFromDate(nextFromMonth)),
+      to: localIsoDate(monthValueToToDate(nextToMonth)),
     });
   }
 

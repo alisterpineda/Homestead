@@ -80,7 +80,7 @@ export class NetWorthChartComponent {
         {
           type: 'line',
           smooth: true,
-          showSymbol: false,
+          showSymbol: this.points().length <= 1,
           connectNulls: false,
           data,
           lineStyle: { color: colors.primary, width: 2 },

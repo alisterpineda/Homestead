@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { switchMap, tap } from 'rxjs';
+import { EMPTY, switchMap, tap } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert, lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -12,11 +12,13 @@ import { FinancesReportsApiService } from '@/api/services/finances-reports-api.s
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
+import { localIsoDate } from '../shared/date';
 import { RangeSelectorComponent } from './range-selector.component';
 import { NetWorthChartComponent } from './net-worth-chart.component';
 import { NetWorthEmptyStateComponent } from './net-worth-empty-state.component';
 import type { NetWorthEmptyReason } from './net-worth-empty-state.component';
 import type { GetNetWorthHistoryResponse } from '@/api/generated/models/get-net-worth-history-response';
+import { resolveWindow } from './resolve-window';
 
 @Component({
   selector: 'app-reports-page',
@@ -96,8 +98,8 @@ import type { GetNetWorthHistoryResponse } from '@/api/generated/models/get-net-
               [points]="response.points"
               [granularity]="response.granularity"
               [displayCurrencySymbol]="response.displayCurrencySymbol ?? null"
-              [xAxisMin]="response.from ?? null"
-              [xAxisMax]="response.to"
+              [xAxisMin]="chartXAxisMin()"
+              [xAxisMax]="chartXAxisMax()"
             />
           </section>
         }
@@ -114,25 +116,45 @@ export class ReportsPageComponent {
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
 
+  protected readonly resolvedWindow = computed(() => {
+    const pref = this.range();
+    if (pref.kind === 'All') return null;
+    return resolveWindow(pref, new Date());
+  });
+
   protected readonly data = toSignal<GetNetWorthHistoryResponse | null, GetNetWorthHistoryResponse | null>(
     toObservable(this.range).pipe(
       tap(() => {
         this.loading.set(true);
         this.error.set(false);
       }),
-      switchMap(pref =>
-        this.reportsApi.getNetWorthHistory({
-          Range: pref.kind,
-          FromDate: pref.kind === 'Custom' ? pref.from : undefined,
-          ToDate: pref.kind === 'Custom' ? pref.to : undefined,
-        }).pipe(
+      switchMap(pref => {
+        const params = pref.kind === 'All'
+          ? { Range: 'All' as const }
+          : this.customRangeParams();
+        if (!params) return EMPTY;
+        return this.reportsApi.getNetWorthHistory(params).pipe(
           tap(() => this.loading.set(false)),
           handleQueryError(this.loading, this.error, null),
-        ),
-      ),
+        );
+      }),
     ),
     { initialValue: null },
   );
+
+  protected readonly chartXAxisMin = computed(
+    () => this.resolvedWindow()?.from?.toISOString() ?? this.data()?.from ?? null,
+  );
+
+  protected readonly chartXAxisMax = computed(
+    () => this.resolvedWindow()?.to?.toISOString() ?? this.data()?.to ?? null,
+  );
+
+  private customRangeParams(): { Range: 'Custom'; FromDate: string; ToDate: string } | null {
+    const w = this.resolvedWindow();
+    if (!w?.from || !w.to) return null;
+    return { Range: 'Custom', FromDate: localIsoDate(w.from), ToDate: localIsoDate(w.to) };
+  }
 
   protected readonly emptyReason = computed<NetWorthEmptyReason | null>(() => {
     const r = this.data()?.reason;

@@ -16,7 +16,9 @@ public class GetAccountHandler(AppDbContext db, IValuationService valuations)
 
         if (account is null) return null;
 
-        var ctx = await valuations.LoadContextAsync(ct);
+        var ctx = request.AsOf is { } asOf
+            ? await valuations.LoadContextAsync(asOf, ct)
+            : await valuations.LoadContextAsync(ct);
         var valuation = await valuations.ValueAccountAsync(account, ctx, ct);
         var hasTransactions = await db.AccountTransactionSplits
             .AsNoTracking()

@@ -11,12 +11,14 @@ import { AccountResponse } from '../../models/account-response';
 
 export interface GetAccount$Params {
   id: string;
+  AsOf?: string;
 }
 
 export function getAccount(http: HttpClient, rootUrl: string, params: GetAccount$Params, context?: HttpContext): Observable<StrictHttpResponse<AccountResponse>> {
   const rb = new RequestBuilder(rootUrl, getAccount.PATH, 'get');
   if (params) {
     rb.path('id', params.id, {});
+    rb.query('AsOf', params.AsOf, {});
   }
 
   return http.request(

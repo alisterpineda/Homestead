@@ -13,6 +13,7 @@ import { PaginatedResponseOfAccountResponse } from '../../models/paginated-respo
 export interface GetAccounts$Params {
   Kind?: AccountKind;
   IncludeArchived?: boolean;
+  AsOf?: string;
   Page: number;
   PageSize: number;
 }
@@ -22,6 +23,7 @@ export function getAccounts(http: HttpClient, rootUrl: string, params: GetAccoun
   if (params) {
     rb.query('Kind', params.Kind, {});
     rb.query('IncludeArchived', params.IncludeArchived, {});
+    rb.query('AsOf', params.AsOf, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

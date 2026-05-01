@@ -13,6 +13,9 @@ public class ValuationService(AppDbContext db) : IValuationService
 
     public async Task<ValuationContext> LoadContextAsync(DateTimeOffset asOf, CancellationToken ct)
     {
+        // Npgsql's `timestamp with time zone` requires UTC offset; the instant is unchanged.
+        asOf = asOf.ToUniversalTime();
+
         var settings = await FinanceSettings.LoadAsync(db, ct);
         var displayCurrencyId = settings.DisplayCurrencyId;
 
@@ -36,13 +39,13 @@ public class ValuationService(AppDbContext db) : IValuationService
         }
         if (displayCurrencyId is { } d) ids.Add(d);
 
-        return new ValuationContext(displayCurrencyId, table, ids);
+        return new ValuationContext(displayCurrencyId, table, ids, asOf);
     }
 
     public async Task<AccountValuation> ValueAccountAsync(
         Account account, ValuationContext ctx, CancellationToken ct)
     {
-        var cutoff = CurrentDayCutoffUtc();
+        var cutoff = ctx.AsOf;
         var rows = await db.AccountTransactionSplits
             .AsNoTracking()
             .Where(s => s.AccountId == account.Id && s.Transaction.OccurredAt <= cutoff)
@@ -67,7 +70,7 @@ public class ValuationService(AppDbContext db) : IValuationService
             return new Dictionary<Guid, AccountValuation>();
 
         var ids = accounts.Select(a => a.Id).ToHashSet();
-        var cutoff = CurrentDayCutoffUtc();
+        var cutoff = ctx.AsOf;
 
         var rows = await db.AccountTransactionSplits
             .AsNoTracking()

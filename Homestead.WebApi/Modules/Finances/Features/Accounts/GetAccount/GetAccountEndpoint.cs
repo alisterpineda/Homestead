@@ -6,9 +6,12 @@ public static class GetAccountEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (
+            [AsParameters] GetAccountQuery request,
+            ISender sender,
+            CancellationToken ct) =>
         {
-            var response = await sender.Send(new GetAccountQuery(id), ct);
+            var response = await sender.Send(request, ct);
             return response is not null ? Results.Ok(response) : Results.NotFound();
         })
         .WithName("GetAccount")
