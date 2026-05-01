@@ -15,13 +15,13 @@ The data-layer invariant is **per-commodity weight balance**: for every commodit
 
 Each split contributes one weight, to exactly one commodity. Same-commodity transactions (transfer within a currency, dividend, balance entry on any commodity) balance trivially per-commodity because every split's weight is in the same commodity and they net to zero. Cross-commodity transactions (cross-currency transfer, buy, sell, DRIP's buy half, optionally-priced security opening balance) rely on at least one annotation to bridge the commodities so both sides resolve to weights in the same quote currency.
 
-Stock splits are the only declared exception: quantities intentionally do not sum to zero, and no price annotation is present.
+The invariant has no exceptions in v1. Quantity-changing events that don't naturally balance (corporate actions like stock splits) are out of scope for v1 and, when added, will be modelled per-commodity rather than as transactions — see [overview.md](overview.md#future-compatibility).
 
 Users never create "transactions" directly. They pick a **shape** — Transfer, Investment Buy, Dividend, ... — which the server expands into the underlying balanced transaction. Users never see the words "split", "annotation", "debit", or "credit" in v1. The shape catalogue is closed; new shapes require a deliberate change.
 
 ## Storage shapes
 
-Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`; only balance entries and stock splits get their own subtype because they relax or extend the base contract.
+Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`; only balance entries get their own subtype because they extend the base contract with an asserted-quantity field.
 
 | Shape                 | Stored type              | Splits | Priced legs | Notes |
 |-----------------------|--------------------------|--------|-------------|-------|
@@ -33,7 +33,6 @@ Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most sh
 | Investment sell       | `NormalTransaction`      | 2 | 1 | Mirror of buy. |
 | Dividend (cash)       | `NormalTransaction`      | 2 | 0 | Both splits in the dividend currency. Counterpart = system `Income` account. |
 | DRIP / reinvestment   | `NormalTransaction` × 2  | 2 each | 0 + 1 | Dividend half unpriced; Buy half priced. Paired via `RelatedTransactionId`. |
-| Stock split           | `StockSplitTransaction`  | ≥1 | 0 | Declared exception to balance invariant. All splits same commodity. |
 | Balance entry         | `BalanceEntryTransaction`| 2 | 0 | Both splits in the asserted commodity. Carries `AssertedCommodityId` + `AssertedQuantity`; counterpart = `Equity:Adjustments`. |
 
 `AccountTransaction.RelatedTransactionId` is a nullable self-FK used in v1 only for DRIP pairing. `OnDelete(SetNull)` — handler logic decides whether the surviving half is kept or removed when its partner is deleted.
@@ -74,7 +73,7 @@ Split **quantities** follow the Beancount convention. Extending the table in [ac
 | Income       | Negative                    |
 | Expense      | Positive                    |
 
-For each commodity, the sum of split weights is zero (stock splits exempted). Net worth remains a flat sum of asset + liability balances; income/expense balances are not part of net worth in v1.
+For each commodity, the sum of split weights is zero. Net worth remains a flat sum of asset + liability balances; income/expense balances are not part of net worth in v1.
 
 The UI accepts positive numbers everywhere. The server applies sign flips when writing splits whose account type calls for it. Liability balances render as positive "amount owed."
 
@@ -88,7 +87,6 @@ All timestamps stored UTC. Defaults per shape:
 | Opening balance (Investment, Add position) | `12:00 UTC`               | Yes               |
 | Transfer (any)                           | `00:00 UTC`                 | No                |
 | Investment buy / sell / dividend / DRIP  | `12:00 UTC`                 | Yes               |
-| Stock split                              | `12:00 UTC`                 | Yes               |
 | Balance entry                            | `23:59:59 UTC`              | No                |
 
 Investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
@@ -197,26 +195,6 @@ Each half balances independently. A: USD = +5 − 5 = 0. B: USD = -5 + (0.05 × 
 
 **Validation:** as for Dividend + Investment buy combined; both halves must reference the same investment account and security; the cash legs in halves A and B must net to zero in the dividend commodity.
 
-### Stock split
-
-Corporate action that changes outstanding unit counts without changing value (typically `2-for-1`, `3-for-1`, `1-for-10` reverse). Scoped **per commodity, not per account** — a 2-for-1 AAPL split affects every account holding AAPL simultaneously.
-
-UI is a per-commodity action ("Apply stock split" on the commodity detail page or a dedicated affordance reachable from any account holding the security). User picks the security, enters new-units-per-old-unit (e.g. `2` for 2-for-1, `0.1` for 1-for-10 reverse), and a date. The server enumerates every account with a non-zero position in that commodity at the chosen date and emits one split per account with the additive delta.
-
-Example (2-for-1 AAPL split on 2026-04-23, with TFSA holding 10 shares and Taxable holding 5):
-
-```
-Transaction: Type=StockSplit, Description="AAPL 2-for-1 split", OccurredAt=2026-04-23T12:00:00Z
-  Split 1: Account=<TFSA>,    Commodity=AAPL, Quantity=+10
-  Split 2: Account=<Taxable>, Commodity=AAPL, Quantity=+5
-```
-
-Stock splits are the sole declared exception to the per-commodity weight-balance invariant: the AAPL weights here sum to +15, and that is intentional — the event creates additional units from nothing. No annotation is permitted.
-
-**Validation:** `Type=StockSplit` requires ≥1 split; every split references the same commodity; that commodity is `Kind=Security`; every split is unpriced (`UnitPriceRate` null); quantities are computed by the server from positions and the user-entered ratio (the API does not accept raw split rows).
-
-No price row. The unit count changes; the per-share price is expected to halve (or scale by `1/ratio`) on the next observation, but Homestead does not synthesise that price — users enter the next price when they next reconcile.
-
 ### Balance entry
 
 User assertion: *"the balance of this account, in this commodity, on this date, was this much."* The server computes the delta vs. the prior running balance and books it against `Equity:Adjustments` in the asserted commodity.
@@ -279,16 +257,14 @@ v1 households are tiny; the full re-pass per affected `(account, commodity)` cha
 
 The "New Transaction" dropdown on each account's detail page surfaces only shapes that make sense for the account's `Kind`. This is a UI rule — the data layer accepts any valid balanced transaction.
 
-| Kind            | Transfer | Buy / Sell | Dividend | DRIP | Stock split            | Balance entry |
-|-----------------|----------|------------|----------|------|------------------------|---------------|
-| Cash            | ✓        |            |          |      |                        | ✓             |
-| Credit Card     | ✓        |            |          |      |                        | ✓             |
-| Loan            | ✓        |            |          |      |                        | ✓             |
-| Other Liability | ✓        |            |          |      |                        | ✓             |
-| Other Asset     | ✓        |            |          |      |                        | ✓             |
-| Investment      | ✓        | ✓          | ✓        | ✓    | ✓ (per-commodity entry)| ✓             |
-
-Stock split is also reachable from the commodity detail page under Settings, since it's a commodity-scoped operation. From an Investment account it appears in the dropdown when the account holds at least one security.
+| Kind            | Transfer | Buy / Sell | Dividend | DRIP | Balance entry |
+|-----------------|----------|------------|----------|------|---------------|
+| Cash            | ✓        |            |          |      | ✓             |
+| Credit Card     | ✓        |            |          |      | ✓             |
+| Loan            | ✓        |            |          |      | ✓             |
+| Other Liability | ✓        |            |          |      | ✓             |
+| Other Asset     | ✓        |            |          |      | ✓             |
+| Investment      | ✓        | ✓          | ✓        | ✓    | ✓             |
 
 The household-level "+ New Transaction" entry point (when added) offers the union of all shapes and asks the user to pick a target account first.
 
@@ -321,9 +297,8 @@ Cross-shape constraints, beyond the per-shape rules above:
 - Every split's commodity exists.
 - Quantities and rates are finite decimals.
 - A split's price annotation is either fully populated (`UnitPriceRate` > 0 and `UnitPriceCommodityId` set to a `Kind=Currency` commodity distinct from `Split.Commodity`) or fully null.
-- For every non-stock-split transaction, the **per-commodity weight-balance** invariant holds exactly: for each commodity `C`, `SUM(weight in C) = 0` (no rounding tolerance — quantities and rates store as `numeric`).
+- For every transaction, the **per-commodity weight-balance** invariant holds exactly: for each commodity `C`, `SUM(weight in C) = 0` (no rounding tolerance — quantities and rates store as `numeric`).
 - For balance entries, exactly two splits, both unpriced and in the asserted commodity, one referencing the asserted account, the other referencing `Equity:Adjustments`.
-- For stock splits, all rules in *Stock split* (all splits same commodity, unpriced, `Kind=Security`).
 - For DRIP pairs, both halves persisted in the same `SaveChangesAsync` (no orphan creation).
 
 ## Listing transactions

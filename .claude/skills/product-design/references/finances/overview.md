@@ -15,7 +15,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Household accounts covering cash, credit, debt, and investments.
 - Balances denominated in any currency.
 - Investment accounts that hold multiple commodities (currencies and securities) simultaneously.
-- A small, fixed set of transaction shapes: transfers between owned accounts, investment purchases and sales, dividends and DRIPs, stock splits, and balance entries.
+- A small, fixed set of transaction shapes: transfers between owned accounts, investment purchases and sales, dividends and DRIPs, and balance entries.
 - Monthly reconciliation against institutional statements as the primary recurring user action.
 - Historical net-worth computation and display in a user-chosen currency.
 - Manual commodity price entry.
@@ -27,6 +27,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Recurring or scheduled transactions.
 - Budgeting.
 - Automated price feeds.
+- Corporate actions on securities (stock splits, spin-offs, mergers, ticker changes). Households that experience one mid-v1 work around it by recording a balance entry on the effective date asserting the new unit count (the delta lands in `Equity:Adjustments`) **and** a new price observation at the post-action rate — both steps are required, otherwise carry-forward of the pre-action price against the new unit count distorts net worth. The workaround leaves residue in `Equity:Adjustments`; v2's commodity-scoped corporate-action model should include a one-time pass to retire those phantom splits in favour of a real action row. See *Future-compatibility*.
 - Soft delete, user-visible change history, undo. (Back-end audit logs *are* written — see *Data integrity and audit trail*.)
 - Multi-user permissions.
 - Adjusted cost basis, tax-lot tracking, realized and unrealized gains for tax reporting.
@@ -76,7 +77,7 @@ A split is the per-account leg of a transaction. It records:
 - The quantity that moved, in the commodity's native units.
 - Optionally, a **unit-price annotation** — a per-unit rate in a quote commodity — that bridges this leg into another commodity for balance purposes. Carried by legs that cross commodity boundaries (a Buy's security leg, a cross-currency Transfer's source leg, etc.); omitted for legs that balance per-commodity against another split.
 
-A transaction balances when, for each commodity, the sum of split **weights** in that commodity is zero. A split's weight is `Quantity` in `Split.Commodity` if it has no price annotation, or `Quantity × Rate` in the annotation's quote commodity if it does. Same-commodity transactions balance trivially per-commodity; cross-commodity transactions rely on at least one annotation to bridge. This invariant is enforced by the data layer; stock splits are the sole declared exception.
+A transaction balances when, for each commodity, the sum of split **weights** in that commodity is zero. A split's weight is `Quantity` in `Split.Commodity` if it has no price annotation, or `Quantity × Rate` in the annotation's quote commodity if it does. Same-commodity transactions balance trivially per-commodity; cross-commodity transactions rely on at least one annotation to bridge. This invariant is enforced by the data layer with no exceptions in v1.
 
 Splits are an implementation concept. Users never see the words "split" or "annotation" in v1.
 
@@ -118,7 +119,7 @@ This is load-bearing for the household's relocation scenarios. Moving from Canad
 
 ### Beancount-style sign convention
 
-Split quantities follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases. For each commodity, the sum of split weights is zero (stock splits exempted). This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [accounts.md](accounts.md) and [transactions.md](transactions.md#sign-convention) for worked examples.
+Split quantities follow the Beancount convention: asset and expense splits are positive when the balance increases; liability, equity, and income splits are negative when the balance increases. For each commodity, the sum of split weights is zero. This makes net worth a straight sum of asset and liability balances with no type-conditional arithmetic. The UI flips signs on liabilities so users always see positive "amount owed" and only ever enters positive numbers. See [accounts.md](accounts.md) and [transactions.md](transactions.md#sign-convention) for worked examples.
 
 ### Single-position vs multi-position is UI-only
 
@@ -166,10 +167,6 @@ Cash dividend received into an investment account. UI asks for the investment ac
 
 Dividend-reinvestment variant that results in additional security units rather than cash. Modelled as two linked `NormalTransaction`s at the same `OccurredAt` — a Dividend half and a Buy half, paired via `RelatedTransactionId`. This matches brokerage statements and keeps each half an ordinary shape. The generic editor surfaces the pair as one logical event.
 
-### Stock split
-
-Corporate action that changes commodity quantities without changing value. Scoped **per commodity** — one transaction covers every account holding the security, with one split per holding account. Stock splits are the sole declared exception to the per-commodity balance invariant: quantities deliberately do not sum to zero (that is the point of the operation), and no price annotation is present.
-
 ### Balance entry
 
 User asserts the balance of one account and commodity on a given date. System computes the delta and books it against Equity:Adjustments. See *Balance entries*.
@@ -206,5 +203,6 @@ The following must be addable later without rewriting history:
 - Scheduled and recurring transactions.
 - Soft delete and user-facing change-history views (the back-end audit log already exists).
 - Shared/multi-user households with permissions.
+- **Corporate actions on securities** (stock splits, spin-offs, mergers, ticker changes). When introduced, modelled as **per-commodity events**, not transactions: a `CommodityCorporateAction` row carries `(commodityId, type, effectiveAt, ratio, …)` and applies at read time — every position in the affected commodity is scaled by the cumulative ratio of qualifying actions, and historical price observations on the commodity are scaled identically so quantity × price stays coherent. No per-account splits materialise, so a back-dated trade entered after the action picks up the scaling automatically. Per-account activity views derive a virtual display row when the account held the commodity at `effectiveAt`. This shape avoids the need to special-case the per-commodity weight-balance invariant, which is why corporate actions are deferred rather than retrofitted into the transaction model.
 
 None of these should require re-migrating historical transaction data.

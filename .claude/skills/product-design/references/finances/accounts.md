@@ -46,7 +46,7 @@ Stored split **quantities** follow the Beancount convention:
 - Asset splits: positive = increase.
 - Liability splits: negative = increase (more owed = more negative).
 - Equity splits: negative = increase (initial wealth is booked as a negative equity quantity).
-- For every commodity in a transaction, the sum of split weights is zero (stock splits exempted). See [transactions.md](transactions.md#conceptual-model) for the weight-balance rule.
+- For every commodity in a transaction, the sum of split weights is zero. See [transactions.md](transactions.md#conceptual-model) for the weight-balance rule.
 
 Consequences:
 

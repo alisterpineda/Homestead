@@ -208,7 +208,6 @@ A price row is created whenever a split carries a price annotation. The rule is 
 | Investment sell             | Security leg             | `(security, funding currency, at, per-unit price)` |
 | Dividend (cash)             | None                     | Same-commodity event — no valuation. |
 | DRIP / reinvestment         | Buy half's security leg  | Dividend half is same-commodity; buy half annotates the security leg. |
-| Stock split                 | None (forbidden)         | Quantity-only adjustment. Annotation rejected. |
 | Transfer (same-currency)    | None                     | Same-commodity. |
 | Transfer (cross-currency)   | Source leg               | `(src currency, dst currency, at, implied rate)` — e.g. $100 USD → $135 CAD emits `(USD, CAD, at, 1.35)`. |
 | Balance entry               | None                     | Both splits in asserted commodity — per-commodity balance. |
