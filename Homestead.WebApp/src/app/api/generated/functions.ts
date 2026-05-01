@@ -183,6 +183,8 @@ export type { DeleteCommodityPrice$Params as DeleteCommodityPrice$Params } from 
 export { deleteCommodityPrice as deleteCommodityPrice } from './fn/finances/delete-commodity-price';
 export type { PatchCommodityPrice$Params as PatchCommodityPrice$Params } from './fn/finances/patch-commodity-price';
 export { patchCommodityPrice as patchCommodityPrice } from './fn/finances/patch-commodity-price';
+export type { BulkDeleteCommodityPrices$Params as BulkDeleteCommodityPrices$Params } from './fn/finances/bulk-delete-commodity-prices';
+export { bulkDeleteCommodityPrices as bulkDeleteCommodityPrices } from './fn/finances/bulk-delete-commodity-prices';
 export type { GetTransactions$Params as GetTransactions$Params } from './fn/finances/get-transactions';
 export { getTransactions as getTransactions } from './fn/finances/get-transactions';
 export type { GetTransaction$Params as GetTransaction$Params } from './fn/finances/get-transaction';

@@ -46,6 +46,8 @@ export type { CreateTagResponse } from './models/create-tag-response';
 export type { CreateTextExtractionEngineCommand } from './models/create-text-extraction-engine-command';
 export type { CreateTransferCommand } from './models/create-transfer-command';
 export type { CreateUserCommand } from './models/create-user-command';
+export type { DeleteCommodityPricesCommand } from './models/delete-commodity-prices-command';
+export type { DeleteCommodityPricesResponse } from './models/delete-commodity-prices-response';
 export type { DocumentSettingsResponse } from './models/document-settings-response';
 export type { DocumentSortBy } from './models/document-sort-by';
 export type { DownloadDocumentsCommand } from './models/download-documents-command';

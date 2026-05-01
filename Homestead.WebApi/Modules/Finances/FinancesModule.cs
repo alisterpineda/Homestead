@@ -16,7 +16,7 @@ using Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodities;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodity;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.PatchCommodity;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodityPrice;
-using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrice;
+using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrices;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.GetCommodityPrices;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommodityPrice;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeningBalance;
@@ -90,7 +90,7 @@ public static class FinancesModule
         GetCommodityPricesEndpoint.Map(prices);
         CreateCommodityPriceEndpoint.Map(prices);
         PatchCommodityPriceEndpoint.Map(prices);
-        DeleteCommodityPriceEndpoint.Map(prices);
+        DeleteCommodityPricesEndpoint.Map(prices);
 
         // Generic transactions surface (read + delete).
         var transactions = v1.MapGroup("/transactions");

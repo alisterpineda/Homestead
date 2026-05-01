@@ -573,4 +573,108 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.False(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == created.Id, CT));
     }
+
+    [Fact]
+    public async Task BulkDeletePrices_DeletesMultiple_Returns200WithCount()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var manualId = await SeedPriceAsync(usdId, cadId, PriceAtJan01, 1.30m, CommodityPriceSource.Manual);
+        var bocId = await SeedPriceAsync(usdId, cadId, PriceAtJan15, 1.33m, CommodityPriceSource.BankOfCanada);
+        var avId = await SeedPriceAsync(usdId, cadId, PriceAtJan31, 1.35m, CommodityPriceSource.AlphaVantage);
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices/bulk-delete", new
+        {
+            ids = new[] { manualId, bocId, avId }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
+        Assert.Equal(3, body!.DeletedCount);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var remaining = await verifyDb.CommodityPrices
+            .Where(p => p.Id == manualId || p.Id == bocId || p.Id == avId)
+            .CountAsync(CT);
+        Assert.Equal(0, remaining);
+    }
+
+    [Fact]
+    public async Task BulkDeletePrices_WithTransactionLinkedId_Returns400AndDeletesNone()
+    {
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var manualId = await SeedPriceAsync(usdId, cadId, PriceAtJan01, 1.30m, CommodityPriceSource.Manual);
+
+        Guid linkedPriceId;
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var transaction = new NormalTransaction
+            {
+                Id = Guid.NewGuid(),
+                OccurredAt = PriceAtJan31,
+                Memo = "Seeded buy",
+                Type = TransactionType.Normal,
+            };
+            db.AccountTransactions.Add(transaction);
+
+            var price = new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = usdId,
+                QuoteCurrencyId = cadId,
+                PriceAt = PriceAtJan31,
+                Rate = 1.3456m,
+                Source = CommodityPriceSource.Transaction,
+                CreatedByTransactionId = transaction.Id,
+            };
+            db.CommodityPrices.Add(price);
+            await db.SaveChangesAsync(CT);
+            linkedPriceId = price.Id;
+        }
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices/bulk-delete", new
+        {
+            ids = new[] { manualId, linkedPriceId }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var verifyScope = CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == manualId, CT));
+        Assert.True(await verifyDb.CommodityPrices.AnyAsync(p => p.Id == linkedPriceId, CT));
+    }
+
+    [Fact]
+    public async Task BulkDeletePrices_EmptyIds_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices/bulk-delete", new
+        {
+            ids = Array.Empty<Guid>()
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkDeletePrices_NonexistentIds_ReturnsZeroDeleted()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/finances/commodity-prices/bulk-delete", new
+        {
+            ids = new[] { Guid.NewGuid(), Guid.NewGuid() }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
+        Assert.Equal(0, body!.DeletedCount);
+    }
 }
