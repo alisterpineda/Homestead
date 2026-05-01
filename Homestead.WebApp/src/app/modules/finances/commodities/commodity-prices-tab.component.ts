@@ -16,6 +16,7 @@ import {
   lucideCircleAlert,
   lucidePlus,
   lucideListFilter,
+  lucideTrash2,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -84,11 +85,17 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
   ],
   providers: [
     CommodityPricesStateService,
-    provideIcons({ lucideCircleAlert, lucidePlus, lucideListFilter }),
+    provideIcons({ lucideCircleAlert, lucidePlus, lucideListFilter, lucideTrash2 }),
   ],
   template: `
     <div class="flex flex-col gap-4">
-      <div class="flex items-center justify-between gap-2">
+      <div class="relative">
+        <div
+          class="flex items-center justify-between gap-2"
+          [class.opacity-0]="hasSelection()"
+          [class.pointer-events-none]="hasSelection()"
+          [attr.inert]="hasSelection() ? '' : null"
+        >
         <div hlmPopover>
           <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
             <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
@@ -180,6 +187,60 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           <ng-icon hlm name="lucidePlus" size="sm" />
           New manual price
         </app-new-price-dialog>
+        </div>
+
+        <div
+          class="absolute inset-0 flex items-center gap-2 bg-background"
+          [class.opacity-0]="!hasSelection()"
+          [class.pointer-events-none]="!hasSelection()"
+          [attr.inert]="!hasSelection() ? '' : null"
+        >
+          <span class="text-sm text-muted-foreground">
+            {{ selectionCount() }} price{{ selectionCount() === 1 ? '' : 's' }} selected
+          </span>
+          <hlm-alert-dialog>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              hlmAlertDialogTrigger
+            >
+              <ng-icon hlm name="lucideTrash2" size="sm" />
+              Delete
+            </button>
+            <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+              <div hlmAlertDialogHeader>
+                <h2 hlmAlertDialogTitle>
+                  Delete {{ selectionCount() }} price{{ selectionCount() === 1 ? '' : 's' }}?
+                </h2>
+                <p hlmAlertDialogDescription>
+                  This permanently removes the selected price observations.
+                </p>
+              </div>
+              <div hlmAlertDialogFooter>
+                <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                <button
+                  hlmAlertDialogAction
+                  variant="destructive"
+                  (click)="onBulkDelete(ctx)"
+                  [disabled]="bulkDeleting()"
+                >
+                  {{ bulkDeleting() ? 'Deleting...' : 'Delete' }}
+                </button>
+              </div>
+            </hlm-alert-dialog-content>
+          </hlm-alert-dialog>
+          <button
+            hlmBtn
+            variant="outline"
+            size="sm"
+            class="ml-auto"
+            (click)="clearSelection()"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
       @if (loading() && !response()) {
@@ -203,12 +264,14 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           [prices]="rows()"
           [sortBy]="sortBy()"
           [sortDir]="sortDir()"
+          [selectedIds]="selectedPriceIds()"
           [formatPriceAt]="formatPriceAt"
           [quoteSymbol]="quoteSymbol"
           [formatRate]="formatRate"
           (edit)="onEdit($event)"
           (delete)="onDeleteRequest($event)"
           (sortChange)="onSortChange($event)"
+          (selectionChange)="selectedPriceIds.set($event)"
         />
 
         @if (response(); as r) {
@@ -268,6 +331,11 @@ export class CommodityPricesTabComponent {
   pendingDelete = signal<CommodityPriceResponse | null>(null);
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
+
+  selectedPriceIds = signal<Set<string>>(new Set());
+  selectionCount = computed(() => this.selectedPriceIds().size);
+  hasSelection = computed(() => this.selectionCount() > 0);
+  bulkDeleting = signal(false);
 
   currencyMap = signal<Record<string, CommodityResponse>>({});
 
@@ -654,4 +722,27 @@ export class CommodityPricesTabComponent {
     });
   }
 
+  clearSelection(): void {
+    this.selectedPriceIds.set(new Set());
+  }
+
+  onBulkDelete(ctx: { close: () => void }): void {
+    const ids = Array.from(this.selectedPriceIds());
+    if (ids.length === 0) return;
+    this.bulkDeleting.set(true);
+    const result$ = this.priceApi.bulkDeleteCommodityPrices({ body: { ids } }).pipe(
+      handleMutationError(this.errorHandler, this.bulkDeleting, 'Failed to delete prices.'),
+    );
+    toast.promise(
+      firstValueFrom(result$).then(response => {
+        this.bulkDeleting.set(false);
+        ctx.close();
+        const count = +response.deletedCount;
+        this.clearSelection();
+        this.onChanged();
+        return `${count} price${count === 1 ? '' : 's'} deleted.`;
+      }),
+      { loading: 'Deleting prices...', success: m => m },
+    );
+  }
 }

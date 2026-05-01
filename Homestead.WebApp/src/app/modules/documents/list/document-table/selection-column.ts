@@ -26,6 +26,7 @@ export class TableHeadSelection<T> {
   template: `
     <hlm-checkbox
       [checked]="context.row.getIsSelected()"
+      [disabled]="!context.row.getCanSelect()"
       (checkedChange)="context.row.getToggleSelectedHandler()($event)"
       [aria-label]="selectLabel()"
     />

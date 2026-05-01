@@ -16,6 +16,7 @@ import { lucidePencil, lucideTrash2, lucideEllipsisVertical } from '@ng-icons/lu
 import {
   type CellContext,
   type ColumnDef,
+  type RowSelectionState,
   type SortingState,
   createAngularTable,
   flexRenderComponent,
@@ -24,6 +25,7 @@ import {
   injectFlexRenderContext,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
+import { TableHeadSelection, TableRowSelection } from '../../documents/list/document-table/selection-column';
 import type { CommodityPriceResponse } from '@/api/generated/models/commodity-price-response';
 import type { CommodityPriceSortBy } from '@/api/generated/models/commodity-price-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
@@ -124,7 +126,7 @@ export class CommodityPriceSourceCell {
   imports: [HlmButton, HlmDropdownMenuImports, HlmIconImports, NgIcon],
   providers: [provideIcons({ lucidePencil, lucideTrash2, lucideEllipsisVertical })],
   template: `
-    @if (price.source === 'Manual') {
+    @if (price.source !== 'Transaction') {
       <button
         hlmBtn
         variant="ghost"
@@ -137,11 +139,13 @@ export class CommodityPriceSourceCell {
       <ng-template #menu>
         <hlm-dropdown-menu class="w-40">
           <hlm-dropdown-menu-group>
-            <button hlmDropdownMenuItem (triggered)="onEdit()">
-              <ng-icon hlm name="lucidePencil" size="sm" />
-              Edit
-            </button>
-            <hlm-dropdown-menu-separator />
+            @if (price.source === 'Manual') {
+              <button hlmDropdownMenuItem (triggered)="onEdit()">
+                <ng-icon hlm name="lucidePencil" size="sm" />
+                Edit
+              </button>
+              <hlm-dropdown-menu-separator />
+            }
             <button hlmDropdownMenuItem variant="destructive" (triggered)="onDelete()">
               <ng-icon hlm name="lucideTrash2" size="sm" />
               Delete
@@ -211,6 +215,7 @@ export class CommodityPricesTableComponent {
   prices = input.required<CommodityPriceResponse[]>();
   sortBy = input<CommodityPriceSortBy | null | undefined>(null);
   sortDir = input<SortDirection | null | undefined>(null);
+  selectedIds = input<Set<string>>();
   formatPriceAt = input.required<(iso: string) => string>();
   quoteSymbol = input.required<(id: string) => string>();
   formatRate = input.required<(price: CommodityPriceResponse) => string>();
@@ -218,8 +223,10 @@ export class CommodityPricesTableComponent {
   edit = output<CommodityPriceResponse>();
   delete = output<CommodityPriceResponse>();
   sortChange = output<{ sortBy: CommodityPriceSortBy; sortDir: SortDirection }>();
+  selectionChange = output<Set<string>>();
 
   private readonly _sorting = signal<SortingState>([{ id: 'priceAt', desc: true }]);
+  private readonly _rowSelection = signal<RowSelectionState>({});
 
   private readonly _meta: PricesTableMeta = {
     formatPriceAt: (iso) => this.formatPriceAt()(iso),
@@ -230,6 +237,12 @@ export class CommodityPricesTableComponent {
   };
 
   private readonly _columns: ColumnDef<CommodityPriceResponse>[] = [
+    {
+      id: 'select',
+      header: () => flexRenderComponent(TableHeadSelection),
+      cell: () => flexRenderComponent(TableRowSelection),
+      enableSorting: false,
+    },
     {
       id: 'priceAt',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'When' } }),
@@ -264,6 +277,7 @@ export class CommodityPricesTableComponent {
     getRowId: (row) => row.id,
     manualSorting: true,
     enableSortingRemoval: false,
+    enableRowSelection: (row) => row.original.source !== 'Transaction',
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       const next = updater instanceof Function ? updater(this._sorting()) : updater;
@@ -276,18 +290,26 @@ export class CommodityPricesTableComponent {
         }
       }
     },
+    onRowSelectionChange: (updater) => {
+      const next = updater instanceof Function ? updater(this._rowSelection()) : updater;
+      this._rowSelection.set(next);
+      this.selectionChange.emit(new Set(Object.keys(next).filter(k => next[k])));
+    },
     state: {
       sorting: this._sorting(),
+      rowSelection: this._rowSelection(),
     },
     meta: this._meta,
   }));
 
   private readonly TH_CLASSES: Record<string, string> = {
+    select: 'w-10',
     rate: 'text-right',
     actions: 'w-12',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
+    select: 'w-10',
     priceAt: 'tabular-nums',
     rate: 'text-right tabular-nums',
     actions: 'w-12',
@@ -310,6 +332,17 @@ export class CommodityPricesTableComponent {
       const cur = this._sorting()[0];
       if (!cur || cur.id !== id || cur.desc !== desc) {
         this._sorting.set([{ id, desc }]);
+      }
+    });
+
+    effect(() => {
+      const ids = this.selectedIds();
+      if (ids) {
+        const selection: RowSelectionState = {};
+        ids.forEach(id => { selection[id] = true; });
+        this._rowSelection.set(selection);
+      } else {
+        this._rowSelection.set({});
       }
     });
   }
