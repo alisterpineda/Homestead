@@ -172,7 +172,7 @@ public class BalanceEntryServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_BlankMemo_FallsBackToBalanceAssertionDefault()
+    public async Task Create_BlankMemo_PersistsEmptyMemo()
     {
         var cash = await AddAccountAsync(AccountKind.Cash);
 
@@ -181,7 +181,7 @@ public class BalanceEntryServiceTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Balance assertion", result.Entry!.Memo);
+        Assert.Equal("", result.Entry!.Memo);
     }
 
     [Fact]

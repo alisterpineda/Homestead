@@ -13,8 +13,6 @@ public class BalanceEntryService(
     ITransactionValidator validator,
     IAuditContext audit) : IBalanceEntryService
 {
-    private const string DefaultMemo = "Balance assertion";
-
     public async Task<BalanceEntryMutationResult> CreateAsync(
         CreateBalanceEntryRequest request, CancellationToken ct)
     {
@@ -206,6 +204,5 @@ public class BalanceEntryService(
     private static DateTimeOffset MinInstant(DateTimeOffset a, DateTimeOffset b) =>
         a < b ? a : b;
 
-    private static string NormalizeMemo(string? memo) =>
-        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
+    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
 }

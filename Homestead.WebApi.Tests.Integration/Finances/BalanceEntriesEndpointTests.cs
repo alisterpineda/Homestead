@@ -58,7 +58,7 @@ public class BalanceEntriesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Create_BlankMemo_DefaultsToBalanceAssertion()
+    public async Task Create_BlankMemo_PersistsEmptyMemo()
     {
         var client = await CreateAdminClientAsync();
         var cad = await GetCurrencyIdAsync("CAD");
@@ -70,7 +70,7 @@ public class BalanceEntriesEndpointTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<BalanceEntryItem>(CT);
-        Assert.Equal("Balance assertion", body!.Memo);
+        Assert.Equal("", body!.Memo);
     }
 
     [Fact]
