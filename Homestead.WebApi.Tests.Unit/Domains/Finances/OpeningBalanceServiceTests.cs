@@ -505,7 +505,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Create_BlankMemo_FallsBackToOpeningBalanceDefault()
+    public async Task Create_BlankMemo_PersistsEmptyMemo()
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
 
@@ -514,7 +514,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Opening balance", txn.Memo);
+        Assert.Equal("", txn.Memo);
     }
 
     [Fact]

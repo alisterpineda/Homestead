@@ -14,8 +14,6 @@ public class OpeningBalanceService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : IOpeningBalanceService
 {
-    private const string DefaultMemo = "Opening balance";
-
     public async Task<AccountTransaction> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct)
     {
         var account = await FindAccountAsync(request.AccountId, ct);
@@ -151,8 +149,7 @@ public class OpeningBalanceService(
                 "An opening balance already exists for this account and commodity. Edit it instead.");
     }
 
-    private static string NormalizeMemo(string? memo) =>
-        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
+    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
 
     private async Task EnsureOpeningBalanceRemainsEarliestAsync(Guid accountId, Guid commodityId,
         Guid openingBalanceTransactionId, DateTimeOffset newOccurredAt, CancellationToken ct)

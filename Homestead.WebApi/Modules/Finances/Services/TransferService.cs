@@ -13,8 +13,6 @@ public class TransferService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : ITransferService
 {
-    private const string DefaultMemo = "Transfer";
-
     public async Task<TransferMutationResult> CreateAsync(
         CreateTransferRequest request, CancellationToken ct)
     {
@@ -240,8 +238,7 @@ public class TransferService(
 
     private static DateTimeOffset ResolveOccurredAt(DateOnly date) => date.ToStartOfDayUtc();
 
-    private static string NormalizeMemo(string? memo) =>
-        TransactionMemos.NormalizeOrDefault(memo, DefaultMemo);
+    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
 
     private static IEnumerable<TouchedPair> TouchedFor(AccountTransaction transaction)
     {

@@ -318,7 +318,7 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Create_BlankMemo_DefaultsToOpeningBalance()
+    public async Task Create_BlankMemo_PersistsEmptyMemo()
     {
         var client = await CreateAdminClientAsync();
         var usdId = await GetUsdIdAsync();
@@ -330,7 +330,7 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var body = await resp.Content.ReadFromJsonAsync<OpeningBalanceItem>(CT);
-        Assert.Equal("Opening balance", body!.Memo);
+        Assert.Equal("", body!.Memo);
     }
 
     [Fact]
