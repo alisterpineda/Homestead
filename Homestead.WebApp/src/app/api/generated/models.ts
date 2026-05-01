@@ -23,6 +23,7 @@ export type { BulkUpdateDocumentsCommand } from './models/bulk-update-documents-
 export type { BulkUpdateDocumentsResponse } from './models/bulk-update-documents-response';
 export type { CommodityKind } from './models/commodity-kind';
 export type { CommodityPriceResponse } from './models/commodity-price-response';
+export type { CommodityPriceSortBy } from './models/commodity-price-sort-by';
 export type { CommodityPriceSource } from './models/commodity-price-source';
 export type { CommodityPriceSourceKind } from './models/commodity-price-source-kind';
 export type { CommodityResponse } from './models/commodity-response';

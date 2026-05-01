@@ -10,6 +10,12 @@ export function startOfDayLocal(date: Date): Date {
   return d;
 }
 
+export function endOfDayLocal(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 export function timeHhMmLocal(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -21,9 +22,10 @@ public class GetCommodityPricesHandler(AppDbContext db)
             query = query.Where(p => p.PriceAt >= fromAt);
         if (request.ToAt is { } toAt)
             query = query.Where(p => p.PriceAt <= toAt);
+        if (request.Sources is { Length: > 0 } sources)
+            query = query.Where(p => sources.Contains(p.Source));
 
-        return await query
-            .OrderByDescending(p => p.PriceAt)
+        return await ApplySort(query, request.SortBy, request.SortDir)
             .Select(p => new CommodityPriceResponse
             {
                 Id = p.Id,
@@ -35,5 +37,25 @@ public class GetCommodityPricesHandler(AppDbContext db)
                 CreatedByTransactionId = p.CreatedByTransactionId,
             })
             .ToPaginatedAsync(request, ct);
+    }
+
+    private static IOrderedQueryable<CommodityPrice> ApplySort(
+        IQueryable<CommodityPrice> query, CommodityPriceSortBy? sortBy, SortDirection? sortDir)
+    {
+        var effectiveSortBy = sortBy ?? CommodityPriceSortBy.PriceAt;
+        var effectiveSortDir = sortDir ?? SortDirection.Desc;
+
+        return (effectiveSortBy, effectiveSortDir) switch
+        {
+            (CommodityPriceSortBy.PriceAt, SortDirection.Desc) => query.OrderByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.PriceAt, SortDirection.Asc) => query.OrderBy(p => p.PriceAt),
+            (CommodityPriceSortBy.Rate, SortDirection.Desc) => query.OrderByDescending(p => p.Rate).ThenByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.Rate, SortDirection.Asc) => query.OrderBy(p => p.Rate).ThenByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.Source, SortDirection.Desc) => query.OrderByDescending(p => p.Source).ThenByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.Source, SortDirection.Asc) => query.OrderBy(p => p.Source).ThenByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.Quote, SortDirection.Desc) => query.OrderByDescending(p => p.QuoteCurrencyId).ThenByDescending(p => p.PriceAt),
+            (CommodityPriceSortBy.Quote, SortDirection.Asc) => query.OrderBy(p => p.QuoteCurrencyId).ThenByDescending(p => p.PriceAt),
+            _ => query.OrderByDescending(p => p.PriceAt),
+        };
     }
 }

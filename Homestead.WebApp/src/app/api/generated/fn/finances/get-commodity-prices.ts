@@ -7,13 +7,19 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { CommodityPriceSortBy } from '../../models/commodity-price-sort-by';
+import { CommodityPriceSource } from '../../models/commodity-price-source';
 import { PaginatedResponseOfCommodityPriceResponse } from '../../models/paginated-response-of-commodity-price-response';
+import { SortDirection } from '../../models/sort-direction';
 
 export interface GetCommodityPrices$Params {
   CommodityId?: string;
   QuoteCurrencyId?: string;
   FromAt?: string;
   ToAt?: string;
+  Sources?: Array<CommodityPriceSource>;
+  SortBy?: CommodityPriceSortBy;
+  SortDir?: SortDirection;
   Page: number;
   PageSize: number;
 }
@@ -25,6 +31,9 @@ export function getCommodityPrices(http: HttpClient, rootUrl: string, params: Ge
     rb.query('QuoteCurrencyId', params.QuoteCurrencyId, {});
     rb.query('FromAt', params.FromAt, {});
     rb.query('ToAt', params.ToAt, {});
+    rb.query('Sources', params.Sources, {});
+    rb.query('SortBy', params.SortBy, {});
+    rb.query('SortDir', params.SortDir, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }
