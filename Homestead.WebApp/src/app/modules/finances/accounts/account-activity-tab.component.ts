@@ -44,6 +44,7 @@ import { displaySign } from '../shared/sign';
 import { formatCurrency } from '../shared/format-currency';
 import { toDateOnly } from '../shared/date';
 import {
+  isDetailsOfKind,
   shapeLabel,
   shapeIconName,
   signedAmountForAccount,
@@ -51,6 +52,7 @@ import {
 } from '../transactions/transaction-display';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+import type { TransactionDetailsBalanceEntryDetails } from '@/api/generated/models/transaction-details-balance-entry-details';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 
 const PAGE_SIZE = 25;
@@ -354,6 +356,9 @@ export class AccountActivityTabComponent {
         const cp = transferCounterparty(tx, accountId);
         if (cp) accountIds.add(cp.accountId);
       }
+      if (isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(tx.details, 'balanceEntry')) {
+        commodityIds.add(tx.details.assertedCommodityId);
+      }
     }
     const knownA = this.accountNames();
     const knownC = this.commodities();
@@ -394,6 +399,11 @@ export class AccountActivityTabComponent {
       const cpName = cp ? this.accountNames()[cp.accountId] : null;
       if (cpName) {
         typeSubtitle = signed < 0 ? `To ${cpName}` : `From ${cpName}`;
+      }
+    } else if (isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(tx.details, 'balanceEntry')) {
+      const assertedCommodity = this.commodities()[tx.details.assertedCommodityId] ?? null;
+      if (assertedCommodity) {
+        typeSubtitle = formatCurrency(tx.details.assertedAmount, assertedCommodity);
       }
     }
 
