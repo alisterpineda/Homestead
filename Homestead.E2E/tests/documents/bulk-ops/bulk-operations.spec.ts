@@ -1,10 +1,20 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
 import { TEST_DATA } from '../../../e2e.config';
 import { fillSignalInput } from '../../../helpers/playwright.helpers';
+import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Bulk operations', () => {
+  test.beforeAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+    await seedFixtureDocuments(request, { include: 'both' });
+  });
+
+  test.afterAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+  });
+
   test('can switch to table view and select multiple documents', async ({ page, documentListPage }) => {
     await documentListPage.goto();
     await documentListPage.switchToTableView();

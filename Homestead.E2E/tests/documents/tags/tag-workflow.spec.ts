@@ -1,10 +1,20 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
 import { TEST_DATA } from '../../../e2e.config';
 import { fillSignalInput } from '../../../helpers/playwright.helpers';
+import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Tag workflow', () => {
+  test.beforeAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+    await seedFixtureDocuments(request, { include: 'pdf' });
+  });
+
+  test.afterAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+  });
+
   test('tag list shows seeded tags', async ({ tagListPage }) => {
     await tagListPage.goto();
     await tagListPage.waitForTagVisible(TEST_DATA.documents.tags.finance);

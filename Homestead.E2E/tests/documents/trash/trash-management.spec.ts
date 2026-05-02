@@ -1,8 +1,30 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
+import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Trash management', () => {
+  test.beforeAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+    await seedFixtureDocuments(request, { include: 'both' });
+
+    // The suite starts in the post-bulk-ops shape (1 active + 1 trashed) so the first
+    // test can assert restore from a non-empty trash.
+    const listResponse = await request.get('/api/v1/documents?Page=1&PageSize=100&IncludeChildTags=false');
+    expect(listResponse.ok()).toBeTruthy();
+    const list = await listResponse.json();
+    const imageDoc = (list.items ?? []).find((d: { name: string }) => d.name === 'test-image');
+    expect(imageDoc).toBeDefined();
+    const deleteResponse = await request.post('/api/v1/documents/bulk-delete', {
+      data: { ids: [imageDoc.id] },
+    });
+    expect(deleteResponse.ok()).toBeTruthy();
+  });
+
+  test.afterAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+  });
+
   test('soft-delete a document via the UI', async ({ page, documentListPage }) => {
     await documentListPage.goto();
     await documentListPage.switchToTableView();

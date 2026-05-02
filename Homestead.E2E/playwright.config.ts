@@ -65,19 +65,19 @@ export default defineConfig({
       name: 'documents-tags',
       testDir: './tests/documents/tags',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-upload'],
+      dependencies: ['documents-data-setup'],
     },
     {
       name: 'documents-bulk-ops',
       testDir: './tests/documents/bulk-ops',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-upload'],
+      dependencies: ['documents-data-setup'],
     },
     {
       name: 'documents-trash',
       testDir: './tests/documents/trash',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-bulk-ops'],
+      dependencies: ['documents-data-setup'],
     },
   ],
 });

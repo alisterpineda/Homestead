@@ -15,6 +15,10 @@ test.describe('Document upload and search workflow', () => {
     await deleteAllDocuments(request);
   });
 
+  test.afterAll(async ({ request }) => {
+    await deleteAllDocuments(request);
+  });
+
   test('shows empty state when no documents exist', async ({ documentListPage }) => {
     await documentListPage.goto();
     await expect(documentListPage.noDocsEmpty).toBeVisible();
