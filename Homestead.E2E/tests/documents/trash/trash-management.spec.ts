@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/app.fixture';
+import { test, expect } from '../../../fixtures/documents.fixture';
 
 test.describe.configure({ mode: 'serial' });
 

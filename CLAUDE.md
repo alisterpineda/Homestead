@@ -78,7 +78,7 @@ cd Homestead.E2E && npm run e2e
 
 **E2E business workflow tests only** (faster — skips OIDC suites):
 ```bash
-cd Homestead.E2E && npx playwright test --project=local-upload --project=local-tags --project=local-bulk-ops --project=local-trash
+cd Homestead.E2E && npx playwright test --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash
 ```
 
 ### Backend Test Filtering (xUnit v3 + MTP v2)

@@ -1,4 +1,4 @@
-import { test, expect } from '../../fixtures/app.fixture';
+import { test, expect } from '../../../fixtures/auth.fixture';
 
 test.describe('OIDC-only auth mode (fresh database)', () => {
   test('redirects to login page', async ({ page }) => {

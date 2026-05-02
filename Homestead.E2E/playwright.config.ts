@@ -29,53 +29,55 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
+    // --- Auth bootstrap (shared across modules) ---
     {
       name: 'oidc-only',
-      testDir: './tests/oidc-only',
+      testDir: './tests/auth/oidc-only',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
     },
     {
       name: 'oidc-only-setup',
-      testDir: './tests/oidc-only-setup',
+      testDir: './tests/auth/oidc-only-setup',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
       dependencies: ['oidc-only'],
     },
     {
       name: 'oidc-only-login',
-      testDir: './tests/oidc-only-login',
+      testDir: './tests/auth/oidc-only-login',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL },
       dependencies: ['oidc-only-setup'],
     },
-    // --- Business workflow tests (use admin storageState from oidc-only-setup) ---
+    // --- Documents pipeline (uses admin storageState from oidc-only-setup) ---
     {
-      name: 'data-setup',
+      name: 'documents-data-setup',
+      testDir: './tests/documents',
       testMatch: /data-setup\.ts/,
       use: { baseURL: OIDC_URL, storageState: '.auth/admin.json' },
       dependencies: ['oidc-only-setup'],
     },
     {
-      name: 'upload',
-      testDir: './tests/upload',
+      name: 'documents-upload',
+      testDir: './tests/documents/upload',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['data-setup'],
+      dependencies: ['documents-data-setup'],
     },
     {
-      name: 'tags',
-      testDir: './tests/tags',
+      name: 'documents-tags',
+      testDir: './tests/documents/tags',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['upload'],
+      dependencies: ['documents-upload'],
     },
     {
-      name: 'bulk-ops',
-      testDir: './tests/bulk-ops',
+      name: 'documents-bulk-ops',
+      testDir: './tests/documents/bulk-ops',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['upload'],
+      dependencies: ['documents-upload'],
     },
     {
-      name: 'trash',
-      testDir: './tests/trash',
+      name: 'documents-trash',
+      testDir: './tests/documents/trash',
       use: { ...devices['Desktop Chrome'], baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['bulk-ops'],
+      dependencies: ['documents-bulk-ops'],
     },
   ],
 });

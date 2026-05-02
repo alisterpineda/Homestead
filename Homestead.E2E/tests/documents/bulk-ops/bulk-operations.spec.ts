@@ -1,6 +1,6 @@
-import { test, expect } from '../../fixtures/app.fixture';
-import { TEST_DATA } from '../../e2e.config';
-import { fillSignalInput } from '../../helpers/playwright.helpers';
+import { test, expect } from '../../../fixtures/documents.fixture';
+import { TEST_DATA } from '../../../e2e.config';
+import { fillSignalInput } from '../../../helpers/playwright.helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -24,7 +24,7 @@ test.describe('Bulk operations', () => {
     await documentListPage.bulkTagsButton().click();
 
     const tagInput = page.getByPlaceholder(/search tags to add/i).first();
-    await fillSignalInput(tagInput, TEST_DATA.tags.bulkTag1);
+    await fillSignalInput(tagInput, TEST_DATA.documents.tags.bulkTag1);
 
     await page.waitForResponse(
       (resp) =>
@@ -33,8 +33,8 @@ test.describe('Bulk operations', () => {
         resp.request().method() === 'GET',
     );
 
-    await expect(page.getByText(TEST_DATA.tags.bulkTag1).first()).toBeVisible();
-    await page.getByText(TEST_DATA.tags.bulkTag1).first().click();
+    await expect(page.getByText(TEST_DATA.documents.tags.bulkTag1).first()).toBeVisible();
+    await page.getByText(TEST_DATA.documents.tags.bulkTag1).first().click();
 
     await page.getByRole('button', { name: /Apply/i }).click();
 
@@ -55,7 +55,7 @@ test.describe('Bulk operations', () => {
     await documentListPage.bulkPartiesButton().click();
 
     const partyInput = page.getByPlaceholder(/search parties to add/i).first();
-    await fillSignalInput(partyInput, TEST_DATA.parties.acmeCorp);
+    await fillSignalInput(partyInput, TEST_DATA.documents.parties.acmeCorp);
 
     await page.waitForResponse(
       (resp) =>
@@ -64,8 +64,8 @@ test.describe('Bulk operations', () => {
         resp.request().method() === 'GET',
     );
 
-    await expect(page.getByText(TEST_DATA.parties.acmeCorp).first()).toBeVisible();
-    await page.getByText(TEST_DATA.parties.acmeCorp).first().click();
+    await expect(page.getByText(TEST_DATA.documents.parties.acmeCorp).first()).toBeVisible();
+    await page.getByText(TEST_DATA.documents.parties.acmeCorp).first().click();
 
     await page.getByRole('button', { name: /Apply/i }).click();
 

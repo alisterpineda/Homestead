@@ -1,6 +1,6 @@
-import { test as setup, expect } from '../../fixtures/app.fixture';
-import { KeycloakLoginPage } from '../../pages/keycloak-login.page';
-import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN, AUTH_STATE } from '../../e2e.config';
+import { test as setup, expect } from '../../../fixtures/auth.fixture';
+import { KeycloakLoginPage } from '../../../pages/auth/keycloak-login.page';
+import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN, AUTH_STATE } from '../../../e2e.config';
 
 export function defineOidcSetup() {
   setup(

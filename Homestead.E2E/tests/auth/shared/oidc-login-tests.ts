@@ -1,5 +1,5 @@
-import { test, expect } from '../../fixtures/app.fixture';
-import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN } from '../../e2e.config';
+import { test, expect } from '../../../fixtures/auth.fixture';
+import { KEYCLOAK_ADMIN, KEYCLOAK_USER, KEYCLOAK_URL_PATTERN } from '../../../e2e.config';
 
 export function defineOidcLoginTests(label: string) {
   test.describe(label, () => {

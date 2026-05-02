@@ -1,14 +1,14 @@
-import { test, expect } from '../../fixtures/app.fixture';
-import { TEST_DATA } from '../../e2e.config';
-import { fillSignalInput } from '../../helpers/playwright.helpers';
+import { test, expect } from '../../../fixtures/documents.fixture';
+import { TEST_DATA } from '../../../e2e.config';
+import { fillSignalInput } from '../../../helpers/playwright.helpers';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Tag workflow', () => {
   test('tag list shows seeded tags', async ({ tagListPage }) => {
     await tagListPage.goto();
-    await tagListPage.waitForTagVisible(TEST_DATA.tags.finance);
-    await tagListPage.waitForTagVisible(TEST_DATA.tags.contracts);
+    await tagListPage.waitForTagVisible(TEST_DATA.documents.tags.finance);
+    await tagListPage.waitForTagVisible(TEST_DATA.documents.tags.contracts);
   });
 
   test('can create a new tag via the UI', async ({ tagListPage }) => {
@@ -22,9 +22,9 @@ test.describe('Tag workflow', () => {
 
     await tagListPage.searchTags('e2e-finance');
     // Should show finance-related tags
-    await tagListPage.waitForTagVisible(TEST_DATA.tags.finance);
+    await tagListPage.waitForTagVisible(TEST_DATA.documents.tags.finance);
     // Unrelated tags should not be visible
-    await expect(tagListPage.page.getByText(TEST_DATA.tags.contracts).first()).not.toBeVisible();
+    await expect(tagListPage.page.getByText(TEST_DATA.documents.tags.contracts).first()).not.toBeVisible();
 
     await tagListPage.clearSearch();
   });
@@ -47,7 +47,7 @@ test.describe('Tag workflow', () => {
     // Use the tag input to add a tag
     const tagInput = page.locator('app-tag-input input').first();
     await tagInput.click();
-    await fillSignalInput(tagInput, TEST_DATA.tags.finance);
+    await fillSignalInput(tagInput, TEST_DATA.documents.tags.finance);
 
     // Wait for autocomplete API response, then click the matching suggestion
     await page.waitForResponse(
@@ -56,7 +56,7 @@ test.describe('Tag workflow', () => {
         resp.url().includes('Search=') &&
         resp.request().method() === 'GET',
     );
-    const suggestion = page.getByRole('button', { name: TEST_DATA.tags.finance }).first();
+    const suggestion = page.getByRole('button', { name: TEST_DATA.documents.tags.finance }).first();
     await expect(suggestion).toBeVisible();
     await suggestion.click();
 
@@ -86,7 +86,7 @@ test.describe('Tag workflow', () => {
         resp.url().includes('Search=') &&
         resp.request().method() === 'GET',
     );
-    await filterSearch.fill(TEST_DATA.tags.finance);
+    await filterSearch.fill(TEST_DATA.documents.tags.finance);
     await tagOptionsResponse;
 
     // Click the filter option and wait for filtered document list
@@ -97,7 +97,7 @@ test.describe('Tag workflow', () => {
         resp.request().method() === 'GET' &&
         resp.status() === 200,
     );
-    await page.getByRole('button', { name: TEST_DATA.tags.finance, exact: true }).click();
+    await page.getByRole('button', { name: TEST_DATA.documents.tags.finance, exact: true }).click();
     await filteredDocsResponse;
 
     // The tagged document should be visible

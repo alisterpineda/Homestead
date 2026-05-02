@@ -1,10 +1,11 @@
 import * as path from 'path';
-import { test, expect } from '../../fixtures/app.fixture';
-import { TEST_DATA } from '../../e2e.config';
-import { waitForProcessingComplete, deleteAllDocuments } from '../../helpers/api.helpers';
+import { test, expect } from '../../../fixtures/documents.fixture';
+import { TEST_DATA } from '../../../e2e.config';
+import { waitForProcessingComplete } from '../../../helpers/api/processing';
+import { deleteAllDocuments } from '../../../helpers/api/documents';
 
-const PDF_PATH = path.resolve(__dirname, '../../fixtures/files/test-document.pdf');
-const IMAGE_PATH = path.resolve(__dirname, '../../fixtures/files/test-image.png');
+const PDF_PATH = path.resolve(__dirname, '../../../fixtures/files/test-document.pdf');
+const IMAGE_PATH = path.resolve(__dirname, '../../../fixtures/files/test-image.png');
 
 test.describe.configure({ mode: 'serial' });
 
@@ -65,7 +66,7 @@ test.describe('Document upload and search workflow', () => {
   test('can search documents by extracted text content', async ({ documentListPage }) => {
     await documentListPage.goto();
 
-    await documentListPage.search(TEST_DATA.documents.searchableText);
+    await documentListPage.search(TEST_DATA.documents.files.searchableText);
     await documentListPage.waitForDocumentVisible('test-document');
     await expect(documentListPage.page.getByText('test-image').first()).not.toBeVisible();
 

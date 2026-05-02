@@ -9,20 +9,22 @@ export const AUTH_STATE = {
 };
 
 export const TEST_DATA = {
-  tags: {
-    finance: 'e2e-finance',
-    invoices: 'e2e-finance/invoices',
-    contracts: 'e2e-contracts',
-    bulkTag1: 'e2e-bulk-tag-1',
-    bulkTag2: 'e2e-bulk-tag-2',
-  },
-  parties: {
-    acmeCorp: 'Acme Corporation',
-    johnDoe: 'John Doe',
-  },
   documents: {
-    pdfName: 'E2E Test Document',
-    imageName: 'E2E Test Image',
-    searchableText: 'Invoice #12345',
+    tags: {
+      finance: 'e2e-finance',
+      invoices: 'e2e-finance/invoices',
+      contracts: 'e2e-contracts',
+      bulkTag1: 'e2e-bulk-tag-1',
+      bulkTag2: 'e2e-bulk-tag-2',
+    },
+    parties: {
+      acmeCorp: 'Acme Corporation',
+      johnDoe: 'John Doe',
+    },
+    files: {
+      pdfName: 'E2E Test Document',
+      imageName: 'E2E Test Image',
+      searchableText: 'Invoice #12345',
+    },
   },
 };
