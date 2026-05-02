@@ -117,25 +117,27 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           </div>
         </div>
       } @else if (account(); as a) {
-        <header class="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground sm:flex-row sm:items-start sm:justify-between">
-          <div class="flex flex-col gap-2 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <h1 class="text-2xl font-semibold truncate">{{ a.name }}</h1>
-              <app-kind-badge [kind]="a.kind" />
-              @if (a.isArchived) {
-                <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Archived</span>
+        <header class="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground">
+          <div class="flex flex-row items-start justify-between gap-3">
+            <div class="flex flex-col gap-2 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-2xl font-semibold truncate">{{ a.name }}</h1>
+                <app-kind-badge [kind]="a.kind" />
+                @if (a.isArchived) {
+                  <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Archived</span>
+                }
+              </div>
+              @if (a.institution) {
+                <p class="text-sm text-muted-foreground">{{ a.institution }}</p>
               }
             </div>
-            @if (a.institution) {
-              <p class="text-sm text-muted-foreground">{{ a.institution }}</p>
-            }
-          </div>
-          <div class="flex flex-col items-end gap-6 shrink-0">
-            <button hlmBtn variant="outline" size="sm" (click)="openEdit()">
+            <button hlmBtn variant="outline" size="sm" class="shrink-0" (click)="openEdit()">
               <ng-icon hlm name="lucidePencil" size="sm" />
-              Edit account
+              Edit
             </button>
-            <div class="text-right tabular-nums">
+          </div>
+          <div class="flex flex-row justify-end tabular-nums">
+            <div class="text-right">
               <p class="text-xs uppercase tracking-wide text-muted-foreground">Balance</p>
               <p class="text-3xl font-semibold">{{ displayText() ?? '—' }}</p>
               @if (showNative() && nativeText(); as nt) {
