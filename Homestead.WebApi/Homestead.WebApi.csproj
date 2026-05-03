@@ -17,19 +17,19 @@
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Asp.Versioning.Http" Version="10.0.0" />
-        <PackageReference Include="Cronos" Version="0.11.0" />
+        <PackageReference Include="Cronos" Version="0.13.0" />
         <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.7">
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.JsonPatch.SystemTextJson" Version="10.0.7" />
-        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
         <PackageReference Include="MediatR" Version="12.4.1" />
-        <PackageReference Include="Scalar.AspNetCore" Version="2.12.41" />
+        <PackageReference Include="Scalar.AspNetCore" Version="2.14.9" />
         <PackageReference Include="PdfPig" Version="0.1.14" />
         <PackageReference Include="SkiaSharp" Version="3.119.2" />
         <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.2" />
-        <PackageReference Include="PDFtoImage" Version="4.1.1" />
+        <PackageReference Include="PDFtoImage" Version="5.2.1" />
     </ItemGroup>
 
     <ItemGroup>
