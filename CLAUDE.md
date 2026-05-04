@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Homestead is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi, PostgreSQL, and Keycloak. Authentication is handled by ASP.NET Core Identity with cookie-based auth, with optional OIDC for external providers (Keycloak, Authentik, Auth0).
+Homestead is a full-stack document management application with a .NET 10 backend API and Angular v21 frontend. It uses .NET Aspire for local orchestration of the WebApi, PostgreSQL, and Keycloak. OIDC is the only sign-in method — ASP.NET Core Identity has been removed; `AppUser` is a plain EF entity and authentication is cookie-based via `AddCookie()` with the OIDC handler bridging external sign-in. Any OIDC-compliant IdP works (Keycloak is used locally; Authentik / Auth0 / etc. work in production).
 
 ## Project Structure
 
@@ -76,7 +76,7 @@ cd Homestead.WebApp && npm test
 cd Homestead.E2E && npm run e2e
 ```
 
-**E2E business workflow tests only** (faster — skips OIDC suites):
+**E2E business workflow tests only** (faster — skips auth suites):
 ```bash
 cd Homestead.E2E && npx playwright test --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash
 ```

@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/auth.fixture';
 
-test.describe('OIDC-only auth mode (fresh database)', () => {
+test.describe('Anonymous access (fresh database)', () => {
   test('redirects to login page', async ({ page }) => {
     await page.goto('/');
     await page.waitForURL('**/login');
