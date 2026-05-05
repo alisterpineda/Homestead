@@ -84,8 +84,8 @@ test.describe('Tag workflow', () => {
   test('can filter documents by tag', async ({ page, documentListPage }) => {
     await documentListPage.goto();
 
-    // Open Tags filter popover and wait for it to render
-    await page.getByRole('button', { name: 'Tags' }).first().click();
+    // Open the unified filter popover and wait for it to render
+    await page.getByRole('button', { name: 'Filter documents' }).click();
     const filterSearch = page.getByPlaceholder('Search tags...');
     await expect(filterSearch).toBeVisible();
 
