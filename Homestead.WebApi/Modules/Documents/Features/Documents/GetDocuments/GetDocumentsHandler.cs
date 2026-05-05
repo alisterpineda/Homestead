@@ -8,64 +8,23 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 
 public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessService)
-    : IRequestHandler<GetDocumentsQuery, PaginatedResponse<GetDocumentsResponse>>
+    : IRequestHandler<GetDocumentsQuery, GetDocumentsResult>
 {
     private const string TsLanguage = "english";
-    public async Task<PaginatedResponse<GetDocumentsResponse>> Handle(
+    // word_similarity finds the best-matching continuous extent of trigrams within the
+    // document name, so it tolerates long names ("Mazda Receipt 2023.pdf") matched by
+    // a short search ("mazdo") far better than plain similarity(). 0.3 is below pg_trgm's
+    // 0.6 word_similarity default but matches the similarity() default — calibrated so
+    // mid-word typos ("invioce" → "invoice", score ≈ 0.33) still surface. Unrelated words
+    // ("qqqzzz") score well below 0.1, so noise stays low.
+    private const double SuggestionSimilarityThreshold = 0.3;
+    private const int SuggestionLimit = 5;
+    private const int SuggestionMinSearchLength = 3;
+
+    public async Task<GetDocumentsResult> Handle(
         GetDocumentsQuery request, CancellationToken ct)
     {
-        IQueryable<Domain.Documents.Document> query;
-
-        if (request.Deleted == true)
-        {
-            query = accessService.FilterByAccess(
-                db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.DeletedAt != null));
-        }
-        else
-        {
-            query = accessService.FilterByAccess(db.Documents.AsNoTracking());
-        }
-
-        if (request.GroupId.HasValue)
-        {
-            query = query.Where(d => d.GroupId == request.GroupId.Value);
-        }
-
-        if (request.PartyIds is { Length: > 0 })
-        {
-            query = query.Where(d =>
-                d.DocumentParties.Any(dp => request.PartyIds.Contains(dp.PartyId)));
-        }
-
-        if (request.TagIds is { Length: > 0 })
-        {
-            if (request.IncludeChildTags)
-            {
-                var selectedPaths = await db.Tags.AsNoTracking()
-                    .Where(t => request.TagIds.Contains(t.Id))
-                    .Select(t => t.Path)
-                    .ToListAsync(ct);
-
-                var expandedTagIds = db.Tags.AsNoTracking()
-                    .Where(t => request.TagIds.Contains(t.Id));
-
-                foreach (var path in selectedPaths)
-                {
-                    expandedTagIds = expandedTagIds.Union(
-                        db.Tags.AsNoTracking().Where(t => t.Path.StartsWith(path + "/")));
-                }
-
-                var tagIdList = await expandedTagIds.Select(t => t.Id).ToListAsync(ct);
-
-                query = query.Where(d =>
-                    d.DocumentTags.Any(dt => tagIdList.Contains(dt.TagId)));
-            }
-            else
-            {
-                query = query.Where(d =>
-                    d.DocumentTags.Any(dt => request.TagIds.Contains(dt.TagId)));
-            }
-        }
+        var query = await BuildScopedQueryAsync(request, ct);
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
         string? tsQueryString = search is not null ? BuildPrefixTsQuery(search) : null;
@@ -86,7 +45,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
 
         var defaultSort = request.Deleted == true ? DocumentSortBy.DeletedAt : (DocumentSortBy?)null;
 
-        return await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, tsQueryString)
+        var paged = await ApplySort(query, request.SortBy ?? defaultSort, request.SortDir, tsQueryString)
             .Select(d => new
             {
                 d.Id,
@@ -153,6 +112,92 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 Parties = d.Parties
             })
             .ToPaginatedAsync(request, ct);
+
+        IReadOnlyList<string> suggestions = [];
+        if (paged.TotalCount == 0 && search is not null && search.Length >= SuggestionMinSearchLength)
+        {
+            var suggestionScope = await BuildScopedQueryAsync(request, ct);
+            suggestions = await suggestionScope
+                .Where(d => EF.Functions.TrigramsWordSimilarity(search, d.Name) >= SuggestionSimilarityThreshold)
+                .GroupBy(d => d.Name)
+                .Select(g => new
+                {
+                    Name = g.Key,
+                    Score = g.Max(d => EF.Functions.TrigramsWordSimilarity(search, d.Name))
+                })
+                .OrderByDescending(x => x.Score)
+                .Take(SuggestionLimit)
+                .Select(x => x.Name)
+                .ToListAsync(ct);
+        }
+
+        return new GetDocumentsResult
+        {
+            Items = paged.Items,
+            Page = paged.Page,
+            PageSize = paged.PageSize,
+            TotalCount = paged.TotalCount,
+            Suggestions = suggestions
+        };
+    }
+
+    private async Task<IQueryable<Domain.Documents.Document>> BuildScopedQueryAsync(
+        GetDocumentsQuery request, CancellationToken ct)
+    {
+        IQueryable<Domain.Documents.Document> query;
+
+        if (request.Deleted == true)
+        {
+            query = accessService.FilterByAccess(
+                db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.DeletedAt != null));
+        }
+        else
+        {
+            query = accessService.FilterByAccess(db.Documents.AsNoTracking());
+        }
+
+        if (request.GroupId.HasValue)
+        {
+            query = query.Where(d => d.GroupId == request.GroupId.Value);
+        }
+
+        if (request.PartyIds is { Length: > 0 })
+        {
+            query = query.Where(d =>
+                d.DocumentParties.Any(dp => request.PartyIds.Contains(dp.PartyId)));
+        }
+
+        if (request.TagIds is { Length: > 0 })
+        {
+            if (request.IncludeChildTags)
+            {
+                var selectedPaths = await db.Tags.AsNoTracking()
+                    .Where(t => request.TagIds.Contains(t.Id))
+                    .Select(t => t.Path)
+                    .ToListAsync(ct);
+
+                var expandedTagIds = db.Tags.AsNoTracking()
+                    .Where(t => request.TagIds.Contains(t.Id));
+
+                foreach (var path in selectedPaths)
+                {
+                    expandedTagIds = expandedTagIds.Union(
+                        db.Tags.AsNoTracking().Where(t => t.Path.StartsWith(path + "/")));
+                }
+
+                var tagIdList = await expandedTagIds.Select(t => t.Id).ToListAsync(ct);
+
+                query = query.Where(d =>
+                    d.DocumentTags.Any(dt => tagIdList.Contains(dt.TagId)));
+            }
+            else
+            {
+                query = query.Where(d =>
+                    d.DocumentTags.Any(dt => request.TagIds.Contains(dt.TagId)));
+            }
+        }
+
+        return query;
     }
 
     private static string SanitizeTsQueryTerm(string term)

@@ -17,7 +17,7 @@ import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
 import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
 import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
-import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
+import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
 import type { PatchDocumentResponse } from '@/api/generated/models/patch-document-response';
@@ -49,7 +49,7 @@ export class DocumentApiService {
   private http = inject(HttpClient);
   private config = inject(ApiConfiguration);
 
-  getDocuments(params: Parameters<typeof getDocuments>[2]): Observable<PaginatedResponseOfGetDocumentsResponse> {
+  getDocuments(params: Parameters<typeof getDocuments>[2]): Observable<GetDocumentsResult> {
     return getDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 

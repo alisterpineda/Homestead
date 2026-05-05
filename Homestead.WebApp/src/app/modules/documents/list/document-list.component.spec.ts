@@ -348,4 +348,56 @@ describe('DocumentListComponent', () => {
       expect(component.resolvedPartyOptions()).toEqual([{ id: 'party-a', label: 'Acme' }]);
     });
   });
+
+  describe('search suggestions', () => {
+    it('renders suggestion buttons in the filtered-empty state when API returns suggestions', () => {
+      (component as any).searchTerm = signal('invioce');
+      (component as any).data = signal({
+        items: [],
+        page: 1,
+        pageSize: 10,
+        totalCount: 0,
+        totalPages: 0,
+        suggestions: ['Invoice 2024.pdf', 'Invoice 2023.pdf'],
+      });
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement;
+      const labels = Array.from(host.querySelectorAll('button'))
+        .map(b => b.textContent?.trim() ?? '');
+      expect(labels).toContain('Invoice 2024.pdf');
+      expect(labels).toContain('Invoice 2023.pdf');
+    });
+
+    it('clicking a suggestion sets searchInput and navigates with the suggestion as the search term', () => {
+      const router = TestBed.inject(Router);
+      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      component.applySuggestion('Invoice 2024.pdf');
+
+      expect(component.searchInput()).toBe('Invoice 2024.pdf');
+      expect(navigateSpy).toHaveBeenCalledWith(['/documents'], expect.objectContaining({
+        queryParams: { page: 1, search: 'Invoice 2024.pdf' },
+        queryParamsHandling: 'merge',
+      }));
+    });
+
+    it('does not render the "Did you mean" block when suggestions array is empty', () => {
+      (component as any).searchTerm = signal('qqqzzz');
+      (component as any).data = signal({
+        items: [],
+        page: 1,
+        pageSize: 10,
+        totalCount: 0,
+        totalPages: 0,
+        suggestions: [],
+      });
+      fixture.detectChanges();
+
+      const host: HTMLElement = fixture.nativeElement;
+      const labels = Array.from(host.querySelectorAll('div'))
+        .filter(d => d.textContent?.trim() === 'Did you mean');
+      expect(labels).toHaveLength(0);
+    });
+  });
 });

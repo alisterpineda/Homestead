@@ -55,6 +55,22 @@ When the user has typed a search term, sort is overridden by FTS rank — the mo
 
 The "search hides sort" rule is intentional: the search-first design means a query implies "show me what's most relevant," and any other ordering would defeat that. The rule is consistent across the live list and the trash list.
 
+## "Did you mean…?" suggestions
+
+When the primary search returns zero results, the list endpoint runs a second, narrow query over `Document.Name` to find names that are *close* to the typed query and surfaces them as explicit "Did you mean…?" chips above the empty-state. The user clicks a chip to retry the search with the suggested name; nothing is silently re-ranked or auto-corrected.
+
+The suggestion query uses PostgreSQL `pg_trgm` `word_similarity()` against the document name. `word_similarity` finds the best-matching continuous extent of trigrams within the name, which tolerates typos against long filenames (e.g., `mazdo` → `Mazda Receipt 2023.pdf`) where plain `similarity()` would score below the threshold because of the surrounding text. The threshold is calibrated so single-letter mid-word typos still surface; unrelated strings score well below the threshold and produce no chips. Up to five distinct names are returned, ordered by descending score.
+
+Rules:
+
+- **Only when there are zero results.** A successful primary match never shows suggestions — they are a recovery affordance, not an always-on signal.
+- **Only when the query is at least three characters.** Two-character queries produce too much trigram noise to be useful.
+- **Filters apply.** Group, party, tag, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
+- **Source is `Document.Name` only in v1.** Extracted text, tag names, and party names are not yet sources of suggestions. Names are the smallest, highest-signal corpus and the most common typo target. The other gaps are tracked separately.
+- **Distinct.** Two documents with the same name produce one chip, not two.
+
+The trigram GIN index on `Document.Name` (added alongside this feature) accelerates both the suggestion query and the primary `ILIKE` substring match described above.
+
 ## Index maintenance and direct edits
 
 `Document.SearchVector` is maintained by application code only. A direct database edit to a document's name or to a version's extracted text — outside the application's command handlers — leaves the search vector stale. The audit log will not capture such edits either; the application's command handlers are the only supported way to mutate documents.

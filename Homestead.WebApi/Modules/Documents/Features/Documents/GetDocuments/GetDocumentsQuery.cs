@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 
-public record GetDocumentsQuery : PaginatedRequest, IRequest<PaginatedResponse<GetDocumentsResponse>>
+public record GetDocumentsQuery : PaginatedRequest, IRequest<GetDocumentsResult>
 {
     [FromQuery(Name = "PartyIds")]
     public Guid[]? PartyIds { get; init; }

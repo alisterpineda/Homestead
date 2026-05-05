@@ -19,7 +19,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - A user-visible activity stream that interleaves field-level audit log entries and user comments.
 - Trash with restore and permanent-delete (soft-delete only for documents; everywhere else delete is destructive).
 - Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk download.
-- PostgreSQL full-text search across document name (weighted A) and the latest version's extracted text (weighted B), with ILIKE fallbacks on both fields and prefix-expansion on user input.
+- PostgreSQL full-text search across document name (weighted A) and the latest version's extracted text (weighted B), with ILIKE fallbacks on both fields and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
 - ZIP download organised by tag path, with a dedicated `_Untagged/` folder and party names embedded in filenames.
 - Household-wide choice of text-extraction engine, with a built-in fallback.
 
@@ -88,7 +88,7 @@ Trash retention is unbounded in v1 — nothing auto-purges. Configurable retenti
 
 ### Search
 
-The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in three OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B), with prefix-expansion on user input. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search.
+The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in three OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B), with prefix-expansion on user input. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search. When the primary search returns no results, the list surfaces "Did you mean…?" chips drawn from a `pg_trgm` fuzzy match against document names — opt-in, never silent.
 
 See [search.md](search.md) for the query mechanics, weighting, prefix expansion, sort interaction, and the filter taxonomy.
 

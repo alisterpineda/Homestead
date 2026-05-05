@@ -17,7 +17,7 @@ import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { DocumentApiService } from '@/api/services/document-api.service';
-import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
+import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import { formatBytes } from '@/shared/utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
@@ -288,7 +288,7 @@ export class TrashListComponent {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r as PaginatedResponseOfGetDocumentsResponse;
+            return r as GetDocumentsResult;
           }),
           handleQueryError(this.loading, this.error, null),
         );

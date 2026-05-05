@@ -59,6 +59,7 @@ export type { GetDocumentPartyDto } from './models/get-document-party-dto';
 export type { GetDocumentResponse } from './models/get-document-response';
 export type { GetDocumentsPartyDto } from './models/get-documents-party-dto';
 export type { GetDocumentsResponse } from './models/get-documents-response';
+export type { GetDocumentsResult } from './models/get-documents-result';
 export type { GetDocumentsTagDto } from './models/get-documents-tag-dto';
 export type { GetDocumentTagDto } from './models/get-document-tag-dto';
 export type { GetDocumentVersionDto } from './models/get-document-version-dto';
@@ -96,7 +97,6 @@ export type { PaginatedResponseOfAccountResponse } from './models/paginated-resp
 export type { PaginatedResponseOfCommodityPriceResponse } from './models/paginated-response-of-commodity-price-response';
 export type { PaginatedResponseOfCommodityResponse } from './models/paginated-response-of-commodity-response';
 export type { PaginatedResponseOfGetActivityResponse } from './models/paginated-response-of-get-activity-response';
-export type { PaginatedResponseOfGetDocumentsResponse } from './models/paginated-response-of-get-documents-response';
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';

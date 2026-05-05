@@ -4,6 +4,9 @@ internal record JobResponse(Guid JobId);
 
 internal record PaginatedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
+internal record PaginatedResultWithSuggestions<T>(
+    IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, IReadOnlyList<string> Suggestions);
+
 internal record BulkDeleteResult(int DeletedCount);
 
 internal record BulkReprocessResult(IReadOnlyList<Guid> JobIds);

@@ -37,7 +37,7 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { DownloadApiService } from '@/api/services/download-api.service';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { PartyApiService } from '@/api/services/party-api.service';
-import type { PaginatedResponseOfGetDocumentsResponse } from '@/api/generated/models/paginated-response-of-get-documents-response';
+import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -337,6 +337,18 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <div hlmEmptyTitle>No matching documents</div>
                 <div hlmEmptyDescription>Try adjusting your search or filters to find what you're looking for.</div>
               </div>
+              @if (searchSuggestions().length > 0) {
+                <div hlmEmptyContent>
+                  <div class="text-sm text-muted-foreground">Did you mean</div>
+                  <div class="flex flex-wrap items-center justify-center gap-2">
+                    @for (suggestion of searchSuggestions(); track suggestion) {
+                      <button hlmBtn variant="outline" size="sm" (click)="applySuggestion(suggestion)">
+                        {{ suggestion }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
               <div hlmEmptyContent>
                 <button hlmBtn variant="outline" size="sm" (click)="resetFilters()">
                   Reset filters
@@ -513,6 +525,9 @@ export class DocumentListComponent implements OnDestroy {
 
   /** Show the "No matching documents" empty state (filters active but no results). */
   showFilteredEmpty = computed(() => !this.hasItems() && this.hasActiveFilters());
+
+  /** Fuzzy "Did you mean…?" suggestions surfaced when search returns no results. */
+  searchSuggestions = computed<string[]>(() => this.data()?.suggestions ?? []);
 
   partyOptions = toSignal(
     toObservable(this.partyFilterSearch).pipe(
@@ -728,7 +743,7 @@ export class DocumentListComponent implements OnDestroy {
         }).pipe(
           map((r) => {
             this.loading.set(false);
-            return r as PaginatedResponseOfGetDocumentsResponse;
+            return r as GetDocumentsResult;
           }),
           handleQueryError(this.loading, this.error, null),
         );
@@ -842,6 +857,15 @@ export class DocumentListComponent implements OnDestroy {
       [id]: prev[id] === false,
     }));
     this.prefs.documentColumnVisibility.set(this.columnVisibility());
+  }
+
+  applySuggestion(suggestion: string): void {
+    this.searchInput.set(suggestion);
+    this.router.navigate(['/documents'], {
+      queryParams: { page: 1, search: suggestion },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   resetFilters(): void {

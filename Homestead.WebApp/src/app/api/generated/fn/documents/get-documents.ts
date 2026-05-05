@@ -8,7 +8,7 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 import { DocumentSortBy } from '../../models/document-sort-by';
-import { PaginatedResponseOfGetDocumentsResponse } from '../../models/paginated-response-of-get-documents-response';
+import { GetDocumentsResult } from '../../models/get-documents-result';
 import { SortDirection } from '../../models/sort-direction';
 
 export interface GetDocuments$Params {
@@ -24,7 +24,7 @@ export interface GetDocuments$Params {
   PageSize: number;
 }
 
-export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetDocumentsResponse>> {
+export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<GetDocumentsResult>> {
   const rb = new RequestBuilder(rootUrl, getDocuments.PATH, 'get');
   if (params) {
     rb.query('PartyIds', params.PartyIds, {});
@@ -44,7 +44,7 @@ export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocum
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<PaginatedResponseOfGetDocumentsResponse>;
+      return r as StrictHttpResponse<GetDocumentsResult>;
     })
   );
 }

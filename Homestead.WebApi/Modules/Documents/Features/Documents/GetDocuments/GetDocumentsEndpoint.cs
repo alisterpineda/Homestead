@@ -1,6 +1,4 @@
-using Homestead.WebApi.Common;
 using MediatR;
-using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 
@@ -15,6 +13,6 @@ public static class GetDocumentsEndpoint
             return Results.Ok(response);
         })
         .WithName("GetDocuments")
-        .Produces<PaginatedResponse<GetDocumentsResponse>>();
+        .Produces<GetDocumentsResult>();
     }
 }
