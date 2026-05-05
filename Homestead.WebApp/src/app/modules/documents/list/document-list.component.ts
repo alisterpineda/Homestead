@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, OnDestroy, DestroyRef, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnDestroy, DestroyRef, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -90,6 +90,8 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <app-documents-filter-panel
                     [tagOptions]="tagOptions()"
                     [partyOptions]="partyOptions()"
+                    [resolvedTagOptions]="resolvedTagOptions()"
+                    [resolvedPartyOptions]="resolvedPartyOptions()"
                     [selectedTagIds]="selectedTagIds()"
                     [selectedPartyIds]="selectedPartyIds()"
                     [includeChildTags]="includeChildTags()"
@@ -567,6 +569,14 @@ export class DocumentListComponent implements OnDestroy {
     { initialValue: [] as FilterOption[] },
   );
 
+  private resolvedTags = signal<Map<string, FilterOption>>(new Map());
+  private resolvedParties = signal<Map<string, FilterOption>>(new Map());
+  private inflightTagIds = new Set<string>();
+  private inflightPartyIds = new Set<string>();
+
+  resolvedTagOptions = computed(() => Array.from(this.resolvedTags().values()));
+  resolvedPartyOptions = computed(() => Array.from(this.resolvedParties().values()));
+
 
   private searchSub: Subscription;
 
@@ -620,6 +630,58 @@ export class DocumentListComponent implements OnDestroy {
       if (items) {
         this.openDocumentsService.setNavigationList(items.map(d => d.id));
       }
+    });
+
+    effect(() => {
+      const ids = this.selectedTagIds();
+      if (ids.length === 0) return;
+      const known = untracked(this.resolvedTags);
+      const missing = ids.filter(id => !known.has(id) && !this.inflightTagIds.has(id));
+      if (missing.length === 0) return;
+      for (const id of missing) this.inflightTagIds.add(id);
+      this.tagApi.getTagsByIds({ body: { ids: missing } })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: tags => {
+            if (tags.length > 0) {
+              this.resolvedTags.update(prev => {
+                const next = new Map(prev);
+                for (const t of tags) next.set(t.id, { id: t.id, label: t.path });
+                return next;
+              });
+            }
+            for (const id of missing) this.inflightTagIds.delete(id);
+          },
+          error: () => {
+            for (const id of missing) this.inflightTagIds.delete(id);
+          },
+        });
+    });
+
+    effect(() => {
+      const ids = this.selectedPartyIds();
+      if (ids.length === 0) return;
+      const known = untracked(this.resolvedParties);
+      const missing = ids.filter(id => !known.has(id) && !this.inflightPartyIds.has(id));
+      if (missing.length === 0) return;
+      for (const id of missing) this.inflightPartyIds.add(id);
+      this.partyApi.getPartiesByIds({ body: { ids: missing } })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: parties => {
+            if (parties.length > 0) {
+              this.resolvedParties.update(prev => {
+                const next = new Map(prev);
+                for (const p of parties) next.set(p.id, { id: p.id, label: p.name });
+                return next;
+              });
+            }
+            for (const id of missing) this.inflightPartyIds.delete(id);
+          },
+          error: () => {
+            for (const id of missing) this.inflightPartyIds.delete(id);
+          },
+        });
     });
   }
 

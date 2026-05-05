@@ -66,6 +66,8 @@ export type { GetDocumentVersionResponse } from './models/get-document-version-r
 export type { GetDocumentVersionsResponse } from './models/get-document-versions-response';
 export type { GetMyGroupsResponse } from './models/get-my-groups-response';
 export type { GetNetWorthHistoryResponse } from './models/get-net-worth-history-response';
+export type { GetPartiesByIdsQuery } from './models/get-parties-by-ids-query';
+export type { GetPartiesByIdsResponse } from './models/get-parties-by-ids-response';
 export type { GetPartiesResponse } from './models/get-parties-response';
 export type { GetPartyResponse } from './models/get-party-response';
 export type { GetPriceSourceResponse } from './models/get-price-source-response';
@@ -73,6 +75,8 @@ export type { GetPriceSourcesResponse } from './models/get-price-sources-respons
 export type { GetProcessingJobsResponse } from './models/get-processing-jobs-response';
 export type { GetProcessingSchedulesResponse } from './models/get-processing-schedules-response';
 export type { GetStatusResponse } from './models/get-status-response';
+export type { GetTagsByIdsQuery } from './models/get-tags-by-ids-query';
+export type { GetTagsByIdsResponse } from './models/get-tags-by-ids-response';
 export type { GetTagsResponse } from './models/get-tags-response';
 export type { GetUserInfoResponse } from './models/get-user-info-response';
 export type { GroupAccessLevel } from './models/group-access-level';

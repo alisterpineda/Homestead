@@ -677,6 +677,75 @@ public class TagTests : IntegrationTestBase
         Assert.Null(tags!.Items.Single(t => t.Name == "ClearDescTag").Description);
     }
 
+    [Fact]
+    public async Task ResolveTags_KnownIds_ReturnsIdAndPath()
+    {
+        var client = await CreateAdminClientAsync();
+        var r1 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RvA" }, CT);
+        var t1 = await r1.Content.ReadFromJsonAsync<TagResult>(CT);
+        var r2 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RvParent/RvB" }, CT);
+        var t2 = await r2.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags/resolve", new
+        {
+            ids = new[] { t1!.Id, t2!.Id }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<List<TagResolveItem>>(CT);
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Count);
+        Assert.Contains(body, x => x.Id == t1.Id && x.Path == "RvA");
+        Assert.Contains(body, x => x.Id == t2.Id && x.Path == "RvParent/RvB");
+    }
+
+    [Fact]
+    public async Task ResolveTags_UnknownIds_AreSilentlyDropped()
+    {
+        var client = await CreateAdminClientAsync();
+        var r1 = await client.PostAsJsonAsync("/api/v1/documents/tags", new { path = "RvSingle" }, CT);
+        var t1 = await r1.Content.ReadFromJsonAsync<TagResult>(CT);
+
+        var unknownId = Guid.NewGuid();
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags/resolve", new
+        {
+            ids = new[] { t1!.Id, unknownId }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<List<TagResolveItem>>(CT);
+        Assert.NotNull(body);
+        Assert.Single(body);
+        Assert.Equal(t1.Id, body[0].Id);
+    }
+
+    [Fact]
+    public async Task ResolveTags_EmptyIds_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags/resolve", new
+        {
+            ids = Array.Empty<Guid>()
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolveTags_TooManyIds_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var ids = Enumerable.Range(0, 201).Select(_ => Guid.NewGuid()).ToArray();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/tags/resolve", new
+        {
+            ids
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task AssignTagAsync(HttpClient client, Guid docId, string tagPath)
     {
         // Get current tag paths on the document
@@ -695,6 +764,7 @@ public class TagTests : IntegrationTestBase
 
     private record TagResult(Guid Id, string Name, string Path, Guid? ParentId, string? Color, string? EffectiveColor, string? Description,
         DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+    private record TagResolveItem(Guid Id, string Path);
     private record TagListItem(Guid Id, string Name, string Path, string? Description, int DocumentCount,
         DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailTag> Tags);

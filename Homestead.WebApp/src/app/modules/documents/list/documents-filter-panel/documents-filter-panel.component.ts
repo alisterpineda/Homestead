@@ -173,6 +173,8 @@ export interface FilterOption {
 export class DocumentsFilterPanelComponent {
   tagOptions = input<FilterOption[]>([]);
   partyOptions = input<FilterOption[]>([]);
+  resolvedTagOptions = input<FilterOption[]>([]);
+  resolvedPartyOptions = input<FilterOption[]>([]);
   selectedTagIds = input<string[]>([]);
   selectedPartyIds = input<string[]>([]);
   includeChildTags = input(false);
@@ -217,20 +219,26 @@ export class DocumentsFilterPanelComponent {
     });
   }
 
-  displayTagOptions = computed(() => this.partition(this.selectedTagIds(), this.tagOptions(), this.tagLabelCache()));
-  displayPartyOptions = computed(() => this.partition(this.selectedPartyIds(), this.partyOptions(), this.partyLabelCache()));
+  displayTagOptions = computed(() => this.partition(this.selectedTagIds(), this.tagOptions(), this.resolvedTagOptions(), this.tagLabelCache()));
+  displayPartyOptions = computed(() => this.partition(this.selectedPartyIds(), this.partyOptions(), this.resolvedPartyOptions(), this.partyLabelCache()));
 
-  private partition(selectedIds: string[], opts: FilterOption[], cache: Map<string, string>): { selected: FilterOption[]; unselected: FilterOption[] } {
+  private partition(selectedIds: string[], opts: FilterOption[], resolved: FilterOption[], cache: Map<string, string>): { selected: FilterOption[]; unselected: FilterOption[] } {
     const optMap = new Map(opts.map(o => [o.id, o]));
+    const resolvedMap = new Map(resolved.map(o => [o.id, o]));
     const selected: FilterOption[] = [];
     for (const id of selectedIds) {
       const fromOpts = optMap.get(id);
       if (fromOpts) {
         selected.push(fromOpts);
-      } else {
-        const cachedLabel = cache.get(id);
-        if (cachedLabel !== undefined) selected.push({ id, label: cachedLabel });
+        continue;
       }
+      const fromResolved = resolvedMap.get(id);
+      if (fromResolved) {
+        selected.push(fromResolved);
+        continue;
+      }
+      const cachedLabel = cache.get(id);
+      if (cachedLabel !== undefined) selected.push({ id, label: cachedLabel });
     }
     const selectedSet = new Set(selectedIds);
     const unselected = opts.filter(o => !selectedSet.has(o.id));

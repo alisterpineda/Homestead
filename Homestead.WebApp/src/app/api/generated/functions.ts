@@ -67,6 +67,8 @@ export type { UpdateParty$Params as UpdateParty$Params } from './fn/documents/up
 export { updateParty as updateParty } from './fn/documents/update-party';
 export type { DeleteParty$Params as DeleteParty$Params } from './fn/documents/delete-party';
 export { deleteParty as deleteParty } from './fn/documents/delete-party';
+export type { GetPartiesByIds$Params as GetPartiesByIds$Params } from './fn/documents/get-parties-by-ids';
+export { getPartiesByIds as getPartiesByIds } from './fn/documents/get-parties-by-ids';
 export type { BulkDeleteTags$Params as BulkDeleteTags$Params } from './fn/documents/bulk-delete-tags';
 export { bulkDeleteTags as bulkDeleteTags } from './fn/documents/bulk-delete-tags';
 export type { GetTags$Params as GetTags$Params } from './fn/documents/get-tags';
@@ -77,6 +79,8 @@ export type { DeleteTag$Params as DeleteTag$Params } from './fn/documents/delete
 export { deleteTag as deleteTag } from './fn/documents/delete-tag';
 export type { PatchTag$Params as PatchTag$Params } from './fn/documents/patch-tag';
 export { patchTag as patchTag } from './fn/documents/patch-tag';
+export type { GetTagsByIds$Params as GetTagsByIds$Params } from './fn/documents/get-tags-by-ids';
+export { getTagsByIds as getTagsByIds } from './fn/documents/get-tags-by-ids';
 export type { GetMyGroups$Params as GetMyGroups$Params } from './fn/documents/get-my-groups';
 export { getMyGroups as getMyGroups } from './fn/documents/get-my-groups';
 export type { DownloadDocuments$Params as DownloadDocuments$Params } from './fn/documents/download-documents';

@@ -2,9 +2,12 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
+import { of, Subject } from 'rxjs';
 import { DocumentListComponent } from './document-list.component';
 import { DEFAULT_COLUMN_VISIBILITY } from './document-table/document-table.component';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
+import { TagApiService } from '@/api/services/tag-api.service';
+import { PartyApiService } from '@/api/services/party-api.service';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 
 describe('DocumentListComponent', () => {
@@ -251,6 +254,98 @@ describe('DocumentListComponent', () => {
       component.onToggleColumn('createdAt');
       expect(component.columnVisibility()['createdAt']).toBe(true);
       expect(prefs.documentColumnVisibility()).toEqual(expect.objectContaining({ createdAt: true }));
+    });
+  });
+
+  describe('selected ID resolution', () => {
+    it('calls tagApi.getTagsByIds for missing IDs only when selectedTagIds change', async () => {
+      const tagApi = TestBed.inject(TagApiService);
+      const spy = vi.spyOn(tagApi, 'getTagsByIds').mockReturnValue(
+        of([{ id: 'tag-a', path: 'Alpha' }]),
+      );
+
+      // Force initial effects to register with empty selectedTagIds
+      fixture.detectChanges();
+      await fixture.whenStable();
+      spy.mockClear();
+
+      const router = TestBed.inject(Router);
+      await router.navigate([], { queryParams: { tagIds: 'tag-a' } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith({ body: { ids: ['tag-a'] } });
+      expect(component.resolvedTagOptions()).toEqual([{ id: 'tag-a', label: 'Alpha' }]);
+    });
+
+    it('only fetches new IDs when a second emission overlaps', async () => {
+      const tagApi = TestBed.inject(TagApiService);
+      const spy = vi.spyOn(tagApi, 'getTagsByIds')
+        .mockReturnValueOnce(of([{ id: 'tag-a', path: 'Alpha' }]))
+        .mockReturnValueOnce(of([{ id: 'tag-b', path: 'Bravo' }]));
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      spy.mockClear();
+
+      const router = TestBed.inject(Router);
+      await router.navigate([], { queryParams: { tagIds: 'tag-a' } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      await router.navigate([], { queryParams: { tagIds: ['tag-a', 'tag-b'] } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[0][0]).toEqual({ body: { ids: ['tag-a'] } });
+      expect(spy.mock.calls[1][0]).toEqual({ body: { ids: ['tag-b'] } });
+    });
+
+    it('does not double-fetch the same ID while a request is still in flight', async () => {
+      const tagApi = TestBed.inject(TagApiService);
+      const pending = new Subject<Array<{ id: string; path: string }>>();
+      const spy = vi.spyOn(tagApi, 'getTagsByIds').mockReturnValue(pending.asObservable());
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      spy.mockClear();
+
+      const router = TestBed.inject(Router);
+      await router.navigate([], { queryParams: { tagIds: 'tag-a' } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      // Re-emit selectedTagIds with the same value while the first call is still pending —
+      // the in-flight guard should block a second fetch for tag-a.
+      await router.navigate([], { queryParams: { tagIds: ['tag-a'], _t: '1' } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      pending.next([{ id: 'tag-a', path: 'Alpha' }]);
+      pending.complete();
+    });
+
+    it('calls partyApi.getPartiesByIds for missing IDs only when selectedPartyIds change', async () => {
+      const partyApi = TestBed.inject(PartyApiService);
+      const spy = vi.spyOn(partyApi, 'getPartiesByIds').mockReturnValue(
+        of([{ id: 'party-a', name: 'Acme' }]),
+      );
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      spy.mockClear();
+
+      const router = TestBed.inject(Router);
+      await router.navigate([], { queryParams: { partyIds: 'party-a' } });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith({ body: { ids: ['party-a'] } });
+      expect(component.resolvedPartyOptions()).toEqual([{ id: 'party-a', label: 'Acme' }]);
     });
   });
 });

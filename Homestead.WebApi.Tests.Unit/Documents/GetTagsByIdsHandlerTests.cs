@@ -1,0 +1,83 @@
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Modules.Documents.Features.Tags.GetTagsByIds;
+
+namespace Homestead.WebApi.Tests.Unit.Documents;
+
+public class GetTagsByIdsHandlerTests : IDisposable
+{
+    private readonly TestAppDbContext _db;
+    private readonly GetTagsByIdsHandler _sut;
+
+    public GetTagsByIdsHandlerTests()
+    {
+        _db = TestAppDbContext.Create();
+        _sut = new GetTagsByIdsHandler(_db);
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    [Fact]
+    public async Task Handle_KnownIds_ReturnsMatchingTags()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tagA = new Tag { Name = "Alpha", Path = "Alpha" };
+        var tagB = new Tag { Name = "Bravo", Path = "Parent/Bravo" };
+        var tagC = new Tag { Name = "Charlie", Path = "Charlie" };
+        _db.Tags.AddRange(tagA, tagB, tagC);
+        await _db.SaveChangesAsync(ct);
+
+        var result = await _sut.Handle(
+            new GetTagsByIdsQuery(new[] { tagA.Id, tagB.Id }),
+            ct);
+
+        Assert.Equal(2, result.Count);
+        var byId = result.ToDictionary(t => t.Id, t => t.Path);
+        Assert.Equal("Alpha", byId[tagA.Id]);
+        Assert.Equal("Parent/Bravo", byId[tagB.Id]);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownIds_AreSilentlyOmitted()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tagA = new Tag { Name = "Alpha", Path = "Alpha" };
+        _db.Tags.Add(tagA);
+        await _db.SaveChangesAsync(ct);
+
+        var unknownId = Guid.NewGuid();
+        var result = await _sut.Handle(
+            new GetTagsByIdsQuery(new[] { tagA.Id, unknownId }),
+            ct);
+
+        Assert.Single(result);
+        Assert.Equal(tagA.Id, result[0].Id);
+    }
+
+    [Fact]
+    public async Task Handle_AllUnknownIds_ReturnsEmptyList()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _db.Tags.Add(new Tag { Name = "Alpha", Path = "Alpha" });
+        await _db.SaveChangesAsync(ct);
+
+        var result = await _sut.Handle(
+            new GetTagsByIdsQuery(new[] { Guid.NewGuid(), Guid.NewGuid() }),
+            ct);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyIdList_ReturnsEmptyList()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _db.Tags.Add(new Tag { Name = "Alpha", Path = "Alpha" });
+        await _db.SaveChangesAsync(ct);
+
+        var result = await _sut.Handle(
+            new GetTagsByIdsQuery(Array.Empty<Guid>()),
+            ct);
+
+        Assert.Empty(result);
+    }
+}

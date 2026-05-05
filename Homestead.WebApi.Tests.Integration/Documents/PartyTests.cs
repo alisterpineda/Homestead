@@ -301,6 +301,72 @@ public class PartyTests : IntegrationTestBase
         Assert.Equal("Zeta Corp", names[1]);
     }
 
+    [Fact]
+    public async Task ResolveParties_KnownIds_ReturnsIdAndName()
+    {
+        var client = await CreateAdminClientAsync();
+        var p1 = await CreatePartyAsync(client, "RvParty A");
+        var p2 = await CreatePartyAsync(client, "RvParty B");
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/parties/resolve", new
+        {
+            ids = new[] { p1.Id, p2.Id }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<List<PartyResolveItem>>(CT);
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Count);
+        Assert.Contains(body, x => x.Id == p1.Id && x.Name == "RvParty A");
+        Assert.Contains(body, x => x.Id == p2.Id && x.Name == "RvParty B");
+    }
+
+    [Fact]
+    public async Task ResolveParties_UnknownIds_AreSilentlyDropped()
+    {
+        var client = await CreateAdminClientAsync();
+        var p1 = await CreatePartyAsync(client, "RvSingleParty");
+        var unknownId = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/parties/resolve", new
+        {
+            ids = new[] { p1.Id, unknownId }
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<List<PartyResolveItem>>(CT);
+        Assert.NotNull(body);
+        Assert.Single(body);
+        Assert.Equal(p1.Id, body[0].Id);
+    }
+
+    [Fact]
+    public async Task ResolveParties_EmptyIds_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/parties/resolve", new
+        {
+            ids = Array.Empty<Guid>()
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResolveParties_TooManyIds_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var ids = Enumerable.Range(0, 201).Select(_ => Guid.NewGuid()).ToArray();
+
+        var response = await client.PostAsJsonAsync("/api/v1/documents/parties/resolve", new
+        {
+            ids
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task AssignPartyAsync(HttpClient client, Guid docId, Guid partyId)
     {
         // Get current parties
@@ -319,6 +385,7 @@ public class PartyTests : IntegrationTestBase
 
     private record PartyResult(Guid Id, string Name, string? Description, DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
+    private record PartyResolveItem(Guid Id, string Name);
     private record PartyListItem(Guid Id, string Name, string? Description, int DocumentCount,
         DateTimeOffset UpdatedAt = default, Guid? UpdatedByUserId = null, string? UpdatedByUserName = null);
     private record DocumentDetail(Guid Id, string Name, IReadOnlyList<DocumentDetailParty> Parties);

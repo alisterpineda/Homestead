@@ -21,11 +21,13 @@ using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentThumbnail;
 using Homestead.WebApi.Modules.Documents.Features.MyGroups.GetMyGroups;
 using Homestead.WebApi.Modules.Documents.Features.Parties.GetParties;
+using Homestead.WebApi.Modules.Documents.Features.Parties.GetPartiesByIds;
 using Homestead.WebApi.Modules.Documents.Features.Parties.GetParty;
 using Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
 using Homestead.WebApi.Modules.Documents.Features.Versions.PatchDocumentVersion;
 using Homestead.WebApi.Modules.Documents.Features.Tags.CreateTag;
 using Homestead.WebApi.Modules.Documents.Features.Tags.GetTags;
+using Homestead.WebApi.Modules.Documents.Features.Tags.GetTagsByIds;
 using Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
 using Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
 using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVersion;
@@ -87,6 +89,7 @@ public static class DocumentsModule
         CreatePartyEndpoint.Map(parties);
         DeletePartyEndpoint.Map(parties);
         GetPartiesEndpoint.Map(parties);
+        GetPartiesByIdsEndpoint.Map(parties);
         GetPartyEndpoint.Map(parties);
         UpdatePartyEndpoint.Map(parties);
 
@@ -95,6 +98,7 @@ public static class DocumentsModule
         CreateTagEndpoint.Map(tags);
         DeleteTagEndpoint.Map(tags);
         GetTagsEndpoint.Map(tags);
+        GetTagsByIdsEndpoint.Map(tags);
         PatchTagEndpoint.Map(tags);
 
         var groups = v1.MapGroup("/groups");

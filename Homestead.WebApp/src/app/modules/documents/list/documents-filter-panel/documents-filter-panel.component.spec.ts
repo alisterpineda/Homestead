@@ -129,9 +129,33 @@ describe('DocumentsFilterPanelComponent', () => {
       expect(display.unselected.map(o => o.id)).toEqual(['b']);
     });
 
-    it('drops selected items whose label has never been observed', () => {
-      // Cache empty; selected id "ghost" was never seen in any tagOptions response
+    it('pins a selected ID using resolvedTagOptions when not in tagOptions or cache', () => {
+      // The user reloaded with ?tagIds=server-resolved active, but it isn't in the
+      // first page of tagOptions and the in-component cache has never seen it.
       fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
+      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'server-resolved', label: 'Resolved/Tag' }]);
+      fixture.componentRef.setInput('selectedTagIds', ['server-resolved']);
+      fixture.detectChanges();
+
+      const display = component.displayTagOptions();
+      expect(display.selected).toEqual([{ id: 'server-resolved', label: 'Resolved/Tag' }]);
+      expect(display.unselected.map(o => o.id)).toEqual(['b']);
+    });
+
+    it('prefers tagOptions over resolvedTagOptions when both contain the same ID', () => {
+      // Live `tagOptions` reflects in-session edits and should win.
+      fixture.componentRef.setInput('tagOptions', [{ id: 'a', label: 'Alpha-fresh' }]);
+      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'a', label: 'Alpha-stale' }]);
+      fixture.componentRef.setInput('selectedTagIds', ['a']);
+      fixture.detectChanges();
+
+      const display = component.displayTagOptions();
+      expect(display.selected).toEqual([{ id: 'a', label: 'Alpha-fresh' }]);
+    });
+
+    it('drops selected items whose label has never been observed and is not server-resolved', () => {
+      fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
+      fixture.componentRef.setInput('resolvedTagOptions', []);
       fixture.componentRef.setInput('selectedTagIds', ['ghost']);
       fixture.detectChanges();
 
