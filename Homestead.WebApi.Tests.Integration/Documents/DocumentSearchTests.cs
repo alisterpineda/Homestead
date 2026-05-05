@@ -201,6 +201,92 @@ public class DocumentSearchTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetDocuments_PhraseSearch_MatchesAdjacentWords()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Operating Agreement 2024.pdf");
+        await UploadAndWaitAsync(client, "Operating Manual.pdf");
+        await UploadAndWaitAsync(client, "Service Agreement.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=%22operating%20agreement%22", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Operating Agreement 2024.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_PhraseSearch_DoesNotMatchSeparatedWords()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Agreement for Operating Lease.pdf");
+        await UploadAndWaitAsync(client, "Operating Agreement.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=%22operating%20agreement%22", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Operating Agreement.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_MixedPhraseAndPrefix_RequiresBoth()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Operating Agreement 2024.pdf");
+        await UploadAndWaitAsync(client, "Operating Agreement 2023.pdf");
+        await UploadAndWaitAsync(client, "Tax Invoice 2024.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=%22operating%20agreement%22%202024", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Operating Agreement 2024.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_UnmatchedQuote_TreatedAsPrefixSearch()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Quarterly Report.pdf");
+        await UploadAndWaitAsync(client, "Unrelated Memo.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=quarterly%22report", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Name == "Quarterly Report.pdf");
+    }
+
+    [Fact]
+    public async Task GetDocuments_PhraseWithSpecialChars_DoesNotThrow()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Normal Document.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=%22foo%26%26%7Cbar%22%3A*", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetDocuments_EmptyQuotes_FallsBackToNoSearch()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Some Document.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=%22%22", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetDocuments_Response_IncludesCreatedAt()
     {
         var client = await CreateAdminClientAsync();

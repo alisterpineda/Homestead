@@ -12,11 +12,29 @@ The user's mental model is "type words, find files." Filters refine; they do not
 
 The list endpoint runs three OR'd searches against the user's query string and unions the matches:
 
-1. **ILIKE on `Document.Name`** — case-insensitive substring match. Catches partial-word matches the FTS analyser would not pick up.
-2. **ILIKE on `DocumentVersion.ExtractedText`** across any version of the document. Catches substring matches inside extracted text — useful when the FTS analyser would tokenise away the user's exact string, and the only path to find a substring buried inside a longer token.
+1. **ILIKE on `Document.Name`** — case-insensitive substring match. Catches partial-word matches the FTS analyser would not pick up. Quote characters in the query are stripped before this match runs so phrase syntax doesn't degrade substring matching.
+2. **ILIKE on `DocumentVersion.ExtractedText`** across any version of the document. Catches substring matches inside extracted text — useful when the FTS analyser would tokenise away the user's exact string, and the only path to find a substring buried inside a longer token. Same quote-stripping rule as above.
 3. **PostgreSQL full-text search** against the document's weighted `tsvector`, when the document has one. Uses `ts_rank_cd` for relevance scoring with prefix expansion — `tax` becomes `tax:*` so it matches `taxes`, `taxation`, `taxed`, etc.
 
 A document is in the result set if any of the three modes matches. ILIKE is the safety net for the FTS analyser's blind spots; FTS is the relevance signal.
+
+### Quoted phrase search
+
+The FTS branch parses `"…"` substrings as adjacency phrases. Inside quotes, words must appear in order with no intervening tokens; outside quotes, the prefix-AND behaviour is unchanged.
+
+- `tax invoice` — both terms must appear, anywhere, in either order. (`tax:* & invoice:*`)
+- `"operating agreement"` — the two words must appear adjacently, in that order. (`(operating <-> agreement)`)
+- `"operating agreement" 2024` — adjacency phrase AND prefix term. (`(operating <-> agreement) & 2024:*`)
+
+Phrases are tolerant rather than strict: English stopwords (`the, a, an, of, and, or, to, in, on, at, for`) are dropped from inside a phrase before the followed-by chain is built. `"the cat in the hat"` matches the content-word adjacency pattern (`cat <-> hat`) rather than enforcing exact word distance. This is a deliberate v1 simplification — `to_tsquery` does not handle stopwords gracefully inside `<->` chains, so stripping them ourselves keeps the common case working at the cost of perfect adjacency for stopword-heavy queries.
+
+Edge cases degrade gracefully:
+
+- An empty phrase (`""`), a whitespace-only phrase, or a phrase that contains nothing but stopwords contributes no FTS clause — the query falls back to the other branches.
+- Stray unmatched quotes are stripped and the surrounding text is treated as ordinary prefix terms; `unmatched"quote` searches for `unmatched:* & quote:*`.
+- tsquery operator characters (`& | ! ( ) : * \ '`) and `<` / `>` inside the query are sanitized out before composition, so a query like `"foo&&|bar":*` cannot inject operators or distance modifiers and never returns a 500.
+
+The phrase parser is the only FTS-side affordance. Quotes are stripped from the input the ILIKE branches and the trigram suggestion path see, so phrase syntax does not degrade substring matching or "Did you mean…?" recovery — but those branches do not honour adjacency. Ranking weights are unaffected.
 
 ## Weighting
 

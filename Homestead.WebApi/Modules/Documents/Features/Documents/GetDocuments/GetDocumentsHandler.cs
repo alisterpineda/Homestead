@@ -27,11 +27,12 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         var query = await BuildScopedQueryAsync(request, ct);
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
-        string? tsQueryString = search is not null ? BuildPrefixTsQuery(search) : null;
+        string? tsQueryString = search is not null ? SearchTsQueryBuilder.Build(search) : null;
+        var ilikeSearch = search?.Replace("\"", string.Empty);
 
         if (search is not null)
         {
-            var namePattern = $"%{search}%";
+            var namePattern = $"%{ilikeSearch}%";
             var hasTsQuery = tsQueryString is not null;
             var tsq = tsQueryString ?? "";
 
@@ -116,14 +117,15 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         IReadOnlyList<string> suggestions = [];
         if (paged.TotalCount == 0 && search is not null && search.Length >= SuggestionMinSearchLength)
         {
+            var suggestionInput = search.Replace("\"", " ").Trim();
             var suggestionScope = await BuildScopedQueryAsync(request, ct);
             suggestions = await suggestionScope
-                .Where(d => EF.Functions.TrigramsWordSimilarity(search, d.Name) >= SuggestionSimilarityThreshold)
+                .Where(d => EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) >= SuggestionSimilarityThreshold)
                 .GroupBy(d => d.Name)
                 .Select(g => new
                 {
                     Name = g.Key,
-                    Score = g.Max(d => EF.Functions.TrigramsWordSimilarity(search, d.Name))
+                    Score = g.Max(d => EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name))
                 })
                 .OrderByDescending(x => x.Score)
                 .Take(SuggestionLimit)
@@ -198,24 +200,6 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         }
 
         return query;
-    }
-
-    private static string SanitizeTsQueryTerm(string term)
-    {
-        var chars = term.Where(c => c != '&' && c != '|' && c != '!' && c != '('
-            && c != ')' && c != ':' && c != '*' && c != '\'' && c != '\\').ToArray();
-        return new string(chars);
-    }
-
-    private static string? BuildPrefixTsQuery(string search)
-    {
-        var terms = search.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Select(SanitizeTsQueryTerm)
-            .Where(t => t.Length > 0)
-            .Select(t => t + ":*")
-            .ToList();
-
-        return terms.Count > 0 ? string.Join(" & ", terms) : null;
     }
 
     private static IOrderedQueryable<Domain.Documents.Document> ApplySort(

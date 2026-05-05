@@ -36,4 +36,8 @@
       <ProjectReference Include="..\Homestead.ServiceDefaults\Homestead.ServiceDefaults.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="Homestead.WebApi.Tests.Unit" />
+    </ItemGroup>
+
 </Project>
