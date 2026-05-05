@@ -31,7 +31,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Document grouping / scoping beyond a single household — the data model carries a `GroupId` field, plumbed through endpoints and filters, but it is not user-facing in v1. Reserved for future use, not necessarily multi-household.
 - In-document collaborative editing, signing flows, approval workflows.
 - Inline preview / annotation beyond a thumbnail.
-- Version diffs, version revert, version delete.
+- Version diffs and version revert. (Version *delete* is supported — see [versions.md](versions.md) → *Version delete*.)
 - Document-to-document relationships (supersedes / derived-from / etc.) beyond the party link.
 - Automated tagging, classification, or party detection.
 - A user-facing field-level change-history view (the audit log already exists and powers the activity stream, but per-field diffs are not surfaced as a separate history surface).
@@ -138,7 +138,9 @@ Tags say where in the filing system a document lives. Parties say what entities 
 
 ### Versioning is monotonic
 
-A new upload always produces a new version with the next version number. There is no version delete, version revert, or version diff in v1. Older versions are accessible read-only — the user can download an older version and edit its `Label`, but cannot replace its content.
+A new upload always produces a new version with the next version number. Older versions are not replaced or rewritten by later uploads — the earlier rows persist with their file blobs and hashes immutable. The user can download an older version and edit its `Label`, but cannot replace its content. There is no version revert and no version diff in v1.
+
+Versions can be explicitly deleted by the user except for the only remaining version of a document (see [versions.md](versions.md) → *Version delete*). Delete is the recovery path for "I uploaded the wrong intermediate state."
 
 ### Activity is the audit log made visible
 

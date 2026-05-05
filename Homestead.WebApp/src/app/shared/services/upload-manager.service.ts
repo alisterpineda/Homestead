@@ -21,6 +21,8 @@ export interface UploadItem {
   error: string | null;
   duplicateDocumentId: string | null;
   duplicateDocumentName: string | null;
+  duplicateVersionNumber: number | null;
+  duplicateIsSameDocument: boolean;
   duplicateIsTrashed: boolean;
 }
 
@@ -79,6 +81,8 @@ export class UploadManagerService {
       error: null,
       duplicateDocumentId: null,
       duplicateDocumentName: null,
+      duplicateVersionNumber: null,
+      duplicateIsSameDocument: false,
       duplicateIsTrashed: false,
     }));
 
@@ -212,16 +216,7 @@ export class UploadManagerService {
       });
     } else if (status === 'Failed') {
       if (errorCode === 'duplicate_content' && errorData) {
-        const isTrashed = errorData['isTrashed'] === 'true';
-        this.updateItem(item.id, {
-          status: 'duplicate',
-          duplicateDocumentId: errorData['documentId'] ?? null,
-          duplicateDocumentName: errorData['documentName'] ?? null,
-          duplicateIsTrashed: isTrashed,
-        });
-        const name = errorData['documentName'] ?? 'unknown';
-        const suffix = isTrashed ? ' (in trash)' : '';
-        toast.info(`"${item.fileName}" already exists as "${name}"${suffix}.`);
+        this.handleDuplicateError(item, errorData);
       } else {
         const errorMsg = error ?? 'Processing failed';
         this.updateItem(item.id, { status: 'failed', error: errorMsg });
@@ -230,6 +225,31 @@ export class UploadManagerService {
     }
 
     this.checkBatchesComplete();
+  }
+
+  private handleDuplicateError(item: UploadItem, errorData: Record<string, string>): void {
+    const isSameDocument = errorData['isSameDocument'] === 'true';
+    const isTrashed = errorData['isTrashed'] === 'true';
+    const parsedVersion = Number(errorData['versionNumber']);
+    const versionNumber = Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : null;
+
+    this.updateItem(item.id, {
+      status: 'duplicate',
+      duplicateDocumentId: isSameDocument ? null : (errorData['documentId'] ?? null),
+      duplicateDocumentName: isSameDocument ? null : (errorData['documentName'] ?? null),
+      duplicateVersionNumber: versionNumber,
+      duplicateIsSameDocument: isSameDocument,
+      duplicateIsTrashed: isTrashed,
+    });
+
+    if (isSameDocument) {
+      const versionSuffix = versionNumber !== null ? ` v${versionNumber}` : ' a prior version';
+      toast.info(`"${item.fileName}" is identical to${versionSuffix} of this document — nothing has changed.`);
+    } else {
+      const name = errorData['documentName'] ?? 'unknown';
+      const suffix = isTrashed ? ' (in trash)' : '';
+      toast.info(`"${item.fileName}" already exists as "${name}"${suffix}.`);
+    }
   }
 
   private checkBatchesComplete(): void {

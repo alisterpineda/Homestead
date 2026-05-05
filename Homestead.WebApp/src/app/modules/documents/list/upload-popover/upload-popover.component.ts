@@ -104,17 +104,29 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
                   } @else if (item.status === 'failed') {
                     <p class="text-xs text-destructive">{{ item.error }}</p>
                   } @else if (item.status === 'duplicate') {
-                    <p class="text-xs text-muted-foreground">
-                      Already exists as
-                      @if (item.duplicateDocumentId && !item.duplicateIsTrashed) {
-                        <a [routerLink]="['/documents', item.duplicateDocumentId]" class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ item.duplicateDocumentName ?? 'unknown' }}</a>
-                      } @else {
-                        <span class="font-medium">{{ item.duplicateDocumentName ?? 'unknown' }}</span>
-                        @if (item.duplicateIsTrashed) {
-                          <span class="text-muted-foreground"> (in trash)</span>
+                    @if (item.duplicateIsSameDocument) {
+                      <p class="text-xs text-muted-foreground">
+                        Identical to
+                        @if (item.duplicateVersionNumber !== null) {
+                          <span class="font-medium">v{{ item.duplicateVersionNumber }}</span>
+                        } @else {
+                          <span class="font-medium">a prior version</span>
                         }
-                      }
-                    </p>
+                        of this document &mdash; nothing has changed.
+                      </p>
+                    } @else {
+                      <p class="text-xs text-muted-foreground">
+                        Already exists as
+                        @if (item.duplicateDocumentId && !item.duplicateIsTrashed) {
+                          <a [routerLink]="['/documents', item.duplicateDocumentId]" class="font-medium text-blue-600 hover:underline dark:text-blue-400">{{ item.duplicateDocumentName ?? 'unknown' }}</a>
+                        } @else {
+                          <span class="font-medium">{{ item.duplicateDocumentName ?? 'unknown' }}</span>
+                          @if (item.duplicateIsTrashed) {
+                            <span class="text-muted-foreground"> (in trash)</span>
+                          }
+                        }
+                      </p>
+                    }
                   }
                 </div>
 

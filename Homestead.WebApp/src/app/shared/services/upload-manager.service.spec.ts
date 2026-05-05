@@ -701,5 +701,97 @@ describe('UploadManagerService', () => {
       expect(item.duplicateIsTrashed).toBe(false);
       expect(toast.info).toHaveBeenCalledWith(expect.not.stringContaining('(in trash)'));
     });
+
+    it('should mark within-document duplicate with isSameDocument true and clear sibling-document fields', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'This file is identical to v2 of the document — nothing has changed.',
+        errorCode: 'duplicate_content',
+        errorData: {
+          documentId: 'doc-123',
+          documentName: 'Lease',
+          versionNumber: '2',
+          isSameDocument: 'true',
+          isTrashed: 'false',
+        },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
+      });
+
+      const item = service.items()[0];
+      expect(item.status).toBe('duplicate');
+      expect(item.duplicateIsSameDocument).toBe(true);
+      expect(item.duplicateVersionNumber).toBe(2);
+      // Same-document collisions don't surface the document link — pointing the user back
+      // at the document they're already on is noise.
+      expect(item.duplicateDocumentId).toBeNull();
+      expect(item.duplicateDocumentName).toBeNull();
+    });
+
+    it('should show "identical to vN of this document" toast for within-document duplicate', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'This file is identical to v2 of the document — nothing has changed.',
+        errorCode: 'duplicate_content',
+        errorData: {
+          documentId: 'doc-123',
+          documentName: 'Lease',
+          versionNumber: '2',
+          isSameDocument: 'true',
+          isTrashed: 'false',
+        },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
+      });
+
+      expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('identical to v2 of this document'));
+      expect(toast.info).toHaveBeenCalledWith(expect.not.stringContaining('Lease'));
+    });
+
+    it('should parse versionNumber from cross-document duplicate errorData', () => {
+      service.addFiles([createFile('test.pdf')]);
+      httpTesting.expectOne('/api/v1/documents').flush({ jobId: 'job-1' });
+
+      jobStatusChanged$.next({
+        jobId: 'job-1',
+        status: 'Failed',
+        entityType: null,
+        entityId: null,
+        documentName: null,
+        error: 'A document with the same content already exists.',
+        errorCode: 'duplicate_content',
+        errorData: {
+          documentId: 'doc-123',
+          documentName: 'Other Doc',
+          versionNumber: '3',
+          isSameDocument: 'false',
+          isTrashed: 'false',
+        },
+        totalChildCount: null,
+        completedChildCount: null,
+        failedChildCount: null,
+      });
+
+      const item = service.items()[0];
+      expect(item.duplicateVersionNumber).toBe(3);
+      expect(item.duplicateIsSameDocument).toBe(false);
+      expect(item.duplicateDocumentName).toBe('Other Doc');
+    });
   });
 });

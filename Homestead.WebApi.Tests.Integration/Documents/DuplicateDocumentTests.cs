@@ -53,6 +53,34 @@ public class DuplicateDocumentTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DuplicateVersionUpload_SameDocument_FailsWithSelfCollisionMessage()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // First upload — creates the document with v1
+        var response1 = await UploadFixedPdfAsync(client, "MyDoc.pdf");
+        Assert.Equal(HttpStatusCode.Accepted, response1.StatusCode);
+        var body1 = await response1.Content.ReadFromJsonAsync<JobResponse>(CT);
+        var docId = await WaitForJobCompletionAsync(body1!.JobId);
+
+        // Try to upload byte-identical content as a new version of the same document
+        var fileBytes = await GetFixedPdfBytes();
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent("v2-attempt"), "label");
+        var fileContent = new ByteArrayContent(fileBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", "same-bytes.pdf");
+
+        var response2 = await client.PostAsync($"/api/v1/documents/{docId}/versions", form, CT);
+        Assert.Equal(HttpStatusCode.Accepted, response2.StatusCode);
+        var body2 = await response2.Content.ReadFromJsonAsync<JobResponse>(CT);
+        var failedJob = await WaitForJobFailureAsync(body2!.JobId);
+
+        Assert.Contains("identical to v1", failedJob.Error);
+        Assert.Contains("nothing has changed", failedJob.Error);
+    }
+
+    [Fact]
     public async Task DuplicateUpload_ExistingDocumentStillAccessible()
     {
         var client = await CreateAdminClientAsync();

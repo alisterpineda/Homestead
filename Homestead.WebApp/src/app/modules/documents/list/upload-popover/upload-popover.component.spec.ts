@@ -18,6 +18,8 @@ function createItem(overrides: Partial<UploadItem> = {}): UploadItem {
     error: null,
     duplicateDocumentId: null,
     duplicateDocumentName: null,
+    duplicateVersionNumber: null,
+    duplicateIsSameDocument: false,
     duplicateIsTrashed: false,
     ...overrides,
   };

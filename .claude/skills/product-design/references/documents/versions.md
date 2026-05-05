@@ -1,10 +1,20 @@
 # Versions and text extraction — design
 
-This file covers the version model — what each upload produces, the document-scope vs version-scope split, the asynchronous upload pipeline, the text-extraction contract, and the household-wide engine setting. The high-level picture lives in [overview.md](overview.md); load this when working on uploads, the version list, reprocessing, or the extraction-engine settings page.
+This file covers the version model — when to add a version vs create a new document, what each upload produces, the document-scope vs version-scope split, the asynchronous upload pipeline, the text-extraction contract, and the household-wide engine setting. The high-level picture lives in [overview.md](overview.md); load this when working on uploads, the version list, reprocessing, or the extraction-engine settings page.
+
+## When to add a version vs create a new document
+
+A new **version** is the same artifact evolving — the signed copy of a draft, an annotated lease, a contract with an addendum. The bytes change but the *thing* is still the same physical or legal artifact, and document-scoped metadata (name, tags, parties, dates) carries through unchanged.
+
+A new **document** is a new artifact, even if it concerns the same subject. A renewed passport is a new document, not a new version of the prior one — the prior passport remains a distinct, immutable artifact in its own right. Likewise a replacement lease that supersedes a prior one (rather than amending it), or a re-issued statement that corrects an earlier one.
+
+The test: would the user ever want to refer to the older state as a self-contained artifact rather than as history of the current one? If yes, it's a new document. If the older state is only ever interesting as the predecessor of the current one, it's a prior version.
+
+Multiple parallel representations of the same artifact at the same point in time (digital + scanned, colour + greyscale of one document) are not versioning either — versioning is a lifecycle, not a set of formats. Multi-format support is out of scope; if it ever becomes needed, it should be modelled as a separate concept, not by widening versioning to cover it.
 
 ## Version model
 
-Every upload to a document produces a new `DocumentVersion` row. Versions are numbered monotonically per document — the first upload is `VersionNumber = 1`, the next `2`, and so on. Older versions are not deleted, replaced, or rewritten by later uploads; they remain accessible read-only.
+Every upload to a document produces a new `DocumentVersion` row. Versions are numbered monotonically per document — the first upload is `VersionNumber = 1`, the next `2`, and so on. Later uploads do not replace or rewrite earlier versions; the earlier rows persist alongside the new one, with their file blobs and `FileHash` immutable. Older versions can be explicitly deleted by the user (see *Version delete*) but accumulate by default.
 
 A version carries:
 
@@ -75,8 +85,14 @@ A built-in fallback engine always exists and is used when no preference has been
 
 Engines are an extensibility point at the model layer (new engines can be registered without touching the upload or reprocess paths), but in v1 the user-facing surface is intentionally small: a single household-wide preference, plus an optional one-shot override on a bulk reprocess run.
 
-## Version delete and retention
+## Version delete
 
-There is no version delete in v1. Every upload accumulates a new row indefinitely; reprocess updates a row in place but never removes one. When a document is permanently deleted from Trash, all of its versions and their files go with it.
+A user can delete an individual version from the version list on the document detail page. The delete is destructive — the row is removed, the file is deleted from disk, an audit entry is recorded, and the document's `SearchVector` is refreshed if the deleted version was the latest (so search reflects the new latest version's extracted text).
+
+The **only-remaining-version guard**: deleting the last surviving version of a document is rejected. To get rid of a document entirely, soft-delete the document itself (which moves it to Trash) and then permanently delete it from there — that path removes every version's file along with the document.
+
+Version delete is the user's recovery path for "I uploaded the wrong intermediate state" — for example, a botched scan of a form that was followed by a clean scan, or an addendum uploaded against the wrong document. Reprocess does not remove a row; only explicit version delete does.
+
+Older versions accumulate by default; nothing auto-prunes. When a document is permanently deleted from Trash, all of its versions and their files go with it regardless of how many there are.
 
 Configurable retention (auto-prune old versions, cap version count per document, etc.) is a v2 concern.

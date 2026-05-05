@@ -69,19 +69,26 @@ public class UploadDocumentVersionJobHandler(
 
             // Duplicate check against all versions globally (IgnoreQueryFilters so trashed documents'
             // versions are still detected — matching the unique index IX_document_versions_FileHash)
-            var existingDocument = await db.DocumentVersions
+            var existingMatch = await db.DocumentVersions
                 .IgnoreQueryFilters()
                 .Where(v => v.FileHash == fileHash)
-                .Select(v => new { v.Document.Id, v.Document.Name, v.Document.DeletedAt })
+                .Select(v => new { v.VersionNumber, v.Document.Id, v.Document.Name, v.Document.DeletedAt })
                 .FirstOrDefaultAsync(ct);
 
-            if (existingDocument is not null)
+            if (existingMatch is not null)
             {
+                var isSameDocument = existingMatch.Id == payload.DocumentId;
+                var message = isSameDocument
+                    ? $"This file is identical to v{existingMatch.VersionNumber} of the document — nothing has changed."
+                    : "A document with the same content already exists.";
+
                 throw new DuplicateDocumentException(
-                    "A document with the same content already exists.",
-                    existingDocument.Id,
-                    existingDocument.Name,
-                    isTrashed: existingDocument.DeletedAt != null);
+                    message,
+                    existingMatch.Id,
+                    existingMatch.Name,
+                    existingVersionNumber: existingMatch.VersionNumber,
+                    isSameDocument: isSameDocument,
+                    isTrashed: existingMatch.DeletedAt != null);
             }
 
             // Compute next version number
