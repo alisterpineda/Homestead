@@ -191,6 +191,15 @@ describe('DocumentListComponent', () => {
     });
   });
 
+  describe('filter panel', () => {
+    it('should render the unified filter panel and not the legacy filter-popover', () => {
+      fixture.detectChanges();
+      const host: HTMLElement = fixture.nativeElement;
+      expect(host.querySelector('app-documents-filter-panel')).not.toBeNull();
+      expect(host.querySelector('app-filter-popover')).toBeNull();
+    });
+  });
+
   describe('onDocumentSelect', () => {
     it('should navigate to the document detail page', () => {
       const router = TestBed.inject(Router);

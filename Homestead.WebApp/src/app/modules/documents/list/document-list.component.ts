@@ -17,8 +17,8 @@ import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
-import { FilterPopoverComponent } from '@/shared/components/filter-popover/filter-popover.component';
-import type { FilterOption } from '@/shared/components/filter-popover/filter-popover.component';
+import { DocumentsFilterPanelComponent } from './documents-filter-panel/documents-filter-panel.component';
+import type { FilterOption } from './documents-filter-panel/documents-filter-panel.component';
 import { DocumentTableComponent, HIDEABLE_COLUMNS, DEFAULT_COLUMN_VISIBILITY } from './document-table/document-table.component';
 import { DocumentCardGridComponent } from './document-card-grid/document-card-grid.component';
 import type { VisibilityState } from '@tanstack/angular-table';
@@ -58,7 +58,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmButtonGroup,
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
-    FilterPopoverComponent,
+    DocumentsFilterPanelComponent,
     DocumentTableComponent,
     DocumentCardGridComponent,
     NgTemplateOutlet,
@@ -87,6 +87,21 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
                 </div>
                 <div class="flex items-center gap-2">
+                  <app-documents-filter-panel
+                    [tagOptions]="tagOptions()"
+                    [partyOptions]="partyOptions()"
+                    [selectedTagIds]="selectedTagIds()"
+                    [selectedPartyIds]="selectedPartyIds()"
+                    [includeChildTags]="includeChildTags()"
+                    [tagOptionsLoading]="tagOptionsLoading()"
+                    [partyOptionsLoading]="partyOptionsLoading()"
+                    (tagSelectionChange)="onTagFilterChange($event)"
+                    (partySelectionChange)="onPartyFilterChange($event)"
+                    (includeChildTagsChange)="onIncludeChildTagsChange($event)"
+                    (tagSearchChange)="onTagSearchChange($event)"
+                    (partySearchChange)="onPartySearchChange($event)"
+                    (reset)="resetFilters()"
+                  />
                   <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
                     <ng-icon hlm [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
                     {{ sortLabel() }}
@@ -201,36 +216,6 @@ import { toast } from '@spartan-ng/brain/sonner';
                     </hlm-dropdown-menu>
                   </ng-template>
                 </div>
-              </div>
-              <div class="flex flex-wrap items-center gap-2 mb-4">
-                <app-filter-popover
-                  label="Parties"
-                  [options]="partyOptions()"
-                  [selectedIds]="selectedPartyIds()"
-                  searchPlaceholder="Search parties..."
-                  [loading]="partyOptionsLoading()"
-                  (selectionChange)="onPartyFilterChange($event)"
-                  (searchChange)="onPartySearchChange($event)"
-                />
-                <app-filter-popover
-                  label="Tags"
-                  [options]="tagOptions()"
-                  [selectedIds]="selectedTagIds()"
-                  searchPlaceholder="Search tags..."
-                  [loading]="tagOptionsLoading()"
-                  [showIncludeChildren]="true"
-                  [includeChildren]="includeChildTags()"
-                  includeChildrenLabel="Include sub-tags"
-                  (selectionChange)="onTagFilterChange($event)"
-                  (searchChange)="onTagSearchChange($event)"
-                  (includeChildrenChange)="onIncludeChildTagsChange($event)"
-                />
-                @if (hasActiveFilters()) {
-                  <button hlmBtn variant="ghost" size="sm" (click)="resetFilters()">
-                    Reset
-                    <ng-icon hlm name="lucideX" size="xs" />
-                  </button>
-                }
               </div>
             }
 
