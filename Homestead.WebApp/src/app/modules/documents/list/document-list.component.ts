@@ -223,54 +223,52 @@ import { toast } from '@spartan-ng/brain/sonner';
 
             @if (isInSelectionState() && auth.canWrite()) {
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3">
-              <div hlmButtonGroup aria-label="Selection controls">
-                <button hlmBtn variant="outline" size="icon-sm" (click)="clearSelection()" aria-label="Exit selection mode">
-                  <ng-icon hlm name="lucideX" size="sm" />
-                </button>
-                @if (!allPageSelected()) {
-                  <button hlmBtn variant="outline" size="sm" (click)="selectAllOnPage()">
-                    Select all
-                  </button>
-                }
-              </div>
-              @if (hasSelection()) {
-                <span class="whitespace-nowrap text-sm text-muted-foreground">
+              <span class="whitespace-nowrap text-sm text-muted-foreground">
+                @if (hasSelection()) {
                   {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }} selected
-                </span>
-              } @else {
-                <span class="whitespace-nowrap text-sm text-muted-foreground">Select items</span>
+                } @else {
+                  Select items
+                }
+              </span>
+
+              @if (!allPageSelected()) {
+                <button hlmBtn variant="outline" size="sm" (click)="selectAllOnPage()">
+                  Select all
+                </button>
               }
 
-              <div class="sm:ml-auto max-sm:basis-full flex flex-wrap items-center gap-2">
-                <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
-                <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
-                <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
-                <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
-                  <ng-icon hlm name="lucideDownload" size="sm" />
-                  Download
+              <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+              <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
+              <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
+              <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
+                <ng-icon hlm name="lucideDownload" size="sm" />
+                Download
+              </button>
+              <hlm-alert-dialog>
+                <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
+                  <ng-icon hlm name="lucideTrash2" size="sm" />
+                  Delete
                 </button>
-                <hlm-alert-dialog>
-                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
-                    <ng-icon hlm name="lucideTrash2" size="sm" />
-                    Delete
-                  </button>
-                  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                    <div hlmAlertDialogHeader>
-                      <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
-                      <p hlmAlertDialogDescription>
-                        The selected document{{ selectionCount() > 1 ? 's' : '' }}
-                        will be moved to trash. You can restore {{ selectionCount() > 1 ? 'them' : 'it' }} later.
-                      </p>
-                    </div>
-                    <div hlmAlertDialogFooter>
-                      <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                      <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
-                        {{ deleting() ? 'Deleting...' : 'Delete' }}
-                      </button>
-                    </div>
-                  </hlm-alert-dialog-content>
-                </hlm-alert-dialog>
-              </div>
+                <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                  <div hlmAlertDialogHeader>
+                    <h2 hlmAlertDialogTitle>Delete {{ selectionCount() }} document{{ selectionCount() > 1 ? 's' : '' }}?</h2>
+                    <p hlmAlertDialogDescription>
+                      The selected document{{ selectionCount() > 1 ? 's' : '' }}
+                      will be moved to trash. You can restore {{ selectionCount() > 1 ? 'them' : 'it' }} later.
+                    </p>
+                  </div>
+                  <div hlmAlertDialogFooter>
+                    <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                    <button hlmAlertDialogAction variant="destructive" (click)="onBulkDelete(ctx)" [disabled]="deleting()">
+                      {{ deleting() ? 'Deleting...' : 'Delete' }}
+                    </button>
+                  </div>
+                </hlm-alert-dialog-content>
+              </hlm-alert-dialog>
+
+              <button hlmBtn variant="outline" size="icon-sm" class="ml-auto" (click)="clearSelection()" aria-label="Exit selection mode">
+                <ng-icon hlm name="lucideX" size="sm" />
+              </button>
             </div>
             }
           </div>
