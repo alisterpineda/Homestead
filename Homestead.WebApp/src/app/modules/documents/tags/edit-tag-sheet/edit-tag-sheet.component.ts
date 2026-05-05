@@ -76,7 +76,7 @@ const NONE_VALUE = '__none__';
 
             <div class="space-y-2">
               <label hlmLabel>Parent</label>
-              <hlm-select [ngModel]="parentSelectValue()" (ngModelChange)="onParentChange($event)">
+              <hlm-select [ngModel]="parentSelectValue()" (ngModelChange)="onParentChange($event)" [itemToString]="parentToString">
                 <hlm-select-trigger class="w-full">
                   <hlm-select-value />
                 </hlm-select-trigger>
@@ -146,6 +146,11 @@ export class EditTagSheetComponent {
   saving = signal(false);
 
   parentSelectValue = computed(() => this.editParentId() ?? NONE_VALUE);
+
+  parentToString = (value: string): string => {
+    if (value === NONE_VALUE) return 'None (root)';
+    return this.allTags().find(t => t.id === value)?.path ?? value;
+  };
 
   availableParents = computed(() => {
     const tags = this.allTags();
