@@ -301,6 +301,124 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.True(doc.CreatedAt > DateTimeOffset.MinValue);
     }
 
+    [Fact]
+    public async Task GetDocuments_SearchByTagName_FindsMatch()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/tagPaths", value = (object)new[] { "Invoice" } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=invoice", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Id == docId);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SearchByTagName_CaseInsensitive()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/tagPaths", value = (object)new[] { "Invoice" } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=INVOICE", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Id == docId);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SearchByTagName_Substring()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/tagPaths", value = (object)new[] { "Invoice" } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=invoi", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Id == docId);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SearchByPartyName_FindsMatch()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Acme Corp" }, CT);
+        partyResponse.EnsureSuccessStatusCode();
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyResult>(CT);
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/partyIds", value = (object)new[] { party!.Id } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=acme", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Id == docId);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SearchByPartyName_CaseInsensitive()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Acme Corp" }, CT);
+        partyResponse.EnsureSuccessStatusCode();
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyResult>(CT);
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/partyIds", value = (object)new[] { party!.Id } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=ACME", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Single(body!.Items, d => d.Id == docId);
+    }
+
+    [Fact]
+    public async Task GetDocuments_SearchByTagName_NoMatch_StillProducesSuggestions()
+    {
+        var client = await CreateAdminClientAsync();
+        await UploadAndWaitAsync(client, "Invoice 2024.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=invioce", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResultWithSuggestions<DocumentListItem>>(CT);
+        Assert.Empty(body!.Items);
+        Assert.Contains("Invoice 2024.pdf", body.Suggestions);
+    }
+
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
     private record TagResult(Guid Id, string Name, string Path);
     private record PartyResult(Guid Id, string Name);

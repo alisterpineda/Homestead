@@ -84,6 +84,26 @@ test.describe('Document upload and search workflow', () => {
     await documentListPage.waitForDocumentVisible('test-document');
   });
 
+  test('can search documents by attached tag name', async ({ request, documentListPage }) => {
+    await documentListPage.goto();
+
+    const listResponse = await request.get('/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false');
+    expect(listResponse.ok()).toBeTruthy();
+    const listBody = await listResponse.json();
+    const docId = listBody.items.find((d: { name: string }) => d.name.includes('test-document'))?.id;
+    expect(docId).toBeDefined();
+
+    const patchResponse = await request.patch(`/api/v1/documents/${docId}`, {
+      headers: { 'Content-Type': 'application/json-patch+json' },
+      data: [{ op: 'replace', path: '/tagPaths', value: ['ZebraTax'] }],
+    });
+    expect(patchResponse.ok()).toBeTruthy();
+
+    await documentListPage.goto();
+    await documentListPage.search('zebra');
+    await documentListPage.waitForDocumentVisible('test-document');
+  });
+
   test('can open a document detail page', async ({ page, documentListPage }) => {
     await documentListPage.goto();
     await page.getByText('test-document').first().click();

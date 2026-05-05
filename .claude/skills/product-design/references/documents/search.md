@@ -10,13 +10,17 @@ The user's mental model is "type words, find files." Filters refine; they do not
 
 ## Query mechanics
 
-The list endpoint runs three OR'd searches against the user's query string and unions the matches:
+The list endpoint runs five OR'd searches against the user's query string and unions the matches:
 
 1. **ILIKE on `Document.Name`** — case-insensitive substring match. Catches partial-word matches the FTS analyser would not pick up. Quote characters in the query are stripped before this match runs so phrase syntax doesn't degrade substring matching.
 2. **ILIKE on `DocumentVersion.ExtractedText`** across any version of the document. Catches substring matches inside extracted text — useful when the FTS analyser would tokenise away the user's exact string, and the only path to find a substring buried inside a longer token. Same quote-stripping rule as above.
-3. **PostgreSQL full-text search** against the document's weighted `tsvector`, when the document has one. Uses `ts_rank_cd` for relevance scoring with prefix expansion — `tax` becomes `tax:*` so it matches `taxes`, `taxation`, `taxed`, etc.
+3. **ILIKE on `Tag.Name`** through the document's attached tags. Typing `invoices` finds documents tagged **Invoice** without the user having to open the filter popover. Case-insensitive substring match, same quote-stripping rule.
+4. **ILIKE on `Party.Name`** through the document's linked parties. Typing `acme` finds documents linked to **Acme Corp**. Same matching rules.
+5. **PostgreSQL full-text search** against the document's weighted `tsvector`, when the document has one. Uses `ts_rank_cd` for relevance scoring with prefix expansion — `tax` becomes `tax:*` so it matches `taxes`, `taxation`, `taxed`, etc.
 
-A document is in the result set if any of the three modes matches. ILIKE is the safety net for the FTS analyser's blind spots; FTS is the relevance signal.
+A document is in the result set if any of the five modes matches. ILIKE on name and extracted text is the safety net for the FTS analyser's blind spots; tag and party ILIKE federate the search bar with the filter popover so both surfaces accept the same vocabulary; FTS is the relevance signal.
+
+The tag/party clauses are deliberately **federated** rather than baked into the `tsvector`. Including tag and party names in the stored vector would force a re-index of every linked document on each tag rename or tag/party add-remove. Renames are common, so the join-time match keeps the index pure at the cost of a wider OR predicate at query time. Access scope is preserved automatically: the join navigates from documents the user can already see, so a user never matches a tag attached to a sibling household member's document. Ranking is unaffected — `ts_rank_cd` returns 0 for documents matched only via tag or party name, so direct content matches outrank association matches under relevance sort.
 
 ### Quoted phrase search
 
@@ -84,7 +88,7 @@ Rules:
 - **Only when there are zero results.** A successful primary match never shows suggestions — they are a recovery affordance, not an always-on signal.
 - **Only when the query is at least three characters.** Two-character queries produce too much trigram noise to be useful.
 - **Filters apply.** Group, party, tag, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
-- **Source is `Document.Name` only in v1.** Extracted text, tag names, and party names are not yet sources of suggestions. Names are the smallest, highest-signal corpus and the most common typo target. The other gaps are tracked separately.
+- **Source is `Document.Name` only.** Extracted text, tag names, and party names are not sources of suggestions. The primary search already federates over tag and party names, so a typo against a tag still matches via the trigram suggestion path against any document name that happens to overlap; dedicated fuzzy suggestions over tag/party names are a follow-up that would benefit from trigram indexes on those columns.
 - **Distinct.** Two documents with the same name produce one chip, not two.
 
 The trigram GIN index on `Document.Name` (added alongside this feature) accelerates both the suggestion query and the primary `ILIKE` substring match described above.

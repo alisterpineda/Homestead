@@ -40,6 +40,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 EF.Functions.ILike(d.Name, namePattern) ||
                 d.Versions.Any(v => v.ExtractedText != null
                     && EF.Functions.ILike(v.ExtractedText, namePattern)) ||
+                d.DocumentTags.Any(dt => EF.Functions.ILike(dt.Tag.Name, namePattern)) ||
+                d.DocumentParties.Any(dp => EF.Functions.ILike(dp.Party.Name, namePattern)) ||
                 (hasTsQuery && d.SearchVector != null &&
                  d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsq))));
         }
