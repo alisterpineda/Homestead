@@ -106,7 +106,7 @@ test.describe('Tag workflow', () => {
         resp.request().method() === 'GET' &&
         resp.status() === 200,
     );
-    await page.getByRole('button', { name: TEST_DATA.documents.tags.finance, exact: true }).click();
+    await page.getByRole('option', { name: TEST_DATA.documents.tags.finance, exact: true }).click();
     await filteredDocsResponse;
 
     // The tagged document should be visible
