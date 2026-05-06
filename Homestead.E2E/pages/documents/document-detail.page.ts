@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { isMobileViewport } from '../../helpers/playwright.helpers';
 
 export class DocumentDetailPage {
   readonly nameInput: Locator;
@@ -17,6 +18,10 @@ export class DocumentDetailPage {
   }
 
   async waitForLoaded() {
+    // Mobile renders a tabbed layout opening on Preview; Name lives in the Info tab.
+    if (isMobileViewport(this.page)) {
+      await this.page.getByRole('tab', { name: 'Info' }).click();
+    }
     await expect(this.nameInput).toBeVisible({ timeout: 15_000 });
   }
 

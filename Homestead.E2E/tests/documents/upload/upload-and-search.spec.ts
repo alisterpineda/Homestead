@@ -104,12 +104,12 @@ test.describe('Document upload and search workflow', () => {
     await documentListPage.waitForDocumentVisible('test-document');
   });
 
-  test('can open a document detail page', async ({ page, documentListPage }) => {
+  test('can open a document detail page', async ({ page, documentListPage, documentDetailPage }) => {
     await documentListPage.goto();
     await page.getByText('test-document').first().click();
     await page.waitForURL(/\/documents\/[0-9a-f-]+/);
 
-    await expect(page.getByLabel('Name')).toBeVisible({ timeout: 15_000 });
+    await documentDetailPage.waitForLoaded();
     await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
   });
 

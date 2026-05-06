@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { isMobileViewport } from '../../helpers/playwright.helpers';
 
 export class DocumentListPage {
   readonly searchInput: Locator;
@@ -62,15 +63,21 @@ export class DocumentListPage {
   }
 
   async switchToTableView() {
-    // Wait for either the table view toggle or the empty state to appear
     await Promise.race([
       this.tableViewButton.waitFor({ state: 'visible', timeout: 10_000 }),
       this.noDocsEmpty.waitFor({ state: 'visible', timeout: 10_000 }),
+      this.page.getByLabel('More options').waitFor({ state: 'visible', timeout: 10_000 }),
     ]).catch(() => {});
-    if (await this.tableViewButton.isVisible()) {
+
+    if (await this.noDocsEmpty.isVisible()) return;
+
+    if (isMobileViewport(this.page)) {
+      await this.page.getByLabel('More options').click();
+      await this.page.getByRole('menuitemradio', { name: 'Table' }).click();
+    } else if (await this.tableViewButton.isVisible()) {
       await this.tableViewButton.click();
-      await expect(this.page.locator('table')).toBeVisible();
     }
+    await expect(this.page.locator('table')).toBeVisible();
   }
 
   async enterSelectionMode() {

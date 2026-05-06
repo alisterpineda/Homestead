@@ -39,7 +39,7 @@ test.describe('Tag workflow', () => {
     await tagListPage.clearSearch();
   });
 
-  test('can assign a tag to a document from the detail page', async ({ page }) => {
+  test('can assign a tag to a document from the detail page', async ({ page, documentDetailPage }) => {
     // Navigate to a document
     const docsResponse = page.waitForResponse(
       (resp) => resp.url().includes('/api/v1/documents') && resp.request().method() === 'GET' && resp.status() === 200,
@@ -51,8 +51,7 @@ test.describe('Tag workflow', () => {
     await page.getByText('test-document').first().click();
     await page.waitForURL(/\/documents\/[0-9a-f-]+/);
 
-    // Wait for the detail page to load
-    await expect(page.getByLabel('Name')).toBeVisible({ timeout: 15_000 });
+    await documentDetailPage.waitForLoaded();
 
     // Use the tag input to add a tag
     const tagInput = page.locator('app-tag-input input').first();

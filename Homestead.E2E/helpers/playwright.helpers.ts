@@ -1,4 +1,11 @@
-import type { Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+
+export const MOBILE_BREAKPOINT_PX = 640; // Tailwind sm
+
+export function isMobileViewport(page: Page): boolean {
+  const vp = page.viewportSize();
+  return !!vp && vp.width < MOBILE_BREAKPOINT_PX;
+}
 
 /**
  * Types into an Angular signal-bound input using pressSequential to ensure

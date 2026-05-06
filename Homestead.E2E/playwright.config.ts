@@ -9,6 +9,7 @@ const baseUrl = (name: string) => {
 const OIDC_URL = baseUrl('homestead-oidc');
 
 const DESKTOP = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
+const MOBILE = { ...devices['Pixel 7'] };
 
 export default defineConfig({
   testDir: './tests',
@@ -80,6 +81,44 @@ export default defineConfig({
       testDir: './tests/documents/trash',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
       dependencies: ['documents-data-setup'],
+    },
+    // --- Bridge from desktop to mobile content ---
+    {
+      name: 'documents-reset-mobile',
+      testDir: './tests/documents',
+      testMatch: /reset-before-mobile\.ts/,
+      use: { baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: [
+        'documents-upload',
+        'documents-tags',
+        'documents-bulk-ops',
+        'documents-trash',
+      ],
+    },
+    // --- Mobile documents pipeline ---
+    {
+      name: 'documents-upload-mobile',
+      testDir: './tests/documents/upload',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['documents-reset-mobile'],
+    },
+    {
+      name: 'documents-tags-mobile',
+      testDir: './tests/documents/tags',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['documents-reset-mobile'],
+    },
+    {
+      name: 'documents-bulk-ops-mobile',
+      testDir: './tests/documents/bulk-ops',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['documents-reset-mobile'],
+    },
+    {
+      name: 'documents-trash-mobile',
+      testDir: './tests/documents/trash',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['documents-reset-mobile'],
     },
   ],
 });
