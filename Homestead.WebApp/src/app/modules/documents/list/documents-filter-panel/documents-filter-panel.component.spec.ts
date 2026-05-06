@@ -72,109 +72,77 @@ describe('DocumentsFilterPanelComponent', () => {
     });
   });
 
-  describe('selection toggling', () => {
-    it('emits the next tag selection when toggling on', () => {
-      fixture.componentRef.setInput('selectedTagIds', ['existing']);
+  describe('search handling', () => {
+    it('updates local tagSearch and emits tagSearchChange', () => {
       const spy = vi.fn();
-      component.tagSelectionChange.subscribe(spy);
-      component.onToggleTag('new');
-      expect(spy).toHaveBeenCalledWith(['existing', 'new']);
+      component.tagSearchChange.subscribe(spy);
+      component.onTagSearchChange('alpha');
+      expect(component.tagSearch()).toBe('alpha');
+      expect(spy).toHaveBeenCalledWith('alpha');
     });
 
-    it('emits the next tag selection when toggling off', () => {
-      fixture.componentRef.setInput('selectedTagIds', ['a', 'b']);
+    it('updates local partySearch and emits partySearchChange', () => {
       const spy = vi.fn();
-      component.tagSelectionChange.subscribe(spy);
-      component.onToggleTag('a');
-      expect(spy).toHaveBeenCalledWith(['b']);
-    });
-
-    it('emits the next party selection when toggling', () => {
-      fixture.componentRef.setInput('selectedPartyIds', []);
-      const spy = vi.fn();
-      component.partySelectionChange.subscribe(spy);
-      component.onToggleParty('p1');
-      expect(spy).toHaveBeenCalledWith(['p1']);
+      component.partySearchChange.subscribe(spy);
+      component.onPartySearchChange('acme');
+      expect(component.partySearch()).toBe('acme');
+      expect(spy).toHaveBeenCalledWith('acme');
     });
   });
 
-  describe('pinned selected items', () => {
-    it('partitions selected and unselected from the current options', () => {
+  describe('label lookup helpers', () => {
+    it('resolves tag labels from tagOptions first', () => {
+      fixture.componentRef.setInput('tagOptions', [{ id: 'a', label: 'Alpha' }]);
+      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'a', label: 'Stale-Alpha' }]);
+      expect(component.getTagLabel('a')).toBe('Alpha');
+    });
+
+    it('falls back to resolvedTagOptions when not in tagOptions', () => {
+      fixture.componentRef.setInput('tagOptions', []);
+      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'r', label: 'Resolved' }]);
+      expect(component.getTagLabel('r')).toBe('Resolved');
+    });
+
+    it('falls back to tagLabelCache when not in tagOptions or resolvedTagOptions', () => {
+      // Populate the cache by surfacing the label in tagOptions once
+      fixture.componentRef.setInput('tagOptions', [{ id: 'a', label: 'Alpha' }]);
+      fixture.detectChanges();
+      // Then narrow tagOptions so the id is no longer in either list
+      fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
+      fixture.componentRef.setInput('resolvedTagOptions', []);
+      fixture.detectChanges();
+      expect(component.getTagLabel('a')).toBe('Alpha');
+    });
+
+    it('falls back to the id itself when no label is known', () => {
+      expect(component.getTagLabel('ghost')).toBe('ghost');
+    });
+
+    it('resolves party labels via the same precedence', () => {
+      fixture.componentRef.setInput('partyOptions', [{ id: 'p1', label: 'Acme' }]);
+      expect(component.getPartyLabel('p1')).toBe('Acme');
+      expect(component.getPartyLabel('unknown')).toBe('unknown');
+    });
+  });
+
+  describe('unselected option lists', () => {
+    it('excludes selected ids from the tag dropdown list', () => {
       fixture.componentRef.setInput('tagOptions', [
         { id: 'a', label: 'Alpha' },
         { id: 'b', label: 'Bravo' },
         { id: 'c', label: 'Charlie' },
       ]);
       fixture.componentRef.setInput('selectedTagIds', ['b']);
-      const display = component.displayTagOptions();
-      expect(display.selected.map(o => o.id)).toEqual(['b']);
-      expect(display.unselected.map(o => o.id)).toEqual(['a', 'c']);
+      expect(component.unselectedTagOptions().map(o => o.id)).toEqual(['a', 'c']);
     });
 
-    it('keeps selected items pinned using a cached label after they leave the current results', () => {
-      // First fetch (no search) populates the cache for "alpha"
-      fixture.componentRef.setInput('tagOptions', [
-        { id: 'a', label: 'Alpha' },
-        { id: 'b', label: 'Bravo' },
-      ]);
-      fixture.componentRef.setInput('selectedTagIds', ['a']);
-      fixture.detectChanges();
-
-      // Search narrows to "bravo" only — but "a" should stay pinned via cache
-      fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
-      fixture.detectChanges();
-
-      const display = component.displayTagOptions();
-      expect(display.selected).toEqual([{ id: 'a', label: 'Alpha' }]);
-      expect(display.unselected.map(o => o.id)).toEqual(['b']);
-    });
-
-    it('pins a selected ID using resolvedTagOptions when not in tagOptions or cache', () => {
-      // The user reloaded with ?tagIds=server-resolved active, but it isn't in the
-      // first page of tagOptions and the in-component cache has never seen it.
-      fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
-      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'server-resolved', label: 'Resolved/Tag' }]);
-      fixture.componentRef.setInput('selectedTagIds', ['server-resolved']);
-      fixture.detectChanges();
-
-      const display = component.displayTagOptions();
-      expect(display.selected).toEqual([{ id: 'server-resolved', label: 'Resolved/Tag' }]);
-      expect(display.unselected.map(o => o.id)).toEqual(['b']);
-    });
-
-    it('prefers tagOptions over resolvedTagOptions when both contain the same ID', () => {
-      // Live `tagOptions` reflects in-session edits and should win.
-      fixture.componentRef.setInput('tagOptions', [{ id: 'a', label: 'Alpha-fresh' }]);
-      fixture.componentRef.setInput('resolvedTagOptions', [{ id: 'a', label: 'Alpha-stale' }]);
-      fixture.componentRef.setInput('selectedTagIds', ['a']);
-      fixture.detectChanges();
-
-      const display = component.displayTagOptions();
-      expect(display.selected).toEqual([{ id: 'a', label: 'Alpha-fresh' }]);
-    });
-
-    it('drops selected items whose label has never been observed and is not server-resolved', () => {
-      fixture.componentRef.setInput('tagOptions', [{ id: 'b', label: 'Bravo' }]);
-      fixture.componentRef.setInput('resolvedTagOptions', []);
-      fixture.componentRef.setInput('selectedTagIds', ['ghost']);
-      fixture.detectChanges();
-
-      const display = component.displayTagOptions();
-      expect(display.selected).toEqual([]);
-      expect(display.unselected.map(o => o.id)).toEqual(['b']);
-    });
-
-    it('partitions parties the same way', () => {
+    it('excludes selected ids from the party dropdown list', () => {
       fixture.componentRef.setInput('partyOptions', [
         { id: 'p1', label: 'Acme' },
         { id: 'p2', label: 'Globex' },
       ]);
       fixture.componentRef.setInput('selectedPartyIds', ['p2']);
-      fixture.detectChanges();
-
-      const display = component.displayPartyOptions();
-      expect(display.selected.map(o => o.id)).toEqual(['p2']);
-      expect(display.unselected.map(o => o.id)).toEqual(['p1']);
+      expect(component.unselectedPartyOptions().map(o => o.id)).toEqual(['p1']);
     });
   });
 

@@ -7,7 +7,7 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmComboboxImports } from '@/shared/components/spartan/combobox';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
@@ -28,7 +28,7 @@ export interface FilterOption {
     HlmSheetImports,
     HlmCheckboxImports,
     HlmSeparatorImports,
-    HlmInput,
+    HlmComboboxImports,
     HlmButton,
     HlmBadge,
   ],
@@ -75,46 +75,35 @@ export interface FilterOption {
 
       <div class="p-3 border-b border-border">
         <div class="mb-2 text-xs font-medium text-muted-foreground">Tags</div>
-        <input
-          hlmInput
-          class="h-8 w-full mb-2"
-          placeholder="Search tags..."
-          [value]="tagSearch()"
-          (input)="onTagSearchInput($event)"
-        />
-        <div class="max-h-[180px] overflow-y-auto -mx-1">
-          @let tagDisplay = displayTagOptions();
-          @for (option of tagDisplay.selected; track option.id) {
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
-              (click)="onToggleTag(option.id)"
-            >
-              <hlm-checkbox class="pointer-events-none" [checked]="true" aria-hidden="true" />
-              <span class="truncate">{{ option.label }}</span>
-            </button>
-          }
-          @if (tagDisplay.selected.length > 0 && tagDisplay.unselected.length > 0) {
-            <div class="my-1 border-t border-border" aria-hidden="true"></div>
-          }
-          @for (option of tagDisplay.unselected; track option.id) {
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
-              (click)="onToggleTag(option.id)"
-            >
-              <hlm-checkbox class="pointer-events-none" [checked]="false" aria-hidden="true" />
-              <span class="truncate">{{ option.label }}</span>
-            </button>
-          }
-          @if (tagDisplay.selected.length === 0 && tagDisplay.unselected.length === 0) {
+        <hlm-combobox-multiple
+          [value]="selectedTagIds()"
+          (valueChange)="tagSelectionChange.emit($event ?? [])"
+          [search]="tagSearch()"
+          (searchChange)="onTagSearchChange($event)"
+          [filter]="passThroughFilter"
+        >
+          <hlm-combobox-chips>
+            <ng-template hlmComboboxValues let-values>
+              @for (id of values; track id) {
+                <hlm-combobox-chip [value]="id">{{ getTagLabel(id) }}</hlm-combobox-chip>
+              }
+            </ng-template>
+            <input hlmComboboxChipInput placeholder="Search tags..." />
+          </hlm-combobox-chips>
+          <hlm-combobox-content *hlmComboboxPortal>
             @if (tagOptionsLoading()) {
               <p class="py-3 text-center text-sm text-muted-foreground">Loading...</p>
             } @else {
-              <p class="py-3 text-center text-sm text-muted-foreground">No tags found.</p>
+              <hlm-combobox-empty>No tags found.</hlm-combobox-empty>
+              <div hlmComboboxList>
+                @for (option of unselectedTagOptions(); track option.id) {
+                  <hlm-combobox-item [value]="option.id">{{ option.label }}</hlm-combobox-item>
+                }
+              </div>
             }
-          }
-        </div>
+          </hlm-combobox-content>
+        </hlm-combobox-multiple>
+
         <label class="mt-2 flex w-full items-center gap-2 rounded-sm px-1 py-1.5 text-sm cursor-pointer">
           <hlm-checkbox
             [checked]="includeChildTags()"
@@ -126,46 +115,34 @@ export interface FilterOption {
 
       <div class="p-3">
         <div class="mb-2 text-xs font-medium text-muted-foreground">Parties</div>
-        <input
-          hlmInput
-          class="h-8 w-full mb-2"
-          placeholder="Search parties..."
-          [value]="partySearch()"
-          (input)="onPartySearchInput($event)"
-        />
-        <div class="max-h-[180px] overflow-y-auto -mx-1">
-          @let partyDisplay = displayPartyOptions();
-          @for (option of partyDisplay.selected; track option.id) {
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
-              (click)="onToggleParty(option.id)"
-            >
-              <hlm-checkbox class="pointer-events-none" [checked]="true" aria-hidden="true" />
-              <span class="truncate">{{ option.label }}</span>
-            </button>
-          }
-          @if (partyDisplay.selected.length > 0 && partyDisplay.unselected.length > 0) {
-            <div class="my-1 border-t border-border" aria-hidden="true"></div>
-          }
-          @for (option of partyDisplay.unselected; track option.id) {
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
-              (click)="onToggleParty(option.id)"
-            >
-              <hlm-checkbox class="pointer-events-none" [checked]="false" aria-hidden="true" />
-              <span class="truncate">{{ option.label }}</span>
-            </button>
-          }
-          @if (partyDisplay.selected.length === 0 && partyDisplay.unselected.length === 0) {
+        <hlm-combobox-multiple
+          [value]="selectedPartyIds()"
+          (valueChange)="partySelectionChange.emit($event ?? [])"
+          [search]="partySearch()"
+          (searchChange)="onPartySearchChange($event)"
+          [filter]="passThroughFilter"
+        >
+          <hlm-combobox-chips>
+            <ng-template hlmComboboxValues let-values>
+              @for (id of values; track id) {
+                <hlm-combobox-chip [value]="id">{{ getPartyLabel(id) }}</hlm-combobox-chip>
+              }
+            </ng-template>
+            <input hlmComboboxChipInput placeholder="Search parties..." />
+          </hlm-combobox-chips>
+          <hlm-combobox-content *hlmComboboxPortal>
             @if (partyOptionsLoading()) {
               <p class="py-3 text-center text-sm text-muted-foreground">Loading...</p>
             } @else {
-              <p class="py-3 text-center text-sm text-muted-foreground">No parties found.</p>
+              <hlm-combobox-empty>No parties found.</hlm-combobox-empty>
+              <div hlmComboboxList>
+                @for (option of unselectedPartyOptions(); track option.id) {
+                  <hlm-combobox-item [value]="option.id">{{ option.label }}</hlm-combobox-item>
+                }
+              </div>
             }
-          }
-        </div>
+          </hlm-combobox-content>
+        </hlm-combobox-multiple>
       </div>
     </ng-template>
   `,
@@ -194,8 +171,11 @@ export class DocumentsFilterPanelComponent {
   tagSearch = signal('');
   partySearch = signal('');
 
-  // Cache labels for selected items so they remain visible (pinned) even when
-  // a search filter excludes them from the current `tagOptions`/`partyOptions`.
+  // Server-side filtering is authoritative; skip the combobox's client-side filter.
+  passThroughFilter = (): boolean => true;
+
+  // Cache labels for selected items so chips keep their text even when a search
+  // filter excludes them from the current `tagOptions`/`partyOptions`.
   private tagLabelCache = signal<Map<string, string>>(new Map());
   private partyLabelCache = signal<Map<string, string>>(new Map());
 
@@ -219,30 +199,27 @@ export class DocumentsFilterPanelComponent {
     });
   }
 
-  displayTagOptions = computed(() => this.partition(this.selectedTagIds(), this.tagOptions(), this.resolvedTagOptions(), this.tagLabelCache()));
-  displayPartyOptions = computed(() => this.partition(this.selectedPartyIds(), this.partyOptions(), this.resolvedPartyOptions(), this.partyLabelCache()));
+  unselectedTagOptions = computed(() => this.excludeSelected(this.tagOptions(), this.selectedTagIds()));
+  unselectedPartyOptions = computed(() => this.excludeSelected(this.partyOptions(), this.selectedPartyIds()));
 
-  private partition(selectedIds: string[], opts: FilterOption[], resolved: FilterOption[], cache: Map<string, string>): { selected: FilterOption[]; unselected: FilterOption[] } {
-    const optMap = new Map(opts.map(o => [o.id, o]));
-    const resolvedMap = new Map(resolved.map(o => [o.id, o]));
-    const selected: FilterOption[] = [];
-    for (const id of selectedIds) {
-      const fromOpts = optMap.get(id);
-      if (fromOpts) {
-        selected.push(fromOpts);
-        continue;
-      }
-      const fromResolved = resolvedMap.get(id);
-      if (fromResolved) {
-        selected.push(fromResolved);
-        continue;
-      }
-      const cachedLabel = cache.get(id);
-      if (cachedLabel !== undefined) selected.push({ id, label: cachedLabel });
-    }
+  private excludeSelected(opts: FilterOption[], selectedIds: string[]): FilterOption[] {
     const selectedSet = new Set(selectedIds);
-    const unselected = opts.filter(o => !selectedSet.has(o.id));
-    return { selected, unselected };
+    return opts.filter(o => !selectedSet.has(o.id));
+  }
+
+  getTagLabel(id: string): string {
+    return this.lookupLabel(id, this.tagOptions(), this.resolvedTagOptions(), this.tagLabelCache());
+  }
+
+  getPartyLabel(id: string): string {
+    return this.lookupLabel(id, this.partyOptions(), this.resolvedPartyOptions(), this.partyLabelCache());
+  }
+
+  private lookupLabel(id: string, opts: FilterOption[], resolved: FilterOption[], cache: Map<string, string>): string {
+    return opts.find(o => o.id === id)?.label
+      ?? resolved.find(o => o.id === id)?.label
+      ?? cache.get(id)
+      ?? id;
   }
 
   hasTagFilter = computed(() => this.selectedTagIds().length > 0 || this.includeChildTags());
@@ -264,26 +241,12 @@ export class DocumentsFilterPanelComponent {
     return `Filter: ${dims.join(', ')}`;
   });
 
-  onToggleTag(id: string): void {
-    const current = this.selectedTagIds();
-    const next = current.includes(id) ? current.filter(i => i !== id) : [...current, id];
-    this.tagSelectionChange.emit(next);
-  }
-
-  onToggleParty(id: string): void {
-    const current = this.selectedPartyIds();
-    const next = current.includes(id) ? current.filter(i => i !== id) : [...current, id];
-    this.partySelectionChange.emit(next);
-  }
-
-  onTagSearchInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
+  onTagSearchChange(value: string): void {
     this.tagSearch.set(value);
     this.tagSearchChange.emit(value);
   }
 
-  onPartySearchInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
+  onPartySearchChange(value: string): void {
     this.partySearch.set(value);
     this.partySearchChange.emit(value);
   }

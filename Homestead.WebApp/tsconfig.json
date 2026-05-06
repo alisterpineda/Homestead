@@ -124,6 +124,9 @@
       ],
       "@/shared/components/spartan/tabs": [
         "./src/app/shared/components/spartan/tabs/src/index.ts"
+      ],
+      "@/shared/components/spartan/combobox": [
+        "./src/app/shared/components/spartan/combobox/src/index.ts"
       ]
     }
   },
