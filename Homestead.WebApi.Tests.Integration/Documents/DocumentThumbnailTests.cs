@@ -20,6 +20,21 @@ public class DocumentThumbnailTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetThumbnail_AfterMultiPagePdfUpload_RendersNonTrivialImage()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadFixtureAndWaitAsync(client, "nist-sp-250-93-vacuum-calibration.pdf");
+
+        var response = await client.GetAsync($"/api/v1/documents/{docId}/thumbnail", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/webp", response.Content.Headers.ContentType?.MediaType);
+
+        var body = await response.Content.ReadAsByteArrayAsync(CT);
+        Assert.True(body.Length > 1024, $"Expected thumbnail > 1024 bytes, got {body.Length}");
+    }
+
+    [Fact]
     public async Task GetThumbnail_AfterUploadImage_Returns200WithWebp()
     {
         var client = await CreateAdminClientAsync();

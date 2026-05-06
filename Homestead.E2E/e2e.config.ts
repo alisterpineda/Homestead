@@ -22,9 +22,9 @@ export const TEST_DATA = {
       johnDoe: 'John Doe',
     },
     files: {
-      pdfName: 'E2E Test Document',
+      pdfName: 'IRS W-9 Form',
       imageName: 'E2E Test Image',
-      searchableText: 'Invoice #12345',
+      searchableText: 'Taxpayer',
     },
   },
 };

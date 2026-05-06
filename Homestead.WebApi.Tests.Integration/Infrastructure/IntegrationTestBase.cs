@@ -168,6 +168,26 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return await WaitForJobCompletionAsync(body!.JobId);
     }
 
+    protected async Task<Guid> UploadFixtureAndWaitAsync(HttpClient client, string fixtureName)
+    {
+        var fileBytes = await File.ReadAllBytesAsync(
+            Path.Combine(AppContext.BaseDirectory, "TestData", "Fixtures", fixtureName));
+
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(fixtureName), "name");
+        var fileContent = new ByteArrayContent(fileBytes);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", fixtureName);
+
+        var response = await client.PostAsync("/api/v1/documents", form);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JobResponse>();
+        // 120s timeout: real-fixture OCR (e.g. scanned PDFs needing Tesseract fallback)
+        // can take tens of seconds, well past the 30s default for synthetic uploads.
+        return await WaitForJobCompletionAsync(body!.JobId, TimeSpan.FromSeconds(120));
+    }
+
     protected static async Task<HttpResponseMessage> SendJsonPatchAsync(
         HttpClient client, string url, object patchOperations)
     {

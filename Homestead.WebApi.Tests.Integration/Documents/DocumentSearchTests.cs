@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -439,6 +440,69 @@ public class DocumentSearchTests : IntegrationTestBase
         var doc = Assert.Single(body!.Items, d => d.Id == docId);
         Assert.NotNull(doc.MatchSnippet);
         Assert.Contains("<mark>tax</mark>", doc.MatchSnippet, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Snippet_RealFixtureExtraction_ReturnsHighlightedExcerpt()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadFixtureAndWaitAsync(client, "irs-form-w9.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=Taxpayer", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.NotNull(doc.MatchSnippet);
+        Assert.Contains("<mark>Taxpayer</mark>", doc.MatchSnippet, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Snippet_LongFormPdf_ReturnsRelevantSnippet()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadFixtureAndWaitAsync(client, "gutenberg-scrap-book-elementary-math.pdf");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=fraction", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.NotNull(doc.MatchSnippet);
+        Assert.Contains("<mark>", doc.MatchSnippet);
+    }
+
+    [Fact]
+    public async Task Search_NoisyOcrPdf_FindsExtractedToken()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadFixtureAndWaitAsync(client, "usda-farmers-bulletin-1923-index.pdf");
+
+        string? extractedText;
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            extractedText = await db.DocumentVersions
+                .AsNoTracking()
+                .Where(v => v.DocumentId == docId)
+                .OrderByDescending(v => v.VersionNumber)
+                .Select(v => v.ExtractedText)
+                .FirstAsync(CT);
+        }
+
+        Assert.False(string.IsNullOrWhiteSpace(extractedText));
+
+        var token = Regex.Match(extractedText!, @"\b[A-Za-z]{6,}\b").Value;
+        Assert.NotEmpty(token);
+
+        var response = await client.GetAsync(
+            $"/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search={Uri.EscapeDataString(token)}", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        Assert.Contains(body!.Items, d => d.Id == docId);
     }
 
     [Fact]

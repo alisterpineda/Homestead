@@ -4,7 +4,7 @@ import { TEST_DATA } from '../../../e2e.config';
 import { waitForProcessingComplete } from '../../../helpers/api/processing';
 import { deleteAllDocuments } from '../../../helpers/api/documents';
 
-const PDF_PATH = path.resolve(__dirname, '../../../fixtures/files/test-document.pdf');
+const PDF_PATH = path.resolve(__dirname, '../../../../tests/fixtures/irs-form-w9.pdf');
 const IMAGE_PATH = path.resolve(__dirname, '../../../fixtures/files/test-image.png');
 
 test.describe.configure({ mode: 'serial' });
@@ -37,7 +37,7 @@ test.describe('Document upload and search workflow', () => {
     await waitForProcessingComplete(request, 60_000);
 
     await documentListPage.goto();
-    await documentListPage.waitForDocumentVisible('test-document', 15_000);
+    await documentListPage.waitForDocumentVisible('irs-form-w9', 15_000);
   });
 
   test('can upload an image document', async ({ page, request, documentListPage }) => {
@@ -63,7 +63,7 @@ test.describe('Document upload and search workflow', () => {
   test('uploaded documents appear in the document list', async ({ documentListPage }) => {
     await documentListPage.goto();
     await expect(documentListPage.noDocsEmpty).not.toBeVisible();
-    await documentListPage.waitForDocumentVisible('test-document');
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
     await documentListPage.waitForDocumentVisible('test-image');
   });
 
@@ -71,17 +71,17 @@ test.describe('Document upload and search workflow', () => {
     await documentListPage.goto();
 
     await documentListPage.search(TEST_DATA.documents.files.searchableText);
-    await documentListPage.waitForDocumentVisible('test-document');
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
     await expect(documentListPage.page.getByText('test-image').first()).not.toBeVisible();
 
     await documentListPage.clearSearch();
-    await documentListPage.waitForDocumentVisible('test-document');
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
   });
 
   test('can search documents by name', async ({ documentListPage }) => {
     await documentListPage.goto();
-    await documentListPage.search('test-document');
-    await documentListPage.waitForDocumentVisible('test-document');
+    await documentListPage.search('irs-form-w9');
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
   });
 
   test('can search documents by attached tag name', async ({ request, documentListPage }) => {
@@ -90,7 +90,7 @@ test.describe('Document upload and search workflow', () => {
     const listResponse = await request.get('/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false');
     expect(listResponse.ok()).toBeTruthy();
     const listBody = await listResponse.json();
-    const docId = listBody.items.find((d: { name: string }) => d.name.includes('test-document'))?.id;
+    const docId = listBody.items.find((d: { name: string }) => d.name.includes('irs-form-w9'))?.id;
     expect(docId).toBeDefined();
 
     const patchResponse = await request.patch(`/api/v1/documents/${docId}`, {
@@ -101,12 +101,12 @@ test.describe('Document upload and search workflow', () => {
 
     await documentListPage.goto();
     await documentListPage.search('zebra');
-    await documentListPage.waitForDocumentVisible('test-document');
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
   });
 
   test('can open a document detail page', async ({ page, documentListPage, documentDetailPage }) => {
     await documentListPage.goto();
-    await page.getByText('test-document').first().click();
+    await page.getByText('irs-form-w9').first().click();
     await page.waitForURL(/\/documents\/[0-9a-f-]+/);
 
     await documentDetailPage.waitForLoaded();
@@ -116,7 +116,7 @@ test.describe('Document upload and search workflow', () => {
   test('can edit document name and save', async ({ page, request, documentListPage, documentDetailPage }) => {
     if (!page.url().match(/\/documents\/[0-9a-f-]+/)) {
       await documentListPage.goto();
-      await page.getByText('test-document').first().click();
+      await page.getByText('irs-form-w9').first().click();
       await page.waitForURL(/\/documents\/[0-9a-f-]+/);
     }
 
@@ -138,7 +138,7 @@ test.describe('Document upload and search workflow', () => {
     // Restore so other test suites see the original name
     await request.patch(`/api/v1/documents/${docId}`, {
       headers: { 'Content-Type': 'application/json-patch+json' },
-      data: [{ op: 'replace', path: '/name', value: 'test-document' }],
+      data: [{ op: 'replace', path: '/name', value: 'irs-form-w9' }],
     });
   });
 });
