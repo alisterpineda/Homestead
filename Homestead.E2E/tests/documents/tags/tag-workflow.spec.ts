@@ -87,6 +87,9 @@ test.describe('Tag workflow', () => {
     await page.getByRole('button', { name: 'Filter documents' }).click();
     const filterSearch = page.getByPlaceholder('Search tags...');
     await expect(filterSearch).toBeVisible();
+    // On mobile the panel slides in over ~500ms; click() waits for the input to be
+    // stable (animation done) so the combobox popover anchors at the final position.
+    await filterSearch.click();
 
     // Search for the tag and wait for the API response
     const tagOptionsResponse = page.waitForResponse(
