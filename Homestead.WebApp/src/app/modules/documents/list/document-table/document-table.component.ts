@@ -16,7 +16,7 @@ import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from './sort-header-button';
 import { TableHeadSelection, TableRowSelection } from './selection-column';
-import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, ModifiedCell, DocumentDateCell } from './table-cells';
+import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, ModifiedCell, DocumentDateCell, NameCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, DocumentSortBy> = {
@@ -161,7 +161,7 @@ export class DocumentTableComponent {
       accessorKey: 'name',
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
-      cell: (info) => `<span class="font-medium">${escapeHtml(info.getValue<string>())}</span>`,
+      cell: () => flexRenderComponent(NameCell),
       enableHiding: false,
       size: 300,
       minSize: 120,

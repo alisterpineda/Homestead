@@ -19,6 +19,7 @@ export interface GetDocumentsResponse {
   groupName?: (string | null);
   hasThumbnail?: boolean;
   id: string;
+  matchSnippet?: (string | null);
   name: string;
   ownerUserId?: (string | null);
   ownerUserName?: (string | null);

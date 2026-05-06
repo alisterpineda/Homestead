@@ -73,6 +73,16 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 d.DeletedByUserId,
                 DeletedByUserName = d.DeletedByUser != null ? d.DeletedByUser.DisplayName : null,
                 VersionCount = d.Versions.Count,
+                MatchSnippet = (tsQueryString != null
+                    && d.SearchVector != null
+                    && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsQueryString)))
+                    ? EF.Functions.ToTsQuery(TsLanguage, tsQueryString)
+                        .GetResultHeadline(
+                            TsLanguage,
+                            d.Versions.OrderByDescending(r => r.VersionNumber)
+                                .Select(r => r.ExtractedText).FirstOrDefault() ?? string.Empty,
+                            MatchSnippetSanitizer.HeadlineOptions)
+                    : null,
                 Tags = d.DocumentTags.Select(dt => new GetDocumentsTagDto
                 {
                     Id = dt.Tag.Id,
@@ -111,10 +121,15 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 DeletedByUserName = d.DeletedByUserName,
                 VersionCount = d.VersionCount,
                 HasThumbnail = d.LatestVersion != null && ThumbnailService.CanGenerate(d.LatestVersion.ContentType),
+                MatchSnippet = d.MatchSnippet,
                 Tags = d.Tags,
                 Parties = d.Parties
             })
             .ToPaginatedAsync(request, ct);
+
+        var sanitizedItems = paged.Items
+            .Select(item => item with { MatchSnippet = MatchSnippetSanitizer.Sanitize(item.MatchSnippet) })
+            .ToList();
 
         IReadOnlyList<string> suggestions = [];
         if (paged.TotalCount == 0 && search is not null && search.Length >= SuggestionMinSearchLength)
@@ -137,7 +152,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
 
         return new GetDocumentsResult
         {
-            Items = paged.Items,
+            Items = sanitizedItems,
             Page = paged.Page,
             PageSize = paged.PageSize,
             TotalCount = paged.TotalCount,

@@ -38,6 +38,13 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
     .tag-card-badge {
       filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
     }
+    :host ::ng-deep .match-snippet mark {
+      background-color: oklch(1 0 0 / 0.25);
+      color: white;
+      padding: 0 1px;
+      border-radius: 2px;
+      font-weight: 600;
+    }
   `,
   template: `
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
@@ -117,7 +124,11 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
           }
 
           <!-- Bottom metadata overlay -->
-          <div class="scrim-overlay absolute bottom-0 inset-x-0 p-3 pt-20">
+          <div
+            class="scrim-overlay absolute bottom-0 inset-x-0 p-3"
+            [class.pt-20]="!doc.matchSnippet"
+            [class.pt-24]="doc.matchSnippet"
+          >
             <!-- Detail lines above the title -->
             @if (doc.documentDate) {
               <div class="h-4 mb-0.5 flex items-center gap-1 overflow-hidden">
@@ -130,6 +141,12 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
                 <ng-icon hlm name="lucideUsers" size="xs" class="shrink-0 text-white/90" />
                 <p class="text-shadow-scrim text-white/90 text-xs truncate">{{ getPartyNames(doc.parties) }}</p>
               </div>
+            }
+            @if (doc.matchSnippet) {
+              <p
+                class="match-snippet text-shadow-scrim text-white/90 text-xs line-clamp-2 mb-0.5"
+                [innerHTML]="doc.matchSnippet"
+              ></p>
             }
             <!-- Title always at the bottom -->
             <p class="text-shadow-scrim text-white font-medium truncate text-sm" [title]="doc.name">{{ doc.name }}</p>

@@ -1,4 +1,9 @@
+using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace Homestead.WebApi.Tests.Integration.Documents;
 
@@ -419,7 +424,143 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.Contains("Invoice 2024.pdf", body.Suggestions);
     }
 
+    [Fact]
+    public async Task Snippet_ContentMatch_ReturnsHighlightedExcerpt()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Receipt.pdf");
+        await SetExtractedTextAsync(docId, "This receipt records the annual property tax payment for fiscal year 2024.");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=tax", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.NotNull(doc.MatchSnippet);
+        Assert.Contains("<mark>tax</mark>", doc.MatchSnippet, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Snippet_NameOnlyMatch_ReturnsNull()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "TaxReceipt.pdf");
+        await SetExtractedTextAsync(docId, "Lorem ipsum dolor sit amet, no relevant words here.");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=taxreceipt", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.Null(doc.MatchSnippet);
+    }
+
+    [Fact]
+    public async Task Snippet_TagOrPartyOnlyMatch_ReturnsNull()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Doc1.pdf");
+        await SetExtractedTextAsync(docId, "Lorem ipsum dolor sit amet, no relevant words here.");
+
+        var partyResponse = await client.PostAsJsonAsync("/api/v1/documents/parties", new { name = "Globex Industries" }, CT);
+        partyResponse.EnsureSuccessStatusCode();
+        var party = await partyResponse.Content.ReadFromJsonAsync<PartyResult>(CT);
+
+        var patchResponse = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", new[]
+        {
+            new { op = "replace", path = "/partyIds", value = (object)new[] { party!.Id } }
+        });
+        patchResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=globex", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.Null(doc.MatchSnippet);
+    }
+
+    [Fact]
+    public async Task Snippet_NullExtractedText_ReturnsNull()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "TaxNoText.pdf");
+        await SetExtractedTextAsync(docId, null);
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=tax", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.Null(doc.MatchSnippet);
+    }
+
+    [Fact]
+    public async Task Snippet_HtmlSafe_EscapesAngleBracketsAndAmpersands()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Hostile.pdf");
+        // Use raw `<`, `>`, `&` outside tag-like patterns so PG's text-search
+        // parser keeps them in the headline output and the sanitizer must
+        // escape them.
+        await SetExtractedTextAsync(docId,
+            "Outstanding tax balance: 5 > 1 & penalties < interest accrued for the year.");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false&Search=tax", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        var doc = Assert.Single(body!.Items, d => d.Id == docId);
+        Assert.NotNull(doc.MatchSnippet);
+        Assert.Contains("<mark>tax</mark>", doc.MatchSnippet, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("&gt;", doc.MatchSnippet);
+        Assert.Contains("&lt;", doc.MatchSnippet);
+        Assert.Contains("&amp;", doc.MatchSnippet);
+        // Raw, unencoded markup chars (other than our injected <mark> tags) must not survive.
+        var withoutMark = doc.MatchSnippet!
+            .Replace("<mark>", string.Empty)
+            .Replace("</mark>", string.Empty);
+        Assert.DoesNotContain("<", withoutMark);
+        Assert.DoesNotContain(">", withoutMark);
+    }
+
+    [Fact]
+    public async Task Snippet_NoSearch_ReturnsNull()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "Receipt.pdf");
+        await SetExtractedTextAsync(docId, "Annual tax payment summary for fiscal year 2024.");
+
+        var response = await client.GetAsync(
+            "/api/v1/documents?Page=1&PageSize=10&IncludeChildTags=false", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentSnippetItem>>(CT);
+        Assert.All(body!.Items, item => Assert.Null(item.MatchSnippet));
+    }
+
+    private async Task SetExtractedTextAsync(Guid documentId, string? extractedText)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.DocumentVersions
+            .Where(v => v.DocumentId == documentId)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstAsync(CT);
+        version.ExtractedText = extractedText;
+        await db.SaveChangesAsync(CT);
+
+        var updater = scope.ServiceProvider.GetRequiredService<ISearchVectorUpdater>();
+        await updater.UpdateSearchVectorAsync(documentId, CT);
+    }
+
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
+    private record DocumentSnippetItem(Guid Id, string Name, string? MatchSnippet);
     private record TagResult(Guid Id, string Name, string Path);
     private record PartyResult(Guid Id, string Name);
 }

@@ -1,10 +1,39 @@
-import { Component, inject, LOCALE_ID } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, LOCALE_ID } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { formatBytes } from '@/shared/utils';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
+
+@Component({
+  selector: 'app-name-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: `
+    :host ::ng-deep .match-snippet mark {
+      background-color: oklch(var(--primary) / 0.18);
+      color: inherit;
+      padding: 0 1px;
+      border-radius: 2px;
+      font-weight: 600;
+    }
+  `,
+  template: `
+    <div class="font-medium truncate">{{ doc.name }}</div>
+    @if (doc.matchSnippet) {
+      <div
+        class="match-snippet text-xs text-muted-foreground line-clamp-1"
+        [innerHTML]="doc.matchSnippet"
+      ></div>
+    }
+  `,
+})
+export class NameCell {
+  protected readonly context = injectFlexRenderContext<CellContext<GetDocumentsResponse, unknown>>();
+  protected get doc(): GetDocumentsResponse {
+    return this.context.row.original;
+  }
+}
 
 @Component({
   selector: 'app-tags-cell',

@@ -186,4 +186,28 @@ describe('DocumentCardGridComponent', () => {
     const overflowBadge = fixture.nativeElement.querySelector('[hlmBadge][aria-label]');
     expect(overflowBadge).toBeNull();
   });
+
+  it('should render match snippet paragraph when matchSnippet is set', () => {
+    const doc = createMockDocument({
+      matchSnippet: 'annual <mark>tax</mark> payment summary',
+    });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const snippet = fixture.nativeElement.querySelector('p.match-snippet');
+    expect(snippet).toBeTruthy();
+    expect(snippet.textContent).toContain('annual tax payment summary');
+    const mark = snippet.querySelector('mark');
+    expect(mark).toBeTruthy();
+    expect(mark.textContent).toBe('tax');
+  });
+
+  it('should not render match snippet paragraph when matchSnippet is null', () => {
+    const doc = createMockDocument({ matchSnippet: null });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const snippet = fixture.nativeElement.querySelector('p.match-snippet');
+    expect(snippet).toBeNull();
+  });
 });

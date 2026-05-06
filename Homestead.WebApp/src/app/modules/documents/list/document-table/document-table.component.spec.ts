@@ -1,9 +1,28 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import {
   DocumentTableComponent,
   HIDEABLE_COLUMNS,
   DEFAULT_COLUMN_VISIBILITY,
 } from './document-table.component';
+import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
+
+function createMockDocument(overrides: Partial<GetDocumentsResponse> = {}): GetDocumentsResponse {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Test Document',
+    contentType: 'application/pdf',
+    fileSize: 1024,
+    fileExtension: '.pdf',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    hasThumbnail: false,
+    versionCount: 1,
+    tags: [],
+    parties: [],
+    ...overrides,
+  };
+}
 
 describe('DocumentTableComponent exports', () => {
   describe('HIDEABLE_COLUMNS', () => {
@@ -43,7 +62,9 @@ describe('DocumentTableComponent', () => {
   let component: DocumentTableComponent;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient()],
+    });
     fixture = TestBed.createComponent(DocumentTableComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput('documents', []);
@@ -94,5 +115,35 @@ describe('DocumentTableComponent', () => {
     const vis = component['_columnVisibility']();
     expect(vis['createdAt']).toBe(false);
     expect(vis['documentDate']).toBe(true);
+  });
+
+  it('should render the document name in the name column without a snippet', () => {
+    const doc = createMockDocument({ name: 'Receipt.pdf', matchSnippet: null });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const row = fixture.nativeElement.querySelector('tbody tr');
+    expect(row).toBeTruthy();
+    expect(row.textContent).toContain('Receipt.pdf');
+    expect(row.querySelector('.match-snippet')).toBeNull();
+  });
+
+  it('should render the match snippet under the name when provided', () => {
+    const doc = createMockDocument({
+      name: 'Receipt.pdf',
+      matchSnippet: 'annual <mark>tax</mark> payment summary',
+    });
+    fixture.componentRef.setInput('documents', [doc]);
+    fixture.detectChanges();
+
+    const row = fixture.nativeElement.querySelector('tbody tr');
+    expect(row).toBeTruthy();
+    expect(row.textContent).toContain('Receipt.pdf');
+    const snippet = row.querySelector('.match-snippet');
+    expect(snippet).toBeTruthy();
+    expect(snippet.textContent).toContain('annual tax payment summary');
+    const mark = snippet.querySelector('mark');
+    expect(mark).toBeTruthy();
+    expect(mark.textContent).toBe('tax');
   });
 });
