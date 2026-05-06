@@ -24,7 +24,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
     public async Task<GetDocumentsResult> Handle(
         GetDocumentsQuery request, CancellationToken ct)
     {
-        var query = await BuildScopedQueryAsync(request, ct);
+        var scopedQuery = await BuildScopedQueryAsync(request, ct);
+        var query = scopedQuery;
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
         string? tsQueryString = search is not null ? SearchTsQueryBuilder.Build(search) : null;
@@ -135,15 +136,26 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         if (paged.TotalCount == 0 && search is not null && search.Length >= SuggestionMinSearchLength)
         {
             var suggestionInput = search.Replace("\"", " ").Trim();
-            var suggestionScope = await BuildScopedQueryAsync(request, ct);
-            suggestions = await suggestionScope
+
+            var docNames = scopedQuery
                 .Where(d => EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) >= SuggestionSimilarityThreshold)
-                .GroupBy(d => d.Name)
-                .Select(g => new
-                {
-                    Name = g.Key,
-                    Score = g.Max(d => EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name))
-                })
+                .Select(d => new { d.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, d.Name) });
+
+            var tagNames = db.Tags.AsNoTracking()
+                .Where(t => t.DocumentTags.Any(dt => scopedQuery.Any(d => d.Id == dt.DocumentId)))
+                .Where(t => EF.Functions.TrigramsWordSimilarity(suggestionInput, t.Name) >= SuggestionSimilarityThreshold)
+                .Select(t => new { t.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, t.Name) });
+
+            var partyNames = db.Parties.AsNoTracking()
+                .Where(p => p.DocumentParties.Any(dp => scopedQuery.Any(d => d.Id == dp.DocumentId)))
+                .Where(p => EF.Functions.TrigramsWordSimilarity(suggestionInput, p.Name) >= SuggestionSimilarityThreshold)
+                .Select(p => new { p.Name, Score = EF.Functions.TrigramsWordSimilarity(suggestionInput, p.Name) });
+
+            suggestions = await docNames
+                .Concat(tagNames)
+                .Concat(partyNames)
+                .GroupBy(x => x.Name)
+                .Select(g => new { Name = g.Key, Score = g.Max(x => x.Score) })
                 .OrderByDescending(x => x.Score)
                 .Take(SuggestionLimit)
                 .Select(x => x.Name)
