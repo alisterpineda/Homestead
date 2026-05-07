@@ -16,9 +16,10 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
       hlmBtn
       variant="ghost"
       size="icon-sm"
+      type="button"
       [hlmDropdownMenuTrigger]="menu"
       aria-label="Account actions"
-      (click)="$event.stopPropagation()"
+      (click)="onTriggerClick($event)"
     >
       <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
     </button>
@@ -54,4 +55,9 @@ export class AccountRowActionsComponent {
   edit = output<AccountResponse>();
   archiveToggle = output<AccountResponse>();
   delete = output<AccountResponse>();
+
+  protected onTriggerClick(event: MouseEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+  }
 }

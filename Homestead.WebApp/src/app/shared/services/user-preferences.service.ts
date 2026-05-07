@@ -59,6 +59,13 @@ export class UserPreferencesService {
     validate: (v): v is 'table' | 'grid' => v === 'table' || v === 'grid',
   });
 
+  readonly accountViewMode = persistedSignal<'table' | 'card' | null>({
+    key: 'homestead-account-view-mode',
+    defaultValue: null,
+    validate: (v): v is 'table' | 'card' | null =>
+      v === null || v === 'table' || v === 'card',
+  });
+
   readonly documentColumnVisibility = persistedSignal<VisibilityState>({
     key: 'homestead-document-columns',
     defaultValue: {},

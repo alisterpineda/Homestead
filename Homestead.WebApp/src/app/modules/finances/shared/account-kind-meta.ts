@@ -55,3 +55,7 @@ export const KIND_GROUPS: ReadonlyArray<{
 export function isUserAccountKind(kind: AccountKind | null | undefined): kind is UserAccountKind {
   return kind != null && USER_ACCOUNT_KINDS.includes(kind);
 }
+
+export function accountKindLabel(kind: AccountKind | null | undefined, fallback = ''): string {
+  return isUserAccountKind(kind) ? KIND_LABELS[kind] : fallback;
+}

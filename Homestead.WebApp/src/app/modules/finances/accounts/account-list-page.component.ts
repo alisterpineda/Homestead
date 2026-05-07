@@ -6,12 +6,25 @@ import {
   computed,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert, lucideListFilter } from '@ng-icons/lucide';
+import {
+  lucidePlus,
+  lucideWallet,
+  lucideCircleAlert,
+  lucideTriangleAlert,
+  lucideListFilter,
+  lucideRows3,
+  lucideTable,
+  lucideEllipsisVertical,
+  lucideArrowUp,
+  lucideArrowDown,
+} from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -19,11 +32,16 @@ import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
+import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
-import { AccountTableComponent } from './account-table.component';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
+import { AccountTableComponent, type AccountSortId, type AccountSortState } from './account-table.component';
+import { AccountCardGridComponent } from './account-card-grid.component';
 import { CreateAccountDialogComponent } from './create-account-dialog/create-account-dialog.component';
 import { EditAccountSheetComponent } from './edit-account-sheet/edit-account-sheet.component';
+import { accountKindLabel } from '../shared/account-kind-meta';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -31,14 +49,29 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
+interface AccountSortFieldOption {
+  readonly id: AccountSortId;
+  readonly label: string;
+  readonly defaultDesc: boolean;
+}
+
+function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, b: T) => number): number {
+  if (av === bv) return 0;
+  if (av === null) return 1;
+  if (bv === null) return -1;
+  return lt(av, bv) * dir;
+}
+
 @Component({
   selector: 'app-account-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmButtonGroup,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -46,11 +79,24 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmLabel,
     HlmPopoverImports,
     HlmSeparatorImports,
+    HlmDropdownMenuImports,
     AccountTableComponent,
+    AccountCardGridComponent,
     CreateAccountDialogComponent,
     EditAccountSheetComponent,
   ],
-  providers: [provideIcons({ lucidePlus, lucideWallet, lucideCircleAlert, lucideTriangleAlert, lucideListFilter })],
+  providers: [provideIcons({
+    lucidePlus,
+    lucideWallet,
+    lucideCircleAlert,
+    lucideTriangleAlert,
+    lucideListFilter,
+    lucideRows3,
+    lucideTable,
+    lucideEllipsisVertical,
+    lucideArrowUp,
+    lucideArrowDown,
+  })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
@@ -138,6 +184,104 @@ import { toast } from '@spartan-ng/brain/sonner';
                   </div>
                 </div>
               }
+
+              <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
+                <ng-icon hlm [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
+                {{ sortFieldLabel() }}
+              </button>
+              <ng-template #sortGroup>
+                <span hlmDropdownMenuLabel>Sort by</span>
+                <hlm-dropdown-menu-group>
+                  @for (opt of sortFields; track opt.id) {
+                    <button
+                      hlmDropdownMenuRadio
+                      [checked]="sortState().id === opt.id"
+                      (triggered)="onSortByChange(opt.id)"
+                    >
+                      <hlm-dropdown-menu-radio-indicator />
+                      {{ opt.label }}
+                    </button>
+                  }
+                </hlm-dropdown-menu-group>
+                <hlm-dropdown-menu-separator />
+                <span hlmDropdownMenuLabel>Direction</span>
+                <hlm-dropdown-menu-group>
+                  <button
+                    hlmDropdownMenuRadio
+                    [checked]="!sortState().desc"
+                    (triggered)="onSortDirChange(false)"
+                  >
+                    <hlm-dropdown-menu-radio-indicator />
+                    Ascending
+                  </button>
+                  <button
+                    hlmDropdownMenuRadio
+                    [checked]="sortState().desc"
+                    (triggered)="onSortDirChange(true)"
+                  >
+                    <hlm-dropdown-menu-radio-indicator />
+                    Descending
+                  </button>
+                </hlm-dropdown-menu-group>
+              </ng-template>
+              <ng-template #sortMenu>
+                <hlm-dropdown-menu class="w-44">
+                  <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
+                </hlm-dropdown-menu>
+              </ng-template>
+
+              <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
+                <button
+                  hlmBtn
+                  [variant]="viewMode() === 'card' ? 'secondary' : 'outline'"
+                  size="icon-sm"
+                  (click)="setViewMode('card')"
+                  aria-label="Card view"
+                >
+                  <ng-icon hlm name="lucideRows3" size="sm" />
+                </button>
+                <button
+                  hlmBtn
+                  [variant]="viewMode() === 'table' ? 'secondary' : 'outline'"
+                  size="icon-sm"
+                  (click)="setViewMode('table')"
+                  aria-label="Table view"
+                >
+                  <ng-icon hlm name="lucideTable" size="sm" />
+                </button>
+              </div>
+
+              <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
+                      [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
+                <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+              </button>
+              <ng-template #overflowMenu>
+                <hlm-dropdown-menu class="w-44">
+                  <span hlmDropdownMenuLabel>View</span>
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuRadio [checked]="viewMode() === 'card'"
+                            (triggered)="setViewMode('card')">
+                      <hlm-dropdown-menu-radio-indicator />
+                      Card
+                    </button>
+                    <button hlmDropdownMenuRadio [checked]="viewMode() === 'table'"
+                            (triggered)="setViewMode('table')">
+                      <hlm-dropdown-menu-radio-indicator />
+                      Table
+                    </button>
+                  </hlm-dropdown-menu-group>
+                  <hlm-dropdown-menu-separator />
+                  <button hlmDropdownMenuItem [hlmDropdownMenuTrigger]="sortSubMenu">
+                    Sort
+                    <hlm-dropdown-menu-item-sub-indicator />
+                  </button>
+                  <ng-template #sortSubMenu>
+                    <hlm-dropdown-menu-sub>
+                      <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
+                    </hlm-dropdown-menu-sub>
+                  </ng-template>
+                </hlm-dropdown-menu>
+              </ng-template>
             </div>
             <app-create-account-dialog triggerSize="sm" (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
@@ -145,13 +289,25 @@ import { toast } from '@spartan-ng/brain/sonner';
             </app-create-account-dialog>
           </div>
 
-          <app-account-table
-            [accounts]="visibleAccounts()"
-            [displayCurrency]="settingsService.displayCurrency()"
-            (edit)="onEdit($event)"
-            (archiveToggle)="onArchiveToggle($event)"
-            (delete)="onDeleteRequest($event)"
-          />
+          @if (viewMode() === 'table') {
+            <app-account-table
+              [accounts]="sortedVisibleAccounts()"
+              [displayCurrency]="settingsService.displayCurrency()"
+              [sortState]="sortState()"
+              (sortChange)="sortState.set($event)"
+              (edit)="onEdit($event)"
+              (archiveToggle)="onArchiveToggle($event)"
+              (delete)="onDeleteRequest($event)"
+            />
+          } @else {
+            <app-account-card-grid
+              [accounts]="sortedVisibleAccounts()"
+              [displayCurrency]="settingsService.displayCurrency()"
+              (edit)="onEdit($event)"
+              (archiveToggle)="onArchiveToggle($event)"
+              (delete)="onDeleteRequest($event)"
+            />
+          }
         }
       }
     </div>
@@ -191,11 +347,28 @@ export class AccountListPageComponent {
   private accountApi = inject(FinancesAccountApiService);
   protected settingsService = inject(FinanceSettingsService);
   private errorHandler = inject(ErrorHandlerService);
+  private prefs = inject(UserPreferencesService);
+  private sidebar = inject(HlmSidebarService);
+
+  readonly sortFields: readonly AccountSortFieldOption[] = [
+    { id: 'name', label: 'Name', defaultDesc: false },
+    { id: 'kind', label: 'Type', defaultDesc: false },
+    { id: 'latestTransactionDate', label: 'Latest transaction', defaultDesc: true },
+    { id: 'displayValue', label: 'Total balance', defaultDesc: true },
+  ];
 
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
   showArchived = signal(false);
+
+  sortState = signal<AccountSortState>({ id: 'name', desc: false });
+
+  viewMode = computed<'table' | 'card'>(() => {
+    const stored = this.prefs.accountViewMode();
+    if (stored === 'table' || stored === 'card') return stored;
+    return this.sidebar.isMobile() ? 'card' : 'table';
+  });
 
   selectedAccount = signal<AccountResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
@@ -232,6 +405,46 @@ export class AccountListPageComponent {
     const all = this.userAccounts();
     return this.showArchived() ? all : all.filter(a => !a.isArchived);
   });
+
+  sortedVisibleAccounts = computed(() => {
+    const accounts = [...this.visibleAccounts()];
+    const { id, desc } = this.sortState();
+    const dir: 1 | -1 = desc ? -1 : 1;
+    accounts.sort((a, b) => {
+      switch (id) {
+        case 'name':
+          return a.name.localeCompare(b.name) * dir;
+        case 'kind':
+          return accountKindLabel(a.kind).localeCompare(accountKindLabel(b.kind)) * dir;
+        case 'latestTransactionDate':
+          return compareNullable(a.latestTransactionDate ?? null, b.latestTransactionDate ?? null, dir, (x, y) => (x < y ? -1 : 1));
+        case 'displayValue':
+          return compareNullable(a.displayValue ?? null, b.displayValue ?? null, dir, (x, y) => x - y);
+        default:
+          return 0;
+      }
+    });
+    return accounts;
+  });
+
+  sortFieldLabel = computed(() => {
+    const { id } = this.sortState();
+    return this.sortFields.find(f => f.id === id)?.label ?? 'Sort';
+  });
+
+  setViewMode(mode: 'table' | 'card'): void {
+    this.prefs.accountViewMode.set(mode);
+  }
+
+  onSortByChange(id: AccountSortId): void {
+    const field = this.sortFields.find(f => f.id === id);
+    const desc = field?.defaultDesc ?? false;
+    this.sortState.set({ id, desc });
+  }
+
+  onSortDirChange(desc: boolean): void {
+    this.sortState.update(prev => ({ id: prev.id, desc }));
+  }
 
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);

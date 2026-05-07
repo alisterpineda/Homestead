@@ -5,7 +5,6 @@ import {
   inject,
   input,
   output,
-  signal,
   LOCALE_ID,
 } from '@angular/core';
 import { formatDate } from '@angular/common';
@@ -14,21 +13,25 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
   type ColumnDef,
-  type SortingState,
   createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
   getCoreRowModel,
-  getSortedRowModel,
   injectFlexRenderContext,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { AccountRowActionsComponent } from './account-row-actions.component';
-import { KIND_LABELS, isUserAccountKind } from '../shared/account-kind-meta';
+import { accountKindLabel } from '../shared/account-kind-meta';
 import { formatAccountBalance } from '../shared/sign';
 import { escapeHtml } from '@/shared/utils';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+
+export type AccountSortId = 'name' | 'kind' | 'latestTransactionDate' | 'displayValue';
+export interface AccountSortState {
+  readonly id: AccountSortId;
+  readonly desc: boolean;
+}
 
 interface AccountTableMeta {
   onEdit: (account: AccountResponse) => void;
@@ -150,12 +153,12 @@ export class AccountActionsCell {
 export class AccountTableComponent {
   accounts = input.required<AccountResponse[]>();
   displayCurrency = input<CommodityResponse | null>(null);
+  sortState = input<AccountSortState>({ id: 'name', desc: false });
 
   edit = output<AccountResponse>();
   archiveToggle = output<AccountResponse>();
   delete = output<AccountResponse>();
-
-  private readonly _sorting = signal<SortingState>([{ id: 'name', desc: false }]);
+  sortChange = output<AccountSortState>();
 
   private readonly _meta: AccountTableMeta = {
     onEdit: (a) => this.edit.emit(a),
@@ -174,7 +177,7 @@ export class AccountTableComponent {
       },
       {
         id: 'kind',
-        accessorFn: (row) => isUserAccountKind(row.kind) ? KIND_LABELS[row.kind] : '',
+        accessorFn: (row) => accountKindLabel(row.kind),
         header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Type' } }),
         cell: (info) => {
           const label = info.getValue<string>();
@@ -218,14 +221,19 @@ export class AccountTableComponent {
     columns: this._columns(),
     getRowId: (row) => row.id,
     enableSorting: true,
+    enableMultiSort: false,
+    manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onSortingChange: (updater) => {
-      const next = updater instanceof Function ? updater(this._sorting()) : updater;
-      this._sorting.set(next);
+      const current = [this.sortState()];
+      const next = updater instanceof Function ? updater(current) : updater;
+      const first = next[0] ?? { id: 'name', desc: false };
+      const prev = this.sortState();
+      if (prev.id === first.id && prev.desc === first.desc) return;
+      this.sortChange.emit({ id: first.id as AccountSortId, desc: first.desc });
     },
     state: {
-      sorting: this._sorting(),
+      sorting: [this.sortState()],
     },
     meta: this._meta,
   }));

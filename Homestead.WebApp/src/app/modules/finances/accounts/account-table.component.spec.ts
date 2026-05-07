@@ -51,10 +51,15 @@ describe('AccountTableComponent', () => {
     });
   });
 
-  function setup(accounts: AccountResponse[], displayCurrency: CommodityResponse | null = cad) {
+  function setup(
+    accounts: AccountResponse[],
+    displayCurrency: CommodityResponse | null = cad,
+    sortState: { id: string; desc: boolean } = { id: 'name', desc: false },
+  ) {
     const fixture = TestBed.createComponent(AccountTableComponent);
     fixture.componentRef.setInput('accounts', accounts);
     fixture.componentRef.setInput('displayCurrency', displayCurrency);
+    fixture.componentRef.setInput('sortState', sortState);
     fixture.detectChanges();
     return fixture;
   }
@@ -81,7 +86,7 @@ describe('AccountTableComponent', () => {
     expect(html).toContain('Unpriced');
   });
 
-  it('default-sorts rows alphabetically by name', () => {
+  it('renders rows in the order they are received (parent controls sorting)', () => {
     const fixture = setup([
       makeAccount({ id: 'z', name: 'Zebra' }),
       makeAccount({ id: 'a', name: 'Alpha' }),
@@ -90,26 +95,21 @@ describe('AccountTableComponent', () => {
     const rowOrder = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
     ).map(tr => tr.textContent ?? '');
-    expect(rowOrder[0]).toContain('Alpha');
-    expect(rowOrder[1]).toContain('Mike');
-    expect(rowOrder[2]).toContain('Zebra');
+    expect(rowOrder[0]).toContain('Zebra');
+    expect(rowOrder[1]).toContain('Alpha');
+    expect(rowOrder[2]).toContain('Mike');
   });
 
-  it('sorts by total balance with nulls last', () => {
+  it('emits sortChange when a sortable column header is toggled', () => {
     const fixture = setup([
-      makeAccount({ id: 'a', name: 'A-Account', displayValue: null, unpricedHoldingCount: 1 }),
-      makeAccount({ id: 'b', name: 'B-Account', displayValue: 50 }),
-      makeAccount({ id: 'c', name: 'C-Account', displayValue: 1000 }),
+      makeAccount({ id: 'a', name: 'A-Account', displayValue: 50 }),
+      makeAccount({ id: 'b', name: 'B-Account', displayValue: 1000 }),
     ]);
+    const events: { id: string; desc: boolean }[] = [];
+    fixture.componentInstance.sortChange.subscribe(e => events.push(e));
     const table = fixture.componentInstance['table'];
     table.getColumn('displayValue')!.toggleSorting(false);
-    fixture.detectChanges();
-    const order = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
-    ).map(tr => tr.textContent ?? '');
-    expect(order[0]).toContain('B-Account');
-    expect(order[1]).toContain('C-Account');
-    expect(order[2]).toContain('A-Account');
+    expect(events).toEqual([{ id: 'displayValue', desc: false }]);
   });
 
   it('applies the archived styling class to archived rows', () => {
