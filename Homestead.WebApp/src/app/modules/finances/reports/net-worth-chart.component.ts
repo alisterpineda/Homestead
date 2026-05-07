@@ -20,7 +20,7 @@ import type { NetWorthHistoryPoint } from '@/api/generated/models/net-worth-hist
       echarts
       [options]="options()"
       [autoResize]="true"
-      class="block h-[420px] w-full"
+      class="block h-[280px] w-full touch-none md:h-[420px]"
       role="img"
       [attr.aria-label]="ariaLabel()"
     ></div>
@@ -53,6 +53,8 @@ export class NetWorthChartComponent {
       grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
       tooltip: {
         trigger: 'axis',
+        axisPointer: { z: 1 },
+        confine: true,
         backgroundColor: colors.popover,
         borderColor: colors.border,
         textStyle: { color: colors.popoverFg },
