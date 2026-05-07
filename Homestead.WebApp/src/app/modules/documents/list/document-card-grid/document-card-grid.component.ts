@@ -10,6 +10,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetDocumentsTagDto } from '@/api/generated/models/get-documents-tag-dto';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
+import { MatchSnippetComponent } from '../match-snippet/match-snippet.component';
 
 @Component({
   selector: 'app-document-card-grid',
@@ -21,6 +22,7 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
     HlmCheckbox,
     HlmBadge,
     TagBadgeComponent,
+    MatchSnippetComponent,
   ],
   providers: [provideIcons({ lucideCalendar, lucideFileText, lucideImage, lucideUsers })],
   styles: `
@@ -41,9 +43,6 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
     :host ::ng-deep .match-snippet mark {
       background-color: oklch(1 0 0 / 0.25);
       color: white;
-      padding: 0 1px;
-      border-radius: 2px;
-      font-weight: 600;
     }
   `,
   template: `
@@ -143,10 +142,10 @@ import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
               </div>
             }
             @if (doc.matchSnippet) {
-              <p
-                class="match-snippet text-shadow-scrim text-white/90 text-xs line-clamp-2 mb-0.5"
-                [innerHTML]="doc.matchSnippet"
-              ></p>
+              <app-match-snippet
+                class="text-shadow-scrim text-white/90 text-xs mb-0.5"
+                [html]="doc.matchSnippet"
+              />
             }
             <!-- Title always at the bottom -->
             <p class="text-shadow-scrim text-white font-medium truncate text-sm" [title]="doc.name">{{ doc.name }}</p>

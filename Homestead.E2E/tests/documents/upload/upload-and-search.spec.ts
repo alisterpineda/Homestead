@@ -84,6 +84,45 @@ test.describe('Document upload and search workflow', () => {
     await documentListPage.waitForDocumentVisible('irs-form-w9');
   });
 
+  test('search-result snippet keeps the highlighted match inside the visible row in both views', async ({
+    page,
+    documentListPage,
+  }) => {
+    await documentListPage.goto();
+    await documentListPage.search(TEST_DATA.documents.files.searchableText);
+    await documentListPage.waitForDocumentVisible('irs-form-w9');
+
+    const expectMarkInsideHost = async (viewLabel: string) => {
+      const snippet = page.locator('app-match-snippet').first();
+      await expect(snippet, viewLabel).toBeVisible();
+
+      const measurement = await snippet.evaluate((el) => {
+        const mark = el.querySelector('mark');
+        if (!mark) return null;
+        const host = el.getBoundingClientRect();
+        const m = mark.getBoundingClientRect();
+        return {
+          markLeftRel: m.left - host.left,
+          markRightRel: m.right - host.left,
+          markWidth: m.width,
+          hostWidth: host.width,
+        };
+      });
+
+      expect(measurement, viewLabel).not.toBeNull();
+      expect(measurement!.markWidth, viewLabel).toBeGreaterThan(0);
+      expect(measurement!.markLeftRel, `${viewLabel}: mark clipped on the left`).toBeGreaterThanOrEqual(-0.5);
+      expect(measurement!.markRightRel, `${viewLabel}: mark clipped on the right`).toBeLessThanOrEqual(
+        measurement!.hostWidth + 0.5,
+      );
+    };
+
+    await expectMarkInsideHost('grid view');
+
+    await documentListPage.switchToTableView();
+    await expectMarkInsideHost('table view');
+  });
+
   test('can search documents by attached tag name', async ({ request, documentListPage }) => {
     await documentListPage.goto();
 

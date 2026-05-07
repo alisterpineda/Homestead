@@ -187,14 +187,14 @@ describe('DocumentCardGridComponent', () => {
     expect(overflowBadge).toBeNull();
   });
 
-  it('should render match snippet paragraph when matchSnippet is set', () => {
+  it('should render match snippet when matchSnippet is set', () => {
     const doc = createMockDocument({
       matchSnippet: 'annual <mark>tax</mark> payment summary',
     });
     fixture.componentRef.setInput('documents', [doc]);
     fixture.detectChanges();
 
-    const snippet = fixture.nativeElement.querySelector('p.match-snippet');
+    const snippet = fixture.nativeElement.querySelector('app-match-snippet');
     expect(snippet).toBeTruthy();
     expect(snippet.textContent).toContain('annual tax payment summary');
     const mark = snippet.querySelector('mark');
@@ -202,12 +202,12 @@ describe('DocumentCardGridComponent', () => {
     expect(mark.textContent).toBe('tax');
   });
 
-  it('should not render match snippet paragraph when matchSnippet is null', () => {
+  it('should not render match snippet when matchSnippet is null', () => {
     const doc = createMockDocument({ matchSnippet: null });
     fixture.componentRef.setInput('documents', [doc]);
     fixture.detectChanges();
 
-    const snippet = fixture.nativeElement.querySelector('p.match-snippet');
+    const snippet = fixture.nativeElement.querySelector('app-match-snippet');
     expect(snippet).toBeNull();
   });
 });

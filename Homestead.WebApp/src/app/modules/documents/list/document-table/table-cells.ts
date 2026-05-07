@@ -4,27 +4,17 @@ import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-tab
 import { formatBytes } from '@/shared/utils';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
+import { MatchSnippetComponent } from '../match-snippet/match-snippet.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 
 @Component({
   selector: 'app-name-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: `
-    :host ::ng-deep .match-snippet mark {
-      background-color: oklch(var(--primary) / 0.18);
-      color: inherit;
-      padding: 0 1px;
-      border-radius: 2px;
-      font-weight: 600;
-    }
-  `,
+  imports: [MatchSnippetComponent],
   template: `
     <div class="font-medium truncate">{{ doc.name }}</div>
     @if (doc.matchSnippet) {
-      <div
-        class="match-snippet text-xs text-muted-foreground line-clamp-1"
-        [innerHTML]="doc.matchSnippet"
-      ></div>
+      <app-match-snippet class="text-xs text-muted-foreground" [html]="doc.matchSnippet" />
     }
   `,
 })
