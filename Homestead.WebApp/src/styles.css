@@ -86,4 +86,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* iOS Safari auto-zooms into focused text inputs whose font-size is < 16px.
+     Bump to 16px on coarse-pointer devices to suppress the zoom while leaving
+     desktop typography (and pinch-zoom for accessibility) untouched. */
+  @media (pointer: coarse) {
+    input[hlmComboboxChipInput] { font-size: 16px; }
+  }
 }
