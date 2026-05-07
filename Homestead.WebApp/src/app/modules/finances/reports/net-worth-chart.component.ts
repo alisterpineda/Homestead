@@ -73,19 +73,23 @@ export class NetWorthChartComponent {
       z: 3,
     };
 
-    const barConfigs: { name: string; field: 'assets' | 'liabilities'; color: string }[] = [
+    const breakdownConfigs: { name: string; field: 'assets' | 'liabilities'; color: string }[] = [
       { name: SERIES.Assets, field: 'assets', color: colors.assetBar },
       { name: SERIES.Liabilities, field: 'liabilities', color: colors.destructive },
     ];
-    const barSeries = barConfigs.map(b => ({
+    const breakdownSeries = breakdownConfigs.map(b => ({
       name: b.name,
-      type: 'bar',
+      type: 'line',
+      smooth: true,
+      showSymbol: false,
       data: points.map(p => [p.asOf, p[b.field] ?? null]),
+      lineStyle: { color: b.color, width: 1, opacity: 0.6 },
       itemStyle: { color: b.color },
+      areaStyle: { color: b.color, opacity: 0.22 },
       z: 1,
     }));
 
-    const series = showBreakdown ? [...barSeries, lineSeries] : [lineSeries];
+    const series = showBreakdown ? [...breakdownSeries, lineSeries] : [lineSeries];
 
     return {
       grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },

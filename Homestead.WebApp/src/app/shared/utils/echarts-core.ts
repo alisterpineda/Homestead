@@ -10,7 +10,6 @@ export async function loadEcharts(): Promise<typeof import('echarts/core')> {
   ]);
   echarts.use([
     charts.LineChart,
-    charts.BarChart,
     components.GridComponent,
     components.TooltipComponent,
     renderers.CanvasRenderer,
