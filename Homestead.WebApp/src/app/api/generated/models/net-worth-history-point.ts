@@ -3,5 +3,7 @@
 
 export interface NetWorthHistoryPoint {
   asOf: string;
+  assets: (number | null);
+  liabilities: (number | null);
   value: (number | null);
 }

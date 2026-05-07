@@ -83,6 +83,12 @@ export class UserPreferencesService {
     validate: isNetWorthRangePref,
   });
 
+  readonly netWorthShowBreakdown = persistedSignal<boolean>({
+    key: 'homestead-finances-net-worth-show-breakdown',
+    defaultValue: false,
+    validate: (v): v is boolean => typeof v === 'boolean',
+  });
+
   constructor() {
     this.migrateOldViewModeKey();
   }

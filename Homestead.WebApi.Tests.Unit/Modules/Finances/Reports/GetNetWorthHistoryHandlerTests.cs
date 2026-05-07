@@ -158,13 +158,19 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         Assert.Equal(NetWorthGranularity.Daily, resp.Granularity);
         // Last point reflects the full running total.
         Assert.Equal(175m, resp.Points[^1].Value);
+        Assert.Equal(175m, resp.Points[^1].Assets);
+        Assert.Equal(0m, resp.Points[^1].Liabilities);
         // ThisMonth would start at 2026-04-01 but clamps to the earliest activity (2026-04-05)
         // per the design-doc rule that charts begin from the user's earliest recorded event.
         Assert.Equal(new DateTime(2026, 4, 5), resp.Points[0].AsOf.UtcDateTime.Date);
         Assert.Equal(100m, resp.Points[0].Value);
+        Assert.Equal(100m, resp.Points[0].Assets);
+        Assert.Equal(0m, resp.Points[0].Liabilities);
         // Point on 2026-04-20 reflects first two splits.
         var apr20 = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 20));
         Assert.Equal(150m, apr20.Value);
+        Assert.Equal(150m, apr20.Assets);
+        Assert.Equal(0m, apr20.Liabilities);
     }
 
     [Fact]
@@ -183,6 +189,8 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
 
         // 1000 CAD + 500 USD * 1.30 = 1650 CAD
         Assert.Equal(1650m, resp.Points[^1].Value);
+        Assert.Equal(1650m, resp.Points[^1].Assets);
+        Assert.Equal(0m, resp.Points[^1].Liabilities);
         Assert.False(resp.HasUnpriced);
     }
 
@@ -286,6 +294,31 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         // After the split, every bucket has a non-zero unpriced position → null value.
         var afterSplit = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 5));
         Assert.Null(afterSplit.Value);
+        // Asset side carries the unpriced position, so its bucket is also null.
+        Assert.Null(afterSplit.Assets);
+        // No liability accounts exist — the liability side stays at zero.
+        Assert.Equal(0m, afterSplit.Liabilities);
+    }
+
+    [Fact]
+    public async Task LiabilityAccount_ProducesNegativeLiabilities_AndValueEqualsAssetsPlusLiabilities()
+    {
+        // Beancount sign: liabilities are stored as negative quantities.
+        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id, "Cash");
+        var card = await AddAccountAsync(AccountKind.CreditCard, _cad.Id, "Card");
+        await AddSplitAsync(cash.Id, _cad.Id, 1000m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(card.Id, _cad.Id, -250m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
+
+        var last = resp.Points[^1];
+        Assert.Equal(1000m, last.Assets);
+        Assert.Equal(-250m, last.Liabilities);
+        Assert.Equal(750m, last.Value);
+        Assert.Equal(last.Assets + last.Liabilities, last.Value);
     }
 
     [Fact]

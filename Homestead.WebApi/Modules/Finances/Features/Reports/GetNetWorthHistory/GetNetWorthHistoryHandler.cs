@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
@@ -57,11 +58,16 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
         // non-system accounts. Beancount sign convention makes this exact without
         // per-type arithmetic. Archived accounts are kept — they held value historically
         // and excluding them would dent the line on the archive date.
-        var accountIds = await db.Accounts
+        var accountInfos = await db.Accounts
             .AsNoTracking()
             .Where(a => !a.IsSystem)
-            .Select(a => a.Id)
+            .Select(a => new { a.Id, a.Kind })
             .ToListAsync(ct);
+
+        var accountIds = accountInfos.Select(a => a.Id).ToList();
+        var accountTypes = accountInfos.ToDictionary(
+            a => a.Id,
+            a => a.Kind!.Value.ToAccountType());
 
         var splits = await db.AccountTransactionSplits
             .AsNoTracking()
@@ -88,27 +94,21 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
                 running[key] = running.GetValueOrDefault(key) + s.Quantity;
             }
 
-            decimal pricedSum = 0m;
-            var anyPriced = false;
-            var anyUnpricedThisBucket = false;
-            foreach (var ((_, commodityId), qty) in running)
+            DisplayBucket total = default, assets = default, liabilities = default;
+            foreach (var ((accountId, commodityId), qty) in running)
             {
                 if (qty == 0m) continue;
                 var dv = ctx.ConvertToDisplayAsOf(commodityId, qty, cutoff);
-                if (dv is { } v)
-                {
-                    pricedSum += v;
-                    anyPriced = true;
-                }
-                else
-                {
-                    anyUnpricedThisBucket = true;
-                }
+                ref var side = ref accountTypes[accountId] == AccountType.Liability
+                    ? ref liabilities
+                    : ref assets;
+                total.Add(dv);
+                side.Add(dv);
             }
 
-            var value = ValuationService.AggregateDisplayValue(pricedSum, anyPriced, anyUnpricedThisBucket);
-            if (anyUnpricedThisBucket) hasUnpriced = true;
-            points.Add(new NetWorthHistoryPoint(cutoff, value));
+            if (total.AnyUnpriced) hasUnpriced = true;
+            points.Add(new NetWorthHistoryPoint(
+                cutoff, total.Aggregate(), assets.Aggregate(), liabilities.Aggregate()));
         }
 
         return new GetNetWorthHistoryResponse
@@ -275,4 +275,27 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
 
     private readonly record struct SplitRow(
         DateTimeOffset OccurredAt, Guid AccountId, Guid CommodityId, decimal Quantity);
+
+    private struct DisplayBucket
+    {
+        public decimal PricedSum;
+        public bool AnyPriced;
+        public bool AnyUnpriced;
+
+        public void Add(decimal? displayValue)
+        {
+            if (displayValue is { } v)
+            {
+                PricedSum += v;
+                AnyPriced = true;
+            }
+            else
+            {
+                AnyUnpriced = true;
+            }
+        }
+
+        public readonly decimal? Aggregate() =>
+            ValuationService.AggregateDisplayValue(PricedSum, AnyPriced, AnyUnpriced);
+    }
 }

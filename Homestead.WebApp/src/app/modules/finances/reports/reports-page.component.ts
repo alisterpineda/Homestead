@@ -8,6 +8,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { FinancesReportsApiService } from '@/api/services/finances-reports-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
@@ -30,6 +32,8 @@ import { resolveWindow } from './resolve-window';
     HlmSpinner,
     HlmEmptyImports,
     HlmButton,
+    HlmCheckboxImports,
+    HlmLabel,
     RangeSelectorComponent,
     NetWorthChartComponent,
     NetWorthEmptyStateComponent,
@@ -48,13 +52,22 @@ import { resolveWindow } from './resolve-window';
         </p>
       </section>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <app-net-worth-range-selector
           [value]="range()"
           [responseFrom]="data()?.from ?? null"
           [responseTo]="data()?.to ?? null"
           (valueChange)="range.set($event)"
         />
+        <div class="flex items-center gap-2">
+          <hlm-checkbox
+            id="show-breakdown"
+            [checked]="showBreakdown()"
+            (checkedChange)="showBreakdown.set($event)"
+            aria-label="Show assets and liabilities"
+          />
+          <label hlmLabel for="show-breakdown" class="cursor-pointer">Show assets &amp; liabilities</label>
+        </div>
       </div>
 
       @if (loading() && !data()) {
@@ -100,6 +113,7 @@ import { resolveWindow } from './resolve-window';
               [displayCurrencySymbol]="response.displayCurrencySymbol ?? null"
               [xAxisMin]="chartXAxisMin()"
               [xAxisMax]="chartXAxisMax()"
+              [showBreakdown]="showBreakdown()"
             />
           </section>
         }
@@ -113,6 +127,7 @@ export class ReportsPageComponent {
   private userPreferences = inject(UserPreferencesService);
 
   protected readonly range = this.userPreferences.netWorthRange;
+  protected readonly showBreakdown = this.userPreferences.netWorthShowBreakdown;
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
 

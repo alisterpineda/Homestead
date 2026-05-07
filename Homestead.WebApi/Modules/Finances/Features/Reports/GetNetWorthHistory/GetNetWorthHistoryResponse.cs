@@ -1,6 +1,10 @@
 namespace Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 
-public record NetWorthHistoryPoint(DateTimeOffset AsOf, decimal? Value);
+public record NetWorthHistoryPoint(
+    DateTimeOffset AsOf,
+    decimal? Value,
+    decimal? Assets,
+    decimal? Liabilities);
 
 public record GetNetWorthHistoryResponse
 {
