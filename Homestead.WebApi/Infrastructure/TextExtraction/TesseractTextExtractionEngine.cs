@@ -60,15 +60,8 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
                     continue;
                 }
 
-                // No embedded text on this page — render as image and OCR
-                pdfStream.Position = 0;
-                using var pngStream = new MemoryStream();
-#pragma warning disable CA1416 // PDFtoImage supports all server platforms (Linux, macOS, Windows)
-                Conversion.SavePng(pngStream, pdfStream, (Index)(page.Number - 1), leaveOpen: true);
-#pragma warning restore CA1416
-                pngStream.Position = 0;
-
-                var ocrText = await tesseract.OcrAsync(pngStream, language, ct);
+                // No embedded text on this page — render as image and OCR.
+                var ocrText = await TryOcrPageAsync(pdfStream, page.Number, language, filePath, ct);
                 if (!string.IsNullOrWhiteSpace(ocrText))
                 {
                     if (sb.Length > 0)
@@ -87,6 +80,31 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to extract text from PDF {FilePath}", filePath);
+            return null;
+        }
+    }
+
+    // Per-page failure (tesseract missing, render error, etc.) must not discard
+    // text already extracted from other pages.
+    private async Task<string?> TryOcrPageAsync(
+        FileStream pdfStream, int pageNumber, string language, string filePath, CancellationToken ct)
+    {
+        try
+        {
+            pdfStream.Position = 0;
+            using var pngStream = new MemoryStream();
+#pragma warning disable CA1416 // PDFtoImage supports all server platforms (Linux, macOS, Windows)
+            Conversion.SavePng(pngStream, pdfStream, (Index)(pageNumber - 1), leaveOpen: true);
+#pragma warning restore CA1416
+            pngStream.Position = 0;
+
+            return await tesseract.OcrAsync(pngStream, language, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex,
+                "OCR fallback failed for page {PageNumber} of {FilePath}; continuing with remaining pages",
+                pageNumber, filePath);
             return null;
         }
     }
