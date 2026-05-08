@@ -1,7 +1,6 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { GetStatusResponse } from '@/api/generated/models/get-status-response';
+import { IdentityApiService } from '@/api/services/identity-api.service';
 import { GetUserInfoResponse } from '@/api/generated/models/get-user-info-response';
 import type { AppRole } from '@/api/generated/models/app-role';
 import { isSafeReturnPath } from '../utils/safe-return-path';
@@ -11,7 +10,7 @@ const ROLE_LEVEL: Record<string, number> = { Admin: 3, Contributor: 2, Viewer: 1
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http = inject(HttpClient);
+  private identityApi = inject(IdentityApiService);
 
   readonly initialized = signal(false);
   readonly isAuthenticated = signal(false);
@@ -34,8 +33,8 @@ export class AuthService {
   async initialize(): Promise<void> {
     try {
       const [statusResult, userResult] = await Promise.allSettled([
-        firstValueFrom(this.http.get<GetStatusResponse>('/api/status')),
-        firstValueFrom(this.http.get<GetUserInfoResponse>('/api/auth/user-info')),
+        firstValueFrom(this.identityApi.getStatus()),
+        firstValueFrom(this.identityApi.getUserInfo()),
       ]);
 
       if (statusResult.status === 'fulfilled') {

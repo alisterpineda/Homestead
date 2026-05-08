@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpRequest } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiConfiguration } from '@/api/generated/api-configuration';
@@ -106,11 +106,32 @@ export class DocumentApiService {
   }
 
   getDocumentFile(id: string, versionId?: string | null): Observable<Blob> {
-    const url = `${this.config.rootUrl}/api/v1/documents/${id}/file`;
-    let params = new HttpParams();
-    if (versionId != null) {
-      params = params.set('versionId', versionId);
-    }
-    return this.http.get(url, { responseType: 'blob', params });
+    const url = this.getDocumentFileUrl(id, versionId);
+    return this.http.get(url, { responseType: 'blob' });
+  }
+
+  getDocumentFileUrl(id: string, versionId?: string | null): string {
+    return this.buildVersionedUrl(id, 'file', versionId);
+  }
+
+  getDocumentThumbnailUrl(id: string, versionId?: string | null): string {
+    return this.buildVersionedUrl(id, 'thumbnail', versionId);
+  }
+
+  private buildVersionedUrl(id: string, segment: 'file' | 'thumbnail', versionId?: string | null): string {
+    const base = `${this.config.rootUrl}/api/v1/documents/${id}/${segment}`;
+    return versionId == null ? base : `${base}?versionId=${encodeURIComponent(versionId)}`;
+  }
+
+  uploadDocument(file: File): Observable<HttpEvent<CreateDocumentResponse>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const req = new HttpRequest<FormData>(
+      'POST',
+      `${this.config.rootUrl}/api/v1/documents`,
+      formData,
+      { reportProgress: true },
+    );
+    return this.http.request<CreateDocumentResponse>(req);
   }
 }

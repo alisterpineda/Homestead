@@ -1,15 +1,13 @@
 import { Component, ChangeDetectionStrategy, inject, input, output, signal, viewChild } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { UploadDropzoneComponent } from '../../list/upload-dropzone/upload-dropzone.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { toast } from '@spartan-ng/brain/sonner';
-import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
 @Component({
   selector: 'app-add-version-dialog',
@@ -70,10 +68,8 @@ export class AddVersionDialogComponent {
   uploadError = signal(false);
 
   private dialog = viewChild(BrnDialog);
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private documentVersionApi = inject(DocumentVersionApiService);
   private processingHub = inject(ProcessingHubService);
-  private errorHandler = inject(ErrorHandlerService);
 
   open(): void {
     this.dialog()?.open();
@@ -100,18 +96,13 @@ export class AddVersionDialogComponent {
     this.uploading.set(true);
     this.uploadError.set(false);
 
-    const formData = new FormData();
-    formData.append('file', f);
     const labelVal = this.label();
-    if (labelVal) {
-      formData.append('label', labelVal);
-    }
     const docId = this.documentId();
-    this.http
-      .post<{ jobId: string }>(
-        `${this.apiConfig.rootUrl}/api/v1/documents/${docId}/versions`,
-        formData,
-      )
+    this.documentVersionApi
+      .createDocumentVersion({
+        documentId: docId,
+        body: { file: f, label: labelVal || undefined },
+      })
       .subscribe({
         next: (response) => {
           this.uploading.set(false);

@@ -1,9 +1,9 @@
 import { Injectable, computed, signal, inject, DestroyRef } from '@angular/core';
-import { HttpClient, HttpRequest, HttpEventType, HttpResponse, HttpErrorResponse } from '@angular/common/http';
+import { HttpEventType, HttpResponse, HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { toast } from '@spartan-ng/brain/sonner';
-import { extractApiError } from '@/shared/utils/api-error.utils';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { DocumentApiService } from '@/api/services/document-api.service';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 
@@ -30,8 +30,8 @@ const MAX_CONCURRENT = 3;
 
 @Injectable({ providedIn: 'root' })
 export class UploadManagerService {
-  private http = inject(HttpClient);
-  private apiConfig = inject(ApiConfiguration);
+  private documentApi = inject(DocumentApiService);
+  private errorHandler = inject(ErrorHandlerService);
   private processingHub = inject(ProcessingHubService);
   private destroyRef = inject(DestroyRef);
 
@@ -150,23 +150,13 @@ export class UploadManagerService {
   private uploadFile(item: UploadItem): void {
     this.updateItem(item.id, { status: 'uploading', progress: 0 });
 
-    const formData = new FormData();
-    formData.append('file', item.file);
-
-    const req = new HttpRequest(
-      'POST',
-      `${this.apiConfig.rootUrl}/api/v1/documents`,
-      formData,
-      { reportProgress: true },
-    );
-
-    const sub = this.http.request(req).subscribe({
+    const sub = this.documentApi.uploadDocument(item.file).subscribe({
       next: event => {
         if (event.type === HttpEventType.UploadProgress && event.total) {
           const progress = Math.round((100 * event.loaded) / event.total);
           this.updateItem(item.id, { progress });
         } else if (event instanceof HttpResponse) {
-          const body = event.body as { jobId: string } | null;
+          const body = event.body;
           if (body?.jobId) {
             this.processingHub.registerManagedJob(body.jobId);
             this.updateItem(item.id, {
@@ -183,9 +173,7 @@ export class UploadManagerService {
         }
       },
       error: (err: HttpErrorResponse) => {
-        const errorMsg = err.status === 0
-          ? 'Network error'
-          : extractApiError(err, err.statusText ?? 'Upload failed');
+        const errorMsg = this.errorHandler.getErrorMessage(err, err.statusText ?? 'Upload failed');
         this.updateItem(item.id, { status: 'failed', error: errorMsg });
         toast.error(`Upload failed for "${item.fileName}": ${errorMsg}`);
         this.activeUploads.delete(item.id);

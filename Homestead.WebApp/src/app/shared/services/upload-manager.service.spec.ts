@@ -162,7 +162,7 @@ describe('UploadManagerService', () => {
 
       const item = service.items()[0];
       expect(item.status).toBe('failed');
-      expect(item.error).toBe('Network error');
+      expect(item.error).toBe('Unable to reach the server. Check your connection and try again.');
     });
 
     it('should start next queued item after failure', () => {

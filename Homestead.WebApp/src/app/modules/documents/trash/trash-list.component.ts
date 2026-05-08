@@ -15,7 +15,6 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import { formatBytes } from '@/shared/utils';
@@ -226,7 +225,6 @@ import { toast } from '@spartan-ng/brain/sonner';
 export class TrashListComponent {
   auth = inject(AuthService);
   private documentApi = inject(DocumentApiService);
-  private apiConfig = inject(ApiConfiguration);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
@@ -302,7 +300,7 @@ export class TrashListComponent {
   }
 
   getFileUrl(id: string): string {
-    return `${this.apiConfig.rootUrl}/api/v1/documents/${id}/file`;
+    return this.documentApi.getDocumentFileUrl(id);
   }
 
   getFormattedSize(bytes: number): string {

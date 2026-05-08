@@ -6,7 +6,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { ApiConfiguration } from '@/api/generated/api-configuration';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetDocumentsTagDto } from '@/api/generated/models/get-documents-tag-dto';
 import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
@@ -156,7 +156,7 @@ import { MatchSnippetComponent } from '../match-snippet/match-snippet.component'
   `,
 })
 export class DocumentCardGridComponent {
-  private apiConfig = inject(ApiConfiguration);
+  private documentApi = inject(DocumentApiService);
   private locale = inject(LOCALE_ID);
 
   documents = input.required<GetDocumentsResponse[]>();
@@ -183,7 +183,7 @@ export class DocumentCardGridComponent {
   }
 
   getThumbnailUrl(docId: string): string {
-    return `${this.apiConfig.rootUrl}/api/v1/documents/${docId}/thumbnail`;
+    return this.documentApi.getDocumentThumbnailUrl(docId);
   }
 
   isImageType(contentType: string): boolean {
