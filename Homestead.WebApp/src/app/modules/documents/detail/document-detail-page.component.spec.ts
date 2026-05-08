@@ -2,13 +2,18 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Component, signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { BehaviorSubject, EMPTY, of, Subject } from 'rxjs';
 import { DocumentDetailPageComponent } from './document-detail-page.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { OpenDocumentsService } from './open-documents.service';
 import { DocumentEditStateService } from './document-edit-state.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
+import { DocumentApiService } from '@/api/services/document-api.service';
+import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
+import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
+import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 
 @Component({ template: '' })
 class DummyComponent {}
@@ -305,4 +310,295 @@ describe('DocumentDetailPageComponent', () => {
       expect(mockEditStateService.setActiveHasChanges).toHaveBeenCalledWith('doc-1', false);
     });
   });
+});
+
+describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
+    let guardFixture: ComponentFixture<DocumentDetailPageComponent>;
+    let guardComponent: DocumentDetailPageComponent;
+    let guardParamMap: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+    let guardEditStateService: Partial<DocumentEditStateService>;
+    let guardOpenDocumentsService: Partial<OpenDocumentsService>;
+    let guardDocumentApi: {
+      getDocument: ReturnType<typeof vi.fn>;
+      getDocumentFile: ReturnType<typeof vi.fn>;
+      patchDocument: ReturnType<typeof vi.fn>;
+    };
+    let guardVersionApi: {
+      getDocumentVersion: ReturnType<typeof vi.fn>;
+      getDocumentActivity: ReturnType<typeof vi.fn>;
+      patchDocumentVersion: ReturnType<typeof vi.fn>;
+      createComment: ReturnType<typeof vi.fn>;
+    };
+    let docResponse: GetDocumentResponse | null;
+    let versionDetailSubject: Subject<GetDocumentVersionResponse | null>;
+    let jobCompletedSubject: Subject<unknown>;
+
+    function makeVersion(overrides: Partial<GetDocumentVersionDto> = {}): GetDocumentVersionDto {
+      return {
+        id: 'ver-1',
+        contentType: 'application/pdf',
+        fileExtension: '.pdf',
+        fileSize: 100,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        versionNumber: 1,
+        label: 'server label',
+        ...overrides,
+      };
+    }
+
+    function makeVersionDetail(
+      overrides: Partial<GetDocumentVersionResponse> = {},
+    ): GetDocumentVersionResponse {
+      return {
+        id: 'ver-1',
+        contentType: 'application/pdf',
+        fileExtension: '.pdf',
+        fileSize: 100,
+        fileHash: 'hash',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        versionNumber: 1,
+        label: 'server label',
+        ...overrides,
+      };
+    }
+
+    function makeDoc(overrides: Partial<GetDocumentResponse> = {}): GetDocumentResponse {
+      return {
+        id: 'doc-1',
+        name: 'Doc 1',
+        contentType: 'application/pdf',
+        fileExtension: '.pdf',
+        fileHash: 'hash',
+        fileSize: 100,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        parties: [],
+        tags: [],
+        versions: [makeVersion()],
+        extractedText: 'server text',
+        ...overrides,
+      };
+    }
+
+    function setGuardDocumentId(id: string | null) {
+      const params = id ? { id } : {};
+      guardParamMap.next(convertToParamMap(params));
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('localStorage', {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      });
+      vi.stubGlobal('sessionStorage', {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+      });
+
+      guardParamMap = new BehaviorSubject(convertToParamMap({}));
+      jobCompletedSubject = new Subject<unknown>();
+      versionDetailSubject = new Subject<GetDocumentVersionResponse | null>();
+      docResponse = null;
+
+      guardOpenDocumentsService = {
+        addDocument: vi.fn(),
+        removeDocument: vi.fn(),
+        getPrevDocumentId: vi.fn(() => null),
+        getNextDocumentId: vi.fn(() => null),
+      };
+
+      guardEditStateService = {
+        saveState: vi.fn(),
+        getState: vi.fn(() => null),
+        clearState: vi.fn(),
+        clearAll: vi.fn(),
+        discardChanges: vi.fn(),
+        setActiveHasChanges: vi.fn(),
+      };
+
+      guardDocumentApi = {
+        getDocument: vi.fn(() => of(docResponse)),
+        getDocumentFile: vi.fn(() => EMPTY),
+        patchDocument: vi.fn(() => of(null)),
+      };
+
+      guardVersionApi = {
+        getDocumentVersion: vi.fn(() => versionDetailSubject.asObservable()),
+        getDocumentActivity: vi.fn(() => of({ items: [] })),
+        patchDocumentVersion: vi.fn(() => of(null)),
+        createComment: vi.fn(() => of(null)),
+      };
+
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideRouter([{ path: 'documents', component: DummyComponent }]),
+          PageHeaderService,
+          { provide: AuthService, useValue: { canWrite: signal(true) } },
+          { provide: OpenDocumentsService, useValue: guardOpenDocumentsService },
+          { provide: DocumentEditStateService, useValue: guardEditStateService },
+          { provide: DocumentApiService, useValue: guardDocumentApi },
+          { provide: DocumentVersionApiService, useValue: guardVersionApi },
+          {
+            provide: ProcessingHubService,
+            useValue: { jobCompleted$: jobCompletedSubject, waitForJob: vi.fn(() => new Promise(() => {})) },
+          },
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              paramMap: guardParamMap.asObservable(),
+              snapshot: { paramMap: convertToParamMap({}) },
+            },
+          },
+        ],
+      });
+
+      // Override the template with a minimal placeholder. The component
+      // owns lots of heavy child components (NgScrollbar, dialogs, Spartan
+      // tabs/resizable) that exercise browser APIs jsdom doesn't support.
+      // We only care about exercising the guard-effect logic, not rendering.
+      TestBed.overrideComponent(DocumentDetailPageComponent, {
+        set: { template: '<div></div>' },
+      });
+
+      guardFixture = TestBed.createComponent(DocumentDetailPageComponent);
+      guardComponent = guardFixture.componentInstance;
+      guardFixture.detectChanges();
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('refreshTrigger increment does not wipe editVersionLabel or editExtractedText', () => {
+      docResponse = makeDoc();
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      guardComponent.editVersionLabel.set('user typed label');
+      guardComponent.editExtractedText.set('user typed text');
+
+      guardComponent.refreshTrigger.update((v) => v + 1);
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editVersionLabel()).toBe('user typed label');
+      expect(guardComponent.editExtractedText()).toBe('user typed text');
+    });
+
+    it('SignalR jobCompleted$ does not wipe edits', () => {
+      docResponse = makeDoc();
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      guardComponent.editVersionLabel.set('user typed label');
+      guardComponent.editExtractedText.set('user typed text');
+
+      jobCompletedSubject.next(null);
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editVersionLabel()).toBe('user typed label');
+      expect(guardComponent.editExtractedText()).toBe('user typed text');
+    });
+
+    it('saved-state restoration survives the first activeVersion() emit', () => {
+      (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+        editName: 'saved name',
+        editDocumentDate: null,
+        editExpiryDate: null,
+        editNotes: 'saved notes',
+        editParties: [],
+        editTags: [],
+        editVersionLabel: 'saved label',
+        editExtractedText: 'saved text',
+        versionId: 'ver-1',
+      });
+
+      docResponse = makeDoc();
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editVersionLabel()).toBe('saved label');
+      expect(guardComponent.editExtractedText()).toBe('saved text');
+    });
+
+    it('switching to a different version reinitializes from server values', () => {
+      docResponse = makeDoc({
+        versions: [
+          makeVersion({ id: 'ver-1', label: 'v1 label', versionNumber: 1 }),
+          makeVersion({ id: 'ver-2', label: 'v2 label', versionNumber: 2 }),
+        ],
+        extractedText: 'v2 text',
+      });
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      // Latest is ver-2
+      expect(guardComponent.editVersionLabel()).toBe('v2 label');
+      expect(guardComponent.editExtractedText()).toBe('v2 text');
+
+      guardComponent.editVersionLabel.set('user typed');
+      guardComponent.editExtractedText.set('user typed text');
+
+      guardComponent.onVersionSelected('ver-1');
+      guardFixture.detectChanges();
+
+      versionDetailSubject.next(
+        makeVersionDetail({ label: 'v1 label', extractedText: 'v1 text' }),
+      );
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editVersionLabel()).toBe('v1 label');
+      expect(guardComponent.editExtractedText()).toBe('v1 text');
+    });
+
+    it('after save, re-fetch overwrites edit fields with server values', () => {
+      docResponse = makeDoc({
+        versions: [makeVersion({ label: 'old label' })],
+      });
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      guardComponent.editVersionLabel.set('user typed');
+
+      // Simulate the server returning a different value than the user typed
+      // (e.g., a sibling editor updated the label between page load and save).
+      docResponse = makeDoc({
+        versions: [makeVersion({ label: 'server value' })],
+      });
+
+      guardComponent.handleSave();
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editVersionLabel()).toBe('server value');
+    });
+
+    it('late-resolved versionDetail populates editExtractedText on a non-latest version', () => {
+      docResponse = makeDoc({
+        versions: [
+          makeVersion({ id: 'ver-1', label: 'v1 label', versionNumber: 1 }),
+          makeVersion({ id: 'ver-2', label: 'v2 label', versionNumber: 2 }),
+        ],
+        extractedText: 'v2 text',
+      });
+
+      // Pre-select non-latest version before doc loads
+      (guardComponent as unknown as { versionId: { set(v: string): void } }).versionId.set('ver-1');
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      // versionDetail hasn't emitted yet; editExtractedText is still empty
+      expect(guardComponent.editExtractedText()).toBe('');
+
+      // Late-resolve the version detail
+      versionDetailSubject.next(
+        makeVersionDetail({ label: 'v1 label', extractedText: 'v1 late text' }),
+      );
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editExtractedText()).toBe('v1 late text');
+    });
 });

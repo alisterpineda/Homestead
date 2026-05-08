@@ -669,8 +669,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private errorHandler = inject(ErrorHandlerService);
   private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
-  private pendingSavedState: DocumentEditState | null = null;
   private initializedDocId: string | null = null;
+  private initializedVersionId: string | null = null;
 
   private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
 
@@ -886,7 +886,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
-          this.pendingSavedState = saved;
           this.editName.set(saved.editName);
           this.editTags.set(saved.editTags);
           this.editParties.set(saved.editParties);
@@ -895,19 +894,17 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editNotes.set(saved.editNotes ?? '');
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
+          this.initializedVersionId = saved.versionId
+            ?? untracked(() => this.activeVersion()?.id ?? null);
           untracked(() => this.editStateService.clearState(doc.id));
         } else {
-          this.pendingSavedState = null;
           this.editName.set(doc.name);
           this.editTags.set(doc.tags?.map((t) => t.path) ?? []);
           this.editParties.set(doc.parties?.map((p) => ({ id: p.id, name: p.name })) ?? []);
           this.editDocumentDate.set(this.origDocumentDate());
           this.editExpiryDate.set(this.origExpiryDate());
           this.editNotes.set(this.origNotes());
-          // Set version-level fields atomically to prevent flash in active changes tracking
-          const ver = untracked(() => this.activeVersion());
-          this.editVersionLabel.set(ver?.label ?? '');
-          this.editExtractedText.set(untracked(() => this.displayExtractedText()) ?? '');
+          this.initializedVersionId = null;
         }
       }
     });
@@ -920,25 +917,18 @@ export class DocumentDetailPageComponent implements OnDestroy {
       }
     });
 
+    // Initialize version-level edit fields. Guard prevents refreshTrigger-driven
+    // re-emits from overwriting pending user edits.
     effect(() => {
       const ver = this.activeVersion();
-      if (ver) {
-        if (this.pendingSavedState && this.pendingSavedState.versionId === ver.id) {
-          this.editVersionLabel.set(this.pendingSavedState.editVersionLabel);
-        } else {
-          this.editVersionLabel.set(ver.label ?? '');
-        }
-      }
-    });
-
-    effect(() => {
       const text = this.displayExtractedText();
-      if (this.pendingSavedState) {
-        this.editExtractedText.set(this.pendingSavedState.editExtractedText);
-        this.pendingSavedState = null;
-      } else {
-        this.editExtractedText.set(text ?? '');
-      }
+      if (!ver) return;
+      if (ver.id === this.initializedVersionId) return;
+      const verId = untracked(() => this.versionId());
+      if (verId && text === null) return; // wait for versionDetail on non-latest
+      this.initializedVersionId = ver.id;
+      this.editVersionLabel.set(ver.label ?? '');
+      this.editExtractedText.set(text ?? '');
     });
 
     // Track active changes for sidebar indicator
@@ -1204,6 +1194,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values
         this.initializedDocId = null;
+        this.initializedVersionId = null;
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },
