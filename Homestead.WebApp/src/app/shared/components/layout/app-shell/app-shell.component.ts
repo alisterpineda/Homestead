@@ -41,14 +41,7 @@ import { getModuleByPath } from '@/modules/registry';
       <hlm-sidebar variant="inset">
         <!-- Sidebar Header -->
         <div hlmSidebarHeader>
-          <div class="flex items-center gap-2">
-            <app-switcher />
-            @if (activeModule()) {
-              <span class="truncate text-sm font-semibold text-sidebar-foreground">
-                {{ activeModule()!.label }}
-              </span>
-            }
-          </div>
+          <app-switcher [activeModule]="activeModule()" />
         </div>
 
         <!-- Sidebar Content -->
