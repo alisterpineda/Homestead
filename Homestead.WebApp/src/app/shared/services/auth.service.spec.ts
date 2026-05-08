@@ -98,6 +98,45 @@ describe('AuthService', () => {
     });
   });
 
+  describe('loginWithOidc', () => {
+    const ORIGIN = 'http://localhost:4200';
+    let mockLocation: { origin: string; href: string };
+
+    beforeEach(() => {
+      mockLocation = { origin: ORIGIN, href: '' };
+      vi.stubGlobal('location', mockLocation);
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    function decodedReturnUrl(): string {
+      const [, query] = mockLocation.href.split('?');
+      const params = new URLSearchParams(query);
+      return params.get('returnUrl') ?? '';
+    }
+
+    it('uses /documents when called without arguments', () => {
+      service.loginWithOidc();
+      expect(decodedReturnUrl()).toBe(`${ORIGIN}/documents`);
+    });
+
+    it('preserves a safe path', () => {
+      service.loginWithOidc('/settings');
+      expect(decodedReturnUrl()).toBe(`${ORIGIN}/settings`);
+    });
+
+    it.each([
+      ['//evil.com/x', 'protocol-relative'],
+      ['/\\evil.com', 'backslash trick'],
+      ['http://evil.com', 'absolute URL'],
+      ['javascript:alert(1)', 'javascript scheme'],
+      ['', 'empty string'],
+    ])('coerces unsafe input %s (%s) to /', (input) => {
+      service.loginWithOidc(input);
+      expect(decodedReturnUrl()).toBe(`${ORIGIN}/`);
+    });
+  });
+
   describe('clearUser', () => {
     it('should reset all session signals to defaults', () => {
       setUser({

@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { GetStatusResponse } from '@/api/generated/models/get-status-response';
 import { GetUserInfoResponse } from '@/api/generated/models/get-user-info-response';
 import type { AppRole } from '@/api/generated/models/app-role';
+import { isSafeReturnPath } from '../utils/safe-return-path';
 
 /** Role hierarchy levels — higher number = more access. */
 const ROLE_LEVEL: Record<string, number> = { Admin: 3, Contributor: 2, Viewer: 1, Guest: 0 };
@@ -60,7 +61,8 @@ export class AuthService {
   }
 
   private redirectToOidc(action: 'login' | 'logout', returnPath: string): void {
-    const fullReturnUrl = window.location.origin + returnPath;
+    const safePath = isSafeReturnPath(returnPath) ? returnPath : '/';
+    const fullReturnUrl = window.location.origin + safePath;
     window.location.href = `/api/auth/oidc/${action}?returnUrl=${encodeURIComponent(fullReturnUrl)}`;
   }
 
