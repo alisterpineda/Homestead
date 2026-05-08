@@ -22,7 +22,8 @@ WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-RUN apk add --no-cache tesseract-ocr fontconfig \
+# tzdata: required by JobSchedulerService for IANA timezone lookups — do not remove
+RUN apk add --no-cache tzdata tesseract-ocr fontconfig \
     tesseract-ocr-data-eng tesseract-ocr-data-fra tesseract-ocr-data-deu \
     tesseract-ocr-data-spa tesseract-ocr-data-ita tesseract-ocr-data-por \
     tesseract-ocr-data-nld tesseract-ocr-data-rus tesseract-ocr-data-chi_sim \
