@@ -71,4 +71,12 @@ export class AuthService {
     this.userEmail.set(user.email);
     this.role.set(user.role);
   }
+
+  clearUser(): void {
+    this.isAuthenticated.set(false);
+    this.isActive.set(true);
+    this.userName.set('');
+    this.userEmail.set('');
+    this.role.set('');
+  }
 }

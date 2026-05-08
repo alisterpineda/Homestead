@@ -3,9 +3,11 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { extractErrorCode } from '@/shared/utils/api-error.utils';
+import { AuthService } from '@/shared/services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
+  const auth = inject(AuthService);
 
   return next(req).pipe(
     tap({
@@ -15,6 +17,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           return;
         }
         if (err.status === 401 && !req.url.includes('/api/auth/')) {
+          auth.clearUser();
           router.navigate(['/login']);
         }
       },

@@ -88,14 +88,46 @@ describe('AuthService', () => {
       setUser({ role: 'Admin' });
       expect(service.role()).toBe('Admin');
 
-      // Directly reset state as logout makes HTTP call
-      service.isAuthenticated.set(false);
-      service.role.set('');
+      // logout() makes a full-page redirect; use clearUser() to reset state in tests.
+      service.clearUser();
 
       expect(service.role()).toBe('');
       expect(service.isAdmin()).toBe(false);
       expect(service.canWrite()).toBe(false);
       expect(service.canRead()).toBe(false);
+    });
+  });
+
+  describe('clearUser', () => {
+    it('should reset all session signals to defaults', () => {
+      setUser({
+        role: 'Admin',
+        email: 'admin@example.com',
+        displayName: 'Admin User',
+        isActive: false,
+      });
+      expect(service.isAuthenticated()).toBe(true);
+      expect(service.role()).toBe('Admin');
+
+      service.clearUser();
+
+      expect(service.isAuthenticated()).toBe(false);
+      expect(service.isActive()).toBe(true);
+      expect(service.userName()).toBe('');
+      expect(service.userEmail()).toBe('');
+      expect(service.role()).toBe('');
+      expect(service.isAdmin()).toBe(false);
+      expect(service.canWrite()).toBe(false);
+      expect(service.canRead()).toBe(false);
+    });
+
+    it('should not clear oidcDisplayName', () => {
+      service.oidcDisplayName.set('Keycloak');
+      setUser({ role: 'Contributor' });
+
+      service.clearUser();
+
+      expect(service.oidcDisplayName()).toBe('Keycloak');
     });
   });
 
