@@ -2,6 +2,29 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EditTextExtractionEngineSheetComponent } from './edit-text-extraction-engine-sheet.component';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+function makeEngine(overrides: Partial<TextExtractionEngineResponse> = {}): TextExtractionEngineResponse {
+  return {
+    id: 'engine-1',
+    name: 'My Engine',
+    engineType: 'Tesseract',
+    configuration: null,
+    isBuiltIn: false,
+    createdAt: '2025-01-15T00:00:00Z',
+    updatedAt: '2025-01-15T00:00:00Z',
+    createdByUserName: null,
+    ...overrides,
+  };
+}
 
 describe('EditTextExtractionEngineSheetComponent', () => {
   let fixture: ComponentFixture<EditTextExtractionEngineSheetComponent>;
@@ -121,34 +144,48 @@ describe('EditTextExtractionEngineSheetComponent', () => {
     });
   });
 
-  describe('onLanguagesChange', () => {
-    it('should update editLanguages and editConfiguration', () => {
-      component.onLanguagesChange(['Fra']);
-      expect(component.editLanguages()).toEqual(['Fra']);
+  describe('editConfiguration (derived)', () => {
+    it('should serialize languages for a Tesseract engine', () => {
+      const engine = makeEngine({ engineType: 'Tesseract' });
+      fixture.componentRef.setInput('engine', engine);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      component.editLanguages.set(['Fra']);
       expect(component.editConfiguration()).toBe(JSON.stringify({ languages: ['Fra'] }));
     });
 
-    it('should handle multiple languages', () => {
-      component.onLanguagesChange(['Eng', 'Fra']);
-      expect(component.editLanguages()).toEqual(['Eng', 'Fra']);
+    it('should serialize multiple languages for a Tesseract engine', () => {
+      const engine = makeEngine({ engineType: 'Tesseract' });
+      fixture.componentRef.setInput('engine', engine);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      component.editLanguages.set(['Eng', 'Fra']);
       expect(component.editConfiguration()).toBe(JSON.stringify({ languages: ['Eng', 'Fra'] }));
     });
-  });
 
-  describe('Azure DI field changes', () => {
-    it('onEndpointChange should update editEndpoint and editConfiguration', () => {
+    it('should serialize endpoint and apiKey for an Azure DI engine', () => {
+      const engine = makeEngine({ engineType: 'AzureDocumentIntelligence' });
+      fixture.componentRef.setInput('engine', engine);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
+      component.editEndpoint.set('https://test.cognitiveservices.azure.com');
       component.editApiKey.set('key123');
-      component.onEndpointChange('https://test.cognitiveservices.azure.com');
-      expect(component.editEndpoint()).toBe('https://test.cognitiveservices.azure.com');
       expect(component.editConfiguration()).toBe(
         JSON.stringify({ endpoint: 'https://test.cognitiveservices.azure.com', apiKey: 'key123' })
       );
     });
 
-    it('onApiKeyChange should update editApiKey and editConfiguration', () => {
+    it('should reflect editApiKey changes for an Azure DI engine', () => {
+      const engine = makeEngine({ engineType: 'AzureDocumentIntelligence' });
+      fixture.componentRef.setInput('engine', engine);
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+
       component.editEndpoint.set('https://test.cognitiveservices.azure.com');
-      component.onApiKeyChange('newkey');
-      expect(component.editApiKey()).toBe('newkey');
+      component.editApiKey.set('newkey');
       expect(component.editConfiguration()).toBe(
         JSON.stringify({ endpoint: 'https://test.cognitiveservices.azure.com', apiKey: 'newkey' })
       );

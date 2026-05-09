@@ -3,10 +3,8 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
@@ -23,6 +21,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 
 @Component({
   selector: 'app-edit-user-sheet',
@@ -119,11 +118,31 @@ export class EditUserSheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  editEmail = signal('');
-  editDisplayName = signal('');
-  editRole = signal<AppRole>('Contributor');
-  editIsActive = signal(true);
-  saving = signal(false);
+  private seedKey = computed(() =>
+    `${this.user()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  editEmail = seededLinkedSignal(this.seedKey, () => {
+    const u = this.user();
+    if (!u || this.state() !== 'open') return '';
+    return u.email ?? '';
+  });
+  editDisplayName = seededLinkedSignal(this.seedKey, () => {
+    const u = this.user();
+    if (!u || this.state() !== 'open') return '';
+    return u.displayName;
+  });
+  editRole = seededLinkedSignal(this.seedKey, (): AppRole => {
+    const u = this.user();
+    if (!u || this.state() !== 'open') return 'Contributor';
+    return u.role;
+  });
+  editIsActive = seededLinkedSignal(this.seedKey, () => {
+    const u = this.user();
+    if (!u || this.state() !== 'open') return true;
+    return u.isActive;
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
 
   hasChanges = computed(() => {
     const u = this.user();
@@ -137,18 +156,6 @@ export class EditUserSheetComponent {
 
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
-
-  constructor() {
-    effect(() => {
-      const u = this.user();
-      if (u && this.state() === 'open') {
-        this.editEmail.set(u.email ?? '');
-        this.editDisplayName.set(u.displayName);
-        this.editRole.set(u.role);
-        this.editIsActive.set(u.isActive);
-      }
-    });
-  }
 
   formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString(undefined, {

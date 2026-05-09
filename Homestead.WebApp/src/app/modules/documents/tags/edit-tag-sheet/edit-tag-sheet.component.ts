@@ -3,13 +3,10 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
 } from '@angular/core';
-import { ReactiveFormsModule, FormsModule, FormControl, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -25,6 +22,7 @@ import { replace } from '@/shared/json-patch';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 
 const NONE_VALUE = '__none__';
@@ -33,7 +31,6 @@ const NONE_VALUE = '__none__';
   selector: 'app-edit-tag-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule,
     FormsModule,
     HlmSheetImports,
     HlmButton,
@@ -60,15 +57,16 @@ const NONE_VALUE = '__none__';
                 hlmInput
                 id="tag-name"
                 class="w-full"
-                [formControl]="nameControl"
+                [value]="editName()"
+                (input)="editName.set(asValue($event))"
               />
               <hlm-hint>Cannot contain '/' characters.</hlm-hint>
               <hlm-error>
-                @if (nameControl.hasError('required')) {
+                @if (nameRequiredError()) {
                   Tag name is required.
-                } @else if (nameControl.hasError('pattern')) {
+                } @else if (namePatternError()) {
                   Tag name cannot contain '/' characters.
-                } @else if (nameControl.hasError('maxlength')) {
+                } @else if (nameMaxLenError()) {
                   Tag name must be 256 characters or fewer.
                 }
               </hlm-error>
@@ -97,7 +95,8 @@ const NONE_VALUE = '__none__';
                 hlmInput
                 id="tag-description"
                 class="w-full"
-                [formControl]="descriptionControl"
+                [value]="editDescription()"
+                (input)="editDescription.set(asValue($event))"
                 rows="3"
               ></textarea>
               <hlm-error>Description must be 512 characters or fewer.</hlm-error>
@@ -116,7 +115,7 @@ const NONE_VALUE = '__none__';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || nameControl.invalid || descriptionControl.invalid || saving()">
+          <button hlmBtn (click)="save()" [disabled]="!hasChanges() || nameInvalid() || descriptionInvalid() || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -131,19 +130,39 @@ export class EditTagSheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  nameControl = new FormControl('', {
-    nonNullable: true,
-    validators: [Validators.required, Validators.pattern(/^[^/]*$/), Validators.maxLength(256)],
+  private seedKey = computed(() =>
+    `${this.tag()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  editName = seededLinkedSignal(this.seedKey, () => {
+    const t = this.tag();
+    if (!t || this.state() !== 'open') return '';
+    return t.name;
   });
-  descriptionControl = new FormControl('', {
-    nonNullable: true,
-    validators: [Validators.maxLength(512)],
+  editDescription = seededLinkedSignal(this.seedKey, () => {
+    const t = this.tag();
+    if (!t || this.state() !== 'open') return '';
+    return t.description ?? '';
   });
-  editName = toSignal(this.nameControl.valueChanges, { initialValue: '' });
-  editDescription = toSignal(this.descriptionControl.valueChanges, { initialValue: '' });
-  editParentId = signal<string | null>(null);
-  editColor = signal<string | null>(null);
-  saving = signal(false);
+  editParentId = seededLinkedSignal<string, string | null>(this.seedKey, () => {
+    const t = this.tag();
+    if (!t || this.state() !== 'open') return null;
+    return t.parentId ?? null;
+  });
+  editColor = seededLinkedSignal<string, string | null>(this.seedKey, () => {
+    const t = this.tag();
+    if (!t || this.state() !== 'open') return null;
+    return t.color ?? null;
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+
+  nameRequiredError = computed(() => this.editName().length === 0);
+  namePatternError = computed(() => /\//.test(this.editName()));
+  nameMaxLenError = computed(() => this.editName().length > 256);
+  nameInvalid = computed(
+    () => this.nameRequiredError() || this.namePatternError() || this.nameMaxLenError(),
+  );
+  descriptionInvalid = computed(() => this.editDescription().length > 512);
 
   parentSelectValue = computed(() => this.editParentId() ?? NONE_VALUE);
 
@@ -194,20 +213,8 @@ export class EditTagSheetComponent {
   private tagApi = inject(TagApiService);
   private errorHandler = inject(ErrorHandlerService);
 
-  constructor() {
-    effect(() => {
-      const t = this.tag();
-      if (t && this.state() === 'open') {
-        this.nameControl.setValue(t.name);
-        this.nameControl.markAsPristine();
-        this.nameControl.markAsUntouched();
-        this.descriptionControl.setValue(t.description ?? '');
-        this.descriptionControl.markAsPristine();
-        this.descriptionControl.markAsUntouched();
-        this.editParentId.set(t.parentId ?? null);
-        this.editColor.set(t.color ?? null);
-      }
-    });
+  asValue(event: Event): string {
+    return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
 
   onParentChange(value: string): void {

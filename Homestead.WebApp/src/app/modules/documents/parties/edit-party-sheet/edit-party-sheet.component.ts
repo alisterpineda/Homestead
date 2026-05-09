@@ -3,13 +3,9 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
 } from '@angular/core';
-import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -21,13 +17,13 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-edit-party-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule,
     HlmSheetImports,
     HlmButton,
     HlmLabel,
@@ -51,12 +47,13 @@ import { toast } from '@spartan-ng/brain/sonner';
                 hlmInput
                 id="party-name"
                 class="w-full"
-                [formControl]="nameControl"
+                [value]="editName()"
+                (input)="editName.set(asValue($event))"
               />
               <hlm-error>
-                @if (nameControl.hasError('required')) {
+                @if (nameRequiredError()) {
                   Party name is required.
-                } @else if (nameControl.hasError('maxlength')) {
+                } @else if (nameMaxLenError()) {
                   Party name must be 256 characters or fewer.
                 }
               </hlm-error>
@@ -70,7 +67,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 rows="3"
                 placeholder="No description"
                 [value]="editDescription()"
-                (input)="editDescription.set(asInputValue($event))"
+                (input)="editDescription.set(asValue($event))"
               ></textarea>
             </div>
 
@@ -84,7 +81,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         }
 
         <hlm-sheet-footer>
-          <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || nameControl.invalid || saving()">
+          <button hlmBtn (click)="handleSave()" [disabled]="!hasChanges() || nameInvalid() || saving()">
             {{ saving() ? 'Saving...' : 'Save' }}
           </button>
         </hlm-sheet-footer>
@@ -98,13 +95,25 @@ export class EditPartySheetComponent {
   saved = output<void>();
   closed = output<void>();
 
-  nameControl = new FormControl('', {
-    nonNullable: true,
-    validators: [Validators.required, Validators.maxLength(256)],
+  private seedKey = computed(() =>
+    `${this.party()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  editName = seededLinkedSignal(this.seedKey, () => {
+    const p = this.party();
+    if (!p || this.state() !== 'open') return '';
+    return p.name;
   });
-  editName = toSignal(this.nameControl.valueChanges, { initialValue: '' });
-  editDescription = signal('');
-  saving = signal(false);
+  editDescription = seededLinkedSignal(this.seedKey, () => {
+    const p = this.party();
+    if (!p || this.state() !== 'open') return '';
+    return p.description ?? '';
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+
+  nameRequiredError = computed(() => this.editName().length === 0);
+  nameMaxLenError = computed(() => this.editName().length > 256);
+  nameInvalid = computed(() => this.nameRequiredError() || this.nameMaxLenError());
 
   hasChanges = computed(() => {
     const p = this.party();
@@ -117,18 +126,6 @@ export class EditPartySheetComponent {
   private partyApi = inject(PartyApiService);
   private errorHandler = inject(ErrorHandlerService);
 
-  constructor() {
-    effect(() => {
-      const p = this.party();
-      if (p && this.state() === 'open') {
-        this.nameControl.setValue(p.name);
-        this.nameControl.markAsPristine();
-        this.nameControl.markAsUntouched();
-        this.editDescription.set(p.description ?? '');
-      }
-    });
-  }
-
   formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString(undefined, {
       year: 'numeric',
@@ -137,8 +134,8 @@ export class EditPartySheetComponent {
     });
   }
 
-  asInputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
+  asValue(event: Event): string {
+    return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
 
   handleSave(): void {

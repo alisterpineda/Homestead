@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -14,7 +14,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { ENGINE_TYPE_LABELS } from '../engine-type-labels';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
+
+type TesseractSeed = { kind: 'tesseract'; languages: string[] };
+type AzureSeed = { kind: 'azure'; endpoint: string; apiKey: string };
 
 @Component({
   selector: 'app-edit-text-extraction-engine-sheet',
@@ -54,7 +58,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 @if (e.isBuiltIn) {
                   <p class="text-sm text-muted-foreground">{{ getLanguagesLabel(e.configuration) }}</p>
                 } @else {
-                  <hlm-select-multiple [ngModel]="editLanguages()" (ngModelChange)="onLanguagesChange($event)" [itemToString]="languageToString">
+                  <hlm-select-multiple [ngModel]="editLanguages()" (ngModelChange)="editLanguages.set($event)" [itemToString]="languageToString">
                     <hlm-select-trigger class="w-full">
                       <hlm-select-value />
                     </hlm-select-trigger>
@@ -80,7 +84,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 } @else {
                   <input hlmInput id="edit-azure-endpoint"
                     placeholder="https://your-resource.cognitiveservices.azure.com"
-                    [value]="editEndpoint()" (input)="onEndpointChange(asInputValue($event))" />
+                    [value]="editEndpoint()" (input)="editEndpoint.set(asInputValue($event))" />
                 }
               </div>
 
@@ -90,7 +94,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <p class="text-sm text-muted-foreground">********</p>
                 } @else {
                   <input hlmInput id="edit-azure-api-key" type="password" placeholder="API Key"
-                    [value]="editApiKey()" (input)="onApiKeyChange(asInputValue($event))" />
+                    [value]="editApiKey()" (input)="editApiKey.set(asInputValue($event))" />
                 }
               </div>
             }
@@ -128,12 +132,74 @@ export class EditTextExtractionEngineSheetComponent {
 
   languages = TESSERACT_LANGUAGES;
   languageToString = (value: string): string => this.languages.find(l => l.value === value)?.label ?? value;
-  editName = signal('');
-  editLanguages = signal<string[]>([...DEFAULT_TESSERACT_LANGUAGES]);
-  editEndpoint = signal('');
-  editApiKey = signal('');
-  editConfiguration = signal<string | null>(null);
-  saving = signal(false);
+
+  private seedKey = computed(() =>
+    `${this.engine()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  private seed = computed((): TesseractSeed | AzureSeed | null => {
+    const e = this.engine();
+    if (!e || this.state() !== 'open') return null;
+
+    if (e.engineType === 'Tesseract') {
+      let languages: string[] = [...DEFAULT_TESSERACT_LANGUAGES];
+      if (e.configuration) {
+        try {
+          const parsed = JSON.parse(e.configuration);
+          if (Array.isArray(parsed.languages)) {
+            languages = parsed.languages;
+          }
+        } catch { /* empty */ }
+      }
+      return { kind: 'tesseract', languages };
+    }
+
+    if (e.engineType === 'AzureDocumentIntelligence') {
+      let endpoint = '';
+      let apiKey = '';
+      if (e.configuration) {
+        try {
+          const parsed = JSON.parse(e.configuration);
+          endpoint = parsed.endpoint ?? '';
+          apiKey = parsed.apiKey ?? '';
+        } catch { /* empty */ }
+      }
+      return { kind: 'azure', endpoint, apiKey };
+    }
+
+    return null;
+  });
+
+  editName = seededLinkedSignal(this.seedKey, () => {
+    const e = this.engine();
+    if (!e || this.state() !== 'open') return '';
+    return e.name;
+  });
+  editLanguages = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed?.kind === 'tesseract' ? seed.languages : [...DEFAULT_TESSERACT_LANGUAGES];
+  });
+  editEndpoint = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed?.kind === 'azure' ? seed.endpoint : '';
+  });
+  editApiKey = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed?.kind === 'azure' ? seed.apiKey : '';
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+
+  editConfiguration = computed(() => {
+    const e = this.engine();
+    if (!e) return null;
+    if (e.engineType === 'Tesseract') {
+      return JSON.stringify({ languages: this.editLanguages() });
+    }
+    if (e.engineType === 'AzureDocumentIntelligence') {
+      return JSON.stringify({ endpoint: this.editEndpoint(), apiKey: this.editApiKey() });
+    }
+    return e.configuration ?? null;
+  });
 
   hasChanges = computed(() => {
     const e = this.engine();
@@ -142,35 +208,6 @@ export class EditTextExtractionEngineSheetComponent {
     if (this.editConfiguration() !== (e.configuration ?? null)) return true;
     return false;
   });
-
-  constructor() {
-    effect(() => {
-      const e = this.engine();
-      if (e && this.state() === 'open') {
-        this.editName.set(e.name);
-        this.editConfiguration.set(e.configuration ?? null);
-        if (e.engineType === 'Tesseract' && e.configuration) {
-          try {
-            const parsed = JSON.parse(e.configuration);
-            if (Array.isArray(parsed.languages)) {
-              this.editLanguages.set(parsed.languages);
-            }
-          } catch {
-            // ignore
-          }
-        }
-        if (e.engineType === 'AzureDocumentIntelligence' && e.configuration) {
-          try {
-            const parsed = JSON.parse(e.configuration);
-            this.editEndpoint.set(parsed.endpoint ?? '');
-            this.editApiKey.set(parsed.apiKey ?? '');
-          } catch {
-            // ignore
-          }
-        }
-      }
-    });
-  }
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
@@ -191,28 +228,6 @@ export class EditTextExtractionEngineSheetComponent {
     } catch {
       return 'Unknown';
     }
-  }
-
-  onLanguagesChange(values: string[]): void {
-    this.editLanguages.set(values);
-    this.editConfiguration.set(JSON.stringify({ languages: values }));
-  }
-
-  onEndpointChange(value: string): void {
-    this.editEndpoint.set(value);
-    this.rebuildAzureConfig();
-  }
-
-  onApiKeyChange(value: string): void {
-    this.editApiKey.set(value);
-    this.rebuildAzureConfig();
-  }
-
-  private rebuildAzureConfig(): void {
-    this.editConfiguration.set(JSON.stringify({
-      endpoint: this.editEndpoint(),
-      apiKey: this.editApiKey(),
-    }));
   }
 
   handleSave(): void {

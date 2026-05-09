@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, input, output } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -9,6 +9,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 
 @Component({
   selector: 'app-edit-group-sheet',
@@ -56,9 +57,21 @@ export class EditGroupSheetComponent {
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
 
-  editName = signal('');
-  editDescription = signal('');
-  saving = signal(false);
+  private seedKey = computed(() =>
+    `${this.group()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  editName = seededLinkedSignal(this.seedKey, () => {
+    const g = this.group();
+    if (!g || this.state() !== 'open') return '';
+    return g.name;
+  });
+  editDescription = seededLinkedSignal(this.seedKey, () => {
+    const g = this.group();
+    if (!g || this.state() !== 'open') return '';
+    return g.description ?? '';
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
 
   hasChanges = computed(() => {
     const g = this.group();
@@ -67,16 +80,6 @@ export class EditGroupSheetComponent {
     if (this.editDescription() !== (g.description ?? '')) return true;
     return false;
   });
-
-  constructor() {
-    effect(() => {
-      const g = this.group();
-      if (g && this.state() === 'open') {
-        this.editName.set(g.name);
-        this.editDescription.set(g.description ?? '');
-      }
-    });
-  }
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
