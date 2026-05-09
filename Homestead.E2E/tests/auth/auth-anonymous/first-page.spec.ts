@@ -3,7 +3,7 @@ import { test, expect } from '../../../fixtures/auth.fixture';
 test.describe('Anonymous access (fresh database)', () => {
   test('redirects to login page', async ({ page }) => {
     await page.goto('/');
-    await page.waitForURL('**/login');
+    await page.waitForURL(/\/login(\?|$)/);
   });
 
   test('login page renders with OIDC button only', async ({ loginPage }) => {

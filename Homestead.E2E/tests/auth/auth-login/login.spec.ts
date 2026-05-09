@@ -6,7 +6,7 @@ test.describe('OIDC login', () => {
 
   test('admin can log in via OIDC', async ({ page, loginPage, keycloakLoginPage }) => {
     await page.goto('/');
-    await page.waitForURL('**/login');
+    await page.waitForURL(/\/login(\?|$)/);
 
     await loginPage.oidcButton.click();
     await page.waitForURL(KEYCLOAK_URL_PATTERN);
@@ -20,7 +20,7 @@ test.describe('OIDC login', () => {
 
   test('regular user can log in via OIDC', async ({ page, loginPage, keycloakLoginPage }) => {
     await page.goto('/');
-    await page.waitForURL('**/login');
+    await page.waitForURL(/\/login(\?|$)/);
 
     await loginPage.oidcButton.click();
     await page.waitForURL(KEYCLOAK_URL_PATTERN);

@@ -7,7 +7,7 @@ setup(
   async ({ page, loginPage, keycloakLoginPage, request }) => {
     // 1. Log in as admin via OIDC (first user — auto-activated)
     await page.goto('/');
-    await page.waitForURL('**/login');
+    await page.waitForURL(/\/login(\?|$)/);
     await loginPage.oidcButton.click();
     await page.waitForURL(KEYCLOAK_URL_PATTERN);
     await keycloakLoginPage.login(KEYCLOAK_ADMIN.email, KEYCLOAK_ADMIN.password);
