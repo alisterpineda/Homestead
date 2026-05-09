@@ -48,8 +48,10 @@ describe('DocumentEditStateService', () => {
     });
 
     it('should persist to sessionStorage', () => {
+      TestBed.flushEffects(); // initial skip
       const state = makeState();
       service.saveState('doc-1', state);
+      TestBed.flushEffects();
       expect(sessionStorage.setItem).toHaveBeenCalled();
       const stored = JSON.parse(mockStorage['homestead-document-edit-state']);
       expect(stored['doc-1']).toEqual(state);
@@ -79,8 +81,10 @@ describe('DocumentEditStateService', () => {
     });
 
     it('should do nothing when clearing non-existent document', () => {
+      TestBed.flushEffects(); // initial skip
       (sessionStorage.setItem as ReturnType<typeof vi.fn>).mockClear();
       service.clearState('unknown');
+      TestBed.flushEffects();
       expect(sessionStorage.setItem).not.toHaveBeenCalled();
     });
   });
@@ -191,19 +195,25 @@ describe('DocumentEditStateService', () => {
       mockStorage['homestead-document-edit-state'] = JSON.stringify({
         'doc-1': makeState(),
       });
-      const freshService = new DocumentEditStateService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(DocumentEditStateService);
       expect(freshService.hasState('doc-1')).toBe(true);
     });
 
     it('should handle invalid JSON gracefully', () => {
       mockStorage['homestead-document-edit-state'] = 'not valid json';
-      const freshService = new DocumentEditStateService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(DocumentEditStateService);
       expect(freshService.getState('doc-1')).toBeNull();
     });
 
     it('should handle non-object JSON gracefully', () => {
       mockStorage['homestead-document-edit-state'] = '[1,2,3]';
-      const freshService = new DocumentEditStateService();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({});
+      const freshService = TestBed.inject(DocumentEditStateService);
       expect(freshService.getState('doc-1')).toBeNull();
     });
   });

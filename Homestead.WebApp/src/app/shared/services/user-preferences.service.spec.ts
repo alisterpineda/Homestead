@@ -98,28 +98,4 @@ describe('UserPreferencesService', () => {
       );
     });
   });
-
-  describe('old view mode key migration', () => {
-    it('should migrate old document-view-mode key to new key', () => {
-      mockStorage['document-view-mode'] = 'table';
-      const service = createService();
-      expect(service.documentViewMode()).toBe('table');
-      expect(localStorage.removeItem).toHaveBeenCalledWith('document-view-mode');
-    });
-
-    it('should not migrate if old key does not exist', () => {
-      const service = createService();
-      expect(service.documentViewMode()).toBe('grid');
-      expect(localStorage.removeItem).not.toHaveBeenCalled();
-    });
-
-    it('should prefer new key over old key when both exist', () => {
-      mockStorage['homestead-document-view-mode'] = '"table"';
-      mockStorage['document-view-mode'] = 'grid';
-      const service = createService();
-      // New key was loaded first by persistedSignal, then migration overwrites with old key value
-      // After migration, old key is removed
-      expect(localStorage.removeItem).toHaveBeenCalledWith('document-view-mode');
-    });
-  });
 });

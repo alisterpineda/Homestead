@@ -3,8 +3,6 @@ import type { VisibilityState } from '@tanstack/angular-table';
 import { persistedSignal } from '../utils/persisted-signal';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
 
-const OLD_VIEW_MODE_KEY = 'document-view-mode';
-
 const NET_WORTH_RANGE_KINDS: readonly NetWorthRange[] = [
   'ThisMonth',
   'ThreeMonths',
@@ -95,20 +93,4 @@ export class UserPreferencesService {
     defaultValue: false,
     validate: (v): v is boolean => typeof v === 'boolean',
   });
-
-  constructor() {
-    this.migrateOldViewModeKey();
-  }
-
-  private migrateOldViewModeKey(): void {
-    try {
-      const old = localStorage.getItem(OLD_VIEW_MODE_KEY);
-      if (old === 'table' || old === 'grid') {
-        this.documentViewMode.set(old);
-        localStorage.removeItem(OLD_VIEW_MODE_KEY);
-      }
-    } catch {
-      // ignore
-    }
-  }
 }

@@ -1,4 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { persistedSignal } from '@/shared/utils/persisted-signal';
 
 export interface DocumentEditState {
   editName: string;
@@ -14,29 +15,29 @@ export interface DocumentEditState {
 
 const STORAGE_KEY = 'homestead-document-edit-state';
 
+function isStateRecord(v: unknown): v is Record<string, DocumentEditState> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 @Injectable({ providedIn: 'root' })
 export class DocumentEditStateService {
-  /** Active changes tracked by the component (lightweight boolean per doc). */
   private activeChanges = signal<Record<string, boolean>>({});
 
-  /** Stored state doc IDs (synced from sessionStorage). */
-  private storedDocIds = signal<Set<string>>(this.loadStoredDocIds());
+  private allStates = persistedSignal<Record<string, DocumentEditState>>({
+    key: STORAGE_KEY,
+    defaultValue: {},
+    storage: 'sessionStorage',
+    validate: isStateRecord,
+  });
+
+  private storedDocIds = computed<Set<string>>(() => new Set(Object.keys(this.allStates())));
 
   saveState(docId: string, state: DocumentEditState): void {
-    const all = this.loadAll();
-    all[docId] = state;
-    this.saveAll(all);
-    this.storedDocIds.update((ids) => {
-      if (ids.has(docId)) return ids;
-      const next = new Set(ids);
-      next.add(docId);
-      return next;
-    });
+    this.allStates.update((all) => ({ ...all, [docId]: state }));
   }
 
   getState(docId: string): DocumentEditState | null {
-    const all = this.loadAll();
-    return all[docId] ?? null;
+    return this.allStates()[docId] ?? null;
   }
 
   hasState(docId: string): boolean {
@@ -44,31 +45,21 @@ export class DocumentEditStateService {
   }
 
   clearState(docId: string): void {
-    const all = this.loadAll();
-    if (!(docId in all)) return;
-    delete all[docId];
-    this.saveAll(all);
-    this.storedDocIds.update((ids) => {
-      if (!ids.has(docId)) return ids;
-      const next = new Set(ids);
-      next.delete(docId);
+    if (!(docId in this.allStates())) return;
+    this.allStates.update((current) => {
+      const next = { ...current };
+      delete next[docId];
       return next;
     });
   }
 
-  /** Clear stored state and active tracking for a document (convenience for close/delete flows). */
   discardChanges(docId: string): void {
     this.clearState(docId);
     this.setActiveHasChanges(docId, false);
   }
 
   clearAll(): void {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-    this.storedDocIds.set(new Set());
+    this.allStates.set({});
     this.activeChanges.set({});
   }
 
@@ -90,29 +81,4 @@ export class DocumentEditStateService {
     }
     return ids;
   });
-
-  private loadAll(): Record<string, DocumentEditState> {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
-      return parsed;
-    } catch {
-      return {};
-    }
-  }
-
-  private saveAll(all: Record<string, DocumentEditState>): void {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-    } catch {
-      // ignore
-    }
-  }
-
-  private loadStoredDocIds(): Set<string> {
-    const all = this.loadAll();
-    return new Set(Object.keys(all));
-  }
 }
