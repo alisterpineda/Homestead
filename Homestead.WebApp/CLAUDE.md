@@ -1,5 +1,7 @@
 # Homestead.WebApp
 
+For generic Angular/TypeScript guidance (reactivity, components, forms, routing, accessibility, Tailwind), consult the `angular-developer` skill. For Spartan/shadcn CLI operations, consult the `spartan-ng` skill. This file covers Homestead-specific architecture and conventions.
+
 ## Commands
 
 All commands run from `Homestead.WebApp/`:
@@ -26,7 +28,7 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 - **Page Header**: The app shell renders a single unified header bar with sidebar trigger, page title, and optional action buttons. Page titles come from route `data: { title }` in each `*.routes.ts` file. Action buttons are projected via `PageHeaderService` (`shared/services/page-header.service.ts`) — pages with actions define an `<ng-template #headerActions>` and register it with `PageHeaderService.setActions()` in `afterNextRender`, clearing in `ngOnDestroy`. Actions are also auto-cleared on `NavigationStart`. Pages without actions need no service interaction — just set the route `data.title`.
 - **Document List Search**: The document list uses URL query param `search` for full-text search, debounced at 300ms. The search term is maintained as a writable signal (`searchInput`) synced to the URL, with a separate `searchTerm` signal reading from query params for the API call pipeline.
 - **Shared**: `src/app/shared/components/layout/` for app shell/sidebar, `src/app/shared/components/theme/` for dark mode, `src/app/shared/services/` for shared services
-- **State**: Signals for local state, `computed()` for derived state, RxJS observables for async operations. State persistence uses three tiers:
+- **State persistence tiers**:
   - **`localStorage`** via `persistedSignal()` (`shared/utils/persisted-signal.ts`): User preferences that survive across sessions (theme, view mode, column visibility, page size). `UserPreferencesService` (`shared/services/user-preferences.service.ts`) owns cross-cutting preferences
   - **`sessionStorage`**: Transient editing state that survives refresh but not session close (document edit drafts via `DocumentEditStateService`)
   - **In-memory signals**: Ephemeral state that resets on navigation (search filters, selections, sort, URL params via list state services)
@@ -44,26 +46,6 @@ Generated files (`src/app/api/generated/` and `src/app/shared/components/spartan
 
 Before declaring a UI-affecting change complete, self-validate it by driving a real browser against the running Aspire stack via the `playwright` MCP server (registered in `.mcp.json`). The full workflow — probe, start, Keycloak login, checklist, teardown — is in the `self-qa` skill. This is ephemeral in-session validation; the durable regression suite in `Homestead.E2E/` is out of scope here.
 
----
-
-You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
-
-## TypeScript Best Practices
-
-- Use strict type checking
-- Prefer type inference when the type is obvious
-- Avoid the `any` type; use `unknown` when type is uncertain
-
-## Angular Best Practices
-
-- Always use standalone components over NgModules
-- Must NOT set `standalone: true` inside Angular decorators. It's the default in Angular v20+.
-- Use signals for state management
-- Implement lazy loading for feature routes
-- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
-- Use `NgOptimizedImage` for all static images.
-  - `NgOptimizedImage` does not work for inline base64 images.
-
 ## Spartan.NG Patterns
 
 - Spartan uses **brain** (headless primitives from `@spartan-ng/brain`) + **helm** (styled UI from generated `src/app/shared/components/spartan/`)
@@ -72,49 +54,14 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 - Always import from the local `@/shared/components/spartan/` path aliases, not directly from `@spartan-ng/brain`
 - **`hlm-checkbox` aria-label**: Use input binding `[aria-label]="expr"`, NOT attribute binding `[attr.aria-label]="expr"`. The host nullifies the attribute and forwards the input to the inner `brn-checkbox`. Same applies to `aria-labelledby` and `aria-describedby`
 
-## Accessibility Requirements
+## Homestead State Management Conventions
 
-- It MUST pass all AXE checks.
-- It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
-
-### Components
-
-- Keep components small and focused on a single responsibility
-- Use `input()` and `output()` functions instead of decorators
-- Use `computed()` for derived state
-- Set `changeDetection: ChangeDetectionStrategy.OnPush` in `@Component` decorator
-- Prefer inline templates for small components
-- Prefer Reactive forms instead of Template-driven ones
-- Do NOT use `ngClass`, use `class` bindings instead
-- Do NOT use `ngStyle`, use `style` bindings instead
-- When using external templates/styles, use paths relative to the component TS file.
-
-## State Management
-
-- Use signals for local component state
-- Use `computed()` for read-only derived state; use `linkedSignal()` for state that defaults from a source signal but the user can also override (writes persist until the source changes)
-- Keep state transformations pure and predictable
-- Do NOT use `mutate` on signals, use `update` or `set` instead
 - Use `persistedSignal()` from `shared/utils/persisted-signal.ts` for state that must survive page refresh — never access `localStorage`/`sessionStorage` directly
 - All storage keys must use the `homestead-` prefix
 - Add new cross-cutting preferences to `UserPreferencesService` (`shared/services/user-preferences.service.ts`)
-- **Edit state seeded from API data**: Seed writable form-field signals via `linkedSignal({ source, computation })` keyed on a composite source (entity id + mode + open/closed), so re-fetches of the same entity (e.g. via `refreshTrigger` or SignalR) don't silently overwrite pending user edits. The four account sheets in `modules/finances/accounts/` are the canonical example. For deeper guidance on `linkedSignal`, `computed`, and when *not* to use `effect`, consult the `angular-developer` skill (`references/linked-signal.md`, `references/effects.md`) — that's the authoritative source for our reactivity idioms. (`document-detail-page.component.ts` still uses an older imperative `initializedDocId`/`initializedVersionId` guard; left in place for now, but new code should follow the `linkedSignal` pattern.)
+- **Edit state seeded from API data**: Seed writable form-field signals via `linkedSignal({ source, computation })` keyed on a composite source (entity id + mode + open/closed), so re-fetches of the same entity (e.g. via `refreshTrigger` or SignalR) don't silently overwrite pending user edits. The four account sheets in `modules/finances/accounts/` are the canonical example. For deeper guidance on `linkedSignal`, `computed`, and when *not* to use `effect`, consult the `angular-developer` skill (`references/linked-signal.md`, `references/effects.md`). (`document-detail-page.component.ts` still uses an older imperative `initializedDocId`/`initializedVersionId` guard; left in place for now, but new code should follow the `linkedSignal` pattern.)
 
-## Templates
-
-- Keep templates simple and avoid complex logic
-- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
-- Use the async pipe to handle observables
-- Do not assume globals like (`new Date()`) are available.
-- Do not write arrow functions in templates (they are not supported).
-
-## Services
-
-- Design services around a single responsibility
-- Use the `providedIn: 'root'` option for singleton services
-- Use the `inject()` function instead of constructor injection
-
-## Theming & Styling
+## Theming
 
 - Uses Spartan.NG default theme convention with OKLCH CSS variables defined in `src/styles.css`
 - Semantic color tokens: `background`/`foreground`, `primary`/`primary-foreground`, `secondary`/`secondary-foreground`, `muted`/`muted-foreground`, `accent`/`accent-foreground`, `destructive`/`destructive-foreground`, `card`/`card-foreground`, `popover`/`popover-foreground`, `input`, `ring`, `border`, `sidebar`/`sidebar-foreground`/`sidebar-accent`/`sidebar-accent-foreground`/`sidebar-border`
