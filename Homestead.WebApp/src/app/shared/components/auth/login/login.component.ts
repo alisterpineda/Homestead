@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmCardImports } from '@/shared/components/spartan/card';
+import { isSafeReturnPath } from '@/shared/utils/safe-return-path';
 
 const INACTIVE_ERROR = 'Your account is inactive. Please contact an administrator.';
 
@@ -43,6 +44,7 @@ export class LoginComponent implements OnInit {
   protected auth = inject(AuthService);
 
   protected error = signal('');
+  private returnUrl: string | null = null;
 
   ngOnInit(): void {
     const errorParam = this.route.snapshot.queryParamMap.get('error');
@@ -51,9 +53,12 @@ export class LoginComponent implements OnInit {
     } else if (errorParam === 'account-inactive') {
       this.error.set(INACTIVE_ERROR);
     }
+
+    const rawReturnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    this.returnUrl = isSafeReturnPath(rawReturnUrl) ? rawReturnUrl : null;
   }
 
   onOidcLogin(): void {
-    this.auth.loginWithOidc();
+    this.auth.loginWithOidc(this.returnUrl ?? undefined);
   }
 }

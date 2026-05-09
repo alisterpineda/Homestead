@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { AuthService } from '@/shared/services/auth.service';
+import { isSafeReturnPath } from '@/shared/utils/safe-return-path';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
@@ -19,7 +20,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         }
         if (err.status === 401 && !req.url.includes('/api/auth/')) {
           auth.clearUser();
-          router.navigate(['/login']);
+          const currentUrl = router.url;
+          const queryParams =
+            isSafeReturnPath(currentUrl) &&
+            currentUrl !== '/login' &&
+            currentUrl !== '/pending-activation' &&
+            currentUrl !== '/'
+              ? { returnUrl: currentUrl }
+              : undefined;
+          router.navigate(['/login'], queryParams ? { queryParams } : undefined);
         }
       },
     }),

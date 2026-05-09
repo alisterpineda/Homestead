@@ -13,6 +13,10 @@ describe('authInterceptor', () => {
   let navigateSpy: ReturnType<typeof vi.spyOn>;
   let clearUserSpy: ReturnType<typeof vi.spyOn>;
 
+  function setRouterUrl(url: string): void {
+    vi.spyOn(router, 'url', 'get').mockReturnValue(url);
+  }
+
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
@@ -34,6 +38,7 @@ describe('authInterceptor', () => {
   });
 
   it('should clearUser before navigating to /login on 401 for non-auth URLs', () => {
+    setRouterUrl('/');
     const callOrder: string[] = [];
     clearUserSpy.mockImplementation(() => {
       callOrder.push('clearUser');
@@ -50,7 +55,7 @@ describe('authInterceptor', () => {
     );
 
     expect(clearUserSpy).toHaveBeenCalledTimes(1);
-    expect(navigateSpy).toHaveBeenCalledWith(['/login']);
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], undefined);
     expect(callOrder).toEqual(['clearUser', 'navigate:/login']);
   });
 
@@ -96,5 +101,69 @@ describe('authInterceptor', () => {
 
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(clearUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('should include returnUrl when navigating to /login on 401 from a deep link', () => {
+    setRouterUrl('/documents/123');
+
+    http.get('/api/documents').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/documents').flush(
+      { detail: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/documents/123' },
+    });
+  });
+
+  it('should preserve query string in returnUrl', () => {
+    setRouterUrl('/documents?search=invoice');
+
+    http.get('/api/documents').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/documents').flush(
+      { detail: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/documents?search=invoice' },
+    });
+  });
+
+  it('should NOT add returnUrl when on /login at the time of 401', () => {
+    setRouterUrl('/login');
+
+    http.get('/api/documents').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/documents').flush(
+      { detail: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], undefined);
+  });
+
+  it('should NOT add returnUrl when on /pending-activation at the time of 401', () => {
+    setRouterUrl('/pending-activation');
+
+    http.get('/api/documents').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/documents').flush(
+      { detail: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], undefined);
+  });
+
+  it('should NOT add returnUrl when on / at the time of 401', () => {
+    setRouterUrl('/');
+
+    http.get('/api/documents').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/documents').flush(
+      { detail: 'Unauthorized' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/login'], undefined);
   });
 });

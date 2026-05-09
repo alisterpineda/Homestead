@@ -1,14 +1,21 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { ActivatedRouteSnapshot, CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '@/shared/services/auth.service';
+import { isSafeReturnPath } from '@/shared/utils/safe-return-path';
 
-export const loginGuard: CanActivateFn = () => {
+export const loginGuard: CanActivateFn = (route: ActivatedRouteSnapshot) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (auth.isAuthenticated()) {
-    return router.createUrlTree(['/documents']);
+  if (!auth.isAuthenticated()) {
+    return true;
   }
 
-  return true;
+  if (!auth.isActive()) {
+    return router.createUrlTree(['/pending-activation']);
+  }
+
+  const returnUrl = route.queryParamMap.get('returnUrl');
+  const target = isSafeReturnPath(returnUrl) ? returnUrl : '/documents';
+  return router.parseUrl(target);
 };
