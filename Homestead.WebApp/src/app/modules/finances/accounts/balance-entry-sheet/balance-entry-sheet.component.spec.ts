@@ -104,4 +104,22 @@ describe('BalanceEntrySheetComponent', () => {
     expect(c.commodityId()).toBe('veqt');
     expect(c.commodity()).toEqual(veqt);
   });
+
+  it('preserves user input when account input re-emits with same id', () => {
+    const fixture = TestBed.createComponent(BalanceEntrySheetComponent);
+    fixture.componentRef.setInput('state', 'open');
+    fixture.componentRef.setInput('account', cashAccount);
+    fixture.componentRef.setInput('mode', 'create');
+    const c = fixture.componentInstance;
+
+    c.amount.set('1234.56');
+    c.memo.set('user-typed memo');
+    c.date.set('2026-04-23');
+
+    fixture.componentRef.setInput('account', { ...cashAccount });
+
+    expect(c.amount()).toBe('1234.56');
+    expect(c.memo()).toBe('user-typed memo');
+    expect(c.date()).toBe('2026-04-23');
+  });
 });

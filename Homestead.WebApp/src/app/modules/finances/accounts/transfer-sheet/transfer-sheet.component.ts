@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   effect,
+  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -17,6 +18,7 @@ import { FinancesAccountApiService } from '@/api/services/finances-account-api.s
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
@@ -192,16 +194,65 @@ export class TransferSheetComponent {
   deleted = output<void>();
   closed = output<void>();
 
-  direction = signal<TransferDirection>('outgoing');
-  counterpartyId = signal<string | null>(null);
+  private seedKey = computed(() =>
+    `${this.account()?.id ?? ''}|${this.mode()}|${this.existing()?.id ?? 'new'}|${this.state() === 'open'}`,
+  );
+
+  private seed = computed(() => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') {
+      return { kind: 'closed' as const };
+    }
+    const rawDetails = ex?.details;
+    const details = isDetailsOfKind<TransactionDetailsTransferDetails>(rawDetails, 'transfer')
+      ? rawDetails
+      : null;
+    if (this.mode() === 'edit' && ex && details) {
+      const isOutgoing = details.sourceAccountId === a.id;
+      return {
+        kind: 'edit' as const,
+        details,
+        ex,
+        isOutgoing,
+        counterpartyId: isOutgoing ? details.destinationAccountId : details.sourceAccountId,
+      };
+    }
+    return { kind: 'create' as const };
+  });
+
+  direction = seededLinkedSignal<string, TransferDirection>(this.seedKey, () => {
+    const seed = this.seed();
+    if (seed.kind === 'edit') return seed.isOutgoing ? 'outgoing' : 'incoming';
+    return 'outgoing';
+  });
+  counterpartyId = seededLinkedSignal<string, string | null>(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? seed.counterpartyId : null;
+  });
+  sourceAmount = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? String(seed.details.sourceAmount) : '';
+  });
+  destinationAmount = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    if (seed.kind !== 'edit') return '';
+    return seed.details.sourceCurrencyId !== seed.details.destinationCurrencyId
+      ? String(seed.details.destinationAmount)
+      : '';
+  });
+  date = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? toDateOnly(seed.ex.occurredAt) : todayIso();
+  });
+  memo = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? (seed.ex.memo ?? '') : '';
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+  deleting = seededLinkedSignal(this.seedKey, () => false);
+  formError = seededLinkedSignal(this.seedKey, () => '');
   counterparty = signal<AccountResponse | null>(null);
-  sourceAmount = signal('');
-  destinationAmount = signal('');
-  date = signal(todayIso());
-  memo = signal('');
-  saving = signal(false);
-  deleting = signal(false);
-  formError = signal('');
   anchorCurrency = signal<CommodityResponse | null>(null);
   counterpartyCurrency = signal<CommodityResponse | null>(null);
 
@@ -243,59 +294,34 @@ export class TransferSheetComponent {
 
   constructor() {
     effect(() => {
-      const a = this.account();
-      if (!a || this.state() !== 'open') return;
-      // Resolve anchor's reporting currency for label / cross-currency check.
+      this.seedKey();
+      const { a, cpId } = untracked(() => ({
+        a: this.state() === 'open' ? this.account() : null,
+        cpId: this.counterpartyId(),
+      }));
+      if (!a) return;
+
       this.anchorCurrency.set(null);
       this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
         next: c => this.anchorCurrency.set(c),
         error: () => this.anchorCurrency.set(null),
       });
 
-      this.saving.set(false);
-      this.deleting.set(false);
-      this.formError.set('');
-
-      const ex = this.existing();
-      const rawDetails = ex?.details;
-      const details = isDetailsOfKind<TransactionDetailsTransferDetails>(rawDetails, 'transfer')
-        ? rawDetails
-        : null;
-      if (this.mode() === 'edit' && ex && details) {
-        const isOutgoing = details.sourceAccountId === a.id;
-        this.direction.set(isOutgoing ? 'outgoing' : 'incoming');
-        const cpId = isOutgoing ? details.destinationAccountId : details.sourceAccountId;
-        this.counterpartyId.set(cpId);
-        // Counterparty's reporting currency is only known after the account response,
-        // so this dependency cannot be parallelised — flatten with switchMap instead of nesting.
-        this.accountApi.getAccount({ id: cpId }).pipe(
-          catchError(() => of(null)),
-          switchMap(acct => {
-            this.counterparty.set(acct);
-            if (!acct) return of(null);
-            return this.commodityApi.getCommodity({ id: acct.reportingCurrencyId }).pipe(
-              catchError(() => of(null)),
-            );
-          }),
-        ).subscribe(c => this.counterpartyCurrency.set(c));
-        this.sourceAmount.set(String(details.sourceAmount));
-        this.destinationAmount.set(
-          details.sourceCurrencyId !== details.destinationCurrencyId
-            ? String(details.destinationAmount)
-            : '',
-        );
-        this.date.set(toDateOnly(ex.occurredAt));
-        this.memo.set(ex.memo ?? '');
-      } else {
-        this.direction.set('outgoing');
-        this.counterpartyId.set(null);
-        this.counterparty.set(null);
-        this.counterpartyCurrency.set(null);
-        this.sourceAmount.set('');
-        this.destinationAmount.set('');
-        this.date.set(todayIso());
-        this.memo.set('');
-      }
+      this.counterparty.set(null);
+      this.counterpartyCurrency.set(null);
+      if (!cpId) return;
+      // Counterparty's reporting currency is only known after the account response,
+      // so this dependency cannot be parallelised — flatten with switchMap instead of nesting.
+      this.accountApi.getAccount({ id: cpId }).pipe(
+        catchError(() => of(null)),
+        switchMap(acct => {
+          this.counterparty.set(acct);
+          if (!acct) return of(null);
+          return this.commodityApi.getCommodity({ id: acct.reportingCurrencyId }).pipe(
+            catchError(() => of(null)),
+          );
+        }),
+      ).subscribe(c => this.counterpartyCurrency.set(c));
     });
   }
 

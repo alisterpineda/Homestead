@@ -92,13 +92,13 @@ You are an expert in TypeScript, Angular, and scalable web application developme
 ## State Management
 
 - Use signals for local component state
-- Use `computed()` for derived state
+- Use `computed()` for read-only derived state; use `linkedSignal()` for state that defaults from a source signal but the user can also override (writes persist until the source changes)
 - Keep state transformations pure and predictable
 - Do NOT use `mutate` on signals, use `update` or `set` instead
 - Use `persistedSignal()` from `shared/utils/persisted-signal.ts` for state that must survive page refresh — never access `localStorage`/`sessionStorage` directly
 - All storage keys must use the `homestead-` prefix
 - Add new cross-cutting preferences to `UserPreferencesService` (`shared/services/user-preferences.service.ts`)
-- **Effects that initialize edit state from API data**: Guard with an ID check so re-fetches of the same entity (e.g., triggered by `refreshTrigger` or SignalR) don't silently overwrite the user's pending edits. Reset the guard after a successful save so the post-save re-fetch reinitializes. See `document-detail-page.component.ts` for the pattern
+- **Edit state seeded from API data**: Seed writable form-field signals via `linkedSignal({ source, computation })` keyed on a composite source (entity id + mode + open/closed), so re-fetches of the same entity (e.g. via `refreshTrigger` or SignalR) don't silently overwrite pending user edits. The four account sheets in `modules/finances/accounts/` are the canonical example. For deeper guidance on `linkedSignal`, `computed`, and when *not* to use `effect`, consult the `angular-developer` skill (`references/linked-signal.md`, `references/effects.md`) — that's the authoritative source for our reactivity idioms. (`document-detail-page.component.ts` still uses an older imperative `initializedDocId`/`initializedVersionId` guard; left in place for now, but new code should follow the `linkedSignal` pattern.)
 
 ## Templates
 

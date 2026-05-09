@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   effect,
+  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -16,6 +17,7 @@ import { FinancesTransactionApiService } from '@/api/services/finances-transacti
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
@@ -147,14 +149,38 @@ export class BalanceEntrySheetComponent {
   deleted = output<void>();
   closed = output<void>();
 
-  amount = signal('');
-  date = signal(todayIso());
-  memo = signal('');
-  saving = signal(false);
-  deleting = signal(false);
-  formError = signal('');
+  private seedKey = computed(() =>
+    `${this.account()?.id ?? ''}|${this.mode()}|${this.existing()?.transactionId ?? 'new'}|${this.state() === 'open'}`,
+  );
+
+  amount = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return '';
+    return this.mode() === 'edit' && ex ? String(ex.assertedAmount) : '';
+  });
+  date = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return todayIso();
+    return this.mode() === 'edit' && ex ? ex.date : todayIso();
+  });
+  memo = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return '';
+    return this.mode() === 'edit' && ex ? ex.memo : '';
+  });
+  commodityId = seededLinkedSignal<string, string | null>(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return null;
+    return this.mode() === 'edit' && ex ? ex.commodityId : a.reportingCurrencyId;
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+  deleting = seededLinkedSignal(this.seedKey, () => false);
+  formError = seededLinkedSignal(this.seedKey, () => '');
   commodity = signal<CommodityResponse | null>(null);
-  commodityId = signal<string | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
@@ -181,33 +207,11 @@ export class BalanceEntrySheetComponent {
 
   constructor() {
     effect(() => {
-      const a = this.account();
-      if (!a || this.state() !== 'open') return;
-
-      this.saving.set(false);
-      this.deleting.set(false);
-      this.formError.set('');
-
-      // Seed form values from existing (edit) or defaults (create). Compute the
-      // active commodity locally so we don't read commodityId() back into the
-      // effect — that would make user-driven commodity picks (which write to
-      // commodityId) re-trigger the effect and overwrite the picked value.
-      const ex = this.existing();
-      let activeCommodityId: string;
-      if (this.mode() === 'edit' && ex) {
-        this.amount.set(String(ex.assertedAmount));
-        this.date.set(ex.date);
-        this.memo.set(ex.memo);
-        activeCommodityId = ex.commodityId;
-      } else {
-        this.amount.set('');
-        this.date.set(todayIso());
-        this.memo.set('');
-        activeCommodityId = a.reportingCurrencyId;
-      }
-      this.commodityId.set(activeCommodityId);
+      this.seedKey();
+      const id = untracked(() => this.commodityId());
+      if (!id) return;
       this.commodity.set(null);
-      this.commodityApi.getCommodity({ id: activeCommodityId }).subscribe({
+      this.commodityApi.getCommodity({ id }).subscribe({
         next: c => this.commodity.set(c),
         error: () => this.commodity.set(null),
       });

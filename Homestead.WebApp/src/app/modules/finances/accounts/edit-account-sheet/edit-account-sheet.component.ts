@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   effect,
+  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -23,6 +24,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { KIND_LABELS, isUserAccountKind, type UserAccountKind } from '../../shared/account-kind-meta';
 
 @Component({
@@ -106,10 +108,26 @@ export class EditAccountSheetComponent {
   saved = output<AccountResponse>();
   closed = output<void>();
 
-  editName = signal('');
-  editInstitution = signal('');
-  editArchived = signal(false);
-  saving = signal(false);
+  private seedKey = computed(() =>
+    `${this.account()?.id ?? ''}|${this.state() === 'open'}`,
+  );
+
+  editName = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    if (!a || this.state() !== 'open') return '';
+    return a.name;
+  });
+  editInstitution = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    if (!a || this.state() !== 'open') return '';
+    return a.institution ?? '';
+  });
+  editArchived = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    if (!a || this.state() !== 'open') return false;
+    return a.isArchived;
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
   reportingCurrency = signal<CommodityResponse | null>(null);
 
   private accountApi = inject(FinancesAccountApiService);
@@ -137,18 +155,16 @@ export class EditAccountSheetComponent {
 
   constructor() {
     effect(() => {
-      const a = this.account();
-      if (a && this.state() === 'open') {
-        this.editName.set(a.name);
-        this.editInstitution.set(a.institution ?? '');
-        this.editArchived.set(a.isArchived);
-        this.saving.set(false);
-        this.reportingCurrency.set(null);
-        this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
-          next: c => this.reportingCurrency.set(c),
-          error: () => this.reportingCurrency.set(null),
-        });
-      }
+      this.seedKey();
+      const a = untracked(() => {
+        return this.state() === 'open' ? this.account() : null;
+      });
+      if (!a) return;
+      this.reportingCurrency.set(null);
+      this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
+        next: c => this.reportingCurrency.set(c),
+        error: () => this.reportingCurrency.set(null),
+      });
     });
   }
 

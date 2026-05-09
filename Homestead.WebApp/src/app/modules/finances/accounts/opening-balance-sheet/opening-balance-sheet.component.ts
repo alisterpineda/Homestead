@@ -7,6 +7,7 @@ import {
   computed,
   inject,
   effect,
+  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -16,6 +17,7 @@ import { FinancesTransactionApiService } from '@/api/services/finances-transacti
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
@@ -158,13 +160,37 @@ export class OpeningBalanceSheetComponent {
   deleted = output<void>();
   closed = output<void>();
 
-  quantity = signal('');
-  unitPrice = signal('');
-  asOfDate = signal(todayIso());
-  memo = signal('');
-  saving = signal(false);
-  deleting = signal(false);
-  formError = signal('');
+  private seedKey = computed(() =>
+    `${this.account()?.id ?? ''}|${this.mode()}|${this.existing()?.commodityId ?? 'new'}|${this.state() === 'open'}`,
+  );
+
+  quantity = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return '';
+    return this.mode() === 'edit' && ex ? String(ex.quantity) : '';
+  });
+  unitPrice = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return '';
+    return this.mode() === 'edit' && ex && ex.valuePerUnit != null ? String(ex.valuePerUnit) : '';
+  });
+  asOfDate = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return todayIso();
+    return this.mode() === 'edit' && ex ? ex.asOfDate : todayIso();
+  });
+  memo = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    const ex = this.existing();
+    if (!a || this.state() !== 'open') return '';
+    return this.mode() === 'edit' && ex ? ex.memo : '';
+  });
+  saving = seededLinkedSignal(this.seedKey, () => false);
+  deleting = seededLinkedSignal(this.seedKey, () => false);
+  formError = seededLinkedSignal(this.seedKey, () => '');
   commodity = signal<CommodityResponse | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
@@ -197,35 +223,21 @@ export class OpeningBalanceSheetComponent {
 
   constructor() {
     effect(() => {
-      const a = this.account();
-      if (!a || this.state() !== 'open') return;
-
-      this.saving.set(false);
-      this.deleting.set(false);
-      this.formError.set('');
-
-      const ex = this.existing();
-      // Per-position OB on Investment accounts is keyed by the existing entry's
-      // commodityId; non-Investment kinds always use the reporting currency.
-      const commodityId = (this.mode() === 'edit' && ex) ? ex.commodityId : a.reportingCurrencyId;
-
+      this.seedKey();
+      const commodityId = untracked(() => {
+        const a = this.account();
+        if (!a || this.state() !== 'open') return null;
+        const ex = this.existing();
+        // Per-position OB on Investment accounts is keyed by the existing entry's
+        // commodityId; non-Investment kinds always use the reporting currency.
+        return this.mode() === 'edit' && ex ? ex.commodityId : a.reportingCurrencyId;
+      });
+      if (!commodityId) return;
       this.commodity.set(null);
       this.commodityApi.getCommodity({ id: commodityId }).subscribe({
         next: c => this.commodity.set(c),
         error: () => this.commodity.set(null),
       });
-
-      if (this.mode() === 'edit' && ex) {
-        this.quantity.set(String(ex.quantity));
-        this.asOfDate.set(ex.asOfDate);
-        this.unitPrice.set(ex.valuePerUnit != null ? String(ex.valuePerUnit) : '');
-        this.memo.set(ex.memo);
-      } else {
-        this.quantity.set('');
-        this.asOfDate.set(todayIso());
-        this.unitPrice.set('');
-        this.memo.set('');
-      }
     });
   }
 
