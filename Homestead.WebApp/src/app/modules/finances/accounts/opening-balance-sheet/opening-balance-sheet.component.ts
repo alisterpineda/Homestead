@@ -3,11 +3,8 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
-  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -22,9 +19,9 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
 import { trimToNull } from '../../shared/trim-to-null';
+import { commodityResource } from '../../shared/commodity-resource';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
-import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
@@ -71,7 +68,7 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount initially owed (positive).</p>
               } @else if (isSecurity()) {
-                <p class="text-xs text-muted-foreground">Number of units held in {{ commodity()!.symbol }}.</p>
+                <p class="text-xs text-muted-foreground">Number of units held in {{ commodity.value()!.symbol }}.</p>
               }
             </div>
 
@@ -191,22 +188,36 @@ export class OpeningBalanceSheetComponent {
   saving = seededLinkedSignal(this.seedKey, () => false);
   deleting = seededLinkedSignal(this.seedKey, () => false);
   formError = seededLinkedSignal(this.seedKey, () => '');
-  commodity = signal<CommodityResponse | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  // Per-position OB on Investment accounts is keyed by the existing entry's
+  // commodityId; non-Investment kinds always use the reporting currency.
+  private commodityId = computed(() => {
+    const a = this.account();
+    if (!a || this.state() !== 'open') return null;
+    const ex = this.existing();
+    return this.mode() === 'edit' && ex ? ex.commodityId : a.reportingCurrencyId;
+  });
+
+  commodity = commodityResource(
+    this.commodityApi,
+    () => this.commodityId(),
+    () => this.state() === 'open',
+  );
+
   readonly maxDate = tomorrowIso();
 
   commodityLabel = computed(() => {
-    const c = this.commodity();
+    const c = this.commodity.value();
     return c ? `${c.symbol} — ${c.name}` : null;
   });
 
-  isSecurity = computed(() => this.commodity()?.kind === 'Security');
+  isSecurity = computed(() => this.commodity.value()?.kind === 'Security');
 
-  quantityStep = computed(() => commodityStep(this.commodity()));
+  quantityStep = computed(() => commodityStep(this.commodity.value()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;
@@ -220,26 +231,6 @@ export class OpeningBalanceSheetComponent {
     }
     return true;
   });
-
-  constructor() {
-    effect(() => {
-      this.seedKey();
-      const commodityId = untracked(() => {
-        const a = this.account();
-        if (!a || this.state() !== 'open') return null;
-        const ex = this.existing();
-        // Per-position OB on Investment accounts is keyed by the existing entry's
-        // commodityId; non-Investment kinds always use the reporting currency.
-        return this.mode() === 'edit' && ex ? ex.commodityId : a.reportingCurrencyId;
-      });
-      if (!commodityId) return;
-      this.commodity.set(null);
-      this.commodityApi.getCommodity({ id: commodityId }).subscribe({
-        next: c => this.commodity.set(c),
-        error: () => this.commodity.set(null),
-      });
-    });
-  }
 
   asValue(event: Event): string {
     return (event.target as HTMLInputElement).value;

@@ -89,20 +89,21 @@ describe('BalanceEntrySheetComponent', () => {
     const c = fixture.componentInstance;
 
     c.onCommodityChange(veqt);
+    c.commodity.set(veqt);
     expect(c.amountStep()).toBe('0.0001');
 
     c.onCommodityChange(cad);
+    c.commodity.set(cad);
     expect(c.amountStep()).toBe('0.01');
   });
 
-  it('updates the active commodity when a commodity is picked (Investment flow)', () => {
+  it('updates the active commodity id when a commodity is picked (Investment flow)', () => {
     const fixture = TestBed.createComponent(BalanceEntrySheetComponent);
     fixture.componentRef.setInput('account', investmentAccount);
     const c = fixture.componentInstance;
 
     c.onCommodityChange(veqt);
     expect(c.commodityId()).toBe('veqt');
-    expect(c.commodity()).toEqual(veqt);
   });
 
   it('preserves user input when account input re-emits with same id', () => {

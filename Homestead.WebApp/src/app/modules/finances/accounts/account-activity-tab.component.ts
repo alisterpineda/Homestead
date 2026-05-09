@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   inject,
   input,
   output,
@@ -8,7 +9,7 @@ import {
   computed,
   effect,
 } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, combineLatest, EMPTY } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -230,6 +231,7 @@ export class AccountActivityTabComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private settingsService = inject(FinanceSettingsService);
+  private destroyRef = inject(DestroyRef);
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / PAGE_SIZE)));
 
@@ -366,12 +368,14 @@ export class AccountActivityTabComponent {
       if (knownA[id]) return;
       this.accountApi.getAccount({ id }).pipe(
         catchError(() => EMPTY),
+        takeUntilDestroyed(this.destroyRef),
       ).subscribe(a => this.accountNames.update(m => ({ ...m, [id]: a.name })));
     });
     commodityIds.forEach(id => {
       if (knownC[id]) return;
       this.commodityApi.getCommodity({ id }).pipe(
         catchError(() => EMPTY),
+        takeUntilDestroyed(this.destroyRef),
       ).subscribe(c => this.commodities.update(m => ({ ...m, [id]: c })));
     });
   }

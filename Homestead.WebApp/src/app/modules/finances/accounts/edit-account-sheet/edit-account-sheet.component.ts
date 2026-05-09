@@ -3,11 +3,8 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
-  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -19,12 +16,12 @@ import { FinancesCommodityApiService } from '@/api/services/finances-commodity-a
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { AccountResponse } from '@/api/generated/models/account-response';
-import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { commodityResource } from '../../shared/commodity-resource';
 import { KIND_LABELS, isUserAccountKind, type UserAccountKind } from '../../shared/account-kind-meta';
 
 @Component({
@@ -128,11 +125,16 @@ export class EditAccountSheetComponent {
     return a.isArchived;
   });
   saving = seededLinkedSignal(this.seedKey, () => false);
-  reportingCurrency = signal<CommodityResponse | null>(null);
 
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
+
+  reportingCurrency = commodityResource(
+    this.commodityApi,
+    () => this.account()?.reportingCurrencyId,
+    () => this.state() === 'open',
+  );
 
   hasChanges = computed(() => {
     const a = this.account();
@@ -149,24 +151,9 @@ export class EditAccountSheetComponent {
   });
 
   currencyLabel = computed(() => {
-    const c = this.reportingCurrency();
+    const c = this.reportingCurrency.value();
     return c ? `${c.symbol} — ${c.name}` : null;
   });
-
-  constructor() {
-    effect(() => {
-      this.seedKey();
-      const a = untracked(() => {
-        return this.state() === 'open' ? this.account() : null;
-      });
-      if (!a) return;
-      this.reportingCurrency.set(null);
-      this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
-        next: c => this.reportingCurrency.set(c),
-        error: () => this.reportingCurrency.set(null),
-      });
-    });
-  }
 
   asValue(event: Event): string {
     return (event.target as HTMLInputElement).value;

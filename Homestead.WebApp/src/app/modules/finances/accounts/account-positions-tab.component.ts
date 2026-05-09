@@ -1,13 +1,14 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   inject,
   input,
   output,
   signal,
   computed,
 } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, tap, catchError, combineLatest, EMPTY } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -154,6 +155,7 @@ export class AccountPositionsTabComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private settingsService = inject(FinanceSettingsService);
+  private destroyRef = inject(DestroyRef);
 
   rows = computed<PositionRow[]>(() => {
     const dc = this.settingsService.displayCurrency();
@@ -212,6 +214,7 @@ export class AccountPositionsTabComponent {
       if (known[p.commodityId]) continue;
       this.commodityApi.getCommodity({ id: p.commodityId }).pipe(
         catchError(() => EMPTY),
+        takeUntilDestroyed(this.destroyRef),
       ).subscribe(c => this.commodities.update(m => ({ ...m, [p.commodityId]: c })));
     }
   }

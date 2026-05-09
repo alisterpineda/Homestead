@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   inject,
   signal,
   computed,
@@ -249,6 +250,7 @@ export class AccountDetailPageComponent implements OnDestroy {
   protected settingsService = inject(FinanceSettingsService);
   private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -425,16 +427,18 @@ export class AccountDetailPageComponent implements OnDestroy {
   private openOpeningBalanceForCommodity(commodityId: string): void {
     const a = this.account();
     if (!a) return;
-    this.txApi.getOpeningBalance({ accountId: a.id, commodityId }).subscribe({
-      next: ob => {
-        this.openingBalanceSheetMode.set('edit');
-        this.openingBalanceSheetExisting.set(ob);
-        this.openingBalanceSheetState.set('open');
-      },
-      error: () => {
-        toast.error('Couldn\'t load opening balance.');
-      },
-    });
+    this.txApi.getOpeningBalance({ accountId: a.id, commodityId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ob => {
+          this.openingBalanceSheetMode.set('edit');
+          this.openingBalanceSheetExisting.set(ob);
+          this.openingBalanceSheetState.set('open');
+        },
+        error: () => {
+          toast.error('Couldn\'t load opening balance.');
+        },
+      });
   }
 
   // ─── Sheet event handlers ────────────────────────────────────────────────

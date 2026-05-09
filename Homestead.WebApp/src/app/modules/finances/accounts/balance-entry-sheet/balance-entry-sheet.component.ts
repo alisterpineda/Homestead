@@ -3,11 +3,8 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
-  untracked,
 } from '@angular/core';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -22,6 +19,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
 import { trimToNull } from '../../shared/trim-to-null';
+import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
@@ -59,7 +57,7 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
                   ariaLabel="Select commodity"
                   placeholder="Pick a currency or security"
                   [value]="commodityId()"
-                  [selectedCommodity]="commodity()"
+                  [selectedCommodity]="commodity.value()"
                   (commodityChange)="onCommodityChange($event)"
                 />
               } @else {
@@ -82,8 +80,8 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
               />
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount currently owed (positive).</p>
-              } @else if (commodity()?.kind === 'Security') {
-                <p class="text-xs text-muted-foreground">Total units held of {{ commodity()!.symbol }}.</p>
+              } @else if (commodity.value()?.kind === 'Security') {
+                <p class="text-xs text-muted-foreground">Total units held of {{ commodity.value()!.symbol }}.</p>
               }
             </div>
 
@@ -180,20 +178,25 @@ export class BalanceEntrySheetComponent {
   saving = seededLinkedSignal(this.seedKey, () => false);
   deleting = seededLinkedSignal(this.seedKey, () => false);
   formError = seededLinkedSignal(this.seedKey, () => '');
-  commodity = signal<CommodityResponse | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  commodity = commodityResource(
+    this.commodityApi,
+    () => this.commodityId(),
+    () => this.state() === 'open',
+  );
+
   readonly maxDate = tomorrowIso();
 
   commodityLabel = computed(() => {
-    const c = this.commodity();
+    const c = this.commodity.value();
     return c ? `${c.symbol} — ${c.name}` : null;
   });
 
-  amountStep = computed(() => commodityStep(this.commodity()));
+  amountStep = computed(() => commodityStep(this.commodity.value()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;
@@ -205,22 +208,8 @@ export class BalanceEntrySheetComponent {
     return true;
   });
 
-  constructor() {
-    effect(() => {
-      this.seedKey();
-      const id = untracked(() => this.commodityId());
-      if (!id) return;
-      this.commodity.set(null);
-      this.commodityApi.getCommodity({ id }).subscribe({
-        next: c => this.commodity.set(c),
-        error: () => this.commodity.set(null),
-      });
-    });
-  }
-
   onCommodityChange(commodity: CommodityResponse): void {
     this.commodityId.set(commodity.id);
-    this.commodity.set(commodity);
   }
 
   asValue(event: Event): string {

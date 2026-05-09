@@ -3,12 +3,10 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  signal,
   computed,
   inject,
-  effect,
-  untracked,
 } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -23,10 +21,10 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
 import { isDetailsOfKind } from '../../transactions/transaction-display';
+import { commodityResource } from '../../shared/commodity-resource';
 import { AccountPickerComponent } from '../../shared/account-picker/account-picker.component';
-import { of, catchError, switchMap } from 'rxjs';
+import { of, catchError } from 'rxjs';
 import type { AccountResponse } from '@/api/generated/models/account-response';
-import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 import type { TransactionDetailsTransferDetails } from '@/api/generated/models/transaction-details-transfer-details';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -83,7 +81,7 @@ export type TransferDirection = 'outgoing' | 'incoming';
                 (valueChange)="counterpartyId.set($event)"
                 (accountChange)="onCounterpartyPicked($event)"
                 [excludeAccountId]="a.id"
-                [selectedAccount]="counterparty()"
+                [selectedAccount]="counterparty.value()"
                 [placeholder]="direction() === 'outgoing' ? 'Select destination' : 'Select source'"
                 [ariaLabel]="direction() === 'outgoing' ? 'Destination account' : 'Source account'"
               />
@@ -252,29 +250,47 @@ export class TransferSheetComponent {
   saving = seededLinkedSignal(this.seedKey, () => false);
   deleting = seededLinkedSignal(this.seedKey, () => false);
   formError = seededLinkedSignal(this.seedKey, () => '');
-  counterparty = signal<AccountResponse | null>(null);
-  anchorCurrency = signal<CommodityResponse | null>(null);
-  counterpartyCurrency = signal<CommodityResponse | null>(null);
 
   private txApi = inject(FinancesTransactionApiService);
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  anchorCurrency = commodityResource(
+    this.commodityApi,
+    () => this.account()?.reportingCurrencyId,
+    () => this.state() === 'open',
+  );
+
+  counterparty = rxResource<AccountResponse | null, { id: string | null; open: boolean }>({
+    params: () => ({ id: this.counterpartyId(), open: this.state() === 'open' }),
+    stream: ({ params }) =>
+      params.open && params.id
+        ? this.accountApi.getAccount({ id: params.id }).pipe(catchError(() => of(null)))
+        : of(null),
+    defaultValue: null,
+  });
+
+  counterpartyCurrency = commodityResource(
+    this.commodityApi,
+    () => this.counterparty.value()?.reportingCurrencyId,
+    () => this.state() === 'open',
+  );
+
   readonly maxDate = tomorrowIso();
 
   isCrossCurrency = computed(() => {
-    const a = this.anchorCurrency();
-    const c = this.counterpartyCurrency();
+    const a = this.anchorCurrency.value();
+    const c = this.counterpartyCurrency.value();
     return !!a && !!c && a.id !== c.id;
   });
 
   // Currency labels by side respect the direction toggle.
   sourceCurrency = computed(() =>
-    this.direction() === 'outgoing' ? this.anchorCurrency() : this.counterpartyCurrency(),
+    this.direction() === 'outgoing' ? this.anchorCurrency.value() : this.counterpartyCurrency.value(),
   );
   destinationCurrency = computed(() =>
-    this.direction() === 'outgoing' ? this.counterpartyCurrency() : this.anchorCurrency(),
+    this.direction() === 'outgoing' ? this.counterpartyCurrency.value() : this.anchorCurrency.value(),
   );
 
   canSubmit = computed(() => {
@@ -292,50 +308,12 @@ export class TransferSheetComponent {
     return true;
   });
 
-  constructor() {
-    effect(() => {
-      this.seedKey();
-      const { a, cpId } = untracked(() => ({
-        a: this.state() === 'open' ? this.account() : null,
-        cpId: this.counterpartyId(),
-      }));
-      if (!a) return;
-
-      this.anchorCurrency.set(null);
-      this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).subscribe({
-        next: c => this.anchorCurrency.set(c),
-        error: () => this.anchorCurrency.set(null),
-      });
-
-      this.counterparty.set(null);
-      this.counterpartyCurrency.set(null);
-      if (!cpId) return;
-      // Counterparty's reporting currency is only known after the account response,
-      // so this dependency cannot be parallelised — flatten with switchMap instead of nesting.
-      this.accountApi.getAccount({ id: cpId }).pipe(
-        catchError(() => of(null)),
-        switchMap(acct => {
-          this.counterparty.set(acct);
-          if (!acct) return of(null);
-          return this.commodityApi.getCommodity({ id: acct.reportingCurrencyId }).pipe(
-            catchError(() => of(null)),
-          );
-        }),
-      ).subscribe(c => this.counterpartyCurrency.set(c));
-    });
-  }
-
   asValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
 
   onCounterpartyPicked(acct: AccountResponse): void {
-    this.counterparty.set(acct);
-    this.counterpartyCurrency.set(null);
-    this.commodityApi.getCommodity({ id: acct.reportingCurrencyId }).subscribe({
-      next: c => this.counterpartyCurrency.set(c),
-      error: () => this.counterpartyCurrency.set(null),
-    });
+    this.counterpartyId.set(acct.id);
   }
 
   handleSave(): void {
