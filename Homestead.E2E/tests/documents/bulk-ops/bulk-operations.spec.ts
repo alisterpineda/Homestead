@@ -1,18 +1,29 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
 import { TEST_DATA } from '../../../e2e.config';
 import { fillSignalInput } from '../../../helpers/playwright.helpers';
-import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
+import {
+  createPartyViaApi,
+  createTagViaApi,
+  deleteAllDocumentMetadata,
+  seedFixtureDocuments,
+} from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Bulk operations', () => {
   test.beforeAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
+    await Promise.all([
+      createTagViaApi(request, TEST_DATA.documents.tags.bulkTag1),
+      createTagViaApi(request, TEST_DATA.documents.tags.bulkTag2),
+      createPartyViaApi(request, TEST_DATA.documents.parties.acmeCorp),
+      createPartyViaApi(request, TEST_DATA.documents.parties.johnDoe),
+    ]);
     await seedFixtureDocuments(request, { include: 'both' });
   });
 
   test.afterAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
   });
 
   test('can switch to table view and select multiple documents', async ({ page, documentListPage }) => {

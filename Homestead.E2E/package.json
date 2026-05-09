@@ -6,7 +6,7 @@
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",
     "e2e:report": "playwright show-report",
-    "e2e:desktop": "playwright test --project=auth-anonymous --project=auth-setup --project=auth-login --project=documents-data-setup --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash",
+    "e2e:desktop": "playwright test --project=auth-anonymous --project=auth-setup --project=auth-login --project=documents-upload --project=documents-tags --project=documents-bulk-ops --project=documents-trash",
     "e2e:mobile": "playwright test --project=documents-upload-mobile --project=documents-tags-mobile --project=documents-bulk-ops-mobile --project=documents-trash-mobile"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@ import * as path from 'path';
 import { test, expect } from '../../../fixtures/documents.fixture';
 import { TEST_DATA } from '../../../e2e.config';
 import { waitForProcessingComplete } from '../../../helpers/api/processing';
-import { deleteAllDocuments } from '../../../helpers/api/documents';
+import { deleteAllDocumentMetadata } from '../../../helpers/api/documents';
 
 const PDF_PATH = path.resolve(__dirname, '../../../../tests/fixtures/irs-form-w9.pdf');
 const IMAGE_PATH = path.resolve(__dirname, '../../../fixtures/files/test-image.png');
@@ -10,13 +10,12 @@ const IMAGE_PATH = path.resolve(__dirname, '../../../fixtures/files/test-image.p
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Document upload and search workflow', () => {
-  // Clean up documents from previous runs so retries start from a clean state
   test.beforeAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
   });
 
   test.afterAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
   });
 
   test('shows empty state when no documents exist', async ({ documentListPage }) => {

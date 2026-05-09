@@ -6,26 +6,64 @@ import { waitForProcessingComplete } from './processing';
 const FIXTURES_DIR = path.resolve(__dirname, '../../fixtures/files');
 
 // IncludeChildTags is required by the GetDocuments endpoint binder (non-nullable bool).
+// PageSize=100 matches the server-side cap (PaginatedRequest clamps PageSize to ≤100).
 const LIST_DOCUMENTS_URL = '/api/v1/documents?Page=1&PageSize=100&IncludeChildTags=false';
+
+/**
+ * Drain a paginated list endpoint by repeatedly fetching the first page and bulk-deleting
+ * its ids. Each iteration deletes up to the server's PageSize cap (100), so this works for
+ * arbitrary backlogs without leaking residue.
+ */
+async function bulkDeleteAll(
+  request: APIRequestContext,
+  listUrl: string,
+  bulkDeleteUrl: string,
+): Promise<void> {
+  while (true) {
+    const response = await request.get(listUrl);
+    expect(response.ok()).toBeTruthy();
+    const body = await response.json();
+    const ids = (body.items ?? []).map((item: { id: string }) => item.id);
+    if (ids.length === 0) return;
+    const deleteResponse = await request.post(bulkDeleteUrl, { data: { ids } });
+    expect(deleteResponse.ok()).toBeTruthy();
+  }
+}
 
 const FIXTURES: Record<'pdf' | 'image', { file: string; mimeType: string }> = {
   pdf: { file: 'test-document.pdf', mimeType: 'application/pdf' },
   image: { file: 'test-image.png', mimeType: 'image/png' },
 };
 
-/**
- * Delete all documents (soft-delete then empty trash).
- * Used to ensure a clean state before serial test blocks that assume an empty list.
- */
 export async function deleteAllDocuments(request: APIRequestContext): Promise<void> {
-  const response = await request.get(LIST_DOCUMENTS_URL);
-  expect(response.ok()).toBeTruthy();
-  const body = await response.json();
-  const ids = (body.items ?? []).map((d: { id: string }) => d.id);
-  if (ids.length === 0) return;
+  await bulkDeleteAll(request, LIST_DOCUMENTS_URL, '/api/v1/documents/bulk-delete');
+  const emptyTrash = await request.post('/api/v1/documents/empty-trash');
+  expect(emptyTrash.ok()).toBeTruthy();
+}
 
-  await request.post('/api/v1/documents/bulk-delete', { data: { ids } });
-  await request.post('/api/v1/documents/empty-trash');
+export async function deleteAllTags(request: APIRequestContext): Promise<void> {
+  await bulkDeleteAll(
+    request,
+    '/api/v1/documents/tags?Page=1&PageSize=100',
+    '/api/v1/documents/tags/bulk-delete',
+  );
+}
+
+export async function deleteAllParties(request: APIRequestContext): Promise<void> {
+  await bulkDeleteAll(
+    request,
+    '/api/v1/documents/parties?Page=1&PageSize=100',
+    '/api/v1/documents/parties/bulk-delete',
+  );
+}
+
+/**
+ * Documents go first so the junction rows that link them to tags/parties are gone
+ * before the bulk-delete checks; tags and parties are independent of each other.
+ */
+export async function deleteAllDocumentMetadata(request: APIRequestContext): Promise<void> {
+  await deleteAllDocuments(request);
+  await Promise.all([deleteAllTags(request), deleteAllParties(request)]);
 }
 
 export async function uploadDocumentViaApi(

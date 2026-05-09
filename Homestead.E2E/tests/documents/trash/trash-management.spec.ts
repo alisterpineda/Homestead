@@ -1,11 +1,11 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
-import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
+import { deleteAllDocumentMetadata, seedFixtureDocuments } from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Trash management', () => {
   test.beforeAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
     await seedFixtureDocuments(request, { include: 'both' });
 
     // The suite starts in the post-bulk-ops shape (1 active + 1 trashed) so the first
@@ -22,7 +22,7 @@ test.describe('Trash management', () => {
   });
 
   test.afterAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
   });
 
   test('soft-delete a document via the UI', async ({ page, documentListPage }) => {

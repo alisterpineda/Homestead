@@ -1,18 +1,28 @@
 import { test, expect } from '../../../fixtures/documents.fixture';
 import { TEST_DATA } from '../../../e2e.config';
 import { fillSignalInput } from '../../../helpers/playwright.helpers';
-import { deleteAllDocuments, seedFixtureDocuments } from '../../../helpers/api/documents';
+import {
+  createTagViaApi,
+  deleteAllDocumentMetadata,
+  seedFixtureDocuments,
+} from '../../../helpers/api/documents';
 
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Tag workflow', () => {
   test.beforeAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
+    // Parent path must exist before children (e.g. e2e-finance before e2e-finance/invoices).
+    await createTagViaApi(request, TEST_DATA.documents.tags.finance);
+    await Promise.all([
+      createTagViaApi(request, TEST_DATA.documents.tags.invoices),
+      createTagViaApi(request, TEST_DATA.documents.tags.contracts),
+    ]);
     await seedFixtureDocuments(request, { include: 'pdf' });
   });
 
   test.afterAll(async ({ request }) => {
-    await deleteAllDocuments(request);
+    await deleteAllDocumentMetadata(request);
   });
 
   test('tag list shows seeded tags', async ({ tagListPage }) => {

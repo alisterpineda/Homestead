@@ -52,48 +52,28 @@ export default defineConfig({
     },
     // --- Documents pipeline (uses admin storageState from auth-setup) ---
     {
-      name: 'documents-data-setup',
-      testDir: './tests/documents',
-      testMatch: /data-setup\.ts/,
-      use: { baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['auth-setup'],
-    },
-    {
       name: 'documents-upload',
       testDir: './tests/documents/upload',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-data-setup'],
+      dependencies: ['auth-setup'],
     },
     {
       name: 'documents-tags',
       testDir: './tests/documents/tags',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-data-setup'],
+      dependencies: ['auth-setup'],
     },
     {
       name: 'documents-bulk-ops',
       testDir: './tests/documents/bulk-ops',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-data-setup'],
+      dependencies: ['auth-setup'],
     },
     {
       name: 'documents-trash',
       testDir: './tests/documents/trash',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-data-setup'],
-    },
-    // --- Bridge from desktop to mobile content ---
-    {
-      name: 'documents-reset-mobile',
-      testDir: './tests/documents',
-      testMatch: /reset-before-mobile\.ts/,
-      use: { baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: [
-        'documents-upload',
-        'documents-tags',
-        'documents-bulk-ops',
-        'documents-trash',
-      ],
+      dependencies: ['auth-setup'],
     },
     // --- Finances (desktop) ---
     {
@@ -138,25 +118,25 @@ export default defineConfig({
       name: 'documents-upload-mobile',
       testDir: './tests/documents/upload',
       use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-reset-mobile'],
+      dependencies: ['documents-upload'],
     },
     {
       name: 'documents-tags-mobile',
       testDir: './tests/documents/tags',
       use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-reset-mobile'],
+      dependencies: ['documents-tags'],
     },
     {
       name: 'documents-bulk-ops-mobile',
       testDir: './tests/documents/bulk-ops',
       use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-reset-mobile'],
+      dependencies: ['documents-bulk-ops'],
     },
     {
       name: 'documents-trash-mobile',
       testDir: './tests/documents/trash',
       use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
-      dependencies: ['documents-reset-mobile'],
+      dependencies: ['documents-trash'],
     },
   ],
 });
