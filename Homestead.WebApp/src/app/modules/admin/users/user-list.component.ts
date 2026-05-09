@@ -1,7 +1,7 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, combineLatest, Subscription, firstValueFrom } from 'rxjs';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, map, combineLatest, firstValueFrom } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/lucide';
@@ -179,11 +179,12 @@ import { toast } from '@spartan-ng/brain/sonner';
     />
   `,
 })
-export class UserListComponent implements OnDestroy {
+export class UserListComponent {
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -241,14 +242,13 @@ export class UserListComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  private searchSub: Subscription;
-
   constructor() {
-    this.searchSub = toObservable(this.searchInput)
+    toObservable(this.searchInput)
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
         filter((value) => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((value) => {
         this.router.navigate(['/admin/users'], {
@@ -257,10 +257,6 @@ export class UserListComponent implements OnDestroy {
           replaceUrl: true,
         });
       });
-  }
-
-  ngOnDestroy(): void {
-    this.searchSub.unsubscribe();
   }
 
   onPageChange(newPage: number): void {

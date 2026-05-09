@@ -1,9 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, DestroyRef } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { AuthService } from '@/shared/services/auth.service';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subscription, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, map, catchError, of, combineLatest, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTags, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -264,7 +264,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     />
   `,
 })
-export class TagListComponent implements OnDestroy {
+export class TagListComponent {
   auth = inject(AuthService);
   private tagApi = inject(TagApiService);
   private router = inject(Router);
@@ -272,6 +272,7 @@ export class TagListComponent implements OnDestroy {
   private listState = inject(TagListStateService);
   private errorHandler = inject(ErrorHandlerService);
   private prefs = inject(UserPreferencesService);
+  private destroyRef = inject(DestroyRef);
 
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: TagSortBy; label: string }[] = [
@@ -341,16 +342,13 @@ export class TagListComponent implements OnDestroy {
   showInitialEmpty = computed(() => !this.hasItems() && !this.hasActiveFilters() && !this.loading());
   showFilteredEmpty = computed(() => !this.hasItems() && this.hasActiveFilters());
 
-  private searchSub: Subscription;
-  private stateSaveSub: Subscription;
-
   constructor() {
     const savedVisibility = this.prefs.tagColumnVisibility();
     if (Object.keys(savedVisibility).length > 0) {
       this.columnVisibility.set({ ...DEFAULT_COLUMN_VISIBILITY, ...savedVisibility });
     }
 
-    this.stateSaveSub = this.route.queryParams.subscribe(params => {
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const hasParams = Object.keys(params).length > 0;
       if (!hasParams && this.listState.hasParams) {
         this.ready.set(false);
@@ -361,6 +359,7 @@ export class TagListComponent implements OnDestroy {
         this.router.events.pipe(
           filter(e => e instanceof NavigationEnd || e instanceof NavigationCancel || e instanceof NavigationError),
           take(1),
+          takeUntilDestroyed(this.destroyRef),
         ).subscribe(() => {
           this.searchInput.set(this.route.snapshot.queryParamMap.get('search') ?? '');
           this.ready.set(true);
@@ -370,10 +369,11 @@ export class TagListComponent implements OnDestroy {
       }
     });
 
-    this.searchSub = toObservable(this.searchInput).pipe(
+    toObservable(this.searchInput).pipe(
       debounceTime(300),
       distinctUntilChanged(),
       filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe(value => {
       this.router.navigate(['/documents/tags'], {
         queryParams: { page: 1, search: value || null },
@@ -381,11 +381,6 @@ export class TagListComponent implements OnDestroy {
         replaceUrl: true,
       });
     });
-  }
-
-  ngOnDestroy(): void {
-    this.searchSub.unsubscribe();
-    this.stateSaveSub.unsubscribe();
   }
 
   private page = toSignal(

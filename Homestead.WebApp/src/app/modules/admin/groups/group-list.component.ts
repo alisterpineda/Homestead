@@ -1,7 +1,7 @@
-import { Component, ChangeDetectionStrategy, inject, signal, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, DestroyRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, combineLatest, Subscription } from 'rxjs';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { switchMap, map, combineLatest } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers2, lucideSearch, lucidePlus } from '@ng-icons/lucide';
@@ -107,10 +107,11 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
     </div>
   `,
 })
-export class GroupListComponent implements OnDestroy {
+export class GroupListComponent {
   private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -158,14 +159,13 @@ export class GroupListComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  private searchSub: Subscription;
-
   constructor() {
-    this.searchSub = toObservable(this.searchInput)
+    toObservable(this.searchInput)
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
         filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(value => {
         this.router.navigate(['/admin/groups'], {
@@ -174,10 +174,6 @@ export class GroupListComponent implements OnDestroy {
           replaceUrl: true,
         });
       });
-  }
-
-  ngOnDestroy(): void {
-    this.searchSub.unsubscribe();
   }
 
   asInputValue(event: Event): string {

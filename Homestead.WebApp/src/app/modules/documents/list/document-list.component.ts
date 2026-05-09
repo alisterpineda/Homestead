@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, OnDestroy, DestroyRef, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, effect, untracked, DestroyRef, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationError } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@/shared/services/auth.service';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, map, catchError, of, combineLatest, Subject, Subscription, debounceTime, distinctUntilChanged, filter, take, takeUntil, takeWhile, firstValueFrom } from 'rxjs';
+import { switchMap, map, catchError, of, combineLatest, Subject, debounceTime, distinctUntilChanged, filter, take, takeUntil, takeWhile, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -392,7 +391,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     <app-download-progress-dialog />
   `,
 })
-export class DocumentListComponent implements OnDestroy {
+export class DocumentListComponent {
   auth = inject(AuthService);
   private documentApi = inject(DocumentApiService);
   private tagApi = inject(TagApiService);
@@ -410,8 +409,6 @@ export class DocumentListComponent implements OnDestroy {
   private cancelDownload$ = new Subject<void>();
   private destroyRef = inject(DestroyRef);
   private prefs = inject(UserPreferencesService);
-  private hubSub: Subscription;
-  private stateSaveSub: Subscription;
 
   readonly skeletonCards = Array(12);
   hideableColumns = HIDEABLE_COLUMNS;
@@ -591,8 +588,6 @@ export class DocumentListComponent implements OnDestroy {
   resolvedPartyOptions = computed(() => Array.from(this.resolvedParties().values()));
 
 
-  private searchSub: Subscription;
-
   constructor() {
     // Restore saved column visibility (merge defaults underneath so new columns default to hidden)
     const savedVisibility = this.prefs.documentColumnVisibility();
@@ -602,7 +597,7 @@ export class DocumentListComponent implements OnDestroy {
 
     // Save query params on every change, and restore saved state when navigating
     // to /documents without params (e.g. sidebar link) while saved state exists.
-    this.stateSaveSub = this.route.queryParams.subscribe(params => {
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const hasParams = Object.keys(params).length > 0;
       if (!hasParams && this.listState.hasParams) {
         this.ready.set(false);
@@ -613,6 +608,7 @@ export class DocumentListComponent implements OnDestroy {
         this.router.events.pipe(
           filter(e => e instanceof NavigationEnd || e instanceof NavigationCancel || e instanceof NavigationError),
           take(1),
+          takeUntilDestroyed(this.destroyRef),
         ).subscribe(() => {
           this.searchInput.set(this.route.snapshot.queryParamMap.get('search') ?? '');
           this.ready.set(true);
@@ -622,14 +618,15 @@ export class DocumentListComponent implements OnDestroy {
       }
     });
 
-    this.hubSub = this.processingHub.jobCompleted$.subscribe(() => {
+    this.processingHub.jobCompleted$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
       this.refreshTrigger.update((v) => v + 1);
     });
 
-    this.searchSub = toObservable(this.searchInput).pipe(
+    toObservable(this.searchInput).pipe(
       debounceTime(300),
       distinctUntilChanged(),
       filter(value => (value || '') !== (this.route.snapshot.queryParamMap.get('search') ?? '')),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe(value => {
       this.router.navigate(['/documents'], {
         queryParams: { page: 1, search: value || null },
@@ -696,12 +693,6 @@ export class DocumentListComponent implements OnDestroy {
           },
         });
     });
-  }
-
-  ngOnDestroy(): void {
-    this.hubSub.unsubscribe();
-    this.searchSub.unsubscribe();
-    this.stateSaveSub.unsubscribe();
   }
 
   private page = toSignal(
