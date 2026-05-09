@@ -27,4 +27,21 @@ export const TEST_DATA = {
       searchableText: 'Taxpayer',
     },
   },
+  finances: {
+    currency: 'CAD',
+    accounts: {
+      chequing: 'E2E Chequing',
+      savings: 'E2E Savings',
+      visa: 'E2E Visa',
+    },
+    amounts: {
+      chequingOpening: 3000,
+      savingsOpening: 1000,
+      cashOpening: 1000,
+      creditCardOpening: 500,
+      balanceEntryOpening: 2000,
+      balanceEntryAsserted: 2500,
+      transferAmount: 500,
+    },
+  },
 };
