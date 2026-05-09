@@ -24,7 +24,9 @@ public class JobSchedulerServiceTests : IntegrationTestBase
         await using var _ = await PauseWorkerAsync();
 
         var dueAt = DateTimeOffset.UtcNow.AddMinutes(-1);
-        var scheduleId = await SeedScheduleAsync(nextRunAt: dueAt, cron: "*/5 * * * *");
+        // Daily cron keeps NextRunAt hours away after firing, so wall-clock drift
+        // between this assertion and the schedule update can't make it look stale.
+        var scheduleId = await SeedScheduleAsync(nextRunAt: dueAt, cron: "0 0 * * *");
 
         var result = await Scheduler.TickOnceAsync(CT);
 
@@ -114,10 +116,13 @@ public class JobSchedulerServiceTests : IntegrationTestBase
     {
         await using var _ = await PauseWorkerAsync();
 
-        // Schedule was due 2 days ago (cron is every 5 min ⇒ hundreds of missed ticks).
+        // Schedule was due 2 days ago. Cron must be coarse enough that the next
+        // occurrence after "now" lands well clear of wall-clock drift between the
+        // two TickOnceAsync calls below — a 5-min cron's next boundary can be
+        // sub-millisecond away if "now" sits right before it, racing the second tick.
         var scheduleId = await SeedScheduleAsync(
             nextRunAt: DateTimeOffset.UtcNow.AddDays(-2),
-            cron: "*/5 * * * *");
+            cron: "0 0 * * *");
 
         var first = await Scheduler.TickOnceAsync(CT);
         Assert.Equal(ScheduleTickResult.Fired, first);
