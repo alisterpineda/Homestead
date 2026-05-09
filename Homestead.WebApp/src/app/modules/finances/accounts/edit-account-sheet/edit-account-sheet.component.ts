@@ -5,7 +5,9 @@ import {
   output,
   computed,
   inject,
+  DestroyRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -129,6 +131,7 @@ export class EditAccountSheetComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
 
   reportingCurrency = commodityResource(
     this.commodityApi,
@@ -170,6 +173,7 @@ export class EditAccountSheetComponent {
     if (this.editArchived() !== a.isArchived) ops.push(replace('/isArchived', this.editArchived()));
 
     this.accountApi.patchAccount({ id: a.id, body: ops }).pipe(
+      takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.saving, 'Failed to save changes.'),
     ).subscribe({
       next: (updated) => {

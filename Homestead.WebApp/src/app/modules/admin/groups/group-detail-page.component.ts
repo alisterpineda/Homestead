@@ -1,6 +1,6 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, DestroyRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, map, catchError, of, combineLatest } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUsers2, lucideEdit, lucideTrash2, lucideShield, lucidePen, lucideEye } from '@ng-icons/lucide';
@@ -138,11 +138,12 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
       (closed)="onSheetClosed()" />
   `,
 })
-export class GroupDetailPageComponent implements OnDestroy {
+export class GroupDetailPageComponent {
   private adminApi = inject(AdminApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
 
   refreshTrigger = signal(0);
   loading = signal(false);
@@ -177,8 +178,6 @@ export class GroupDetailPageComponent implements OnDestroy {
     { initialValue: null },
   );
 
-  ngOnDestroy(): void {}
-
   openEditSheet(): void {
     this.sheetState.set('open');
   }
@@ -197,6 +196,7 @@ export class GroupDetailPageComponent implements OnDestroy {
     if (!g) return;
     this.deleting.set(true);
     this.adminApi.deleteGroup({ id: g.id }).pipe(
+      takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete group.'),
     ).subscribe({
       next: () => {
@@ -213,7 +213,7 @@ export class GroupDetailPageComponent implements OnDestroy {
       id: groupId,
       userId,
       body: { accessLevel: level },
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         toast.success('Access level updated.');
         this.onRefresh();
@@ -227,7 +227,7 @@ export class GroupDetailPageComponent implements OnDestroy {
   }
 
   onRemoveMember(groupId: string, userId: string, name: string): void {
-    this.adminApi.removeGroupMember({ id: groupId, userId }).subscribe({
+    this.adminApi.removeGroupMember({ id: groupId, userId }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         toast.success(`${name} removed from group.`);
         this.onRefresh();

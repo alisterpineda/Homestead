@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, input, output, viewChild, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideUserPlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -96,6 +97,7 @@ export class AddMemberDialogComponent {
 
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
   private dialog = viewChild(BrnDialog);
 
   userSearch = signal('');
@@ -110,6 +112,12 @@ export class AddMemberDialogComponent {
   canSubmit = computed(() => this.selectedUserId() !== null);
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.searchTimeout) clearTimeout(this.searchTimeout);
+    });
+  }
 
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
@@ -131,7 +139,7 @@ export class AddMemberDialogComponent {
       Page: 1,
       PageSize: 10,
       Search: search,
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (r) => {
         this.loadingUsers.set(false);
         const body = r as { items: UserResponse[] };
@@ -175,7 +183,7 @@ export class AddMemberDialogComponent {
         userId,
         accessLevel: this.accessLevel(),
       },
-    }).subscribe({
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.adding.set(false);
         toast.success('Member added.');

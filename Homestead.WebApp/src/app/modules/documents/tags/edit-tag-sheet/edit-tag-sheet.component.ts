@@ -5,7 +5,9 @@ import {
   output,
   computed,
   inject,
+  DestroyRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -22,6 +24,7 @@ import { replace } from '@/shared/json-patch';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -212,6 +215,7 @@ export class EditTagSheetComponent {
 
   private tagApi = inject(TagApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
 
   asValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
@@ -235,17 +239,14 @@ export class EditTagSheetComponent {
     this.tagApi.patchTag({
       id: t.id,
       body: ops,
-    }).subscribe({
+    }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.saving, 'Failed to update tag.'),
+    ).subscribe({
       next: () => {
         this.saving.set(false);
         toast.success('Tag updated.');
         this.saved.emit();
-      },
-      error: (err: unknown) => {
-        this.saving.set(false);
-        if (!this.errorHandler.isServerOrNetworkError(err)) {
-          toast.error(this.errorHandler.getErrorMessage(err, 'Failed to update tag.'));
-        }
       },
     });
   }

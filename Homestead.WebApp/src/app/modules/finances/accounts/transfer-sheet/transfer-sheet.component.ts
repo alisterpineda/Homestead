@@ -5,8 +5,9 @@ import {
   output,
   computed,
   inject,
+  DestroyRef,
 } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -255,6 +256,7 @@ export class TransferSheetComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
 
   anchorCurrency = commodityResource(
     this.commodityApi,
@@ -346,6 +348,7 @@ export class TransferSheetComponent {
       : this.txApi.createTransfer({ body });
 
     obs.pipe(
+      takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.saving, 'Failed to save transfer.'),
     ).subscribe({
       next: result => {
@@ -362,6 +365,7 @@ export class TransferSheetComponent {
     this.deleting.set(true);
     this.formError.set('');
     this.txApi.deleteTransaction({ transactionId: ex.id }).pipe(
+      takeUntilDestroyed(this.destroyRef),
       handleMutationError(this.errorHandler, this.deleting, 'Failed to delete transfer.'),
     ).subscribe({
       next: () => {
