@@ -95,7 +95,7 @@ export default defineConfig({
         'documents-trash',
       ],
     },
-    // --- Finances (desktop only) ---
+    // --- Finances (desktop) ---
     {
       name: 'finances-accounts',
       testDir: './tests/finances/accounts',
@@ -113,6 +113,25 @@ export default defineConfig({
       testDir: './tests/finances/transfers',
       use: { ...DESKTOP, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
       dependencies: ['auth-setup'],
+    },
+    // --- Finances (mobile) ---
+    {
+      name: 'finances-accounts-mobile',
+      testDir: './tests/finances/accounts',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['finances-accounts'],
+    },
+    {
+      name: 'finances-balance-entries-mobile',
+      testDir: './tests/finances/balance-entries',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['finances-balance-entries'],
+    },
+    {
+      name: 'finances-transfers-mobile',
+      testDir: './tests/finances/transfers',
+      use: { ...MOBILE, baseURL: OIDC_URL, storageState: '.auth/admin.json' },
+      dependencies: ['finances-transfers'],
     },
     // --- Mobile documents pipeline ---
     {

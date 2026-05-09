@@ -41,7 +41,10 @@ import { todayIso, tomorrowIso } from '../../shared/date';
         <ng-content />
       </button>
 
-      <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-[560px]">
+      <hlm-dialog-content
+        *hlmDialogPortal="let ctx"
+        class="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[560px]"
+      >
         <div hlmDialogHeader>
           <h2 hlmDialogTitle>New account</h2>
           <p hlmDialogDescription>Pick a kind and fill in the basics. You can edit these later.</p>
