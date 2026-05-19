@@ -18,13 +18,11 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
-import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { PageHeaderService } from '@/shared/services/page-header.service';
-import { CommodityInfoTabComponent } from './commodity-info-tab.component';
-import { CommodityPricesTabComponent } from './commodity-prices-tab.component';
+import { CommodityPricesSectionComponent } from './commodity-prices-section.component';
 import { EditCommoditySheetComponent } from './edit-commodity-sheet/edit-commodity-sheet.component';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -40,10 +38,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmSpinner,
     HlmEmptyImports,
     HlmBreadCrumbImports,
-    HlmTabsImports,
     HlmBadgeImports,
-    CommodityInfoTabComponent,
-    CommodityPricesTabComponent,
+    CommodityPricesSectionComponent,
     EditCommoditySheetComponent,
   ],
   providers: [provideIcons({ lucidePencil, lucideCircleAlert })],
@@ -92,18 +88,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <p class="text-sm text-muted-foreground">{{ c.name }}</p>
         </header>
 
-        <hlm-tabs tab="info" class="flex flex-1 flex-col">
-          <hlm-tabs-list variant="line">
-            <button hlmTabsTrigger="info">Info</button>
-            <button hlmTabsTrigger="prices">Prices</button>
-          </hlm-tabs-list>
-          <div hlmTabsContent="info" class="pt-4">
-            <app-commodity-info-tab [commodity]="c" />
-          </div>
-          <div hlmTabsContent="prices" class="pt-4">
-            <app-commodity-prices-tab [commodity]="c" />
-          </div>
-        </hlm-tabs>
+        <app-commodity-prices-section [commodity]="c" />
       } @else if (loading()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
       } @else {

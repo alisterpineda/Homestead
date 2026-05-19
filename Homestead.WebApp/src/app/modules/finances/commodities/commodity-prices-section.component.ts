@@ -63,7 +63,7 @@ const isSortDirection = (v: string | null): v is SortDirection =>
 type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
 
 @Component({
-  selector: 'app-commodity-prices-tab',
+  selector: 'app-commodity-prices-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
@@ -315,7 +315,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
     </hlm-alert-dialog>
   `,
 })
-export class CommodityPricesTabComponent {
+export class CommodityPricesSectionComponent {
   commodity = input.required<CommodityResponse>();
 
   readonly allSources = ALL_SOURCES;
