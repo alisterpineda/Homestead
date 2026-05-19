@@ -67,8 +67,18 @@ public class ImportCommodityPricesJobHandler(
         var fromAt = payload.FromAt ?? settings.LastImportAt ?? await ResolveEarliestActivityAsync(now, ct);
         var toAt = payload.ToAt ?? now;
 
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation(
+                "Price import {Source}: passing {CommodityCount} commodities to provider, window {FromAt:o}..{ToAt:o}",
+                payload.Source, commodities.Count, fromAt, toAt);
+
         var result = await provider.ImportAsync(
             new PriceImportRequest(commodities, fromAt, toAt, settings.Config), ct);
+
+        if (logger.IsEnabled(LogLevel.Information))
+            logger.LogInformation(
+                "Price import {Source}: provider returned {ObservationCount} observations, warning={Warning}",
+                payload.Source, result.Observations.Count, result.Warning ?? "(none)");
 
         await UpsertObservationsAsync(payload.Source, result.Observations, job, now, ct);
 
