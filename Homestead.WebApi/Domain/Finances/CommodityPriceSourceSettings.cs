@@ -12,6 +12,11 @@ public class CommodityPriceSourceSettings
 
     public string? PairAllowList { get; set; }
 
+    /// <summary>
+    /// Wall-clock timestamp of the last completed import. Audit / UI use only —
+    /// do NOT use this as a data window anchor. The next-run window is derived
+    /// from <c>CommodityPrices</c> in <c>ImportCommodityPricesJobHandler.ResolveImportAnchorAsync</c>.
+    /// </summary>
     public DateTimeOffset? LastImportAt { get; set; }
 
     public string? LastImportStatus { get; set; }

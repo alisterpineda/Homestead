@@ -449,7 +449,314 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         Assert.Single(_db.CommodityPrices.Where(p => p.Source == CommodityPriceSource.BankOfCanada));
     }
 
-    private async Task SeedHeldUsdAccountAsync()
+    [Fact]
+    public async Task RunImport_NoPriorPricesForSource_AnchorsToEarliestActivity()
+    {
+        var occurredAt = new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero);
+        await SeedHeldUsdAccountAsync(occurredAt);
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(PriceImportAnchorSource.EarliestActivity, captured!.AnchorSource);
+        Assert.Equal(occurredAt, captured.FromAt);
+    }
+
+    [Fact]
+    public async Task RunImport_PriorPricesExist_AnchorsToMinMaxPriceAtMinusLookback()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+
+        var eur = new Commodity { Id = Guid.NewGuid(), Symbol = "EUR", Name = "Euro", Kind = CommodityKind.Currency };
+        _db.Commodities.Add(eur);
+        var eurAccount = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "EUR account",
+            AccountType = AccountType.Asset,
+            ReportingCurrencyId = _cad.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Accounts.Add(eurAccount);
+        var eurTx = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = DateTimeOffset.UtcNow.AddDays(-20),
+            Memo = "buy EUR",
+            Type = TransactionType.Normal,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.AccountTransactions.Add(eurTx);
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = eurTx.Id,
+            AccountId = eurAccount.Id,
+            CommodityId = eur.Id,
+            Quantity = 100m,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+
+        _provider.SupportedPairs.Returns(new[]
+        {
+            new PriceProviderSupportedPair("USD", null, "CAD"),
+            new PriceProviderSupportedPair("EUR", null, "CAD"),
+        });
+
+        var usdLatest = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
+        var eurLatest = new DateTimeOffset(2026, 5, 16, 0, 0, 0, TimeSpan.Zero);
+        _db.CommodityPrices.AddRange(
+            new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = _usd.Id, QuoteCurrencyId = _cad.Id,
+                PriceAt = usdLatest, Rate = 1.36m,
+                Source = CommodityPriceSource.BankOfCanada,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            },
+            new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = eur.Id, QuoteCurrencyId = _cad.Id,
+                PriceAt = eurLatest, Rate = 1.50m,
+                Source = CommodityPriceSource.BankOfCanada,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(PriceImportAnchorSource.Watermark, captured!.AnchorSource);
+        Assert.Equal(eurLatest, captured.FromAt);
+    }
+
+    [Fact]
+    public async Task RunImport_AppliesProviderRevisionLookback()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+
+        var watermark = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
+        _db.CommodityPrices.Add(new CommodityPrice
+        {
+            Id = Guid.NewGuid(),
+            CommodityId = _usd.Id, QuoteCurrencyId = _cad.Id,
+            PriceAt = watermark, Rate = 1.36m,
+            Source = CommodityPriceSource.BankOfCanada,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        _provider.RevisionLookback.Returns(TimeSpan.FromDays(7));
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(watermark - TimeSpan.FromDays(7), captured!.FromAt);
+    }
+
+    [Fact]
+    public async Task RunImport_FrozenPairForArchivedCommodity_DoesNotDragAnchor()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+
+        var eur = new Commodity { Id = Guid.NewGuid(), Symbol = "EUR", Name = "Euro", Kind = CommodityKind.Currency };
+        _db.Commodities.Add(eur);
+        var archivedAccount = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "EUR archived",
+            AccountType = AccountType.Asset,
+            ReportingCurrencyId = _cad.Id,
+            IsArchived = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Accounts.Add(archivedAccount);
+        var eurTx = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = DateTimeOffset.UtcNow.AddDays(-200),
+            Memo = "old buy",
+            Type = TransactionType.Normal,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+        _db.AccountTransactions.Add(eurTx);
+        _db.AccountTransactionSplits.Add(new AccountTransactionSplit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = eurTx.Id,
+            AccountId = archivedAccount.Id,
+            CommodityId = eur.Id,
+            Quantity = 100m,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+
+        var usdLatest = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
+        var eurFrozen = new DateTimeOffset(2025, 8, 1, 0, 0, 0, TimeSpan.Zero);
+        _db.CommodityPrices.AddRange(
+            new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = _usd.Id, QuoteCurrencyId = _cad.Id,
+                PriceAt = usdLatest, Rate = 1.36m,
+                Source = CommodityPriceSource.BankOfCanada,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            },
+            new CommodityPrice
+            {
+                Id = Guid.NewGuid(),
+                CommodityId = eur.Id, QuoteCurrencyId = _cad.Id,
+                PriceAt = eurFrozen, Rate = 1.45m,
+                Source = CommodityPriceSource.BankOfCanada,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(PriceImportAnchorSource.Watermark, captured!.AnchorSource);
+        Assert.Equal(usdLatest, captured.FromAt);
+    }
+
+    [Fact]
+    public async Task RunImport_ExplicitPayloadFromAt_BypassesWatermark()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        _db.CommodityPrices.Add(new CommodityPrice
+        {
+            Id = Guid.NewGuid(),
+            CommodityId = _usd.Id, QuoteCurrencyId = _cad.Id,
+            PriceAt = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero),
+            Rate = 1.36m,
+            Source = CommodityPriceSource.BankOfCanada,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var explicitFrom = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(
+            CommodityPriceSource.BankOfCanada,
+            FromAt: explicitFrom));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.Equal(PriceImportAnchorSource.ExplicitOverride, captured!.AnchorSource);
+        Assert.Equal(explicitFrom, captured.FromAt);
+    }
+
+    [Fact]
+    public async Task RunImport_ScheduledRun_DoesNotDropMidnightUtcObservations()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+
+        var yesterdayMidnight = new DateTimeOffset(2026, 5, 18, 0, 0, 0, TimeSpan.Zero);
+        _db.CommodityPrices.Add(new CommodityPrice
+        {
+            Id = Guid.NewGuid(),
+            CommodityId = _usd.Id, QuoteCurrencyId = _cad.Id,
+            PriceAt = yesterdayMidnight, Rate = 1.36m,
+            Source = CommodityPriceSource.BankOfCanada,
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        PriceImportRequest? captured = null;
+        _provider.ImportAsync(Arg.Do<PriceImportRequest>(r => captured = r), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(captured);
+        Assert.True(captured!.FromAt <= yesterdayMidnight,
+            $"FromAt {captured.FromAt:o} must be <= yesterday-midnight {yesterdayMidnight:o}");
+    }
+
+    [Fact]
+    public async Task RunImport_StillWritesLastImportAt()
+    {
+        await SeedHeldUsdAccountAsync();
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = CommodityPriceSource.BankOfCanada,
+            IsEnabled = true,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        _provider.ImportAsync(Arg.Any<PriceImportRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PriceImportResult.Success(Array.Empty<PriceObservation>()));
+
+        var job = MakeJob(new ImportCommodityPricesPayload(CommodityPriceSource.BankOfCanada));
+        await _sut.HandleAsync(job, TestContext.Current.CancellationToken);
+
+        var settings = _db.CommodityPriceSourceSettings.Single(s => s.Source == CommodityPriceSource.BankOfCanada);
+        Assert.NotNull(settings.LastImportAt);
+    }
+
+    private async Task SeedHeldUsdAccountAsync(DateTimeOffset? occurredAt = null)
     {
         var account = new Account
         {
@@ -466,7 +773,7 @@ public class ImportCommodityPricesJobHandlerTests : IDisposable
         var tx = new Homestead.WebApi.Domain.Finances.NormalTransaction
         {
             Id = Guid.NewGuid(),
-            OccurredAt = DateTimeOffset.UtcNow.AddDays(-10),
+            OccurredAt = occurredAt ?? DateTimeOffset.UtcNow.AddDays(-10),
             Memo = "seed",
             Type = TransactionType.Normal,
             CreatedAt = DateTimeOffset.UtcNow,

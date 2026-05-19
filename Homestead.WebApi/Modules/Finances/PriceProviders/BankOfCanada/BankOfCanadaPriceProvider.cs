@@ -47,6 +47,8 @@ public class BankOfCanadaPriceProvider : IPriceProvider
 
     public IReadOnlyList<string> CoveredQuoteCurrencies { get; } = Array.Empty<string>();
 
+    public TimeSpan RevisionLookback => TimeSpan.FromDays(5);
+
     public async Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct)
     {
         _logger.LogInformation(

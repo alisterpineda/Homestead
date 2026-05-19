@@ -69,6 +69,8 @@ public class AlphaVantagePriceProvider : IPriceProvider
     public IReadOnlyList<string> CoveredQuoteCurrencies { get; } =
         _exchangeToQuote.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
+    public TimeSpan RevisionLookback => TimeSpan.FromDays(1);
+
     public async Task<PriceImportResult> ImportAsync(PriceImportRequest request, CancellationToken ct)
     {
         _logger.LogInformation(
@@ -227,7 +229,9 @@ public class AlphaVantagePriceProvider : IPriceProvider
                     "AlphaVantage daily for {Symbol} parsed {Parsed} rows but none fell inside window {FromAt:o}..{ToAt:o} (earliest={Earliest:o})",
                     security.Symbol, dailyParsed, request.FromAt, request.ToAt, dailyEarliest);
 
-            if (dailyEarliest is { } earliest && request.FromAt < earliest)
+            if (request.AnchorSource == PriceImportAnchorSource.ExplicitOverride
+                && dailyEarliest is { } earliest
+                && request.FromAt < earliest)
             {
                 await _delay(_interCallDelay, ct);
 

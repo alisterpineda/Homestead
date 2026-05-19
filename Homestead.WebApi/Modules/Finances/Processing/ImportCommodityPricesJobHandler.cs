@@ -64,16 +64,18 @@ public class ImportCommodityPricesJobHandler(
         var commodities = await ResolveCommoditiesAsync(provider, settings, payload, ct);
 
         var now = DateTimeOffset.UtcNow;
-        var fromAt = payload.FromAt ?? settings.LastImportAt ?? await ResolveEarliestActivityAsync(now, ct);
+        var (fromAt, anchorSource) = payload.FromAt is { } explicitFrom
+            ? (explicitFrom, PriceImportAnchorSource.ExplicitOverride)
+            : await ResolveImportAnchorAsync(payload.Source, provider, commodities, now, ct);
         var toAt = payload.ToAt ?? now;
 
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation(
-                "Price import {Source}: passing {CommodityCount} commodities to provider, window {FromAt:o}..{ToAt:o}",
-                payload.Source, commodities.Count, fromAt, toAt);
+                "Price import {Source}: {CommodityCount} commodities, anchor={AnchorSource} window={FromAt:o}..{ToAt:o}",
+                payload.Source, commodities.Count, anchorSource, fromAt, toAt);
 
         var result = await provider.ImportAsync(
-            new PriceImportRequest(commodities, fromAt, toAt, settings.Config), ct);
+            new PriceImportRequest(commodities, fromAt, toAt, anchorSource, settings.Config), ct);
 
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation(
@@ -137,6 +139,33 @@ public class ImportCommodityPricesJobHandler(
         }
 
         return filtered.ToList();
+    }
+
+    private async Task<(DateTimeOffset FromAt, PriceImportAnchorSource AnchorSource)> ResolveImportAnchorAsync(
+        CommodityPriceSource source,
+        IPriceProvider provider,
+        IReadOnlyCollection<Commodity> activeCommodities,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var activeIds = activeCommodities.Select(c => c.Id).ToList();
+
+        // min(max(PriceAt)) across currently-held (commodity, quote) pairs for this source.
+        // Filtering to activeIds prevents frozen pairs (delisted, archived) from dragging the anchor.
+        // The Cast<DateTimeOffset?> idiom lets us distinguish "no rows" from default(DateTimeOffset).
+        var earliestWatermark = await db.CommodityPrices
+            .Where(p => p.Source == source && activeIds.Contains(p.CommodityId))
+            .GroupBy(p => new { p.CommodityId, p.QuoteCurrencyId })
+            .Select(g => (DateTimeOffset?)g.Max(p => p.PriceAt))
+            .MinAsync(ct);
+
+        if (earliestWatermark is null)
+        {
+            var earliest = await ResolveEarliestActivityAsync(now, ct);
+            return (earliest, PriceImportAnchorSource.EarliestActivity);
+        }
+
+        return (earliestWatermark.Value - provider.RevisionLookback, PriceImportAnchorSource.Watermark);
     }
 
     private async Task<DateTimeOffset> ResolveEarliestActivityAsync(DateTimeOffset now, CancellationToken ct)

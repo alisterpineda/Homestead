@@ -32,12 +32,20 @@ public class BankOfCanadaPriceProviderTests
     }
 
     [Fact]
+    public void RevisionLookback_IsFiveDays()
+    {
+        var (provider, _) = CreateSut();
+        Assert.Equal(TimeSpan.FromDays(5), provider.RevisionLookback);
+    }
+
+    [Fact]
     public async Task ImportAsync_NoCommodities_ReturnsEmpty()
     {
         var (provider, handler) = CreateSut();
         var result = await provider.ImportAsync(
             new PriceImportRequest(Array.Empty<Commodity>(),
-                DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow, null),
+                DateTimeOffset.UtcNow.AddDays(-7), DateTimeOffset.UtcNow,
+                PriceImportAnchorSource.Watermark, null),
             TestContext.Current.CancellationToken);
         Assert.Empty(result.Observations);
         Assert.Null(result.Warning);
@@ -63,7 +71,7 @@ public class BankOfCanadaPriceProviderTests
             new PriceImportRequest(new[] { cad, usd },
                 new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero),
                 new DateTimeOffset(2026, 4, 28, 0, 0, 0, TimeSpan.Zero),
-                null),
+                PriceImportAnchorSource.Watermark, null),
             TestContext.Current.CancellationToken);
 
         var obs = Assert.Single(result.Observations);
@@ -86,7 +94,8 @@ public class BankOfCanadaPriceProviderTests
 
         var result = await provider.ImportAsync(
             new PriceImportRequest(new[] { cad, xyz },
-                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow, null),
+                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow,
+                PriceImportAnchorSource.Watermark, null),
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Observations);
@@ -107,7 +116,8 @@ public class BankOfCanadaPriceProviderTests
 
         await provider.ImportAsync(
             new PriceImportRequest(new[] { cad, usd },
-                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow, configJson),
+                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow,
+                PriceImportAnchorSource.Watermark, configJson),
             TestContext.Current.CancellationToken);
 
         Assert.StartsWith(customBaseUrl, handler.LastRequestUrl);
