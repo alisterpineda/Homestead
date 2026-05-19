@@ -16,7 +16,7 @@ import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from '../../list/document-table/sort-header-button';
 import { TableHeadSelection, TableRowSelection } from '../../list/document-table/selection-column';
 import type { HideableColumn } from '../../list/document-table/document-table.component';
-import { TagNameCell, TagDateAddedCell, TagModifiedCell } from './table-cells';
+import { TagColorCell, TagNameCell, TagDateAddedCell, TagModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
 const COLUMN_ID_TO_SORT_KEY: Record<string, TagSortBy> = {
@@ -149,6 +149,17 @@ export class TagTableComponent {
       maxSize: 48,
     },
     {
+      id: 'color',
+      header: '',
+      cell: () => flexRenderComponent(TagColorCell),
+      enableSorting: false,
+      enableHiding: false,
+      enableResizing: false,
+      size: 32,
+      minSize: 32,
+      maxSize: 32,
+    },
+    {
       accessorKey: 'name',
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
@@ -263,11 +274,13 @@ export class TagTableComponent {
 
   private readonly TH_CLASSES: Record<string, string> = {
     select: '',
+    color: 'px-0',
     documentCount: 'text-right',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
     select: '',
+    color: 'px-0 text-center',
     name: 'overflow-hidden',
     path: 'overflow-hidden',
     description: 'overflow-hidden',

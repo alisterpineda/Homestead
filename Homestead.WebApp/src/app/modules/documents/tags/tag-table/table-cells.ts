@@ -4,15 +4,24 @@ import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-tab
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 
 @Component({
+  selector: 'app-tag-color-cell',
+  template: `
+    @if (context.row.original.effectiveColor) {
+      <span class="inline-block h-3 w-3 rounded-full align-middle" [style.background-color]="context.row.original.effectiveColor"></span>
+    }
+  `,
+})
+export class TagColorCell {
+  protected readonly context = injectFlexRenderContext<CellContext<GetTagsResponse, unknown>>();
+}
+
+@Component({
   selector: 'app-tag-name-cell',
   template: `
     @if (parentPrefix) {
       <span class="text-muted-foreground">{{ parentPrefix }} / </span>
     }
     <span class="font-medium">{{ context.row.original.name }}</span>
-    @if (context.row.original.effectiveColor) {
-      <span class="ml-2 inline-block h-3 w-3 rounded-full" [style.background-color]="context.row.original.effectiveColor"></span>
-    }
   `,
 })
 export class TagNameCell {

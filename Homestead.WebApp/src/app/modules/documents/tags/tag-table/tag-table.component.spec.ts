@@ -65,7 +65,7 @@ describe('TagTableComponent', () => {
   it('should define all expected columns', () => {
     fixture.detectChanges();
     const columnIds = component['_columns'].map(c => c.id);
-    expect(columnIds).toEqual(['select', 'name', 'path', 'description', 'documentCount', 'createdAt', 'updatedAt']);
+    expect(columnIds).toEqual(['select', 'color', 'name', 'path', 'description', 'documentCount', 'createdAt', 'updatedAt']);
   });
 
   it('should map name column to Name sort key via sort input', () => {
