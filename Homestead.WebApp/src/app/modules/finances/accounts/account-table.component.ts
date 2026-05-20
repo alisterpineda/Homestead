@@ -23,6 +23,7 @@ import { SortHeaderButton } from '../../documents/list/document-table/sort-heade
 import { AccountRowActionsComponent } from './account-row-actions.component';
 import { accountKindLabel } from '../shared/account-kind-meta';
 import { formatAccountBalance } from '../shared/sign';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { escapeHtml } from '@/shared/utils';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -151,6 +152,8 @@ export class AccountActionsCell {
   `,
 })
 export class AccountTableComponent {
+  private readonly prefs = inject(UserPreferencesService);
+
   accounts = input.required<AccountResponse[]>();
   displayCurrency = input<CommodityResponse | null>(null);
   sortState = input<AccountSortState>({ id: 'name', desc: false });
@@ -168,6 +171,7 @@ export class AccountTableComponent {
 
   private readonly _columns = computed<ColumnDef<AccountResponse>[]>(() => {
     const dc = this.displayCurrency();
+    const masked = this.prefs.financesPrivacyMasked();
     return [
       {
         accessorKey: 'name',
@@ -200,7 +204,7 @@ export class AccountTableComponent {
         header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Total balance' } }),
         cell: (info) => {
           const account = info.row.original;
-          const text = formatAccountBalance(account, dc);
+          const text = formatAccountBalance(account, dc, masked);
           if (text === null && (account.unpricedHoldingCount ?? 0) > 0) {
             return '<span class="text-xs text-amber-600 dark:text-amber-500">Unpriced</span>';
           }

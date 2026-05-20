@@ -93,4 +93,10 @@ export class UserPreferencesService {
     defaultValue: false,
     validate: (v): v is boolean => typeof v === 'boolean',
   });
+
+  readonly financesPrivacyMasked = persistedSignal<boolean>({
+    key: 'homestead-finances-privacy-masked',
+    defaultValue: true,
+    validate: (v): v is boolean => typeof v === 'boolean',
+  });
 }

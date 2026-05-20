@@ -46,6 +46,7 @@ import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { toDateOnly } from '../shared/date';
 import { isDetailsOfKind } from '../transactions/transaction-display';
 import { PageHeaderService } from '@/shared/services/page-header.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
@@ -248,6 +249,7 @@ export class AccountDetailPageComponent implements OnDestroy {
   private commodityApi = inject(FinancesCommodityApiService);
   private txApi = inject(FinancesTransactionApiService);
   protected settingsService = inject(FinanceSettingsService);
+  private prefs = inject(UserPreferencesService);
   private pageHeaderService = inject(PageHeaderService);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
@@ -305,7 +307,9 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   displayText = computed(() => {
     const a = this.account();
-    return a ? formatAccountBalance(a, this.settingsService.displayCurrency()) : null;
+    return a
+      ? formatAccountBalance(a, this.settingsService.displayCurrency(), this.prefs.financesPrivacyMasked())
+      : null;
   });
 
   showNative = computed(() => {
@@ -320,7 +324,7 @@ export class AccountDetailPageComponent implements OnDestroy {
   nativeText(): string | null {
     const a = this.account();
     if (!a) return null;
-    return formatNativeBalance(a, this.reportingCurrency());
+    return formatNativeBalance(a, this.reportingCurrency(), this.prefs.financesPrivacyMasked());
   }
 
   constructor() {

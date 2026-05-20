@@ -57,10 +57,17 @@ setup(
     );
     expect(activateResponse.ok()).toBeTruthy();
 
-    // 4. Persist the admin's authenticated browser state for workflow tests
+    // 4. Disable the finances privacy mask so existing balance assertions read
+    //    unmasked values. The default-on mask is correct for real users but
+    //    breaks tests that grep for numeric balance text.
+    await page.evaluate(() =>
+      localStorage.setItem('homestead-finances-privacy-masked', 'false'),
+    );
+
+    // 5. Persist the admin's authenticated browser state for workflow tests
     await page.context().storageState({ path: AUTH_STATE.adminPath });
 
-    // 5. Log out so the login tests start from an unauthenticated state
+    // 6. Log out so the login tests start from an unauthenticated state
     await page.goto(`${baseUrl}/api/auth/logout`, { waitUntil: 'networkidle' });
   },
 );

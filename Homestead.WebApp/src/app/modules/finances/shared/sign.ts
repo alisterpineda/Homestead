@@ -1,7 +1,7 @@
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { AccountType } from '@/api/generated/models/account-type';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
-import { formatCurrency } from './format-currency';
+import { formatMaskedCurrency } from './format-currency';
 
 // Beancount-style stored sign convention:
 // - Asset/Expense: positive on increase
@@ -24,11 +24,12 @@ export function toUserAmount(amount: number | null, accountType: AccountType): n
 export function formatAccountBalance(
   account: Pick<AccountResponse, 'accountType' | 'displayValue'>,
   displayCurrency: CommodityResponse | null,
+  masked = false,
 ): string | null {
   if (!displayCurrency) return null;
   const raw = account.displayValue ?? null;
   if (raw === null) return null;
-  return formatCurrency(toUserAmount(raw, account.accountType) ?? 0, displayCurrency);
+  return formatMaskedCurrency(toUserAmount(raw, account.accountType) ?? 0, displayCurrency, masked);
 }
 
 // Format a single-position account's native balance. Returns null for multi-position
@@ -36,11 +37,12 @@ export function formatAccountBalance(
 export function formatNativeBalance(
   account: Pick<AccountResponse, 'accountType' | 'nativeBalance'>,
   reportingCurrency: CommodityResponse | null,
+  masked = false,
 ): string | null {
   if (!reportingCurrency) return null;
   const raw = account.nativeBalance ?? null;
   if (raw === null) return null;
-  return formatCurrency(toUserAmount(raw, account.accountType) ?? 0, reportingCurrency);
+  return formatMaskedCurrency(toUserAmount(raw, account.accountType) ?? 0, reportingCurrency, masked);
 }
 
 // Net worth = sum of stored displayValue across all accounts (Beancount sign already

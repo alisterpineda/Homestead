@@ -139,6 +139,9 @@ import { getModuleByPath } from '@/modules/registry';
             <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
           }
           <div class="ml-auto flex items-center gap-2">
+            @if (headerSecondaryActions()) {
+              <ng-container *ngTemplateOutlet="headerSecondaryActions()!" />
+            }
             @if (headerActions()) {
               <ng-container *ngTemplateOutlet="headerActions()!" />
             }
@@ -160,6 +163,7 @@ export class AppShellComponent {
   private pageHeaderService = inject(PageHeaderService);
 
   headerActions = this.pageHeaderService.actions;
+  headerSecondaryActions = this.pageHeaderService.secondaryActions;
   headerTitle = this.pageHeaderService.title;
 
   constructor() {

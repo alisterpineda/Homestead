@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { AccountPositionsTabComponent } from './account-positions-tab.component';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { PositionResponse } from '@/api/generated/models/position-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -63,6 +64,7 @@ describe('AccountPositionsTabComponent', () => {
         { provide: FinanceSettingsService, useClass: FakeSettings },
       ],
     });
+    TestBed.inject(UserPreferencesService).financesPrivacyMasked.set(false);
   });
 
   it('should create', () => {

@@ -26,7 +26,8 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
-import { formatCurrency } from '../shared/format-currency';
+import { formatMaskedCurrency } from '../shared/format-currency';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { PositionResponse } from '@/api/generated/models/position-response';
@@ -155,18 +156,20 @@ export class AccountPositionsTabComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private settingsService = inject(FinanceSettingsService);
+  private prefs = inject(UserPreferencesService);
   private destroyRef = inject(DestroyRef);
 
   rows = computed<PositionRow[]>(() => {
     const dc = this.settingsService.displayCurrency();
+    const masked = this.prefs.financesPrivacyMasked();
     const map = this.commodities();
     return this.raw().map(p => {
       const c = map[p.commodityId] ?? null;
       const quantityText = c
-        ? formatCurrency(p.quantity, c)
-        : p.quantity.toString();
+        ? formatMaskedCurrency(p.quantity, c, masked)
+        : (masked ? '•••••' : p.quantity.toString());
       const displayValueText = (p.displayValue != null && dc)
-        ? formatCurrency(p.displayValue, dc)
+        ? formatMaskedCurrency(p.displayValue, dc, masked)
         : null;
       const shareText = p.shareOfAccount != null
         ? `${(p.shareOfAccount * 100).toFixed(1)}%`

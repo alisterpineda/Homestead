@@ -12,6 +12,7 @@ import { HlmCardImports } from '@/shared/components/spartan/card';
 import { AccountRowActionsComponent } from './account-row-actions.component';
 import { accountKindLabel } from '../shared/account-kind-meta';
 import { formatAccountBalance } from '../shared/sign';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
@@ -63,6 +64,7 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
 })
 export class AccountCardGridComponent {
   private readonly locale = inject(LOCALE_ID);
+  private readonly prefs = inject(UserPreferencesService);
 
   accounts = input.required<AccountResponse[]>();
   displayCurrency = input<CommodityResponse | null>(null);
@@ -77,7 +79,7 @@ export class AccountCardGridComponent {
   }
 
   protected balanceText(a: AccountResponse): string | null {
-    return formatAccountBalance(a, this.displayCurrency());
+    return formatAccountBalance(a, this.displayCurrency(), this.prefs.financesPrivacyMasked());
   }
 
   protected latestTxText(a: AccountResponse): string {

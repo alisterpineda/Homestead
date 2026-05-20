@@ -10,6 +10,7 @@ import type { EChartsCoreOption } from 'echarts/core';
 import { ThemeService } from '@/shared/services/theme.service';
 import type { NetWorthGranularity } from '@/api/generated/models/net-worth-granularity';
 import type { NetWorthHistoryPoint } from '@/api/generated/models/net-worth-history-point';
+import { formatNetWorthValue } from './format-net-worth';
 
 const SERIES = {
   NetWorth: 'Net worth',
@@ -41,6 +42,7 @@ export class NetWorthChartComponent {
   readonly xAxisMin = input<string | null>(null);
   readonly xAxisMax = input<string | null>(null);
   readonly showBreakdown = input<boolean>(false);
+  readonly masked = input<boolean>(false);
 
   protected readonly ariaLabel = computed(() =>
     `Net worth over time, ${this.points().length} data points in ${this.displayCurrencySymbol() ?? 'display currency'}.`,
@@ -59,6 +61,7 @@ export class NetWorthChartComponent {
     const granularity = this.granularity();
     const points = this.points();
     const showBreakdown = this.showBreakdown();
+    const masked = this.masked();
 
     const lineSeries = {
       name: SERIES.NetWorth,
@@ -100,7 +103,7 @@ export class NetWorthChartComponent {
         backgroundColor: colors.popover,
         borderColor: colors.border,
         textStyle: { color: colors.popoverFg },
-        formatter: (params: unknown) => formatTooltip(params, symbol, granularity),
+        formatter: (params: unknown) => formatTooltip(params, symbol, granularity, masked),
       },
       xAxis: {
         type: 'time',
@@ -116,7 +119,7 @@ export class NetWorthChartComponent {
         axisLine: { show: false },
         axisLabel: {
           color: colors.mutedFg,
-          formatter: (value: number) => formatAxis(value, symbol),
+          formatter: (value: number) => formatAxis(value, symbol, masked),
         },
         splitLine: { lineStyle: { color: colors.border, type: 'dashed' } },
       },
@@ -176,12 +179,8 @@ function toRgb(value: string, fallback: string): string {
   }
 }
 
-function formatAxis(value: number, symbol: string | null): string {
-  return new Intl.NumberFormat(undefined, {
-    style: symbol ? 'currency' : 'decimal',
-    currency: symbol ?? undefined,
-    maximumFractionDigits: 0,
-  }).format(value);
+function formatAxis(value: number, symbol: string | null, masked: boolean): string {
+  return formatNetWorthValue(value, symbol, masked, { minFraction: 0, maxFraction: 0 });
 }
 
 interface AxisTooltipParam {
@@ -195,6 +194,7 @@ function formatTooltip(
   params: unknown,
   symbol: string | null,
   granularity: NetWorthGranularity,
+  masked: boolean,
 ): string {
   const arr = Array.isArray(params) ? (params as AxisTooltipParam[]) : [params as AxisTooltipParam];
   if (arr.length === 0) return '';
@@ -204,12 +204,7 @@ function formatTooltip(
   const fmt = (v: number | null) =>
     v === null
       ? '—'
-      : new Intl.NumberFormat(undefined, {
-          style: symbol ? 'currency' : 'decimal',
-          currency: symbol ?? undefined,
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        }).format(v);
+      : formatNetWorthValue(v, symbol, masked, { minFraction: 0, maxFraction: 2 });
 
   const head = `<div style="margin-bottom:4px;opacity:.8">${dateLabel}</div>`;
 

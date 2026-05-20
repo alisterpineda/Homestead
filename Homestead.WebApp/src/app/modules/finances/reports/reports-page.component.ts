@@ -21,6 +21,7 @@ import { NetWorthEmptyStateComponent } from './net-worth-empty-state.component';
 import type { NetWorthEmptyReason } from './net-worth-empty-state.component';
 import type { GetNetWorthHistoryResponse } from '@/api/generated/models/get-net-worth-history-response';
 import { resolveWindow } from './resolve-window';
+import { formatNetWorthValue } from './format-net-worth';
 
 @Component({
   selector: 'app-reports-page',
@@ -114,6 +115,7 @@ import { resolveWindow } from './resolve-window';
               [xAxisMin]="chartXAxisMin()"
               [xAxisMax]="chartXAxisMax()"
               [showBreakdown]="showBreakdown()"
+              [masked]="privacyMasked()"
             />
           </section>
         }
@@ -128,6 +130,7 @@ export class ReportsPageComponent {
 
   protected readonly range = this.userPreferences.netWorthRange;
   protected readonly showBreakdown = this.userPreferences.netWorthShowBreakdown;
+  protected readonly privacyMasked = this.userPreferences.financesPrivacyMasked;
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
 
@@ -183,12 +186,10 @@ export class ReportsPageComponent {
     const lastValue = response.points[response.points.length - 1].value;
     if (lastValue == null) return '—';
     const symbol = response.displayCurrencySymbol ?? null;
-    return new Intl.NumberFormat(undefined, {
-      style: symbol ? 'currency' : 'decimal',
-      currency: symbol ?? undefined,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(lastValue);
+    return formatNetWorthValue(lastValue, symbol, this.privacyMasked(), {
+      minFraction: 0,
+      maxFraction: 2,
+    });
   });
 
   protected readonly subtitleText = computed(() => {

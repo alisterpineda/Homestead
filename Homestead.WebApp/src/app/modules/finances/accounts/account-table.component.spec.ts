@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { AccountTableComponent } from './account-table.component';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
@@ -49,6 +50,7 @@ describe('AccountTableComponent', () => {
         provideRouter([]),
       ],
     });
+    TestBed.inject(UserPreferencesService).financesPrivacyMasked.set(false);
   });
 
   function setup(

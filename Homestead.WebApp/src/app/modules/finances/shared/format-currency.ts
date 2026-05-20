@@ -29,6 +29,47 @@ export function formatCurrency(
   return `${formatted} ${commodity.symbol}`;
 }
 
+// Render a value with all digit characters replaced by '•', preserving the
+// currency symbol, grouping marks, and decimal mark so the result still reads
+// as currency at a glance (e.g. "$•••••.••", "CA$•••••.••", "••••• VEQT").
+export function formatMaskedCurrency(
+  value: number,
+  commodity: CommodityResponse,
+  masked: boolean,
+  locale?: string,
+): string {
+  if (!masked) return formatCurrency(value, commodity, locale);
+  const precision = commodity.displayPrecision ?? 2;
+  if (commodity.kind === 'Currency') {
+    try {
+      const parts = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: commodity.symbol,
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision,
+      }).formatToParts(value);
+      return parts.map(maskDigitPart).join('');
+    } catch {
+      // Unknown currency code (shouldn't happen for ISO 4217, but defensive).
+    }
+  }
+  const parts = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: precision,
+    maximumFractionDigits: precision,
+  }).formatToParts(value);
+  return `${parts.map(maskDigitPart).join('')} ${commodity.symbol}`;
+}
+
+// Sign chars are stripped so the masked output is constant-width and doesn't
+// reveal whether the value is negative.
+export function maskDigitPart(part: Intl.NumberFormatPart): string {
+  if (part.type === 'integer' || part.type === 'fraction') {
+    return '•'.repeat(part.value.length);
+  }
+  if (part.type === 'minusSign' || part.type === 'plusSign') return '';
+  return part.value;
+}
+
 // HTML <input type="number"> step matching a commodity's display precision.
 // CAD (precision 2) → "0.01"; VEQT (precision 4) → "0.0001"; integer → "1".
 export function commodityStep(commodity: CommodityResponse | null): string {
