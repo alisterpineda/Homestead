@@ -14,7 +14,7 @@ import { FinancesReportsApiService } from '@/api/services/finances-reports-api.s
 import { FinanceSettingsService } from '../shared/finance-settings.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
-import { localIsoDate } from '../shared/date';
+import { localIsoDate, localEndOfTodayIso } from '../shared/date';
 import { RangeSelectorComponent } from './range-selector.component';
 import { NetWorthChartComponent } from './net-worth-chart.component';
 import { NetWorthEmptyStateComponent } from './net-worth-empty-state.component';
@@ -144,10 +144,11 @@ export class ReportsPageComponent {
         this.error.set(false);
       }),
       switchMap(pref => {
-        const params = pref.kind === 'All'
+        const base = pref.kind === 'All'
           ? { Range: 'All' as const }
           : this.customRangeParams();
-        if (!params) return EMPTY;
+        if (!base) return EMPTY;
+        const params = { ...base, AsOf: localEndOfTodayIso() };
         return this.reportsApi.getNetWorthHistory(params).pipe(
           tap(() => this.loading.set(false)),
           handleQueryError(this.loading, this.error, null),

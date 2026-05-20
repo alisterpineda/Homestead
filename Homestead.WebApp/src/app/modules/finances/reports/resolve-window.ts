@@ -50,12 +50,14 @@ export function resolveWindow(pref: NetWorthRangePref, today: Date): ResolvedWin
 }
 
 // Calendar-aligned window of the last N calendar months including the current
-// month. Mirrors the backend's PriorCalendarMonthsWindow.
+// month. Mirrors the backend's PriorCalendarMonthsWindow. The end-of-month
+// upper bound is clamped to `today` so the chart axis doesn't extend past
+// today into empty future days.
 function priorCalendarMonthsWindow(today: Date, months: number): ResolvedWindow {
   const year = today.getFullYear();
   const month = today.getMonth();
   const from = new Date(year, month - (months - 1), 1);
-  // (year, month + 1, 0) → last day of current month
-  const to = new Date(year, month + 1, 0);
+  const endOfMonth = new Date(year, month + 1, 0);
+  const to = endOfMonth > today ? today : endOfMonth;
   return { from, to };
 }

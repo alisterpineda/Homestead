@@ -557,4 +557,51 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
                 ToDate = new DateOnly(2026, 1, 1),
             }, Ct));
     }
+
+    [Fact]
+    public async Task Custom_FutureToDate_ClampsToAsOf()
+    {
+        // AsOf is mid-month; ToDate sits at end of a future month. The clamp
+        // must keep every point at or before AsOf and pin response.To to AsOf.
+        var asOf = new DateTimeOffset(2026, 5, 15, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2026, 2, 10, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 5, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery
+            {
+                Range = NetWorthRange.Custom,
+                AsOf = asOf,
+                FromDate = new DateOnly(2026, 2, 15),
+                ToDate = new DateOnly(2026, 8, 31),
+            }, Ct);
+
+        Assert.Equal(asOf, resp.To);
+        Assert.All(resp.Points, p => Assert.True(p.AsOf <= asOf,
+            $"Point {p.AsOf} exceeded AsOf {asOf}"));
+        Assert.Equal(asOf, resp.Points[^1].AsOf);
+        Assert.Equal(150m, resp.Points[^1].Value);
+    }
+
+    [Fact]
+    public async Task ThreeMonths_MidMonthAsOf_ClampsToAsOf()
+    {
+        // ThreeMonths normally extends to end-of-current-month. With a mid-month
+        // AsOf the clamp must trim future days so no point sits past AsOf.
+        var asOf = new DateTimeOffset(2026, 5, 15, 23, 59, 59, TimeSpan.Zero);
+        var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
+        await AddSplitAsync(cash.Id, _cad.Id, 100m, new DateTimeOffset(2026, 3, 5, 12, 0, 0, TimeSpan.Zero));
+        await AddSplitAsync(cash.Id, _cad.Id, 50m, new DateTimeOffset(2026, 4, 20, 12, 0, 0, TimeSpan.Zero));
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var resp = await _sut.Handle(
+            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThreeMonths, AsOf = asOf }, Ct);
+
+        Assert.Equal(asOf, resp.To);
+        Assert.All(resp.Points, p => Assert.True(p.AsOf <= asOf,
+            $"Point {p.AsOf} exceeded AsOf {asOf}"));
+        Assert.Equal(new DateTime(2026, 5, 15), resp.Points[^1].AsOf.UtcDateTime.Date);
+    }
 }

@@ -49,7 +49,9 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
 
         var (from, resolvedTo, granularity) = ResolveRange(
             request.Range, request.FromDate, request.ToDate, to, firstAt.Value);
-        to = resolvedTo;
+        // Preset month windows extend to end-of-current-month and Custom accepts any
+        // ToDate; clamp so we never emit future-dated points.
+        to = resolvedTo > to ? to : resolvedTo;
         var cutoffs = GenerateCutoffs(from, to, granularity);
 
         var ctx = await valuations.LoadContextAsync(to, ct);
