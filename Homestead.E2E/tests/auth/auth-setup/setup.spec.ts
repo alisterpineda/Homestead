@@ -59,10 +59,19 @@ setup(
 
     // 4. Disable the finances privacy mask so existing balance assertions read
     //    unmasked values. The default-on mask is correct for real users but
-    //    breaks tests that grep for numeric balance text.
-    await page.evaluate(() =>
-      localStorage.setItem('homestead-finances-privacy-masked', 'false'),
-    );
+    //    breaks tests that grep for numeric balance text. A revealed-at anchor
+    //    is required too — FinancesPrivacyAutoMaskService treats a missing or
+    //    >5-min-old anchor as stale and re-masks on cold start. Stamping a
+    //    far-future timestamp keeps every dependent test fresh regardless of
+    //    how long the overall suite takes.
+    await page.evaluate(() => {
+      const FAR_FUTURE = Date.now() + 365 * 24 * 60 * 60 * 1000;
+      localStorage.setItem('homestead-finances-privacy-masked', 'false');
+      localStorage.setItem(
+        'homestead-finances-privacy-revealed-at',
+        JSON.stringify(FAR_FUTURE),
+      );
+    });
 
     // 5. Persist the admin's authenticated browser state for workflow tests
     await page.context().storageState({ path: AUTH_STATE.adminPath });
