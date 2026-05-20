@@ -16,6 +16,7 @@ import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
+import { FinancesPrivacyAutoMaskService } from '@/modules/finances/shared/finances-privacy-auto-mask.service';
 import { getModuleByPath } from '@/modules/registry';
 
 @Component({
@@ -168,6 +169,7 @@ export class AppShellComponent {
 
   constructor() {
     this.processingHub.connect();
+    inject(FinancesPrivacyAutoMaskService);
 
     // Auto-clear header actions on navigation to prevent stale buttons
     this.router.events
