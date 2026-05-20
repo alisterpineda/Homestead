@@ -6,13 +6,12 @@ import { waitForProcessingComplete } from './processing';
 const FIXTURES_DIR = path.resolve(__dirname, '../../fixtures/files');
 
 // IncludeChildTags is required by the GetDocuments endpoint binder (non-nullable bool).
-// PageSize=100 matches the server-side cap (PaginatedRequest clamps PageSize to ≤100).
 const LIST_DOCUMENTS_URL = '/api/v1/documents?Page=1&PageSize=100&IncludeChildTags=false';
 
 /**
  * Drain a paginated list endpoint by repeatedly fetching the first page and bulk-deleting
- * its ids. Each iteration deletes up to the server's PageSize cap (100), so this works for
- * arbitrary backlogs without leaking residue.
+ * its ids. Each iteration deletes up to the requested PageSize, so this works for arbitrary
+ * backlogs without leaking residue.
  */
 async function bulkDeleteAll(
   request: APIRequestContext,

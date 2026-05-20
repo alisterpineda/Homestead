@@ -14,6 +14,6 @@ public record PaginatedRequest
     public int PageSize
     {
         get => _pageSize;
-        init => _pageSize = value < 1 ? 1 : value > 100 ? 100 : value;
+        init => _pageSize = value < 1 ? 1 : value > 1000 ? 1000 : value;
     }
 }
