@@ -29,6 +29,7 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
+import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -47,9 +48,8 @@ import type { CommodityPriceSource } from '@/api/generated/models/commodity-pric
 import type { CommodityPriceSortBy } from '@/api/generated/models/commodity-price-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import type { PaginatedResponseOfCommodityPriceResponse } from '@/api/generated/models/paginated-response-of-commodity-price-response';
+import type { PriceSourceSummary } from '@/api/generated/models/price-source-summary';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-
-const ALL_SOURCES: readonly CommodityPriceSource[] = ['Manual', 'Transaction', 'BankOfCanada', 'AlphaVantage'];
 
 const isCommodityPriceSource = (v: string): v is CommodityPriceSource =>
   v === 'Manual' || v === 'Transaction' || v === 'BankOfCanada' || v === 'AlphaVantage';
@@ -118,14 +118,19 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
             <div role="group" aria-labelledby="prices-source-filter-label" class="p-3">
               <div id="prices-source-filter-label" class="text-xs font-medium text-muted-foreground mb-2">Source</div>
               <div class="flex flex-col gap-2">
-                @for (src of allSources; track src) {
+                @for (src of allSources(); track src) {
                   <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
                     <hlm-checkbox
                       [checked]="isSourceChecked(src)"
                       (checkedChange)="onSourceToggle(src, $event === true)"
                       [aria-label]="'Toggle ' + sourceLabel(src) + ' filter'"
                     />
-                    <span>{{ sourceLabel(src) }}</span>
+                    <span>
+                      {{ sourceLabel(src) }}
+                      @if (disabledSources().has(src)) {
+                        <span class="text-muted-foreground">(disabled)</span>
+                      }
+                    </span>
                   </label>
                 }
               </div>
@@ -265,6 +270,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           [sortBy]="sortBy()"
           [sortDir]="sortDir()"
           [selectedIds]="selectedPriceIds()"
+          [disabledSources]="disabledSources()"
           [formatPriceAt]="formatPriceAt"
           [quoteSymbol]="quoteSymbol"
           [formatRate]="formatRate"
@@ -318,8 +324,6 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
 export class CommodityPricesSectionComponent {
   commodity = input.required<CommodityResponse>();
 
-  readonly allSources = ALL_SOURCES;
-
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
@@ -346,12 +350,41 @@ export class CommodityPricesSectionComponent {
 
   private commodityApi = inject(FinancesCommodityApiService);
   private priceApi = inject(FinancesCommodityPriceApiService);
+  private priceSourcesApi = inject(FinancesPriceSourcesApiService);
   private errorHandler = inject(ErrorHandlerService);
   private prefs = inject(UserPreferencesService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private pricesState = inject(CommodityPricesStateService);
   private destroyRef = inject(DestroyRef);
+
+  priceSources = toSignal(
+    this.priceSourcesApi.list().pipe(
+      map(r => r.items),
+      catchError(() => of([] as PriceSourceSummary[])),
+    ),
+    { initialValue: [] as PriceSourceSummary[] },
+  );
+
+  allSources = computed<CommodityPriceSource[]>(() =>
+    this.priceSources().map(s => s.source)
+  );
+
+  disabledSources = computed<Set<CommodityPriceSource>>(() => {
+    const set = new Set<CommodityPriceSource>();
+    for (const s of this.priceSources()) {
+      if (!s.isEnabled) set.add(s.source);
+    }
+    return set;
+  });
+
+  private sourceLabelMap = computed<Map<CommodityPriceSource, string>>(() => {
+    const map = new Map<CommodityPriceSource, string>();
+    for (const s of this.priceSources()) {
+      map.set(s.source, s.displayName);
+    }
+    return map;
+  });
 
   page = toSignal(
     this.route.queryParamMap.pipe(map(p => Number(p.get('page') ?? 1) || 1)),
@@ -549,18 +582,13 @@ export class CommodityPricesSectionComponent {
   }
 
   sourceLabel(src: CommodityPriceSource): string {
-    switch (src) {
-      case 'Manual': return 'Manual';
-      case 'Transaction': return 'Transaction';
-      case 'BankOfCanada': return 'Bank of Canada';
-      case 'AlphaVantage': return 'Alpha Vantage';
-    }
+    return this.sourceLabelMap().get(src) ?? src;
   }
 
   onSourceToggle(src: CommodityPriceSource, checked: boolean): void {
     const current = new Set(this.sources());
     if (checked) current.add(src); else current.delete(src);
-    const next = ALL_SOURCES.filter(s => current.has(s));
+    const next = this.allSources().filter(s => current.has(s));
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

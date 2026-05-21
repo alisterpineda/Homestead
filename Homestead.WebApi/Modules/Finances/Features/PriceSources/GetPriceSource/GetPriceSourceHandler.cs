@@ -66,7 +66,7 @@ public class GetPriceSourceHandler(
             Source = request.Source,
             DisplayName = request.Source.DisplayName(),
             Kind = kind,
-            IsEnabled = kind == CommodityPriceSourceKind.External ? settings?.IsEnabled ?? false : true,
+            IsEnabled = CommodityPriceSourceQueryExtensions.IsEnabledSource(request.Source, settings),
             Config = configJson,
             PairAllowList = pairAllowList,
             LastImportAt = settings?.LastImportAt,

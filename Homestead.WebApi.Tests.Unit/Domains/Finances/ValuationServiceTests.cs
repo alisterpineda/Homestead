@@ -50,8 +50,15 @@ public class ValuationServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync();
     }
 
-    private async Task AddPriceAsync(Guid commodityId, Guid quoteId, decimal rate, DateTimeOffset priceAt)
+    private async Task AddPriceAsync(
+        Guid commodityId,
+        Guid quoteId,
+        decimal rate,
+        DateTimeOffset priceAt,
+        CommodityPriceSource source = default,
+        DateTimeOffset? createdAt = null)
     {
+        var stamp = createdAt ?? DateTimeOffset.UtcNow;
         _db.CommodityPrices.Add(new CommodityPrice
         {
             Id = Guid.NewGuid(),
@@ -59,6 +66,19 @@ public class ValuationServiceTests : IAsyncLifetime
             QuoteCurrencyId = quoteId,
             Rate = rate,
             PriceAt = priceAt,
+            Source = source,
+            CreatedAt = stamp,
+            UpdatedAt = stamp,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    private async Task SetSourceEnabledAsync(CommodityPriceSource source, bool isEnabled)
+    {
+        _db.CommodityPriceSourceSettings.Add(new CommodityPriceSourceSettings
+        {
+            Source = source,
+            IsEnabled = isEnabled,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
@@ -338,5 +358,78 @@ public class ValuationServiceTests : IAsyncLifetime
 
         Assert.Equal(100m, batched[a1.Id].DisplayValue);
         Assert.Equal(260m, batched[a2.Id].DisplayValue);
+    }
+
+    [Fact]
+    public async Task LoadContext_DisabledExternalSource_IsExcludedThenReincludedWhenEnabled()
+    {
+        // BankOfCanada price exists, but the source is disabled → should not be used.
+        var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.35m, priceAt, CommodityPriceSource.BankOfCanada);
+        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: false);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var ctxDisabled = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
+        Assert.Null(ctxDisabled.ConvertToDisplay(_usd.Id, 100m));
+
+        // Toggle on → restored.
+        var settings = _db.CommodityPriceSourceSettings
+            .Single(s => s.Source == CommodityPriceSource.BankOfCanada);
+        settings.IsEnabled = true;
+        await _db.SaveChangesAsync();
+
+        var ctxEnabled = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(135m, ctxEnabled.ConvertToDisplay(_usd.Id, 100m));
+    }
+
+    [Fact]
+    public async Task LoadContext_SamePriceAt_ManualOutranksTransactionOutranksExternal()
+    {
+        var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
+        // Insert in an order that does NOT match the spec priority — depending on
+        // insertion order would otherwise yield the wrong winner.
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.10m, priceAt, CommodityPriceSource.BankOfCanada);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.20m, priceAt, CommodityPriceSource.Transaction);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.30m, priceAt, CommodityPriceSource.Manual);
+        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var ctx = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
+
+        // Manual wins.
+        Assert.Equal(130m, ctx.ConvertToDisplay(_usd.Id, 100m));
+    }
+
+    [Fact]
+    public async Task LoadContext_SamePriceAtAndKind_MostRecentlyCreatedWins()
+    {
+        var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
+        var earlier = DateTimeOffset.UtcNow.AddHours(-2);
+        var later = DateTimeOffset.UtcNow.AddHours(-1);
+
+        // Both Manual at the same PriceAt — most-recently-created (later) should win.
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.10m, priceAt, CommodityPriceSource.Manual, createdAt: earlier);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.20m, priceAt, CommodityPriceSource.Manual, createdAt: later);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var ctx = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(120m, ctx.ConvertToDisplay(_usd.Id, 100m));
+    }
+
+    [Fact]
+    public async Task LoadContext_ManualOverrideAtSamePriceAtAsExternal_IsUsedForValuation()
+    {
+        // Durable Manual override workflow: an imported external row and a Manual row at the
+        // same instant — valuation must use the Manual rate.
+        var priceAt = DateTimeOffset.UtcNow.AddDays(-1);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.35m, priceAt, CommodityPriceSource.BankOfCanada);
+        await AddPriceAsync(_usd.Id, _cad.Id, 1.40m, priceAt, CommodityPriceSource.Manual);
+        await SetSourceEnabledAsync(CommodityPriceSource.BankOfCanada, isEnabled: true);
+        await SetDisplayCurrencyAsync(_cad.Id);
+
+        var ctx = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(140m, ctx.ConvertToDisplay(_usd.Id, 100m));
     }
 }

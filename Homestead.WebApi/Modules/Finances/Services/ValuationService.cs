@@ -19,20 +19,30 @@ public class ValuationService(AppDbContext db) : IValuationService
         var settings = await FinanceSettings.LoadAsync(db, ct);
         var displayCurrencyId = settings.DisplayCurrencyId;
 
+        var activeSources = await CommodityPriceSourceQueryExtensions.GetEnabledSourcesAsync(db, ct);
+
         var prices = await db.CommodityPrices
             .AsNoTracking()
-            .Where(p => p.PriceAt <= asOf)
-            .OrderBy(p => p.PriceAt)
+            .Where(p => p.PriceAt <= asOf && activeSources.Contains(p.Source))
             .ToListAsync(ct);
+
+        // Same-PriceAt tiebreaker: Manual > Transaction > External, then most-recently-created wins.
+        // Ordering ascending by (PriceAt, TiebreakerRank, CreatedAt) puts the spec-correct winner
+        // last in each group, which is what FindAtOrBefore's "rightmost <= asOf" binary search
+        // returns.
+        var sorted = prices
+            .OrderBy(p => p.PriceAt)
+            .ThenBy(p => p.Source.TiebreakerRank())
+            .ThenBy(p => p.CreatedAt)
+            .ToList();
 
         var table = new Dictionary<(Guid, Guid), IReadOnlyList<CommodityPrice>>();
         var ids = new HashSet<Guid>();
-        foreach (var group in prices.GroupBy(p => (p.CommodityId, p.QuoteCurrencyId)))
+        foreach (var group in sorted.GroupBy(p => (p.CommodityId, p.QuoteCurrencyId)))
         {
-            // Already ordered ascending by PriceAt from the query.
             table[group.Key] = group.ToList();
         }
-        foreach (var p in prices)
+        foreach (var p in sorted)
         {
             ids.Add(p.CommodityId);
             ids.Add(p.QuoteCurrencyId);

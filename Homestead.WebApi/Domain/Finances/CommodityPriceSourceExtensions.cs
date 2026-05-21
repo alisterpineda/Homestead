@@ -20,6 +20,18 @@ public static class CommodityPriceSourceExtensions
         _ => throw new ArgumentOutOfRangeException(nameof(source), source, $"Unsupported price source: {source}"),
     };
 
+    /// <summary>
+    /// Same-PriceAt tiebreaker rank: External (0) → Transaction (1) → Manual (2).
+    /// Higher rank wins ties — Manual is the durable override per commodities.md §"Same-PriceAt tiebreaker".
+    /// </summary>
+    public static int TiebreakerRank(this CommodityPriceSource source) => source.Kind() switch
+    {
+        CommodityPriceSourceKind.External => 0,
+        CommodityPriceSourceKind.Transaction => 1,
+        CommodityPriceSourceKind.Manual => 2,
+        _ => 0,
+    };
+
     public static string DisplayName(this CommodityPriceSource source) => source switch
     {
         CommodityPriceSource.Transaction => "Transaction",

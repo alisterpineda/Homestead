@@ -27,6 +27,7 @@ import {
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { TableHeadSelection, TableRowSelection } from '../../documents/list/document-table/selection-column';
 import type { CommodityPriceResponse } from '@/api/generated/models/commodity-price-response';
+import type { CommodityPriceSource } from '@/api/generated/models/commodity-price-source';
 import type { CommodityPriceSortBy } from '@/api/generated/models/commodity-price-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 
@@ -48,6 +49,7 @@ interface PricesTableMeta {
   formatPriceAt: (iso: string) => string;
   quoteSymbol: (id: string) => string;
   formatRate: (price: CommodityPriceResponse) => string;
+  isSourceDisabled: (source: CommodityPriceSource) => boolean;
   onEdit: (price: CommodityPriceResponse) => void;
   onDelete: (price: CommodityPriceResponse) => void;
 }
@@ -96,28 +98,42 @@ export class CommodityPriceRateCell {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmBadgeImports],
   template: `
-    @switch (price.source) {
-      @case ('Manual') {
-        <span hlmBadge variant="outline">Manual</span>
+    <span class="inline-flex items-center gap-1.5" [class.opacity-60]="isDisabled">
+      @switch (price.source) {
+        @case ('Manual') {
+          <span hlmBadge variant="outline">Manual</span>
+        }
+        @case ('Transaction') {
+          <span hlmBadge variant="secondary" title="Edited via the source transaction.">Transaction</span>
+        }
+        @case ('BankOfCanada') {
+          <span hlmBadge variant="secondary" title="Imported from the Bank of Canada.">Bank of Canada</span>
+        }
+        @case ('AlphaVantage') {
+          <span hlmBadge variant="secondary" title="Imported from Alpha Vantage.">Alpha Vantage</span>
+        }
+        @default {
+          <span hlmBadge variant="secondary">{{ price.source }}</span>
+        }
       }
-      @case ('Transaction') {
-        <span hlmBadge variant="secondary" title="Edited via the source transaction.">Transaction</span>
+      @if (isDisabled) {
+        <span
+          hlmBadge
+          variant="outline"
+          class="text-muted-foreground"
+          title="This source is disabled. Prices from it are not contributing to net worth."
+        >Not contributing</span>
       }
-      @case ('BankOfCanada') {
-        <span hlmBadge variant="secondary" title="Imported from the Bank of Canada.">Bank of Canada</span>
-      }
-      @case ('AlphaVantage') {
-        <span hlmBadge variant="secondary" title="Imported from Alpha Vantage.">Alpha Vantage</span>
-      }
-      @default {
-        <span hlmBadge variant="secondary">{{ price.source }}</span>
-      }
-    }
+    </span>
   `,
 })
 export class CommodityPriceSourceCell {
   private readonly ctx = injectFlexRenderContext<CellContext<CommodityPriceResponse, unknown>>();
   protected get price(): CommodityPriceResponse { return this.ctx.row.original; }
+  protected get isDisabled(): boolean {
+    const meta = this.ctx.table.options.meta as PricesTableMeta;
+    return meta.isSourceDisabled(this.price.source);
+  }
 }
 
 @Component({
@@ -216,6 +232,7 @@ export class CommodityPricesTableComponent {
   sortBy = input<CommodityPriceSortBy | null | undefined>(null);
   sortDir = input<SortDirection | null | undefined>(null);
   selectedIds = input<Set<string>>();
+  disabledSources = input<Set<CommodityPriceSource>>(new Set());
   formatPriceAt = input.required<(iso: string) => string>();
   quoteSymbol = input.required<(id: string) => string>();
   formatRate = input.required<(price: CommodityPriceResponse) => string>();
@@ -232,6 +249,7 @@ export class CommodityPricesTableComponent {
     formatPriceAt: (iso) => this.formatPriceAt()(iso),
     quoteSymbol: (id) => this.quoteSymbol()(id),
     formatRate: (p) => this.formatRate()(p),
+    isSourceDisabled: (src) => this.disabledSources().has(src),
     onEdit: (p) => this.edit.emit(p),
     onDelete: (p) => this.delete.emit(p),
   };
