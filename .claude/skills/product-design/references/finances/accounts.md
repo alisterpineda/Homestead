@@ -67,7 +67,7 @@ A single modal, not a wizard. The kind picker plus the form body fits comfortabl
 
 **Kind-dependent:**
 
-- **Cash, Credit Card, Loan, Other Liability, Other Asset:** require an initial **amount** and **as-of date**. The user enters a positive number; the server applies sign conventions. Default as-of date is today; the server accepts dates up to one day past UTC today to tolerate timezone drift between client and server (Homestead supports cross-timezone households). No "skip" affordance — users who don't know the current balance can enter 0 and edit later.
+- **Cash, Credit Card, Loan, Other Liability, Other Asset:** require an initial **amount** and **as-of date**. The user enters a positive number; the server applies sign conventions. Default as-of date is today; the server accepts dates up to one day past UTC today to tolerate timezone drift between client and server (Homestead supports cross-timezone households). No "skip" affordance — users who don't know the current balance can enter 0; no opening-balance transaction is recorded in that case, and they can add one later via *Add opening balance* on the account detail page.
 - **Investment:** no initial balance field at creation. Positions are added afterward via the *Add position* action on the account detail page.
 
 **Post-submit:** navigate to the account detail page.
