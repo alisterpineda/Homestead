@@ -32,12 +32,14 @@ Users never pick `Asset`/`Liability` or "multi-position" directly. They pick a *
 
 ## System accounts
 
-Two system-created equity accounts always exist for each household:
+Four system-created accounts always exist for each household:
 
-- **Equity:Opening Balances** — counterpart for wealth present before tracking began.
-- **Equity:Adjustments** — counterpart for unexplained balance-entry deltas.
+- **Equity:Opening Balances** (`AccountType=Equity`) — counterpart for wealth present before tracking began.
+- **Equity:Adjustments** (`AccountType=Equity`) — counterpart for unexplained balance-entry deltas.
+- **Income** (`AccountType=Income`) — counterpart for cash dividends in v1. Subsumed by user-created income accounts in v2; see [transactions.md](transactions.md#system-accounts-used-as-counterparts).
+- **Expense** (`AccountType=Expense`) — reserved for symmetry; no v1 shape posts to it. Seeded so v2 doesn't have to backfill it.
 
-Both are multi-position (they must be able to hold opening balances and adjustments in any commodity) and hidden from the account list.
+All four are multi-position (postings can be in any commodity) and hidden from the account list.
 
 ## Sign convention (Beancount-style)
 
