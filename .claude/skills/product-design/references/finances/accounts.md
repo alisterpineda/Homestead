@@ -185,3 +185,23 @@ Archived accounts render read-only. Primary actions disappear; Edit and Unarchiv
 **Archive / Unarchive:** toggles the `IsArchived` flag. Archived accounts are read-only; balance-entry, transaction, and add-position actions are not offered.
 
 **Delete:** allowed only when the account has zero transactions (opening balance included). Otherwise the menu offers Archive only.
+
+## Privacy mask
+
+A user-toggleable mask that hides every numeric value across the Finances module, for use in shared / over-the-shoulder settings.
+
+**Toggle.** Eye / eye-off icon button in the Finances page header (lives in the layout component, so it appears on every Finances route — Accounts list and detail, Positions tab, Reports, Commodities). Pressing toggles between masked and revealed.
+
+**Scope.** All numeric surfaces in Finances render through a single helper that respects the toggle: account list balances, group / net-worth totals, account-detail header balance, Activity row amounts, Positions tab (quantity, native value, display value, share), the net-worth chart, and reports. Non-numeric data (names, dates, kinds, currency codes) is never masked.
+
+**Mask format.** Digit characters in the formatted output are replaced with U+2022 (`•`), preserving the currency symbol, grouping marks (`,`), decimal mark (`.`), and the trailing security symbol for non-currency commodities — e.g. `$1,234.56` → `$•,•••.••`, `100 VEQT` → `••• VEQT`. Sign characters are stripped so the masked output is constant-width and does not reveal whether the value is negative.
+
+**Persistence.** The masked/revealed state survives across sessions (`localStorage`).
+
+**Auto-remask.** Once revealed, the mask re-engages automatically after **5 minutes of inactivity** (no pointer / wheel / touch / keyboard activity). A "revealed-at" anchor is refreshed in `localStorage` on activity (throttled to once per 30s) and on page hide; on cold start, if the anchor is missing or older than the timeout, the mask is re-applied before any value is rendered. Switching tabs counts as idle — returning to the tab after >5 min hidden re-masks immediately.
+
+**Default.** Masked. New sessions and stale resumes start in the masked state; the user must explicitly press the toggle to reveal.
+
+### Font rendering note: the leading bullet sits higher
+
+A consequence of using `•` as the mask glyph with the Inter font: in strings like `CA$•,•••.••`, the **first** bullet renders visibly higher than the rest. This is not a bug — Inter ships a case-sensitive form of U+2022 that shifts up to cap-height when shaped adjacent to all-caps text or `$`. Only the bullet touching `CA$` triggers the shift; subsequent bullets (flanked by `,`, `.`, or other bullets) stay at the default x-height. The masking code emits identical U+2022 characters; the visual offset is introduced by the font's OpenType shaping. Acceptable as-is in v1. If the inconsistency ever needs to be removed, options are (a) switch the mask glyph to one without case-sensitive forms in Inter (e.g. `●` U+25CF), or (b) disable the case feature on masked spans via `font-feature-settings` — both untested.
