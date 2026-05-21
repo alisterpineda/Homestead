@@ -12,7 +12,6 @@ public enum TransactionShape
     Transfer,
     OpeningBalance,
     BalanceEntry,
-    StockSplit,
     Other,
 }
 

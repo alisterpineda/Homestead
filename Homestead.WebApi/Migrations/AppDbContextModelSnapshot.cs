@@ -1139,13 +1139,6 @@ namespace Homestead.WebApi.Migrations
                     b.HasDiscriminator().HasValue("OpeningBalance");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.StockSplitTransaction", b =>
-                {
-                    b.HasBaseType("Homestead.WebApi.Domain.Finances.AccountTransaction");
-
-                    b.HasDiscriminator().HasValue("StockSplit");
-                });
-
             modelBuilder.Entity("Homestead.WebApi.Domain.Documents.Document", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")

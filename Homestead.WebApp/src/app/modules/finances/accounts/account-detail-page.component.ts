@@ -387,7 +387,7 @@ export class AccountDetailPageComponent implements OnDestroy {
       case 'OpeningBalance':
         this.openOpeningBalanceEditor(tx);
         break;
-      // StockSplit and 'Other' are read-only on single-position account surfaces.
+      // 'Other' is read-only on single-position account surfaces.
     }
   }
 

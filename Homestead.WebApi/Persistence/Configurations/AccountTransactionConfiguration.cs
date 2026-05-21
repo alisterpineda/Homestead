@@ -26,8 +26,7 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
         builder.HasDiscriminator(t => t.Type)
             .HasValue<NormalTransaction>(TransactionType.Normal)
             .HasValue<OpeningBalanceTransaction>(TransactionType.OpeningBalance)
-            .HasValue<BalanceEntryTransaction>(TransactionType.BalanceEntry)
-            .HasValue<StockSplitTransaction>(TransactionType.StockSplit);
+            .HasValue<BalanceEntryTransaction>(TransactionType.BalanceEntry);
 
         builder.Property(t => t.CreatedAt)
             .IsRequired()

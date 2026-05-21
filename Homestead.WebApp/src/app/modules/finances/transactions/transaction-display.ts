@@ -16,7 +16,6 @@ export function shapeLabel(shape: TransactionShape): string {
     case 'Transfer': return 'Transfer';
     case 'BalanceEntry': return 'Balance entry';
     case 'OpeningBalance': return 'Opening balance';
-    case 'StockSplit': return 'Stock split';
     case 'Other': return 'Transaction';
   }
 }
@@ -26,7 +25,6 @@ export function shapeIconName(shape: TransactionShape): string {
     case 'Transfer': return 'lucideArrowRightLeft';
     case 'BalanceEntry': return 'lucideScale';
     case 'OpeningBalance': return 'lucideFlag';
-    case 'StockSplit': return 'lucideSplit';
     case 'Other': return 'lucideCircleDashed';
   }
 }

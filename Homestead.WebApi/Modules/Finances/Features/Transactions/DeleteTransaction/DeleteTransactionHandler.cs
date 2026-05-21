@@ -34,8 +34,6 @@ public class DeleteTransactionHandler(
                     "Opening-balance transactions must be deleted via the opening-balance endpoint."),
             TransactionType.Normal =>
                 (await transfers.DeleteAsync(request.TransactionId, ct)).TouchedPairs,
-            TransactionType.StockSplit => throw new BusinessRuleException(
-                "Stock-split transaction deletion is not supported in v1."),
             _ => throw new BusinessRuleException(
                 $"Deletion is not supported for transactions of type {probeType}."),
         };

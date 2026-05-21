@@ -16,7 +16,6 @@ import {
   lucideArrowRightLeft,
   lucideScale,
   lucideFlag,
-  lucideSplit,
   lucideCircleDashed,
   lucideChevronLeft,
   lucideChevronRight,
@@ -73,7 +72,7 @@ interface ActivityRowViewModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports],
   providers: [provideIcons({
-    lucideArrowRightLeft, lucideScale, lucideFlag, lucideSplit, lucideCircleDashed,
+    lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
   })],
   template: `
     <div class="flex items-center gap-2">
@@ -125,7 +124,7 @@ class ActivityAmountCell {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, FlexRenderDirective],
   providers: [provideIcons({
-    lucideArrowRightLeft, lucideScale, lucideFlag, lucideSplit, lucideCircleDashed,
+    lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideListTodo,
   })],
   template: `

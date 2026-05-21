@@ -65,7 +65,6 @@ public class GetTransactionsHandler(AppDbContext db)
         IQueryable<AccountTransaction> query, TransactionShape shape) => shape switch
     {
         TransactionShape.BalanceEntry => query.OfType<BalanceEntryTransaction>(),
-        TransactionShape.StockSplit => query.OfType<StockSplitTransaction>(),
         TransactionShape.OpeningBalance => query.OfType<OpeningBalanceTransaction>(),
         // Mirrors TransactionMapping.ResolveShape: a NormalTransaction is only classified as
         // Transfer when it has exactly two splits. Any other split count maps to Other.

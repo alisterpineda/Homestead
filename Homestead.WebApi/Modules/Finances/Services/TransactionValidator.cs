@@ -12,9 +12,6 @@ public class TransactionValidator : ITransactionValidator
             case BalanceEntryTransaction be:
                 ValidateBalanceEntry(be);
                 break;
-            case StockSplitTransaction:
-                ValidateStockSplit(transaction);
-                break;
             case OpeningBalanceTransaction:
             case NormalTransaction:
                 ValidateNormal(transaction);
@@ -50,26 +47,6 @@ public class TransactionValidator : ITransactionValidator
             if (sum != 0m)
                 throw new BusinessRuleException(
                     $"Transaction splits must balance per commodity (commodity {commodityId} sums to {sum}).");
-        }
-    }
-
-    private static void ValidateStockSplit(AccountTransaction transaction)
-    {
-        var splits = transaction.Splits;
-
-        if (splits.Count < 1)
-            throw new BusinessRuleException("A stock-split transaction must have at least one split.");
-
-        var commodityId = splits.First().CommodityId;
-        foreach (var split in splits)
-        {
-            if (split.CommodityId != commodityId)
-                throw new BusinessRuleException(
-                    "A stock-split transaction's splits must all reference the same commodity.");
-            if (split.Quantity == 0m)
-                throw new BusinessRuleException("A stock-split transaction's splits must have a non-zero quantity.");
-            if (split.UnitPriceRate is not null || split.UnitPriceCommodityId is not null)
-                throw new BusinessRuleException("A stock-split transaction's splits must not carry a price annotation.");
         }
     }
 

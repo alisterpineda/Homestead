@@ -35,7 +35,6 @@ internal static class TransactionMapping
     public static TransactionShape ResolveShape(AccountTransaction transaction) => transaction switch
     {
         BalanceEntryTransaction => TransactionShape.BalanceEntry,
-        StockSplitTransaction => TransactionShape.StockSplit,
         OpeningBalanceTransaction => TransactionShape.OpeningBalance,
         NormalTransaction { Splits.Count: 2 } => TransactionShape.Transfer,
         _ => TransactionShape.Other,

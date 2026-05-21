@@ -94,7 +94,6 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
         {
             TransactionType.OpeningBalance => new OpeningBalanceTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "ob", Type = type },
             TransactionType.BalanceEntry => new BalanceEntryTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "be", Type = type, AssertedQuantity = 0m, AssertedCommodityId = commodityId },
-            TransactionType.StockSplit => new StockSplitTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "ss", Type = type },
             _ => new NormalTransaction { Id = Guid.NewGuid(), OccurredAt = occurredAt, Memo = "txn", Type = type },
         };
         _db.AccountTransactions.Add(txn);
@@ -245,37 +244,6 @@ public class GetNetWorthHistoryHandlerTests : IAsyncLifetime
 
         var openingDay = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 10));
         Assert.Equal(750m, openingDay.Value);
-    }
-
-    [Fact]
-    public async Task StockSplit_DoesNotMoveNetWorth_WhenBothCommoditiesPriced()
-    {
-        // 1:2 split: -1 of pre-split, +2 of post-split. With matching prices on both,
-        // the converted display value is unchanged.
-        var to = new DateTimeOffset(2026, 4, 28, 23, 59, 59, TimeSpan.Zero);
-        var preSplit = new Commodity { Id = Guid.NewGuid(), Symbol = "OLD", Exchange = "NASDAQ", Name = "Old", Kind = CommodityKind.Security, DisplayPrecision = 4 };
-        var postSplit = new Commodity { Id = Guid.NewGuid(), Symbol = "NEW", Exchange = "NASDAQ", Name = "New", Kind = CommodityKind.Security, DisplayPrecision = 4 };
-        _db.Commodities.AddRange(preSplit, postSplit);
-        await _db.SaveChangesAsync();
-
-        var inv = await AddAccountAsync(AccountKind.Investment, _cad.Id);
-        // Acquire 10 of preSplit at 2 CAD each.
-        await AddSplitAsync(inv.Id, preSplit.Id, 10m, new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero));
-        await AddPriceAsync(preSplit.Id, _cad.Id, 2m, new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero));
-        // Stock split: -10 OLD, +20 NEW (priced at 1 CAD).
-        var splitDate = new DateTimeOffset(2026, 4, 15, 12, 0, 0, TimeSpan.Zero);
-        await AddSplitAsync(inv.Id, preSplit.Id, -10m, splitDate, TransactionType.StockSplit);
-        await AddSplitAsync(inv.Id, postSplit.Id, 20m, splitDate, TransactionType.StockSplit);
-        await AddPriceAsync(postSplit.Id, _cad.Id, 1m, new DateTimeOffset(2026, 4, 15, 0, 0, 0, TimeSpan.Zero));
-        await SetDisplayCurrencyAsync(_cad.Id);
-
-        var resp = await _sut.Handle(
-            new GetNetWorthHistoryQuery { Range = NetWorthRange.ThisMonth, AsOf = to }, Ct);
-
-        // Before split: 10 × 2 = 20 CAD. After split: 20 × 1 = 20 CAD.
-        var beforeSplit = resp.Points.First(p => p.AsOf.UtcDateTime.Date == new DateTime(2026, 4, 14));
-        Assert.Equal(20m, beforeSplit.Value);
-        Assert.Equal(20m, resp.Points[^1].Value);
     }
 
     [Fact]
