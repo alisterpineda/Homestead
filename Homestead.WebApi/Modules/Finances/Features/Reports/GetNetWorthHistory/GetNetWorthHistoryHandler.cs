@@ -19,7 +19,7 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
     {
         ValidateCustomRange(request);
 
-        var to = request.AsOf ?? CurrentDayCutoffUtc();
+        var to = request.AsOf?.ToUniversalTime() ?? CurrentDayCutoffUtc();
 
         var settings = await FinanceSettings.LoadAsync(db, ct);
         if (settings.DisplayCurrencyId is not Guid displayCurrencyId)
