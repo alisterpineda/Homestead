@@ -219,13 +219,33 @@ Failures here are loud: text extraction failure throws `TextExtractionFailedExce
 
 ### `BulkReprocessDocuments` *(parent)*
 
-The only parent-job handler in v1. Triggered by the bulk-reprocess action on the documents list. The handler:
+Triggered by the bulk-reprocess action on the documents list. The handler:
 
 1. Idempotency check: if children already exist for this parent ID (crash recovery), restore `TotalChildCount` and return.
 2. Resolve the latest version per supplied document ID.
 3. Insert one `ReprocessDocumentVersion` child per `(documentId, latestVersionId)` with `ParentJobId = job.Id`.
 4. Set `TotalChildCount = N`, save, and signal the worker.
 5. Return — the parent is left `InProgress`; child completions drive the rest.
+
+### `ClassifyDocument`
+
+Triggered when a document is classified by an AI provider — either manually from the detail page, as part of a bulk classify, or automatically on upload when `AutoClassifyOnUpload` is enabled. The handler:
+
+1. Load the document with its current tags and any pending suggestions.
+2. Resolve the AI provider via `IAiProviderResolver` (explicit ID → settings default → null). If no provider resolves, skip classification but still send a notification.
+3. Load the latest version's `ExtractedText` and all available tags (Id, Name, Path).
+4. Call `IAiClassificationService.ClassifyAsync()` — builds a prompt with the document's name, extracted text, and available tags; parses the structured JSON response.
+5. Clear any prior pending suggestions: revert AI-applied tags, name, and summary to their pre-AI state. Persist deletes before applying new data (two-save pattern to avoid composite key collisions on the `DocumentTag` join table).
+6. Auto-apply the new classification: add AI-suggested tags (skipping tags already on the document), set the suggested title, set the summary. Create one `DocumentSuggestion` record per applied field.
+7. Update the search vector. Send a SignalR notification.
+
+When run as a child of `BulkClassifyDocuments`, the handler suppresses its own success notification — the parent's progress updates are the sole channel.
+
+Sets `EntityType = Document`, `EntityId = documentId`.
+
+### `BulkClassifyDocuments` *(parent)*
+
+Triggered by the bulk-classify action on the documents list. The handler fans out to one `ClassifyDocument` child per document, optionally pinning a specific AI provider. Follows the same idempotent parent pattern as `BulkReprocessDocuments` — checks for existing children on re-entry and short-circuits. Per-document write authorisation is verified before enqueue.
 
 ### `DownloadDocuments`
 

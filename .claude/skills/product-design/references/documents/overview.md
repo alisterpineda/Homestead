@@ -18,10 +18,11 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Linked **parties** — people, organisations, or other entities a document concerns.
 - A user-visible activity stream that interleaves field-level audit log entries and user comments.
 - Trash with restore and permanent-delete (soft-delete only for documents; everywhere else delete is destructive).
-- Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk download.
-- PostgreSQL full-text search across document name (weighted A) and the latest version's extracted text (weighted B), with ILIKE fallbacks on both fields and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
+- Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk classify, bulk download.
+- PostgreSQL full-text search across document name (weighted A), the latest version's extracted text (weighted B), and document summary (weighted C), with ILIKE fallbacks on name and extracted text, and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
 - ZIP download organised by tag path, with a dedicated `_Untagged/` folder and party names embedded in filenames.
 - Household-wide choice of text-extraction engine, with a built-in fallback.
+- AI-powered document classification: user-configured LLM providers classify documents by selecting matching tags, generating a summary, and suggesting a title. Results are auto-applied with per-field approve/decline controls via a generic suggestion system.
 
 ## Out of scope for v1
 
@@ -33,7 +34,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Inline preview / annotation beyond a thumbnail.
 - Version diffs and version revert. (Version *delete* is supported — see [versions.md](versions.md) → *Version delete*.)
 - Document-to-document relationships (supersedes / derived-from / etc.) beyond the party link.
-- Automated tagging, classification, or party detection.
+- Automated party detection.
 - A user-facing field-level change-history view (the audit log already exists and powers the activity stream, but per-field diffs are not surfaced as a separate history surface).
 - Multi-user permissions / per-document ACLs.
 
@@ -43,7 +44,7 @@ These are excluded from v1 but the model must not block adding them later.
 
 ### Document
 
-A document is the unit the user thinks about — "my 2024 lease," "passport," "Q3 brokerage statement." It carries identity and metadata at the document level (Name, Notes, optional DocumentDate, optional ExpiryDate), a set of Tags, a set of linked Parties, and a chain of Versions. Document-level fields are independent of which file is currently the latest version: re-uploading does not re-tag; renaming does not re-upload.
+A document is the unit the user thinks about — "my 2024 lease," "passport," "Q3 brokerage statement." It carries identity and metadata at the document level (Name, Notes, optional DocumentDate, optional ExpiryDate, optional Summary), a set of Tags, a set of linked Parties, and a chain of Versions. Document-level fields are independent of which file is currently the latest version: re-uploading does not re-tag; renaming does not re-upload.
 
 Documents soft-delete to Trash rather than disappearing. Audit fields (`CreatedAt`/`CreatedByUserId`, `UpdatedAt`/`UpdatedByUserId`, `OwnerUserId`, and on soft-delete `DeletedAt`/`DeletedByUserId`) are recorded but not editable.
 
@@ -80,6 +81,18 @@ A document has a single combined **activity stream** that interleaves two source
 
 The activity stream is the user-facing projection of the audit log with comments interleaved. There is no separate field-level diff surface in v1.
 
+### AI classification and suggestions
+
+Documents can be classified by an AI provider — a user-configured LLM endpoint (Azure AI Foundry for v1). Classification takes the document's name and latest version's extracted text, along with all available tags, and returns three outputs: matching tag IDs, a summary, and a suggested title. These are **auto-applied** to the document immediately so the values are useful right away, but each AI-modified field is tracked by a **suggestion** record with approve/decline controls.
+
+The suggestion system is generic — `DocumentSuggestion` tracks any AI-modified field (Tags, Name, Summary) with `Pending → Approved | Declined` status. Approving a suggestion confirms the AI value (it stays applied; the AI indicator disappears). Declining reverts the change: for tags, the AI-applied tag is removed; for name, the document reverts to its original name; for summary, the summary is cleared. Approve-all and decline-all bulk actions are available when multiple suggestions are pending.
+
+Re-classifying a document clears any prior pending suggestions (reverting their changes) before applying new ones. Manual edits to a field auto-decline its pending suggestion — the user has taken explicit ownership.
+
+Classification runs as a background job and can be triggered three ways: manually from the document detail menu, as a bulk action from the list page, or automatically on upload when the household-wide `AutoClassifyOnUpload` setting is enabled and a default AI provider is configured. Auto-classify on upload is fire-and-forget — the upload completes immediately and classification runs as a separate job.
+
+AI providers are managed in Admin (`/admin/ai-providers`) and follow the same CRUD pattern as text-extraction engines. Each provider has a type (Azure AI Foundry for v1), a JSON configuration block (endpoint, API key, deployment name), and an enabled/disabled toggle. The Documents settings page (`/documents/settings`) has a default AI provider picker and an auto-classify toggle. The suggestion system is designed to be extensible: adding new AI-suggested fields (document date, parties, expiry date) requires only a new enum value, a prompt update, and UI — no schema changes.
+
 ### Trash
 
 Deleting a document soft-deletes it: the document gains a `DeletedAt` timestamp and disappears from the default list. Trash has a dedicated route (`/documents/trash`) that the user must navigate to explicitly. From Trash, a document can be **restored** (clears `DeletedAt`) or **permanently deleted** (removes the row and every version's file from disk). An "Empty Trash" affordance permanently deletes everything in Trash.
@@ -99,6 +112,7 @@ The list page has a selection mode toggled inline (not a separate page). With on
 - **Bulk soft-delete** to Trash.
 - **Bulk metadata edit**: add or remove tags; add or remove parties.
 - **Bulk reprocess** the latest version of each document, optionally pinning a specific extraction engine for the run.
+- **Bulk classify** via an AI provider, optionally pinning a specific provider for the run.
 - **Bulk download** as a ZIP.
 
 Bulk metadata edit uses tri-state controls — for each tag/party, the value can be "add to all," "remove from all," or "leave alone" — so existing per-document state is not overwritten unintentionally. Bulk metadata edit is intentionally narrow to taxonomy fields (tags, parties); document-level scalars (Name, Notes, DocumentDate, ExpiryDate) are not bulk-editable in v1.
@@ -127,7 +141,7 @@ The asymmetry is deliberate: uploads prioritise capturing the file safely; repro
 
 What belongs to the document and what belongs to the version is a contract, not an implementation detail:
 
-- **Document-scoped:** Name, Notes, DocumentDate, ExpiryDate, Tags, Parties, GroupId (deferred), trash state.
+- **Document-scoped:** Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, GroupId (deferred), trash state.
 - **Version-scoped:** the file blob, ContentType, FileSize, FileExtension, FileHash, ExtractedText, Label.
 
 This split is what makes "uploading a corrected version of the same document" coherent: metadata you have already curated stays attached to the document, while file content rolls forward. Code paths and UI must respect the split — moving a field across the boundary is a deliberate decision, not an offhand patch.
@@ -165,6 +179,9 @@ Trash never auto-purges. Old versions are never pruned. The audit log is retaine
 5. **The activity stream interleaves comments and audit entries** rather than separating them. Users read "what happened to this document" as one chronological feed.
 6. **Bulk metadata edits use tri-state controls** so leaving a tag/party alone is a first-class option distinct from adding or removing it. Users do not get surprised by accidentally clearing tags they never touched.
 7. **OCR failure on upload is silent.** The document saves, the extracted-text section is empty, and the user notices when content search misses. This is a deliberate "don't block on extraction" stance; reprocess is the recovery path.
+8. **AI suggestions integrate inline**, not as a separate panel or modal. The name input gains an AI badge with approve/decline buttons; AI-suggested tags render with a dashed border and sparkle icon with per-tag approve/decline; the summary section appears with an AI indicator. There is no "review suggestions" step — the values are already applied and the approve/decline controls are right where the values are displayed.
+9. **AI-suggested tags are visually distinct** — dashed border, sparkle icon, and per-tag check/X buttons — so the user can tell at a glance which tags came from AI vs manual assignment.
+10. **Approve-all / decline-all** appears as a compact inline action row when two or more suggestions are pending, providing a fast path for users who trust or distrust the classification wholesale.
 
 ## Future-compatibility
 
@@ -177,7 +194,9 @@ The following must be addable later without re-migrating documents, versions, ta
 - **A user-facing field-level change-history view** beyond the activity feed — a per-field diff surface sourced from the existing audit log. No backfill required.
 - **In-document preview, annotation, version diffs, version revert.**
 - **Document-to-document relationships** (supersedes, derived-from, etc.) beyond the party link.
-- **Automated tagging or classification** driven by extracted text or external models.
+- **Additional AI providers** (Anthropic Claude, OpenAI, Ollama) as new `AiProviderType` enum values and config records — the `IChatClient` abstraction and factory pattern make this additive.
+- **New AI-suggested fields** (document date, parties, expiry date) via new `DocumentSuggestionField` enum values, prompt updates, and UI — no schema changes needed.
+- **AI-driven tag creation** — v1 limits AI to picking from existing tags; suggesting new tags requires a new prompt strategy and a creation flow.
 - **External-source ingestion** — cloud-storage import, scanner uploads, email forwarding.
 - **Multi-user / per-document permissions** if the household ever expands beyond a single trust boundary.
 

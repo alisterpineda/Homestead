@@ -32,7 +32,7 @@ The split between document-scoped and version-scoped fields is a contract:
 
 | Scope | Fields |
 |---|---|
-| Document | Name, Notes, DocumentDate, ExpiryDate, Tags, Parties, `GroupId` (deferred), trash state |
+| Document | Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, `GroupId` (deferred), trash state |
 | Version | File blob, ContentType, FileSize, FileExtension, FileHash, ExtractedText, Label |
 
 Document-scoped fields persist across uploads — replacing a file with a corrected version does not reset the document's name, notes, dates, or tag/party graph. Version-scoped fields belong to the specific upload that produced them; reprocessing a version updates only that version's `ExtractedText`.
@@ -51,6 +51,8 @@ The job:
 4. Updates the document's `SearchVector` so the new content is reflected in FTS results.
 
 Processing failures do not roll the upload back: the file remains, the row remains, and downstream artefacts (thumbnail, extracted text) may be missing. The user can reprocess to retry.
+
+When `AutoClassifyOnUpload` is enabled in the Documents settings and a default AI provider is configured and enabled, the upload job additionally enqueues a `ClassifyDocument` job after completing its own work. This is fire-and-forget — the upload job completes and notifies the user immediately; classification runs as a separate job and its failure does not affect the upload. See the [overview](overview.md#ai-classification-and-suggestions) for the classification flow.
 
 Two job handlers cover the two entry points:
 

@@ -22,7 +22,7 @@ Homestead is a self-hosted suite for a single household. Each user signs in once
 |---|---|---|---|
 | **Documents** | Upload, tag, search, version, and organise household files; link them to people/entities (parties); soft-delete via trash. | Yes | [references/documents/overview.md](references/documents/overview.md) |
 | **Finances** | Track household net worth across cash, credit, debt, and investment accounts in any currency; reconcile against monthly statements. | Yes | [references/finances/overview.md](references/finances/overview.md) |
-| **Admin** | Manage users, groups, and text-extraction engine configuration. | Yes (admin role only) | — no product doc; infrastructure / configuration surface |
+| **Admin** | Manage users, groups, text-extraction engine configuration, and AI provider configuration. | Yes (admin role only) | — no product doc; infrastructure / configuration surface |
 | **Identity** | OIDC sign-in, sign-out, and current-user info. | Indirect (every page passes through the auth flow) | — no product doc; infrastructure |
 | **Processing** | Background-job queue for OCR, reprocessing, ZIP downloads, and other async work initiated by other modules. | Read-only status surface | [references/processing/overview.md](references/processing/overview.md) — infrastructure / architecture |
 | **Status** | Health/liveness probe for deployment orchestration. | No | — no product doc; infrastructure |

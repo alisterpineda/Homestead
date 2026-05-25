@@ -42,10 +42,11 @@ The phrase parser is the only FTS-side affordance. Quotes are stripped from the 
 
 ## Weighting
 
-The `tsvector` index combines two fields with explicit weights:
+The `tsvector` index combines three fields with explicit weights:
 
 - **Weight A**: `Document.Name`. Hits in the document name rank highest.
 - **Weight B**: the *latest* `DocumentVersion.ExtractedText`. Hits in file content rank lower than name hits.
+- **Weight C**: `Document.Summary`. Hits in the AI-generated (or manually entered) summary rank below extracted text. This enriches search results with semantically dense content without dominating relevance.
 
 Older versions' extracted text does not contribute to the search vector. This keeps the index small and ensures the document's "current" identity drives ranking. Reprocessing a version that happens to be the latest version updates the search vector; reprocessing an older version does not.
 
@@ -55,6 +56,8 @@ The vector is materialised on `Document.SearchVector` and indexed with a GIN ind
 - Document name patch.
 - New version upload (against the new latest version).
 - Version reprocess that changes the extracted text.
+- AI classification (which may set or change the document's name and summary).
+- Suggestion decline that reverts a name or clears a summary.
 
 Updates happen as part of the same job or handler that produced the new content, so the search index is consistent with the version state by the time the operation completes. The application code is the only writer — there is no database trigger maintaining the column.
 
