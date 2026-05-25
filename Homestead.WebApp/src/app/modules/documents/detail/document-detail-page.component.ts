@@ -17,7 +17,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, Subscription } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, finalize, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
@@ -73,9 +73,10 @@ import { DocumentVersionApiService } from '@/api/services/document-version-api.s
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
-import type { DocumentSuggestionDto } from '@/api/generated/models/document-suggestion-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
+import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
+import type { ClassifyPreviewTagDto } from '@/api/generated/models/classify-preview-tag-dto';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -235,9 +236,9 @@ import { toast } from '@spartan-ng/brain/sonner';
             </button>
             <ng-template #moreMenu>
               <hlm-dropdown-menu class="w-48">
-                <button hlmDropdownMenuItem (triggered)="handleClassify()">
+                <button hlmDropdownMenuItem (triggered)="handleClassify()" [disabled]="classifyingPreview()">
                   <ng-icon hlm name="lucideSparkles" size="sm" />
-                  <span>Classify</span>
+                  <span>{{ classifyingPreview() ? 'Classifying...' : 'Classify' }}</span>
                 </button>
                 <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
@@ -339,13 +340,19 @@ import { toast } from '@spartan-ng/brain/sonner';
       <ng-template #infoContent>
         <div class="space-y-4">
           <!-- AI Suggestions summary -->
-          @if (pendingSuggestionCount() >= 2) {
+          @if (totalSuggestionCount() >= 2) {
             <div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
               <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
-              <span class="text-muted-foreground">AI suggestions ({{ pendingSuggestionCount() }})</span>
+              <span class="text-muted-foreground">AI suggestions ({{ totalSuggestionCount() }})</span>
               <span class="ml-auto flex items-center gap-1">
-                <button hlmBtn variant="ghost" size="sm" (click)="approveAllSuggestions()">Approve all</button>
-                <button hlmBtn variant="ghost" size="sm" (click)="declineAllSuggestions()">Decline all</button>
+                @if (pendingSuggestionCount() > 0) {
+                  <button hlmBtn variant="ghost" size="sm" (click)="approveAllSuggestions()">Approve all</button>
+                  <button hlmBtn variant="ghost" size="sm" (click)="declineAllSuggestions()">Decline all</button>
+                }
+                @if (hasTransientSuggestions()) {
+                  <button hlmBtn variant="ghost" size="sm" (click)="applyAllTransient()">Apply all</button>
+                  <button hlmBtn variant="ghost" size="sm" (click)="dismissAllTransient()">Dismiss all</button>
+                }
               </span>
             </div>
           }
@@ -378,6 +385,18 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </button>
               </div>
             }
+            @if (transientNameSuggestion(); as name) {
+              <div class="mt-1 flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground">
+                <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
+                <span class="truncate">{{ name }}</span>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="applyTransientName()" aria-label="Apply name suggestion">
+                  <ng-icon hlm name="lucideCheck" size="xs" />
+                </button>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="dismissTransientName()" aria-label="Dismiss name suggestion">
+                  <ng-icon hlm name="lucideX" size="xs" />
+                </button>
+              </div>
+            }
           </hlm-form-field>
 
           <!-- Summary -->
@@ -400,10 +419,35 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </button>
               </div>
             </div>
+          } @else if (editSummary() !== null) {
+            <div class="space-y-2">
+              <label hlmLabel>Summary</label>
+              <p class="text-sm text-muted-foreground">{{ editSummary() }}</p>
+            </div>
           } @else if (document()?.summary) {
             <div class="space-y-2">
               <label hlmLabel>Summary</label>
               <p class="text-sm text-muted-foreground">{{ document()!.summary }}</p>
+            </div>
+          }
+          @if (transientSummarySuggestion(); as summary) {
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <label hlmLabel>Suggested Summary</label>
+                <span hlmBadge variant="outline" class="text-xs gap-1">
+                  <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
+                  AI
+                </span>
+              </div>
+              <p class="rounded border border-dashed border-border px-2 py-1 text-sm text-muted-foreground">{{ summary }}</p>
+              <div class="flex items-center gap-1">
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="applyTransientSummary()" aria-label="Apply summary suggestion">
+                  <ng-icon hlm name="lucideCheck" size="xs" />
+                </button>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="dismissTransientSummary()" aria-label="Dismiss summary suggestion">
+                  <ng-icon hlm name="lucideX" size="xs" />
+                </button>
+              </div>
             </div>
           }
 
@@ -426,6 +470,19 @@ import { toast } from '@spartan-ng/brain/sonner';
                     [aiSuggested]="true"
                     (approved)="approveSuggestion(suggestion.id)"
                     (declined)="declineSuggestion(suggestion.id)"
+                  />
+                }
+              </div>
+            }
+            @if (transientTagSuggestions().length > 0) {
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                @for (tag of transientTagSuggestions(); track tag.id) {
+                  <app-tag-badge
+                    [path]="tag.path"
+                    [color]="tag.effectiveColor ?? tag.color"
+                    [aiSuggested]="true"
+                    (approved)="applyTransientTag(tag)"
+                    (declined)="dismissTransientTag(tag)"
                   />
                 }
               </div>
@@ -735,6 +792,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
   activityLoading = signal(false);
   commentBody = signal('');
   commentSubmitting = signal(false);
+  transientClassification = signal<ClassifyPreviewResponse | null>(null);
+  classifyingPreview = signal(false);
+  editSummary = signal<string | null>(null);
 
   formatBytes = formatBytes;
 
@@ -801,6 +861,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (!datesEqual(this.editDocumentDate(), this.origDocumentDate())) return true;
     if (!datesEqual(this.editExpiryDate(), this.origExpiryDate())) return true;
     if (this.editNotes() !== this.origNotes()) return true;
+    if (this.editSummary() !== null && this.editSummary() !== (doc.summary ?? null)) return true;
     return false;
   });
 
@@ -964,6 +1025,34 @@ export class DocumentDetailPageComponent implements OnDestroy {
   });
   pendingSuggestionCount = computed(() => this.pendingSuggestions().length);
 
+  transientNameSuggestion = computed(() => {
+    return this.transientClassification()?.suggestedTitle ?? null;
+  });
+
+  transientSummarySuggestion = computed(() => {
+    return this.transientClassification()?.summary ?? null;
+  });
+
+  transientTagSuggestions = computed(() => {
+    const tc = this.transientClassification();
+    if (!tc?.tags?.length) return [];
+    const currentPaths = new Set(this.editTags());
+    return tc.tags.filter(t => !currentPaths.has(t.path));
+  });
+
+  hasTransientSuggestions = computed(() =>
+    !!this.transientNameSuggestion()
+    || !!this.transientSummarySuggestion()
+    || this.transientTagSuggestions().length > 0,
+  );
+
+  totalSuggestionCount = computed(() =>
+    this.pendingSuggestionCount()
+    + (this.transientNameSuggestion() ? 1 : 0)
+    + (this.transientSummarySuggestion() ? 1 : 0)
+    + this.transientTagSuggestions().length,
+  );
+
   constructor() {
     // Save edit state when documentId changes (component reuse on sidebar navigation)
     // and initialize edit fields when a new document loads.
@@ -988,6 +1077,9 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (doc.id === this.initializedDocId) return;
         this.initializedDocId = doc.id;
 
+        this.transientClassification.set(null);
+        this.editSummary.set(null);
+
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
           this.editName.set(saved.editName);
@@ -996,6 +1088,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editDocumentDate.set(saved.editDocumentDate ? parseDate(saved.editDocumentDate) : null);
           this.editExpiryDate.set(saved.editExpiryDate ? parseDate(saved.editExpiryDate) : null);
           this.editNotes.set(saved.editNotes ?? '');
+          this.editSummary.set(saved.editSummary ?? null);
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
           this.initializedVersionId = saved.versionId
@@ -1272,16 +1365,91 @@ export class DocumentDetailPageComponent implements OnDestroy {
   handleClassify(): void {
     const id = this.documentId();
     if (!id) return;
-    this.documentApi.classifyDocument({ documentId: id }).pipe(
-      handleMutationError(this.errorHandler, signal(false), 'Failed to start classification.'),
+    this.classifyingPreview.set(true);
+    this.transientClassification.set(null);
+    const toastId = toast.loading('Classifying document...');
+    this.documentApi.classifyPreview({ documentId: id }).pipe(
+      handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
+      finalize(() => toast.dismiss(toastId)),
     ).subscribe({
-      next: (r) => {
-        toast.promise(this.processingHub.waitForJob(r.jobId), {
-          loading: 'Classifying document...',
-          success: 'Classification completed.',
-          error: (err: unknown) => `Classification failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
-        });
+      next: (result) => {
+        this.classifyingPreview.set(false);
+        this.transientClassification.set(result);
+        const count = (result.suggestedTitle ? 1 : 0)
+          + (result.summary ? 1 : 0)
+          + (result.tags?.length ?? 0);
+        if (count > 0) {
+          toast.success(`${count} suggestion${count === 1 ? '' : 's'} ready to review.`);
+        } else {
+          toast.info('No new suggestions.');
+        }
       },
+    });
+  }
+
+  applyTransientName(): void {
+    const name = this.transientNameSuggestion();
+    if (!name) return;
+    this.editName.set(name);
+    this.clearTransientField('name');
+  }
+
+  dismissTransientName(): void {
+    this.clearTransientField('name');
+  }
+
+  applyTransientSummary(): void {
+    const summary = this.transientSummarySuggestion();
+    if (!summary) return;
+    this.editSummary.set(summary);
+    this.clearTransientField('summary');
+  }
+
+  dismissTransientSummary(): void {
+    this.clearTransientField('summary');
+  }
+
+  applyTransientTag(tag: ClassifyPreviewTagDto): void {
+    this.editTags.update(tags => [...tags, tag.path]);
+    this.clearTransientTag(tag.id);
+  }
+
+  dismissTransientTag(tag: ClassifyPreviewTagDto): void {
+    this.clearTransientTag(tag.id);
+  }
+
+  applyAllTransient(): void {
+    const name = this.transientNameSuggestion();
+    if (name) this.editName.set(name);
+    const summary = this.transientSummarySuggestion();
+    if (summary) this.editSummary.set(summary);
+    const tags = this.transientTagSuggestions();
+    if (tags.length > 0) {
+      this.editTags.update(current => [...current, ...tags.map(t => t.path)]);
+    }
+    this.transientClassification.set(null);
+  }
+
+  dismissAllTransient(): void {
+    this.transientClassification.set(null);
+  }
+
+  private clearTransientField(field: 'name' | 'summary'): void {
+    const tc = this.transientClassification();
+    if (!tc) return;
+    this.transientClassification.set({
+      ...tc,
+      suggestedTitle: field === 'name' ? null : tc.suggestedTitle,
+      summary: field === 'summary' ? null : tc.summary,
+    });
+  }
+
+  private clearTransientTag(tagId: string): void {
+    const tc = this.transientClassification();
+    if (!tc) return;
+    this.transientClassification.set({
+      ...tc,
+      tags: tc.tags.filter(t => t.id !== tagId),
     });
   }
 
@@ -1370,6 +1538,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.saving.set(false);
+        this.transientClassification.set(null);
+        this.editSummary.set(null);
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values
@@ -1397,6 +1567,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
     if (this.editNotes() !== this.origNotes()) {
       ops.push(replace('/notes', this.editNotes()));
+    }
+
+    if (this.editSummary() !== null && this.editSummary() !== (doc.summary ?? null)) {
+      ops.push(replace('/summary', this.editSummary()));
     }
 
     const origTags = (doc.tags?.map((t) => t.path) ?? []).slice().sort();
@@ -1436,6 +1610,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       editDocumentDate: toIsoDateString(this.editDocumentDate()),
       editExpiryDate: toIsoDateString(this.editExpiryDate()),
       editNotes: this.editNotes(),
+      editSummary: this.editSummary(),
       editParties: this.editParties(),
       editTags: this.editTags(),
       editVersionLabel: this.editVersionLabel(),

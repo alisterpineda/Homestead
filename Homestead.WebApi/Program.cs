@@ -114,6 +114,7 @@ builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ISearchVectorUpdater, SearchVectorUpdater>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
+builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
 builder.Services.AddScoped<ISystemAccountProvider, SystemAccountProvider>();
 builder.Services.AddScoped<ILinkedPriceManager, LinkedPriceManager>();

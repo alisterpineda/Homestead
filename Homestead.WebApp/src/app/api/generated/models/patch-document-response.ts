@@ -21,6 +21,7 @@ export interface PatchDocumentResponse {
   ownerUserId?: (string | null);
   ownerUserName?: (string | null);
   parties: Array<PartyDto>;
+  summary?: (string | null);
   tags: Array<TagDto>;
   updatedAt: string;
   updatedByUserId?: (string | null);

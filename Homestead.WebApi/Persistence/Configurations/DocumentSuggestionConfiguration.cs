@@ -21,6 +21,10 @@ public class DocumentSuggestionConfiguration : IEntityTypeConfiguration<Document
         builder.Property(e => e.SuggestedValue)
             .IsRequired();
 
+        builder.Property(e => e.IsApplied)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(e => e.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

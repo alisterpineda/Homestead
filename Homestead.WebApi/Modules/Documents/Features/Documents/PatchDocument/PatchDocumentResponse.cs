@@ -15,6 +15,7 @@ public record PatchDocumentResponse
     public DateOnly? DocumentDate { get; init; }
     public DateOnly? ExpiryDate { get; init; }
     public string Notes { get; init; } = string.Empty;
+    public string? Summary { get; init; }
     public Guid? CreatedByUserId { get; init; }
     public string? CreatedByUserName { get; init; }
     public Guid? OwnerUserId { get; init; }

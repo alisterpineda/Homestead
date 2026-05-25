@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Infrastructure.AiClassification;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -10,8 +9,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing;
 
 public class ClassifyDocumentJobHandler(
     AppDbContext db,
-    IAiProviderResolver providerResolver,
-    IAiClassificationService classificationService,
+    IDocumentClassifier classifier,
     ISearchVectorUpdater searchVectorUpdater,
     IProcessingNotifier notifier) : IJobHandler
 {
@@ -30,10 +28,22 @@ public class ClassifyDocumentJobHandler(
 
         job.EntityId = payload.DocumentId;
 
-        var provider = await providerResolver.ResolveAsync(payload.AiProviderId, ct);
-        if (provider is not null)
+        var output = await classifier.ClassifyAsync(
+            payload.DocumentId, document.Name, payload.AiProviderId, ct);
+
+        if (output is not null)
         {
-            await ClassifyWithProviderAsync(document, provider, payload.DocumentId, ct);
+            // Persist deletes first so the subsequent inserts don't collide
+            // with Deleted entities sharing the same composite key (DocumentTag).
+            if (ClearPendingSuggestions(document))
+                await db.SaveChangesAsync(ct);
+
+            ApplyTags(document, output.Classification.MatchedTagIds, output.ProviderId);
+            ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
+            ApplySummary(document, output.Classification.Summary, output.ProviderId);
+
+            await db.SaveChangesAsync(ct);
+            await searchVectorUpdater.UpdateSearchVectorAsync(payload.DocumentId, ct);
         }
 
         if (job.ParentJobId is null)
@@ -48,38 +58,6 @@ public class ClassifyDocumentJobHandler(
                 job.CreatedByUserId,
                 ct);
         }
-    }
-
-    private async Task ClassifyWithProviderAsync(
-        Document document, Domain.Settings.AiProvider provider, Guid documentId, CancellationToken ct)
-    {
-        var latestVersion = await db.DocumentVersions
-            .Where(v => v.DocumentId == documentId)
-            .OrderByDescending(v => v.VersionNumber)
-            .FirstOrDefaultAsync(ct);
-
-        var allTags = await db.Tags
-            .AsNoTracking()
-            .Select(t => new TagInfo(t.Id, t.Name, t.Path))
-            .ToListAsync(ct);
-
-        var result = await classificationService.ClassifyAsync(
-            provider, document.Name, latestVersion?.ExtractedText, allTags, ct);
-
-        if (result is null)
-            return;
-
-        // Persist deletes first so the subsequent inserts don't collide
-        // with Deleted entities sharing the same composite key (DocumentTag).
-        if (ClearPendingSuggestions(document))
-            await db.SaveChangesAsync(ct);
-
-        ApplyTags(document, result.MatchedTagIds, provider.Id);
-        ApplyName(document, result.SuggestedTitle, provider.Id);
-        ApplySummary(document, result.Summary, provider.Id);
-
-        await db.SaveChangesAsync(ct);
-        await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
     }
 
     private bool ClearPendingSuggestions(Document document)

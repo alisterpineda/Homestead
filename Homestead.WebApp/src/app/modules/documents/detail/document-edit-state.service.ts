@@ -8,6 +8,7 @@ export interface DocumentEditState {
   editNotes: string;
   editParties: Array<{ id: string; name: string }>;
   editTags: string[];
+  editSummary?: string | null;
   editVersionLabel: string;
   editExtractedText: string;
   versionId: string | null;

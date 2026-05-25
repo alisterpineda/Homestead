@@ -205,6 +205,11 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsApplied")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("OriginalValue")
                         .HasColumnType("text");
 
