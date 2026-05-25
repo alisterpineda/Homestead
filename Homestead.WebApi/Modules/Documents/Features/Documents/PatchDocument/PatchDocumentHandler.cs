@@ -41,8 +41,7 @@ public class PatchDocumentHandler(AppDbContext db,
             Notes = document.Notes,
             TagPaths = document.DocumentTags.Select(dt => dt.Tag.Path).ToList(),
             PartyIds = document.DocumentParties.Select(dp => dp.PartyId).ToList(),
-            GroupId = document.GroupId,
-            Summary = document.Summary
+            GroupId = document.GroupId
         };
 
         // Apply patch operations
@@ -81,7 +80,6 @@ public class PatchDocumentHandler(AppDbContext db,
         document.ExpiryDate = model.ExpiryDate;
         document.Notes = model.Notes;
         document.GroupId = model.GroupId;
-        document.Summary = model.Summary;
         document.UpdatedAt = DateTimeOffset.UtcNow;
         document.UpdatedByUserId = currentUser.UserId;
 
@@ -112,16 +110,6 @@ public class PatchDocumentHandler(AppDbContext db,
         {
             foreach (var s in document.Suggestions
                 .Where(s => s.Field == DocumentSuggestionField.Name).ToList())
-            {
-                s.Status = DocumentSuggestionStatus.Declined;
-                s.ResolvedAt = DateTimeOffset.UtcNow;
-            }
-        }
-
-        if (patchPaths.Contains("summary"))
-        {
-            foreach (var s in document.Suggestions
-                .Where(s => s.Field == DocumentSuggestionField.Summary).ToList())
             {
                 s.Status = DocumentSuggestionStatus.Declined;
                 s.ResolvedAt = DateTimeOffset.UtcNow;

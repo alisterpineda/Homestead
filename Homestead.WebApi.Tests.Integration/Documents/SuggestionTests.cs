@@ -170,32 +170,6 @@ public class SuggestionTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task PatchDocument_Summary_AutoDeclinesSummarySuggestion()
-    {
-        var docId = await SeedDocumentWithSuggestionsAsync();
-        var client = await CreateAdminClientAsync();
-
-        var patchOps = new[]
-        {
-            new { op = "replace", path = "/summary", value = "User-written summary" }
-        };
-
-        var response = await SendJsonPatchAsync(client, $"/api/v1/documents/{docId}", patchOps);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var summarySuggestion = await db.DocumentSuggestions
-            .FirstAsync(s => s.DocumentId == docId && s.Field == DocumentSuggestionField.Summary, CT);
-        Assert.Equal(DocumentSuggestionStatus.Declined, summarySuggestion.Status);
-        Assert.NotNull(summarySuggestion.ResolvedAt);
-
-        var doc = await db.Documents.FirstAsync(d => d.Id == docId, CT);
-        Assert.Equal("User-written summary", doc.Summary);
-    }
-
-    [Fact]
     public async Task DeclineAllSuggestions_DeclinesAllAndRevertsChanges()
     {
         var docId = await SeedDocumentWithSuggestionsAsync();

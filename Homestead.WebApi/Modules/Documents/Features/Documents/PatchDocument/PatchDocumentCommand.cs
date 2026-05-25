@@ -14,7 +14,6 @@ public class PatchDocumentModel
     public List<string> TagPaths { get; set; } = [];
     public List<Guid> PartyIds { get; set; } = [];
     public Guid? GroupId { get; set; }
-    public string? Summary { get; set; }
 }
 
 public record PatchDocumentCommand : IRequest<PatchDocumentResponse>, IRequireDocumentAuthorization
