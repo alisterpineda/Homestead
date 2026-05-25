@@ -17,7 +17,8 @@ public class SearchVectorUpdater(AppDbContext db) : ISearchVectorUpdater
                      FROM documents.document_versions dv
                      WHERE dv."DocumentId" = documents.documents."Id"
                      ORDER BY dv."VersionNumber" DESC
-                     LIMIT 1), '')), 'B')
+                     LIMIT 1), '')), 'B') ||
+                setweight(to_tsvector('english', COALESCE("Summary", '')), 'C')
             WHERE "Id" = {documentId}
             """, ct);
     }

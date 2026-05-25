@@ -28,6 +28,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
     private readonly IAuditLogger _auditLogger;
     private readonly ISearchVectorUpdater _searchVectorUpdater;
     private readonly ITextExtractionEngineResolver _engineResolver;
+    private readonly IJobQueue _jobQueue;
     private readonly ThumbnailService _thumbnailService;
     private readonly UploadDocumentJobHandler _handler;
 
@@ -61,6 +62,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Build();
 
         var logger = Substitute.For<ILogger<UploadDocumentJobHandler>>();
+        _jobQueue = Substitute.For<IJobQueue>();
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), config,
             Substitute.For<ILogger<ThumbnailService>>());
@@ -72,7 +74,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         _handler = new UploadDocumentJobHandler(
             _db, config, logger,
-            _notifier, _auditLogger, _searchVectorUpdater, _thumbnailService, textExtractionHelper);
+            _notifier, _auditLogger, _searchVectorUpdater, _jobQueue, _thumbnailService, textExtractionHelper);
     }
 
     public void Dispose()

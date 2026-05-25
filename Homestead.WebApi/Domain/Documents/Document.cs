@@ -13,6 +13,7 @@ public class Document
     public DateOnly? DocumentDate { get; set; }
     public DateOnly? ExpiryDate { get; set; }
     public string Notes { get; set; } = string.Empty;
+    public string? Summary { get; set; }
     public NpgsqlTsVector? SearchVector { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
@@ -35,4 +36,5 @@ public class Document
     public ICollection<DocumentComment> Comments { get; set; } = [];
     public ICollection<DocumentTag> DocumentTags { get; set; } = [];
     public ICollection<DocumentParty> DocumentParties { get; set; } = [];
+    public ICollection<DocumentSuggestion> Suggestions { get; set; } = [];
 }

@@ -12,6 +12,10 @@ using Homestead.WebApi.Modules.Admin.Features.Users.GetUsers;
 using Homestead.WebApi.Modules.Admin.Features.Groups.RemoveGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.BulkDeleteAiProviders;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.CreateAiProvider;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.GetAiProviders;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.UpdateAiProvider;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.GetTextExtractionEngines;
@@ -67,6 +71,17 @@ public static class AdminModule
         CreateTextExtractionEngineEndpoint.Map(textExtractionEngines);
         UpdateTextExtractionEngineEndpoint.Map(textExtractionEngines);
         BulkDeleteTextExtractionEnginesEndpoint.Map(textExtractionEngines);
+
+        var aiProviders = app.MapGroup("/api/v{version:apiVersion}/admin/ai-providers")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetAiProvidersEndpoint.Map(aiProviders);
+        CreateAiProviderEndpoint.Map(aiProviders);
+        UpdateAiProviderEndpoint.Map(aiProviders);
+        BulkDeleteAiProvidersEndpoint.Map(aiProviders);
 
         var settings = app.MapGroup("/api/v{version:apiVersion}/admin/settings")
             .HasApiVersion(1, 0)

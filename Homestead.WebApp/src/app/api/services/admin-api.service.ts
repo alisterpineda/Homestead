@@ -19,6 +19,10 @@ import { getTextExtractionEngines } from '@/api/generated/fn/admin/get-text-extr
 import { createTextExtractionEngine } from '@/api/generated/fn/admin/create-text-extraction-engine';
 import { updateTextExtractionEngine } from '@/api/generated/fn/admin/update-text-extraction-engine';
 import { bulkDeleteTextExtractionEngines } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
+import { getAiProviders } from '@/api/generated/fn/admin/get-ai-providers';
+import { createAiProvider } from '@/api/generated/fn/admin/create-ai-provider';
+import { updateAiProvider } from '@/api/generated/fn/admin/update-ai-provider';
+import { bulkDeleteAiProviders } from '@/api/generated/fn/admin/bulk-delete-ai-providers';
 import { getProcessingJobs } from '@/api/generated/fn/processing/get-processing-jobs';
 import { getProcessingSchedules } from '@/api/generated/fn/admin/get-processing-schedules';
 import { createProcessingSchedule } from '@/api/generated/fn/admin/create-processing-schedule';
@@ -33,6 +37,9 @@ import type { GroupMemberResponse } from '@/api/generated/models/group-member-re
 import type { PaginatedResponseOfTextExtractionEngineResponse } from '@/api/generated/models/paginated-response-of-text-extraction-engine-response';
 import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/models/bulk-delete-text-extraction-engines-response';
+import type { PaginatedResponseOfAiProviderResponse } from '@/api/generated/models/paginated-response-of-ai-provider-response';
+import type { AiProviderResponse } from '@/api/generated/models/ai-provider-response';
+import type { BulkDeleteAiProvidersResponse } from '@/api/generated/models/bulk-delete-ai-providers-response';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/generated/models/paginated-response-of-get-processing-schedules-response';
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
@@ -53,6 +60,10 @@ export type { GetTextExtractionEngines$Params } from '@/api/generated/fn/admin/g
 export type { CreateTextExtractionEngine$Params } from '@/api/generated/fn/admin/create-text-extraction-engine';
 export type { UpdateTextExtractionEngine$Params } from '@/api/generated/fn/admin/update-text-extraction-engine';
 export type { BulkDeleteTextExtractionEngines$Params } from '@/api/generated/fn/admin/bulk-delete-text-extraction-engines';
+export type { GetAiProviders$Params } from '@/api/generated/fn/admin/get-ai-providers';
+export type { CreateAiProvider$Params } from '@/api/generated/fn/admin/create-ai-provider';
+export type { UpdateAiProvider$Params } from '@/api/generated/fn/admin/update-ai-provider';
+export type { BulkDeleteAiProviders$Params } from '@/api/generated/fn/admin/bulk-delete-ai-providers';
 export type { GetProcessingJobs$Params } from '@/api/generated/fn/processing/get-processing-jobs';
 export type { GetProcessingSchedules$Params } from '@/api/generated/fn/admin/get-processing-schedules';
 export type { CreateProcessingSchedule$Params } from '@/api/generated/fn/admin/create-processing-schedule';
@@ -125,6 +136,22 @@ export class AdminApiService {
 
   bulkDeleteTextExtractionEngines(params: Parameters<typeof bulkDeleteTextExtractionEngines>[2]): Observable<BulkDeleteTextExtractionEnginesResponse> {
     return bulkDeleteTextExtractionEngines(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getAiProviders(params: Parameters<typeof getAiProviders>[2]): Observable<PaginatedResponseOfAiProviderResponse> {
+    return getAiProviders(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createAiProvider(params: Parameters<typeof createAiProvider>[2]): Observable<AiProviderResponse> {
+    return createAiProvider(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  updateAiProvider(params: Parameters<typeof updateAiProvider>[2]): Observable<AiProviderResponse> {
+    return updateAiProvider(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  bulkDeleteAiProviders(params: Parameters<typeof bulkDeleteAiProviders>[2]): Observable<BulkDeleteAiProvidersResponse> {
+    return bulkDeleteAiProviders(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   getProcessingJobs(params: Parameters<typeof getProcessingJobs>[2]): Observable<PaginatedResponseOfGetProcessingJobsResponse> {

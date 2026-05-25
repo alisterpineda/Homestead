@@ -1,3 +1,5 @@
+using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Modules.Documents.Features.Suggestions;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +31,7 @@ public class GetDocumentHandler(AppDbContext db)
                 OwnerUserName = d.OwnerUser != null ? d.OwnerUser.DisplayName : null,
                 d.GroupId,
                 GroupName = d.Group != null ? d.Group.Name : null,
+                d.Summary,
                 LatestVersion = d.Versions
                     .OrderByDescending(r => r.VersionNumber)
                     .Select(r => new
@@ -69,7 +72,19 @@ public class GetDocumentHandler(AppDbContext db)
                     Id = dp.Party.Id,
                     Name = dp.Party.Name,
                     Description = dp.Party.Description
-                }).ToList()
+                }).ToList(),
+                Suggestions = d.Suggestions
+                    .Where(s => s.Status == DocumentSuggestionStatus.Pending)
+                    .Select(s => new DocumentSuggestionDto
+                    {
+                        Id = s.Id,
+                        Field = s.Field,
+                        Status = s.Status,
+                        SuggestedValue = s.SuggestedValue,
+                        OriginalValue = s.OriginalValue,
+                        CreatedAt = s.CreatedAt,
+                        ResolvedAt = s.ResolvedAt,
+                    }).ToList()
             })
             .Select(d => d.LatestVersion == null ? null : new GetDocumentResponse
             {
@@ -92,11 +107,13 @@ public class GetDocumentHandler(AppDbContext db)
                 OwnerUserName = d.OwnerUserName,
                 GroupId = d.GroupId,
                 GroupName = d.GroupName,
+                Summary = d.Summary,
                 ExtractedText = d.LatestVersion.ExtractedText,
                 VersionCount = d.VersionCount,
                 Versions = d.Versions,
                 Tags = d.Tags,
-                Parties = d.Parties
+                Parties = d.Parties,
+                Suggestions = d.Suggestions,
             })
             .FirstOrDefaultAsync(ct);
     }

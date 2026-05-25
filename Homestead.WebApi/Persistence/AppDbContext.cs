@@ -29,6 +29,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<TextExtractionEngine> TextExtractionEngines { get; set; }
+    public DbSet<AiProvider> AiProviders { get; set; }
+    public DbSet<DocumentSuggestion> DocumentSuggestions { get; set; }
     public DbSet<AppSetting> AppSettings { get; set; }
 
     public DbSet<Commodity> Commodities { get; set; }

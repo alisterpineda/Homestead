@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideX } from '@ng-icons/lucide';
+import { lucideX, lucideSparkles, lucideCheck } from '@ng-icons/lucide';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 
@@ -8,17 +8,38 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   selector: 'app-tag-badge',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmBadge],
-  providers: [provideIcons({ lucideX })],
+  providers: [provideIcons({ lucideX, lucideSparkles, lucideCheck })],
   template: `
     <span
       hlmBadge
       [variant]="color() ? 'default' : 'secondary'"
       [class.tag-badge-colored]="color()"
+      [class.border-dashed]="aiSuggested()"
       class="badge-inner gap-1"
       [style.--tag-color]="color()"
     >
+      @if (aiSuggested()) {
+        <ng-icon hlm name="lucideSparkles" class="shrink-0" size="xs" />
+      }
       <span class="truncate min-w-0">{{ compact() ? compactPath() : path() }}</span>
-      @if (removable()) {
+      @if (aiSuggested()) {
+        <button
+          type="button"
+          (click)="onApprove($event)"
+          class="ml-0.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-muted-foreground/20"
+          aria-label="Approve suggestion"
+        >
+          <ng-icon hlm name="lucideCheck" size="xs" />
+        </button>
+        <button
+          type="button"
+          (click)="onDecline($event)"
+          class="flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-muted-foreground/20"
+          aria-label="Decline suggestion"
+        >
+          <ng-icon hlm name="lucideX" size="xs" />
+        </button>
+      } @else if (removable()) {
         <button
           type="button"
           (click)="onRemove($event)"
@@ -57,7 +78,10 @@ export class TagBadgeComponent {
   color = input<string | null | undefined>(null);
   removable = input(false);
   compact = input(false);
+  aiSuggested = input(false);
   removed = output<void>();
+  approved = output<void>();
+  declined = output<void>();
 
   compactPath = computed(() => {
     const segments = this.path().split('/');
@@ -68,5 +92,15 @@ export class TagBadgeComponent {
   onRemove(event: Event): void {
     event.stopPropagation();
     this.removed.emit();
+  }
+
+  onApprove(event: Event): void {
+    event.stopPropagation();
+    this.approved.emit();
+  }
+
+  onDecline(event: Event): void {
+    event.stopPropagation();
+    this.declined.emit();
   }
 }

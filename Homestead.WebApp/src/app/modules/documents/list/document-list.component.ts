@@ -5,7 +5,7 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subject, debounceTime, distinctUntilChanged, filter, take, takeUntil, takeWhile, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSkeletonImports } from '@/shared/components/spartan/skeleton';
 import { HlmCardImports } from '@/shared/components/spartan/card';
@@ -29,6 +29,7 @@ import { UserPreferencesService } from '@/shared/services/user-preferences.servi
 import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit-tags-popover.component';
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { BulkReprocessDialogComponent } from './bulk-reprocess-dialog/bulk-reprocess-dialog.component';
+import { BulkClassifyDialogComponent } from './bulk-classify-dialog/bulk-classify-dialog.component';
 import { BulkReprocessProgressDialogComponent } from './bulk-reprocess-progress-dialog/bulk-reprocess-progress-dialog.component';
 import { DownloadProgressDialogComponent } from './download-progress-dialog/download-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
@@ -65,11 +66,12 @@ import { toast } from '@spartan-ng/brain/sonner';
     BulkEditTagsPopoverComponent,
     BulkEditPartiesPopoverComponent,
     BulkReprocessDialogComponent,
+    BulkClassifyDialogComponent,
     BulkReprocessProgressDialogComponent,
     DownloadProgressDialogComponent,
   ],
   host: { class: 'block' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles })],
   template: `
     <div>
       <div [class.hidden]="showInitialEmpty()">
@@ -239,6 +241,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
               <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
               <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
+              <app-bulk-classify-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (classifyStarted)="onBulkClassifyStarted($event)" />
               <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                 <ng-icon hlm name="lucideDownload" size="sm" />
                 Download
@@ -924,6 +927,43 @@ export class DocumentListComponent {
         this.onRefresh();
       }
     });
+  }
+
+  onBulkClassifyStarted(jobIds: string[]): void {
+    const parentJobId = jobIds[0];
+    const documentCount = this.selectedDocumentIds().size;
+    this.clearSelection();
+    this.processingHub.registerManagedJob(parentJobId);
+
+    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+
+    toast.promise(
+      new Promise<string>((resolve, reject) => {
+        this.processingHub.jobStatusChanged$.pipe(
+          filter(msg => msg.jobId === parentJobId),
+          takeWhile(msg => !isTerminal(msg.status), true),
+          takeUntilDestroyed(this.destroyRef),
+        ).subscribe({
+          next: msg => {
+            if (msg.status === 'Completed') {
+              this.onRefresh();
+              resolve(`${documentCount} document${documentCount > 1 ? 's' : ''} classified successfully.`);
+            } else if (msg.status === 'PartiallyCompleted') {
+              this.onRefresh();
+              resolve(`Classification partially completed for ${documentCount} document${documentCount > 1 ? 's' : ''}.`);
+            } else if (msg.status === 'Failed') {
+              this.onRefresh();
+              reject(new Error('Classification failed.'));
+            }
+          },
+        });
+      }),
+      {
+        loading: `Classifying ${documentCount} document${documentCount > 1 ? 's' : ''}...`,
+        success: (message) => message,
+        error: (err: unknown) => err instanceof Error ? err.message : 'Classification failed.',
+      },
+    );
   }
 
   onBulkDelete(ctx: { close: () => void }): void {

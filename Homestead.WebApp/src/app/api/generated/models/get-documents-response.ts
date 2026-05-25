@@ -17,6 +17,7 @@ export interface GetDocumentsResponse {
   fileSize: number;
   groupId?: (string | null);
   groupName?: (string | null);
+  hasPendingSuggestions?: boolean;
   hasThumbnail?: boolean;
   id: string;
   matchSnippet?: (string | null);

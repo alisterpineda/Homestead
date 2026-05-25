@@ -9,6 +9,7 @@ using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
 
@@ -23,6 +24,7 @@ public class PatchDocumentHandler(AppDbContext db,
         var document = await db.Documents
             .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
+            .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
             .FirstOrDefaultAsync(d => d.Id == request.Id, ct);
 
         if (document is null)
@@ -87,6 +89,32 @@ public class PatchDocumentHandler(AppDbContext db,
 
         // Update parties
         metadataService.SetParties(document, model.PartyIds);
+
+        // Clear pending suggestions for fields the user explicitly changed
+        var patchPaths = request.PatchDocument.Operations
+            .Select(op => op.path?.TrimStart('/').ToLowerInvariant())
+            .Where(p => p is not null)
+            .ToHashSet();
+
+        if (patchPaths.Contains("tagpaths"))
+        {
+            foreach (var s in document.Suggestions
+                .Where(s => s.Field == DocumentSuggestionField.Tags).ToList())
+            {
+                s.Status = DocumentSuggestionStatus.Declined;
+                s.ResolvedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        if (patchPaths.Contains("name"))
+        {
+            foreach (var s in document.Suggestions
+                .Where(s => s.Field == DocumentSuggestionField.Name).ToList())
+            {
+                s.Status = DocumentSuggestionStatus.Declined;
+                s.ResolvedAt = DateTimeOffset.UtcNow;
+            }
+        }
 
         await db.SaveChangesAsync(ct);
 

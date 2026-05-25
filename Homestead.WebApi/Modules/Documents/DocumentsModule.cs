@@ -35,6 +35,13 @@ using Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.PermanentlyDeleteDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.EmptyTrash;
 using Homestead.WebApi.Modules.Documents.Features.TextExtractionEngineSummaries.GetTextExtractionEngineSummaries;
+using Homestead.WebApi.Modules.Documents.Features.AiProviderSummaries.GetAiProviderSummaries;
+using Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocuments;
+using Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
+using Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveSuggestion;
+using Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineSuggestion;
+using Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveAllSuggestions;
+using Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineAllSuggestions;
 using Homestead.WebApi.Modules.Documents.Features.Download;
 
 using Homestead.WebApi.Authentication;
@@ -55,6 +62,7 @@ public static class DocumentsModule
             .RequireAuthorization(AuthPolicies.ActiveUser);
 
         BulkDeleteDocumentsEndpoint.Map(v1);
+        BulkClassifyDocumentsEndpoint.Map(v1);
         BulkReprocessDocumentsEndpoint.Map(v1);
         BulkUpdateDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
@@ -69,6 +77,8 @@ public static class DocumentsModule
         RestoreDocumentsEndpoint.Map(v1);
 
         GetTextExtractionEngineSummariesEndpoint.Map(v1);
+        GetAiProviderSummariesEndpoint.Map(v1);
+        ClassifyDocumentEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);
@@ -77,6 +87,12 @@ public static class DocumentsModule
         GetDocumentVersionEndpoint.Map(versions);
         PatchDocumentVersionEndpoint.Map(versions);
         ReprocessDocumentVersionEndpoint.Map(versions);
+
+        var suggestions = v1.MapGroup("/{documentId:guid}/suggestions");
+        ApproveSuggestionEndpoint.Map(suggestions);
+        DeclineSuggestionEndpoint.Map(suggestions);
+        ApproveAllSuggestionsEndpoint.Map(suggestions);
+        DeclineAllSuggestionsEndpoint.Map(suggestions);
 
         var comments = v1.MapGroup("/{documentId:guid}/comments");
         CreateCommentEndpoint.Map(comments);

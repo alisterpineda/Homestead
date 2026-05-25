@@ -1,3 +1,5 @@
+using Homestead.WebApi.Modules.Documents.Features.Suggestions;
+
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 
 public record GetDocumentResponse
@@ -21,11 +23,13 @@ public record GetDocumentResponse
     public string? OwnerUserName { get; init; }
     public Guid? GroupId { get; init; }
     public string? GroupName { get; init; }
+    public string? Summary { get; init; }
     public string? ExtractedText { get; init; }
     public int VersionCount { get; init; }
     public required IReadOnlyList<GetDocumentVersionDto> Versions { get; init; }
     public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentPartyDto> Parties { get; init; }
+    public required IReadOnlyList<DocumentSuggestionDto> Suggestions { get; init; }
 }
 
 public record GetDocumentVersionDto

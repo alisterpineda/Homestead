@@ -34,7 +34,24 @@ internal record ProblemDetailsResponse(string? Type, string? Title, int? Status,
 
 internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
 
-internal record DocumentSettingsItem(Guid? DefaultTextExtractionEngineId = null);
+internal record DocumentSettingsItem(
+    Guid? DefaultTextExtractionEngineId = null,
+    Guid? DefaultAiProviderId = null,
+    bool? AutoClassifyOnUpload = null);
+
+internal record AiProviderItem(Guid Id, string Name, string ProviderType, string? Configuration, bool IsEnabled);
+
+internal record AiProviderSummaryItem(Guid Id, string Name, string ProviderType, bool IsEnabled);
+
+internal record BulkClassifyResult(IReadOnlyList<Guid> JobIds);
+
+internal record ClassifyResult(Guid JobId);
+
+internal record DocumentSuggestionItem(Guid Id, string Field, string Status, string SuggestedValue, string? OriginalValue);
+
+internal record DocumentDetailItem(
+    Guid Id, string Name, string? Summary,
+    IReadOnlyList<DocumentSuggestionItem>? Suggestions = null);
 
 internal record SystemSettingsItem();
 

@@ -24,6 +24,7 @@ public record GetDocumentsResponse
     public string? DeletedByUserName { get; init; }
     public int VersionCount { get; init; }
     public bool HasThumbnail { get; init; }
+    public bool HasPendingSuggestions { get; init; }
     public string? MatchSnippet { get; init; }
     public required IReadOnlyList<GetDocumentsTagDto> Tags { get; init; }
     public required IReadOnlyList<GetDocumentsPartyDto> Parties { get; init; }

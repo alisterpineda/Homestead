@@ -376,6 +376,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         updatedAt: '2026-01-01T00:00:00Z',
         parties: [],
         tags: [],
+        suggestions: [],
         versions: [makeVersion()],
         extractedText: 'server text',
         ...overrides,

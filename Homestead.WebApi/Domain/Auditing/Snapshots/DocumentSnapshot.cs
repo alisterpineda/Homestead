@@ -8,6 +8,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
     public DateOnly? DocumentDate { get; init; }
     public DateOnly? ExpiryDate { get; init; }
     public string Notes { get; init; } = string.Empty;
+    public string? Summary { get; init; }
     public required List<string> TagPaths { get; init; }
     public required List<Guid> PartyIds { get; init; }
     public Guid? GroupId { get; init; }
@@ -18,6 +19,7 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
         DocumentDate = source.DocumentDate,
         ExpiryDate = source.ExpiryDate,
         Notes = source.Notes,
+        Summary = source.Summary,
         TagPaths = source.DocumentTags.Select(dt => dt.Tag.Path).Order().ToList(),
         PartyIds = source.DocumentParties.Select(dp => dp.PartyId).Order().ToList(),
         GroupId = source.GroupId
@@ -35,6 +37,8 @@ public record DocumentSnapshot : IAuditSnapshot<DocumentSnapshot, Document>
             changes.Add(new ScalarFieldChange("ExpiryDate", ExpiryDate?.ToString(), other.ExpiryDate?.ToString()));
         if (Notes != other.Notes)
             changes.Add(new ScalarFieldChange("Notes", Notes, other.Notes));
+        if (Summary != other.Summary)
+            changes.Add(new ScalarFieldChange("Summary", Summary, other.Summary));
         if (!TagPaths.SequenceEqual(other.TagPaths))
             changes.Add(new ArrayFieldChange("TagPaths", TagPaths, other.TagPaths));
         if (!PartyIds.SequenceEqual(other.PartyIds))

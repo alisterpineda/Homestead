@@ -17,6 +17,13 @@ import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
 import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
 import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
+import { classifyDocument } from '@/api/generated/fn/documents/classify-document';
+import { bulkClassifyDocuments } from '@/api/generated/fn/documents/bulk-classify-documents';
+import { approveSuggestion } from '@/api/generated/fn/documents/approve-suggestion';
+import { declineSuggestion } from '@/api/generated/fn/documents/decline-suggestion';
+import { approveAllSuggestions } from '@/api/generated/fn/documents/approve-all-suggestions';
+import { declineAllSuggestions } from '@/api/generated/fn/documents/decline-all-suggestions';
+import { getAiProviderSummaries } from '@/api/generated/fn/documents/get-ai-provider-summaries';
 import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
@@ -29,6 +36,9 @@ import type { PermanentlyDeleteDocumentsResponse } from '@/api/generated/models/
 import type { EmptyTrashResponse } from '@/api/generated/models/empty-trash-response';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
 import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
+import type { ClassifyDocumentResponse } from '@/api/generated/models/classify-document-response';
+import type { BulkClassifyDocumentsResponse } from '@/api/generated/models/bulk-classify-documents-response';
+import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
 
 export type { GetDocuments$Params } from '@/api/generated/fn/documents/get-documents';
 export type { GetDocument$Params } from '@/api/generated/fn/documents/get-document';
@@ -43,6 +53,12 @@ export type { BulkPermanentlyDeleteDocuments$Params } from '@/api/generated/fn/d
 export type { EmptyTrash$Params } from '@/api/generated/fn/documents/empty-trash';
 export type { GetMyGroups$Params } from '@/api/generated/fn/documents/get-my-groups';
 export type { PatchDocumentSettings$Params } from '@/api/generated/fn/documents/patch-document-settings';
+export type { ClassifyDocument$Params } from '@/api/generated/fn/documents/classify-document';
+export type { BulkClassifyDocuments$Params } from '@/api/generated/fn/documents/bulk-classify-documents';
+export type { ApproveSuggestion$Params } from '@/api/generated/fn/documents/approve-suggestion';
+export type { DeclineSuggestion$Params } from '@/api/generated/fn/documents/decline-suggestion';
+export type { ApproveAllSuggestions$Params } from '@/api/generated/fn/documents/approve-all-suggestions';
+export type { DeclineAllSuggestions$Params } from '@/api/generated/fn/documents/decline-all-suggestions';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentApiService {
@@ -103,6 +119,34 @@ export class DocumentApiService {
 
   patchDocumentSettings(params: Parameters<typeof patchDocumentSettings>[2]): Observable<DocumentSettingsResponse> {
     return patchDocumentSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  classifyDocument(params: Parameters<typeof classifyDocument>[2]): Observable<ClassifyDocumentResponse> {
+    return classifyDocument(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  bulkClassifyDocuments(params: Parameters<typeof bulkClassifyDocuments>[2]): Observable<BulkClassifyDocumentsResponse> {
+    return bulkClassifyDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  approveSuggestion(params: Parameters<typeof approveSuggestion>[2]): Observable<void> {
+    return approveSuggestion(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  declineSuggestion(params: Parameters<typeof declineSuggestion>[2]): Observable<void> {
+    return declineSuggestion(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  approveAllSuggestions(params: Parameters<typeof approveAllSuggestions>[2]): Observable<void> {
+    return approveAllSuggestions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  declineAllSuggestions(params: Parameters<typeof declineAllSuggestions>[2]): Observable<void> {
+    return declineAllSuggestions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getAiProviderSummaries(): Observable<Array<AiProviderSummary>> {
+    return getAiProviderSummaries(this.http, this.config.rootUrl).pipe(map(r => r.body));
   }
 
   getDocumentFile(id: string, versionId?: string | null): Observable<Blob> {

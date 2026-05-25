@@ -31,11 +31,13 @@ import {
   lucideChevronLeft,
   lucideChevronRight,
   lucideX,
+  lucideCheck,
   lucideMessageSquare,
   lucideHistory,
   lucideSend,
   lucideRefreshCw,
   lucideArrowLeft,
+  lucideSparkles,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -58,7 +60,9 @@ import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
 import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { NgScrollbar } from 'ngx-scrollbar';
+import { HlmTooltipImports } from '@/shared/components/spartan/tooltip';
 import { TagInputComponent } from '../tags/tag-input/tag-input.component';
+import { TagBadgeComponent } from '../tags/tag-badge/tag-badge.component';
 import { PartyInputComponent } from '../parties/party-input/party-input.component';
 import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
@@ -69,6 +73,7 @@ import { DocumentVersionApiService } from '@/api/services/document-version-api.s
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import type { DocumentSuggestionDto } from '@/api/generated/models/document-suggestion-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
 import { AuthService } from '@/shared/services/auth.service';
@@ -99,8 +104,10 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmFormFieldImports,
     HlmLabel,
     TagInputComponent,
+    TagBadgeComponent,
     PartyInputComponent,
     HlmTextareaImports,
+    HlmTooltipImports,
     HlmSeparatorImports,
     HlmScrollAreaImports,
     HlmInputGroupImports,
@@ -125,11 +132,13 @@ import { toast } from '@spartan-ng/brain/sonner';
       lucideChevronLeft,
       lucideChevronRight,
       lucideX,
+      lucideCheck,
       lucideMessageSquare,
       lucideHistory,
       lucideSend,
       lucideRefreshCw,
       lucideArrowLeft,
+      lucideSparkles,
     }),
   ],
   template: `
@@ -226,6 +235,10 @@ import { toast } from '@spartan-ng/brain/sonner';
             </button>
             <ng-template #moreMenu>
               <hlm-dropdown-menu class="w-48">
+                <button hlmDropdownMenuItem (triggered)="handleClassify()">
+                  <ng-icon hlm name="lucideSparkles" size="sm" />
+                  <span>Classify</span>
+                </button>
                 <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
                   <span>Add Version</span>
@@ -325,16 +338,74 @@ import { toast } from '@spartan-ng/brain/sonner';
 
       <ng-template #infoContent>
         <div class="space-y-4">
+          <!-- AI Suggestions summary -->
+          @if (pendingSuggestionCount() >= 2) {
+            <div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+              <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
+              <span class="text-muted-foreground">AI suggestions ({{ pendingSuggestionCount() }})</span>
+              <span class="ml-auto flex items-center gap-1">
+                <button hlmBtn variant="ghost" size="sm" (click)="approveAllSuggestions()">Approve all</button>
+                <button hlmBtn variant="ghost" size="sm" (click)="declineAllSuggestions()">Decline all</button>
+              </span>
+            </div>
+          }
+
           <!-- Name -->
           <hlm-form-field>
-            <label hlmLabel for="doc-name">Name</label>
+            <div class="flex items-center gap-2">
+              <label hlmLabel for="doc-name">Name</label>
+              @if (pendingNameSuggestion(); as suggestion) {
+                <span hlmBadge variant="outline" class="text-xs gap-1">
+                  <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
+                  AI
+                </span>
+              }
+            </div>
             <input
               hlmInput
               id="doc-name"
               [value]="editName()"
               (input)="editName.set(asInputValue($event))"
             />
+            @if (pendingNameSuggestion(); as suggestion) {
+              <div class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <span [hlmTooltip]="'Original: ' + (suggestion.originalValue ?? '(none)')">Suggested: {{ suggestion.suggestedValue }}</span>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve name suggestion">
+                  <ng-icon hlm name="lucideCheck" size="xs" />
+                </button>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline name suggestion">
+                  <ng-icon hlm name="lucideX" size="xs" />
+                </button>
+              </div>
+            }
           </hlm-form-field>
+
+          <!-- Summary -->
+          @if (pendingSummarySuggestion(); as suggestion) {
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <label hlmLabel>Summary</label>
+                <span hlmBadge variant="outline" class="text-xs gap-1">
+                  <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
+                  AI
+                </span>
+              </div>
+              <p class="text-sm text-muted-foreground">{{ suggestion.suggestedValue }}</p>
+              <div class="flex items-center gap-1">
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve summary suggestion">
+                  <ng-icon hlm name="lucideCheck" size="xs" />
+                </button>
+                <button hlmBtn variant="ghost" size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline summary suggestion">
+                  <ng-icon hlm name="lucideX" size="xs" />
+                </button>
+              </div>
+            </div>
+          } @else if (document()?.summary) {
+            <div class="space-y-2">
+              <label hlmLabel>Summary</label>
+              <p class="text-sm text-muted-foreground">{{ document()!.summary }}</p>
+            </div>
+          }
 
           <!-- Parties -->
           <div class="space-y-2">
@@ -346,6 +417,19 @@ import { toast } from '@spartan-ng/brain/sonner';
           <div class="space-y-2">
             <label hlmLabel>Tags</label>
             <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
+            @if (pendingTagSuggestions().length > 0) {
+              <div class="flex flex-wrap gap-1.5 mt-1">
+                @for (suggestion of pendingTagSuggestions(); track suggestion.id) {
+                  <app-tag-badge
+                    [path]="suggestion.tag!.path"
+                    [color]="suggestion.tag!.effectiveColor ?? suggestion.tag!.color"
+                    [aiSuggested]="true"
+                    (approved)="approveSuggestion(suggestion.id)"
+                    (declined)="declineSuggestion(suggestion.id)"
+                  />
+                }
+              </div>
+            }
           </div>
 
           <!-- Document Date -->
@@ -860,6 +944,26 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return map;
   });
 
+  // AI suggestion computed signals
+  pendingSuggestions = computed(() =>
+    (this.document()?.suggestions ?? []).filter(s => s.status === 'Pending'),
+  );
+  pendingNameSuggestion = computed(() =>
+    this.pendingSuggestions().find(s => s.field === 'Name'),
+  );
+  pendingSummarySuggestion = computed(() =>
+    this.pendingSuggestions().find(s => s.field === 'Summary'),
+  );
+  pendingTagSuggestions = computed(() => {
+    const suggestions = this.pendingSuggestions().filter(s => s.field === 'Tags');
+    const tags = this.document()?.tags ?? [];
+    const tagById = new Map(tags.map(t => [t.id, t]));
+    return suggestions
+      .map(s => ({ ...s, tag: tagById.get(s.suggestedValue) }))
+      .filter(s => s.tag != null);
+  });
+  pendingSuggestionCount = computed(() => this.pendingSuggestions().length);
+
   constructor() {
     // Save edit state when documentId changes (component reuse on sidebar navigation)
     // and initialize edit fields when a new document loads.
@@ -1162,6 +1266,82 @@ export class DocumentDetailPageComponent implements OnDestroy {
       loading: 'Reprocessing text extraction...',
       success: 'Text extraction completed successfully.',
       error: (err: unknown) => `Reprocessing failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+    });
+  }
+
+  handleClassify(): void {
+    const id = this.documentId();
+    if (!id) return;
+    this.documentApi.classifyDocument({ documentId: id }).pipe(
+      handleMutationError(this.errorHandler, signal(false), 'Failed to start classification.'),
+    ).subscribe({
+      next: (r) => {
+        toast.promise(this.processingHub.waitForJob(r.jobId), {
+          loading: 'Classifying document...',
+          success: 'Classification completed.',
+          error: (err: unknown) => `Classification failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+        });
+      },
+    });
+  }
+
+  approveSuggestion(suggestionId: string): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    this.documentApi.approveSuggestion({ documentId: docId, suggestionId }).pipe(
+      handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestion.'),
+    ).subscribe({
+      next: () => {
+        this.initializedDocId = null;
+        this.initializedVersionId = null;
+        this.refreshTrigger.update(v => v + 1);
+        toast.success('Suggestion approved.');
+      },
+    });
+  }
+
+  declineSuggestion(suggestionId: string): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    this.documentApi.declineSuggestion({ documentId: docId, suggestionId }).pipe(
+      handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestion.'),
+    ).subscribe({
+      next: () => {
+        this.initializedDocId = null;
+        this.initializedVersionId = null;
+        this.refreshTrigger.update(v => v + 1);
+        toast.success('Suggestion declined.');
+      },
+    });
+  }
+
+  approveAllSuggestions(): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    this.documentApi.approveAllSuggestions({ documentId: docId }).pipe(
+      handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestions.'),
+    ).subscribe({
+      next: () => {
+        this.initializedDocId = null;
+        this.initializedVersionId = null;
+        this.refreshTrigger.update(v => v + 1);
+        toast.success('All suggestions approved.');
+      },
+    });
+  }
+
+  declineAllSuggestions(): void {
+    const docId = this.documentId();
+    if (!docId) return;
+    this.documentApi.declineAllSuggestions({ documentId: docId }).pipe(
+      handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestions.'),
+    ).subscribe({
+      next: () => {
+        this.initializedDocId = null;
+        this.initializedVersionId = null;
+        this.refreshTrigger.update(v => v + 1);
+        toast.success('All suggestions declined.');
+      },
     });
   }
 

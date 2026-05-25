@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Documents;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Infrastructure.Thumbnails;
@@ -96,7 +97,8 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 {
                     Id = dp.Party.Id,
                     Name = dp.Party.Name
-                }).ToList()
+                }).ToList(),
+                HasPendingSuggestions = d.Suggestions.Any(s => s.Status == DocumentSuggestionStatus.Pending)
             })
             .Select(d => new GetDocumentsResponse
             {
@@ -122,6 +124,7 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
                 DeletedByUserName = d.DeletedByUserName,
                 VersionCount = d.VersionCount,
                 HasThumbnail = d.LatestVersion != null && ThumbnailService.CanGenerate(d.LatestVersion.ContentType),
+                HasPendingSuggestions = d.HasPendingSuggestions,
                 MatchSnippet = d.MatchSnippet,
                 Tags = d.Tags,
                 Parties = d.Parties

@@ -28,6 +28,8 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
             .HasForeignKey(d => d.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.Property(d => d.Summary);
+
         builder.Property(d => d.DocumentDate);
         builder.Property(d => d.ExpiryDate);
         builder.Property(d => d.Notes);
