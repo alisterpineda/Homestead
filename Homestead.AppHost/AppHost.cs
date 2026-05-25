@@ -2,7 +2,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume()
-    .WithPgWeb();
+    .WithPgAdmin();
 var postgresdb = postgres.AddDatabase("postgresdb");
 
 var keycloak = builder.AddKeycloak("keycloak", 8080)
