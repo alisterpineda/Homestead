@@ -5,7 +5,7 @@ using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Infrastructure.AiClassification;
+namespace Homestead.WebApi.Modules.Documents.Services;
 
 public class AiProviderResolver(AppDbContext db) : IAiProviderResolver
 {

@@ -1,6 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Infrastructure.AiClassification.Configurations;
+using Homestead.WebApi.Infrastructure.Ai.Configurations;
 
 namespace Homestead.WebApi.Modules.Admin.Features.AiProviders;
 

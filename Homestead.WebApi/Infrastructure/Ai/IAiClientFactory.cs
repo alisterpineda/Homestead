@@ -1,7 +1,7 @@
 using Homestead.WebApi.Domain.Settings;
 using Microsoft.Extensions.AI;
 
-namespace Homestead.WebApi.Infrastructure.AiClassification;
+namespace Homestead.WebApi.Infrastructure.Ai;
 
 public interface IAiClientFactory
 {

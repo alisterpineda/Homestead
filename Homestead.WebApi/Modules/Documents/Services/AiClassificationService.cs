@@ -1,8 +1,9 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
 
-namespace Homestead.WebApi.Infrastructure.AiClassification;
+namespace Homestead.WebApi.Modules.Documents.Services;
 
 public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiClassificationService> logger)
     : IAiClassificationService

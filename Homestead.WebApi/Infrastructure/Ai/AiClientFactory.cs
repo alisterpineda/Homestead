@@ -1,10 +1,10 @@
 using System.ClientModel;
 using Azure.AI.OpenAI;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Infrastructure.AiClassification.Configurations;
+using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
 
-namespace Homestead.WebApi.Infrastructure.AiClassification;
+namespace Homestead.WebApi.Infrastructure.Ai;
 
 public class AiClientFactory : IAiClientFactory
 {

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Infrastructure.AiClassification;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
+using Homestead.WebApi.Modules.Documents.Services;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homestead.WebApi.Tests.Unit.Infrastructure;
+namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class AiProviderResolverTests : IDisposable
 {

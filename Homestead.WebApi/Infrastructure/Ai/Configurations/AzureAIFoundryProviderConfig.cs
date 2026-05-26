@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Homestead.WebApi.Infrastructure.AiClassification.Configurations;
+namespace Homestead.WebApi.Infrastructure.Ai.Configurations;
 
 public record AzureAIFoundryProviderConfig
 {

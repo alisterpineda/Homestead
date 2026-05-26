@@ -1,4 +1,4 @@
-using Homestead.WebApi.Infrastructure.AiClassification.Configurations;
+using Homestead.WebApi.Infrastructure.Ai.Configurations;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure;
 

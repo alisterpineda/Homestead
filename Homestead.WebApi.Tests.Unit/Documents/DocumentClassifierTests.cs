@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Infrastructure.AiClassification;
 using Homestead.WebApi.Modules.Documents.Services;
 using NSubstitute;
 

@@ -1,4 +1,3 @@
-using Homestead.WebApi.Infrastructure.AiClassification;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 

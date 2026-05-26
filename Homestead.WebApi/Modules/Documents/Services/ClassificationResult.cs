@@ -1,4 +1,4 @@
-namespace Homestead.WebApi.Infrastructure.AiClassification;
+namespace Homestead.WebApi.Modules.Documents.Services;
 
 public record ClassificationResult(
     List<Guid> MatchedTagIds,
