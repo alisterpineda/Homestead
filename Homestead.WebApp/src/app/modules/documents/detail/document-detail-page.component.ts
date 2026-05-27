@@ -340,7 +340,7 @@ import { toast } from '@spartan-ng/brain/sonner';
       <ng-template #infoContent>
         <div class="space-y-4">
           <!-- AI Suggestions summary -->
-          @if (totalSuggestionCount() >= 2) {
+          @if (totalSuggestionCount() > 0) {
             <div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
               <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
               <span class="text-muted-foreground">AI suggestions ({{ totalSuggestionCount() }})</span>
@@ -359,43 +359,38 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <!-- Name -->
           <hlm-form-field>
-            <div class="flex items-center gap-2">
-              <label hlmLabel for="doc-name">Name</label>
-              @if (pendingNameSuggestion(); as suggestion) {
-                <span hlmBadge variant="outline" class="text-xs gap-1">
-                  <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
-                  AI
+            <label hlmLabel for="doc-name">
+              Name
+              @if (pendingNameSuggestion() || nameIsAiSuggested()) {
+                <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
+                  <ng-icon hlm name="lucideSparkles" size="xs" />
+                  AI Suggested
                 </span>
               }
-            </div>
-            <input
-              hlmInput
-              id="doc-name"
-              [value]="editName()"
-              (input)="editName.set(asInputValue($event))"
-            />
+            </label>
             @if (pendingNameSuggestion(); as suggestion) {
-              <div class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <span [hlmTooltip]="'Original: ' + (suggestion.originalValue ?? '(none)')">Suggested: {{ suggestion.suggestedValue }}</span>
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve name suggestion">
+              <hlm-input-group>
+                <input
+                  hlmInputGroupInput
+                  id="doc-name"
+                  [value]="editName()"
+                  (input)="editName.set(asInputValue($event)); appliedTransientName.set(null)"
+                  [hlmTooltip]="'Original: ' + (suggestion.originalValue ?? '(none)')"
+                />
+                <button hlmInputGroupButton size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve name suggestion">
                   <ng-icon hlm name="lucideCheck" size="xs" />
                 </button>
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline name suggestion">
+                <button hlmInputGroupButton size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline name suggestion">
                   <ng-icon hlm name="lucideX" size="xs" />
                 </button>
-              </div>
-            }
-            @if (transientNameSuggestion(); as name) {
-              <div class="mt-1 flex items-center gap-1 rounded border border-dashed border-border px-2 py-1 text-xs text-muted-foreground">
-                <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
-                <span class="truncate">{{ name }}</span>
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="applyTransientName()" aria-label="Apply name suggestion">
-                  <ng-icon hlm name="lucideCheck" size="xs" />
-                </button>
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="dismissTransientName()" aria-label="Dismiss name suggestion">
-                  <ng-icon hlm name="lucideX" size="xs" />
-                </button>
-              </div>
+              </hlm-input-group>
+            } @else {
+              <input
+                hlmInput
+                id="doc-name"
+                [value]="editName()"
+                (input)="editName.set(asInputValue($event)); appliedTransientName.set(null)"
+              />
             }
           </hlm-form-field>
 
@@ -554,13 +549,13 @@ import { toast } from '@spartan-ng/brain/sonner';
         <div class="flex h-full flex-col gap-3">
           @if (pendingSummarySuggestion(); as suggestion) {
             <div class="space-y-1.5">
-              <div class="flex items-center gap-2">
-                <label hlmLabel>Summary</label>
-                <span hlmBadge variant="outline" class="text-xs gap-1">
-                  <ng-icon hlm name="lucideSparkles" style="font-size: 10px" />
-                  AI
+              <label hlmLabel>
+                Summary
+                <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
+                  <ng-icon hlm name="lucideSparkles" size="xs" />
+                  AI Suggested
                 </span>
-              </div>
+              </label>
               <p class="text-sm text-muted-foreground">{{ suggestion.suggestedValue }}</p>
               <div class="flex items-center gap-1">
                 <button hlmBtn variant="ghost" size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve summary suggestion">
@@ -769,6 +764,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
   commentSubmitting = signal(false);
   transientClassification = signal<ClassifyPreviewResponse | null>(null);
   classifyingPreview = signal(false);
+  appliedTransientName = signal<string | null>(null);
+  preClassifyName = signal<string | null>(null);
 
   formatBytes = formatBytes;
 
@@ -935,6 +932,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   private fileSub: Subscription | null = null;
   private versionDetailSub: Subscription | null = null;
+  private classifySub: Subscription | null = null;
+  private preserveTransientOnNextInit = false;
 
   private documentData = toSignal(
     combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
@@ -998,10 +997,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
   });
   pendingSuggestionCount = computed(() => this.pendingSuggestions().length);
 
-  transientNameSuggestion = computed(() => {
-    return this.transientClassification()?.suggestedTitle ?? null;
-  });
-
   transientTagSuggestions = computed(() => {
     const tc = this.transientClassification();
     if (!tc?.tags?.length) return [];
@@ -1010,14 +1005,18 @@ export class DocumentDetailPageComponent implements OnDestroy {
   });
 
   hasTransientSuggestions = computed(() =>
-    !!this.transientNameSuggestion()
-    || this.transientTagSuggestions().length > 0,
+    this.transientTagSuggestions().length > 0 || this.nameIsAiSuggested(),
   );
+
+  nameIsAiSuggested = computed(() => {
+    const applied = this.appliedTransientName();
+    return applied !== null && this.editName() === applied;
+  });
 
   totalSuggestionCount = computed(() =>
     this.pendingSuggestionCount()
-    + (this.transientNameSuggestion() ? 1 : 0)
-    + this.transientTagSuggestions().length,
+    + this.transientTagSuggestions().length
+    + (this.nameIsAiSuggested() ? 1 : 0),
   );
 
   constructor() {
@@ -1031,6 +1030,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           untracked(() => this.editStateService.saveState(prevDocId!, this.buildEditState()));
         }
         untracked(() => this.editStateService.setActiveHasChanges(prevDocId!, false));
+        untracked(() => this.classifySub?.unsubscribe());
       }
       prevDocId = id;
     });
@@ -1044,7 +1044,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (doc.id === this.initializedDocId) return;
         this.initializedDocId = doc.id;
 
-        this.transientClassification.set(null);
+        if (this.preserveTransientOnNextInit) {
+          this.preserveTransientOnNextInit = false;
+        } else {
+          this.transientClassification.set(null);
+          this.appliedTransientName.set(null);
+          this.preClassifyName.set(null);
+        }
 
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
@@ -1210,6 +1216,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
     this.fileSub?.unsubscribe();
     this.versionDetailSub?.unsubscribe();
+    this.classifySub?.unsubscribe();
     this.swapBlobUrl(null);
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
@@ -1332,14 +1339,21 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (!id) return;
     this.classifyingPreview.set(true);
     this.transientClassification.set(null);
+    this.appliedTransientName.set(null);
+    this.preClassifyName.set(this.editName());
+    this.classifySub?.unsubscribe();
     const toastId = toast.loading('Classifying document...');
-    this.documentApi.classifyPreview({ documentId: id }).pipe(
+    this.classifySub = this.documentApi.classifyPreview({ documentId: id }).pipe(
       handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
       finalize(() => toast.dismiss(toastId)),
     ).subscribe({
       next: (result) => {
         this.classifyingPreview.set(false);
         this.transientClassification.set(result);
+        if (result.suggestedTitle && this.editName() === this.preClassifyName()) {
+          this.editName.set(result.suggestedTitle);
+          this.appliedTransientName.set(result.suggestedTitle);
+        }
         const count = (result.suggestedTitle ? 1 : 0)
           + (result.tags?.length ?? 0);
         if (count > 0) {
@@ -1349,17 +1363,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
         }
       },
     });
-  }
-
-  applyTransientName(): void {
-    const name = this.transientNameSuggestion();
-    if (!name) return;
-    this.editName.set(name);
-    this.clearTransientName();
-  }
-
-  dismissTransientName(): void {
-    this.clearTransientName();
   }
 
   applyTransientTag(tag: ClassifyPreviewTagDto): void {
@@ -1372,26 +1375,23 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   applyAllTransient(): void {
-    const name = this.transientNameSuggestion();
-    if (name) this.editName.set(name);
     const tags = this.transientTagSuggestions();
     if (tags.length > 0) {
       this.editTags.update(current => [...current, ...tags.map(t => t.path)]);
     }
+    this.appliedTransientName.set(null);
+    this.preClassifyName.set(null);
     this.transientClassification.set(null);
   }
 
   dismissAllTransient(): void {
+    const pre = this.preClassifyName();
+    if (pre !== null) {
+      this.editName.set(pre);
+    }
+    this.appliedTransientName.set(null);
+    this.preClassifyName.set(null);
     this.transientClassification.set(null);
-  }
-
-  private clearTransientName(): void {
-    const tc = this.transientClassification();
-    if (!tc) return;
-    this.transientClassification.set({
-      ...tc,
-      suggestedTitle: null,
-    });
   }
 
   private clearTransientTag(tagId: string): void {
@@ -1410,6 +1410,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestion.'),
     ).subscribe({
       next: () => {
+        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1425,6 +1426,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestion.'),
     ).subscribe({
       next: () => {
+        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1440,6 +1442,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestions.'),
     ).subscribe({
       next: () => {
+        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1455,6 +1458,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestions.'),
     ).subscribe({
       next: () => {
+        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
