@@ -32,7 +32,16 @@ import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
         class="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (tag of value(); track tag) {
-          <app-tag-badge [path]="tag" [color]="colorMap().get(tag) ?? null" [removable]="true" (removed)="removeTag(tag)" />
+          <app-tag-badge
+            [path]="tag"
+            [color]="colorMap().get(tag) ?? null"
+            [aiSuggested]="aiPendingTags().has(tag) || aiTransientTags().has(tag)"
+            [aiTransient]="aiTransientTags().has(tag)"
+            [removable]="!aiPendingTags().has(tag)"
+            (removed)="removeTag(tag)"
+            (approved)="tagApproved.emit(tag)"
+            (declined)="tagDeclined.emit(tag)"
+          />
         }
         <input
           #inputEl
@@ -89,7 +98,11 @@ export class TagInputComponent {
 
   value = input.required<string[]>();
   initialColorMap = input<Record<string, string>>({});
+  aiPendingTags = input<Set<string>>(new Set());
+  aiTransientTags = input<Set<string>>(new Set());
   valueChange = output<string[]>();
+  tagApproved = output<string>();
+  tagDeclined = output<string>();
 
   searchText = signal('');
   showSuggestions = signal(false);
@@ -226,7 +239,10 @@ export class TagInputComponent {
         this.selectOption(options[this.selectedIndex()]);
       }
     } else if (event.key === 'Backspace' && this.searchText() === '' && this.value().length > 0) {
-      this.removeTag(this.value()[this.value().length - 1]);
+      const lastTag = this.value()[this.value().length - 1];
+      if (!this.aiPendingTags().has(lastTag)) {
+        this.removeTag(lastTag);
+      }
     } else if (event.key === 'ArrowDown' && this.showSuggestions()) {
       event.preventDefault();
       this.selectedIndex.update((i) => (i < options.length - 1 ? i + 1 : i));

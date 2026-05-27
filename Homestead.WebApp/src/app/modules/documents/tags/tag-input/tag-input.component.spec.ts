@@ -7,10 +7,21 @@ import { CREATE_OPTION_ID } from '../../bulk-edit-shared';
 
 @Component({
   imports: [TagInputComponent],
-  template: `<app-tag-input [value]="tags()" (valueChange)="tags.set($event)" />`,
+  template: `<app-tag-input
+    [value]="tags()"
+    [aiPendingTags]="aiPendingTags()"
+    [aiTransientTags]="aiTransientTags()"
+    (valueChange)="tags.set($event)"
+    (tagApproved)="lastApproved.set($event)"
+    (tagDeclined)="lastDeclined.set($event)"
+  />`,
 })
 class TestHostComponent {
   tags = signal<string[]>([]);
+  aiPendingTags = signal<Set<string>>(new Set());
+  aiTransientTags = signal<Set<string>>(new Set());
+  lastApproved = signal<string | null>(null);
+  lastDeclined = signal<string | null>(null);
 }
 
 describe('TagInputComponent', () => {
@@ -119,5 +130,66 @@ describe('TagInputComponent', () => {
 
     expect(fixture.componentInstance.tags()).toContain('finance');
     expect(component.colorMap().get('finance')).toBe('#ff0000');
+  });
+
+  it('renders AI-pending tag with approve/decline buttons', () => {
+    fixture.componentInstance.tags.set(['finance']);
+    fixture.componentInstance.aiPendingTags.set(new Set(['finance']));
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('app-tag-badge');
+    expect(badge).toBeTruthy();
+    const approveBtn = badge.querySelector('[aria-label="Approve suggestion"]');
+    const declineBtn = badge.querySelector('[aria-label="Decline suggestion"]');
+    expect(approveBtn).toBeTruthy();
+    expect(declineBtn).toBeTruthy();
+    const removeBtn = badge.querySelector('button:not([aria-label])');
+    expect(removeBtn).toBeFalsy();
+  });
+
+  it('renders AI-transient tag with remove button only', () => {
+    fixture.componentInstance.tags.set(['taxes']);
+    fixture.componentInstance.aiTransientTags.set(new Set(['taxes']));
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('app-tag-badge');
+    expect(badge).toBeTruthy();
+    const approveBtn = badge.querySelector('[aria-label="Approve suggestion"]');
+    expect(approveBtn).toBeFalsy();
+    const removeBtn = badge.querySelector('[aria-label="Remove tag"]');
+    expect(removeBtn).toBeTruthy();
+  });
+
+  it('emits tagApproved when approve is clicked on a pending tag', () => {
+    fixture.componentInstance.tags.set(['finance']);
+    fixture.componentInstance.aiPendingTags.set(new Set(['finance']));
+    fixture.detectChanges();
+
+    const approveBtn = fixture.nativeElement.querySelector('[aria-label="Approve suggestion"]');
+    approveBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.lastApproved()).toBe('finance');
+  });
+
+  it('emits tagDeclined when decline is clicked on a pending tag', () => {
+    fixture.componentInstance.tags.set(['finance']);
+    fixture.componentInstance.aiPendingTags.set(new Set(['finance']));
+    fixture.detectChanges();
+
+    const declineBtn = fixture.nativeElement.querySelector('[aria-label="Decline suggestion"]');
+    declineBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.lastDeclined()).toBe('finance');
+  });
+
+  it('pending tags are not removable via backspace', () => {
+    fixture.componentInstance.tags.set(['finance']);
+    fixture.componentInstance.aiPendingTags.set(new Set(['finance']));
+    fixture.detectChanges();
+
+    component.onKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+    expect(fixture.componentInstance.tags()).toContain('finance');
   });
 });

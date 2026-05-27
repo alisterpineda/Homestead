@@ -62,7 +62,6 @@ import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { NgScrollbar } from 'ngx-scrollbar';
 import { HlmTooltipImports } from '@/shared/components/spartan/tooltip';
 import { TagInputComponent } from '../tags/tag-input/tag-input.component';
-import { TagBadgeComponent } from '../tags/tag-badge/tag-badge.component';
 import { PartyInputComponent } from '../parties/party-input/party-input.component';
 import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
@@ -76,7 +75,6 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
 import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
-import type { ClassifyPreviewTagDto } from '@/api/generated/models/classify-preview-tag-dto';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -105,7 +103,6 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmFormFieldImports,
     HlmLabel,
     TagInputComponent,
-    TagBadgeComponent,
     PartyInputComponent,
     HlmTextareaImports,
     HlmTooltipImports,
@@ -403,33 +400,15 @@ import { toast } from '@spartan-ng/brain/sonner';
           <!-- Tags -->
           <div class="space-y-2">
             <label hlmLabel>Tags</label>
-            <app-tag-input [value]="editTags()" [initialColorMap]="tagColorMap()" (valueChange)="editTags.set($event)" />
-            @if (pendingTagSuggestions().length > 0) {
-              <div class="flex flex-wrap gap-1.5 mt-1">
-                @for (suggestion of pendingTagSuggestions(); track suggestion.id) {
-                  <app-tag-badge
-                    [path]="suggestion.tag!.path"
-                    [color]="suggestion.tag!.effectiveColor ?? suggestion.tag!.color"
-                    [aiSuggested]="true"
-                    (approved)="approveSuggestion(suggestion.id)"
-                    (declined)="declineSuggestion(suggestion.id)"
-                  />
-                }
-              </div>
-            }
-            @if (transientTagSuggestions().length > 0) {
-              <div class="flex flex-wrap gap-1.5 mt-1">
-                @for (tag of transientTagSuggestions(); track tag.id) {
-                  <app-tag-badge
-                    [path]="tag.path"
-                    [color]="tag.effectiveColor ?? tag.color"
-                    [aiSuggested]="true"
-                    (approved)="applyTransientTag(tag)"
-                    (declined)="dismissTransientTag(tag)"
-                  />
-                }
-              </div>
-            }
+            <app-tag-input
+              [value]="editTags()"
+              [initialColorMap]="tagColorMap()"
+              [aiPendingTags]="aiPendingTagPaths()"
+              [aiTransientTags]="aiTransientTagPaths()"
+              (valueChange)="onEditTagsChanged($event)"
+              (tagApproved)="approveTagByPath($event)"
+              (tagDeclined)="declineTagByPath($event)"
+            />
           </div>
 
           <!-- Document Date -->
@@ -950,10 +929,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   tagColorMap = computed(() => {
     const doc = this.document();
-    if (!doc?.tags) return {};
     const map: Record<string, string> = {};
-    for (const t of doc.tags) {
-      if (t.color) map[t.path] = t.color;
+    if (doc?.tags) {
+      for (const t of doc.tags) {
+        const c = t.effectiveColor ?? t.color;
+        if (c) map[t.path] = c;
+      }
+    }
+    const tc = this.transientClassification();
+    if (tc?.tags) {
+      for (const t of tc.tags) {
+        const c = t.effectiveColor ?? t.color;
+        if (c) map[t.path] = c;
+      }
     }
     return map;
   });
@@ -975,15 +963,24 @@ export class DocumentDetailPageComponent implements OnDestroy {
   });
   pendingSuggestionCount = computed(() => this.pendingSuggestions().length);
 
-  transientTagSuggestions = computed(() => {
-    const tc = this.transientClassification();
-    if (!tc?.tags?.length) return [];
-    const currentPaths = new Set(this.editTags());
-    return tc.tags.filter(t => !currentPaths.has(t.path));
+  aiPendingTagPaths = computed(() => {
+    const suggestions = this.pendingTagSuggestions();
+    return new Set(suggestions.map(s => s.tag!.path));
+  });
+
+  aiTransientTagPaths = signal<Set<string>>(new Set());
+
+  pendingTagPathToSuggestionId = computed(() => {
+    const suggestions = this.pendingTagSuggestions();
+    const map = new Map<string, string>();
+    for (const s of suggestions) {
+      map.set(s.tag!.path, s.id);
+    }
+    return map;
   });
 
   hasTransientSuggestions = computed(() =>
-    this.transientTagSuggestions().length > 0 || this.nameIsAiSuggested(),
+    this.aiTransientTagPaths().size > 0 || this.nameIsAiSuggested(),
   );
 
   nameIsAiSuggested = computed(() => {
@@ -993,7 +990,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   totalSuggestionCount = computed(() =>
     this.pendingSuggestionCount()
-    + this.transientTagSuggestions().length
+    + this.aiTransientTagPaths().size
     + (this.nameIsAiSuggested() ? 1 : 0),
   );
 
@@ -1022,12 +1019,15 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (doc.id === this.initializedDocId) return;
         this.initializedDocId = doc.id;
 
+        let preservedTransient = false;
         if (this.preserveTransientOnNextInit) {
           this.preserveTransientOnNextInit = false;
+          preservedTransient = true;
         } else {
           this.transientClassification.set(null);
           this.appliedTransientName.set(null);
           this.preClassifyName.set(null);
+          this.aiTransientTagPaths.set(new Set());
         }
 
         const saved = untracked(() => this.editStateService.getState(doc.id));
@@ -1051,6 +1051,20 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editExpiryDate.set(this.origExpiryDate());
           this.editNotes.set(this.origNotes());
           this.initializedVersionId = null;
+        }
+
+        if (preservedTransient) {
+          const transient = this.aiTransientTagPaths();
+          if (transient.size > 0) {
+            const serverPaths = new Set(this.editTags());
+            const stillTransient = [...transient].filter(p => !serverPaths.has(p));
+            if (stillTransient.length > 0) {
+              this.editTags.update(tags => [...tags, ...stillTransient]);
+            }
+            if (stillTransient.length < transient.size) {
+              this.aiTransientTagPaths.set(new Set(stillTransient));
+            }
+          }
         }
       }
     });
@@ -1332,8 +1346,18 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editName.set(result.suggestedTitle);
           this.appliedTransientName.set(result.suggestedTitle);
         }
-        const count = (result.suggestedTitle ? 1 : 0)
-          + (result.tags?.length ?? 0);
+        let newTagCount = 0;
+        if (result.tags?.length) {
+          const currentPaths = new Set(this.editTags());
+          const newPaths = result.tags.filter(t => !currentPaths.has(t.path)).map(t => t.path);
+          newTagCount = newPaths.length;
+          if (newPaths.length > 0) {
+            this.editTags.update(tags => [...tags, ...newPaths]);
+            const existing = this.aiTransientTagPaths();
+            this.aiTransientTagPaths.set(new Set([...existing, ...newPaths]));
+          }
+        }
+        const count = (result.suggestedTitle ? 1 : 0) + newTagCount;
         if (count > 0) {
           toast.success(`${count} suggestion${count === 1 ? '' : 's'} ready to review.`);
         } else {
@@ -1343,42 +1367,56 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
-  applyTransientTag(tag: ClassifyPreviewTagDto): void {
-    this.editTags.update(tags => [...tags, tag.path]);
-    this.clearTransientTag(tag.id);
-  }
-
-  dismissTransientTag(tag: ClassifyPreviewTagDto): void {
-    this.clearTransientTag(tag.id);
-  }
-
   applyAllTransient(): void {
-    const tags = this.transientTagSuggestions();
-    if (tags.length > 0) {
-      this.editTags.update(current => [...current, ...tags.map(t => t.path)]);
-    }
+    this.aiTransientTagPaths.set(new Set());
     this.appliedTransientName.set(null);
     this.preClassifyName.set(null);
-    this.transientClassification.set(null);
   }
 
   dismissAllTransient(): void {
+    const transientPaths = this.aiTransientTagPaths();
+    if (transientPaths.size > 0) {
+      this.editTags.update(tags => tags.filter(t => !transientPaths.has(t)));
+    }
     const pre = this.preClassifyName();
     if (pre !== null) {
       this.editName.set(pre);
     }
+    this.aiTransientTagPaths.set(new Set());
     this.appliedTransientName.set(null);
     this.preClassifyName.set(null);
     this.transientClassification.set(null);
   }
 
-  private clearTransientTag(tagId: string): void {
-    const tc = this.transientClassification();
-    if (!tc) return;
-    this.transientClassification.set({
-      ...tc,
-      tags: tc.tags.filter(t => t.id !== tagId),
-    });
+  approveTagByPath(path: string): void {
+    const suggestionId = this.pendingTagPathToSuggestionId().get(path);
+    if (suggestionId) {
+      this.approveSuggestion(suggestionId);
+    } else {
+      toast.error('Could not find suggestion to approve.');
+    }
+  }
+
+  declineTagByPath(path: string): void {
+    const suggestionId = this.pendingTagPathToSuggestionId().get(path);
+    if (suggestionId) {
+      this.declineSuggestion(suggestionId);
+    } else {
+      toast.error('Could not find suggestion to decline.');
+    }
+  }
+
+  onEditTagsChanged(newTags: string[]): void {
+    const newSet = new Set(newTags);
+    const removed = new Set(this.editTags().filter(t => !newSet.has(t)));
+    this.editTags.set(newTags);
+    if (removed.size > 0) {
+      const transient = this.aiTransientTagPaths();
+      const updated = new Set([...transient].filter(t => !removed.has(t)));
+      if (updated.size !== transient.size) {
+        this.aiTransientTagPaths.set(updated);
+      }
+    }
   }
 
   approveSuggestion(suggestionId: string): void {
@@ -1471,6 +1509,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
       next: () => {
         this.saving.set(false);
         this.transientClassification.set(null);
+        this.aiTransientTagPaths.set(new Set());
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values

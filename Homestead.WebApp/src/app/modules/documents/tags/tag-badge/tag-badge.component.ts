@@ -12,9 +12,10 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   template: `
     <span
       hlmBadge
-      [variant]="color() ? 'default' : 'secondary'"
-      [class.tag-badge-colored]="color()"
+      [variant]="color() && !aiSuggested() ? 'default' : 'secondary'"
+      [class.tag-badge-colored]="color() && !aiSuggested()"
       [class.border-dashed]="aiSuggested()"
+      [class.tag-badge-ai]="aiSuggested()"
       class="badge-inner gap-1"
       [style.--tag-color]="color()"
     >
@@ -22,7 +23,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
         <ng-icon hlm name="lucideSparkles" class="shrink-0" size="xs" />
       }
       <span class="truncate min-w-0">{{ compact() ? compactPath() : path() }}</span>
-      @if (aiSuggested()) {
+      @if (aiSuggested() && !aiTransient()) {
         <button
           type="button"
           (click)="onApprove($event)"
@@ -39,11 +40,12 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
         >
           <ng-icon hlm name="lucideX" size="xs" />
         </button>
-      } @else if (removable()) {
+      } @else if ((aiSuggested() && aiTransient()) || removable()) {
         <button
           type="button"
           (click)="onRemove($event)"
           class="ml-0.5 cursor-pointer rounded hover:bg-muted-foreground/20"
+          aria-label="Remove tag"
         >
           <ng-icon hlm name="lucideX" size="xs" />
         </button>
@@ -71,6 +73,16 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
       background-color: color-mix(in oklch, var(--tag-color) 15%, black);
       color: oklch(from var(--tag-color) max(l, 0.75) c h);
     }
+
+    .tag-badge-ai {
+      background-color: color-mix(in oklch, var(--ai) 10%, white);
+      color: var(--ai);
+      border-color: transparent;
+    }
+
+    :host-context(.dark) .tag-badge-ai {
+      background-color: color-mix(in oklch, var(--ai) 20%, black);
+    }
   `,
 })
 export class TagBadgeComponent {
@@ -79,6 +91,7 @@ export class TagBadgeComponent {
   removable = input(false);
   compact = input(false);
   aiSuggested = input(false);
+  aiTransient = input(false);
   removed = output<void>();
   approved = output<void>();
   declined = output<void>();
