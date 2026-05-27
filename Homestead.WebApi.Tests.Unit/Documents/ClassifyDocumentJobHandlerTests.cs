@@ -57,9 +57,8 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         Assert.Equal("AI summary", doc.Summary);
 
         var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == _documentId).ToList();
-        Assert.Equal(3, suggestions.Count);
+        Assert.Equal(2, suggestions.Count);
         Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Name);
-        Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Summary);
         Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Tags);
     }
 

@@ -547,26 +547,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
       <ng-template #textContent>
         <div class="flex h-full flex-col gap-3">
-          @if (pendingSummarySuggestion(); as suggestion) {
-            <div class="space-y-1.5">
-              <label hlmLabel>
-                Summary
-                <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
-                  <ng-icon hlm name="lucideSparkles" size="xs" />
-                  AI Suggested
-                </span>
-              </label>
-              <p class="text-sm text-muted-foreground">{{ suggestion.suggestedValue }}</p>
-              <div class="flex items-center gap-1">
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve summary suggestion">
-                  <ng-icon hlm name="lucideCheck" size="xs" />
-                </button>
-                <button hlmBtn variant="ghost" size="icon-xs" (click)="declineSuggestion(suggestion.id)" aria-label="Decline summary suggestion">
-                  <ng-icon hlm name="lucideX" size="xs" />
-                </button>
-              </div>
-            </div>
-          } @else if (document()?.summary) {
+          @if (document()?.summary) {
             <div class="space-y-1.5">
               <label hlmLabel>Summary</label>
               <p class="text-sm text-muted-foreground">{{ document()!.summary }}</p>
@@ -983,9 +964,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
   );
   pendingNameSuggestion = computed(() =>
     this.pendingSuggestions().find(s => s.field === 'Name'),
-  );
-  pendingSummarySuggestion = computed(() =>
-    this.pendingSuggestions().find(s => s.field === 'Summary'),
   );
   pendingTagSuggestions = computed(() => {
     const suggestions = this.pendingSuggestions().filter(s => s.field === 'Tags');

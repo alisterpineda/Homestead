@@ -43,17 +43,6 @@ public class SuggestionTests : IntegrationTestBase
             CreatedAt = DateTimeOffset.UtcNow
         });
 
-        db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            Id = Guid.NewGuid(),
-            DocumentId = docId,
-            Field = DocumentSuggestionField.Summary,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = "This is an AI-generated summary.",
-            AiProviderId = provider.Id,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-
         var document = await db.Documents.FirstAsync(d => d.Id == docId, CT);
         document.Name = "AI Suggested Title";
         document.Summary = "This is an AI-generated summary.";
@@ -73,9 +62,8 @@ public class SuggestionTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var doc = await response.Content.ReadFromJsonAsync<DocumentDetailItem>(CT);
         Assert.NotNull(doc!.Suggestions);
-        Assert.Equal(2, doc.Suggestions.Count);
+        Assert.Equal(1, doc.Suggestions.Count);
         Assert.Contains(doc.Suggestions, s => s.Field == "Name");
-        Assert.Contains(doc.Suggestions, s => s.Field == "Summary");
     }
 
     [Fact]
@@ -125,27 +113,6 @@ public class SuggestionTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task DeclineSuggestion_Summary_ClearsSummary()
-    {
-        var docId = await SeedDocumentWithSuggestionsAsync();
-        var client = await CreateAdminClientAsync();
-
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var suggestion = await db.DocumentSuggestions
-            .FirstAsync(s => s.DocumentId == docId && s.Field == DocumentSuggestionField.Summary, CT);
-
-        var response = await client.PostAsync(
-            $"/api/v1/documents/{docId}/suggestions/{suggestion.Id}/decline", null, CT);
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-
-        db.ChangeTracker.Clear();
-        var doc = await db.Documents.FirstAsync(d => d.Id == docId, CT);
-        Assert.Null(doc.Summary);
-    }
-
-    [Fact]
     public async Task ApproveAllSuggestions_ApprovesAllPending()
     {
         var docId = await SeedDocumentWithSuggestionsAsync();
@@ -166,7 +133,7 @@ public class SuggestionTests : IntegrationTestBase
         var approved = await db.DocumentSuggestions
             .Where(s => s.DocumentId == docId && s.Status == DocumentSuggestionStatus.Approved)
             .CountAsync(CT);
-        Assert.Equal(2, approved);
+        Assert.Equal(1, approved);
     }
 
     [Fact]
@@ -184,11 +151,11 @@ public class SuggestionTests : IntegrationTestBase
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var doc = await db.Documents.FirstAsync(d => d.Id == docId, CT);
         Assert.Equal("suggestion-test.pdf", doc.Name);
-        Assert.Null(doc.Summary);
+        Assert.Equal("This is an AI-generated summary.", doc.Summary);
 
         var declined = await db.DocumentSuggestions
             .Where(s => s.DocumentId == docId && s.Status == DocumentSuggestionStatus.Declined)
             .CountAsync(CT);
-        Assert.Equal(2, declined);
+        Assert.Equal(1, declined);
     }
 }

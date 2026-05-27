@@ -40,7 +40,7 @@ public class ClassifyDocumentJobHandler(
 
             ApplyTags(document, output.Classification.MatchedTagIds, output.ProviderId);
             ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
-            ApplySummary(document, output.Classification.Summary, output.ProviderId);
+            ApplySummary(document, output.Classification.Summary);
 
             await db.SaveChangesAsync(ct);
             await searchVectorUpdater.UpdateSearchVectorAsync(payload.DocumentId, ct);
@@ -83,10 +83,6 @@ public class ClassifyDocumentJobHandler(
                 case DocumentSuggestionField.Name:
                     if (suggestion.OriginalValue is not null)
                         document.Name = suggestion.OriginalValue;
-                    break;
-
-                case DocumentSuggestionField.Summary:
-                    document.Summary = null;
                     break;
             }
 
@@ -143,21 +139,11 @@ public class ClassifyDocumentJobHandler(
         });
     }
 
-    private void ApplySummary(Document document, string summary, Guid providerId)
+    private static void ApplySummary(Document document, string summary)
     {
         if (string.IsNullOrWhiteSpace(summary))
             return;
 
         document.Summary = summary;
-
-        db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            DocumentId = document.Id,
-            Field = DocumentSuggestionField.Summary,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = summary,
-            AiProviderId = providerId,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
     }
 }

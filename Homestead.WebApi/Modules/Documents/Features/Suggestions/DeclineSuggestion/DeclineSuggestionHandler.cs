@@ -39,11 +39,6 @@ public class DeclineSuggestionHandler(AppDbContext db, ISearchVectorUpdater sear
                     needsSearchUpdate = true;
                 }
                 break;
-
-            case DocumentSuggestionField.Summary:
-                suggestion.Document.Summary = null;
-                needsSearchUpdate = true;
-                break;
         }
 
         suggestion.Status = DocumentSuggestionStatus.Declined;

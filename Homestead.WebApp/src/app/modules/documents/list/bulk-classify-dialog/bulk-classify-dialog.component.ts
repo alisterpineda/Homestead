@@ -39,7 +39,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           <h2 hlmDialogTitle>AI Classification</h2>
           <p hlmDialogDescription>
             This will classify {{ documentCount() }}
-            selected document{{ documentCount() > 1 ? 's' : '' }} using AI. Suggestions for name, summary, and tags will be generated.
+            selected document{{ documentCount() > 1 ? 's' : '' }} using AI. Suggestions for name and tags will be generated.
           </p>
         </div>
 
