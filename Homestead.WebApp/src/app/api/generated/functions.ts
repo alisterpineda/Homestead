@@ -43,8 +43,6 @@ export type { GetTextExtractionEngineSummaries$Params as GetTextExtractionEngine
 export { getTextExtractionEngineSummaries as getTextExtractionEngineSummaries } from './fn/documents/get-text-extraction-engine-summaries';
 export type { GetAiProviderSummaries$Params as GetAiProviderSummaries$Params } from './fn/documents/get-ai-provider-summaries';
 export { getAiProviderSummaries as getAiProviderSummaries } from './fn/documents/get-ai-provider-summaries';
-export type { ClassifyDocument$Params as ClassifyDocument$Params } from './fn/documents/classify-document';
-export { classifyDocument as classifyDocument } from './fn/documents/classify-document';
 export type { ClassifyPreview$Params as ClassifyPreview$Params } from './fn/documents/classify-preview';
 export { classifyPreview as classifyPreview } from './fn/documents/classify-preview';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';

@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Processing;
@@ -12,20 +11,17 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IDocumentClassifier _classifier;
-    private readonly ISearchVectorUpdater _searchVectorUpdater;
     private readonly IProcessingNotifier _notifier;
     private readonly ClassifyDocumentJobHandler _sut;
 
     private readonly Guid _documentId = Guid.NewGuid();
-    private readonly Guid _providerId = Guid.NewGuid();
 
     public ClassifyDocumentJobHandlerTests()
     {
         _db = TestAppDbContext.Create();
         _classifier = Substitute.For<IDocumentClassifier>();
-        _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
         _notifier = Substitute.For<IProcessingNotifier>();
-        _sut = new ClassifyDocumentJobHandler(_db, _classifier, _searchVectorUpdater, _notifier);
+        _sut = new ClassifyDocumentJobHandler(_db, _classifier, _notifier);
     }
 
     public void Dispose()
@@ -35,118 +31,182 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_CallsDocumentClassifier_AppliesResult()
+    public async Task HandleAsync_CallsClassifyAndApplyAsync()
     {
         var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
 
-        SeedDocumentWithProvider();
-        SeedTag(tagId, "Finance", "Finance");
+        SeedDocument();
 
-        var classification = new ClassificationResult([tagId], "AI summary", "AI Title");
-        var availableTags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-        var output = new DocumentClassificationOutput(classification, availableTags, _providerId);
-
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(true);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        var doc = await _db.Documents.FindAsync([_documentId], ct);
-        Assert.Equal("AI Title", doc!.Name);
-        Assert.Equal("AI summary", doc.Summary);
-
-        var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == _documentId).ToList();
-        Assert.Equal(2, suggestions.Count);
-        Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Name);
-        Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Tags);
+        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, null, ct);
     }
 
     [Fact]
-    public async Task HandleAsync_NullResult_SkipsApply()
+    public async Task HandleAsync_PassesAiProviderIdFromPayload()
     {
         var ct = TestContext.Current.CancellationToken;
+        var aiProviderId = Guid.NewGuid();
 
-        SeedDocumentWithProvider();
+        SeedDocument();
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct)
-            .Returns((DocumentClassificationOutput?)null);
+        _classifier.ClassifyAndApplyAsync(_documentId, aiProviderId, ct).Returns(true);
 
-        var job = CreateJob();
+        var job = CreateJob(aiProviderId);
         await _sut.HandleAsync(job, ct);
 
-        var doc = await _db.Documents.FindAsync([_documentId], ct);
-        Assert.Equal("Test Doc", doc!.Name);
-        Assert.Null(doc.Summary);
-
-        var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == _documentId).ToList();
-        Assert.Empty(suggestions);
-
-        await _searchVectorUpdater.DidNotReceive().UpdateSearchVectorAsync(
-            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, aiProviderId, ct);
     }
 
     [Fact]
-    public async Task HandleAsync_ClearsPendingSuggestions_BeforeApplyingNew()
+    public async Task HandleAsync_SendsNotification_WhenNoParentJob()
     {
         var ct = TestContext.Current.CancellationToken;
-        var oldTagId = Guid.NewGuid();
-        var newTagId = Guid.NewGuid();
 
-        SeedDocumentWithProvider();
-        SeedTag(oldTagId, "OldTag", "OldTag");
-        SeedTag(newTagId, "NewTag", "NewTag");
+        SeedDocument();
 
-        _db.DocumentTags.Add(new DocumentTag
-        {
-            DocumentId = _documentId,
-            TagId = oldTagId
-        });
-        _db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            DocumentId = _documentId,
-            Field = DocumentSuggestionField.Tags,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = oldTagId.ToString(),
-            AiProviderId = _providerId,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        _db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            DocumentId = _documentId,
-            Field = DocumentSuggestionField.Name,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = "Old AI Name",
-            OriginalValue = "Test Doc",
-            AiProviderId = _providerId,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync(ct);
-
-        var classification = new ClassificationResult([newTagId], "new summary", "New Title");
-        var availableTags = new List<TagInfo>
-        {
-            new(oldTagId, "OldTag", "OldTag"),
-            new(newTagId, "NewTag", "NewTag")
-        };
-        var output = new DocumentClassificationOutput(classification, availableTags, _providerId);
-
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(true);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        var pendingSuggestions = _db.DocumentSuggestions
-            .Where(s => s.DocumentId == _documentId && s.Status == DocumentSuggestionStatus.Pending)
-            .ToList();
-
-        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == oldTagId.ToString());
-        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == "Old AI Name");
-        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == newTagId.ToString());
-        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == "New Title");
+        await _notifier.Received(1).NotifyJobStatusAsync(
+            job.Id,
+            ProcessingJobStatus.Completed,
+            ProcessingEntityType.Document,
+            _documentId,
+            "Test Doc",
+            null,
+            job.CreatedByUserId,
+            ct);
     }
 
-    private void SeedDocumentWithProvider()
+    [Fact]
+    public async Task HandleAsync_SkipsNotification_WhenChildJob()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocument();
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(true);
+
+        var job = CreateJob();
+        job.ParentJobId = Guid.NewGuid();
+        await _sut.HandleAsync(job, ct);
+
+        await _notifier.DidNotReceive().NotifyJobStatusAsync(
+            Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
+            Arg.Any<ProcessingEntityType>(), Arg.Any<Guid>(),
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_UsesCurrentDocumentName_ForNotification()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocument();
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct)
+            .Returns(callInfo =>
+            {
+                var doc = _db.Documents.Find(_documentId)!;
+                doc.Name = "AI Suggested Name";
+                _db.SaveChanges();
+                return true;
+            });
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        await _notifier.Received(1).NotifyJobStatusAsync(
+            job.Id,
+            ProcessingJobStatus.Completed,
+            ProcessingEntityType.Document,
+            _documentId,
+            "AI Suggested Name",
+            error: null,
+            job.CreatedByUserId,
+            ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SetsEntityId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocument();
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(true);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Equal(_documentId, job.EntityId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClassificationSkipped_StillSendsNotification()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocument();
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(false);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        await _notifier.Received(1).NotifyJobStatusAsync(
+            job.Id,
+            ProcessingJobStatus.Completed,
+            ProcessingEntityType.Document,
+            _documentId,
+            "Test Doc",
+            null,
+            job.CreatedByUserId,
+            ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClassificationSkipped_ChildJob_CompletesWithoutNotification()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocument();
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct).Returns(false);
+
+        var job = CreateJob();
+        job.ParentJobId = Guid.NewGuid();
+        await _sut.HandleAsync(job, ct);
+
+        await _notifier.DidNotReceive().NotifyJobStatusAsync(
+            Arg.Any<Guid>(), Arg.Any<ProcessingJobStatus>(),
+            Arg.Any<ProcessingEntityType>(), Arg.Any<Guid>(),
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_DocumentNotFound_Throws()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        _classifier.ClassifyAndApplyAsync(_documentId, null, ct)
+            .Returns<bool>(x => throw new InvalidOperationException("Document not found."));
+
+        var job = CreateJob();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _sut.HandleAsync(job, ct));
+    }
+
+    private void SeedDocument()
     {
         _db.Documents.Add(new Document
         {
@@ -154,33 +214,12 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
             Name = "Test Doc",
             CreatedAt = DateTimeOffset.UtcNow
         });
-        _db.AiProviders.Add(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
         _db.SaveChanges();
     }
 
-    private void SeedTag(Guid id, string name, string path)
+    private ProcessingJob CreateJob(Guid? aiProviderId = null)
     {
-        _db.Tags.Add(new Tag
-        {
-            Id = id,
-            Name = name,
-            Path = path,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-        _db.SaveChanges();
-    }
-
-    private ProcessingJob CreateJob()
-    {
-        var payload = new ClassifyDocumentPayload(_documentId);
+        var payload = new ClassifyDocumentPayload(_documentId, aiProviderId);
         var job = new ProcessingJob
         {
             Id = Guid.NewGuid(),

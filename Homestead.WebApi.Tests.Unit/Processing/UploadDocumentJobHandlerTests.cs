@@ -7,7 +7,6 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
-using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
@@ -28,7 +27,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
     private readonly IAuditLogger _auditLogger;
     private readonly ISearchVectorUpdater _searchVectorUpdater;
     private readonly ITextExtractionEngineResolver _engineResolver;
-    private readonly IJobQueue _jobQueue;
+    private readonly IDocumentClassifier _classifier;
     private readonly ThumbnailService _thumbnailService;
     private readonly UploadDocumentJobHandler _handler;
 
@@ -62,7 +61,8 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Build();
 
         var logger = Substitute.For<ILogger<UploadDocumentJobHandler>>();
-        _jobQueue = Substitute.For<IJobQueue>();
+        _classifier = Substitute.For<IDocumentClassifier>();
+        _classifier.IsAutoClassifyEnabledAsync(Arg.Any<CancellationToken>()).Returns(false);
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), config,
             Substitute.For<ILogger<ThumbnailService>>());
@@ -74,7 +74,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         _handler = new UploadDocumentJobHandler(
             _db, config, logger,
-            _notifier, _auditLogger, _searchVectorUpdater, _jobQueue, _thumbnailService, textExtractionHelper);
+            _notifier, _auditLogger, _searchVectorUpdater, _classifier, _thumbnailService, textExtractionHelper);
     }
 
     public void Dispose()
@@ -419,5 +419,155 @@ public class UploadDocumentJobHandlerTests : IDisposable
         Assert.True(File.Exists(finalPath));
         var doc = await _db.Documents.FirstOrDefaultAsync(ct);
         Assert.NotNull(doc);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutoClassifyEnabled_CallsClassifier()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct).Returns(true);
+
+        await _handler.HandleAsync(job, ct);
+
+        await _classifier.Received(1).ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutoClassifyDisabled_SkipsClassifier()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(false);
+
+        await _handler.HandleAsync(job, ct);
+
+        await _classifier.DidNotReceive().ClassifyAndApplyAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClassificationFails_StillCompletesUpload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+            .Returns<bool>(x => throw new Exception("AI service unavailable"));
+
+        await _handler.HandleAsync(job, ct);
+
+        var doc = await _db.Documents.FirstOrDefaultAsync(ct);
+        Assert.NotNull(doc);
+
+        await _notifier.Received(1).NotifyJobStatusAsync(
+            job.Id,
+            ProcessingJobStatus.Completed,
+            Arg.Any<ProcessingEntityType?>(),
+            Arg.Any<Guid?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<Guid?>(),
+            ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NotificationUsesDocumentName_AfterClassification()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+            .Returns(callInfo =>
+            {
+                var docId = callInfo.ArgAt<Guid>(0);
+                var doc = _db.Documents.Find(docId)!;
+                doc.Name = "AI Suggested Name";
+                _db.SaveChanges();
+                return true;
+            });
+
+        await _handler.HandleAsync(job, ct);
+
+        await _notifier.Received(1).NotifyJobStatusAsync(
+            job.Id,
+            ProcessingJobStatus.Completed,
+            ProcessingEntityType.Document,
+            Arg.Any<Guid>(),
+            "AI Suggested Name",
+            error: null,
+            job.CreatedByUserId,
+            ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutoClassifySucceeds_SearchVectorNotCalledByHandler()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct).Returns(true);
+
+        await _handler.HandleAsync(job, ct);
+
+        await _searchVectorUpdater.DidNotReceive().UpdateSearchVectorAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClassificationFails_SearchVectorStillCalled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+            .Returns<bool>(x => throw new Exception("AI service unavailable"));
+
+        await _handler.HandleAsync(job, ct);
+
+        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(
+            Arg.Any<Guid>(), ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ClassificationCancelled_Propagates()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+            .Returns<bool>(x => throw new OperationCanceledException());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => _handler.HandleAsync(job, ct));
     }
 }

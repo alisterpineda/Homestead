@@ -3,6 +3,8 @@ using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
 
+public record ClassifyDocumentBody(Guid? AiProviderId = null);
+
 public static class ClassifyPreviewEndpoint
 {
     public static void Map(RouteGroupBuilder group)

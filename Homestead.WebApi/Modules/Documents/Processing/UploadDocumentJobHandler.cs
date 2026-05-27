@@ -1,12 +1,8 @@
 using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Common.Auditing;
 using System.Security.Cryptography;
-using System.Text.Json;
-using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
@@ -22,7 +18,7 @@ public class UploadDocumentJobHandler(
     IProcessingNotifier notifier,
     IAuditLogger auditLogger,
     ISearchVectorUpdater searchVectorUpdater,
-    IJobQueue jobQueue,
+    IDocumentClassifier classifier,
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper) : IJobHandler
 {
@@ -141,18 +137,36 @@ public class UploadDocumentJobHandler(
                 throw;
             }
 
-            await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
-
             // Update job with entity reference
             job.EntityId = documentId;
 
-            // Send SignalR notification before thumbnail generation so the UI sees the upload as complete immediately
+            // Auto-classify if enabled (non-fatal — document is created regardless)
+            var classified = false;
+            try
+            {
+                if (await classifier.IsAutoClassifyEnabledAsync(ct))
+                    classified = await classifier.ClassifyAndApplyAsync(documentId, null, ct);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Auto-classification failed for document {DocumentId}", documentId);
+            }
+
+            // ClassifyAndApplyAsync updates the search vector on success; only needed here if it didn't run
+            if (!classified)
+                await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
+
+            // Reload to pick up any name changes from classification (or revert dirty state on partial failure)
+            await db.Entry(document).ReloadAsync(ct);
+
+            // Send SignalR notification after classification so the UI sees AI-suggested name/tags immediately
             await notifier.NotifyJobStatusAsync(
                 job.Id,
                 ProcessingJobStatus.Completed,
                 ProcessingEntityType.Document,
                 documentId,
-                documentName,
+                document.Name,
                 error: null,
                 job.CreatedByUserId,
                 ct);
@@ -162,54 +176,15 @@ public class UploadDocumentJobHandler(
             {
                 await thumbnailService.GenerateAsync(finalPath, payload.ContentType, fileHash, ct);
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Thumbnail generation failed for upload {UploadId}", payload.UploadId);
             }
-
-            // Auto-classify if enabled
-            await TryEnqueueClassificationAsync(documentId, job.CreatedByUserId, ct);
         }
         finally
         {
             try { File.Delete(stagingPath); } catch { }
-        }
-    }
-
-    private async Task TryEnqueueClassificationAsync(Guid documentId, Guid? userId, CancellationToken ct)
-    {
-        try
-        {
-            var settingsEntity = await db.AppSettings
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
-
-            if (settingsEntity is null)
-                return;
-
-            var settings = JsonSerializer.Deserialize<DocumentSettings>(settingsEntity.Value, FieldChange.JsonOptions);
-            if (settings?.AutoClassifyOnUpload != true || settings.DefaultAiProviderId is null)
-                return;
-
-            var providerExists = await db.AiProviders
-                .AsNoTracking()
-                .AnyAsync(p => p.Id == settings.DefaultAiProviderId && p.IsEnabled, ct);
-
-            if (!providerExists)
-                return;
-
-            var classifyPayload = new ClassifyDocumentPayload(documentId);
-            await jobQueue.EnqueueAsync(ProcessingJobType.ClassifyDocument, opts =>
-            {
-                opts.EntityType = ProcessingEntityType.Document;
-                opts.EntityId = documentId;
-                opts.CreatedByUserId = userId;
-                opts.Payload = JsonSerializer.Serialize(classifyPayload);
-            }, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to enqueue auto-classification for document {DocumentId}", documentId);
         }
     }
 }

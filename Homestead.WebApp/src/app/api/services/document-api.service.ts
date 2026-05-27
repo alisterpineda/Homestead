@@ -17,7 +17,6 @@ import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
 import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
 import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
-import { classifyDocument } from '@/api/generated/fn/documents/classify-document';
 import { classifyPreview } from '@/api/generated/fn/documents/classify-preview';
 import { bulkClassifyDocuments } from '@/api/generated/fn/documents/bulk-classify-documents';
 import { approveSuggestion } from '@/api/generated/fn/documents/approve-suggestion';
@@ -37,7 +36,6 @@ import type { PermanentlyDeleteDocumentsResponse } from '@/api/generated/models/
 import type { EmptyTrashResponse } from '@/api/generated/models/empty-trash-response';
 import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-response';
 import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
-import type { ClassifyDocumentResponse } from '@/api/generated/models/classify-document-response';
 import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
 import type { BulkClassifyDocumentsResponse } from '@/api/generated/models/bulk-classify-documents-response';
 import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
@@ -55,7 +53,6 @@ export type { BulkPermanentlyDeleteDocuments$Params } from '@/api/generated/fn/d
 export type { EmptyTrash$Params } from '@/api/generated/fn/documents/empty-trash';
 export type { GetMyGroups$Params } from '@/api/generated/fn/documents/get-my-groups';
 export type { PatchDocumentSettings$Params } from '@/api/generated/fn/documents/patch-document-settings';
-export type { ClassifyDocument$Params } from '@/api/generated/fn/documents/classify-document';
 export type { ClassifyPreview$Params } from '@/api/generated/fn/documents/classify-preview';
 export type { BulkClassifyDocuments$Params } from '@/api/generated/fn/documents/bulk-classify-documents';
 export type { ApproveSuggestion$Params } from '@/api/generated/fn/documents/approve-suggestion';
@@ -122,10 +119,6 @@ export class DocumentApiService {
 
   patchDocumentSettings(params: Parameters<typeof patchDocumentSettings>[2]): Observable<DocumentSettingsResponse> {
     return patchDocumentSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
-  }
-
-  classifyDocument(params: Parameters<typeof classifyDocument>[2]): Observable<ClassifyDocumentResponse> {
-    return classifyDocument(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   classifyPreview(params: Parameters<typeof classifyPreview>[2]): Observable<ClassifyPreviewResponse> {

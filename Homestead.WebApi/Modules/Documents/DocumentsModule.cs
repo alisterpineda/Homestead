@@ -78,7 +78,6 @@ public static class DocumentsModule
 
         GetTextExtractionEngineSummariesEndpoint.Map(v1);
         GetAiProviderSummariesEndpoint.Map(v1);
-        ClassifyDocumentEndpoint.Map(v1);
         ClassifyPreviewEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
