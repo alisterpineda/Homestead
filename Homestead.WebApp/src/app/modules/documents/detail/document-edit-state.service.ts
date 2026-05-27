@@ -11,6 +11,11 @@ export interface DocumentEditState {
   editVersionLabel: string;
   editExtractedText: string;
   versionId: string | null;
+  transientAi?: {
+    appliedTransientName: string | null;
+    preClassifyName: string | null;
+    aiTransientTagPaths: string[];
+  };
 }
 
 const STORAGE_KEY = 'homestead-document-edit-state';

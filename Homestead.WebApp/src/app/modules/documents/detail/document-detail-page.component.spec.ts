@@ -11,6 +11,7 @@ import { DocumentEditStateService } from './document-edit-state.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
+import type { DocumentEditState } from './document-edit-state.service';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
@@ -25,6 +26,7 @@ describe('DocumentDetailPageComponent', () => {
   let mockOpenDocumentsService: Partial<OpenDocumentsService>;
   let mockEditStateService: Partial<DocumentEditStateService>;
   let paramMapSubject: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let openDocumentsSignal: ReturnType<typeof signal<{ id: string; name: string }[]>>;
 
   function setDocumentId(id: string | null) {
     const params = id ? { id } : {};
@@ -45,12 +47,14 @@ describe('DocumentDetailPageComponent', () => {
     });
 
     paramMapSubject = new BehaviorSubject(convertToParamMap({}));
+    openDocumentsSignal = signal<{ id: string; name: string }[]>([]);
 
     mockOpenDocumentsService = {
       addDocument: vi.fn(),
       removeDocument: vi.fn(),
       getPrevDocumentId: vi.fn(() => null),
       getNextDocumentId: vi.fn(() => null),
+      openDocuments: openDocumentsSignal as unknown as OpenDocumentsService['openDocuments'],
     };
 
     mockEditStateService = {
@@ -275,9 +279,10 @@ describe('DocumentDetailPageComponent', () => {
   });
 
   describe('ngOnDestroy state persistence', () => {
-    it('should save edit state to service when destroyed with changes', () => {
+    it('should save edit state to service when destroyed with changes and document is still open', () => {
       setDocumentId('doc-1');
       fixture.detectChanges();
+      openDocumentsSignal.set([{ id: 'doc-1', name: 'Doc 1' }]);
 
       Object.defineProperty(component, 'hasChanges', {
         value: () => true,
@@ -292,6 +297,21 @@ describe('DocumentDetailPageComponent', () => {
     it('should not save state when destroyed without changes', () => {
       setDocumentId('doc-1');
       fixture.detectChanges();
+      openDocumentsSignal.set([{ id: 'doc-1', name: 'Doc 1' }]);
+
+      component.ngOnDestroy();
+
+      expect(mockEditStateService.saveState).not.toHaveBeenCalled();
+    });
+
+    it('should not save state when document has been removed from open list (close flow)', () => {
+      setDocumentId('doc-1');
+      fixture.detectChanges();
+
+      Object.defineProperty(component, 'hasChanges', {
+        value: () => true,
+        writable: true,
+      });
 
       component.ngOnDestroy();
 
@@ -318,6 +338,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
     let guardParamMap: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
     let guardEditStateService: Partial<DocumentEditStateService>;
     let guardOpenDocumentsService: Partial<OpenDocumentsService>;
+    let guardOpenDocsSignal: ReturnType<typeof signal<{ id: string; name: string }[]>>;
     let guardDocumentApi: {
       getDocument: ReturnType<typeof vi.fn>;
       getDocumentFile: ReturnType<typeof vi.fn>;
@@ -405,11 +426,13 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       versionDetailSubject = new Subject<GetDocumentVersionResponse | null>();
       docResponse = null;
 
+      guardOpenDocsSignal = signal<{ id: string; name: string }[]>([]);
       guardOpenDocumentsService = {
         addDocument: vi.fn(),
         removeDocument: vi.fn(),
         getPrevDocumentId: vi.fn(() => null),
         getNextDocumentId: vi.fn(() => null),
+        openDocuments: guardOpenDocsSignal as unknown as OpenDocumentsService['openDocuments'],
       };
 
       guardEditStateService = {
@@ -601,5 +624,180 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       guardFixture.detectChanges();
 
       expect(guardComponent.editExtractedText()).toBe('v1 late text');
+    });
+
+    describe('buildEditState persists transient AI metadata', () => {
+      function triggerSaveAndGetState(): DocumentEditState {
+        guardOpenDocsSignal.set([{ id: 'doc-1', name: 'Doc 1' }]);
+
+        Object.defineProperty(guardComponent, 'hasChanges', {
+          value: () => true,
+          writable: true,
+          configurable: true,
+        });
+
+        guardComponent.ngOnDestroy();
+
+        const calls = (guardEditStateService.saveState as ReturnType<typeof vi.fn>).mock.calls;
+        expect(calls.length).toBeGreaterThan(0);
+        return calls[0][1] as DocumentEditState;
+      }
+
+      it('includes transientAi metadata when AI suggestions are active', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.preClassifyName.set('Doc 1');
+        guardComponent.appliedTransientName.set('AI Name');
+        guardComponent.editName.set('AI Name');
+
+        const saved = triggerSaveAndGetState();
+        expect(saved.editName).toBe('AI Name');
+        expect(saved.transientAi).toEqual({
+          appliedTransientName: 'AI Name',
+          preClassifyName: 'Doc 1',
+          aiTransientTagPaths: [],
+        });
+      });
+
+      it('includes transient tag paths in metadata', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editTags.set(['Existing', 'AI Tag']);
+        guardComponent.aiTransientTagPaths.set(new Set(['AI Tag']));
+
+        const saved = triggerSaveAndGetState();
+        expect(saved.editTags).toEqual(['Existing', 'AI Tag']);
+        expect(saved.transientAi?.aiTransientTagPaths).toEqual(['AI Tag']);
+      });
+
+      it('omits transientAi when no AI suggestions are active', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editName.set('Manual Edit');
+        guardComponent.editTags.set(['Manual Tag']);
+
+        const saved = triggerSaveAndGetState();
+        expect(saved.editName).toBe('Manual Edit');
+        expect(saved.transientAi).toBeUndefined();
+      });
+    });
+
+    describe('init effect restores transient AI metadata from saved state', () => {
+      it('restores transient signals when saved state has transientAi', () => {
+        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+          editName: 'AI Name',
+          editDocumentDate: null,
+          editExpiryDate: null,
+          editNotes: '',
+          editParties: [],
+          editTags: ['AI Tag'],
+          editVersionLabel: '',
+          editExtractedText: '',
+          versionId: null,
+          transientAi: {
+            appliedTransientName: 'AI Name',
+            preClassifyName: 'Original',
+            aiTransientTagPaths: ['AI Tag'],
+          },
+        });
+
+        docResponse = makeDoc({ name: 'Original' });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        expect(guardComponent.editName()).toBe('AI Name');
+        expect(guardComponent.appliedTransientName()).toBe('AI Name');
+        expect(guardComponent.preClassifyName()).toBe('Original');
+        expect(guardComponent.aiTransientTagPaths()).toEqual(new Set(['AI Tag']));
+      });
+
+      it('does not set transient signals when saved state lacks transientAi', () => {
+        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+          editName: 'Manual Edit',
+          editDocumentDate: null,
+          editExpiryDate: null,
+          editNotes: '',
+          editParties: [],
+          editTags: [],
+          editVersionLabel: '',
+          editExtractedText: '',
+          versionId: null,
+        });
+
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        expect(guardComponent.editName()).toBe('Manual Edit');
+        expect(guardComponent.appliedTransientName()).toBeNull();
+        expect(guardComponent.preClassifyName()).toBeNull();
+        expect(guardComponent.aiTransientTagPaths().size).toBe(0);
+      });
+    });
+
+    describe('ngOnDestroy does not save when document is closed', () => {
+      it('skips save when document has been removed from open list', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editName.set('Changed');
+
+        Object.defineProperty(guardComponent, 'hasChanges', {
+          value: () => true,
+          writable: true,
+          configurable: true,
+        });
+
+        guardComponent.ngOnDestroy();
+
+        expect(guardEditStateService.saveState).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('handleClassify preserves original name on re-classify', () => {
+      it('keeps the original preClassifyName when classify is run twice', () => {
+        docResponse = makeDoc({ name: 'Original' });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editName.set('Original');
+        guardComponent.preClassifyName.set(null);
+        guardComponent.appliedTransientName.set(null);
+
+        guardComponent.preClassifyName.set(guardComponent.preClassifyName() ?? guardComponent.editName());
+        expect(guardComponent.preClassifyName()).toBe('Original');
+
+        guardComponent.editName.set('AI Name 1');
+        guardComponent.appliedTransientName.set('AI Name 1');
+
+        guardComponent.preClassifyName.set(guardComponent.preClassifyName() ?? guardComponent.editName());
+        expect(guardComponent.preClassifyName()).toBe('Original');
+      });
+    });
+
+    describe('handleSave clears transient state', () => {
+      it('clears all transient signals on save success', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.preClassifyName.set('Original');
+        guardComponent.appliedTransientName.set('AI Name');
+        guardComponent.aiTransientTagPaths.set(new Set(['Tag']));
+
+        guardComponent.handleSave();
+        guardFixture.detectChanges();
+
+        expect(guardComponent.appliedTransientName()).toBeNull();
+        expect(guardComponent.preClassifyName()).toBeNull();
+        expect(guardComponent.aiTransientTagPaths().size).toBe(0);
+      });
     });
 });

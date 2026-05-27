@@ -1024,10 +1024,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.preserveTransientOnNextInit = false;
           preservedTransient = true;
         } else {
-          this.transientClassification.set(null);
-          this.appliedTransientName.set(null);
-          this.preClassifyName.set(null);
-          this.aiTransientTagPaths.set(new Set());
+          this.clearTransientState();
         }
 
         const saved = untracked(() => this.editStateService.getState(doc.id));
@@ -1040,6 +1037,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editNotes.set(saved.editNotes ?? '');
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
+          if (saved.transientAi) {
+            this.appliedTransientName.set(saved.transientAi.appliedTransientName);
+            this.preClassifyName.set(saved.transientAi.preClassifyName);
+            this.aiTransientTagPaths.set(new Set(saved.transientAi.aiTransientTagPaths));
+          }
           this.initializedVersionId = saved.versionId
             ?? untracked(() => this.activeVersion()?.id ?? null);
           untracked(() => this.editStateService.clearState(doc.id));
@@ -1200,7 +1202,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     const id = this.documentId();
-    if (id && this.hasChanges()) {
+    if (id && this.openDocumentsService.openDocuments().some(d => d.id === id) && this.hasChanges()) {
       this.editStateService.saveState(id, this.buildEditState());
     }
     if (id) {
@@ -1332,7 +1334,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.classifyingPreview.set(true);
     this.transientClassification.set(null);
     this.appliedTransientName.set(null);
-    this.preClassifyName.set(this.editName());
+    this.preClassifyName.set(this.preClassifyName() ?? this.editName());
     this.classifySub?.unsubscribe();
     const toastId = toast.loading('Classifying document...');
     this.classifySub = this.documentApi.classifyPreview({ documentId: id }).pipe(
@@ -1368,9 +1370,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   applyAllTransient(): void {
-    this.aiTransientTagPaths.set(new Set());
-    this.appliedTransientName.set(null);
-    this.preClassifyName.set(null);
+    this.clearTransientState();
   }
 
   dismissAllTransient(): void {
@@ -1382,10 +1382,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     if (pre !== null) {
       this.editName.set(pre);
     }
-    this.aiTransientTagPaths.set(new Set());
-    this.appliedTransientName.set(null);
-    this.preClassifyName.set(null);
-    this.transientClassification.set(null);
+    this.clearTransientState();
   }
 
   approveTagByPath(path: string): void {
@@ -1508,8 +1505,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.saving.set(false);
-        this.transientClassification.set(null);
-        this.aiTransientTagPaths.set(new Set());
+        this.clearTransientState();
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values
@@ -1570,7 +1566,19 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return ops;
   }
 
+  private clearTransientState(): void {
+    this.transientClassification.set(null);
+    this.appliedTransientName.set(null);
+    this.preClassifyName.set(null);
+    this.aiTransientTagPaths.set(new Set());
+  }
+
   private buildEditState(): DocumentEditState {
+    const appliedName = this.appliedTransientName();
+    const preName = this.preClassifyName();
+    const transientPaths = this.aiTransientTagPaths();
+    const hasTransient = appliedName !== null || preName !== null || transientPaths.size > 0;
+
     return {
       editName: this.editName(),
       editDocumentDate: toIsoDateString(this.editDocumentDate()),
@@ -1581,6 +1589,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
       editVersionLabel: this.editVersionLabel(),
       editExtractedText: this.editExtractedText(),
       versionId: this.versionId(),
+      ...(hasTransient ? {
+        transientAi: {
+          appliedTransientName: appliedName,
+          preClassifyName: preName,
+          aiTransientTagPaths: [...transientPaths],
+        },
+      } : {}),
     };
   }
 
