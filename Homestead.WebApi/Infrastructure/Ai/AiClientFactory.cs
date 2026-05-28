@@ -1,8 +1,8 @@
 using System.ClientModel;
-using Azure.AI.OpenAI;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
+using OpenAI;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
@@ -29,10 +29,19 @@ public class AiClientFactory : IAiClientFactory
         if (string.IsNullOrWhiteSpace(config.Model))
             throw new InvalidOperationException($"Model is required for AI provider '{provider.Name}'.");
 
-        var azureClient = new AzureOpenAIClient(
-            new Uri(config.Endpoint),
-            new ApiKeyCredential(config.ApiKey));
+        var openAiClient = new OpenAIClient(
+            new ApiKeyCredential(config.ApiKey),
+            new OpenAIClientOptions { Endpoint = NormalizeEndpoint(config.Endpoint) });
 
-        return azureClient.GetChatClient(config.Model).AsIChatClient();
+        return openAiClient.GetChatClient(config.Model).AsIChatClient();
+    }
+
+    // /openai/v1 is versionless — the OpenAI client (unlike AzureOpenAIClient) won't append a dated api-version that Foundry rejects.
+    private static Uri NormalizeEndpoint(string endpoint)
+    {
+        var trimmed = endpoint.TrimEnd('/');
+        if (!trimmed.EndsWith("/openai/v1", StringComparison.OrdinalIgnoreCase))
+            trimmed += "/openai/v1";
+        return new Uri(trimmed + "/");
     }
 }
