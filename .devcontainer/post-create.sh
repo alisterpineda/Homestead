@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+sudo apt-get update && sudo apt-get install -y tmux
+
 dotnet tool install -g aspire.cli
 
 (cd Homestead.WebApp && npm install)
