@@ -31,9 +31,11 @@ The four stages are: **probe → start if needed → log in → exercise → tea
 Two curl probes — run them in parallel (single Bash message, two calls, or combined with `&&`):
 
 ```bash
-curl -sSf -o /dev/null -m 2 http://localhost:4200 && echo ui-up || echo ui-down
-curl -sSf -o /dev/null -m 2 http://localhost:8080/realms/homestead/.well-known/openid-configuration && echo oidc-up || echo oidc-down
+curl -sSf  -o /dev/null -m 2 http://localhost:4200 && echo ui-up || echo ui-down
+curl -sSfk -o /dev/null -m 2 https://localhost:8080/realms/homestead/.well-known/openid-configuration && echo oidc-up || echo oidc-down
 ```
+
+Keycloak is served over **HTTPS** on `:8080` with a self-signed dev cert, so the OIDC probe uses `https://` and the `-k` (insecure) flag to skip cert validation — plain HTTP on `:8080` no longer responds. The Angular dev server on `:4200` stays plain HTTP.
 
 - **Both up** → developer already has Aspire running. Skip straight to *Log in*. Do **not** launch a second copy, and do **not** tear it down at the end of the session.
 - **Either down** → continue to step 2 and start the stack yourself.
@@ -52,14 +54,14 @@ Cold-start timing: a fresh devcontainer can take several minutes because Postgre
 
 **Wait for readiness** by re-running the two probes from step 1 at ~2-second intervals. Use a ~180-second overall timeout on a cold start and ~60 seconds when warm. If the timeout expires, read the background task's stdout/stderr for the real failure reason, report it to the developer, and stop. Never silently proceed to the browser steps against a half-started stack — the resulting failures will look like UI bugs and waste time.
 
-Once both probes return up, the app is at `http://localhost:4200` and Keycloak is at `http://localhost:8080`.
+Once both probes return up, the app is at `http://localhost:4200` and Keycloak is at `https://localhost:8080` (self-signed dev cert).
 
 ### 3. Log in through Keycloak
 
 Auth is OIDC-only — the browser has to complete a Keycloak login before it can see any protected screen. Drive it with the Playwright MCP tools:
 
 1. `browser_navigate` to `http://localhost:4200`. Angular redirects to `/login`.
-2. `browser_click` the **Sign in with …** button (the label ends with whatever `/api/status` reports as the OIDC display name — "SSO" initially, then usually "Keycloak" once the status call resolves; match on the "Sign in with" prefix, not the full label). The tab redirects to Keycloak on `localhost:8080`.
+2. `browser_click` the **Sign in with …** button (the label ends with whatever `/api/status` reports as the OIDC display name — "SSO" initially, then usually "Keycloak" once the status call resolves; match on the "Sign in with" prefix, not the full label). The tab redirects to Keycloak on `https://localhost:8080`.
 3. `browser_type` the dev email into the **Username or email** field: `admin@test.com`.
 4. `browser_type` the dev password: `admin123`.
 5. `browser_click` the Keycloak **Sign In** submit button and wait for the redirect back to `/documents`.
