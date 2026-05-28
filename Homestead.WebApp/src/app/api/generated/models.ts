@@ -29,6 +29,7 @@ export type { BulkReprocessDocumentsResponse } from './models/bulk-reprocess-doc
 export type { BulkUpdateDocumentsCommand } from './models/bulk-update-documents-command';
 export type { BulkUpdateDocumentsResponse } from './models/bulk-update-documents-response';
 export type { ClassifyDocumentBody } from './models/classify-document-body';
+export type { ClassifyPreviewPartyDto } from './models/classify-preview-party-dto';
 export type { ClassifyPreviewResponse } from './models/classify-preview-response';
 export type { ClassifyPreviewTagDto } from './models/classify-preview-tag-dto';
 export type { CommodityKind } from './models/commodity-kind';

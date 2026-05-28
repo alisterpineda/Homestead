@@ -51,7 +51,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var availableTags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
-        var classification = new ClassificationResult([tagId], "A summary", "Better Title");
+        var classification = new ClassificationResult([tagId], [], "A summary", "Better Title");
         var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
@@ -91,6 +91,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         Assert.Null(response.SuggestedTitle);
         Assert.Null(response.Summary);
         Assert.Empty(response.Tags);
+        Assert.Empty(response.Parties);
     }
 
     [Fact]
@@ -117,7 +118,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var availableTags = new List<TagInfo> { new(knownTagId, "Finance", "Finance") };
-        var classification = new ClassificationResult([knownTagId, unknownTagId], "summary", "title");
+        var classification = new ClassificationResult([knownTagId, unknownTagId], [], "summary", "title");
         var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
@@ -142,7 +143,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var classification = new ClassificationResult([], "new summary", "Same Name");
+        var classification = new ClassificationResult([], [], "new summary", "Same Name");
         var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
 
         _classifier.ClassifyAsync(_documentId, "Same Name", null, ct).Returns(output);
@@ -168,7 +169,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        var classification = new ClassificationResult([], "existing summary", "New Title");
+        var classification = new ClassificationResult([], [], "existing summary", "New Title");
         var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
@@ -216,7 +217,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
             new(existingTagId, "Existing", "Existing"),
             new(newTagId, "New", "New")
         };
-        var classification = new ClassificationResult([existingTagId, newTagId], "summary", "title");
+        var classification = new ClassificationResult([existingTagId, newTagId], [], "summary", "title");
         var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
 
         _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
@@ -226,5 +227,48 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         Assert.Single(response.Tags);
         Assert.Equal(newTagId, response.Tags[0].Id);
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsMatchedParties_ExcludingThoseAlreadyLinked()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var existingPartyId = Guid.NewGuid();
+        var newPartyId = Guid.NewGuid();
+
+        _db.Documents.Add(new Document
+        {
+            Id = _documentId,
+            Name = "Test Doc",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        _db.Parties.Add(new Homestead.WebApi.Domain.Parties.Party
+        {
+            Id = existingPartyId, Name = "Existing Party",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        });
+        _db.Parties.Add(new Homestead.WebApi.Domain.Parties.Party
+        {
+            Id = newPartyId, Name = "New Party",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        });
+        _db.DocumentParties.Add(new Homestead.WebApi.Domain.Parties.DocumentParty
+        {
+            DocumentId = _documentId,
+            PartyId = existingPartyId
+        });
+        await _db.SaveChangesAsync(ct);
+
+        var classification = new ClassificationResult([], [existingPartyId, newPartyId], "summary", "title");
+        var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
+
+        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ct).Returns(output);
+
+        var query = new ClassifyPreviewQuery { DocumentId = _documentId };
+        var response = await _sut.Handle(query, ct);
+
+        Assert.Single(response.Parties);
+        Assert.Equal(newPartyId, response.Parties[0].Id);
+        Assert.Equal("New Party", response.Parties[0].Name);
     }
 }

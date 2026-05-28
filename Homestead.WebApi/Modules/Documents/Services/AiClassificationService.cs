@@ -9,6 +9,7 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
     : IAiClassificationService
 {
     private const int MaxTextLength = 12_000;
+    private const int MaxPartyDescriptionLength = 200;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -17,15 +18,16 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         string documentName,
         string? extractedText,
         List<TagInfo> availableTags,
+        List<PartyInfo> availableParties,
         CancellationToken ct)
     {
-        if (availableTags.Count == 0 && string.IsNullOrWhiteSpace(extractedText))
+        if (availableTags.Count == 0 && availableParties.Count == 0 && string.IsNullOrWhiteSpace(extractedText))
             return null;
 
         using var client = clientFactory.CreateClient(provider);
 
         var systemPrompt = BuildSystemPrompt();
-        var userMessage = BuildUserMessage(documentName, extractedText, availableTags);
+        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties);
 
         var messages = new List<ChatMessage>
         {
@@ -67,8 +69,15 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
                 .Distinct()
                 .ToList();
 
+            var validPartyIds = new HashSet<Guid>(availableParties.Select(p => p.Id));
+            var matchedPartyIds = (parsed.PartyIds ?? [])
+                .Where(id => validPartyIds.Contains(id))
+                .Distinct()
+                .ToList();
+
             return new ClassificationResult(
                 matchedTagIds,
+                matchedPartyIds,
                 parsed.Summary ?? string.Empty,
                 parsed.SuggestedTitle ?? documentName);
         }
@@ -84,12 +93,14 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         You are a document classification assistant. Given a document's name and extracted text content, you must:
 
         1. Select applicable tags from the provided tag list by their IDs. Only select tags that are clearly relevant to the document content. Do not create new tags.
-        2. Write a concise 2-3 sentence summary of the document.
-        3. Suggest a clear, descriptive title for the document.
+        2. Select applicable parties (people or organisations the document concerns) from the provided party list by their IDs. Only select parties that are clearly relevant to the document content. Do not create new parties.
+        3. Write a concise 2-3 sentence summary of the document.
+        4. Suggest a clear, descriptive title for the document.
 
         Respond with a JSON object in this exact format:
         {
           "tagIds": ["guid1", "guid2"],
+          "partyIds": ["guid1", "guid2"],
           "summary": "A brief summary of the document.",
           "suggestedTitle": "A descriptive title"
         }
@@ -97,12 +108,15 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         Rules:
         - Only use tag IDs from the provided list
         - If no tags match, return an empty tagIds array
+        - Only use party IDs from the provided list
+        - If no parties match, return an empty partyIds array
         - The summary should capture the key information in the document
         - The suggested title should be human-readable and descriptive
         - Always respond with valid JSON only, no additional text
         """;
 
-    private static string BuildUserMessage(string documentName, string? extractedText, List<TagInfo> tags)
+    private static string BuildUserMessage(
+        string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties)
     {
         var text = extractedText ?? string.Empty;
         if (text.Length > MaxTextLength)
@@ -110,6 +124,17 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
 
         var tagsJson = JsonSerializer.Serialize(
             tags.Select(t => new { t.Id, t.Name, t.Path }),
+            JsonOptions);
+
+        var partiesJson = JsonSerializer.Serialize(
+            parties.Select(p => new
+            {
+                p.Id,
+                p.Name,
+                Description = p.Description is { Length: > MaxPartyDescriptionLength }
+                    ? p.Description[..MaxPartyDescriptionLength]
+                    : p.Description
+            }),
             JsonOptions);
 
         return $"""
@@ -120,15 +145,21 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
 
             Available tags:
             {tagsJson}
+
+            Available parties:
+            {partiesJson}
             """;
     }
 
     private sealed class ClassificationResponse
     {
         public List<Guid>? TagIds { get; set; }
+        public List<Guid>? PartyIds { get; set; }
         public string? Summary { get; set; }
         public string? SuggestedTitle { get; set; }
     }
 }
 
 public record TagInfo(Guid Id, string Name, string Path);
+
+public record PartyInfo(Guid Id, string Name, string? Description);

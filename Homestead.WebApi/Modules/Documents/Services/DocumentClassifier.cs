@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Persistence;
@@ -46,8 +47,13 @@ public class DocumentClassifier(
             .Select(t => new TagInfo(t.Id, t.Name, t.Path))
             .ToListAsync(ct);
 
+        var allParties = await db.Parties
+            .AsNoTracking()
+            .Select(p => new PartyInfo(p.Id, p.Name, p.Description))
+            .ToListAsync(ct);
+
         var result = await classificationService.ClassifyAsync(
-            provider, documentName, latestVersion?.ExtractedText, allTags, ct);
+            provider, documentName, latestVersion?.ExtractedText, allTags, allParties, ct);
 
         if (result is null)
             return null;
@@ -59,6 +65,7 @@ public class DocumentClassifier(
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentParties)
             .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
             .FirstOrDefaultAsync(d => d.Id == documentId, ct)
             ?? throw new InvalidOperationException($"Document {documentId} not found.");
@@ -71,6 +78,7 @@ public class DocumentClassifier(
             await db.SaveChangesAsync(ct);
 
         ApplyTags(document, output.Classification.MatchedTagIds, output.ProviderId);
+        ApplyParties(document, output.Classification.MatchedPartyIds, output.ProviderId);
         ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
         ApplySummary(document, output.Classification.Summary);
 
@@ -104,21 +112,7 @@ public class DocumentClassifier(
 
         foreach (var suggestion in pendingSuggestions)
         {
-            switch (suggestion.Field)
-            {
-                case DocumentSuggestionField.Tags:
-                    var tagId = Guid.Parse(suggestion.SuggestedValue);
-                    var docTag = document.DocumentTags.FirstOrDefault(dt => dt.TagId == tagId);
-                    if (docTag is not null)
-                        document.DocumentTags.Remove(docTag);
-                    break;
-
-                case DocumentSuggestionField.Name:
-                    if (suggestion.OriginalValue is not null)
-                        document.Name = suggestion.OriginalValue;
-                    break;
-            }
-
+            DocumentSuggestionReverter.Revert(document, suggestion);
             db.DocumentSuggestions.Remove(suggestion);
         }
 
@@ -146,6 +140,33 @@ public class DocumentClassifier(
                 Field = DocumentSuggestionField.Tags,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = tagId.ToString(),
+                AiProviderId = providerId,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
+    private void ApplyParties(Document document, List<Guid> partyIds, Guid providerId)
+    {
+        var existingPartyIds = new HashSet<Guid>(document.DocumentParties.Select(dp => dp.PartyId));
+
+        foreach (var partyId in partyIds)
+        {
+            if (existingPartyIds.Contains(partyId))
+                continue;
+
+            document.DocumentParties.Add(new DocumentParty
+            {
+                DocumentId = document.Id,
+                PartyId = partyId
+            });
+
+            db.DocumentSuggestions.Add(new DocumentSuggestion
+            {
+                DocumentId = document.Id,
+                Field = DocumentSuggestionField.Parties,
+                Status = DocumentSuggestionStatus.Pending,
+                SuggestedValue = partyId.ToString(),
                 AiProviderId = providerId,
                 CreatedAt = DateTimeOffset.UtcNow
             });

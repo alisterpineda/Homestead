@@ -9,5 +9,6 @@ public interface IAiClassificationService
         string documentName,
         string? extractedText,
         List<TagInfo> availableTags,
+        List<PartyInfo> availableParties,
         CancellationToken ct);
 }

@@ -22,7 +22,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - PostgreSQL full-text search across document name (weighted A), the latest version's extracted text (weighted B), and document summary (weighted C), with ILIKE fallbacks on name and extracted text, and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
 - ZIP download organised by tag path, with a dedicated `_Untagged/` folder and party names embedded in filenames.
 - Household-wide choice of text-extraction engine, with a built-in fallback.
-- AI-powered document classification: user-configured LLM providers classify documents by selecting matching tags, generating a summary, and suggesting a title. Tags and name are auto-applied with per-field approve/decline controls via a generic suggestion system; summaries are applied directly without suggestion records (no approve/decline — the summary is purely AI-managed).
+- AI-powered document classification: user-configured LLM providers classify documents by selecting matching tags, linking matching parties, generating a summary, and suggesting a title. Tags, parties, and name are auto-applied with per-field approve/decline controls via a generic suggestion system; summaries are applied directly without suggestion records (no approve/decline — the summary is purely AI-managed).
 
 ## Out of scope for v1
 
@@ -34,7 +34,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Inline preview / annotation beyond a thumbnail.
 - Version diffs and version revert. (Version *delete* is supported — see [versions.md](versions.md) → *Version delete*.)
 - Document-to-document relationships (supersedes / derived-from / etc.) beyond the party link.
-- Automated party detection.
+- Automated *creation* of new parties from document content — AI classification matches only parties that already exist; it never invents new ones.
 - A user-facing field-level change-history view (the audit log already exists and powers the activity stream, but per-field diffs are not surfaced as a separate history surface).
 - Multi-user permissions / per-document ACLs.
 
@@ -83,15 +83,15 @@ The activity stream is the user-facing projection of the audit log with comments
 
 ### AI classification and suggestions
 
-Documents can be classified by an AI provider — a user-configured LLM endpoint (Azure AI Foundry for v1). Classification takes the document's name and latest version's extracted text, along with all available tags, and returns three outputs: matching tag IDs, a summary, and a suggested title. Tags and name are **auto-applied** to the document immediately so the values are useful right away, and each is tracked by a **suggestion** record with approve/decline controls. Summaries are also auto-applied but are **not** tracked as suggestions — they are purely AI-managed and displayed as read-only text with no approve/decline UI.
+Documents can be classified by an AI provider — a user-configured LLM endpoint (Azure AI Foundry for v1). Classification takes the document's name and latest version's extracted text, along with all available tags and parties, and returns four outputs: matching tag IDs, matching party IDs, a summary, and a suggested title. Tags, parties, and name are **auto-applied** to the document immediately so the values are useful right away, and each is tracked by a **suggestion** record with approve/decline controls. Summaries are also auto-applied but are **not** tracked as suggestions — they are purely AI-managed and displayed as read-only text with no approve/decline UI. As with tags, the AI picks parties only from those that already exist; it never creates new parties.
 
-The suggestion system is generic — `DocumentSuggestion` tracks AI-modified fields (Tags, Name) with `Pending → Approved | Declined` status. Approving a suggestion confirms the AI value (it stays applied; the AI indicator disappears). Declining reverts the change: for tags, the AI-applied tag is removed; for name, the document reverts to its original name. Approve-all and decline-all bulk actions are available when multiple suggestions are pending.
+The suggestion system is generic — `DocumentSuggestion` tracks AI-modified fields (Tags, Parties, Name) with `Pending → Approved | Declined` status. Approving a suggestion confirms the AI value (it stays applied; the AI indicator disappears). Declining reverts the change: for tags, the AI-applied tag is removed; for parties, the AI-applied party link is removed; for name, the document reverts to its original name. Approve-all and decline-all bulk actions are available when multiple suggestions are pending.
 
 Re-classifying a document clears any prior pending suggestions (reverting their changes) before applying new ones. Manual edits to a field auto-decline its pending suggestion — the user has taken explicit ownership.
 
 Classification runs as a background job and can be triggered three ways: manually from the document detail menu, as a bulk action from the list page, or automatically on upload when the household-wide `AutoClassifyOnUpload` setting is enabled and a default AI provider is configured. Auto-classify on upload is fire-and-forget — the upload completes immediately and classification runs as a separate job.
 
-AI providers are managed in Admin (`/admin/ai-providers`) and follow the same CRUD pattern as text-extraction engines. Each provider has a type (Azure AI Foundry for v1), a JSON configuration block (endpoint, API key, deployment name), and an enabled/disabled toggle. The Documents settings page (`/documents/settings`) has a default AI provider picker and an auto-classify toggle. The suggestion system is designed to be extensible: adding new AI-suggested fields (document date, parties, expiry date) requires only a new enum value, a prompt update, and UI — no schema changes.
+AI providers are managed in Admin (`/admin/ai-providers`) and follow the same CRUD pattern as text-extraction engines. Each provider has a type (Azure AI Foundry for v1), a JSON configuration block (endpoint, API key, deployment name), and an enabled/disabled toggle. The Documents settings page (`/documents/settings`) has a default AI provider picker and an auto-classify toggle. The suggestion system is designed to be extensible: adding new AI-suggested fields (document date, expiry date) requires only a new enum value, a prompt update, and UI — no schema changes (parties were added this way).
 
 ### Trash
 
@@ -179,8 +179,8 @@ Trash never auto-purges. Old versions are never pruned. The audit log is retaine
 5. **The activity stream interleaves comments and audit entries** rather than separating them. Users read "what happened to this document" as one chronological feed.
 6. **Bulk metadata edits use tri-state controls** so leaving a tag/party alone is a first-class option distinct from adding or removing it. Users do not get surprised by accidentally clearing tags they never touched.
 7. **OCR failure on upload is silent.** The document saves, the extracted-text section is empty, and the user notices when content search misses. This is a deliberate "don't block on extraction" stance; reprocess is the recovery path.
-8. **AI suggestions integrate inline**, not as a separate panel or modal. The name input gains an AI badge with approve/decline buttons; AI-suggested tags render with a dashed border and sparkle icon with per-tag approve/decline; the summary appears as plain read-only text (no approve/decline — it is purely AI-managed). There is no "review suggestions" step — the values are already applied and the approve/decline controls are right where the values are displayed.
-9. **AI-suggested tags are visually distinct** — dashed border, sparkle icon, and per-tag check/X buttons — so the user can tell at a glance which tags came from AI vs manual assignment.
+8. **AI suggestions integrate inline**, not as a separate panel or modal. The name input gains an AI badge with approve/decline buttons; AI-suggested tags and parties render inside their own combobox with a dashed border and sparkle icon with per-item approve/decline; the summary appears as plain read-only text (no approve/decline — it is purely AI-managed). There is no "review suggestions" step — the values are already applied and the approve/decline controls are right where the values are displayed.
+9. **AI-suggested tags and parties are visually distinct** — dashed border, sparkle icon, and per-item check/X buttons — so the user can tell at a glance which tags/parties came from AI vs manual assignment.
 10. **Approve-all / decline-all** appears as a compact inline action row when two or more suggestions are pending, providing a fast path for users who trust or distrust the classification wholesale.
 
 ## Future-compatibility
@@ -195,7 +195,7 @@ The following must be addable later without re-migrating documents, versions, ta
 - **In-document preview, annotation, version diffs, version revert.**
 - **Document-to-document relationships** (supersedes, derived-from, etc.) beyond the party link.
 - **Additional AI providers** (Anthropic Claude, OpenAI, Ollama) as new `AiProviderType` enum values and config records — the `IChatClient` abstraction and factory pattern make this additive.
-- **New AI-suggested fields** (document date, parties, expiry date) via new `DocumentSuggestionField` enum values, prompt updates, and UI — no schema changes needed.
+- **New AI-suggested fields** (document date, expiry date) via new `DocumentSuggestionField` enum values, prompt updates, and UI — no schema changes needed (tags, name, and parties already use this).
 - **AI-driven tag creation** — v1 limits AI to picking from existing tags; suggesting new tags requires a new prompt strategy and a creation flow.
 - **External-source ingestion** — cloud-storage import, scanner uploads, email forwarding.
 - **Multi-user / per-document permissions** if the household ever expands beyond a single trust boundary.

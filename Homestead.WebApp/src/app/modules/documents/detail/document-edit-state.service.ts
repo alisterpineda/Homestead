@@ -15,6 +15,7 @@ export interface DocumentEditState {
     appliedTransientName: string | null;
     preClassifyName: string | null;
     aiTransientTagPaths: string[];
+    aiTransientPartyIds: string[];
   };
 }
 

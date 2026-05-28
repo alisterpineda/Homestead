@@ -106,6 +106,16 @@ public class PatchDocumentHandler(AppDbContext db,
             }
         }
 
+        if (patchPaths.Contains("partyids"))
+        {
+            foreach (var s in document.Suggestions
+                .Where(s => s.Field == DocumentSuggestionField.Parties).ToList())
+            {
+                s.Status = DocumentSuggestionStatus.Declined;
+                s.ResolvedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
         if (patchPaths.Contains("name"))
         {
             foreach (var s in document.Suggestions

@@ -14,6 +14,7 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
         var document = await db.Documents
             .AsNoTracking()
             .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentParties)
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
             ?? throw new EntityNotFoundException("Document not found.");
 
@@ -26,7 +27,8 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
             {
                 SuggestedTitle = null,
                 Summary = null,
-                Tags = []
+                Tags = [],
+                Parties = []
             };
         }
 
@@ -58,11 +60,29 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
                 .ToListAsync(ct)
             : [];
 
+        var existingPartyIds = new HashSet<Guid>(document.DocumentParties.Select(dp => dp.PartyId));
+        var newPartyIds = output.Classification.MatchedPartyIds
+            .Where(id => !existingPartyIds.Contains(id))
+            .ToHashSet();
+
+        var parties = newPartyIds.Count > 0
+            ? await db.Parties
+                .AsNoTracking()
+                .Where(p => newPartyIds.Contains(p.Id))
+                .Select(p => new ClassifyPreviewPartyDto
+                {
+                    Id = p.Id,
+                    Name = p.Name
+                })
+                .ToListAsync(ct)
+            : [];
+
         return new ClassifyPreviewResponse
         {
             SuggestedTitle = suggestedTitle,
             Summary = summary,
-            Tags = tags
+            Tags = tags,
+            Parties = parties
         };
     }
 }

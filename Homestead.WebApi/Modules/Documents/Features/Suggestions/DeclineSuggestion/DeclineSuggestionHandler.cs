@@ -15,31 +15,15 @@ public class DeclineSuggestionHandler(AppDbContext db, ISearchVectorUpdater sear
         var suggestion = await db.DocumentSuggestions
             .Include(s => s.Document)
             .ThenInclude(d => d.DocumentTags)
+            .Include(s => s.Document)
+            .ThenInclude(d => d.DocumentParties)
             .FirstOrDefaultAsync(s => s.Id == request.SuggestionId && s.DocumentId == request.DocumentId, ct)
             ?? throw new EntityNotFoundException("Suggestion not found.");
 
         if (suggestion.Status != DocumentSuggestionStatus.Pending)
             throw new BusinessRuleException("Suggestion has already been resolved.");
 
-        var needsSearchUpdate = false;
-
-        switch (suggestion.Field)
-        {
-            case DocumentSuggestionField.Tags:
-                var tagId = Guid.Parse(suggestion.SuggestedValue);
-                var docTag = suggestion.Document.DocumentTags.FirstOrDefault(dt => dt.TagId == tagId);
-                if (docTag is not null)
-                    suggestion.Document.DocumentTags.Remove(docTag);
-                break;
-
-            case DocumentSuggestionField.Name:
-                if (suggestion.OriginalValue is not null)
-                {
-                    suggestion.Document.Name = suggestion.OriginalValue;
-                    needsSearchUpdate = true;
-                }
-                break;
-        }
+        var needsSearchUpdate = DocumentSuggestionReverter.Revert(suggestion.Document, suggestion);
 
         suggestion.Status = DocumentSuggestionStatus.Declined;
         suggestion.ResolvedAt = DateTimeOffset.UtcNow;

@@ -37,7 +37,15 @@ export interface PartyOption {
         class="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20"
       >
         @for (party of value(); track party.id) {
-          <app-party-badge [name]="party.name" [removable]="true" (removed)="removeParty(party.id)" />
+          <app-party-badge
+            [name]="party.name"
+            [aiSuggested]="aiPendingParties().has(party.id) || aiTransientParties().has(party.id)"
+            [aiTransient]="aiTransientParties().has(party.id)"
+            [removable]="!aiPendingParties().has(party.id)"
+            (removed)="removeParty(party.id)"
+            (approved)="partyApproved.emit(party.id)"
+            (declined)="partyDeclined.emit(party.id)"
+          />
         }
         <input
           #inputEl
@@ -90,7 +98,11 @@ export class PartyInputComponent {
   protected readonly createOptionId = CREATE_OPTION_ID;
 
   value = input.required<PartyOption[]>();
+  aiPendingParties = input<Set<string>>(new Set());
+  aiTransientParties = input<Set<string>>(new Set());
   valueChange = output<PartyOption[]>();
+  partyApproved = output<string>();
+  partyDeclined = output<string>();
 
   searchText = signal('');
   showSuggestions = signal(false);
@@ -196,7 +208,10 @@ export class PartyInputComponent {
         this.selectOption(options[this.selectedIndex()]);
       }
     } else if (event.key === 'Backspace' && this.searchText() === '' && this.value().length > 0) {
-      this.removeParty(this.value()[this.value().length - 1].id);
+      const lastParty = this.value()[this.value().length - 1];
+      if (!this.aiPendingParties().has(lastParty.id)) {
+        this.removeParty(lastParty.id);
+      }
     } else if (event.key === 'ArrowDown' && this.showSuggestions()) {
       event.preventDefault();
       this.selectedIndex.update((i) => (i < options.length - 1 ? i + 1 : i));

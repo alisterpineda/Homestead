@@ -658,6 +658,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
           appliedTransientName: 'AI Name',
           preClassifyName: 'Doc 1',
           aiTransientTagPaths: [],
+          aiTransientPartyIds: [],
         });
       });
 
@@ -672,6 +673,19 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         const saved = triggerSaveAndGetState();
         expect(saved.editTags).toEqual(['Existing', 'AI Tag']);
         expect(saved.transientAi?.aiTransientTagPaths).toEqual(['AI Tag']);
+      });
+
+      it('includes transient party ids in metadata', () => {
+        docResponse = makeDoc();
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editParties.set([{ id: 'party-1', name: 'AI Party' }]);
+        guardComponent.aiTransientPartyIds.set(new Set(['party-1']));
+
+        const saved = triggerSaveAndGetState();
+        expect(saved.editParties).toEqual([{ id: 'party-1', name: 'AI Party' }]);
+        expect(saved.transientAi?.aiTransientPartyIds).toEqual(['party-1']);
       });
 
       it('omits transientAi when no AI suggestions are active', () => {

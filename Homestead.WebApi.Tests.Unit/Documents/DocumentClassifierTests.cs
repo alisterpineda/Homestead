@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Modules.Documents.Services;
@@ -55,8 +56,8 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "extracted text here",
-            Arg.Any<List<TagInfo>>(), ct)
-            .Returns(new ClassificationResult([tagId], "A summary", "Better Title"));
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([tagId], [], "A summary", "Better Title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
 
@@ -80,7 +81,7 @@ public class DocumentClassifierTests : IDisposable
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
             Arg.Any<AiProvider>(), Arg.Any<string>(), Arg.Any<string?>(),
-            Arg.Any<List<TagInfo>>(), Arg.Any<CancellationToken>());
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -102,7 +103,7 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
             .Returns((ClassificationResult?)null);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
@@ -159,15 +160,15 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), ct)
-            .Returns(new ClassificationResult([], "summary", "title"));
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([], [], "summary", "title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
 
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
             provider, "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), ct);
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct);
     }
 
     [Fact]
@@ -190,8 +191,8 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), ct)
-            .Returns(new ClassificationResult([tagId], "AI summary", "AI Title"));
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([tagId], [], "AI summary", "AI Title"));
 
         var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
 
@@ -207,6 +208,135 @@ public class DocumentClassifierTests : IDisposable
         Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Tags);
 
         await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(_documentId, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_AppliesParties_AndCreatesPendingSuggestions()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var partyId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedParty(partyId, "ACME Insurance");
+        SeedProvider();
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
+
+        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+
+        Assert.True(result);
+
+        var links = _db.DocumentParties.Where(dp => dp.DocumentId == _documentId).ToList();
+        Assert.Single(links);
+        Assert.Equal(partyId, links[0].PartyId);
+
+        var suggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Parties)
+            .ToList();
+        Assert.Single(suggestions);
+        Assert.Equal(partyId.ToString(), suggestions[0].SuggestedValue);
+        Assert.Equal(DocumentSuggestionStatus.Pending, suggestions[0].Status);
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_SkipsAlreadyLinkedParty()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var partyId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedParty(partyId, "ACME Insurance");
+        SeedProvider();
+        _db.DocumentParties.Add(new DocumentParty { DocumentId = _documentId, PartyId = partyId });
+        await _db.SaveChangesAsync(ct);
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
+
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+
+        var links = _db.DocumentParties.Where(dp => dp.DocumentId == _documentId).ToList();
+        Assert.Single(links);
+        var partySuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Parties)
+            .ToList();
+        Assert.Empty(partySuggestions);
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_ClearsPendingPartySuggestions_BeforeApplyingNew()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var oldPartyId = Guid.NewGuid();
+        var newPartyId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedProvider();
+        SeedParty(oldPartyId, "Old Party");
+        SeedParty(newPartyId, "New Party");
+
+        _db.DocumentParties.Add(new DocumentParty { DocumentId = _documentId, PartyId = oldPartyId });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Parties,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = oldPartyId.ToString(),
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([], [newPartyId], "new summary", "Test Doc"));
+
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+
+        // Old AI-applied party link is reverted; new one is linked.
+        var linkedPartyIds = _db.DocumentParties
+            .Where(dp => dp.DocumentId == _documentId)
+            .Select(dp => dp.PartyId)
+            .ToList();
+        Assert.DoesNotContain(oldPartyId, linkedPartyIds);
+        Assert.Contains(newPartyId, linkedPartyIds);
+
+        var pendingSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Status == DocumentSuggestionStatus.Pending)
+            .Select(s => s.SuggestedValue)
+            .ToList();
+        Assert.DoesNotContain(oldPartyId.ToString(), pendingSuggestions);
+        Assert.Contains(newPartyId.ToString(), pendingSuggestions);
     }
 
     [Fact]
@@ -287,8 +417,8 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), ct)
-            .Returns(new ClassificationResult([newTagId], "new summary", "New Title"));
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            .Returns(new ClassificationResult([newTagId], [], "new summary", "New Title"));
 
         await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
 
@@ -397,6 +527,18 @@ public class DocumentClassifierTests : IDisposable
             ProviderType = AiProviderType.AzureAIFoundry,
             Configuration = "{}",
             IsEnabled = true
+        });
+        _db.SaveChanges();
+    }
+
+    private void SeedParty(Guid id, string name)
+    {
+        _db.Parties.Add(new Party
+        {
+            Id = id,
+            Name = name,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
         });
         _db.SaveChanges();
     }

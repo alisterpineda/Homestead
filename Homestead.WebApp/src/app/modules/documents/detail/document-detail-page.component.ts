@@ -394,7 +394,14 @@ import { toast } from '@spartan-ng/brain/sonner';
           <!-- Parties -->
           <div class="space-y-2">
             <label hlmLabel>Parties</label>
-            <app-party-input [value]="editParties()" (valueChange)="editParties.set($event)" />
+            <app-party-input
+              [value]="editParties()"
+              [aiPendingParties]="aiPendingPartyIds()"
+              [aiTransientParties]="aiTransientPartyIds()"
+              (valueChange)="onEditPartiesChanged($event)"
+              (partyApproved)="approvePartyById($event)"
+              (partyDeclined)="declinePartyById($event)"
+            />
           </div>
 
           <!-- Tags -->
@@ -961,6 +968,14 @@ export class DocumentDetailPageComponent implements OnDestroy {
       .map(s => ({ ...s, tag: tagById.get(s.suggestedValue) }))
       .filter(s => s.tag != null);
   });
+  pendingPartySuggestions = computed(() => {
+    const suggestions = this.pendingSuggestions().filter(s => s.field === 'Parties');
+    const parties = this.document()?.parties ?? [];
+    const partyById = new Map(parties.map(p => [p.id, p]));
+    return suggestions
+      .map(s => ({ ...s, party: partyById.get(s.suggestedValue) }))
+      .filter(s => s.party != null);
+  });
   pendingSuggestionCount = computed(() => this.pendingSuggestions().length);
 
   aiPendingTagPaths = computed(() => {
@@ -968,7 +983,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return new Set(suggestions.map(s => s.tag!.path));
   });
 
+  aiPendingPartyIds = computed(() => {
+    const suggestions = this.pendingPartySuggestions();
+    return new Set(suggestions.map(s => s.party!.id));
+  });
+
   aiTransientTagPaths = signal<Set<string>>(new Set());
+  aiTransientPartyIds = signal<Set<string>>(new Set());
 
   pendingTagPathToSuggestionId = computed(() => {
     const suggestions = this.pendingTagSuggestions();
@@ -979,8 +1000,17 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return map;
   });
 
+  pendingPartyIdToSuggestionId = computed(() => {
+    const suggestions = this.pendingPartySuggestions();
+    const map = new Map<string, string>();
+    for (const s of suggestions) {
+      map.set(s.party!.id, s.id);
+    }
+    return map;
+  });
+
   hasTransientSuggestions = computed(() =>
-    this.aiTransientTagPaths().size > 0 || this.nameIsAiSuggested(),
+    this.aiTransientTagPaths().size > 0 || this.aiTransientPartyIds().size > 0 || this.nameIsAiSuggested(),
   );
 
   nameIsAiSuggested = computed(() => {
@@ -991,6 +1021,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   totalSuggestionCount = computed(() =>
     this.pendingSuggestionCount()
     + this.aiTransientTagPaths().size
+    + this.aiTransientPartyIds().size
     + (this.nameIsAiSuggested() ? 1 : 0),
   );
 
@@ -1027,6 +1058,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.clearTransientState();
         }
 
+        // Capture transient party options (with names) before editParties is reset/restored,
+        // so the preserve block below can re-add them without depending on the non-persisted
+        // transientClassification signal.
+        const priorTransientPartyOptions = preservedTransient
+          ? untracked(() => this.editParties().filter(p => this.aiTransientPartyIds().has(p.id)))
+          : [];
+
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
           this.editName.set(saved.editName);
@@ -1041,6 +1079,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
             this.appliedTransientName.set(saved.transientAi.appliedTransientName);
             this.preClassifyName.set(saved.transientAi.preClassifyName);
             this.aiTransientTagPaths.set(new Set(saved.transientAi.aiTransientTagPaths));
+            this.aiTransientPartyIds.set(new Set(saved.transientAi.aiTransientPartyIds));
           }
           this.initializedVersionId = saved.versionId
             ?? untracked(() => this.activeVersion()?.id ?? null);
@@ -1065,6 +1104,26 @@ export class DocumentDetailPageComponent implements OnDestroy {
             }
             if (stillTransient.length < transient.size) {
               this.aiTransientTagPaths.set(new Set(stillTransient));
+            }
+          }
+
+          const transientPartyIds = this.aiTransientPartyIds();
+          if (transientPartyIds.size > 0) {
+            const serverPartyIds = new Set((doc.parties ?? []).map(p => p.id));
+            const stillTransientIds = new Set(
+              [...transientPartyIds].filter(id => !serverPartyIds.has(id)),
+            );
+            const currentPartyIds = new Set(this.editParties().map(p => p.id));
+            const toAdd = priorTransientPartyOptions
+              .filter(p => stillTransientIds.has(p.id) && !currentPartyIds.has(p.id));
+            if (toAdd.length > 0) {
+              this.editParties.update(parties => [
+                ...parties,
+                ...toAdd.map(p => ({ id: p.id, name: p.name })),
+              ]);
+            }
+            if (stillTransientIds.size !== transientPartyIds.size) {
+              this.aiTransientPartyIds.set(stillTransientIds);
             }
           }
         }
@@ -1359,7 +1418,21 @@ export class DocumentDetailPageComponent implements OnDestroy {
             this.aiTransientTagPaths.set(new Set([...existing, ...newPaths]));
           }
         }
-        const count = (result.suggestedTitle ? 1 : 0) + newTagCount;
+        let newPartyCount = 0;
+        if (result.parties?.length) {
+          const currentIds = new Set(this.editParties().map(p => p.id));
+          const newParties = result.parties.filter(p => !currentIds.has(p.id));
+          newPartyCount = newParties.length;
+          if (newParties.length > 0) {
+            this.editParties.update(parties => [
+              ...parties,
+              ...newParties.map(p => ({ id: p.id, name: p.name })),
+            ]);
+            const existing = this.aiTransientPartyIds();
+            this.aiTransientPartyIds.set(new Set([...existing, ...newParties.map(p => p.id)]));
+          }
+        }
+        const count = (result.suggestedTitle ? 1 : 0) + newTagCount + newPartyCount;
         if (count > 0) {
           toast.success(`${count} suggestion${count === 1 ? '' : 's'} ready to review.`);
         } else {
@@ -1377,6 +1450,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const transientPaths = this.aiTransientTagPaths();
     if (transientPaths.size > 0) {
       this.editTags.update(tags => tags.filter(t => !transientPaths.has(t)));
+    }
+    const transientPartyIds = this.aiTransientPartyIds();
+    if (transientPartyIds.size > 0) {
+      this.editParties.update(parties => parties.filter(p => !transientPartyIds.has(p.id)));
     }
     const pre = this.preClassifyName();
     if (pre !== null) {
@@ -1412,6 +1489,37 @@ export class DocumentDetailPageComponent implements OnDestroy {
       const updated = new Set([...transient].filter(t => !removed.has(t)));
       if (updated.size !== transient.size) {
         this.aiTransientTagPaths.set(updated);
+      }
+    }
+  }
+
+  approvePartyById(partyId: string): void {
+    const suggestionId = this.pendingPartyIdToSuggestionId().get(partyId);
+    if (suggestionId) {
+      this.approveSuggestion(suggestionId);
+    } else {
+      toast.error('Could not find suggestion to approve.');
+    }
+  }
+
+  declinePartyById(partyId: string): void {
+    const suggestionId = this.pendingPartyIdToSuggestionId().get(partyId);
+    if (suggestionId) {
+      this.declineSuggestion(suggestionId);
+    } else {
+      toast.error('Could not find suggestion to decline.');
+    }
+  }
+
+  onEditPartiesChanged(newParties: PartyOption[]): void {
+    const newIds = new Set(newParties.map(p => p.id));
+    const removed = new Set(this.editParties().filter(p => !newIds.has(p.id)).map(p => p.id));
+    this.editParties.set(newParties);
+    if (removed.size > 0) {
+      const transient = this.aiTransientPartyIds();
+      const updated = new Set([...transient].filter(id => !removed.has(id)));
+      if (updated.size !== transient.size) {
+        this.aiTransientPartyIds.set(updated);
       }
     }
   }
@@ -1571,13 +1679,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.appliedTransientName.set(null);
     this.preClassifyName.set(null);
     this.aiTransientTagPaths.set(new Set());
+    this.aiTransientPartyIds.set(new Set());
   }
 
   private buildEditState(): DocumentEditState {
     const appliedName = this.appliedTransientName();
     const preName = this.preClassifyName();
     const transientPaths = this.aiTransientTagPaths();
-    const hasTransient = appliedName !== null || preName !== null || transientPaths.size > 0;
+    const transientPartyIds = this.aiTransientPartyIds();
+    const hasTransient = appliedName !== null || preName !== null
+      || transientPaths.size > 0 || transientPartyIds.size > 0;
 
     return {
       editName: this.editName(),
@@ -1594,6 +1705,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
           appliedTransientName: appliedName,
           preClassifyName: preName,
           aiTransientTagPaths: [...transientPaths],
+          aiTransientPartyIds: [...transientPartyIds],
         },
       } : {}),
     };

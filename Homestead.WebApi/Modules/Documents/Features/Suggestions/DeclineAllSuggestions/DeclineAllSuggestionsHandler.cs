@@ -13,6 +13,7 @@ public class DeclineAllSuggestionsHandler(AppDbContext db, ISearchVectorUpdater 
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentParties)
             .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct);
 
@@ -24,23 +25,8 @@ public class DeclineAllSuggestionsHandler(AppDbContext db, ISearchVectorUpdater 
 
         foreach (var suggestion in document.Suggestions.ToList())
         {
-            switch (suggestion.Field)
-            {
-                case DocumentSuggestionField.Tags:
-                    var tagId = Guid.Parse(suggestion.SuggestedValue);
-                    var docTag = document.DocumentTags.FirstOrDefault(dt => dt.TagId == tagId);
-                    if (docTag is not null)
-                        document.DocumentTags.Remove(docTag);
-                    break;
-
-                case DocumentSuggestionField.Name:
-                    if (suggestion.OriginalValue is not null)
-                    {
-                        document.Name = suggestion.OriginalValue;
-                        needsSearchUpdate = true;
-                    }
-                    break;
-            }
+            if (DocumentSuggestionReverter.Revert(document, suggestion))
+                needsSearchUpdate = true;
 
             suggestion.Status = DocumentSuggestionStatus.Declined;
             suggestion.ResolvedAt = now;

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -113,6 +114,74 @@ public class SuggestionTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task DeclineSuggestion_Parties_UnlinksParty()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "party-suggestion-test.pdf");
+
+        Guid suggestionId;
+        Guid partyId;
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var provider = new AiProvider
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Test Provider {Guid.NewGuid():N}",
+                ProviderType = AiProviderType.AzureAIFoundry,
+                IsEnabled = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.AiProviders.Add(provider);
+
+            var party = new Party
+            {
+                Id = Guid.NewGuid(),
+                Name = $"ACME Insurance {Guid.NewGuid():N}",
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.Parties.Add(party);
+            partyId = party.Id;
+
+            db.DocumentParties.Add(new DocumentParty { DocumentId = docId, PartyId = partyId });
+
+            var suggestion = new DocumentSuggestion
+            {
+                Id = Guid.NewGuid(),
+                DocumentId = docId,
+                Field = DocumentSuggestionField.Parties,
+                Status = DocumentSuggestionStatus.Pending,
+                SuggestedValue = partyId.ToString(),
+                AiProviderId = provider.Id,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            db.DocumentSuggestions.Add(suggestion);
+            suggestionId = suggestion.Id;
+
+            await db.SaveChangesAsync(CT);
+        }
+
+        var response = await client.PostAsync(
+            $"/api/v1/documents/{docId}/suggestions/{suggestionId}/decline", null, CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var updated = await db.DocumentSuggestions.FirstAsync(s => s.Id == suggestionId, CT);
+            Assert.Equal(DocumentSuggestionStatus.Declined, updated.Status);
+
+            var stillLinked = await db.DocumentParties
+                .AnyAsync(dp => dp.DocumentId == docId && dp.PartyId == partyId, CT);
+            Assert.False(stillLinked);
+        }
+    }
+
+    [Fact]
     public async Task ApproveAllSuggestions_ApprovesAllPending()
     {
         var docId = await SeedDocumentWithSuggestionsAsync();
@@ -157,5 +226,72 @@ public class SuggestionTests : IntegrationTestBase
             .Where(s => s.DocumentId == docId && s.Status == DocumentSuggestionStatus.Declined)
             .CountAsync(CT);
         Assert.Equal(1, declined);
+    }
+
+    [Fact]
+    public async Task DeclineAllSuggestions_Parties_UnlinksParty()
+    {
+        var client = await CreateAdminClientAsync();
+        var docId = await UploadAndWaitAsync(client, "decline-all-party-test.pdf");
+
+        Guid partyId;
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var provider = new AiProvider
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Test Provider {Guid.NewGuid():N}",
+                ProviderType = AiProviderType.AzureAIFoundry,
+                IsEnabled = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.AiProviders.Add(provider);
+
+            var party = new Party
+            {
+                Id = Guid.NewGuid(),
+                Name = $"ACME Insurance {Guid.NewGuid():N}",
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.Parties.Add(party);
+            partyId = party.Id;
+
+            db.DocumentParties.Add(new DocumentParty { DocumentId = docId, PartyId = partyId });
+            db.DocumentSuggestions.Add(new DocumentSuggestion
+            {
+                Id = Guid.NewGuid(),
+                DocumentId = docId,
+                Field = DocumentSuggestionField.Parties,
+                Status = DocumentSuggestionStatus.Pending,
+                SuggestedValue = partyId.ToString(),
+                AiProviderId = provider.Id,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+
+            await db.SaveChangesAsync(CT);
+        }
+
+        var response = await client.PostAsync(
+            $"/api/v1/documents/{docId}/suggestions/decline-all", null, CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var stillLinked = await db.DocumentParties
+                .AnyAsync(dp => dp.DocumentId == docId && dp.PartyId == partyId, CT);
+            Assert.False(stillLinked);
+
+            var declined = await db.DocumentSuggestions
+                .AnyAsync(s => s.DocumentId == docId
+                    && s.Field == DocumentSuggestionField.Parties
+                    && s.Status == DocumentSuggestionStatus.Declined, CT);
+            Assert.True(declined);
+        }
     }
 }
