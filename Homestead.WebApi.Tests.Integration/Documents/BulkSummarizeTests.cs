@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -53,6 +54,15 @@ public class BulkSummarizeTests : IntegrationTestBase
         {
             var doc = await db.Documents.AsNoTracking().FirstAsync(d => d.Id == docId, CT);
             Assert.Equal(FakeAiClassificationService.GeneratedSummary, doc.Summary);
+
+            // The bulk (background-job) summarize path now writes a Document/Updated audit row,
+            // matching the single-doc summarize path (see SummarizeTests).
+            var auditRow = await db.AuditLogs
+                .AsNoTracking()
+                .Where(a => a.EntityType == "Document" && a.EntityId == docId && a.Action == AuditAction.Updated)
+                .FirstOrDefaultAsync(CT);
+            Assert.NotNull(auditRow);
+            Assert.Contains("Summary", auditRow!.Changes);
         }
 
         // Summarize must never create suggestion rows — this is what distinguishes it from classify.

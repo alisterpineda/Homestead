@@ -146,7 +146,8 @@ public class UploadDocumentJobHandler(
             {
                 if (await classifier.IsAutoClassifyEnabledAsync(ct))
                     classified = await classifier.ClassifyAndApplyAsync(
-                        documentId, null, ClassificationScope.All, job.CreatedByUserId, ct);
+                        documentId, null, ClassificationScope.All, job.CreatedByUserId,
+                        partOfCreation: true, ct);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

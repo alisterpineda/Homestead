@@ -37,12 +37,12 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct);
+        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct);
     }
 
     [Fact]
@@ -53,12 +53,12 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, aiProviderId, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, aiProviderId, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob(aiProviderId);
         await _sut.HandleAsync(job, ct);
 
-        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, aiProviderId, Arg.Any<ClassificationScope>(), null, ct);
+        await _classifier.Received(1).ClassifyAndApplyAsync(_documentId, aiProviderId, Arg.Any<ClassificationScope>(), null, false, ct);
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
@@ -91,7 +91,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob();
         job.ParentJobId = Guid.NewGuid();
@@ -111,7 +111,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct)
             .Returns(callInfo =>
             {
                 var doc = _db.Documents.Find(_documentId)!;
@@ -141,7 +141,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
@@ -156,7 +156,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(false);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(false);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
@@ -179,7 +179,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(false);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(false);
 
         var job = CreateJob();
         job.ParentJobId = Guid.NewGuid();
@@ -199,13 +199,13 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
 
         SeedDocument();
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct).Returns(true);
 
         var job = CreateJob(scope: ClassificationScope.Summary);
         await _sut.HandleAsync(job, ct);
 
         await _classifier.Received(1).ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Summary, null, ct);
+            _documentId, null, ClassificationScope.Summary, null, false, ct);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(_documentId, null, Arg.Any<ClassificationScope>(), null, false, ct)
             .Returns<bool>(x => throw new InvalidOperationException("Document not found."));
 
         var job = CreateJob();

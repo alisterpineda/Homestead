@@ -21,7 +21,8 @@ public class ClassifyDocumentJobHandler(
         job.EntityId = payload.DocumentId;
 
         await classifier.ClassifyAndApplyAsync(
-            payload.DocumentId, payload.AiProviderId, payload.Scope, job.CreatedByUserId, ct);
+            payload.DocumentId, payload.AiProviderId, payload.Scope, job.CreatedByUserId,
+            partOfCreation: false, ct);
 
         if (job.ParentJobId is null)
         {

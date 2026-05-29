@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
@@ -20,7 +22,8 @@ public interface IDocumentClassifier
         Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct);
 
     Task<bool> ClassifyAndApplyAsync(
-        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId, CancellationToken ct);
+        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId,
+        bool partOfCreation, CancellationToken ct);
 
     Task<bool> IsAutoClassifyEnabledAsync(CancellationToken ct);
 }
@@ -29,7 +32,8 @@ public class DocumentClassifier(
     AppDbContext db,
     IAiProviderResolver providerResolver,
     IAiClassificationService classificationService,
-    ISearchVectorUpdater searchVectorUpdater) : IDocumentClassifier
+    ISearchVectorUpdater searchVectorUpdater,
+    IAuditLogger auditLogger) : IDocumentClassifier
 {
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
         Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct)
@@ -68,10 +72,11 @@ public class DocumentClassifier(
     }
 
     public async Task<bool> ClassifyAndApplyAsync(
-        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId, CancellationToken ct)
+        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId,
+        bool partOfCreation, CancellationToken ct)
     {
         var document = await db.Documents
-            .Include(d => d.DocumentTags)
+            .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
             .Include(d => d.DocumentParties)
             .Include(d => d.Suggestions.Where(s => s.Status == DocumentSuggestionStatus.Pending))
             .FirstOrDefaultAsync(d => d.Id == documentId, ct)
@@ -80,6 +85,12 @@ public class DocumentClassifier(
         var output = await ClassifyAsync(documentId, document.Name, aiProviderId, scope, ct);
         if (output is null)
             return false;
+
+        // Auto-classify-on-upload is part of document creation (the Created audit entry already
+        // covers it), so no Updated row is written. Bulk classify/summarize on existing documents
+        // audit the real DB diff (entry vs commit) — capture the "before" snapshot here, before
+        // ClearPendingSuggestions mutates the entity.
+        var before = partOfCreation ? null : DocumentSnapshot.From(document);
 
         // Only clear pending suggestions for in-scope fields — refreshing one field must never
         // discard another field's pending suggestions. The intermediate save below avoids
@@ -94,10 +105,37 @@ public class DocumentClassifier(
         if (scope.HasFlag(ClassificationScope.Name))
             ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
         if (scope.HasFlag(ClassificationScope.Summary))
-            ApplySummary(document, output.Classification.Summary, updatedByUserId);
+            ApplySummary(document, output.Classification.Summary, updatedByUserId, stampMetadata: !partOfCreation);
 
         await db.SaveChangesAsync(ct);
         await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
+
+        if (before is not null)
+        {
+            // Diff entry-state vs committed-state. The "after" snapshot is read fresh (AsNoTracking)
+            // so newly-applied tags resolve their Tag.Path from the DB — the tracked entity's new
+            // DocumentTags carry only TagId. This net diff also collapses any revert-then-reapply
+            // churn from ClearPendingSuggestions.
+            //
+            // FirstOrDefault (not First): the apply already committed above, so if the document is
+            // deleted between that save and this reload (e.g. a concurrent soft-delete), just skip
+            // the audit row — failing here would report an already-successful classify as a failed job.
+            var after = await db.Documents
+                .AsNoTracking()
+                .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
+                .Include(d => d.DocumentParties)
+                .FirstOrDefaultAsync(d => d.Id == documentId, ct);
+
+            if (after is not null)
+            {
+                var changes = before.Diff(DocumentSnapshot.From(after));
+                if (changes.Count > 0)
+                {
+                    auditLogger.ForUser(updatedByUserId).LogUpdated("Document", documentId, changes);
+                    await db.SaveChangesAsync(ct);
+                }
+            }
+        }
 
         return true;
     }
@@ -217,15 +255,20 @@ public class DocumentClassifier(
         });
     }
 
-    private static void ApplySummary(Document document, string summary, Guid? updatedByUserId)
+    private static void ApplySummary(Document document, string summary, Guid? updatedByUserId, bool stampMetadata)
     {
         if (string.IsNullOrWhiteSpace(summary))
             return;
 
-        // Summary is written directly (no approval workflow), so it is a real modification —
-        // stamp modified-metadata to match the single-doc summarize path (SummarizeDocumentHandler).
         document.Summary = summary;
-        document.UpdatedAt = DateTimeOffset.UtcNow;
-        document.UpdatedByUserId = updatedByUserId;
+
+        // On the bulk/refresh path a written summary is a real modification — stamp modified-metadata
+        // to match the single-doc summarize path (SummarizeDocumentHandler). On the auto-classify-on-upload
+        // path (partOfCreation) the document reads as created-only, so the stamp is skipped.
+        if (stampMetadata)
+        {
+            document.UpdatedAt = DateTimeOffset.UtcNow;
+            document.UpdatedByUserId = updatedByUserId;
+        }
     }
 }
