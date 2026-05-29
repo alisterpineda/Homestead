@@ -4,12 +4,36 @@
         "pr": ""
     },
     "permissions": {
-    "allow": [
-        "mcp__playwright",
-        "Bash(curl -sSf -o /dev/null -m 2 http://localhost:4200*)",
-        "Bash(curl -sSf -o /dev/null -m 2 http://localhost:8080/*)",
-        "Bash(dotnet run --project Homestead.AppHost*)",
-        "Bash(pkill -f Homestead.AppHost*)"
-    ]
+        "allow": [
+            "mcp__playwright",
+            "Bash(curl -sSf -o /dev/null -m 2 http://localhost:4200*)",
+            "Bash(curl -sSf -o /dev/null -m 2 http://localhost:8080/*)",
+            "Bash(aspire ps*)",
+            "Bash(aspire start*)",
+            "Bash(aspire stop*)",
+            "Bash(aspire wait*)",
+            "Bash(aspire logs*)",
+            "Bash(aspire describe*)",
+            "Bash(aspire otel*)",
+            "Bash(aspire resource*)",
+            "Bash(dotnet build*)",
+            "Bash(dotnet test*)",
+            "Bash(npm run build*)",
+            "Bash(dotnet run --project Homestead.AppHost*)",
+            "Bash(pkill -f Homestead.AppHost*)"
+        ]
+    },
+    "hooks": {
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.sh",
+                        "timeout": 600
+                    }
+                ]
+            }
+        ]
     }
 }

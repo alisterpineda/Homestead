@@ -42,9 +42,9 @@ npm run generate-api # Regenerate API clients from openapi.json via ng-openapi-g
 
 Generated files (`src/app/api/generated/` and `src/app/shared/components/spartan/`) should not be manually edited.
 
-## Self-QA with Playwright MCP
+## Self-QA
 
-Before declaring a UI-affecting change complete, self-validate it by driving a real browser against the running Aspire stack via the `playwright` MCP server (registered in `.mcp.json`). The full workflow — probe, start, Keycloak login, checklist, teardown — is in the `self-qa` skill. This is ephemeral in-session validation; the durable regression suite in `Homestead.E2E/` is out of scope here.
+Before declaring a UI-affecting change complete, validate it in a real browser via the **`self-qa` subagent** (`.claude/agents/self-qa.md`) — it drives Playwright against the running Aspire stack. The durable regression suite in `Homestead.E2E/` is separate.
 
 ## Spartan.NG Patterns
 
