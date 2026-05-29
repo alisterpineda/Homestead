@@ -201,15 +201,16 @@ Triggered when a new document is uploaded. The HTTP endpoint stages the file und
 2. Computes the SHA-256 hash; rejects the upload as a duplicate if any other version (including in trashed documents) shares the hash. The duplicate exception is `IStructuredJobError` so the client can offer "view the existing document".
 3. Moves the file from staging to its hash-addressed final location (copy + delete to be safe across filesystems).
 4. Creates the `Document` and its first `DocumentVersion` in the same transaction; rolls back the file move on DB failure.
-5. Updates the search vector.
-6. Sends the SignalR completion notification.
-7. Generates a thumbnail (post-notification, best-effort).
+5. If auto-classify is enabled (the `AutoClassifyOnUpload` setting plus a resolvable default provider), runs `ClassifyAndApplyAsync` **inline**. Non-fatal — a classification failure logs a warning and the upload still succeeds.
+6. Updates the search vector (skipped when classification already updated it).
+7. Sends the SignalR completion notification — deliberately **after** classification, so the UI sees the AI-suggested name/tags/parties/summary the moment the upload lands.
+8. Generates a thumbnail (post-notification, best-effort).
 
 Sets `EntityType = Document`, `EntityId = documentId`.
 
 ### `UploadDocumentVersion`
 
-Triggered when a new version of an existing document is uploaded. Same shape as `UploadDocument`, but creates only a `DocumentVersion` (with `VersionNumber = max(existing) + 1`) attached to the existing document. Sets `EntityId` to the *parent* document.
+Triggered when a new version of an existing document is uploaded. Same shape as `UploadDocument` — minus the auto-classify step, since re-uploading a file does not re-classify — but creates only a `DocumentVersion` (with `VersionNumber = max(existing) + 1`) attached to the existing document. Sets `EntityId` to the *parent* document.
 
 ### `ReprocessDocumentVersion`
 
@@ -229,14 +230,14 @@ Triggered by the bulk-reprocess action on the documents list. The handler:
 
 ### `ClassifyDocument`
 
-Triggered when a document is classified by an AI provider — either manually from the detail page, as part of a bulk classify, or automatically on upload when `AutoClassifyOnUpload` is enabled. The handler:
+Enqueued only as a child of a `BulkClassifyDocuments` parent — one per document. Two other classification paths deliberately do **not** use this job type: single-document classify from the detail page runs synchronously through the `classify-preview` query (persisting nothing until the user saves the edit form), and auto-classify-on-upload calls the classifier inline inside `UploadDocument` rather than spawning a separate job. The handler:
 
 1. Load the document with its current tags and any pending suggestions.
 2. Resolve the AI provider via `IAiProviderResolver` (explicit ID → settings default → null). If no provider resolves, skip classification but still send a notification.
 3. Load the latest version's `ExtractedText` and all available tags (Id, Name, Path).
 4. Call `IAiClassificationService.ClassifyAsync()` — builds a prompt with the document's name, extracted text, and available tags; parses the structured JSON response.
 5. Clear any prior pending suggestions: revert AI-applied tags, name, and summary to their pre-AI state. Persist deletes before applying new data (two-save pattern to avoid composite key collisions on the `DocumentTag` join table).
-6. Auto-apply the new classification: add AI-suggested tags (skipping tags already on the document), set the suggested title, set the summary. Create one `DocumentSuggestion` record per applied field.
+6. Auto-apply the new classification: add AI-suggested tags (skipping tags already on the document), set the suggested title, and set the summary. A `DocumentSuggestion` record is created for each applied **tag, party, and name** — but **not** for the summary, which is written directly and is purely AI-managed (no approve/decline).
 7. Update the search vector. Send a SignalR notification.
 
 When run as a child of `BulkClassifyDocuments`, the handler suppresses its own success notification — the parent's progress updates are the sole channel.

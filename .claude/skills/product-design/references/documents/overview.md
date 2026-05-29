@@ -18,11 +18,11 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Linked **parties** — people, organisations, or other entities a document concerns.
 - A user-visible activity stream that interleaves field-level audit log entries and user comments.
 - Trash with restore and permanent-delete (soft-delete only for documents; everywhere else delete is destructive).
-- Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk classify, bulk download.
+- Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk classify, bulk summarize, bulk download.
 - PostgreSQL full-text search across document name (weighted A), the latest version's extracted text (weighted B), and document summary (weighted C), with ILIKE fallbacks on name and extracted text, and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
 - ZIP download organised by tag path, with a dedicated `_Untagged/` folder and party names embedded in filenames.
 - Household-wide choice of text-extraction engine, with a built-in fallback.
-- AI-powered document classification: user-configured LLM providers classify documents by selecting matching tags, linking matching parties, generating a summary, and suggesting a title. Tags, parties, and name are auto-applied with per-field approve/decline controls via a generic suggestion system; summaries are applied directly without suggestion records (no approve/decline — the summary is purely AI-managed).
+- AI-powered document classification and summarization: user-configured LLM providers classify documents by selecting matching tags, linking matching parties, and suggesting a title, and — as a separate action — generate a document summary. Classification is **field-scoped** — the user picks which of tags, parties, and name to (re)classify, and the prompt is built only for those fields. Tags, parties, and name are tracked via a generic suggestion system with per-field approve/decline; the summary is written directly without a suggestion record (no approve/decline — purely AI-managed). Both classify and summarize run on a single document or in bulk.
 
 ## Out of scope for v1
 
@@ -81,17 +81,25 @@ A document has a single combined **activity stream** that interleaves two source
 
 The activity stream is the user-facing projection of the audit log with comments interleaved. There is no separate field-level diff surface in v1.
 
-### AI classification and suggestions
+### AI classification and summarization
 
-Documents can be classified by an AI provider — a user-configured LLM endpoint (Azure AI Foundry for v1). Classification takes the document's name and latest version's extracted text, along with all available tags and parties, and returns four outputs: matching tag IDs, matching party IDs, a summary, and a suggested title. Tags, parties, and name are **auto-applied** to the document immediately so the values are useful right away, and each is tracked by a **suggestion** record with approve/decline controls. Summaries are also auto-applied but are **not** tracked as suggestions — they are purely AI-managed and displayed as read-only text with no approve/decline UI. As with tags, the AI picks parties only from those that already exist; it never creates new parties.
+Documents can be classified and summarized by an AI provider — a user-configured LLM endpoint. These are **two distinct actions** with separate triggers:
 
-The suggestion system is generic — `DocumentSuggestion` tracks AI-modified fields (Tags, Parties, Name) with `Pending → Approved | Declined` status. Approving a suggestion confirms the AI value (it stays applied; the AI indicator disappears). Declining reverts the change: for tags, the AI-applied tag is removed; for parties, the AI-applied party link is removed; for name, the document reverts to its original name. Approve-all and decline-all bulk actions are available when multiple suggestions are pending.
+- **Classify** populates the organisational and identity fields: matching **tags**, linked **parties**, and a suggested **name**. Classification is **field-scoped** — the user chooses which of those three fields to (re)classify, and the prompt is built dynamically for only the selected fields, so "just refresh the tags" never overwrites a curated name and never spends tokens producing outputs that get discarded. As with tags, the AI links only parties that already exist; it never creates new ones.
+- **Summarize** generates the document's **summary** and nothing else. It is deliberately separate so a user who has curated tags, parties, and name can regenerate the summary — e.g. after switching to a better model or re-running OCR — without disturbing anything else. The summary is written **directly**: no suggestion record, no approve/decline, rendered as read-only text. It is purely AI-managed, and "no undo" is acceptable because regenerating it is a single deliberate action.
 
-Re-classifying a document clears any prior pending suggestions (reverting their changes) before applying new ones. Manual edits to a field auto-decline its pending suggestion — the user has taken explicit ownership.
+Both actions run on a **single document** (from the detail page) or in **bulk** (from the list's selection mode), each via a small dialog that picks the AI provider; the classify dialog adds the per-field checkboxes.
 
-Classification runs as a background job and can be triggered three ways: manually from the document detail menu, as a bulk action from the list page, or automatically on upload when the household-wide `AutoClassifyOnUpload` setting is enabled and a default AI provider is configured. Auto-classify on upload is fire-and-forget — the upload completes immediately and classification runs as a separate job.
+**How classify results are applied differs by surface — and both keep the user in control:**
 
-AI providers are managed in Admin (`/admin/ai-providers`) and follow the same CRUD pattern as text-extraction engines. Each provider has a type (Azure AI Foundry for v1), a JSON configuration block (endpoint, API key, deployment name), and an enabled/disabled toggle. The Documents settings page (`/documents/settings`) has a default AI provider picker and an auto-classify toggle. The suggestion system is designed to be extensible: adding new AI-suggested fields (document date, expiry date) requires only a new enum value, a prompt update, and UI — no schema changes (parties were added this way).
+- **Single document** is a synchronous *preview*. The AI's picks appear inline in the document's edit form as transient, clearly-marked suggestions (dashed border, sparkle; the name input gains an AI badge), and persist only when the user saves the form. Nothing is written before then, and no `DocumentSuggestion` records are created.
+- **Bulk** and **auto-classify-on-upload** run as background jobs that **auto-apply** immediately so the values are useful right away, tracking each applied field as a pending **suggestion** to review afterwards. There is no per-document review at bulk time; review happens later, per document, through the suggestion controls.
+
+The suggestion system (the bulk/upload path) is generic — `DocumentSuggestion` tracks AI-applied fields (Tags, Parties, Name) with `Pending → Approved | Declined` status. Approving confirms the AI value (it stays applied; the AI indicator disappears). Declining reverts it: the AI-applied tag or party link is removed, or the name reverts to its original value. Approve-all and decline-all are available when multiple suggestions are pending. Re-classifying clears prior pending suggestions **only for the fields in scope** before applying new ones — refreshing tags leaves a pending name suggestion untouched. A manual edit to a field auto-declines that field's pending suggestion — the user has taken explicit ownership.
+
+**Triggers.** *Classify* — manually from the detail page, as a bulk action from the list, or automatically on upload when the household-wide `AutoClassifyOnUpload` setting is enabled and a default provider is configured. Auto-classify on upload runs at **full scope** (all fields plus summary), since a freshly-uploaded document has nothing curated to protect. It runs as part of the upload's background processing and is non-fatal — a classification failure never fails the upload — and the upload's completion is held until classification finishes, so the document surfaces already tagged, named, and summarized. *Summarize* — manually from the detail page or as a bulk action.
+
+AI providers are managed in Admin (`/admin/ai-providers`) and follow the same CRUD pattern as text-extraction engines: a provider type, a JSON configuration block (endpoint, API key, model), and an enabled/disabled toggle. The Documents settings page (`/documents/settings`) carries the default AI provider picker and the auto-classify toggle. The system is built to extend: adding a new AI-suggested field (document date, expiry date) needs only a new `DocumentSuggestionField` value, a prompt update, and UI — no schema change (parties were added this way).
 
 ### Trash
 
@@ -112,7 +120,8 @@ The list page has a selection mode toggled inline (not a separate page). With on
 - **Bulk soft-delete** to Trash.
 - **Bulk metadata edit**: add or remove tags; add or remove parties.
 - **Bulk reprocess** the latest version of each document, optionally pinning a specific extraction engine for the run.
-- **Bulk classify** via an AI provider, optionally pinning a specific provider for the run.
+- **Bulk classify** via an AI provider — choose which fields (tags, parties, name) to classify, and optionally pin a specific provider for the run.
+- **Bulk summarize** via an AI provider — (re)generate the summary for each selected document, optionally pinning a provider.
 - **Bulk download** as a ZIP.
 
 Bulk metadata edit uses tri-state controls — for each tag/party, the value can be "add to all," "remove from all," or "leave alone" — so existing per-document state is not overwritten unintentionally. Bulk metadata edit is intentionally narrow to taxonomy fields (tags, parties); document-level scalars (Name, Notes, DocumentDate, ExpiryDate) are not bulk-editable in v1.
@@ -182,6 +191,7 @@ Trash never auto-purges. Old versions are never pruned. The audit log is retaine
 8. **AI suggestions integrate inline**, not as a separate panel or modal. The name input gains an AI badge with approve/decline buttons; AI-suggested tags and parties render inside their own combobox with a dashed border and sparkle icon with per-item approve/decline; the summary appears as plain read-only text (no approve/decline — it is purely AI-managed). There is no "review suggestions" step — the values are already applied and the approve/decline controls are right where the values are displayed.
 9. **AI-suggested tags and parties are visually distinct** — dashed border, sparkle icon, and per-item check/X buttons — so the user can tell at a glance which tags/parties came from AI vs manual assignment.
 10. **Approve-all / decline-all** appears as a compact inline action row when two or more suggestions are pending, providing a fast path for users who trust or distrust the classification wholesale.
+11. **Classify is field-scoped; summarize is its own action.** The classify dialog lets the user tick exactly which of tags, parties, and name to (re)classify, so refreshing one field never overwrites the others — and the summary sits behind a separate "Summarize" button. Two deliberate, narrowly-scoped AI actions instead of one all-or-nothing "classify everything" button.
 
 ## Future-compatibility
 
