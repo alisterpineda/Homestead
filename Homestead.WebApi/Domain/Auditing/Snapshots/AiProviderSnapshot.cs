@@ -9,6 +9,9 @@ public record AiProviderSnapshot : IAuditSnapshot<AiProviderSnapshot, AiProvider
     public string? Configuration { get; init; }
     public required bool IsEnabled { get; init; }
 
+    // Records the RAW configuration (including secrets) on purpose — audit must capture the true
+    // before/after values. This intentionally diverges from CommodityPriceSourceSettingsSnapshot,
+    // which masks secrets in its snapshot.
     public static AiProviderSnapshot From(AiProvider source) => new()
     {
         Name = source.Name,

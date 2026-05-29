@@ -23,6 +23,10 @@ import { getAiProviders } from '@/api/generated/fn/admin/get-ai-providers';
 import { createAiProvider } from '@/api/generated/fn/admin/create-ai-provider';
 import { updateAiProvider } from '@/api/generated/fn/admin/update-ai-provider';
 import { bulkDeleteAiProviders } from '@/api/generated/fn/admin/bulk-delete-ai-providers';
+import { testAiProviderConnection } from '@/api/generated/fn/admin/test-ai-provider-connection';
+import { testAiProviderConnectionById } from '@/api/generated/fn/admin/test-ai-provider-connection-by-id';
+import { listAiProviderModels } from '@/api/generated/fn/admin/list-ai-provider-models';
+import { listAiProviderModelsById } from '@/api/generated/fn/admin/list-ai-provider-models-by-id';
 import { getProcessingJobs } from '@/api/generated/fn/processing/get-processing-jobs';
 import { getProcessingSchedules } from '@/api/generated/fn/admin/get-processing-schedules';
 import { createProcessingSchedule } from '@/api/generated/fn/admin/create-processing-schedule';
@@ -40,6 +44,8 @@ import type { BulkDeleteTextExtractionEnginesResponse } from '@/api/generated/mo
 import type { PaginatedResponseOfAiProviderResponse } from '@/api/generated/models/paginated-response-of-ai-provider-response';
 import type { AiProviderResponse } from '@/api/generated/models/ai-provider-response';
 import type { BulkDeleteAiProvidersResponse } from '@/api/generated/models/bulk-delete-ai-providers-response';
+import type { TestConnectionResponse } from '@/api/generated/models/test-connection-response';
+import type { ListModelsResponse } from '@/api/generated/models/list-models-response';
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/generated/models/paginated-response-of-get-processing-schedules-response';
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
@@ -64,6 +70,10 @@ export type { GetAiProviders$Params } from '@/api/generated/fn/admin/get-ai-prov
 export type { CreateAiProvider$Params } from '@/api/generated/fn/admin/create-ai-provider';
 export type { UpdateAiProvider$Params } from '@/api/generated/fn/admin/update-ai-provider';
 export type { BulkDeleteAiProviders$Params } from '@/api/generated/fn/admin/bulk-delete-ai-providers';
+export type { TestAiProviderConnection$Params } from '@/api/generated/fn/admin/test-ai-provider-connection';
+export type { TestAiProviderConnectionById$Params } from '@/api/generated/fn/admin/test-ai-provider-connection-by-id';
+export type { ListAiProviderModels$Params } from '@/api/generated/fn/admin/list-ai-provider-models';
+export type { ListAiProviderModelsById$Params } from '@/api/generated/fn/admin/list-ai-provider-models-by-id';
 export type { GetProcessingJobs$Params } from '@/api/generated/fn/processing/get-processing-jobs';
 export type { GetProcessingSchedules$Params } from '@/api/generated/fn/admin/get-processing-schedules';
 export type { CreateProcessingSchedule$Params } from '@/api/generated/fn/admin/create-processing-schedule';
@@ -152,6 +162,22 @@ export class AdminApiService {
 
   bulkDeleteAiProviders(params: Parameters<typeof bulkDeleteAiProviders>[2]): Observable<BulkDeleteAiProvidersResponse> {
     return bulkDeleteAiProviders(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  testAiProviderConnection(params: Parameters<typeof testAiProviderConnection>[2]): Observable<TestConnectionResponse> {
+    return testAiProviderConnection(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  testAiProviderConnectionById(params: Parameters<typeof testAiProviderConnectionById>[2]): Observable<TestConnectionResponse> {
+    return testAiProviderConnectionById(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  listAiProviderModels(params: Parameters<typeof listAiProviderModels>[2]): Observable<ListModelsResponse> {
+    return listAiProviderModels(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  listAiProviderModelsById(params: Parameters<typeof listAiProviderModelsById>[2]): Observable<ListModelsResponse> {
+    return listAiProviderModelsById(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   getProcessingJobs(params: Parameters<typeof getProcessingJobs>[2]): Observable<PaginatedResponseOfGetProcessingJobsResponse> {

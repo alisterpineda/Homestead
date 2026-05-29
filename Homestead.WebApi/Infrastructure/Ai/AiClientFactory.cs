@@ -1,8 +1,6 @@
-using System.ClientModel;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
-using OpenAI;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
@@ -13,14 +11,14 @@ public class AiClientFactory : IAiClientFactory
         return provider.ProviderType switch
         {
             AiProviderType.AzureAIFoundry => CreateAzureAIFoundryClient(provider),
+            AiProviderType.OpenAI => CreateOpenAIClient(provider),
             _ => throw new NotSupportedException($"AI provider type '{provider.ProviderType}' is not supported.")
         };
     }
 
     private static IChatClient CreateAzureAIFoundryClient(AiProvider provider)
     {
-        if (!AzureAIFoundryProviderConfig.TryParse(provider.Configuration, out var config) || config is null)
-            throw new InvalidOperationException($"Invalid configuration for AI provider '{provider.Name}'.");
+        var config = ParseConfig(provider);
 
         if (string.IsNullOrWhiteSpace(config.Endpoint))
             throw new InvalidOperationException($"Endpoint is required for AI provider '{provider.Name}'.");
@@ -29,19 +27,28 @@ public class AiClientFactory : IAiClientFactory
         if (string.IsNullOrWhiteSpace(config.Model))
             throw new InvalidOperationException($"Model is required for AI provider '{provider.Name}'.");
 
-        var openAiClient = new OpenAIClient(
-            new ApiKeyCredential(config.ApiKey),
-            new OpenAIClientOptions { Endpoint = NormalizeEndpoint(config.Endpoint) });
-
+        var openAiClient = OpenAIClientBuilder.Build(config.ApiKey, config.Endpoint, normalizeForAzure: true);
         return openAiClient.GetChatClient(config.Model).AsIChatClient();
     }
 
-    // /openai/v1 is versionless — the OpenAI client (unlike AzureOpenAIClient) won't append a dated api-version that Foundry rejects.
-    private static Uri NormalizeEndpoint(string endpoint)
+    private static IChatClient CreateOpenAIClient(AiProvider provider)
     {
-        var trimmed = endpoint.TrimEnd('/');
-        if (!trimmed.EndsWith("/openai/v1", StringComparison.OrdinalIgnoreCase))
-            trimmed += "/openai/v1";
-        return new Uri(trimmed + "/");
+        var config = ParseConfig(provider);
+
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+            throw new InvalidOperationException($"API key is required for AI provider '{provider.Name}'.");
+        if (string.IsNullOrWhiteSpace(config.Model))
+            throw new InvalidOperationException($"Model is required for AI provider '{provider.Name}'.");
+
+        // Endpoint is optional for OpenAI — the SDK default is used when none is supplied.
+        var openAiClient = OpenAIClientBuilder.Build(config.ApiKey, config.Endpoint, normalizeForAzure: false);
+        return openAiClient.GetChatClient(config.Model).AsIChatClient();
+    }
+
+    private static AiProviderConfig ParseConfig(AiProvider provider)
+    {
+        if (!AiProviderConfig.TryParse(provider.Configuration, out var config) || config is null)
+            throw new InvalidOperationException($"Invalid configuration for AI provider '{provider.Name}'.");
+        return config;
     }
 }

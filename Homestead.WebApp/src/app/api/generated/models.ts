@@ -103,6 +103,8 @@ export type { HttpValidationProblemDetails } from './models/http-validation-prob
 export type { IFormFile } from './models/i-form-file';
 export type { InitialBalanceInput } from './models/initial-balance-input';
 export type { JsonPatchDocument } from './models/json-patch-document';
+export type { ListAiProviderModelsRequest } from './models/list-ai-provider-models-request';
+export type { ListModelsResponse } from './models/list-models-response';
 export type { NetWorthGranularity } from './models/net-worth-granularity';
 export type { NetWorthHistoryPoint } from './models/net-worth-history-point';
 export type { NetWorthRange } from './models/net-worth-range';
@@ -156,6 +158,8 @@ export type { SortDirection } from './models/sort-direction';
 export type { SystemSettingsResponse } from './models/system-settings-response';
 export type { TagDto } from './models/tag-dto';
 export type { TagSortBy } from './models/tag-sort-by';
+export type { TestAiProviderConnectionRequest } from './models/test-ai-provider-connection-request';
+export type { TestConnectionResponse } from './models/test-connection-response';
 export type { TextExtractionEngineResponse } from './models/text-extraction-engine-response';
 export type { TextExtractionEngineSummary } from './models/text-extraction-engine-summary';
 export type { TextExtractionEngineType } from './models/text-extraction-engine-type';

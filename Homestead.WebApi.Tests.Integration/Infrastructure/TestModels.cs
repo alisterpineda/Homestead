@@ -43,6 +43,10 @@ internal record AiProviderItem(Guid Id, string Name, string ProviderType, string
 
 internal record AiProviderSummaryItem(Guid Id, string Name, string ProviderType, bool IsEnabled);
 
+internal record TestConnectionResult(bool Success, string? Message);
+
+internal record ListModelsResult(IReadOnlyList<string> Models);
+
 internal record BulkClassifyResult(IReadOnlyList<Guid> JobIds);
 
 internal record ClassifyResult(Guid JobId);

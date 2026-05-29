@@ -149,6 +149,14 @@ export type { UpdateAiProvider$Params as UpdateAiProvider$Params } from './fn/ad
 export { updateAiProvider as updateAiProvider } from './fn/admin/update-ai-provider';
 export type { BulkDeleteAiProviders$Params as BulkDeleteAiProviders$Params } from './fn/admin/bulk-delete-ai-providers';
 export { bulkDeleteAiProviders as bulkDeleteAiProviders } from './fn/admin/bulk-delete-ai-providers';
+export type { TestAiProviderConnection$Params as TestAiProviderConnection$Params } from './fn/admin/test-ai-provider-connection';
+export { testAiProviderConnection as testAiProviderConnection } from './fn/admin/test-ai-provider-connection';
+export type { TestAiProviderConnectionById$Params as TestAiProviderConnectionById$Params } from './fn/admin/test-ai-provider-connection-by-id';
+export { testAiProviderConnectionById as testAiProviderConnectionById } from './fn/admin/test-ai-provider-connection-by-id';
+export type { ListAiProviderModels$Params as ListAiProviderModels$Params } from './fn/admin/list-ai-provider-models';
+export { listAiProviderModels as listAiProviderModels } from './fn/admin/list-ai-provider-models';
+export type { ListAiProviderModelsById$Params as ListAiProviderModelsById$Params } from './fn/admin/list-ai-provider-models-by-id';
+export { listAiProviderModelsById as listAiProviderModelsById } from './fn/admin/list-ai-provider-models-by-id';
 export type { GetSystemSettings$Params as GetSystemSettings$Params } from './fn/admin/get-system-settings';
 export { getSystemSettings as getSystemSettings } from './fn/admin/get-system-settings';
 export type { PatchSystemSettings$Params as PatchSystemSettings$Params } from './fn/admin/patch-system-settings';

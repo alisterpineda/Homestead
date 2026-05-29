@@ -53,7 +53,7 @@ public class CreateAiProviderHandler(AppDbContext db, ICurrentUserAccessor curre
             Id = provider.Id,
             Name = provider.Name,
             ProviderType = provider.ProviderType,
-            Configuration = provider.Configuration,
+            Configuration = JsonSecretConfig.Mask(provider.Configuration, AiProviderSecrets.Keys),
             IsEnabled = provider.IsEnabled,
             CreatedAt = provider.CreatedAt,
             UpdatedAt = provider.UpdatedAt,

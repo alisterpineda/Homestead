@@ -21,23 +21,40 @@ public class GetAiProvidersHandler(AppDbContext db)
 
         var totalCount = await query.CountAsync(ct);
 
-        var items = await query
+        // DB-side projection keeps the join to a single CreatedByUser.DisplayName column (no full-entity
+        // load); masking can't translate to SQL, so it runs in the in-memory pass below.
+        var rows = await query
             .OrderBy(e => e.Name)
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Select(e => new AiProviderResponse
+            .Select(e => new
             {
-                Id = e.Id,
-                Name = e.Name,
-                ProviderType = e.ProviderType,
-                Configuration = e.Configuration,
-                IsEnabled = e.IsEnabled,
-                CreatedAt = e.CreatedAt,
-                UpdatedAt = e.UpdatedAt,
-                CreatedByUserId = e.CreatedByUserId,
+                e.Id,
+                e.Name,
+                e.ProviderType,
+                e.Configuration,
+                e.IsEnabled,
+                e.CreatedAt,
+                e.UpdatedAt,
+                e.CreatedByUserId,
                 CreatedByUserName = e.CreatedByUser != null ? e.CreatedByUser.DisplayName : null,
             })
             .ToListAsync(ct);
+
+        var items = rows
+            .Select(r => new AiProviderResponse
+            {
+                Id = r.Id,
+                Name = r.Name,
+                ProviderType = r.ProviderType,
+                Configuration = JsonSecretConfig.Mask(r.Configuration, AiProviderSecrets.Keys),
+                IsEnabled = r.IsEnabled,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                CreatedByUserId = r.CreatedByUserId,
+                CreatedByUserName = r.CreatedByUserName,
+            })
+            .ToList();
 
         return new PaginatedResponse<AiProviderResponse>
         {

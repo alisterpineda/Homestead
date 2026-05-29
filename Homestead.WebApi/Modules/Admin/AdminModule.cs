@@ -15,6 +15,8 @@ using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.AiProviders.BulkDeleteAiProviders;
 using Homestead.WebApi.Modules.Admin.Features.AiProviders.CreateAiProvider;
 using Homestead.WebApi.Modules.Admin.Features.AiProviders.GetAiProviders;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.ListAiProviderModels;
+using Homestead.WebApi.Modules.Admin.Features.AiProviders.TestAiProviderConnection;
 using Homestead.WebApi.Modules.Admin.Features.AiProviders.UpdateAiProvider;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
@@ -82,6 +84,8 @@ public static class AdminModule
         CreateAiProviderEndpoint.Map(aiProviders);
         UpdateAiProviderEndpoint.Map(aiProviders);
         BulkDeleteAiProvidersEndpoint.Map(aiProviders);
+        TestAiProviderConnectionEndpoint.Map(aiProviders);
+        ListAiProviderModelsEndpoint.Map(aiProviders);
 
         var settings = app.MapGroup("/api/v{version:apiVersion}/admin/settings")
             .HasApiVersion(1, 0)

@@ -8,6 +8,8 @@ import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { AdminApiService } from '@/api/services/admin-api.service';
 import type { AiProviderType } from '@/api/generated/models/ai-provider-type';
 import { PROVIDER_TYPE_LABELS, PROVIDER_TYPE_OPTIONS } from '../provider-type-labels';
+import { aiProviderConfigComplete, buildAiProviderConfiguration, type AiProviderTestResult } from '../ai-provider-config';
+import { AiProviderProbeService } from '../ai-provider-probe.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
 
@@ -39,7 +41,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Provider Type</label>
-            <hlm-select [ngModel]="selectedProviderType()" (ngModelChange)="selectedProviderType.set($event)" [itemToString]="providerTypeToString">
+            <hlm-select [ngModel]="selectedProviderType()" (ngModelChange)="onProviderTypeChange($event)" [itemToString]="providerTypeToString">
               <hlm-select-trigger class="w-full">
                 <hlm-select-value />
               </hlm-select-trigger>
@@ -74,6 +76,51 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
           }
 
+          @if (selectedProviderType() === 'OpenAI') {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="openai-api-key">API Key</label>
+              <input hlmInput id="openai-api-key" type="password" placeholder="API Key"
+                [value]="apiKey()" (input)="apiKey.set(asInputValue($event))" />
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="openai-model">Default model</label>
+              <div class="flex gap-2">
+                <input hlmInput id="openai-model" class="flex-1" placeholder="e.g. gpt-4o"
+                  list="create-openai-model-options"
+                  [value]="model()" (input)="model.set(asInputValue($event))" />
+                <datalist id="create-openai-model-options">
+                  @for (m of models(); track m) {
+                    <option [value]="m"></option>
+                  }
+                </datalist>
+                <button hlmBtn variant="outline" type="button"
+                  [disabled]="apiKey().trim().length === 0 || fetchingModels()"
+                  (click)="fetchModels()">
+                  {{ fetchingModels() ? 'Fetching...' : 'Fetch models' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="openai-endpoint">Endpoint (optional)</label>
+              <input hlmInput id="openai-endpoint" placeholder="https://api.openai.com/v1"
+                [value]="endpoint()" (input)="endpoint.set(asInputValue($event))" />
+              <p class="text-xs text-muted-foreground">Leave blank to use the default OpenAI endpoint.</p>
+            </div>
+          }
+
+          @if (canTest()) {
+            <div class="flex flex-col gap-1.5">
+              <button hlmBtn variant="outline" type="button" [disabled]="testing()" (click)="testConnection()">
+                {{ testing() ? 'Testing...' : 'Test connection' }}
+              </button>
+              @if (testResult(); as r) {
+                <p [class]="'text-sm ' + (r.success ? 'text-green-600 dark:text-green-400' : 'text-destructive')">{{ r.message }}</p>
+              }
+            </div>
+          }
+
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>
           }
@@ -95,6 +142,7 @@ export class CreateAiProviderDialogComponent {
 
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private probe = inject(AiProviderProbeService);
 
   providerTypeOptions = PROVIDER_TYPE_OPTIONS;
   providerTypeToString = (value: string): string => PROVIDER_TYPE_LABELS[value] ?? value;
@@ -107,30 +155,85 @@ export class CreateAiProviderDialogComponent {
   creating = signal(false);
   createError = signal('');
 
-  canSubmit = computed(() => {
-    if (this.name().trim().length === 0) return false;
-    if (this.selectedProviderType() === 'AzureAIFoundry') {
-      return this.endpoint().trim().length > 0
-        && this.apiKey().trim().length > 0
-        && this.model().trim().length > 0;
-    }
-    return false;
-  });
+  models = signal<string[]>([]);
+  fetchingModels = signal(false);
+  testing = signal(false);
+  testResult = signal<AiProviderTestResult | null>(null);
+
+  // Required fields per provider, excluding the name — gates the Test connection button.
+  canTest = computed(() => aiProviderConfigComplete(this.selectedProviderType(), {
+    endpoint: this.endpoint(),
+    apiKey: this.apiKey(),
+    model: this.model(),
+  }));
+
+  canSubmit = computed(() => this.name().trim().length > 0 && this.canTest());
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.name.set('');
       this.selectedProviderType.set('AzureAIFoundry');
-      this.endpoint.set('');
-      this.apiKey.set('');
-      this.model.set('');
+      this.resetProviderFields();
       this.creating.set(false);
       this.createError.set('');
     }
   }
 
+  onProviderTypeChange(type: AiProviderType): void {
+    this.selectedProviderType.set(type);
+    this.resetProviderFields();
+  }
+
+  private resetProviderFields(): void {
+    this.endpoint.set('');
+    this.apiKey.set('');
+    this.model.set('');
+    this.models.set([]);
+    this.fetchingModels.set(false);
+    this.testing.set(false);
+    this.testResult.set(null);
+  }
+
   asInputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
+  }
+
+  private buildConfiguration(): string {
+    return buildAiProviderConfiguration({
+      endpoint: this.endpoint(),
+      apiKey: this.apiKey(),
+      model: this.model(),
+    });
+  }
+
+  fetchModels(): void {
+    this.fetchingModels.set(true);
+    this.probe.fetchModels(this.adminApi.listAiProviderModels({
+      body: {
+        providerType: this.selectedProviderType(),
+        configuration: this.buildConfiguration(),
+      },
+    })).subscribe({
+      next: (models) => {
+        this.fetchingModels.set(false);
+        this.models.set(models);
+      },
+      error: () => this.fetchingModels.set(false),
+    });
+  }
+
+  testConnection(): void {
+    this.testing.set(true);
+    this.testResult.set(null);
+    this.probe.testConnection(this.adminApi.testAiProviderConnection({
+      body: {
+        providerType: this.selectedProviderType(),
+        configuration: this.buildConfiguration(),
+      },
+    })).subscribe((result) => {
+      this.testing.set(false);
+      this.testResult.set(result);
+    });
   }
 
   handleSubmit(ctx: { close: () => void }): void {
@@ -139,17 +242,11 @@ export class CreateAiProviderDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    const configuration = JSON.stringify({
-      endpoint: this.endpoint().trim(),
-      apiKey: this.apiKey().trim(),
-      model: this.model().trim(),
-    });
-
     this.adminApi.createAiProvider({
       body: {
         name: this.name().trim(),
         providerType: this.selectedProviderType(),
-        configuration,
+        configuration: this.buildConfiguration(),
       },
     }).subscribe({
       next: () => {

@@ -2,5 +2,7 @@ namespace Homestead.WebApi.Domain.Settings;
 
 public enum AiProviderType
 {
-    AzureAIFoundry
+    AzureAIFoundry,
+    OpenAI,
+    Anthropic
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 
 namespace Homestead.WebApi.Tests.Integration.Admin;
@@ -117,6 +118,84 @@ public class AiProviderTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
         var result = await deleteResponse.Content.ReadFromJsonAsync<BulkDeleteResult>(CT);
         Assert.Equal(1, result!.DeletedCount);
+    }
+
+    [Fact]
+    public async Task CreateAiProvider_OpenAI_Returns201()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ai-providers", new
+        {
+            name = "Test OpenAI",
+            providerType = "OpenAI",
+            configuration = """{"apiKey":"sk-test-key-1234","model":"gpt-4o"}"""
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AiProviderItem>(CT);
+        Assert.Equal("Test OpenAI", body!.Name);
+        Assert.Equal("OpenAI", body.ProviderType);
+        Assert.True(body.IsEnabled);
+    }
+
+    [Fact]
+    public async Task GetAiProviders_MasksApiKey_NeverReturnsRawSecret()
+    {
+        var client = await CreateAdminClientAsync();
+
+        await client.PostAsJsonAsync("/api/v1/admin/ai-providers", new
+        {
+            name = "Mask Test",
+            providerType = "OpenAI",
+            configuration = """{"apiKey":"sk-super-secret-7890","model":"gpt-4o"}"""
+        }, CT);
+
+        var response = await client.GetAsync("/api/v1/admin/ai-providers?Page=1&PageSize=50", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<AiProviderItem>>(CT);
+        var item = body!.Items.Single(p => p.Name == "Mask Test");
+
+        Assert.NotNull(item.Configuration);
+        Assert.DoesNotContain("sk-super-secret-7890", item.Configuration);
+        var apiKey = JsonDocument.Parse(item.Configuration!).RootElement.GetProperty("apiKey").GetString();
+        Assert.StartsWith("••••", apiKey);
+        Assert.EndsWith("7890", apiKey);
+    }
+
+    [Fact]
+    public async Task TestAiProviderConnection_UnreachableEndpoint_Returns200WithFailure()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // An unreachable endpoint makes the live call fail fast and deterministically (no external
+        // network needed). The contract: connection failures surface as 200 {success:false}, never 500.
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ai-providers/test-connection", new
+        {
+            providerType = "OpenAI",
+            configuration = """{"apiKey":"sk-bad-key","model":"gpt-4o","endpoint":"http://localhost:1/v1"}"""
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<TestConnectionResult>(CT);
+        Assert.False(body!.Success);
+    }
+
+    [Fact]
+    public async Task ListAiProviderModels_Azure_Returns200EmptyList()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.PostAsJsonAsync("/api/v1/admin/ai-providers/list-models", new
+        {
+            providerType = "AzureAIFoundry",
+            configuration = """{"endpoint":"https://x.openai.azure.com","apiKey":"k","model":"gpt-4o"}"""
+        }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ListModelsResult>(CT);
+        Assert.Empty(body!.Models);
     }
 
     [Fact]

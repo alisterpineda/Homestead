@@ -2,14 +2,14 @@ using Homestead.WebApi.Infrastructure.Ai.Configurations;
 
 namespace Homestead.WebApi.Tests.Unit.Infrastructure;
 
-public class AzureAIFoundryProviderConfigTests
+public class AiProviderConfigTests
 {
     [Fact]
     public void TryParse_ValidJson_ReturnsTrue()
     {
         var json = """{"endpoint":"https://test.openai.azure.com","apiKey":"key123","model":"gpt-4o"}""";
 
-        var result = AzureAIFoundryProviderConfig.TryParse(json, out var config);
+        var result = AiProviderConfig.TryParse(json, out var config);
 
         Assert.True(result);
         Assert.NotNull(config);
@@ -21,7 +21,7 @@ public class AzureAIFoundryProviderConfigTests
     [Fact]
     public void TryParse_NullJson_ReturnsFalse()
     {
-        var result = AzureAIFoundryProviderConfig.TryParse(null, out var config);
+        var result = AiProviderConfig.TryParse(null, out var config);
 
         Assert.False(result);
         Assert.Null(config);
@@ -30,7 +30,7 @@ public class AzureAIFoundryProviderConfigTests
     [Fact]
     public void TryParse_EmptyJson_ReturnsFalse()
     {
-        var result = AzureAIFoundryProviderConfig.TryParse("", out var config);
+        var result = AiProviderConfig.TryParse("", out var config);
 
         Assert.False(result);
         Assert.Null(config);
@@ -39,7 +39,7 @@ public class AzureAIFoundryProviderConfigTests
     [Fact]
     public void TryParse_InvalidJson_ReturnsFalse()
     {
-        var result = AzureAIFoundryProviderConfig.TryParse("not json", out var config);
+        var result = AiProviderConfig.TryParse("not json", out var config);
 
         Assert.False(result);
         Assert.Null(config);
@@ -50,7 +50,7 @@ public class AzureAIFoundryProviderConfigTests
     {
         var json = """{"endpoint":"https://test.openai.azure.com"}""";
 
-        var result = AzureAIFoundryProviderConfig.TryParse(json, out var config);
+        var result = AiProviderConfig.TryParse(json, out var config);
 
         Assert.True(result);
         Assert.NotNull(config);
