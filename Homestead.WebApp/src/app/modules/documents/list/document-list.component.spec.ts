@@ -8,6 +8,7 @@ import { DEFAULT_COLUMN_VISIBILITY } from './document-table/document-table.compo
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { PartyApiService } from '@/api/services/party-api.service';
+import { DocumentApiService } from '@/api/services/document-api.service';
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 
 describe('DocumentListComponent', () => {
@@ -346,6 +347,46 @@ describe('DocumentListComponent', () => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith({ body: { ids: ['party-a'] } });
       expect(component.resolvedPartyOptions()).toEqual([{ id: 'party-a', label: 'Acme' }]);
+    });
+  });
+
+  describe('bulk AI actions', () => {
+    it('onBulkClassifyConfirmed sends a body with ids, provider, and selected fields', () => {
+      const documentApi = TestBed.inject(DocumentApiService);
+      const apiSpy = vi.spyOn(documentApi, 'bulkClassifyDocuments').mockReturnValue(of({ jobIds: ['job-1'] }));
+      const startedSpy = vi.spyOn(component, 'onBulkClassifyStarted').mockImplementation(() => {});
+      component.selectedDocumentIds.set(new Set(['doc-1', 'doc-2']));
+
+      component.onBulkClassifyConfirmed({ aiProviderId: 'provider-1', fields: ['Tags', 'Name'] });
+
+      expect(apiSpy).toHaveBeenCalledWith({
+        body: { ids: ['doc-1', 'doc-2'], aiProviderId: 'provider-1', fields: ['Tags', 'Name'] },
+      });
+      expect(startedSpy).toHaveBeenCalledWith(['job-1']);
+    });
+
+    it('onBulkSummarizeConfirmed sends a body with ids and provider but no fields', () => {
+      const documentApi = TestBed.inject(DocumentApiService);
+      const apiSpy = vi.spyOn(documentApi, 'bulkSummarizeDocuments').mockReturnValue(of({ jobIds: ['job-2'] }));
+      const startedSpy = vi.spyOn(component, 'onBulkSummarizeStarted').mockImplementation(() => {});
+      component.selectedDocumentIds.set(new Set(['doc-1']));
+
+      component.onBulkSummarizeConfirmed({ aiProviderId: null });
+
+      expect(apiSpy).toHaveBeenCalledWith({ body: { ids: ['doc-1'], aiProviderId: null } });
+      expect(startedSpy).toHaveBeenCalledWith(['job-2']);
+    });
+
+    it('does not call the API when there is no selection', () => {
+      const documentApi = TestBed.inject(DocumentApiService);
+      const classifySpy = vi.spyOn(documentApi, 'bulkClassifyDocuments');
+      const summarizeSpy = vi.spyOn(documentApi, 'bulkSummarizeDocuments');
+
+      component.onBulkClassifyConfirmed({ aiProviderId: null, fields: ['Tags'] });
+      component.onBulkSummarizeConfirmed({ aiProviderId: null });
+
+      expect(classifySpy).not.toHaveBeenCalled();
+      expect(summarizeSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -19,6 +19,8 @@ import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-s
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
 import { classifyPreview } from '@/api/generated/fn/documents/classify-preview';
 import { bulkClassifyDocuments } from '@/api/generated/fn/documents/bulk-classify-documents';
+import { summarizeDocument } from '@/api/generated/fn/documents/summarize-document';
+import { bulkSummarizeDocuments } from '@/api/generated/fn/documents/bulk-summarize-documents';
 import { approveSuggestion } from '@/api/generated/fn/documents/approve-suggestion';
 import { declineSuggestion } from '@/api/generated/fn/documents/decline-suggestion';
 import { approveAllSuggestions } from '@/api/generated/fn/documents/approve-all-suggestions';
@@ -38,6 +40,7 @@ import type { GetMyGroupsResponse } from '@/api/generated/models/get-my-groups-r
 import type { DocumentSettingsResponse } from '@/api/generated/models/document-settings-response';
 import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
 import type { BulkClassifyDocumentsResponse } from '@/api/generated/models/bulk-classify-documents-response';
+import type { SummarizeDocumentResponse } from '@/api/generated/models/summarize-document-response';
 import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
 
 export type { GetDocuments$Params } from '@/api/generated/fn/documents/get-documents';
@@ -55,6 +58,8 @@ export type { GetMyGroups$Params } from '@/api/generated/fn/documents/get-my-gro
 export type { PatchDocumentSettings$Params } from '@/api/generated/fn/documents/patch-document-settings';
 export type { ClassifyPreview$Params } from '@/api/generated/fn/documents/classify-preview';
 export type { BulkClassifyDocuments$Params } from '@/api/generated/fn/documents/bulk-classify-documents';
+export type { SummarizeDocument$Params } from '@/api/generated/fn/documents/summarize-document';
+export type { BulkSummarizeDocuments$Params } from '@/api/generated/fn/documents/bulk-summarize-documents';
 export type { ApproveSuggestion$Params } from '@/api/generated/fn/documents/approve-suggestion';
 export type { DeclineSuggestion$Params } from '@/api/generated/fn/documents/decline-suggestion';
 export type { ApproveAllSuggestions$Params } from '@/api/generated/fn/documents/approve-all-suggestions';
@@ -127,6 +132,14 @@ export class DocumentApiService {
 
   bulkClassifyDocuments(params: Parameters<typeof bulkClassifyDocuments>[2]): Observable<BulkClassifyDocumentsResponse> {
     return bulkClassifyDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  summarizeDocument(params: Parameters<typeof summarizeDocument>[2]): Observable<SummarizeDocumentResponse> {
+    return summarizeDocument(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  bulkSummarizeDocuments(params: Parameters<typeof bulkSummarizeDocuments>[2]): Observable<BulkClassifyDocumentsResponse> {
+    return bulkSummarizeDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   approveSuggestion(params: Parameters<typeof approveSuggestion>[2]): Observable<void> {

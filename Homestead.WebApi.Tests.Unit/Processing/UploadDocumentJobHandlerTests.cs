@@ -431,11 +431,13 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct).Returns(true);
 
         await _handler.HandleAsync(job, ct);
 
-        await _classifier.Received(1).ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct);
+        // Auto-classify-on-upload uses the full scope (Tags + Parties + Name + Summary).
+        await _classifier.Received(1).ClassifyAndApplyAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), ClassificationScope.All, Arg.Any<Guid?>(), ct);
     }
 
     [Fact]
@@ -452,7 +454,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         await _handler.HandleAsync(job, ct);
 
         await _classifier.DidNotReceive().ClassifyAndApplyAsync(
-            Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
+            Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -465,7 +467,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct)
             .Returns<bool>(x => throw new Exception("AI service unavailable"));
 
         await _handler.HandleAsync(job, ct);
@@ -494,7 +496,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct)
             .Returns(callInfo =>
             {
                 var docId = callInfo.ArgAt<Guid>(0);
@@ -527,7 +529,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct).Returns(true);
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct).Returns(true);
 
         await _handler.HandleAsync(job, ct);
 
@@ -545,7 +547,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct)
             .Returns<bool>(x => throw new Exception("AI service unavailable"));
 
         await _handler.HandleAsync(job, ct);
@@ -564,7 +566,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns("text");
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), null, ct)
+        _classifier.ClassifyAndApplyAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), ct)
             .Returns<bool>(x => throw new OperationCanceledException());
 
         await Assert.ThrowsAsync<OperationCanceledException>(

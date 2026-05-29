@@ -3,6 +3,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using MediatR;
@@ -30,7 +31,8 @@ public class BulkClassifyDocumentsHandler(
         await queryService.EnsureAllDocumentsWritableAsync(
             db.Documents.Where(d => existingIds.Contains(d.Id)).Select(d => d.Id), ct);
 
-        var payload = new BulkClassifyPayload(existingIds, request.AiProviderId);
+        var scope = ClassificationScopeExtensions.FromFields(request.Fields);
+        var payload = new BulkClassifyPayload(existingIds, request.AiProviderId, scope);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.BulkClassifyDocuments, opts =>
         {

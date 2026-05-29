@@ -66,6 +66,7 @@ import { PartyInputComponent } from '../parties/party-input/party-input.componen
 import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
 import { ReprocessDialogComponent } from './reprocess-dialog/reprocess-dialog.component';
+import { ClassifyOptionsDialogComponent } from '../shared/classify-options-dialog/classify-options-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual, triggerDownload } from '@/shared/utils';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
@@ -75,6 +76,7 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
 import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
+import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -112,6 +114,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     NgScrollbar,
     AddVersionDialogComponent,
     ReprocessDialogComponent,
+    ClassifyOptionsDialogComponent,
     HlmBadge,
     HlmEmptyImports,
     DatePickerComponent,
@@ -233,9 +236,13 @@ import { toast } from '@spartan-ng/brain/sonner';
             </button>
             <ng-template #moreMenu>
               <hlm-dropdown-menu class="w-48">
-                <button hlmDropdownMenuItem (triggered)="handleClassify()" [disabled]="classifyingPreview()">
+                <button hlmDropdownMenuItem (triggered)="classifyOptionsDialog.open()" [disabled]="classifyingPreview()">
                   <ng-icon hlm name="lucideSparkles" size="sm" />
                   <span>{{ classifyingPreview() ? 'Classifying...' : 'Classify' }}</span>
+                </button>
+                <button hlmDropdownMenuItem (triggered)="summarizeOptionsDialog.open()" [disabled]="summarizing()">
+                  <ng-icon hlm name="lucideFileText" size="sm" />
+                  <span>{{ summarizing() ? 'Summarizing...' : 'Summarize' }}</span>
                 </button>
                 <button hlmDropdownMenuItem (triggered)="addVersionDialog.open()">
                   <ng-icon hlm name="lucideFilePlus2" size="sm" />
@@ -275,6 +282,20 @@ import { toast } from '@spartan-ng/brain/sonner';
               [documentId]="doc.id"
               [versionId]="activeVersion()!.id"
               (reprocessStarted)="onReprocessStarted($event)"
+            />
+
+            <app-classify-options-dialog
+              #classifyOptionsDialog
+              mode="single"
+              [showFields]="true"
+              (confirmed)="handleClassify($event)"
+            />
+
+            <app-classify-options-dialog
+              #summarizeOptionsDialog
+              mode="single"
+              [showFields]="false"
+              (confirmed)="handleSummarize($event)"
             />
           }
         </div>
@@ -731,6 +752,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   commentSubmitting = signal(false);
   transientClassification = signal<ClassifyPreviewResponse | null>(null);
   classifyingPreview = signal(false);
+  summarizing = signal(false);
   appliedTransientName = signal<string | null>(null);
   preClassifyName = signal<string | null>(null);
 
@@ -900,6 +922,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private fileSub: Subscription | null = null;
   private versionDetailSub: Subscription | null = null;
   private classifySub: Subscription | null = null;
+  private summarizeSub: Subscription | null = null;
   private preserveTransientOnNextInit = false;
 
   private documentData = toSignal(
@@ -1270,6 +1293,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.fileSub?.unsubscribe();
     this.versionDetailSub?.unsubscribe();
     this.classifySub?.unsubscribe();
+    this.summarizeSub?.unsubscribe();
     this.swapBlobUrl(null);
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
@@ -1387,7 +1411,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
-  handleClassify(): void {
+  handleClassify(options: { aiProviderId: string | null; fields: DocumentSuggestionField[] }): void {
     const id = this.documentId();
     if (!id) return;
     this.classifyingPreview.set(true);
@@ -1396,7 +1420,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.preClassifyName.set(this.preClassifyName() ?? this.editName());
     this.classifySub?.unsubscribe();
     const toastId = toast.loading('Classifying document...');
-    this.classifySub = this.documentApi.classifyPreview({ documentId: id }).pipe(
+    this.classifySub = this.documentApi.classifyPreview({
+      documentId: id,
+      body: { aiProviderId: options.aiProviderId, fields: options.fields },
+    }).pipe(
       handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
       finalize(() => toast.dismiss(toastId)),
     ).subscribe({
@@ -1438,6 +1465,28 @@ export class DocumentDetailPageComponent implements OnDestroy {
         } else {
           toast.info('No new suggestions.');
         }
+      },
+    });
+  }
+
+  handleSummarize(options: { aiProviderId: string | null }): void {
+    const id = this.documentId();
+    if (!id) return;
+    this.summarizing.set(true);
+    this.summarizeSub?.unsubscribe();
+    const toastId = toast.loading('Summarizing document...');
+    this.summarizeSub = this.documentApi.summarizeDocument({
+      documentId: id,
+      body: { aiProviderId: options.aiProviderId },
+    }).pipe(
+      handleMutationError(this.errorHandler, this.summarizing, 'Failed to summarize document.'),
+      finalize(() => toast.dismiss(toastId)),
+    ).subscribe({
+      next: (result) => {
+        this.summarizing.set(false);
+        // Refresh the document so the read-only summary block reflects the new summary.
+        this.refreshTrigger.update(v => v + 1);
+        toast.success(result.summary ? 'Summary updated.' : 'No summary was generated.');
       },
     });
   }

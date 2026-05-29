@@ -10,5 +10,6 @@ public interface IAiClassificationService
         string? extractedText,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
+        ClassificationScope scope,
         CancellationToken ct);
 }

@@ -18,8 +18,10 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
             ?? throw new EntityNotFoundException("Document not found.");
 
+        var scope = ClassificationScopeExtensions.FromFields(request.Fields);
+
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, request.AiProviderId, ct);
+            request.DocumentId, document.Name, request.AiProviderId, scope, ct);
 
         if (output is null)
         {
@@ -35,10 +37,6 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
         var suggestedTitle = output.Classification.SuggestedTitle;
         if (suggestedTitle == document.Name)
             suggestedTitle = null;
-
-        var summary = output.Classification.Summary;
-        if (summary == document.Summary)
-            summary = null;
 
         var existingTagIds = new HashSet<Guid>(document.DocumentTags.Select(dt => dt.TagId));
         var newTagIds = output.Classification.MatchedTagIds
@@ -80,7 +78,7 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
         return new ClassifyPreviewResponse
         {
             SuggestedTitle = suggestedTitle,
-            Summary = summary,
+            Summary = null, // always null on classify — Summary is never in classify scope (use summarize)
             Tags = tags,
             Parties = parties
         };

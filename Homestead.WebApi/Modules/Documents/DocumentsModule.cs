@@ -37,7 +37,9 @@ using Homestead.WebApi.Modules.Documents.Features.Documents.EmptyTrash;
 using Homestead.WebApi.Modules.Documents.Features.TextExtractionEngineSummaries.GetTextExtractionEngineSummaries;
 using Homestead.WebApi.Modules.Documents.Features.AiProviderSummaries.GetAiProviderSummaries;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocuments;
+using Homestead.WebApi.Modules.Documents.Features.Documents.BulkSummarizeDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
+using Homestead.WebApi.Modules.Documents.Features.Documents.SummarizeDocument;
 using Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveSuggestion;
 using Homestead.WebApi.Modules.Documents.Features.Suggestions.DeclineSuggestion;
 using Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveAllSuggestions;
@@ -63,6 +65,7 @@ public static class DocumentsModule
 
         BulkDeleteDocumentsEndpoint.Map(v1);
         BulkClassifyDocumentsEndpoint.Map(v1);
+        BulkSummarizeDocumentsEndpoint.Map(v1);
         BulkReprocessDocumentsEndpoint.Map(v1);
         BulkUpdateDocumentsEndpoint.Map(v1);
         CreateDocumentEndpoint.Map(v1);
@@ -79,6 +82,7 @@ public static class DocumentsModule
         GetTextExtractionEngineSummariesEndpoint.Map(v1);
         GetAiProviderSummariesEndpoint.Map(v1);
         ClassifyPreviewEndpoint.Map(v1);
+        SummarizeDocumentEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);

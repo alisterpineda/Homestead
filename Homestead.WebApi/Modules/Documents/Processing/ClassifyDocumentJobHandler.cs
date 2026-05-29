@@ -20,7 +20,8 @@ public class ClassifyDocumentJobHandler(
 
         job.EntityId = payload.DocumentId;
 
-        await classifier.ClassifyAndApplyAsync(payload.DocumentId, payload.AiProviderId, ct);
+        await classifier.ClassifyAndApplyAsync(
+            payload.DocumentId, payload.AiProviderId, payload.Scope, job.CreatedByUserId, ct);
 
         if (job.ParentJobId is null)
         {

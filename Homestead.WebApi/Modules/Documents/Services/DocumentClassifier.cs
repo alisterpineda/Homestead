@@ -17,9 +17,10 @@ public record DocumentClassificationOutput(
 public interface IDocumentClassifier
 {
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, Guid? aiProviderId, CancellationToken ct);
+        Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct);
 
-    Task<bool> ClassifyAndApplyAsync(Guid documentId, Guid? aiProviderId, CancellationToken ct);
+    Task<bool> ClassifyAndApplyAsync(
+        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId, CancellationToken ct);
 
     Task<bool> IsAutoClassifyEnabledAsync(CancellationToken ct);
 }
@@ -31,7 +32,7 @@ public class DocumentClassifier(
     ISearchVectorUpdater searchVectorUpdater) : IDocumentClassifier
 {
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, Guid? aiProviderId, CancellationToken ct)
+        Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct)
     {
         var provider = await providerResolver.ResolveAsync(aiProviderId, ct);
         if (provider is null)
@@ -42,18 +43,23 @@ public class DocumentClassifier(
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
 
-        var allTags = await db.Tags
-            .AsNoTracking()
-            .Select(t => new TagInfo(t.Id, t.Name, t.Path))
-            .ToListAsync(ct);
+        // Only load a catalog when its field is in scope — mirrors the service omitting it from the prompt.
+        var allTags = scope.HasFlag(ClassificationScope.Tags)
+            ? await db.Tags
+                .AsNoTracking()
+                .Select(t => new TagInfo(t.Id, t.Name, t.Path))
+                .ToListAsync(ct)
+            : [];
 
-        var allParties = await db.Parties
-            .AsNoTracking()
-            .Select(p => new PartyInfo(p.Id, p.Name, p.Description))
-            .ToListAsync(ct);
+        var allParties = scope.HasFlag(ClassificationScope.Parties)
+            ? await db.Parties
+                .AsNoTracking()
+                .Select(p => new PartyInfo(p.Id, p.Name, p.Description))
+                .ToListAsync(ct)
+            : [];
 
         var result = await classificationService.ClassifyAsync(
-            provider, documentName, latestVersion?.ExtractedText, allTags, allParties, ct);
+            provider, documentName, latestVersion?.ExtractedText, allTags, allParties, scope, ct);
 
         if (result is null)
             return null;
@@ -61,7 +67,8 @@ public class DocumentClassifier(
         return new DocumentClassificationOutput(result, allTags, provider.Id);
     }
 
-    public async Task<bool> ClassifyAndApplyAsync(Guid documentId, Guid? aiProviderId, CancellationToken ct)
+    public async Task<bool> ClassifyAndApplyAsync(
+        Guid documentId, Guid? aiProviderId, ClassificationScope scope, Guid? updatedByUserId, CancellationToken ct)
     {
         var document = await db.Documents
             .Include(d => d.DocumentTags)
@@ -70,17 +77,24 @@ public class DocumentClassifier(
             .FirstOrDefaultAsync(d => d.Id == documentId, ct)
             ?? throw new InvalidOperationException($"Document {documentId} not found.");
 
-        var output = await ClassifyAsync(documentId, document.Name, aiProviderId, ct);
+        var output = await ClassifyAsync(documentId, document.Name, aiProviderId, scope, ct);
         if (output is null)
             return false;
 
-        if (ClearPendingSuggestions(document))
+        // Only clear pending suggestions for in-scope fields — refreshing one field must never
+        // discard another field's pending suggestions. The intermediate save below avoids
+        // DocumentTag composite-key collisions when a just-reverted tag is immediately re-added.
+        if (ClearPendingSuggestions(document, scope))
             await db.SaveChangesAsync(ct);
 
-        ApplyTags(document, output.Classification.MatchedTagIds, output.ProviderId);
-        ApplyParties(document, output.Classification.MatchedPartyIds, output.ProviderId);
-        ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
-        ApplySummary(document, output.Classification.Summary);
+        if (scope.HasFlag(ClassificationScope.Tags))
+            ApplyTags(document, output.Classification.MatchedTagIds, output.ProviderId);
+        if (scope.HasFlag(ClassificationScope.Parties))
+            ApplyParties(document, output.Classification.MatchedPartyIds, output.ProviderId);
+        if (scope.HasFlag(ClassificationScope.Name))
+            ApplyName(document, output.Classification.SuggestedTitle, output.ProviderId);
+        if (scope.HasFlag(ClassificationScope.Summary))
+            ApplySummary(document, output.Classification.Summary, updatedByUserId);
 
         await db.SaveChangesAsync(ct);
         await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
@@ -101,10 +115,11 @@ public class DocumentClassifier(
         return settings?.AutoClassifyOnUpload == true;
     }
 
-    private bool ClearPendingSuggestions(Document document)
+    private bool ClearPendingSuggestions(Document document, ClassificationScope scope)
     {
         var pendingSuggestions = document.Suggestions
             .Where(s => s.Status == DocumentSuggestionStatus.Pending)
+            .Where(s => SuggestionFieldInScope(s.Field, scope))
             .ToList();
 
         if (pendingSuggestions.Count == 0)
@@ -118,6 +133,15 @@ public class DocumentClassifier(
 
         return true;
     }
+
+    private static bool SuggestionFieldInScope(DocumentSuggestionField field, ClassificationScope scope) =>
+        field switch
+        {
+            DocumentSuggestionField.Tags => scope.HasFlag(ClassificationScope.Tags),
+            DocumentSuggestionField.Parties => scope.HasFlag(ClassificationScope.Parties),
+            DocumentSuggestionField.Name => scope.HasFlag(ClassificationScope.Name),
+            _ => false
+        };
 
     private void ApplyTags(Document document, List<Guid> tagIds, Guid providerId)
     {
@@ -193,11 +217,15 @@ public class DocumentClassifier(
         });
     }
 
-    private static void ApplySummary(Document document, string summary)
+    private static void ApplySummary(Document document, string summary, Guid? updatedByUserId)
     {
         if (string.IsNullOrWhiteSpace(summary))
             return;
 
+        // Summary is written directly (no approval workflow), so it is a real modification —
+        // stamp modified-metadata to match the single-doc summarize path (SummarizeDocumentHandler).
         document.Summary = summary;
+        document.UpdatedAt = DateTimeOffset.UtcNow;
+        document.UpdatedByUserId = updatedByUserId;
     }
 }

@@ -19,15 +19,26 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         string? extractedText,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
+        ClassificationScope scope,
         CancellationToken ct)
     {
-        if (availableTags.Count == 0 && availableParties.Count == 0 && string.IsNullOrWhiteSpace(extractedText))
+        // Nothing in scope (e.g. a malformed Fields request that maps to no known field) -> no-op,
+        // never call the model with a degenerate empty-schema prompt.
+        if (scope == ClassificationScope.None)
+            return null;
+
+        // Scope-aware early return: skip the model call when nothing in scope could produce a useful result.
+        // A tag/party field is only useful if there is a catalog to match against; Name/Summary need text.
+        var hasText = !string.IsNullOrWhiteSpace(extractedText);
+        var tagsUseful = scope.HasFlag(ClassificationScope.Tags) && availableTags.Count > 0;
+        var partiesUseful = scope.HasFlag(ClassificationScope.Parties) && availableParties.Count > 0;
+        if (!hasText && !tagsUseful && !partiesUseful)
             return null;
 
         using var client = clientFactory.CreateClient(provider);
 
-        var systemPrompt = BuildSystemPrompt();
-        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties);
+        var systemPrompt = BuildSystemPrompt(scope);
+        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope);
 
         var messages = new List<ChatMessage>
         {
@@ -63,23 +74,29 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
                 return null;
             }
 
-            var validTagIds = new HashSet<Guid>(availableTags.Select(t => t.Id));
-            var matchedTagIds = (parsed.TagIds ?? [])
-                .Where(id => validTagIds.Contains(id))
-                .Distinct()
-                .ToList();
+            // Gate each field by scope so out-of-scope model output is neutralized to a no-op downstream:
+            // tag/party lists -> [], summary -> "", title -> the unchanged document name.
+            var matchedTagIds = scope.HasFlag(ClassificationScope.Tags)
+                ? FilterToCatalog(parsed.TagIds, availableTags.Select(t => t.Id))
+                : [];
 
-            var validPartyIds = new HashSet<Guid>(availableParties.Select(p => p.Id));
-            var matchedPartyIds = (parsed.PartyIds ?? [])
-                .Where(id => validPartyIds.Contains(id))
-                .Distinct()
-                .ToList();
+            var matchedPartyIds = scope.HasFlag(ClassificationScope.Parties)
+                ? FilterToCatalog(parsed.PartyIds, availableParties.Select(p => p.Id))
+                : [];
+
+            var summary = scope.HasFlag(ClassificationScope.Summary)
+                ? parsed.Summary ?? string.Empty
+                : string.Empty;
+
+            var suggestedTitle = scope.HasFlag(ClassificationScope.Name)
+                ? parsed.SuggestedTitle ?? documentName
+                : documentName;
 
             return new ClassificationResult(
                 matchedTagIds,
                 matchedPartyIds,
-                parsed.Summary ?? string.Empty,
-                parsed.SuggestedTitle ?? documentName);
+                summary,
+                suggestedTitle);
         }
         catch (Exception ex)
         {
@@ -88,67 +105,125 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         }
     }
 
-    private static string BuildSystemPrompt() =>
-        """
-        You are a document classification assistant. Given a document's name and extracted text content, you must:
+    private static List<Guid> FilterToCatalog(List<Guid>? proposed, IEnumerable<Guid> catalog)
+    {
+        var valid = new HashSet<Guid>(catalog);
+        return (proposed ?? [])
+            .Where(valid.Contains)
+            .Distinct()
+            .ToList();
+    }
 
-        1. Select applicable tags from the provided tag list by their IDs. Only select tags that are clearly relevant to the document content. Do not create new tags.
-        2. Select applicable parties (people or organisations the document concerns) from the provided party list by their IDs. Only select parties that are clearly relevant to the document content. Do not create new parties.
-        3. Write a concise 2-3 sentence summary of the document.
-        4. Suggest a clear, descriptive title for the document.
+    // The system prompt is assembled from fragments so it describes only the in-scope fields:
+    // each field contributes one numbered instruction, one JSON-schema line, and any guardrail rules.
+    // This keeps the model focused (and the JSON small) when only a subset of fields is requested.
+    private static string BuildSystemPrompt(ClassificationScope scope)
+    {
+        var instructions = new List<string>();
+        var schemaLines = new List<string>();
+        var rules = new List<string>();
 
-        Respond with a JSON object in this exact format:
+        if (scope.HasFlag(ClassificationScope.Tags))
         {
-          "tagIds": ["guid1", "guid2"],
-          "partyIds": ["guid1", "guid2"],
-          "summary": "A brief summary of the document.",
-          "suggestedTitle": "A descriptive title"
+            instructions.Add("Select applicable tags from the provided tag list by their IDs. Only select tags that are clearly relevant to the document content. Do not create new tags.");
+            schemaLines.Add("  \"tagIds\": [\"guid1\", \"guid2\"]");
+            rules.Add("- Only use tag IDs from the provided list");
+            rules.Add("- If no tags match, return an empty tagIds array");
         }
 
-        Rules:
-        - Only use tag IDs from the provided list
-        - If no tags match, return an empty tagIds array
-        - Only use party IDs from the provided list
-        - If no parties match, return an empty partyIds array
-        - The summary should capture the key information in the document
-        - The suggested title should be human-readable and descriptive
-        - Always respond with valid JSON only, no additional text
-        """;
+        if (scope.HasFlag(ClassificationScope.Parties))
+        {
+            instructions.Add("Select applicable parties (people or organisations the document concerns) from the provided party list by their IDs. Only select parties that are clearly relevant to the document content. Do not create new parties.");
+            schemaLines.Add("  \"partyIds\": [\"guid1\", \"guid2\"]");
+            rules.Add("- Only use party IDs from the provided list");
+            rules.Add("- If no parties match, return an empty partyIds array");
+        }
+
+        if (scope.HasFlag(ClassificationScope.Summary))
+        {
+            instructions.Add("Write a concise 2-3 sentence summary of the document.");
+            schemaLines.Add("  \"summary\": \"A brief summary of the document.\"");
+            rules.Add("- The summary should capture the key information in the document");
+        }
+
+        if (scope.HasFlag(ClassificationScope.Name))
+        {
+            instructions.Add("Suggest a clear, descriptive title for the document.");
+            schemaLines.Add("  \"suggestedTitle\": \"A descriptive title\"");
+            rules.Add("- The suggested title should be human-readable and descriptive");
+        }
+
+        rules.Add("- Always respond with valid JSON only, no additional text");
+
+        var numberedInstructions = string.Join(
+            "\n", instructions.Select((text, i) => $"{i + 1}. {text}"));
+        var schemaBlock = string.Join(",\n", schemaLines);
+        var rulesBlock = string.Join("\n", rules);
+
+        return
+            "You are a document classification assistant. Given a document's name and extracted text content, you must:\n\n" +
+            numberedInstructions + "\n\n" +
+            "Respond with a JSON object in this exact format:\n" +
+            "{\n" +
+            schemaBlock + "\n" +
+            "}\n\n" +
+            "Rules:\n" +
+            rulesBlock;
+    }
 
     private static string BuildUserMessage(
-        string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties)
+        string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties,
+        ClassificationScope scope)
     {
         var text = extractedText ?? string.Empty;
         if (text.Length > MaxTextLength)
             text = text[..MaxTextLength];
 
-        var tagsJson = JsonSerializer.Serialize(
-            tags.Select(t => new { t.Id, t.Name, t.Path }),
-            JsonOptions);
-
-        var partiesJson = JsonSerializer.Serialize(
-            parties.Select(p => new
-            {
-                p.Id,
-                p.Name,
-                Description = p.Description is { Length: > MaxPartyDescriptionLength }
-                    ? p.Description[..MaxPartyDescriptionLength]
-                    : p.Description
-            }),
-            JsonOptions);
-
-        return $"""
+        // Every field needs the source, so name + extracted text are always present.
+        var message = $"""
             Document name: {documentName}
 
             Extracted text:
             {text}
-
-            Available tags:
-            {tagsJson}
-
-            Available parties:
-            {partiesJson}
             """;
+
+        // The catalogs are only sent for the fields that consume them — this is the real token saving.
+        if (scope.HasFlag(ClassificationScope.Tags))
+        {
+            var tagsJson = JsonSerializer.Serialize(
+                tags.Select(t => new { t.Id, t.Name, t.Path }),
+                JsonOptions);
+
+            message += $"""
+
+
+                Available tags:
+                {tagsJson}
+                """;
+        }
+
+        if (scope.HasFlag(ClassificationScope.Parties))
+        {
+            var partiesJson = JsonSerializer.Serialize(
+                parties.Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    Description = p.Description is { Length: > MaxPartyDescriptionLength }
+                        ? p.Description[..MaxPartyDescriptionLength]
+                        : p.Description
+                }),
+                JsonOptions);
+
+            message += $"""
+
+
+                Available parties:
+                {partiesJson}
+                """;
+        }
+
+        return message;
     }
 
     private sealed class ClassificationResponse

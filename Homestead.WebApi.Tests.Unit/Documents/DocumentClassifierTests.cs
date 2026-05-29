@@ -56,10 +56,10 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "extracted text here",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([tagId], [], "A summary", "Better Title"));
 
-        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
+        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.All, ct);
 
         Assert.NotNull(result);
         Assert.Equal("Better Title", result!.Classification.SuggestedTitle);
@@ -76,12 +76,12 @@ public class DocumentClassifierTests : IDisposable
 
         _providerResolver.ResolveAsync(null, ct).Returns((AiProvider?)null);
 
-        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
+        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.All, ct);
 
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
             Arg.Any<AiProvider>(), Arg.Any<string>(), Arg.Any<string?>(),
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<CancellationToken>());
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -103,10 +103,10 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns((ClassificationResult?)null);
 
-        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
+        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.All, ct);
 
         Assert.Null(result);
     }
@@ -160,15 +160,15 @@ public class DocumentClassifierTests : IDisposable
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
         _classificationService.ClassifyAsync(
             provider, "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "summary", "title"));
 
-        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ct);
+        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.All, ct);
 
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
             provider, "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct);
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
     }
 
     [Fact]
@@ -191,10 +191,10 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([tagId], [], "AI summary", "AI Title"));
 
-        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         Assert.True(result);
 
@@ -230,10 +230,10 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
 
-        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         Assert.True(result);
 
@@ -271,10 +271,10 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
 
-        await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         var links = _db.DocumentParties.Where(dp => dp.DocumentId == _documentId).ToList();
         Assert.Single(links);
@@ -318,10 +318,10 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [newPartyId], "new summary", "Test Doc"));
 
-        await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         // Old AI-applied party link is reverted; new one is linked.
         var linkedPartyIds = _db.DocumentParties
@@ -348,7 +348,7 @@ public class DocumentClassifierTests : IDisposable
 
         _providerResolver.ResolveAsync(null, ct).Returns((AiProvider?)null);
 
-        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         Assert.False(result);
 
@@ -366,7 +366,7 @@ public class DocumentClassifierTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _sut.ClassifyAndApplyAsync(Guid.NewGuid(), null, ct));
+            () => _sut.ClassifyAndApplyAsync(Guid.NewGuid(), null, ClassificationScope.All, null, ct));
     }
 
     [Fact]
@@ -417,10 +417,10 @@ public class DocumentClassifierTests : IDisposable
         });
         _classificationService.ClassifyAsync(
             Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ct)
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([newTagId], [], "new summary", "New Title"));
 
-        await _sut.ClassifyAndApplyAsync(_documentId, null, ct);
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.All, null, ct);
 
         var pendingSuggestions = _db.DocumentSuggestions
             .Where(s => s.DocumentId == _documentId && s.Status == DocumentSuggestionStatus.Pending)
@@ -430,6 +430,147 @@ public class DocumentClassifierTests : IDisposable
         Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == "Old AI Name");
         Assert.Contains(pendingSuggestions, s => s.SuggestedValue == newTagId.ToString());
         Assert.Contains(pendingSuggestions, s => s.SuggestedValue == "New Title");
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_ScopedToTags_LeavesPendingNameSuggestionUntouched()
+    {
+        // Headline product rule: refreshing one field must not clear another field's pending suggestions.
+        var ct = TestContext.Current.CancellationToken;
+        var oldTagId = Guid.NewGuid();
+        var newTagId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedProvider();
+        SeedTag(oldTagId, "OldTag", "OldTag");
+        SeedTag(newTagId, "NewTag", "NewTag");
+
+        _db.DocumentTags.Add(new DocumentTag { DocumentId = _documentId, TagId = oldTagId });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Tags,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = oldTagId.ToString(),
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Name,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = "Old AI Name",
+            OriginalValue = "Test Doc",
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([newTagId], [], "new summary", "New Title"));
+
+        await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.Tags, null, ct);
+
+        // Tags: old suggestion cleared + reverted, new one applied.
+        var tagSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Tags
+                && s.Status == DocumentSuggestionStatus.Pending)
+            .Select(s => s.SuggestedValue)
+            .ToList();
+        Assert.DoesNotContain(oldTagId.ToString(), tagSuggestions);
+        Assert.Contains(newTagId.ToString(), tagSuggestions);
+
+        // Name: out of scope, so its pending suggestion survives untouched.
+        var nameSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Name)
+            .ToList();
+        Assert.Single(nameSuggestions);
+        Assert.Equal(DocumentSuggestionStatus.Pending, nameSuggestions[0].Status);
+        Assert.Equal("Old AI Name", nameSuggestions[0].SuggestedValue);
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_ScopedToSummary_WritesSummary_NoSuggestion_UpdatesSearchVector()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocumentWithVersion("some text");
+        SeedProvider();
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "The generated summary", "Test Doc"));
+
+        var userId = Guid.NewGuid();
+        var result = await _sut.ClassifyAndApplyAsync(_documentId, null, ClassificationScope.Summary, userId, ct);
+
+        Assert.True(result);
+
+        var doc = await _db.Documents.FindAsync([_documentId], ct);
+        Assert.Equal("The generated summary", doc!.Summary);
+        // Writing a summary is a real modification — modified-metadata is stamped (matches single summarize).
+        Assert.Equal(userId, doc.UpdatedByUserId);
+        Assert.NotEqual(default, doc.UpdatedAt);
+
+        var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == _documentId).ToList();
+        Assert.Empty(suggestions);
+
+        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(_documentId, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAndApplyAsync_ScopeWithoutName_LeavesDocumentNameUnchanged()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tagId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedProvider();
+        SeedTag(tagId, "Finance", "Finance");
+
+        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        {
+            Id = _providerId,
+            Name = "Test Provider",
+            ProviderType = AiProviderType.AzureAIFoundry,
+            Configuration = "{}",
+            IsEnabled = true
+        });
+        _classificationService.ClassifyAsync(
+            Arg.Any<AiProvider>(), "Test Doc", "some text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([tagId], [], "summary", "Should Not Apply"));
+
+        await _sut.ClassifyAndApplyAsync(
+            _documentId, null, ClassificationScope.Tags | ClassificationScope.Parties, null, ct);
+
+        var doc = await _db.Documents.FindAsync([_documentId], ct);
+        Assert.Equal("Test Doc", doc!.Name);
+
+        var nameSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Name)
+            .ToList();
+        Assert.Empty(nameSuggestions);
     }
 
     [Fact]

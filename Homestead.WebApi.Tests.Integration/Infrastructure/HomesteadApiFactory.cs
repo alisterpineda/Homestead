@@ -1,10 +1,12 @@
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
@@ -61,6 +63,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         {
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
+
+            // Substitute the AI service so classify/summarize flows are deterministic and never make
+            // a live model call. Benign by default (only reached when a provider resolves, which no
+            // existing test triggers); summarize/classify tests seed an enabled provider to exercise it.
+            services.RemoveAll<IAiClassificationService>();
+            services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
 
             // Remove ALL Aspire/EF Core DbContext-related registrations to avoid lifetime conflicts.
             // Aspire's AddNpgsqlDbContext registers pooling services (singleton IDbContextPool)

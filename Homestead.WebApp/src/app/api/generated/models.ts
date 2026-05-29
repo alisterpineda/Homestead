@@ -26,6 +26,7 @@ export type { BulkDeleteUsersCommand } from './models/bulk-delete-users-command'
 export type { BulkDeleteUsersResponse } from './models/bulk-delete-users-response';
 export type { BulkReprocessDocumentsCommand } from './models/bulk-reprocess-documents-command';
 export type { BulkReprocessDocumentsResponse } from './models/bulk-reprocess-documents-response';
+export type { BulkSummarizeDocumentsCommand } from './models/bulk-summarize-documents-command';
 export type { BulkUpdateDocumentsCommand } from './models/bulk-update-documents-command';
 export type { BulkUpdateDocumentsResponse } from './models/bulk-update-documents-response';
 export type { ClassifyDocumentBody } from './models/classify-document-body';
@@ -155,6 +156,8 @@ export type { RestoreDocumentsResponse } from './models/restore-documents-respon
 export type { RunNowBody } from './models/run-now-body';
 export type { RunPriceSourceImportNowResponse } from './models/run-price-source-import-now-response';
 export type { SortDirection } from './models/sort-direction';
+export type { SummarizeDocumentBody } from './models/summarize-document-body';
+export type { SummarizeDocumentResponse } from './models/summarize-document-response';
 export type { SystemSettingsResponse } from './models/system-settings-response';
 export type { TagDto } from './models/tag-dto';
 export type { TagSortBy } from './models/tag-sort-by';

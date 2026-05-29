@@ -30,6 +30,8 @@ import { BulkEditTagsPopoverComponent } from './bulk-edit-tags-popover/bulk-edit
 import { BulkEditPartiesPopoverComponent } from './bulk-edit-parties-popover/bulk-edit-parties-popover.component';
 import { BulkReprocessDialogComponent } from './bulk-reprocess-dialog/bulk-reprocess-dialog.component';
 import { BulkClassifyDialogComponent } from './bulk-classify-dialog/bulk-classify-dialog.component';
+import { BulkSummarizeDialogComponent } from './bulk-summarize-dialog/bulk-summarize-dialog.component';
+import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
 import { BulkReprocessProgressDialogComponent } from './bulk-reprocess-progress-dialog/bulk-reprocess-progress-dialog.component';
 import { DownloadProgressDialogComponent } from './download-progress-dialog/download-progress-dialog.component';
 import { OpenDocumentsService } from '../detail/open-documents.service';
@@ -67,6 +69,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     BulkEditPartiesPopoverComponent,
     BulkReprocessDialogComponent,
     BulkClassifyDialogComponent,
+    BulkSummarizeDialogComponent,
     BulkReprocessProgressDialogComponent,
     DownloadProgressDialogComponent,
   ],
@@ -241,7 +244,8 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-bulk-edit-tags-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
               <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
               <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
-              <app-bulk-classify-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (classifyStarted)="onBulkClassifyStarted($event)" />
+              <app-bulk-classify-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkClassifyConfirmed($event)" />
+              <app-bulk-summarize-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkSummarizeConfirmed($event)" />
               <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                 <ng-icon hlm name="lucideDownload" size="sm" />
                 Download
@@ -429,6 +433,7 @@ export class DocumentListComponent {
   error = signal(false);
   deleting = signal(false);
   downloading = signal(false);
+  bulkAiEnqueuing = signal(false);
 
   ready = signal(true);
 
@@ -929,7 +934,36 @@ export class DocumentListComponent {
     });
   }
 
+  onBulkClassifyConfirmed(options: { aiProviderId: string | null; fields: DocumentSuggestionField[] }): void {
+    const ids = Array.from(this.selectedDocumentIds());
+    if (ids.length === 0) return;
+
+    this.documentApi.bulkClassifyDocuments({
+      body: { ids, aiProviderId: options.aiProviderId, fields: options.fields },
+    }).pipe(
+      handleMutationError(this.errorHandler, this.bulkAiEnqueuing, 'Failed to start AI classification.'),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (r) => this.onBulkClassifyStarted(r.jobIds),
+    });
+  }
+
+  onBulkSummarizeConfirmed(options: { aiProviderId: string | null }): void {
+    const ids = Array.from(this.selectedDocumentIds());
+    if (ids.length === 0) return;
+
+    this.documentApi.bulkSummarizeDocuments({
+      body: { ids, aiProviderId: options.aiProviderId },
+    }).pipe(
+      handleMutationError(this.errorHandler, this.bulkAiEnqueuing, 'Failed to start AI summarization.'),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (r) => this.onBulkSummarizeStarted(r.jobIds),
+    });
+  }
+
   onBulkClassifyStarted(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
     const parentJobId = jobIds[0];
     const documentCount = this.selectedDocumentIds().size;
     this.clearSelection();
@@ -962,6 +996,44 @@ export class DocumentListComponent {
         loading: `Classifying ${documentCount} document${documentCount > 1 ? 's' : ''}...`,
         success: (message) => message,
         error: (err: unknown) => err instanceof Error ? err.message : 'Classification failed.',
+      },
+    );
+  }
+
+  onBulkSummarizeStarted(jobIds: string[]): void {
+    if (jobIds.length === 0) return;
+    const parentJobId = jobIds[0];
+    const documentCount = this.selectedDocumentIds().size;
+    this.clearSelection();
+    this.processingHub.registerManagedJob(parentJobId);
+
+    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+
+    toast.promise(
+      new Promise<string>((resolve, reject) => {
+        this.processingHub.jobStatusChanged$.pipe(
+          filter(msg => msg.jobId === parentJobId),
+          takeWhile(msg => !isTerminal(msg.status), true),
+          takeUntilDestroyed(this.destroyRef),
+        ).subscribe({
+          next: msg => {
+            if (msg.status === 'Completed') {
+              this.onRefresh();
+              resolve(`${documentCount} document${documentCount > 1 ? 's' : ''} summarized successfully.`);
+            } else if (msg.status === 'PartiallyCompleted') {
+              this.onRefresh();
+              resolve(`Summarization partially completed for ${documentCount} document${documentCount > 1 ? 's' : ''}.`);
+            } else if (msg.status === 'Failed') {
+              this.onRefresh();
+              reject(new Error('Summarization failed.'));
+            }
+          },
+        });
+      }),
+      {
+        loading: `Summarizing ${documentCount} document${documentCount > 1 ? 's' : ''}...`,
+        success: (message) => message,
+        error: (err: unknown) => err instanceof Error ? err.message : 'Summarization failed.',
       },
     );
   }

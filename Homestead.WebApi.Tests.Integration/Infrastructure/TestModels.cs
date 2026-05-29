@@ -51,6 +51,8 @@ internal record BulkClassifyResult(IReadOnlyList<Guid> JobIds);
 
 internal record ClassifyResult(Guid JobId);
 
+internal record SummarizeResult(string? Summary);
+
 internal record DocumentSuggestionItem(Guid Id, string Field, string Status, string SuggestedValue, string? OriginalValue);
 
 internal record ClassifyPreviewResult(

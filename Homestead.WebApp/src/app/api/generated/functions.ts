@@ -11,6 +11,8 @@ export type { BulkDeleteDocuments$Params as BulkDeleteDocuments$Params } from '.
 export { bulkDeleteDocuments as bulkDeleteDocuments } from './fn/documents/bulk-delete-documents';
 export type { BulkClassifyDocuments$Params as BulkClassifyDocuments$Params } from './fn/documents/bulk-classify-documents';
 export { bulkClassifyDocuments as bulkClassifyDocuments } from './fn/documents/bulk-classify-documents';
+export type { BulkSummarizeDocuments$Params as BulkSummarizeDocuments$Params } from './fn/documents/bulk-summarize-documents';
+export { bulkSummarizeDocuments as bulkSummarizeDocuments } from './fn/documents/bulk-summarize-documents';
 export type { BulkReprocessDocuments$Params as BulkReprocessDocuments$Params } from './fn/documents/bulk-reprocess-documents';
 export { bulkReprocessDocuments as bulkReprocessDocuments } from './fn/documents/bulk-reprocess-documents';
 export type { BulkUpdateDocuments$Params as BulkUpdateDocuments$Params } from './fn/documents/bulk-update-documents';
@@ -45,6 +47,8 @@ export type { GetAiProviderSummaries$Params as GetAiProviderSummaries$Params } f
 export { getAiProviderSummaries as getAiProviderSummaries } from './fn/documents/get-ai-provider-summaries';
 export type { ClassifyPreview$Params as ClassifyPreview$Params } from './fn/documents/classify-preview';
 export { classifyPreview as classifyPreview } from './fn/documents/classify-preview';
+export type { SummarizeDocument$Params as SummarizeDocument$Params } from './fn/documents/summarize-document';
+export { summarizeDocument as summarizeDocument } from './fn/documents/summarize-document';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';
 export { getDocumentVersions as getDocumentVersions } from './fn/documents/get-document-versions';
 export type { CreateDocumentVersion$Params as CreateDocumentVersion$Params } from './fn/documents/create-document-version';

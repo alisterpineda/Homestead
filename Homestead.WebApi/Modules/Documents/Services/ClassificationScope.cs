@@ -1,0 +1,48 @@
+using Homestead.WebApi.Domain.Documents;
+
+namespace Homestead.WebApi.Modules.Documents.Services;
+
+/// <summary>
+/// The set of document fields an AI classification run should generate and apply.
+/// Field-scoped classification lets the user refresh one field (e.g. Tags) without
+/// re-generating or overwriting the others, and avoids spending tokens on discarded output.
+/// </summary>
+[Flags]
+public enum ClassificationScope
+{
+    None = 0,
+    Tags = 1,
+    Parties = 2,
+    Name = 4,
+    Summary = 8,
+    All = Tags | Parties | Name | Summary
+}
+
+public static class ClassificationScopeExtensions
+{
+    /// <summary>
+    /// Maps the API-facing <see cref="DocumentSuggestionField"/> set to an internal
+    /// <see cref="ClassificationScope"/>. A null or empty set defaults to the three classify
+    /// fields (Tags | Parties | Name) and <b>never</b> includes Summary — Summary is only ever
+    /// requested explicitly via the separate summarize path.
+    /// </summary>
+    public static ClassificationScope FromFields(IReadOnlyCollection<DocumentSuggestionField>? fields)
+    {
+        if (fields is null || fields.Count == 0)
+            return ClassificationScope.Tags | ClassificationScope.Parties | ClassificationScope.Name;
+
+        var scope = ClassificationScope.None;
+        foreach (var field in fields)
+        {
+            scope |= field switch
+            {
+                DocumentSuggestionField.Tags => ClassificationScope.Tags,
+                DocumentSuggestionField.Parties => ClassificationScope.Parties,
+                DocumentSuggestionField.Name => ClassificationScope.Name,
+                _ => ClassificationScope.None
+            };
+        }
+
+        return scope;
+    }
+}

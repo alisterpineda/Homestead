@@ -343,6 +343,8 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       getDocument: ReturnType<typeof vi.fn>;
       getDocumentFile: ReturnType<typeof vi.fn>;
       patchDocument: ReturnType<typeof vi.fn>;
+      classifyPreview: ReturnType<typeof vi.fn>;
+      summarizeDocument: ReturnType<typeof vi.fn>;
     };
     let guardVersionApi: {
       getDocumentVersion: ReturnType<typeof vi.fn>;
@@ -448,6 +450,8 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         getDocument: vi.fn(() => of(docResponse)),
         getDocumentFile: vi.fn(() => EMPTY),
         patchDocument: vi.fn(() => of(null)),
+        classifyPreview: vi.fn(() => of({ suggestedTitle: null, summary: null, tags: [], parties: [] })),
+        summarizeDocument: vi.fn(() => of({ summary: 'AI generated summary.' })),
       };
 
       guardVersionApi = {
@@ -793,6 +797,53 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
 
         guardComponent.preClassifyName.set(guardComponent.preClassifyName() ?? guardComponent.editName());
         expect(guardComponent.preClassifyName()).toBe('Original');
+      });
+    });
+
+    describe('field-scoped classify and summarize', () => {
+      it('forwards the selected fields to classifyPreview', () => {
+        docResponse = makeDoc({ name: 'Original' });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.handleClassify({ aiProviderId: 'provider-1', fields: ['Tags'] });
+
+        expect(guardDocumentApi.classifyPreview).toHaveBeenCalledWith({
+          documentId: 'doc-1',
+          body: { aiProviderId: 'provider-1', fields: ['Tags'] },
+        });
+      });
+
+      it('leaves editName untouched when Name is unchecked (null suggestedTitle)', () => {
+        docResponse = makeDoc({ name: 'Original' });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        guardComponent.editName.set('Original');
+        // Name unchecked => backend returns null suggestedTitle.
+        (guardDocumentApi.classifyPreview as ReturnType<typeof vi.fn>).mockReturnValue(
+          of({ suggestedTitle: null, summary: null, tags: [], parties: [] }));
+
+        guardComponent.handleClassify({ aiProviderId: null, fields: ['Tags', 'Parties'] });
+        guardFixture.detectChanges();
+
+        expect(guardComponent.editName()).toBe('Original');
+      });
+
+      it('handleSummarize calls summarizeDocument and refreshes the document', () => {
+        docResponse = makeDoc({ name: 'Original' });
+        setGuardDocumentId('doc-1');
+        guardFixture.detectChanges();
+
+        const before = guardComponent.refreshTrigger();
+        guardComponent.handleSummarize({ aiProviderId: 'provider-1' });
+        guardFixture.detectChanges();
+
+        expect(guardDocumentApi.summarizeDocument).toHaveBeenCalledWith({
+          documentId: 'doc-1',
+          body: { aiProviderId: 'provider-1' },
+        });
+        expect(guardComponent.refreshTrigger()).toBeGreaterThan(before);
       });
     });
 
