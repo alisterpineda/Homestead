@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Processing;
 using NSubstitute;
@@ -8,13 +9,17 @@ public class JobQueueTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IJobSignal _signal;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly JobQueue _queue;
 
     public JobQueueTests()
     {
         _db = TestAppDbContext.Create();
         _signal = Substitute.For<IJobSignal>();
-        _queue = new JobQueue(_db, _signal);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        // The InMemory provider reports no ambient transaction (CurrentTransaction == null), so the queue
+        // takes the "no transaction" branch and signals inline — exactly as the scheduler's own scope does.
+        _queue = new JobQueue(_db, _signal, _unitOfWork);
     }
 
     public void Dispose()

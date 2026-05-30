@@ -1,6 +1,7 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Common;
 
@@ -13,6 +14,30 @@ public class UnitOfWork(
 {
     private Guid? _actorOverride;
     private List<Func<CancellationToken, Task>>? _afterCommitHooks;
+
+    public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken)
+    {
+        // Insurance + correctness for any nested command (ISender dispatched within an already-open
+        // scope): join the ambient transaction and let the outermost command own the commit + hook
+        // draining. Re-opening here would either throw (relational) or split the work across transactions.
+        if (db.Database.CurrentTransaction is not null)
+            return await work();
+
+        T result;
+        await using (var tx = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            result = await work();
+            // Flush batched audit + persist into the open transaction; idempotent guard preserved so a
+            // handler that already flushed mid-handler is not double-committed or double-audited.
+            await SaveChangesAsync(cancellationToken);
+            await tx.CommitAsync(cancellationToken);
+        }
+
+        // Post-commit side effects run OUTSIDE the transaction: they must observe durably-committed
+        // state (SignalR, file deletes, job-processor signals read from a separate connection).
+        await RunAfterCommitHooksAsync(cancellationToken);
+        return result;
+    }
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken)
     {
@@ -37,7 +62,7 @@ public class UnitOfWork(
 
     public void SetActor(Guid? actorUserId) => _actorOverride = actorUserId;
 
-    public async Task RunAfterCommitHooksAsync(CancellationToken cancellationToken)
+    private async Task RunAfterCommitHooksAsync(CancellationToken cancellationToken)
     {
         if (_afterCommitHooks is null)
             return;

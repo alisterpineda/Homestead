@@ -6,7 +6,6 @@ using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceSchedule;
 
@@ -25,32 +24,28 @@ public class UpsertPriceSourceScheduleHandler(
         var nextRunAt = CronSchedule.NextOccurrence(request.CronExpression, now);
         var newId = Guid.NewGuid();
 
-        var strategy = db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        // RemoveBySource only marks the existing schedule for deletion; the Add below stages the new one.
+        // Both are a single atomic SaveChanges committed by the command pipeline's transaction — no need
+        // for an explicit execution strategy or transaction here (which would nest illegally now).
+        await scheduleStore.RemoveBySourceAsync(request.Source, ct);
+
+        var schedule = new ProcessingSchedule
         {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            await scheduleStore.RemoveBySourceAsync(request.Source, ct);
+            Id = newId,
+            Name = $"{request.Source.DisplayName()} price import",
+            Description = "Managed via /finances/settings/price-sources",
+            JobType = ProcessingJobType.ImportCommodityPrices,
+            CronExpression = request.CronExpression,
+            TimeZone = CronSchedule.DefaultTimeZone,
+            Priority = request.Priority,
+            IsEnabled = request.IsEnabled,
+            CreatedAt = now,
+            CreatedByUserId = currentUser.UserId,
+            NextRunAt = nextRunAt,
+        };
+        schedule.SetPayload(new ImportCommodityPricesPayload(request.Source));
 
-            var schedule = new ProcessingSchedule
-            {
-                Id = newId,
-                Name = $"{request.Source.DisplayName()} price import",
-                Description = "Managed via /finances/settings/price-sources",
-                JobType = ProcessingJobType.ImportCommodityPrices,
-                CronExpression = request.CronExpression,
-                TimeZone = CronSchedule.DefaultTimeZone,
-                Priority = request.Priority,
-                IsEnabled = request.IsEnabled,
-                CreatedAt = now,
-                CreatedByUserId = currentUser.UserId,
-                NextRunAt = nextRunAt,
-            };
-            schedule.SetPayload(new ImportCommodityPricesPayload(request.Source));
-
-            db.ProcessingSchedules.Add(schedule);
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-        });
+        db.ProcessingSchedules.Add(schedule);
 
         return new UpsertPriceSourceScheduleResponse(newId, nextRunAt);
     }

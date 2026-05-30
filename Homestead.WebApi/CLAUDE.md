@@ -92,7 +92,17 @@ Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints 
 - **Domain types** in `Domain/Auditing/`: `AuditLog`, `AuditAction` enum, polymorphic `FieldChange` (`ScalarFieldChange`/`ArrayFieldChange`), `IAuditSnapshot<TSelf, TSource>` interface
 - **Snapshots** per entity (e.g., `DocumentSnapshot`) implement `IAuditSnapshot` with `From()` and `Diff()`
 - **`IAuditLogger`** — DI-injected service (`Common/Auditing/AuditLogger.cs`) — call `LogCreated`/`LogUpdated`/`LogDeleted` before `SaveChangesAsync`. Auto-resolves the current user from `ICurrentUserAccessor` — handlers do not pass `userId`. Background job handlers use `auditLogger.ForUser(job.CreatedByUserId)` to attribute audit entries to the user who initiated the job.
-- **`IAuditContext`** — scoped service (`Common/Auditing/AuditContext.cs`) for batching audit entries within a request, flushed by `UnitOfWorkBehavior`
+- **`IAuditContext`** — scoped service (`Common/Auditing/AuditContext.cs`) for batching audit entries within a request, flushed alongside persistence by `UnitOfWork.SaveChangesAsync` (driven by `UnitOfWorkBehavior`)
+
+## Transactions & Unit of Work
+
+Every command runs inside a single database transaction owned by the `IUnitOfWork` chokepoint (`Common/UnitOfWork.cs`). `UnitOfWorkBehavior` is registered **innermost** in the MediatR pipeline (outer→inner: Authorization → Validation → UnitOfWork → handler), so authorization and validation run *outside* the transaction and a rejected request never opens one.
+
+- **A command = one transaction, committed exactly once** by `UnitOfWork.ExecuteInTransactionAsync`. The `ICommand` marker is the gate: queries are not `ICommand`, run with no transaction, and are guaranteed read-only.
+- **`unitOfWork.SaveChangesAsync` flushes, it does not commit.** Handlers may call it mid-handler so a follow-up read/service sees their writes (read-your-writes), but nothing is durable until the transaction commits at the end of the pipeline. It is idempotent, so a mid-handler flush plus the final commit never double-write or double-audit. Any failure anywhere rolls the whole command back.
+- **Side effects that must outlive or observe the commit must go through `unitOfWork.OnAfterCommit`, never inline.** This includes SignalR/`IProcessingNotifier` sends, file deletes, and **job-processor signals** (the processor reads committed rows from a separate connection, so signalling before commit would lose the wakeup until the 30s poll). After-commit hooks are drained outside the transaction once the commit succeeds. `JobQueue.EnqueueAsync` already defers its signal this way when inside a command transaction.
+- **Do slow external calls (AI, HTTP) *before* the first write, or defer them.** While the transaction is open it holds a pooled DB connection for its whole duration.
+- EF execution-strategy **retries are disabled** (`Program.cs`, `DisableRetry = true`) so an explicit `BeginTransactionAsync` is legal without an execution-strategy re-run. Don't open your own `BeginTransactionAsync`/`CreateExecutionStrategy` inside a command handler — it would nest illegally; rely on the pipeline transaction instead.
 
 ## Error Handling (RFC 9457)
 

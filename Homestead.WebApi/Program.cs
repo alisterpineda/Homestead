@@ -78,6 +78,11 @@ void MapCsvEnvToConfigArray(string envVar, string configPrefix)
 
 builder.AddNpgsqlDbContext<AppDbContext>(
     connectionName: "postgresdb",
+    // Disable EF execution-strategy retries: the command pipeline wraps each command in an explicit
+    // transaction (UnitOfWork.ExecuteInTransactionAsync), and BeginTransactionAsync is only legal
+    // without a retrying execution strategy. The integration test factory already registers the
+    // DbContext without retry, so test and production execution-strategy behavior now match.
+    configureSettings: settings => settings.DisableRetry = true,
     configureDbContextOptions: opts => opts
         .UseSeeding((ctx, created) =>
         {
@@ -130,9 +135,12 @@ builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssemblyContaining<Program>();
     cfg.Lifetime = ServiceLifetime.Scoped;
-    cfg.AddOpenBehavior(typeof(UnitOfWorkBehavior<,>));
+    // Order is outer→inner. UnitOfWork is registered last (innermost) so it owns the transaction
+    // boundary around the handler alone: authorization + validation run OUTSIDE the transaction, so a
+    // rejected request fails fast without opening (and rolling back) a transaction.
     cfg.AddOpenBehavior(typeof(AuthorizationBehavior<,>));
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(UnitOfWorkBehavior<,>));
 });
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
 builder.Services.AddProcessing(builder.Configuration);

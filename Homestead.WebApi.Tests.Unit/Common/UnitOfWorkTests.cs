@@ -1,6 +1,12 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Identity;
+using Homestead.WebApi.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Common;
@@ -73,22 +79,111 @@ public class UnitOfWorkTests : IDisposable
     }
 
     [Fact]
-    public async Task RunAfterCommitHooksAsync_RunsRegisteredHooks_Once()
+    public async Task ExecuteInTransactionAsync_InvokesWork_AndReturnsResult()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var workRan = false;
+
+        var result = await _sut.ExecuteInTransactionAsync(() =>
+        {
+            workRan = true;
+            return Task.FromResult("done");
+        }, ct);
+
+        Assert.True(workRan);
+        Assert.Equal("done", result);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_PersistsWorkAndFlushesAudit()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var currentUserId = Guid.NewGuid();
+        _currentUser.UserId.Returns(currentUserId);
+
+        var userId = Guid.NewGuid();
+
+        await _sut.ExecuteInTransactionAsync(() =>
+        {
+            _db.Users.Add(new AppUser { Id = userId, Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            _auditContext.Created("AppUser", userId);
+            return Task.FromResult(userId);
+        }, ct);
+
+        // The work was flushed + committed by ExecuteInTransactionAsync (it calls SaveChangesAsync itself),
+        // so a store-backed query now sees the row and the change tracker is clean.
+        Assert.False(_db.ChangeTracker.HasChanges());
+        Assert.True(await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, ct));
+        _auditLogger.Received(1).ForUser(currentUserId);
+        _auditLogger.Received(1).LogCreated("AppUser", userId, null);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_DrainsRegisteredHooks_OnceAfterCommit()
     {
         var ct = TestContext.Current.CancellationToken;
         var runCount = 0;
-        _sut.OnAfterCommit(_ => { runCount++; return Task.CompletedTask; });
 
-        await _sut.RunAfterCommitHooksAsync(ct);
-        await _sut.RunAfterCommitHooksAsync(ct); // hooks are cleared after the first drain
+        await _sut.ExecuteInTransactionAsync(() =>
+        {
+            _sut.OnAfterCommit(_ => { runCount++; return Task.CompletedTask; });
+            return Task.FromResult(0);
+        }, ct);
 
+        Assert.Equal(1, runCount);
+
+        // Hooks are cleared after the first drain: a second transaction does not re-run them.
+        await _sut.ExecuteInTransactionAsync(() => Task.FromResult(0), ct);
         Assert.Equal(1, runCount);
     }
 
     [Fact]
-    public async Task RunAfterCommitHooksAsync_NoHooks_DoesNothing()
+    public async Task ExecuteInTransactionAsync_WhenTransactionAlreadyOpen_JoinsWithoutCommittingOrDraining()
     {
+        // A nested command dispatched within an already-open transaction must join it: run the work and
+        // return, but leave commit + hook draining to the outermost command. We can't open a real
+        // ambient transaction on the InMemory provider (it always reports CurrentTransaction == null), so
+        // we drive the join branch with a DbContext whose facade reports an open transaction.
         var ct = TestContext.Current.CancellationToken;
-        await _sut.RunAfterCommitHooksAsync(ct);
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+        using var ambientTxDb = new AmbientTransactionDbContext(options);
+        var sut = new UnitOfWork(ambientTxDb, new AuditContext(), _auditLogger, _currentUser);
+
+        var workRan = false;
+        var hookRan = false;
+
+        var result = await sut.ExecuteInTransactionAsync(() =>
+        {
+            workRan = true;
+            sut.OnAfterCommit(_ => { hookRan = true; return Task.CompletedTask; });
+            return Task.FromResult("joined");
+        }, ct);
+
+        Assert.Equal("joined", result);
+        Assert.True(workRan);
+        // The outermost command owns the commit and hook draining, so the joined call must not drain.
+        Assert.False(hookRan);
+    }
+
+    /// <summary>
+    /// A <see cref="TestAppDbContext"/> whose <see cref="DatabaseFacade"/> reports an open ambient
+    /// transaction, used to exercise the join branch of <see cref="UnitOfWork.ExecuteInTransactionAsync{T}"/>
+    /// (the InMemory provider always reports <c>CurrentTransaction == null</c>, so the branch is otherwise
+    /// unreachable in a unit test).
+    /// </summary>
+    private sealed class AmbientTransactionDbContext(DbContextOptions<AppDbContext> options)
+        : TestAppDbContext(options)
+    {
+        private DatabaseFacade? _database;
+        public override DatabaseFacade Database => _database ??= new StubTransactionFacade(this);
+
+        private sealed class StubTransactionFacade(DbContext context) : DatabaseFacade(context)
+        {
+            public override IDbContextTransaction? CurrentTransaction { get; } =
+                Substitute.For<IDbContextTransaction>();
+        }
     }
 }

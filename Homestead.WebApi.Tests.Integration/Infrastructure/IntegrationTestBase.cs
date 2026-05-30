@@ -258,7 +258,12 @@ public abstract class IntegrationTestBase : IAsyncLifetime
 
     protected async Task<Guid> WaitForJobCompletionAsync(Guid jobId, TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+        // Default deadline is deliberately BELOW the processor's 30s poll interval: with the enqueue
+        // signal deferred to after-commit, a correctly-signalled job starts within milliseconds, but a
+        // *lost* signal would only get picked up by the 30s poll — so a regression here fails the test
+        // instead of silently passing after a 30s stall. Synthetic uploads complete in a second or two;
+        // genuinely slow flows (real-fixture OCR) pass an explicit larger timeout.
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(20));
 
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

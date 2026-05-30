@@ -39,19 +39,25 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
     [Fact]
     public async Task UpsertReplacesExistingSchedule()
     {
-        // First call creates the schedule.
+        var ct = TestContext.Current.CancellationToken;
+
+        // The handler now only stages Remove + Add; the command pipeline's transaction commits. These
+        // unit tests bypass the pipeline, so save explicitly after each Handle to mirror that commit —
+        // each call is a separate command (and therefore a separate transaction) in production.
         var sut = new UpsertPriceSourceScheduleHandler(_db, _currentUser, new PriceSourceScheduleStore(_db));
         var first = await sut.Handle(new UpsertPriceSourceScheduleCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             CronExpression = "0 6 * * *",
-        }, TestContext.Current.CancellationToken);
+        }, ct);
+        await _db.SaveChangesAsync(ct);
 
         var second = await sut.Handle(new UpsertPriceSourceScheduleCommand
         {
             Source = CommodityPriceSource.BankOfCanada,
             CronExpression = "0 7 * * *",
-        }, TestContext.Current.CancellationToken);
+        }, ct);
+        await _db.SaveChangesAsync(ct);
 
         var schedules = _db.ProcessingSchedules.ToList();
         var single = Assert.Single(schedules);
@@ -67,6 +73,7 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
     [Fact]
     public async Task PersistsCreatedByUserId()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         _currentUser.UserId.Returns(userId);
         var sut = new UpsertPriceSourceScheduleHandler(_db, _currentUser, new PriceSourceScheduleStore(_db));
@@ -74,7 +81,10 @@ public class UpsertPriceSourceScheduleHandlerTests : IDisposable
         {
             Source = CommodityPriceSource.BankOfCanada,
             CronExpression = "0 6 * * *",
-        }, TestContext.Current.CancellationToken);
+        }, ct);
+        // The handler stages the Add; the pipeline transaction commits. Bypassing the pipeline here, save
+        // explicitly to mirror that commit before asserting on persisted state.
+        await _db.SaveChangesAsync(ct);
 
         var schedule = _db.ProcessingSchedules.Single(s => s.Id == response.Id);
         Assert.Equal(userId, schedule.CreatedByUserId);

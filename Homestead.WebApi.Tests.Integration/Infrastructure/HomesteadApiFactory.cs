@@ -2,6 +2,7 @@ using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
+using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -70,6 +71,16 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         {
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
+
+            // Register test-only probe handlers used by TransactionRollbackTests. The MediatR open
+            // behaviors (Authorization → Validation → UnitOfWork) are registered as open generics, so
+            // they wrap these requests automatically — the probe runs inside the real command transaction.
+            services.AddTransient<
+                IRequestHandler<TransactionRollbackProbes.AuditedRollbackProbeCommand, Unit>,
+                TransactionRollbackProbes.AuditedRollbackProbeHandler>();
+            services.AddTransient<
+                IRequestHandler<TransactionRollbackProbes.EnqueueRollbackProbeCommand, Unit>,
+                TransactionRollbackProbes.EnqueueRollbackProbeHandler>();
 
             // Swap the system clock for a controllable one so scheduler tests can pin "now". This
             // replaces TimeProvider for EVERY DI consumer (the scheduler today, but also anything else

@@ -12,49 +12,63 @@ public class UnitOfWorkBehaviorTests
 
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
 
+    public UnitOfWorkBehaviorTests()
+    {
+        // By default, make ExecuteInTransactionAsync actually run the work it is handed and return the
+        // result, so the behavior's response still flows through and call-order is observable. Individual
+        // tests can still assert whether it was called at all.
+        _unitOfWork
+            .ExecuteInTransactionAsync(Arg.Any<Func<Task<string>>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<Task<string>>>()());
+    }
+
     [Fact]
-    public async Task Handle_Query_DoesNotCommitOrDrain()
+    public async Task Handle_Query_DoesNotOpenTransaction()
     {
         var behavior = new UnitOfWorkBehavior<TestQuery, string>(_unitOfWork);
 
         var result = await behavior.Handle(new TestQuery(), () => Task.FromResult("ok"), CancellationToken.None);
 
         Assert.Equal("ok", result);
-        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-        await _unitOfWork.DidNotReceive().RunAfterCommitHooksAsync(Arg.Any<CancellationToken>());
+        await _unitOfWork.DidNotReceive()
+            .ExecuteInTransactionAsync(Arg.Any<Func<Task<string>>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_Command_CommitsAndDrainsHooks()
+    public async Task Handle_Command_RunsHandlerInsideTransaction()
     {
         var ct = TestContext.Current.CancellationToken;
+        var handlerRan = false;
         var behavior = new UnitOfWorkBehavior<TestCommand, string>(_unitOfWork);
 
-        var result = await behavior.Handle(new TestCommand(), () => Task.FromResult("ok"), ct);
+        var result = await behavior.Handle(
+            new TestCommand(),
+            () => { handlerRan = true; return Task.FromResult("ok"); },
+            ct);
 
         Assert.Equal("ok", result);
-        await _unitOfWork.Received(1).SaveChangesAsync(ct);
-        await _unitOfWork.Received(1).RunAfterCommitHooksAsync(ct);
+        Assert.True(handlerRan);
+        await _unitOfWork.Received(1)
+            .ExecuteInTransactionAsync(Arg.Any<Func<Task<string>>>(), ct);
     }
 
     [Fact]
-    public async Task Handle_NonCommand_DoesNotCommitEvenIfHandlerProducedAuditEntries()
+    public async Task Handle_NonCommand_DoesNotOpenTransaction()
     {
-        // The legacy fallback (commit when auditContext.HasEntries) has been removed: the ICommand marker
-        // is now the sole commit gate. A non-ICommand request never commits — even if its handler somehow
-        // produced audit entries — so the behavior no longer depends on IAuditContext at all. Queries never
-        // audit, so this can't regress real flows.
+        // The ICommand marker is the sole transaction gate. A non-ICommand request never opens a
+        // transaction — even if its handler somehow produced audit entries — so the behavior no longer
+        // depends on IAuditContext at all. Queries never audit, so this can't regress real flows.
         var ct = TestContext.Current.CancellationToken;
         var behavior = new UnitOfWorkBehavior<TestQuery, string>(_unitOfWork);
 
         await behavior.Handle(new TestQuery(), () => Task.FromResult("ok"), ct);
 
-        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-        await _unitOfWork.DidNotReceive().RunAfterCommitHooksAsync(Arg.Any<CancellationToken>());
+        await _unitOfWork.DidNotReceive()
+            .ExecuteInTransactionAsync(Arg.Any<Func<Task<string>>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_CommandHandlerThrows_DoesNotCommitOrDrain()
+    public async Task Handle_CommandHandlerThrows_PropagatesThroughTransaction()
     {
         var behavior = new UnitOfWorkBehavior<TestCommand, string>(_unitOfWork);
 
@@ -63,8 +77,10 @@ public class UnitOfWorkBehaviorTests
                 () => throw new InvalidOperationException("Handler failed"),
                 CancellationToken.None));
 
-        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
-        await _unitOfWork.DidNotReceive().RunAfterCommitHooksAsync(Arg.Any<CancellationToken>());
+        // The behavior still routes the command through the transaction boundary; rolling the
+        // transaction back on the throw is UnitOfWork's responsibility (covered in UnitOfWorkTests).
+        await _unitOfWork.Received(1)
+            .ExecuteInTransactionAsync(Arg.Any<Func<Task<string>>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -93,19 +109,15 @@ public class UnitOfWorkBehaviorTests
     }
 
     [Fact]
-    public async Task Handle_CallsNextBeforeCommit()
+    public async Task Handle_Query_SetsActorToNull()
     {
+        // SetActor runs for every request, not just commands, so the scoped override never leaks into a
+        // later query within the same scope.
         var ct = TestContext.Current.CancellationToken;
-        var callOrder = new List<string>();
-        var behavior = new UnitOfWorkBehavior<TestCommand, string>(_unitOfWork);
+        var behavior = new UnitOfWorkBehavior<TestQuery, string>(_unitOfWork);
 
-        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
-            .Returns(_ => { callOrder.Add("commit"); return 0; });
+        await behavior.Handle(new TestQuery(), () => Task.FromResult("ok"), ct);
 
-        await behavior.Handle(new TestCommand(),
-            () => { callOrder.Add("handler"); return Task.FromResult("ok"); },
-            ct);
-
-        Assert.Equal(["handler", "commit"], callOrder);
+        _unitOfWork.Received(1).SetActor(null);
     }
 }

@@ -3,12 +3,18 @@ using MediatR;
 namespace Homestead.WebApi.Common;
 
 /// <summary>
-/// Persistence/audit chokepoint for the MediatR pipeline. After the handler runs, commits the work
-/// for any <see cref="ICommand"/> through <see cref="IUnitOfWork"/> (idempotent — a no-op when a
-/// handler already saved), then drains post-commit side effects. The <see cref="ICommand"/> marker is
-/// the sole commit gate: queries are not <see cref="ICommand"/> and skip the commit entirely, so they
-/// are guaranteed read-only.
+/// Persistence/audit/transaction chokepoint adapter for the MediatR pipeline. Threads the audit actor,
+/// then wraps every <see cref="ICommand"/> in a single database transaction via
+/// <see cref="IUnitOfWork.ExecuteInTransactionAsync{T}"/>: the handler runs, the work is flushed and
+/// committed exactly once, and post-commit hooks drain afterwards. Any failure rolls the whole command
+/// back. The <see cref="ICommand"/> marker is the sole transaction gate: queries are not
+/// <see cref="ICommand"/>, run with no transaction, and are therefore guaranteed read-only.
 /// </summary>
+/// <remarks>
+/// Registered innermost so authorization and validation run <em>outside</em> the transaction — a
+/// rejected request never opens a transaction. This behavior is DbContext-free: the transaction
+/// boundary lives entirely on <see cref="IUnitOfWork"/>.
+/// </remarks>
 public class UnitOfWorkBehavior<TRequest, TResponse>(IUnitOfWork unitOfWork)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
@@ -24,18 +30,11 @@ public class UnitOfWorkBehavior<TRequest, TResponse>(IUnitOfWork unitOfWork)
         // previous send into a later, non-attributed one within the same scope.
         unitOfWork.SetActor(request is IActorAttributed actorAttributed ? actorAttributed.ActorUserId : null);
 
-        var response = await next();
+        // Queries are not ICommand: they run with no transaction and are guaranteed read-only. Commands
+        // run inside a single transaction that commits once and then drains post-commit hooks.
+        if (request is not ICommand)
+            return await next();
 
-        // The ICommand marker is the sole commit gate: commit every command through the single
-        // chokepoint (idempotent — a no-op when the handler already saved), then drain true post-commit
-        // side effects (hooks) only after the durable commit. Queries are not ICommand, so they never
-        // commit and are therefore guaranteed read-only.
-        if (request is ICommand)
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            await unitOfWork.RunAfterCommitHooksAsync(cancellationToken);
-        }
-
-        return response;
+        return await unitOfWork.ExecuteInTransactionAsync(() => next(), cancellationToken);
     }
 }
