@@ -1,11 +1,11 @@
 using System.Text.Json;
-using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Modules.Documents.Services;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -15,8 +15,6 @@ public class DocumentClassifierTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly IAiProviderResolver _providerResolver;
     private readonly IAiClassificationService _classificationService;
-    private readonly ISearchVectorUpdater _searchVectorUpdater;
-    private readonly IAuditLogger _auditLogger;
     private readonly DocumentClassifier _sut;
 
     private readonly Guid _documentId = Guid.NewGuid();
@@ -27,11 +25,7 @@ public class DocumentClassifierTests : IDisposable
         _db = TestAppDbContext.Create();
         _providerResolver = Substitute.For<IAiProviderResolver>();
         _classificationService = Substitute.For<IAiClassificationService>();
-        _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _auditLogger.ForUser(Arg.Any<Guid?>()).Returns(_auditLogger);
-        _sut = new DocumentClassifier(
-            _db, _providerResolver, _classificationService, _searchVectorUpdater, _auditLogger);
+        _sut = new DocumentClassifier(_db, _providerResolver, _classificationService);
     }
 
     public void Dispose()
@@ -40,20 +34,15 @@ public class DocumentClassifierTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    // ---- ClassifyAsync (pure — no document writes) -------------------------------------------------
+
     [Fact]
     public async Task ClassifyAsync_ResolvesProvider_LoadsInputs_CallsAiService()
     {
         var ct = TestContext.Current.CancellationToken;
         var tagId = Guid.NewGuid();
 
-        var provider = new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        };
+        var provider = NewProvider();
 
         SeedDocumentWithVersion("extracted text here");
         SeedTag(tagId, "Finance", "Finance");
@@ -94,15 +83,7 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var provider = new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        };
-
+        var provider = NewProvider();
         SeedDocumentWithVersion("some text");
 
         _providerResolver.ResolveAsync(null, ct).Returns(provider);
@@ -121,14 +102,7 @@ public class DocumentClassifierTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var provider = new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        };
+        var provider = NewProvider();
 
         _db.Documents.Add(new Document
         {
@@ -177,32 +151,41 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_AppliesClassification()
+    public async Task ClassifyAsync_InMemoryOverload_UsesProvidedText_NoDocumentLoad()
+    {
+        // The in-memory overload classifies pre-creation (no persisted document/version).
+        var ct = TestContext.Current.CancellationToken;
+        var provider = NewProvider();
+
+        _providerResolver.ResolveAsync(null, ct).Returns(provider);
+        _classificationService.ClassifyAsync(
+            provider, "Upload Name", "in-memory text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "summary", "title"));
+
+        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
+
+        Assert.NotNull(result);
+        await _classificationService.Received(1).ClassifyAsync(
+            provider, "Upload Name", "in-memory text",
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+    }
+
+    // ---- ApplyAsync (net-diff onto a tracked/new document; no save, no audit) ----------------------
+
+    [Fact]
+    public async Task ApplyAsync_AppliesClassification_TagsNameSummary()
     {
         var ct = TestContext.Current.CancellationToken;
         var tagId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
         SeedTag(tagId, "Finance", "Finance");
-        SeedProvider();
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([tagId], [], "AI summary", "AI Title"));
-
-        var result = await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
-
-        Assert.True(result);
+        await _sut.ApplyAsync(document, new ClassificationResult([tagId], [], "AI summary", "AI Title"),
+            _providerId, ClassificationScope.All, actorUserId: null, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
 
         var doc = await _db.Documents.FindAsync([_documentId], ct);
         Assert.Equal("AI Title", doc!.Name);
@@ -212,37 +195,41 @@ public class DocumentClassifierTests : IDisposable
         Assert.Equal(2, suggestions.Count);
         Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Name);
         Assert.Contains(suggestions, s => s.Field == DocumentSuggestionField.Tags);
-
-        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(_documentId, ct);
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_AppliesParties_AndCreatesPendingSuggestions()
+    public async Task ApplyAsync_SetsTagNavigation_SoSnapshotResolvesTagPath()
+    {
+        // The applied DocumentTag carries its Tag navigation, so an in-memory DocumentSnapshot diff
+        // resolves Tag.Path without a re-read (this is what feeds the Updated audit at the chokepoint).
+        var ct = TestContext.Current.CancellationToken;
+        var tagId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedTag(tagId, "Finance", "Root/Finance");
+        var document = LoadDocument();
+
+        await _sut.ApplyAsync(document, new ClassificationResult([tagId], [], "", "Test Doc"),
+            _providerId, ClassificationScope.Tags, actorUserId: null, stampSummaryMetadata: false, ct);
+
+        var added = document.DocumentTags.Single(dt => dt.TagId == tagId);
+        Assert.NotNull(added.Tag);
+        Assert.Equal("Root/Finance", added.Tag.Path);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_AppliesParties_AndCreatesPendingSuggestions()
     {
         var ct = TestContext.Current.CancellationToken;
         var partyId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
         SeedParty(partyId, "ACME Insurance");
-        SeedProvider();
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
-
-        var result = await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
-
-        Assert.True(result);
+        await _sut.ApplyAsync(document, new ClassificationResult([], [partyId], "AI summary", "Test Doc"),
+            _providerId, ClassificationScope.All, actorUserId: null, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
 
         var links = _db.DocumentParties.Where(dp => dp.DocumentId == _documentId).ToList();
         Assert.Single(links);
@@ -257,32 +244,20 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_SkipsAlreadyLinkedParty()
+    public async Task ApplyAsync_SkipsAlreadyLinkedUserParty_NoSuggestion()
     {
         var ct = TestContext.Current.CancellationToken;
         var partyId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
         SeedParty(partyId, "ACME Insurance");
-        SeedProvider();
         _db.DocumentParties.Add(new DocumentParty { DocumentId = _documentId, PartyId = partyId });
         await _db.SaveChangesAsync(ct);
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [partyId], "AI summary", "Test Doc"));
-
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
+        await _sut.ApplyAsync(document, new ClassificationResult([], [partyId], "AI summary", "Test Doc"),
+            _providerId, ClassificationScope.All, actorUserId: null, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
 
         var links = _db.DocumentParties.Where(dp => dp.DocumentId == _documentId).ToList();
         Assert.Single(links);
@@ -293,14 +268,13 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_ClearsPendingPartySuggestions_BeforeApplyingNew()
+    public async Task ApplyAsync_ClearsPendingPartySuggestions_BeforeApplyingNew()
     {
         var ct = TestContext.Current.CancellationToken;
         var oldPartyId = Guid.NewGuid();
         var newPartyId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
-        SeedProvider();
         SeedParty(oldPartyId, "Old Party");
         SeedParty(newPartyId, "New Party");
 
@@ -315,24 +289,13 @@ public class DocumentClassifierTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync(ct);
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [newPartyId], "new summary", "Test Doc"));
+        await _sut.ApplyAsync(document, new ClassificationResult([], [newPartyId], "new summary", "Test Doc"),
+            _providerId, ClassificationScope.All, actorUserId: null, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
 
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
-
-        // Old AI-applied party link is reverted; new one is linked.
+        // Old AI-applied party link is removed; new one is linked.
         var linkedPartyIds = _db.DocumentParties
             .Where(dp => dp.DocumentId == _documentId)
             .Select(dp => dp.PartyId)
@@ -349,111 +312,13 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_NoProvider_ReturnsFalse()
-    {
-        var ct = TestContext.Current.CancellationToken;
-
-        SeedDocumentWithVersion("some text");
-
-        _providerResolver.ResolveAsync(null, ct).Returns((AiProvider?)null);
-
-        var result = await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
-
-        Assert.False(result);
-
-        var doc = await _db.Documents.FindAsync([_documentId], ct);
-        Assert.Equal("Test Doc", doc!.Name);
-        Assert.Null(doc.Summary);
-
-        await _searchVectorUpdater.DidNotReceive().UpdateSearchVectorAsync(
-            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_DocumentNotFound_Throws()
-    {
-        var ct = TestContext.Current.CancellationToken;
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _sut.ClassifyAndApplyAsync(
-                Guid.NewGuid(), null, ClassificationScope.All, null, partOfCreation: false, ct));
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_ClearsPendingSuggestions_BeforeApplyingNew()
+    public async Task ApplyAsync_ClearsPendingSuggestions_BeforeApplyingNew()
     {
         var ct = TestContext.Current.CancellationToken;
         var oldTagId = Guid.NewGuid();
         var newTagId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
-        SeedProvider();
-        SeedTag(oldTagId, "OldTag", "OldTag");
-        SeedTag(newTagId, "NewTag", "NewTag");
-
-        _db.DocumentTags.Add(new DocumentTag
-        {
-            DocumentId = _documentId,
-            TagId = oldTagId
-        });
-        _db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            DocumentId = _documentId,
-            Field = DocumentSuggestionField.Tags,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = oldTagId.ToString(),
-            AiProviderId = _providerId,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        _db.DocumentSuggestions.Add(new DocumentSuggestion
-        {
-            DocumentId = _documentId,
-            Field = DocumentSuggestionField.Name,
-            Status = DocumentSuggestionStatus.Pending,
-            SuggestedValue = "Old AI Name",
-            OriginalValue = "Test Doc",
-            AiProviderId = _providerId,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync(ct);
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([newTagId], [], "new summary", "New Title"));
-
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.All, null, partOfCreation: false, ct);
-
-        var pendingSuggestions = _db.DocumentSuggestions
-            .Where(s => s.DocumentId == _documentId && s.Status == DocumentSuggestionStatus.Pending)
-            .ToList();
-
-        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == oldTagId.ToString());
-        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == "Old AI Name");
-        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == newTagId.ToString());
-        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == "New Title");
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_ScopedToTags_LeavesPendingNameSuggestionUntouched()
-    {
-        // Headline product rule: refreshing one field must not clear another field's pending suggestions.
-        var ct = TestContext.Current.CancellationToken;
-        var oldTagId = Guid.NewGuid();
-        var newTagId = Guid.NewGuid();
-
-        SeedDocumentWithVersion("some text");
-        SeedProvider();
         SeedTag(oldTagId, "OldTag", "OldTag");
         SeedTag(newTagId, "NewTag", "NewTag");
 
@@ -478,24 +343,101 @@ public class DocumentClassifierTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow
         });
         await _db.SaveChangesAsync(ct);
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
+        await _sut.ApplyAsync(document, new ClassificationResult([newTagId], [], "new summary", "New Title"),
+            _providerId, ClassificationScope.All, actorUserId: null, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
+
+        var pendingSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Status == DocumentSuggestionStatus.Pending)
+            .ToList();
+
+        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == oldTagId.ToString());
+        Assert.DoesNotContain(pendingSuggestions, s => s.SuggestedValue == "Old AI Name");
+        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == newTagId.ToString());
+        Assert.Contains(pendingSuggestions, s => s.SuggestedValue == "New Title");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_RematchedTag_KeepsLink_NoCompositeKeyChurn()
+    {
+        // Canary for the net-diff: re-matching an already-AI-applied tag must NOT remove-then-re-add the
+        // DocumentTag (which would collide on the composite key). The link stays; the suggestion refreshes.
+        var ct = TestContext.Current.CancellationToken;
+        var tagId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedTag(tagId, "Finance", "Finance");
+        _db.DocumentTags.Add(new DocumentTag { DocumentId = _documentId, TagId = tagId });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
         {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Tags,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = tagId.ToString(),
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
         });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([newTagId], [], "new summary", "New Title"));
+        await _db.SaveChangesAsync(ct);
+        var document = LoadDocument();
 
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Tags, null, partOfCreation: false, ct);
+        await _sut.ApplyAsync(document, new ClassificationResult([tagId], [], "", "Test Doc"),
+            _providerId, ClassificationScope.Tags, actorUserId: null, stampSummaryMetadata: false, ct);
+        // No InvalidOperationException for a duplicate-tracked DocumentTag.
+        await _db.SaveChangesAsync(ct);
 
-        // Tags: old suggestion cleared + reverted, new one applied.
+        var links = _db.DocumentTags.Where(dt => dt.DocumentId == _documentId).ToList();
+        Assert.Single(links);
+        Assert.Equal(tagId, links[0].TagId);
+
+        var pendingTagSuggestions = _db.DocumentSuggestions
+            .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Tags
+                && s.Status == DocumentSuggestionStatus.Pending)
+            .ToList();
+        Assert.Single(pendingTagSuggestions);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ScopedToTags_LeavesPendingNameSuggestionUntouched()
+    {
+        // Headline product rule: refreshing one field must not clear another field's pending suggestions.
+        var ct = TestContext.Current.CancellationToken;
+        var oldTagId = Guid.NewGuid();
+        var newTagId = Guid.NewGuid();
+
+        SeedDocumentWithVersion("some text");
+        SeedTag(oldTagId, "OldTag", "OldTag");
+        SeedTag(newTagId, "NewTag", "NewTag");
+
+        _db.DocumentTags.Add(new DocumentTag { DocumentId = _documentId, TagId = oldTagId });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Tags,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = oldTagId.ToString(),
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        _db.DocumentSuggestions.Add(new DocumentSuggestion
+        {
+            DocumentId = _documentId,
+            Field = DocumentSuggestionField.Name,
+            Status = DocumentSuggestionStatus.Pending,
+            SuggestedValue = "Old AI Name",
+            OriginalValue = "Test Doc",
+            AiProviderId = _providerId,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await _db.SaveChangesAsync(ct);
+        var document = LoadDocument();
+
+        await _sut.ApplyAsync(document, new ClassificationResult([newTagId], [], "new summary", "New Title"),
+            _providerId, ClassificationScope.Tags, actorUserId: null, stampSummaryMetadata: false, ct);
+        await _db.SaveChangesAsync(ct);
+
+        // Tags: old suggestion cleared, new one applied.
         var tagSuggestions = _db.DocumentSuggestions
             .Where(s => s.DocumentId == _documentId && s.Field == DocumentSuggestionField.Tags
                 && s.Status == DocumentSuggestionStatus.Pending)
@@ -514,74 +456,61 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_ScopedToSummary_WritesSummary_NoSuggestion_UpdatesSearchVector()
+    public async Task ApplyAsync_ScopedToSummary_StampsMetadata_NoSuggestion()
     {
         var ct = TestContext.Current.CancellationToken;
 
         SeedDocumentWithVersion("some text");
-        SeedProvider();
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [], "The generated summary", "Test Doc"));
-
+        var document = LoadDocument();
         var userId = Guid.NewGuid();
-        var result = await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Summary, userId, partOfCreation: false, ct);
 
-        Assert.True(result);
+        await _sut.ApplyAsync(document, new ClassificationResult([], [], "The generated summary", "Test Doc"),
+            _providerId, ClassificationScope.Summary, actorUserId: userId, stampSummaryMetadata: true, ct);
+        await _db.SaveChangesAsync(ct);
 
         var doc = await _db.Documents.FindAsync([_documentId], ct);
         Assert.Equal("The generated summary", doc!.Summary);
-        // Writing a summary is a real modification — modified-metadata is stamped (matches single summarize).
+        // Writing a summary on the existing-doc path stamps modified-metadata.
         Assert.Equal(userId, doc.UpdatedByUserId);
-        Assert.NotEqual(default, doc.UpdatedAt);
 
         var suggestions = _db.DocumentSuggestions.Where(s => s.DocumentId == _documentId).ToList();
         Assert.Empty(suggestions);
-
-        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(_documentId, ct);
-
-        // The summary write is audited as a Document/Updated row (matches single-doc summarize).
-        _auditLogger.Received(1).LogUpdated("Document", _documentId,
-            Arg.Is<List<FieldChange>>(c => c.Any(f => f.Field == "Summary")));
     }
 
     [Fact]
-    public async Task ClassifyAndApplyAsync_ScopeWithoutName_LeavesDocumentNameUnchanged()
+    public async Task ApplyAsync_SummaryWithoutStamp_WritesSummary_LeavesMetadataClean()
+    {
+        // Creation path: the summary is part of the initial state, so no modified-metadata stamp —
+        // the document reads as created-only.
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedDocumentWithVersion("some text");
+        var document = LoadDocument();
+        var userId = Guid.NewGuid();
+
+        await _sut.ApplyAsync(document, new ClassificationResult([], [], "The generated summary", "Test Doc"),
+            _providerId, ClassificationScope.Summary, actorUserId: userId, stampSummaryMetadata: false, ct);
+        await _db.SaveChangesAsync(ct);
+
+        var doc = await _db.Documents.FindAsync([_documentId], ct);
+        Assert.Equal("The generated summary", doc!.Summary);
+        Assert.Null(doc.UpdatedByUserId);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_ScopeWithoutName_LeavesDocumentNameUnchanged()
     {
         var ct = TestContext.Current.CancellationToken;
         var tagId = Guid.NewGuid();
 
         SeedDocumentWithVersion("some text");
-        SeedProvider();
         SeedTag(tagId, "Finance", "Finance");
+        var document = LoadDocument();
 
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([tagId], [], "summary", "Should Not Apply"));
-
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Tags | ClassificationScope.Parties, null,
-            partOfCreation: false, ct);
+        await _sut.ApplyAsync(document, new ClassificationResult([tagId], [], "summary", "Should Not Apply"),
+            _providerId, ClassificationScope.Tags | ClassificationScope.Parties, actorUserId: null,
+            stampSummaryMetadata: false, ct);
+        await _db.SaveChangesAsync(ct);
 
         var doc = await _db.Documents.FindAsync([_documentId], ct);
         Assert.Equal("Test Doc", doc!.Name);
@@ -592,147 +521,7 @@ public class DocumentClassifierTests : IDisposable
         Assert.Empty(nameSuggestions);
     }
 
-    [Fact]
-    public async Task ClassifyAndApplyAsync_NameAndTags_AuditsFullDiff()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var tagId = Guid.NewGuid();
-
-        SeedDocumentWithVersion("some text");
-        SeedProvider();
-        SeedTag(tagId, "Finance", "Finance");
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([tagId], [], "ignored summary", "New AI Title"));
-
-        var userId = Guid.NewGuid();
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Name | ClassificationScope.Tags, userId,
-            partOfCreation: false, ct);
-
-        // The audit captures whatever actually changed in the DB — here Name and the newly-applied tag path.
-        _auditLogger.Received(1).LogUpdated("Document", _documentId,
-            Arg.Is<List<FieldChange>>(c =>
-                c.Any(f => f.Field == "Name") && c.Any(f => f.Field == "TagPaths")));
-        _auditLogger.Received(1).ForUser(userId);
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_PartOfCreation_WritesSummary_ButNoAuditAndNoMetadataStamp()
-    {
-        var ct = TestContext.Current.CancellationToken;
-
-        SeedDocumentWithVersion("some text");
-        SeedProvider();
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [], "The generated summary", "Test Doc"));
-
-        var userId = Guid.NewGuid();
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Summary, userId, partOfCreation: true, ct);
-
-        var doc = await _db.Documents.FindAsync([_documentId], ct);
-        // Summary is still applied as part of creation...
-        Assert.Equal("The generated summary", doc!.Summary);
-        // ...but the document reads as created-only: no modified-metadata stamp and no Updated audit row.
-        Assert.Equal(default, doc.UpdatedAt);
-        Assert.Null(doc.UpdatedByUserId);
-        _auditLogger.DidNotReceive().LogUpdated(
-            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_NothingChanged_DoesNotAudit()
-    {
-        var ct = TestContext.Current.CancellationToken;
-
-        SeedDocumentWithVersion("some text");
-        SeedProvider();
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        // Blank summary + unchanged title => no field actually changes.
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [], "", "Test Doc"));
-
-        await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Summary, Guid.NewGuid(), partOfCreation: false, ct);
-
-        _auditLogger.DidNotReceive().LogUpdated(
-            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
-    }
-
-    [Fact]
-    public async Task ClassifyAndApplyAsync_DocumentDeletedDuringRun_SkipsAudit_WithoutThrowing()
-    {
-        // The classification commits before the after-snapshot reload. If the document is deleted in
-        // that window (e.g. a concurrent soft-delete), the reload must not turn already-committed work
-        // into a failure — it should skip the audit and complete. The search-vector update runs between
-        // the apply-save and the reload, so it is a faithful injection point for that race.
-        var ct = TestContext.Current.CancellationToken;
-
-        SeedDocumentWithVersion("some text");
-        SeedProvider();
-
-        _providerResolver.ResolveAsync(null, ct).Returns(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
-        });
-        // A real Name change — so the audit WOULD fire if the document still existed at reload.
-        _classificationService.ClassifyAsync(
-            Arg.Any<AiProvider>(), "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new ClassificationResult([], [], "summary", "New Title"));
-
-        _searchVectorUpdater
-            .When(s => s.UpdateSearchVectorAsync(_documentId, ct))
-            .Do(_ =>
-            {
-                var doc = _db.Documents.Find(_documentId)!;
-                _db.Documents.Remove(doc);
-                _db.SaveChanges();
-            });
-
-        var result = await _sut.ClassifyAndApplyAsync(
-            _documentId, null, ClassificationScope.Name, Guid.NewGuid(), partOfCreation: false, ct);
-
-        Assert.True(result);
-        _auditLogger.DidNotReceive().LogUpdated(
-            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<List<FieldChange>>(), Arg.Any<Guid?>());
-    }
+    // ---- IsAutoClassifyEnabledAsync ---------------------------------------------------------------
 
     [Fact]
     public async Task IsAutoClassifyEnabledAsync_ReturnsTrue_WhenEnabled()
@@ -784,6 +573,23 @@ public class DocumentClassifierTests : IDisposable
         Assert.False(result);
     }
 
+    // ---- helpers ----------------------------------------------------------------------------------
+
+    private AiProvider NewProvider() => new()
+    {
+        Id = _providerId,
+        Name = "Test Provider",
+        ProviderType = AiProviderType.AzureAIFoundry,
+        Configuration = "{}",
+        IsEnabled = true
+    };
+
+    private Document LoadDocument() => _db.Documents
+        .Include(d => d.DocumentTags).ThenInclude(dt => dt.Tag)
+        .Include(d => d.DocumentParties)
+        .Include(d => d.Suggestions)
+        .First(d => d.Id == _documentId);
+
     private void SeedDocumentWithVersion(string? extractedText)
     {
         _db.Documents.Add(new Document
@@ -816,19 +622,6 @@ public class DocumentClassifierTests : IDisposable
             Path = path,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
-        });
-        _db.SaveChanges();
-    }
-
-    private void SeedProvider()
-    {
-        _db.AiProviders.Add(new AiProvider
-        {
-            Id = _providerId,
-            Name = "Test Provider",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            Configuration = "{}",
-            IsEnabled = true
         });
         _db.SaveChanges();
     }

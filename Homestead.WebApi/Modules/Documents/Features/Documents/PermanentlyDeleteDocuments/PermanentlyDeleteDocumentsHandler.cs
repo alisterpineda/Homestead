@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.PermanentlyDeleteDocuments;
 
 public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration configuration,
-    IAuditLogger auditLogger, IDocumentQueryService accessService,
+    IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<PermanentlyDeleteDocumentsHandler> logger)
     : IRequestHandler<PermanentlyDeleteDocumentsCommand, PermanentlyDeleteDocumentsResponse>
 {
@@ -28,7 +28,7 @@ public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IConfiguration c
             return new PermanentlyDeleteDocumentsResponse(0);
 
         var count = await DocumentPermanentDeleter.ExecuteAsync(
-            documents, db, configuration, auditLogger, logger, ct);
+            documents, db, configuration, audit, unitOfWork, logger, ct);
 
         return new PermanentlyDeleteDocumentsResponse(count);
     }

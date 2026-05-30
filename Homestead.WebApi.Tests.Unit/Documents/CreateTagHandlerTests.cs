@@ -2,6 +2,7 @@ using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Tags.CreateTag;
 using Homestead.WebApi.Persistence;
@@ -15,6 +16,7 @@ public class CreateTagHandlerTests : IDisposable
     private readonly ITagPathResolver _tagPathResolver;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly CreateTagHandler _sut;
 
     public CreateTagHandlerTests()
@@ -24,7 +26,10 @@ public class CreateTagHandlerTests : IDisposable
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
         _audit = Substitute.For<IAuditContext>();
-        _sut = new CreateTagHandler(_db, _tagPathResolver, _currentUser, _audit);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new CreateTagHandler(_tagPathResolver, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();

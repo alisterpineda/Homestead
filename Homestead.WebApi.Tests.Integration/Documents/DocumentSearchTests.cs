@@ -617,10 +617,9 @@ public class DocumentSearchTests : IntegrationTestBase
             .OrderByDescending(v => v.VersionNumber)
             .FirstAsync(CT);
         version.ExtractedText = extractedText;
+        // SearchVector is maintained by a DB trigger on document_versions — persisting the new
+        // ExtractedText recomputes the parent document's vector automatically.
         await db.SaveChangesAsync(CT);
-
-        var updater = scope.ServiceProvider.GetRequiredService<ISearchVectorUpdater>();
-        await updater.UpdateSearchVectorAsync(documentId, CT);
     }
 
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);

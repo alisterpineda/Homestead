@@ -15,7 +15,8 @@ namespace Homestead.WebApi.Modules.Documents.Features.Settings.PatchDocumentSett
 public class PatchDocumentSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchDocumentSettingsCommand, DocumentSettingsResponse>
 {
     public async Task<DocumentSettingsResponse> Handle(
@@ -65,7 +66,7 @@ public class PatchDocumentSettingsHandler(
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
+            audit.Created("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
         }
         else
         {
@@ -77,11 +78,11 @@ public class PatchDocumentSettingsHandler(
             var changes = before!.Diff(after);
 
             if (changes.Count > 0)
-                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
-                    changes);
+                audit.Track(() => changes, "AppSetting",
+                    AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new DocumentSettingsResponse
         {

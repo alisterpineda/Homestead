@@ -1,5 +1,6 @@
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocuments;
 using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkSummarizeDocuments;
 
@@ -7,4 +8,4 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkSummarizeDoc
 // BulkClassifyDocuments job with Scope=Summary, so the job/response shape is identical.
 public record BulkSummarizeDocumentsCommand(
     List<Guid> Ids,
-    Guid? AiProviderId = null) : IRequest<BulkClassifyDocumentsResponse>;
+    Guid? AiProviderId = null) : ICommand<BulkClassifyDocumentsResponse>;

@@ -1,12 +1,13 @@
-using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Common.Auditing;
 using System.Security.Cryptography;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Documents.Processing.Commands;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
@@ -16,11 +17,10 @@ public class UploadDocumentJobHandler(
     IConfiguration configuration,
     ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier,
-    IAuditLogger auditLogger,
-    ISearchVectorUpdater searchVectorUpdater,
     IDocumentClassifier classifier,
     ThumbnailService thumbnailService,
-    TextExtractionHelper textExtractionHelper) : IJobHandler
+    TextExtractionHelper textExtractionHelper,
+    ISender sender) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
 
@@ -79,34 +79,7 @@ public class UploadDocumentJobHandler(
                     isTrashed: existingMatch.DeletedAt != null);
             }
 
-            // Create document entity
-            var documentId = Guid.NewGuid();
             var documentName = payload.Name ?? Path.GetFileNameWithoutExtension(payload.OriginalFileName);
-
-            var document = new Document
-            {
-                Id = documentId,
-                Name = documentName,
-                CreatedAt = DateTimeOffset.UtcNow,
-                CreatedByUserId = job.CreatedByUserId,
-                OwnerUserId = job.CreatedByUserId,
-                GroupId = payload.GroupId
-            };
-
-            var version = new DocumentVersion
-            {
-                Id = Guid.NewGuid(),
-                VersionNumber = 1,
-                Label = payload.Label,
-                ContentType = payload.ContentType,
-                FileSize = payload.FileSize,
-                FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),
-                FileHash = fileHash,
-                FileExtension = payload.FileExtension,
-                CreatedAt = DateTimeOffset.UtcNow,
-                DocumentId = documentId,
-                ExtractedText = extractedText
-            };
 
             // Move file to final location FIRST (Copy+Delete for cross-filesystem safety)
             var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
@@ -119,56 +92,66 @@ public class UploadDocumentJobHandler(
                 filePlaced = true;
             }
 
-            // Then commit DB
-            db.Documents.Add(document);
-            db.DocumentVersions.Add(version);
-
-            auditLogger.ForUser(job.CreatedByUserId).LogCreated("Document", documentId);
-
+            // Auto-classify in-memory (non-fatal). Folded into creation below so the document is created
+            // with AI values already applied — a single Created audit entry, no suppressed Updated.
+            ClassificationResult? classification = null;
+            Guid? providerId = null;
             try
             {
-                await db.SaveChangesAsync(ct);
+                if (await classifier.IsAutoClassifyEnabledAsync(ct))
+                {
+                    var output = await classifier.ClassifyAsync(
+                        documentName, extractedText, aiProviderId: null, ClassificationScope.All, ct);
+                    if (output is not null)
+                    {
+                        classification = output.Classification;
+                        providerId = output.ProviderId;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Auto-classification failed during upload {UploadId}", payload.UploadId);
+            }
+
+            // Persist document + first version (+ folded classification) in one unit of work.
+            CreateDocumentFromUploadResult result;
+            try
+            {
+                result = await sender.Send(new CreateDocumentFromUploadCommand
+                {
+                    Name = documentName,
+                    GroupId = payload.GroupId,
+                    ContentType = payload.ContentType,
+                    FileSize = payload.FileSize,
+                    FileHash = fileHash,
+                    FileExtension = payload.FileExtension,
+                    Label = payload.Label,
+                    ExtractedText = extractedText,
+                    Classification = classification,
+                    ProviderId = providerId,
+                    ActorUserId = job.CreatedByUserId
+                }, ct);
             }
             catch
             {
-                // Compensation: remove the file we just placed
+                // Compensation: remove the file we just placed (the DB never committed)
                 if (filePlaced)
                     try { File.Delete(finalPath); } catch { }
                 throw;
             }
 
-            // Update job with entity reference
-            job.EntityId = documentId;
+            // Update job with entity reference (committed with the job's terminal status by the processor)
+            job.EntityId = result.DocumentId;
 
-            // Auto-classify if enabled (non-fatal — document is created regardless)
-            var classified = false;
-            try
-            {
-                if (await classifier.IsAutoClassifyEnabledAsync(ct))
-                    classified = await classifier.ClassifyAndApplyAsync(
-                        documentId, null, ClassificationScope.All, job.CreatedByUserId,
-                        partOfCreation: true, ct);
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Auto-classification failed for document {DocumentId}", documentId);
-            }
-
-            // ClassifyAndApplyAsync updates the search vector on success; only needed here if it didn't run
-            if (!classified)
-                await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
-
-            // Reload to pick up any name changes from classification (or revert dirty state on partial failure)
-            await db.Entry(document).ReloadAsync(ct);
-
-            // Send SignalR notification after classification so the UI sees AI-suggested name/tags immediately
+            // SignalR notification after the commit so the UI sees the AI-suggested name immediately
             await notifier.NotifyJobStatusAsync(
                 job.Id,
                 ProcessingJobStatus.Completed,
                 ProcessingEntityType.Document,
-                documentId,
-                document.Name,
+                result.DocumentId,
+                result.Name,
                 error: null,
                 job.CreatedByUserId,
                 ct);

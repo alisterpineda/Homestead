@@ -37,4 +37,16 @@ public class Document
     public ICollection<DocumentTag> DocumentTags { get; set; } = [];
     public ICollection<DocumentParty> DocumentParties { get; set; } = [];
     public ICollection<DocumentSuggestion> Suggestions { get; set; } = [];
+
+    /// <summary>
+    /// Applies a summary to an existing document and stamps modified-metadata. Shared by the single-doc
+    /// summarize path and the classifier's summary application so the two cannot diverge. Not used at
+    /// creation, where the summary is part of the initial state (no modified stamp).
+    /// </summary>
+    public void ApplySummary(string summary, Guid? updatedByUserId)
+    {
+        Summary = summary;
+        UpdatedAt = DateTimeOffset.UtcNow;
+        UpdatedByUserId = updatedByUserId;
+    }
 }

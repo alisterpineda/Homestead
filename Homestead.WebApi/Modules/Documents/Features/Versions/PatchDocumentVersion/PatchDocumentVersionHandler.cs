@@ -1,4 +1,3 @@
-using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
@@ -11,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.PatchDocumentVersion;
 
 public class PatchDocumentVersionHandler(AppDbContext db,
-    IAuditContext audit, ISearchVectorUpdater searchVectorUpdater)
+    IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<PatchDocumentVersionCommand, PatchDocumentVersionResponse>
 {
     public async Task<PatchDocumentVersionResponse> Handle(PatchDocumentVersionCommand request, CancellationToken ct)
@@ -49,9 +48,7 @@ public class PatchDocumentVersionHandler(AppDbContext db,
         version.ExtractedText = model.ExtractedText;
         version.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(ct);
-
-        await searchVectorUpdater.UpdateSearchVectorAsync(version.DocumentId, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new PatchDocumentVersionResponse
         {

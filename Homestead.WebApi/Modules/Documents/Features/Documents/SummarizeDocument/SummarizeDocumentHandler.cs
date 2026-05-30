@@ -14,7 +14,7 @@ public class SummarizeDocumentHandler(
     AppDbContext db,
     IDocumentClassifier classifier,
     IAuditContext audit,
-    ISearchVectorUpdater searchVectorUpdater,
+    IUnitOfWork unitOfWork,
     ICurrentUserAccessor currentUser)
     : IRequestHandler<SummarizeDocumentCommand, SummarizeDocumentResponse>
 {
@@ -36,12 +36,9 @@ public class SummarizeDocumentHandler(
         if (string.IsNullOrWhiteSpace(summary))
             return new SummarizeDocumentResponse { Summary = document.Summary };
 
-        document.Summary = summary;
-        document.UpdatedAt = DateTimeOffset.UtcNow;
-        document.UpdatedByUserId = currentUser.UserId;
+        document.ApplySummary(summary, currentUser.UserId);
 
-        await db.SaveChangesAsync(ct);
-        await searchVectorUpdater.UpdateSearchVectorAsync(document.Id, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new SummarizeDocumentResponse { Summary = document.Summary };
     }

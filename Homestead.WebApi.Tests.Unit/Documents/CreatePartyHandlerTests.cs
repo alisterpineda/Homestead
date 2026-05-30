@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 using Homestead.WebApi.Persistence;
@@ -11,6 +12,7 @@ public class CreatePartyHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly CreatePartyHandler _sut;
 
     public CreatePartyHandlerTests()
@@ -19,7 +21,10 @@ public class CreatePartyHandlerTests : IDisposable
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
         _audit = Substitute.For<IAuditContext>();
-        _sut = new CreatePartyHandler(_db, _currentUser, _audit);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new CreatePartyHandler(_db, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();

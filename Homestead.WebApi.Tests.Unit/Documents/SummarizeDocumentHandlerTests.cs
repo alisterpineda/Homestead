@@ -14,7 +14,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly IDocumentClassifier _classifier;
     private readonly IAuditContext _audit;
-    private readonly ISearchVectorUpdater _searchVectorUpdater;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly SummarizeDocumentHandler _sut;
 
@@ -26,10 +26,10 @@ public class SummarizeDocumentHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         _classifier = Substitute.For<IDocumentClassifier>();
         _audit = Substitute.For<IAuditContext>();
-        _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(_userId);
-        _sut = new SummarizeDocumentHandler(_db, _classifier, _audit, _searchVectorUpdater, _currentUser);
+        _sut = new SummarizeDocumentHandler(_db, _classifier, _audit, _unitOfWork, _currentUser);
     }
 
     public void Dispose()
@@ -51,7 +51,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_Success_WritesSummary_Returns_UpdatesSearchVector_Tracks()
+    public async Task Handle_Success_WritesSummary_Returns_Tracks()
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocument();
@@ -70,7 +70,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         Assert.Equal("Generated summary", doc!.Summary);
         Assert.Equal(_userId, doc.UpdatedByUserId);
 
-        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(_documentId, ct);
+        await _unitOfWork.Received(1).SaveChangesAsync(ct);
         _audit.Received(1).Track<DocumentSnapshot, Document>(
             Arg.Any<Document>(), "Document", _documentId);
     }
@@ -91,9 +91,6 @@ public class SummarizeDocumentHandlerTests : IDisposable
 
         var doc = await _db.Documents.FindAsync([_documentId], ct);
         Assert.Equal("existing summary", doc!.Summary);
-
-        await _searchVectorUpdater.DidNotReceive().UpdateSearchVectorAsync(
-            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -116,9 +113,6 @@ public class SummarizeDocumentHandlerTests : IDisposable
 
         var doc = await _db.Documents.FindAsync([_documentId], ct);
         Assert.Equal("existing summary", doc!.Summary);
-
-        await _searchVectorUpdater.DidNotReceive().UpdateSearchVectorAsync(
-            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

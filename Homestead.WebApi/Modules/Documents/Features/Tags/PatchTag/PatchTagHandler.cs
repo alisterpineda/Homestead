@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
 
 public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<PatchTagCommand, PatchTagResponse>
 {
     public async Task<PatchTagResponse> Handle(PatchTagCommand request, CancellationToken ct)
@@ -144,7 +144,7 @@ public class PatchTagHandler(AppDbContext db, IDocumentQueryService accessServic
             EffectiveColorResolver.Recompute(tag, newParentEffectiveColor, descendants);
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         // Load updater info
         string? updatedByUserName = null;

@@ -2,6 +2,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Tags.PatchTag;
 using Homestead.WebApi.Persistence;
@@ -15,6 +16,7 @@ public class PatchTagHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly PatchTagHandler _sut;
 
     public PatchTagHandlerTests()
@@ -24,7 +26,10 @@ public class PatchTagHandlerTests : IDisposable
         _audit = Substitute.For<IAuditContext>();
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.UserId.Returns(Guid.NewGuid());
-        _sut = new PatchTagHandler(_db, accessService, _audit, currentUser);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new PatchTagHandler(_db, accessService, _audit, currentUser, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();

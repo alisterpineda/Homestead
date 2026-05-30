@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 
-public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
+public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreatePartyCommand, CreatePartyResponse>
 {
     public async Task<CreatePartyResponse> Handle(CreatePartyCommand request, CancellationToken ct)
@@ -30,7 +31,7 @@ public class CreatePartyHandler(AppDbContext db, ICurrentUserAccessor currentUse
 
         db.Parties.Add(party);
         audit.Created("Party", party.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CreatePartyResponse
         {

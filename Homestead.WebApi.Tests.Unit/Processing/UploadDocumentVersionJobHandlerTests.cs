@@ -1,16 +1,15 @@
-using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Modules.Documents;
-using Homestead.WebApi.Modules.Documents.Services;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
-using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,10 +24,9 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
-    private readonly IAuditLogger _auditLogger;
-    private readonly ISearchVectorUpdater _searchVectorUpdater;
     private readonly ITextExtractionEngineResolver _engineResolver;
     private readonly ThumbnailService _thumbnailService;
+    private readonly ISender _sender;
     private readonly UploadDocumentVersionJobHandler _handler;
 
     public UploadDocumentVersionJobHandlerTests()
@@ -43,9 +41,6 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
             .Returns((string?)null);
 
         _notifier = Substitute.For<IProcessingNotifier>();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _auditLogger.ForUser(Arg.Any<Guid?>()).Returns(_auditLogger);
-        _searchVectorUpdater = Substitute.For<ISearchVectorUpdater>();
         _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
         _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(new TextExtractionContext(
@@ -70,9 +65,13 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var textExtractionHelper = new TextExtractionHelper(
             serviceProvider, _engineResolver);
 
+        _sender = Substitute.For<ISender>();
+        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Existing Document"));
+
         _handler = new UploadDocumentVersionJobHandler(
             _db, config, logger,
-            _notifier, _auditLogger, _searchVectorUpdater, _thumbnailService, textExtractionHelper);
+            _notifier, _thumbnailService, textExtractionHelper, _sender);
     }
 
     public void Dispose()
@@ -98,7 +97,8 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
     private (ProcessingJob job, string stagingPath) CreateVersionUploadJob(
         Guid documentId,
-        Guid? textExtractionEngineId = null)
+        Guid? textExtractionEngineId = null,
+        byte[]? content = null)
     {
         var uploadId = Guid.NewGuid();
         var payload = new UploadDocumentVersionPayload(
@@ -116,65 +116,13 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         };
 
         var stagingPath = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId}.pdf");
-        File.WriteAllText(stagingPath, $"unique version content {Guid.NewGuid()}");
+        File.WriteAllBytes(stagingPath, content ?? Encoding.UTF8.GetBytes($"unique version content {Guid.NewGuid()}"));
 
         return (job, stagingPath);
     }
 
-    [Fact]
-    public async Task HandleAsync_CreatesVersionWithCorrectNumber()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job, _) = CreateVersionUploadJob(doc.Id);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("version 2 text");
-
-        await _handler.HandleAsync(job, ct);
-
-        var version = await _db.DocumentVersions.FirstOrDefaultAsync(ct);
-        Assert.NotNull(version);
-        Assert.Equal(1, version.VersionNumber);
-        Assert.Equal("v2", version.Label);
-        Assert.Equal("version 2 text", version.ExtractedText);
-        Assert.Equal(doc.Id, version.DocumentId);
-    }
-
-    [Fact]
-    public async Task HandleAsync_IncrementsVersionNumber()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-
-        // Add existing version 1
-        _db.DocumentVersions.Add(new DocumentVersion
-        {
-            Id = Guid.NewGuid(),
-            VersionNumber = 1,
-            ContentType = "application/pdf",
-            FileSize = 1024,
-            FilePath = "files/ab/cd/old.pdf",
-            FileHash = Guid.NewGuid().ToString("N"),
-            FileExtension = ".pdf",
-            CreatedAt = DateTimeOffset.UtcNow,
-            DocumentId = doc.Id
-        });
-        await _db.SaveChangesAsync(ct);
-
-        var (job, _) = CreateVersionUploadJob(doc.Id);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
-
-        await _handler.HandleAsync(job, ct);
-
-        var newVersion = await _db.DocumentVersions
-            .Where(v => v.VersionNumber == 2)
-            .FirstOrDefaultAsync(ct);
-        Assert.NotNull(newVersion);
-        Assert.Equal(2, newVersion.VersionNumber);
-    }
+    private static string HashOf(byte[] content)
+        => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     [Fact]
     public async Task HandleAsync_CallsEngineResolverWithPayloadEngineId()
@@ -208,24 +156,30 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_LogsAuditCreatedForVersion()
+    public async Task HandleAsync_SendsAddDocumentVersionCommand_WithCorrectFields()
     {
         var ct = TestContext.Current.CancellationToken;
         var doc = SeedDocument();
-        var (job, _) = CreateVersionUploadJob(doc.Id);
+        var content = Encoding.UTF8.GetBytes($"version-fields {Guid.NewGuid()}");
+        var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
+            .Returns("extracted text");
 
         await _handler.HandleAsync(job, ct);
 
-        _auditLogger.Received(1).ForUser(job.CreatedByUserId);
-        _auditLogger.Received(1).LogCreated(
-            "DocumentVersion", Arg.Any<Guid>(), parentEntityId: doc.Id);
+        await _sender.Received(1).Send(
+            Arg.Is<AddDocumentVersionCommand>(c =>
+                c.DocumentId == doc.Id &&
+                c.ExtractedText == "extracted text" &&
+                c.FileHash == HashOf(content) &&
+                c.Label == "v2" &&
+                c.ActorUserId == job.CreatedByUserId),
+            ct);
     }
 
     [Fact]
-    public async Task HandleAsync_UpdatesSearchVector()
+    public async Task HandleAsync_SendsSignalRNotification_WithResultName()
     {
         var ct = TestContext.Current.CancellationToken;
         var doc = SeedDocument();
@@ -234,20 +188,8 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
             .Returns("text");
 
-        await _handler.HandleAsync(job, ct);
-
-        await _searchVectorUpdater.Received(1).UpdateSearchVectorAsync(doc.Id, ct);
-    }
-
-    [Fact]
-    public async Task HandleAsync_SendsSignalRNotification()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job, _) = CreateVersionUploadJob(doc.Id);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
+        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Stored Doc Name"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -256,20 +198,23 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
             ProcessingJobStatus.Completed,
             ProcessingEntityType.Document,
             doc.Id,
-            "Existing Document",
+            "Stored Doc Name",
             error: null,
             job.CreatedByUserId,
             ct);
     }
 
     [Fact]
-    public async Task HandleAsync_DocumentNotFound_Throws()
+    public async Task HandleAsync_DocumentNotFound_Throws_AndDoesNotSend()
     {
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateVersionUploadJob(Guid.NewGuid());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => _handler.HandleAsync(job, ct));
+
+        await _sender.DidNotReceive().Send(
+            Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -284,138 +229,116 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         await _handler.HandleAsync(job, ct);
 
-        var version = await _db.DocumentVersions.FirstOrDefaultAsync(ct);
-        Assert.NotNull(version);
-        Assert.Null(version.ExtractedText);
+        await _sender.Received(1).Send(
+            Arg.Is<AddDocumentVersionCommand>(c => c.ExtractedText == null), ct);
     }
 
     [Fact]
-    public async Task HandleAsync_DuplicateHash_ThrowsDuplicateDocumentException()
+    public async Task HandleAsync_MovesFileToFinalLocation_AndCleansUpStaging()
     {
         var ct = TestContext.Current.CancellationToken;
         var doc = SeedDocument();
-        var (job1, _) = CreateVersionUploadJob(doc.Id);
+        var content = Encoding.UTF8.GetBytes($"move-final-ver {Guid.NewGuid()}");
+        var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
             .Returns("text");
 
-        await _handler.HandleAsync(job1, ct);
+        await _handler.HandleAsync(job, ct);
 
-        // Create a second version upload with same file content (same hash)
-        var existingVersion = await _db.DocumentVersions.FirstAsync(ct);
-        var uploadId2 = Guid.NewGuid();
-        var stagingPath2 = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId2}.pdf");
-        var finalPath = Path.Combine(_mediaPath, existingVersion.FilePath);
-        File.Copy(finalPath, stagingPath2);
+        Assert.False(File.Exists(stagingPath));
 
-        var payload2 = new UploadDocumentVersionPayload(
-            uploadId2, doc.Id, "dupe-version.pdf", "v-dupe",
-            "application/pdf", 2048, ".pdf");
-        var job2 = new ProcessingJob
-        {
-            Id = Guid.NewGuid(),
-            Type = ProcessingJobType.UploadDocumentVersion,
-            Status = ProcessingJobStatus.InProgress,
-            Payload = System.Text.Json.JsonSerializer.Serialize(payload2),
-            CreatedByUserId = Guid.NewGuid(),
-            CreatedAt = DateTimeOffset.UtcNow
-        };
+        var finalPath = Path.Combine(_mediaPath, DocumentVersion.GetFilePath(HashOf(content), ".pdf"));
+        Assert.True(File.Exists(finalPath));
+    }
+
+    [Fact]
+    public async Task HandleAsync_CommandFails_DeletesPlacedFinalFile_AndRethrows_StagingCleanedUp()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var content = Encoding.UTF8.GetBytes($"compensation-ver {Guid.NewGuid()}");
+        var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
+            .Returns<Task<AddDocumentVersionResult>>(_ => throw new Exception("commit failed"));
+
+        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(job, ct));
+
+        Assert.False(File.Exists(stagingPath));
+        var finalPath = Path.Combine(_mediaPath, DocumentVersion.GetFilePath(HashOf(content), ".pdf"));
+        Assert.False(File.Exists(finalPath));
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateHash_Throws_AndDoesNotSend()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var doc = SeedDocument();
+        var content = Encoding.UTF8.GetBytes($"dupe-ver {Guid.NewGuid()}");
+        var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+            .Returns("text");
+
+        SeedExistingVersion(doc, HashOf(content));
 
         var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
-            () => _handler.HandleAsync(job2, ct));
+            () => _handler.HandleAsync(job, ct));
 
         Assert.Equal(doc.Id, ex.ExistingDocumentId);
         Assert.Equal(doc.Name, ex.ExistingDocumentName);
         Assert.Equal("duplicate_content", ex.ErrorCode);
         Assert.False(ex.IsTrashed);
         Assert.Equal("false", ex.ErrorData["isTrashed"]);
+
+        await _sender.DidNotReceive().Send(
+            Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task HandleAsync_DuplicateHash_TrashedDocument_SetsIsTrashed()
     {
         var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job1, _) = CreateVersionUploadJob(doc.Id);
+        var content = Encoding.UTF8.GetBytes($"dupe-ver-trashed {Guid.NewGuid()}");
+
+        // The matching content lives on a (soft-deleted) document; the upload targets a different doc.
+        var trashedDoc = SeedDocument();
+        SeedExistingVersion(trashedDoc, HashOf(content));
+        trashedDoc.DeletedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        var targetDoc = SeedDocument();
+        var (job, _) = CreateVersionUploadJob(targetDoc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
             .Returns("text");
 
-        await _handler.HandleAsync(job1, ct);
-
-        // Soft-delete the document
-        doc.DeletedAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(ct);
-
-        // Create a second document to upload a version against (can't upload version to trashed doc)
-        var doc2 = SeedDocument();
-        var existingVersion = await _db.DocumentVersions.IgnoreQueryFilters().FirstAsync(ct);
-        var uploadId2 = Guid.NewGuid();
-        var stagingPath2 = Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot, $"{uploadId2}.pdf");
-        var finalPath = Path.Combine(_mediaPath, existingVersion.FilePath);
-        File.Copy(finalPath, stagingPath2);
-
-        var payload2 = new UploadDocumentVersionPayload(
-            uploadId2, doc2.Id, "dupe-version.pdf", "v-dupe",
-            "application/pdf", 2048, ".pdf");
-        var job2 = new ProcessingJob
-        {
-            Id = Guid.NewGuid(),
-            Type = ProcessingJobType.UploadDocumentVersion,
-            Status = ProcessingJobStatus.InProgress,
-            Payload = System.Text.Json.JsonSerializer.Serialize(payload2),
-            CreatedByUserId = Guid.NewGuid(),
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-
         var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
-            () => _handler.HandleAsync(job2, ct));
+            () => _handler.HandleAsync(job, ct));
 
-        Assert.Equal(doc.Id, ex.ExistingDocumentId);
+        Assert.Equal(trashedDoc.Id, ex.ExistingDocumentId);
         Assert.True(ex.IsTrashed);
         Assert.Equal("true", ex.ErrorData["isTrashed"]);
     }
 
-    [Fact]
-    public async Task HandleAsync_StagingFileCleanedUpOnAnyFailure()
+    private void SeedExistingVersion(Document doc, string fileHash)
     {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job, stagingPath) = CreateVersionUploadJob(doc.Id);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
-
-        _searchVectorUpdater.UpdateSearchVectorAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException(new Exception("Search vector update failed")));
-
-        await Assert.ThrowsAsync<Exception>(() => _handler.HandleAsync(job, ct));
-
-        Assert.False(File.Exists(stagingPath));
-    }
-
-    [Fact]
-    public async Task HandleAsync_IdempotentFileMove_WhenFinalPathExists()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job, stagingPath) = CreateVersionUploadJob(doc.Id);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
-
-        // Compute hash and pre-create the final file to simulate a previous failed attempt
-        var content = await File.ReadAllBytesAsync(stagingPath, ct);
-        var hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
-        var finalPath = Path.Combine(_mediaPath, DocumentVersion.GetFilePath(hash, ".pdf"));
-        Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
-        File.Copy(stagingPath, finalPath);
-
-        await _handler.HandleAsync(job, ct);
-
-        Assert.False(File.Exists(stagingPath));
-        Assert.True(File.Exists(finalPath));
-        var version = await _db.DocumentVersions.FirstOrDefaultAsync(ct);
-        Assert.NotNull(version);
+        _db.DocumentVersions.Add(new DocumentVersion
+        {
+            Id = Guid.NewGuid(),
+            VersionNumber = 1,
+            ContentType = "application/pdf",
+            FileSize = 1024,
+            FilePath = DocumentVersion.GetFilePath(fileHash, ".pdf"),
+            FileHash = fileHash,
+            FileExtension = ".pdf",
+            CreatedAt = DateTimeOffset.UtcNow,
+            DocumentId = doc.Id
+        });
+        _db.SaveChanges();
     }
 }

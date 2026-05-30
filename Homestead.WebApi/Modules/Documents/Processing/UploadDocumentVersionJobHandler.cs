@@ -1,12 +1,12 @@
-using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Common.Auditing;
 using System.Security.Cryptography;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
@@ -16,10 +16,9 @@ public class UploadDocumentVersionJobHandler(
     IConfiguration configuration,
     ILogger<UploadDocumentVersionJobHandler> logger,
     IProcessingNotifier notifier,
-    IAuditLogger auditLogger,
-    ISearchVectorUpdater searchVectorUpdater,
     ThumbnailService thumbnailService,
-    TextExtractionHelper textExtractionHelper) : IJobHandler
+    TextExtractionHelper textExtractionHelper,
+    ISender sender) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocumentVersion;
 
@@ -31,13 +30,10 @@ public class UploadDocumentVersionJobHandler(
         var mediaPath = configuration["FileStorage:MediaPath"]
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
-        // Verify document exists
-        var document = await db.Documents
-            .AsNoTracking()
-            .Where(d => d.Id == payload.DocumentId)
-            .Select(d => new { d.Id, d.Name })
-            .FirstOrDefaultAsync(ct)
-            ?? throw new InvalidOperationException($"Document {payload.DocumentId} not found.");
+        // Fail early (before extraction/file move) if the parent document is gone
+        var documentExists = await db.Documents.AnyAsync(d => d.Id == payload.DocumentId, ct);
+        if (!documentExists)
+            throw new InvalidOperationException($"Document {payload.DocumentId} not found.");
 
         var stagingPath = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot, $"{payload.UploadId}{payload.FileExtension}");
 
@@ -91,26 +87,6 @@ public class UploadDocumentVersionJobHandler(
                     isTrashed: existingMatch.DeletedAt != null);
             }
 
-            // Compute next version number
-            var maxVersionNumber = await db.DocumentVersions
-                .Where(r => r.DocumentId == payload.DocumentId)
-                .MaxAsync(r => (int?)r.VersionNumber, ct) ?? 0;
-
-            var version = new DocumentVersion
-            {
-                Id = Guid.NewGuid(),
-                VersionNumber = maxVersionNumber + 1,
-                Label = payload.Label,
-                ContentType = payload.ContentType,
-                FileSize = payload.FileSize,
-                FilePath = DocumentVersion.GetFilePath(fileHash, payload.FileExtension),
-                FileHash = fileHash,
-                FileExtension = payload.FileExtension,
-                CreatedAt = DateTimeOffset.UtcNow,
-                DocumentId = payload.DocumentId,
-                ExtractedText = extractedText
-            };
-
             // Move file to final location FIRST (Copy+Delete for cross-filesystem safety)
             var finalPath = Path.Combine(mediaPath, DocumentVersion.GetFilePath(fileHash, payload.FileExtension));
             Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
@@ -122,24 +98,29 @@ public class UploadDocumentVersionJobHandler(
                 filePlaced = true;
             }
 
-            // Then commit DB
-            db.DocumentVersions.Add(version);
-
-            auditLogger.ForUser(job.CreatedByUserId).LogCreated("DocumentVersion", version.Id, parentEntityId: payload.DocumentId);
-
+            // Persist the new version in one unit of work.
+            AddDocumentVersionResult result;
             try
             {
-                await db.SaveChangesAsync(ct);
+                result = await sender.Send(new AddDocumentVersionCommand
+                {
+                    DocumentId = payload.DocumentId,
+                    ContentType = payload.ContentType,
+                    FileSize = payload.FileSize,
+                    FileHash = fileHash,
+                    FileExtension = payload.FileExtension,
+                    Label = payload.Label,
+                    ExtractedText = extractedText,
+                    ActorUserId = job.CreatedByUserId
+                }, ct);
             }
             catch
             {
-                // Compensation: remove the file we just placed
+                // Compensation: remove the file we just placed (the DB never committed)
                 if (filePlaced)
                     try { File.Delete(finalPath); } catch { }
                 throw;
             }
-
-            await searchVectorUpdater.UpdateSearchVectorAsync(payload.DocumentId, ct);
 
             // Update job with entity reference (parent document)
             job.EntityId = payload.DocumentId;
@@ -150,7 +131,7 @@ public class UploadDocumentVersionJobHandler(
                 ProcessingJobStatus.Completed,
                 ProcessingEntityType.Document,
                 payload.DocumentId,
-                document.Name,
+                result.DocumentName,
                 error: null,
                 job.CreatedByUserId,
                 ct);

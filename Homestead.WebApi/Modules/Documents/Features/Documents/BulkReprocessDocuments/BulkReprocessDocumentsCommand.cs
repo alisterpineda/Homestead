@@ -1,7 +1,8 @@
 using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocuments;
 
 public record BulkReprocessDocumentsCommand(
     List<Guid> Ids,
-    Guid? TextExtractionEngineId = null) : IRequest<BulkReprocessDocumentsResponse>;
+    Guid? TextExtractionEngineId = null) : ICommand<BulkReprocessDocumentsResponse>;

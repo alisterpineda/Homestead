@@ -10,7 +10,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments
 
 public class RestoreDocumentsHandler(AppDbContext db,
     IAuditContext audit, IDocumentQueryService accessService,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<RestoreDocumentsCommand, RestoreDocumentsResponse>
 {
     public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
@@ -33,7 +33,7 @@ public class RestoreDocumentsHandler(AppDbContext db,
             audit.Restored("Document", doc.Id, description: doc.Name);
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new RestoreDocumentsResponse(documents.Count);
     }

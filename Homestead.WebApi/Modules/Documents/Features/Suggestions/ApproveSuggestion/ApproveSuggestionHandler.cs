@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Suggestions.ApproveSuggestion;
 
-public class ApproveSuggestionHandler(AppDbContext db)
+public class ApproveSuggestionHandler(AppDbContext db, IUnitOfWork unitOfWork)
     : IRequestHandler<ApproveSuggestionCommand>
 {
     public async Task Handle(ApproveSuggestionCommand request, CancellationToken ct)
@@ -21,6 +21,6 @@ public class ApproveSuggestionHandler(AppDbContext db)
         suggestion.Status = DocumentSuggestionStatus.Approved;
         suggestion.ResolvedAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
     }
 }

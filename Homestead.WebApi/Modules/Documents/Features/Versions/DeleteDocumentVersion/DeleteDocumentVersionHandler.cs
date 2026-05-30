@@ -1,4 +1,3 @@
-using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using MediatR;
@@ -9,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.DeleteDocumentVersion;
 
 public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
-    IAuditContext audit, ISearchVectorUpdater searchVectorUpdater,
+    IAuditContext audit, IUnitOfWork unitOfWork,
     ILogger<DeleteDocumentVersionHandler> logger)
     : IRequestHandler<DeleteDocumentVersionCommand, bool>
 {
@@ -44,18 +43,21 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
             description: description, parentEntityId: documentId);
 
         db.DocumentVersions.Remove(version);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
-        await searchVectorUpdater.UpdateSearchVectorAsync(documentId, ct);
-
-        try
+        // Delete the backing file only after the row removal has durably committed.
+        unitOfWork.OnAfterCommit(_ =>
         {
-            File.Delete(physicalPath);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to delete file {Path}", physicalPath);
-        }
+            try
+            {
+                File.Delete(physicalPath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete file {Path}", physicalPath);
+            }
+            return Task.CompletedTask;
+        });
 
         return true;
     }

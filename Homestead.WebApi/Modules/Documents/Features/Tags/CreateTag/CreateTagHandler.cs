@@ -1,12 +1,12 @@
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using MediatR;
-using Homestead.WebApi.Persistence;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Tags.CreateTag;
 
-public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit)
+public class CreateTagHandler(ITagPathResolver tagPathResolver, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<CreateTagCommand, CreateTagResponse>
 {
     public async Task<CreateTagResponse> Handle(CreateTagCommand request, CancellationToken ct)
@@ -14,7 +14,7 @@ public class CreateTagHandler(AppDbContext db, ITagPathResolver tagPathResolver,
         var tag = await tagPathResolver.ResolveOrCreateAsync(request.Path, leafColor: request.Color, leafDescription: request.Description, createdByUserId: currentUser.UserId, ct: ct);
 
         audit.Created("Tag", tag.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CreateTagResponse
         {

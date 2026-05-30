@@ -1,11 +1,9 @@
-using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Domain.Auditing.Snapshots;
-using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
@@ -14,9 +12,8 @@ public class ReprocessDocumentVersionJobHandler(
     AppDbContext db,
     IConfiguration configuration,
     IProcessingNotifier notifier,
-    IAuditLogger auditLogger,
-    ISearchVectorUpdater searchVectorUpdater,
-    TextExtractionHelper textExtractionHelper) : IJobHandler
+    TextExtractionHelper textExtractionHelper,
+    ISender sender) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.ReprocessDocumentVersion;
 
@@ -29,7 +26,7 @@ public class ReprocessDocumentVersionJobHandler(
             ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
 
         var version = await db.DocumentVersions
-            .Include(v => v.Document)
+            .AsNoTracking()
             .FirstOrDefaultAsync(v => v.Id == payload.VersionId && v.DocumentId == payload.DocumentId, ct)
             ?? throw new InvalidOperationException($"DocumentVersion {payload.VersionId} not found.");
 
@@ -37,9 +34,7 @@ public class ReprocessDocumentVersionJobHandler(
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        var before = DocumentVersionSnapshot.From(version);
-
-        // Re-extract text
+        // Re-extract text (the failure-prone step stays in the job handler)
         var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
             filePath, version.ContentType, payload.TextExtractionEngineId, ct);
 
@@ -50,20 +45,14 @@ public class ReprocessDocumentVersionJobHandler(
                 extractionResult.Error!);
         }
 
-        version.ExtractedText = extractionResult.Text;
-
-        var after = DocumentVersionSnapshot.From(version);
-        var changes = before.Diff(after);
-
-        if (changes.Count > 0)
+        // Persist the re-extracted text + audit in one unit of work.
+        var result = await sender.Send(new ReprocessVersionTextCommand
         {
-            auditLogger.ForUser(job.CreatedByUserId).LogUpdated("DocumentVersion", version.Id, changes,
-                parentEntityId: version.DocumentId);
-        }
-
-        await db.SaveChangesAsync(ct);
-
-        await searchVectorUpdater.UpdateSearchVectorAsync(version.DocumentId, ct);
+            DocumentId = payload.DocumentId,
+            VersionId = payload.VersionId,
+            ExtractedText = extractionResult.Text,
+            ActorUserId = job.CreatedByUserId
+        }, ct);
 
         job.EntityId = payload.DocumentId;
 
@@ -76,7 +65,7 @@ public class ReprocessDocumentVersionJobHandler(
                 ProcessingJobStatus.Completed,
                 ProcessingEntityType.Document,
                 payload.DocumentId,
-                version.Document.Name,
+                result.DocumentName,
                 error: null,
                 job.CreatedByUserId,
                 ct);

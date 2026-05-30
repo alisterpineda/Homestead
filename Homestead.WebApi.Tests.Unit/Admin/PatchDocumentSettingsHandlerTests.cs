@@ -17,7 +17,8 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly PatchDocumentSettingsHandler _sut;
 
     public PatchDocumentSettingsHandlerTests()
@@ -25,8 +26,11 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new PatchDocumentSettingsHandler(_db, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose()
@@ -65,9 +69,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        _auditLogger.Received(1).LogCreated(
-            "AppSetting",
-            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule));
+        _audit.Received(1).Created("AppSetting", Arg.Any<Guid>());
     }
 
     [Fact]
@@ -108,10 +110,11 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        _auditLogger.Received(1).LogUpdated(
+        _audit.Received(1).Track(
+            Arg.Any<Func<List<FieldChange>>>(),
             "AppSetting",
-            AppSettingSnapshot.KeyToGuid(AppSetting.DocumentsModule),
-            Arg.Is<List<FieldChange>>(c => c.Count > 0));
+            Arg.Any<Guid>(),
+            Arg.Any<Guid?>());
     }
 
     [Fact]
@@ -140,10 +143,10 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        _auditLogger.DidNotReceive().LogUpdated(
+        _audit.DidNotReceive().Track(
+            Arg.Any<Func<List<FieldChange>>>(),
             Arg.Any<string>(),
             Arg.Any<Guid>(),
-            Arg.Any<List<FieldChange>>(),
             Arg.Any<Guid?>());
     }
 

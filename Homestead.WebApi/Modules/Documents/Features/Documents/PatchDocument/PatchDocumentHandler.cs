@@ -14,9 +14,9 @@ using System.Text.Json;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.PatchDocument;
 
 public class PatchDocumentHandler(AppDbContext db,
-    IAuditContext audit, ISearchVectorUpdater searchVectorUpdater,
+    IAuditContext audit,
     IDocumentMetadataService metadataService, IDocumentQueryService queryService,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<PatchDocumentCommand, PatchDocumentResponse>
 {
     public async Task<PatchDocumentResponse> Handle(PatchDocumentCommand request, CancellationToken ct)
@@ -126,9 +126,7 @@ public class PatchDocumentHandler(AppDbContext db,
             }
         }
 
-        await db.SaveChangesAsync(ct);
-
-        await searchVectorUpdater.UpdateSearchVectorAsync(document.Id, ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         // Load tags for response
         var tags = await db.DocumentTags

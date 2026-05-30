@@ -11,7 +11,8 @@ namespace Homestead.WebApi.Modules.Documents.Features.Comments.CreateComment;
 public class CreateCommentHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditContext audit)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateCommentCommand, CreateCommentResponse>
 {
     public async Task<CreateCommentResponse> Handle(CreateCommentCommand request, CancellationToken ct)
@@ -34,7 +35,7 @@ public class CreateCommentHandler(
         db.DocumentComments.Add(comment);
 
         audit.Created("DocumentComment", comment.Id, parentEntityId: request.DocumentId);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CreateCommentResponse
         {

@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Tags.BulkDeleteTags;
 using Homestead.WebApi.Persistence;
@@ -11,6 +12,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly BulkDeleteTagsHandler _sut;
 
     public BulkDeleteTagsHandlerTests()
@@ -18,7 +20,10 @@ public class BulkDeleteTagsHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         var accessService = Substitute.For<IDocumentQueryService>();
         _audit = Substitute.For<IAuditContext>();
-        _sut = new BulkDeleteTagsHandler(_db, accessService, _audit);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new BulkDeleteTagsHandler(_db, accessService, _audit, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();

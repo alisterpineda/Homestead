@@ -1,5 +1,6 @@
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authorization;
 using MediatR;
@@ -11,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkUpdateDocuments;
 
 public class BulkUpdateDocumentsHandler(AppDbContext db,
-    IAuditLogger auditLogger, IDocumentMetadataService metadataService,
+    IAuditContext audit, IUnitOfWork unitOfWork, IDocumentMetadataService metadataService,
     IDocumentQueryService queryService, ICurrentUserAccessor currentUser)
     : IRequestHandler<BulkUpdateDocumentsCommand, BulkUpdateDocumentsResponse>
 {
@@ -78,12 +79,14 @@ public class BulkUpdateDocumentsHandler(AppDbContext db,
             {
                 document.UpdatedAt = DateTimeOffset.UtcNow;
                 document.UpdatedByUserId = currentUser.UserId;
-                auditLogger.LogUpdated("Document", document.Id, changes);
+                // Diff already computed above (drives stamping + count); hand it to the audit context
+                // so it flushes through the same chokepoint as every other document mutation.
+                audit.Track(() => changes, "Document", document.Id);
                 updatedCount++;
             }
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new BulkUpdateDocumentsResponse(updatedCount);
     }

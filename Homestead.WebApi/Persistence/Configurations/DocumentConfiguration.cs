@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Documents;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Homestead.WebApi.Persistence.Configurations;
@@ -58,8 +59,14 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
 
         builder.HasIndex(d => d.GroupId);
 
-        builder.Property(d => d.SearchVector)
+        var searchVector = builder.Property(d => d.SearchVector)
             .HasColumnType("tsvector");
+
+        // SearchVector is maintained entirely by DB triggers (see AddSearchVectorTriggers). EF must
+        // never write it — on insert or update — otherwise a save that doesn't touch Name/Summary could
+        // overwrite the trigger-computed value with null (the BEFORE trigger only fires for Name/Summary).
+        searchVector.Metadata.SetBeforeSaveBehavior(PropertySaveBehavior.Ignore);
+        searchVector.Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
 
         builder.HasIndex(d => d.SearchVector)
             .HasMethod("GIN");

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
 
 public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessService, IAuditContext audit,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdatePartyCommand, UpdatePartyResponse?>
 {
     public async Task<UpdatePartyResponse?> Handle(UpdatePartyCommand request, CancellationToken ct)
@@ -41,7 +41,7 @@ public class UpdatePartyHandler(AppDbContext db, IDocumentQueryService accessSer
         party.Description = request.Description?.Trim();
         party.UpdatedAt = DateTimeOffset.UtcNow;
         party.UpdatedByUserId = currentUser.UserId;
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         // Load updater info
         string? updatedByUserName = null;

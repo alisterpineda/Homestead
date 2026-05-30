@@ -1,5 +1,6 @@
 using Homestead.WebApi.Authorization;
 using MediatR;
+using Homestead.WebApi.Common;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
@@ -11,7 +12,7 @@ public class PatchDocumentVersionModel
     public string? ExtractedText { get; set; }
 }
 
-public record PatchDocumentVersionCommand : IRequest<PatchDocumentVersionResponse>, IRequireDocumentAuthorization
+public record PatchDocumentVersionCommand : ICommand<PatchDocumentVersionResponse>, IRequireDocumentAuthorization
 {
     public Guid DocumentId { get; init; }
     public Guid Id { get; init; }

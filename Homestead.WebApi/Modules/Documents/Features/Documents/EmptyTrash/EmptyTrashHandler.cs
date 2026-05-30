@@ -1,4 +1,5 @@
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authorization;
 using MediatR;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.EmptyTrash;
 
 public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
-    IAuditLogger auditLogger, IDocumentQueryService accessService,
+    IAuditContext audit, IUnitOfWork unitOfWork, IDocumentQueryService accessService,
     ILogger<EmptyTrashHandler> logger)
     : IRequestHandler<EmptyTrashCommand, EmptyTrashResponse>
 {
@@ -24,7 +25,7 @@ public class EmptyTrashHandler(AppDbContext db, IConfiguration configuration,
             return new EmptyTrashResponse(0);
 
         var count = await DocumentPermanentDeleter.ExecuteAsync(
-            documents, db, configuration, auditLogger, logger, ct);
+            documents, db, configuration, audit, unitOfWork, logger, ct);
 
         return new EmptyTrashResponse(count);
     }

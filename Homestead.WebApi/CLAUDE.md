@@ -81,9 +81,8 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 
 Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) column on the `documents` table, indexed with GIN.
 
-- **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B
-- **`ISearchVectorUpdater.UpdateSearchVectorAsync()`** — DI-injected service (`Modules/Documents/Services/SearchVectorUpdater.cs`) that must be called after any mutation that changes a document's name or its latest version's extracted text
-- **Mutation points**: `UploadDocumentJobHandler`, `UploadDocumentVersionJobHandler`, `PatchDocumentHandler`, `PatchDocumentVersionHandler`, `DeleteDocumentVersionHandler`
+- **Weights**: `Document.Name` = A, `DocumentVersion.ExtractedText` (latest version) = B, `Document.Summary` = C
+- **DB-owned**: `SearchVector` is maintained entirely by database triggers (migration `AddSearchVectorTriggers`) — there is no app-side updater. A `BEFORE` trigger on `documents` recomputes the vector when `Name`/`Summary` change; an `AFTER` trigger on `document_versions` recomputes the parent document's vector when the latest version's `ExtractedText` changes or a version is added/removed. Because the vector spans two tables (latest version's text lives on `document_versions`), a `GENERATED ALWAYS AS … STORED` column is not sufficient — hence triggers.
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 
 ## Audit Logging
