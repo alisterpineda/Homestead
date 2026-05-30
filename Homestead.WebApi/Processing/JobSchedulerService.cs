@@ -1,4 +1,5 @@
 using Cronos;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -16,6 +17,11 @@ public class JobSchedulerService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // The build-time OpenAPI generator boots the host with no database; skip the scheduler loop so
+        // spec generation stays quiet and side-effect free.
+        if (BuildTimeOpenApi.IsGenerating)
+            return;
+
         if (!options.Value.Enabled)
         {
             logger.LogInformation("Job scheduler is disabled via configuration");

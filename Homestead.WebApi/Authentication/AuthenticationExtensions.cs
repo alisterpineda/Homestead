@@ -1,9 +1,11 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Logging;
 
 namespace Homestead.WebApi.Authentication;
 
@@ -15,8 +17,20 @@ public static class AuthenticationExtensions
 
     public static WebApplicationBuilder AddAppAuthentication(this WebApplicationBuilder builder)
     {
-        builder.Services.AddDataProtection()
-            .PersistKeysToDbContext<AppDbContext>();
+        var dataProtection = builder.Services.AddDataProtection();
+        if (BuildTimeOpenApi.IsGenerating)
+        {
+            // The build-time OpenAPI generator has no database for the key ring, and nothing is
+            // protected during a throwaway spec-gen host run. Use an in-memory provider (so the DB
+            // key ring is never read) and quiet the framework's expected "keys are not persisted"
+            // notice so the build stays clean. Both are scoped to this run only.
+            dataProtection.UseEphemeralDataProtectionProvider();
+            builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+        }
+        else
+        {
+            dataProtection.PersistKeysToDbContext<AppDbContext>();
+        }
 
         builder.Services.AddHttpContextAccessor();
 

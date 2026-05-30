@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Tests.Unit.Domains.Finances;
 
@@ -26,7 +27,7 @@ public class ValuationServiceTests : IAsyncLifetime
         _eur = new Commodity { Id = Guid.NewGuid(), Symbol = "EUR", Name = "EUR", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
         _veqt = new Commodity { Id = Guid.NewGuid(), Symbol = "VEQT", Exchange = "TSX", Name = "VEQT", Kind = CommodityKind.Security, DisplayPrecision = 4 };
         _db.Commodities.AddRange(_cad, _usd, _eur, _veqt);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _sut = new ValuationService(_db);
     }
@@ -47,7 +48,7 @@ public class ValuationServiceTests : IAsyncLifetime
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task AddPriceAsync(
@@ -70,7 +71,7 @@ public class ValuationServiceTests : IAsyncLifetime
             CreatedAt = stamp,
             UpdatedAt = stamp,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task SetSourceEnabledAsync(CommodityPriceSource source, bool isEnabled)
@@ -82,7 +83,7 @@ public class ValuationServiceTests : IAsyncLifetime
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<Account> AddAccountAsync(AccountKind kind, Guid reportingCurrencyId, string name = "Acct")
@@ -98,7 +99,7 @@ public class ValuationServiceTests : IAsyncLifetime
             IsArchived = false,
         };
         _db.Accounts.Add(account);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return account;
     }
 
@@ -123,7 +124,7 @@ public class ValuationServiceTests : IAsyncLifetime
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -373,10 +374,10 @@ public class ValuationServiceTests : IAsyncLifetime
         Assert.Null(ctxDisabled.ConvertToDisplay(_usd.Id, 100m));
 
         // Toggle on → restored.
-        var settings = _db.CommodityPriceSourceSettings
-            .Single(s => s.Source == CommodityPriceSource.BankOfCanada);
+        var settings = await _db.CommodityPriceSourceSettings
+            .SingleAsync(s => s.Source == CommodityPriceSource.BankOfCanada, TestContext.Current.CancellationToken);
         settings.IsEnabled = true;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var ctxEnabled = await _sut.LoadContextAsync(TestContext.Current.CancellationToken);
         Assert.Equal(135m, ctxEnabled.ConvertToDisplay(_usd.Id, 100m));

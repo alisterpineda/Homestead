@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,11 @@ public class JobProcessorService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // The build-time OpenAPI generator boots the host with no database; skip all polling so spec
+        // generation stays quiet and side-effect free.
+        if (BuildTimeOpenApi.IsGenerating)
+            return;
+
         await RecoverOrphanedJobsAsync(stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)

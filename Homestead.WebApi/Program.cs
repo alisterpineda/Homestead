@@ -211,8 +211,9 @@ builder.Services.AddOpenApi("v1", options =>
     options.AddSchemaTransformer<NullableEnumSchemaTransformer>();
 });
 
-// Hosted service (not a service-registration check) so build-time OpenAPI
-// generation — which builds the host but never calls StartAsync — bypasses it.
+// Runs the OIDC requirement check at host start (as a hosted service) rather than at
+// service-registration time. The build-time OpenAPI generator does start the host, so the validator
+// self-skips that run via BuildTimeOpenApi.IsGenerating instead of relying on startup being bypassed.
 builder.Services.AddHostedService<Homestead.WebApi.Authentication.OidcStartupValidator>();
 
 var app = builder.Build();

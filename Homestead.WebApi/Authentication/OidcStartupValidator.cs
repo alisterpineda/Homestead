@@ -1,4 +1,4 @@
-using System.Reflection;
+using Homestead.WebApi.Common;
 using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Authentication;
@@ -7,10 +7,9 @@ public class OidcStartupValidator(IOptions<OidcOptions> options) : IHostedServic
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Skip validation during build-time OpenAPI document generation
-        // (Microsoft.Extensions.ApiDescription.Server runs the app via GetDocument.Insider
-        // without real OIDC env vars set).
-        if (Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider")
+        // The build-time OpenAPI generator starts the host without real OIDC env vars, so skip the
+        // requirement check there — otherwise it would fail `dotnet build` spec generation.
+        if (BuildTimeOpenApi.IsGenerating)
             return Task.CompletedTask;
 
         if (!options.Value.IsConfigured)

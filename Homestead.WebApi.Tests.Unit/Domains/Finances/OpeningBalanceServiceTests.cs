@@ -41,7 +41,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         };
         _db.Accounts.Add(_openingBalances);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         _systemAccounts = Substitute.For<ISystemAccountProvider>();
         _systemAccounts.GetOpeningBalancesAsync(Arg.Any<CancellationToken>())
@@ -72,7 +72,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             IsArchived = false,
         };
         _db.Accounts.Add(account);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return account;
     }
 
@@ -94,7 +94,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = txn.Splits.Single(s => s.AccountId == cash.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -117,7 +117,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             new CreateOpeningBalanceRequest(cc.Id, _cad.Id, 500m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = txn.Splits.Single(s => s.AccountId == cc.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -148,7 +148,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             new CreateOpeningBalanceRequest(invest.Id, _usd.Id, 5000m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -170,7 +170,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             new CreateOpeningBalanceRequest(invest.Id, _veqt.Id, 100m, 35.12m, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = txn.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = txn.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -186,7 +186,8 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(expectedAt, txn.OccurredAt);
 
         var price = await _db.CommodityPrices.SingleAsync(p =>
-            p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id);
+            p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id,
+            TestContext.Current.CancellationToken);
         Assert.Equal(35.12m, price.Rate);
         Assert.Equal(expectedAt, price.PriceAt);
         Assert.Equal(txn.Id, price.CreatedByTransactionId);
@@ -233,7 +234,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             PriceAt = NoonUtc(date),
             Rate = 40m,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.CreateAsync(
@@ -248,7 +249,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.CreateAsync(
@@ -270,7 +271,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
     {
         var cash = await AddAccountAsync(AccountKind.Cash, _cad.Id);
         cash.IsArchived = true;
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.CreateAsync(
@@ -285,12 +286,12 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var created = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var updated = await _sut.UpdateAsync(created.Id,
             new UpdateOpeningBalanceRequest(1500m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == cash.Id);
         var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -319,7 +320,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             ],
         };
         _db.AccountTransactions.Add(laterTxn);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.UpdateAsync(ob.Id,
@@ -337,18 +338,18 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var created = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(invest.Id, _veqt.Id, 100m, 30m, oldDate),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var updated = await _sut.UpdateAsync(created.Id,
             new UpdateOpeningBalanceRequest(100m, 35m, newDate),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(NoonUtc(newDate), updated.OccurredAt);
 
         var prices = await _db.CommodityPrices
             .Where(p => p.CommodityId == _veqt.Id && p.QuoteCurrencyId == _cad.Id)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         var price = Assert.Single(prices);
         Assert.Equal(NoonUtc(newDate), price.PriceAt);
@@ -375,7 +376,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             PriceAt = NoonUtc(newDate),
             Rate = 42m,
         });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.UpdateAsync(created.Id,
@@ -486,12 +487,12 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var created = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(invest.Id, _veqt.Id, 100m, 30m, date),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var updated = await _sut.UpdateAsync(created.Id,
             new UpdateOpeningBalanceRequest(100m, 42m, date),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var accountSplit = updated.Splits.Single(s => s.AccountId == invest.Id);
         var equitySplit = updated.Splits.Single(s => s.AccountId == _openingBalances.Id);
@@ -499,7 +500,8 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         Assert.Equal(-4200m, equitySplit.Quantity);
 
         var price = await _db.CommodityPrices.SingleAsync(p =>
-            p.CreatedByTransactionId == created.Id);
+            p.CreatedByTransactionId == created.Id,
+            TestContext.Current.CancellationToken);
         Assert.Equal(42m, price.Rate);
         Assert.Equal(NoonUtc(date), price.PriceAt);
     }
@@ -539,12 +541,12 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var created = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 100m, null, date, Memo: "Initial"),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var updated = await _sut.UpdateAsync(created.Id,
             new UpdateOpeningBalanceRequest(100m, null, date, Memo: "Updated"),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Updated", updated.Memo);
     }
@@ -556,12 +558,12 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         var ob = await _sut.CreateAsync(
             new CreateOpeningBalanceRequest(cash.Id, _cad.Id, 1000m, null, new DateOnly(2026, 4, 23)),
             TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var touched = await _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id));
+        Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id, TestContext.Current.CancellationToken));
         Assert.Contains(touched, t => t.AccountId == cash.Id && t.CommodityId == _cad.Id);
     }
 
@@ -586,13 +588,13 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
             ],
         };
         _db.AccountTransactions.Add(laterTxn);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var touched = await _sut.DeleteAsync(ob.Id, TestContext.Current.CancellationToken);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id));
-        Assert.Equal(2, await _db.AccountTransactionSplits.CountAsync(s => s.TransactionId == laterTxn.Id));
+        Assert.Equal(0, await _db.AccountTransactions.CountAsync(t => t.Id == ob.Id, TestContext.Current.CancellationToken));
+        Assert.Equal(2, await _db.AccountTransactionSplits.CountAsync(s => s.TransactionId == laterTxn.Id, TestContext.Current.CancellationToken));
         Assert.Contains(touched, t => t.AccountId == cash.Id && t.CommodityId == _cad.Id);
     }
 }
