@@ -24,6 +24,13 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
     public string MediaPath => _mediaPath;
     public string CachePath => _cachePath;
 
+    /// <summary>
+    /// The clock the WebApi resolves as <see cref="TimeProvider"/>. Follows system time by default;
+    /// tests pin it via <see cref="ControllableTimeProvider.Freeze"/> to make cron-tick timing
+    /// deterministic. Shared across the integration collection, so freeze for the smallest scope needed.
+    /// </summary>
+    public ControllableTimeProvider Clock { get; } = new();
+
     public ValueTask InitializeAsync()
     {
         var basePath = Path.Combine(Path.GetTempPath(), "homestead-tests", Guid.NewGuid().ToString());
@@ -63,6 +70,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         {
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
+
+            // Swap the system clock for a controllable one so scheduler tests can pin "now". This
+            // replaces TimeProvider for EVERY DI consumer (the scheduler today, but also anything else
+            // resolving it), and Clock.Freeze() pins it process-wide. That is safe only because the whole
+            // suite is one serial [Collection("Integration")] and the freezing tests make no other
+            // time-dependent calls while pinned. Splitting the collection or enabling intra-collection
+            // parallelism would let a frozen window bleed across concurrently-running tests.
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
 
             // Substitute the AI service so classify/summarize flows are deterministic and never make
             // a live model call. Benign by default (only reached when a provider resolves, which no

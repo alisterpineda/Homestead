@@ -8,6 +8,7 @@ namespace Homestead.WebApi.Processing;
 public class JobSchedulerService(
     IServiceScopeFactory scopeFactory,
     IOptions<JobSchedulingOptions> options,
+    TimeProvider timeProvider,
     ILogger<JobSchedulerService> logger) : BackgroundService, IJobSchedulerControl
 {
     private readonly TimeSpan _pollInterval =
@@ -67,7 +68,7 @@ public class JobSchedulerService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
 
         var candidate = await db.ProcessingSchedules
             .Where(s => s.IsEnabled && s.NextRunAt <= now)

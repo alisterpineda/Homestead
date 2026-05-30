@@ -23,10 +23,13 @@ public class JobSchedulerServiceTests : IntegrationTestBase
     {
         await using var _ = await PauseWorkerAsync();
 
-        var dueAt = DateTimeOffset.UtcNow.AddMinutes(-1);
-        // Daily cron keeps NextRunAt hours away after firing, so wall-clock drift
-        // between this assertion and the schedule update can't make it look stale.
-        var scheduleId = await SeedScheduleAsync(nextRunAt: dueAt, cron: "0 0 * * *");
+        // Pin the clock so the post-fire "NextRunAt is in the future" assertion compares against the same
+        // instant the scheduler advanced from, not a later real-clock read that could straddle a cron
+        // boundary and see the freshly-advanced NextRunAt as already stale.
+        using var _clock = Factory.Clock.Freeze();
+        var now = Factory.Clock.GetUtcNow();
+
+        var scheduleId = await SeedScheduleAsync(nextRunAt: now.AddMinutes(-1), cron: "*/5 * * * *");
 
         var result = await Scheduler.TickOnceAsync(CT);
 
@@ -38,7 +41,7 @@ public class JobSchedulerServiceTests : IntegrationTestBase
         var schedule = await db.ProcessingSchedules.AsNoTracking()
             .FirstAsync(s => s.Id == scheduleId, CT);
         Assert.NotNull(schedule.LastRunAt);
-        Assert.True(schedule.NextRunAt > DateTimeOffset.UtcNow,
+        Assert.True(schedule.NextRunAt > now,
             $"NextRunAt should advance past now; got {schedule.NextRunAt:O}");
         Assert.NotNull(schedule.LastJobId);
 
@@ -116,18 +119,22 @@ public class JobSchedulerServiceTests : IntegrationTestBase
     {
         await using var _ = await PauseWorkerAsync();
 
-        // Schedule was due 2 days ago. Cron must be coarse enough that the next
-        // occurrence after "now" lands well clear of wall-clock drift between the
-        // two TickOnceAsync calls below — a 5-min cron's next boundary can be
-        // sub-millisecond away if "now" sits right before it, racing the second tick.
+        // Pin the clock so both ticks observe the same "now". The first tick advances NextRunAt to the
+        // next cron occurrence strictly after now; with now frozen, the second tick reads that same now
+        // and so cannot see the schedule as due again — regardless of how close a cron boundary sits to
+        // the real wall clock. (Under the real clock the two reads could straddle a boundary and re-fire.)
+        using var _clock = Factory.Clock.Freeze();
+        var now = Factory.Clock.GetUtcNow();
+
+        // Schedule was due 2 days ago — overdue when the first tick runs.
         var scheduleId = await SeedScheduleAsync(
-            nextRunAt: DateTimeOffset.UtcNow.AddDays(-2),
-            cron: "0 0 * * *");
+            nextRunAt: now.AddDays(-2),
+            cron: "*/5 * * * *");
 
         var first = await Scheduler.TickOnceAsync(CT);
         Assert.Equal(ScheduleTickResult.Fired, first);
 
-        // After firing once, NextRunAt should be in the future — a second invocation must not fire.
+        // After firing once, NextRunAt is in the future — a second invocation must not fire.
         var second = await Scheduler.TickOnceAsync(CT);
         Assert.Equal(ScheduleTickResult.NothingDue, second);
 
@@ -135,7 +142,7 @@ public class JobSchedulerServiceTests : IntegrationTestBase
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var schedule = await db.ProcessingSchedules.AsNoTracking()
             .FirstAsync(s => s.Id == scheduleId, CT);
-        Assert.True(schedule.NextRunAt > DateTimeOffset.UtcNow);
+        Assert.True(schedule.NextRunAt > now);
 
         var jobCount = await db.ProcessingJobs.CountAsync(j => j.ScheduleId == scheduleId, CT);
         Assert.Equal(1, jobCount);

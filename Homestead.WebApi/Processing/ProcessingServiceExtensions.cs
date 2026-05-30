@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Homestead.WebApi.Processing;
 
@@ -8,6 +9,13 @@ public static class ProcessingServiceExtensions
     {
         services.Configure<JobProcessingOptions>(configuration.GetSection(JobProcessingOptions.SectionName));
         services.Configure<JobSchedulingOptions>(configuration.GetSection(JobSchedulingOptions.SectionName));
+
+        // The scheduler resolves "now" through TimeProvider rather than DateTimeOffset.UtcNow so the
+        // cron-tick timing path is deterministically testable (tests can pin the clock). System time is
+        // the production default; TryAdd is idempotent and won't clobber a TimeProvider registered
+        // earlier in the composition. (Integration tests override it afterwards, in the test host's
+        // ConfigureServices, via RemoveAll + AddSingleton — not by pre-registering here.)
+        services.TryAddSingleton(TimeProvider.System);
 
         var assembly = typeof(Program).Assembly;
 
