@@ -1,4 +1,3 @@
-using Homestead.WebApi.Common.Auditing;
 using MediatR;
 
 namespace Homestead.WebApi.Common;
@@ -6,12 +5,11 @@ namespace Homestead.WebApi.Common;
 /// <summary>
 /// Persistence/audit chokepoint for the MediatR pipeline. After the handler runs, commits the work
 /// for any <see cref="ICommand"/> through <see cref="IUnitOfWork"/> (idempotent — a no-op when a
-/// handler already saved), then drains post-commit side effects. Queries are not <see cref="ICommand"/>
-/// and skip the commit entirely, so they are guaranteed read-only.
+/// handler already saved), then drains post-commit side effects. The <see cref="ICommand"/> marker is
+/// the sole commit gate: queries are not <see cref="ICommand"/> and skip the commit entirely, so they
+/// are guaranteed read-only.
 /// </summary>
-public class UnitOfWorkBehavior<TRequest, TResponse>(
-    IUnitOfWork unitOfWork,
-    IAuditContext auditContext)
+public class UnitOfWorkBehavior<TRequest, TResponse>(IUnitOfWork unitOfWork)
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
@@ -28,11 +26,11 @@ public class UnitOfWorkBehavior<TRequest, TResponse>(
 
         var response = await next();
 
-        // Commit through the single chokepoint for commands; the legacy fallback also commits modules
-        // not yet migrated to the ICommand marker (Finances/Admin) that rely on this behavior to flush
-        // audit. Queries never audit, so this never fires for a read — read-only holds. Either way,
-        // drain true post-commit side effects (hooks) only after the durable commit.
-        if (request is ICommand || auditContext.HasEntries)
+        // The ICommand marker is the sole commit gate: commit every command through the single
+        // chokepoint (idempotent — a no-op when the handler already saved), then drain true post-commit
+        // side effects (hooks) only after the durable commit. Queries are not ICommand, so they never
+        // commit and are therefore guaranteed read-only.
+        if (request is ICommand)
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
             await unitOfWork.RunAfterCommitHooksAsync(cancellationToken);

@@ -12,7 +12,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommod
 public class PatchCommodityPriceHandler(
     AppDbContext db,
     IAuditContext audit,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchCommodityPriceCommand, CommodityPriceResponse>
 {
     public async Task<CommodityPriceResponse> Handle(
@@ -63,7 +64,7 @@ public class PatchCommodityPriceHandler(
         price.UpdatedAt = DateTimeOffset.UtcNow;
         price.UpdatedByUserId = currentUser.UserId;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CommodityPriceResponse
         {

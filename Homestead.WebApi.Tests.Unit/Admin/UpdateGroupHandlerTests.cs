@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
@@ -12,15 +13,19 @@ public class UpdateGroupHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly UpdateGroupHandler _sut;
 
     public UpdateGroupHandlerTests()
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
         var currentUser = Substitute.For<ICurrentUserAccessor>();
         currentUser.UserId.Returns(Guid.NewGuid());
-        _sut = new UpdateGroupHandler(_db, _audit, currentUser);
+        _sut = new UpdateGroupHandler(_db, _audit, currentUser, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();

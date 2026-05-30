@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 
-public class UpdateGroupHandler(AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser)
+public class UpdateGroupHandler(
+    AppDbContext db, IAuditContext audit, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateGroupCommand, GroupResponse>
 {
     public async Task<GroupResponse> Handle(UpdateGroupCommand command, CancellationToken ct)
@@ -33,7 +34,7 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit, ICurrentUs
         group.UpdatedAt = DateTimeOffset.UtcNow;
         group.UpdatedByUserId = currentUser.UserId;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var memberCount = await db.GroupMembers.CountAsync(gm => gm.GroupId == group.Id, ct);
         var creatorName = group.CreatedByUserId.HasValue
@@ -65,7 +66,7 @@ public class UpdateGroupHandler(AppDbContext db, IAuditContext audit, ICurrentUs
     }
 }
 
-public record UpdateGroupCommand : IRequest<GroupResponse>
+public record UpdateGroupCommand : ICommand<GroupResponse>
 {
     public Guid Id { get; init; }
     public required UpdateGroupRequest Request { get; init; }

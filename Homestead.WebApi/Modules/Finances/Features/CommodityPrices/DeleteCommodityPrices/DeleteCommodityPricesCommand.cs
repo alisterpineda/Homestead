@@ -1,6 +1,6 @@
-using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrices;
 
 public record DeleteCommodityPricesCommand(IReadOnlyList<Guid> Ids)
-    : IRequest<DeleteCommodityPricesResponse>;
+    : ICommand<DeleteCommodityPricesResponse>;

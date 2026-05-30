@@ -1,6 +1,5 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Modules.Admin.Features.Groups.RemoveGroupMember;
@@ -12,14 +11,18 @@ namespace Homestead.WebApi.Tests.Unit.Admin;
 public class RemoveGroupMemberHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly RemoveGroupMemberHandler _sut;
 
     public RemoveGroupMemberHandlerTests()
     {
         _db = TestAppDbContext.Create();
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new RemoveGroupMemberHandler(_db, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new RemoveGroupMemberHandler(_db, _audit, _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();
@@ -50,9 +53,8 @@ public class RemoveGroupMemberHandlerTests : IDisposable
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        _auditLogger.Received(1).LogUpdated("Group", groupId,
-            Arg.Is<List<FieldChange>>(c => c.Count == 1 && ((ScalarFieldChange)c[0]).Field == "MemberRemoved"),
-            Arg.Any<Guid?>());
+        _audit.Received(1).TrackScalar("Group", groupId, "MemberRemoved",
+            Arg.Any<string?>(), Arg.Any<string?>());
     }
 
     [Fact]

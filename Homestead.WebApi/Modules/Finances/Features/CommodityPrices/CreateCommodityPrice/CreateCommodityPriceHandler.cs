@@ -11,7 +11,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommo
 public class CreateCommodityPriceHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditContext audit)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateCommodityPriceCommand, CommodityPriceResponse>
 {
     public async Task<CommodityPriceResponse> Handle(
@@ -65,7 +66,7 @@ public class CreateCommodityPriceHandler(
 
         db.CommodityPrices.Add(price);
         audit.Created("CommodityPrice", price.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CommodityPriceResponse
         {

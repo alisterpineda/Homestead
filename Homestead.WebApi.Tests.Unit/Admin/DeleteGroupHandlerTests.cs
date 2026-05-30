@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Modules.Admin.Features.Groups.DeleteGroup;
 using Homestead.WebApi.Common.Auditing;
@@ -14,10 +15,11 @@ public class DeleteGroupHandlerTests
     [Fact]
     public void Handler_AcceptsAuditContextDependency()
     {
-        // Verify the handler can be constructed with IAuditContext
+        // Verify the handler can be constructed with IAuditContext + IUnitOfWork
         using var db = TestAppDbContext.Create();
         var audit = Substitute.For<IAuditContext>();
-        var handler = new DeleteGroupHandler(db, audit);
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        var handler = new DeleteGroupHandler(db, audit, unitOfWork);
 
         Assert.NotNull(handler);
     }

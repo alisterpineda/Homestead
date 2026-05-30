@@ -9,7 +9,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpenin
 public class PatchOpeningBalanceHandler(
     AppDbContext db,
     IOpeningBalanceService openingBalances,
-    ISystemAccountProvider systemAccounts)
+    ISystemAccountProvider systemAccounts,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchOpeningBalanceCommand, OpeningBalanceResponse>
 {
     public async Task<OpeningBalanceResponse> Handle(PatchOpeningBalanceCommand request, CancellationToken ct)
@@ -25,7 +26,7 @@ public class PatchOpeningBalanceHandler(
                 request.Quantity, request.ValuePerUnit, request.AsOfDate, request.Memo),
             ct);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
         var accountSplit = OpeningBalanceMapping.AccountSideSplit(transaction, openingBalancesAccount.Id);

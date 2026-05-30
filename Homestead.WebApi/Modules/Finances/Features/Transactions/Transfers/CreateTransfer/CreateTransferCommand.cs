@@ -1,9 +1,9 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Features.Transactions;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
 
-public record CreateTransferCommand : IRequest<TransactionResponse>
+public record CreateTransferCommand : ICommand<TransactionResponse>
 {
     public required Guid SourceAccountId { get; init; }
     public required Guid DestinationAccountId { get; init; }

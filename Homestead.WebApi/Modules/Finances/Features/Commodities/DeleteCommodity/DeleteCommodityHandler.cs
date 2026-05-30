@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.DeleteCommodity;
 
-public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
+public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteCommodityCommand, bool>
 {
     public async Task<bool> Handle(DeleteCommodityCommand request, CancellationToken ct)
@@ -40,7 +40,7 @@ public class DeleteCommodityHandler(AppDbContext db, IAuditContext audit)
 
         db.Commodities.Remove(commodity);
         audit.Deleted("Commodity", commodity.Id, $"{commodity.Symbol} — {commodity.Name}");
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return true;
     }

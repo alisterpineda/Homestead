@@ -1,9 +1,9 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.RunPriceSourceImportNow;
 
-public record RunPriceSourceImportNowCommand : IRequest<RunPriceSourceImportNowResponse>
+public record RunPriceSourceImportNowCommand : ICommand<RunPriceSourceImportNowResponse>
 {
     public CommodityPriceSource Source { get; init; }
     public DateTimeOffset? FromAt { get; init; }

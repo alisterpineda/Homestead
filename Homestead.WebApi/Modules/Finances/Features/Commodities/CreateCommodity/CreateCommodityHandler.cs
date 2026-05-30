@@ -11,7 +11,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity
 public class CreateCommodityHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditContext audit)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateCommodityCommand, CommodityResponse>
 {
     public async Task<CommodityResponse> Handle(CreateCommodityCommand request, CancellationToken ct)
@@ -43,7 +44,7 @@ public class CreateCommodityHandler(
 
         db.Commodities.Add(commodity);
         audit.Created("Commodity", commodity.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CommodityResponse
         {

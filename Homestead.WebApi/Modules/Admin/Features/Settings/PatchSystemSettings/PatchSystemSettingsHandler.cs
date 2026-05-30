@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
@@ -14,7 +15,8 @@ namespace Homestead.WebApi.Modules.Admin.Features.Settings.PatchSystemSettings;
 public class PatchSystemSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchSystemSettingsCommand, SystemSettingsResponse>
 {
     public async Task<SystemSettingsResponse> Handle(
@@ -42,7 +44,7 @@ public class PatchSystemSettingsHandler(
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
+            audit.Created("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
         }
         else
         {
@@ -54,11 +56,11 @@ public class PatchSystemSettingsHandler(
             var changes = before!.Diff(after);
 
             if (changes.Count > 0)
-                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule),
-                    changes);
+                audit.Track(() => changes, "AppSetting",
+                    AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new SystemSettingsResponse();
     }

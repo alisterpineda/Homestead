@@ -15,7 +15,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.PatchPriceSour
 public class PatchPriceSourceHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger,
+    IAuditContext audit,
+    IUnitOfWork unitOfWork,
     IServiceProvider serviceProvider)
     : IRequestHandler<PatchPriceSourceCommand, PatchPriceSourceResponse>
 {
@@ -59,13 +60,12 @@ public class PatchPriceSourceHandler(
         var changes = before.Diff(after);
         if (changes.Count > 0)
         {
-            auditLogger.LogUpdated(
+            audit.Track(() => changes,
                 "CommodityPriceSourceSettings",
-                CommodityPriceSourceSettingsSnapshot.SourceToGuid(entity.Source),
-                changes);
+                CommodityPriceSourceSettingsSnapshot.SourceToGuid(entity.Source));
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new PatchPriceSourceResponse(entity.Source, entity.IsEnabled);
     }

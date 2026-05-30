@@ -1,8 +1,8 @@
-using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
 
-public record PatchTransferCommand : IRequest<TransactionResponse>
+public record PatchTransferCommand : ICommand<TransactionResponse>
 {
     public Guid TransactionId { get; init; }
     public required Guid SourceAccountId { get; init; }

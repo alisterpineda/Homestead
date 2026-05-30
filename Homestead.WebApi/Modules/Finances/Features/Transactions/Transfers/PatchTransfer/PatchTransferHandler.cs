@@ -1,13 +1,13 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using Homestead.WebApi.Persistence;
 using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
 
 public class PatchTransferHandler(
-    AppDbContext db,
     ITransferService transfers,
-    IBalanceEntryReconciler reconciler)
+    IBalanceEntryReconciler reconciler,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchTransferCommand, TransactionResponse>
 {
     public async Task<TransactionResponse> Handle(PatchTransferCommand request, CancellationToken ct)
@@ -23,7 +23,7 @@ public class PatchTransferHandler(
                 request.Memo),
             ct);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 

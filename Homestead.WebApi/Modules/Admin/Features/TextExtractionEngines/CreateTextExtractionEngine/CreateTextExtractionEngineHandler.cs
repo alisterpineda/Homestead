@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
 
-public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
+public class CreateTextExtractionEngineHandler(
+    AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<CreateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
     public async Task<TextExtractionEngineResponse> Handle(CreateTextExtractionEngineCommand request, CancellationToken ct)
@@ -40,7 +41,7 @@ public class CreateTextExtractionEngineHandler(AppDbContext db, ICurrentUserAcce
 
         db.TextExtractionEngines.Add(engine);
         audit.Created("TextExtractionEngine", engine.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var creatorName = userId.HasValue
             ? await db.Users.Where(u => u.Id == userId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)

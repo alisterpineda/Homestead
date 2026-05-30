@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.UpdateTextExtractionEngine;
 
-public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext audit)
+public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateTextExtractionEngineCommand, TextExtractionEngineResponse>
 {
     public async Task<TextExtractionEngineResponse> Handle(UpdateTextExtractionEngineCommand command, CancellationToken ct)
@@ -43,7 +43,7 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext au
         engine.Configuration = command.Request.Configuration;
         engine.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new TextExtractionEngineResponse
         {
@@ -60,7 +60,7 @@ public class UpdateTextExtractionEngineHandler(AppDbContext db, IAuditContext au
     }
 }
 
-public record UpdateTextExtractionEngineCommand : IRequest<TextExtractionEngineResponse>
+public record UpdateTextExtractionEngineCommand : ICommand<TextExtractionEngineResponse>
 {
     public Guid Id { get; init; }
     public required UpdateTextExtractionEngineRequest Request { get; init; }

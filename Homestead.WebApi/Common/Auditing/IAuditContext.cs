@@ -14,6 +14,14 @@ public interface IAuditContext
     void Track(Func<List<FieldChange>> deferredDiff, string entityType, Guid entityId,
         Guid? parentEntityId = null);
 
+    /// <summary>
+    /// Convenience for a single fixed scalar field change (the value is already known, so no deferral is
+    /// needed). Equivalent to <see cref="Track(Func{List{FieldChange}}, string, Guid, Guid?)"/> with a
+    /// one-element <see cref="ScalarFieldChange"/> list.
+    /// </summary>
+    void TrackScalar(string entityType, Guid entityId, string field, string? oldValue, string? newValue,
+        Guid? parentEntityId = null);
+
     void Deleted(string entityType, Guid entityId, string? description = null,
         Guid? parentEntityId = null);
 

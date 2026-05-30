@@ -1,6 +1,5 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 
-public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
+public class AddGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<AddGroupMemberCommand, GroupMemberResponse>
 {
     public async Task<GroupMemberResponse> Handle(AddGroupMemberCommand command, CancellationToken ct)
@@ -42,12 +41,10 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
             AccessLevel = command.Request.AccessLevel
         });
 
-        auditLogger.LogUpdated("Group", command.GroupId,
-        [
-            new ScalarFieldChange("MemberAdded", null, $"{user.DisplayName} as {command.Request.AccessLevel}")
-        ]);
+        audit.TrackScalar("Group", command.GroupId, "MemberAdded",
+            null, $"{user.DisplayName} as {command.Request.AccessLevel}");
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new GroupMemberResponse
         {
@@ -59,7 +56,7 @@ public class AddGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record AddGroupMemberCommand : IRequest<GroupMemberResponse>
+public record AddGroupMemberCommand : ICommand<GroupMemberResponse>
 {
     public Guid GroupId { get; init; }
     public required AddGroupMemberRequest Request { get; init; }

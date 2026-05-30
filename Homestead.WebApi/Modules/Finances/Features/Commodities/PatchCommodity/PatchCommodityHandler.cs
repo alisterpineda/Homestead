@@ -12,7 +12,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.Commodities.PatchCommodity;
 public class PatchCommodityHandler(
     AppDbContext db,
     IAuditContext audit,
-    ICurrentUserAccessor currentUser)
+    ICurrentUserAccessor currentUser,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchCommodityCommand, CommodityResponse>
 {
     public async Task<CommodityResponse> Handle(PatchCommodityCommand request, CancellationToken ct)
@@ -46,7 +47,7 @@ public class PatchCommodityHandler(
         commodity.UpdatedAt = DateTimeOffset.UtcNow;
         commodity.UpdatedByUserId = currentUser.UserId;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return await db.Commodities
             .AsNoTracking()

@@ -1,10 +1,11 @@
 using System.Text.Json;
-using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +14,7 @@ namespace Homestead.WebApi.Modules.Finances.Processing;
 public class ImportCommodityPricesJobHandler(
     AppDbContext db,
     IServiceProvider serviceProvider,
-    IAuditLogger auditLogger,
+    ISender sender,
     IServiceScopeFactory scopeFactory,
     ILogger<ImportCommodityPricesJobHandler> logger) : IJobHandler
 {
@@ -82,13 +83,17 @@ public class ImportCommodityPricesJobHandler(
                 "Price import {Source}: provider returned {ObservationCount} observations, warning={Warning}",
                 payload.Source, result.Observations.Count, result.Warning ?? "(none)");
 
-        await UpsertObservationsAsync(payload.Source, result.Observations, job, now, ct);
-
-        settings.LastImportAt = now;
-        settings.LastImportStatus = result.Warning is null ? ImportStatus.Success : ImportStatus.PartialSuccess;
-        settings.LastImportMessage = Truncate(result.Warning);
-        settings.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
+        // Fold the DB write + audit into the unit-of-work chokepoint. Runs in this job's DI scope, so the
+        // command handler shares the pooled AppDbContext (and the settings entity loaded above), and the
+        // UnitOfWorkBehavior commits once after the command. Scheduled imports stay system-attributed;
+        // manual runs are attributed to the initiating user.
+        await sender.Send(new ApplyCommodityPriceObservationsCommand
+        {
+            Source = payload.Source,
+            Observations = result.Observations,
+            Warning = result.Warning,
+            ActorUserId = job.ScheduleId is null ? job.CreatedByUserId : null,
+        }, ct);
     }
 
     private async Task<IReadOnlyCollection<Commodity>> ResolveCommoditiesAsync(
@@ -177,63 +182,6 @@ public class ImportCommodityPricesJobHandler(
             .FirstOrDefaultAsync(ct);
 
         return earliest ?? now.AddDays(-30);
-    }
-
-    private async Task UpsertObservationsAsync(
-        CommodityPriceSource source,
-        IReadOnlyList<PriceObservation> observations,
-        ProcessingJob job,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        if (observations.Count == 0) return;
-
-        var attribution = auditLogger.ForUser(job.ScheduleId is null ? job.CreatedByUserId : null);
-
-        var commodityIds = observations.Select(o => o.CommodityId).Distinct().ToList();
-        var quoteIds = observations.Select(o => o.QuoteCurrencyId).Distinct().ToList();
-        var instants = observations.Select(o => o.PriceAt).Distinct().ToList();
-
-        var existing = await db.CommodityPrices
-            .Where(p => p.Source == source
-                && commodityIds.Contains(p.CommodityId)
-                && quoteIds.Contains(p.QuoteCurrencyId)
-                && instants.Contains(p.PriceAt))
-            .ToListAsync(ct);
-
-        var existingByKey = existing.ToDictionary(p => (p.CommodityId, p.QuoteCurrencyId, p.PriceAt));
-
-        foreach (var observation in observations)
-        {
-            var key = (observation.CommodityId, observation.QuoteCurrencyId, observation.PriceAt);
-            if (existingByKey.TryGetValue(key, out var match))
-            {
-                if (match.Rate == observation.Rate) continue;
-                var oldRate = match.Rate;
-                match.Rate = observation.Rate;
-                match.UpdatedAt = now;
-                attribution.LogUpdated("CommodityPrice", match.Id, new()
-                {
-                    new Domain.Auditing.ScalarFieldChange("Rate", oldRate.ToString(), observation.Rate.ToString()),
-                });
-            }
-            else
-            {
-                var price = new CommodityPrice
-                {
-                    Id = Guid.NewGuid(),
-                    CommodityId = observation.CommodityId,
-                    QuoteCurrencyId = observation.QuoteCurrencyId,
-                    PriceAt = observation.PriceAt,
-                    Rate = observation.Rate,
-                    Source = source,
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                };
-                db.CommodityPrices.Add(price);
-                attribution.LogCreated("CommodityPrice", price.Id);
-            }
-        }
     }
 
     private async Task RecordFailureAsync(

@@ -14,7 +14,8 @@ public class CreateAccountHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IOpeningBalanceService openingBalances,
-    IValuationService valuations)
+    IValuationService valuations,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(CreateAccountCommand request, CancellationToken ct)
@@ -54,7 +55,7 @@ public class CreateAccountHandler(
                 ct);
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var ctx = await valuations.LoadContextAsync(ct);
         var valuation = await valuations.ValueAccountAsync(account, ctx, ct);

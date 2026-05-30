@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 using Homestead.WebApi.Common.Auditing;
@@ -11,13 +12,17 @@ public class BulkDeleteTextExtractionEnginesHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly BulkDeleteTextExtractionEnginesHandler _sut;
 
     public BulkDeleteTextExtractionEnginesHandlerTests()
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
-        _sut = new BulkDeleteTextExtractionEnginesHandler(_db, _audit);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new BulkDeleteTextExtractionEnginesHandler(_db, _audit, _unitOfWork);
     }
 
     public void Dispose()

@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrices;
 
-public class DeleteCommodityPricesHandler(AppDbContext db, IAuditContext audit)
+public class DeleteCommodityPricesHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteCommodityPricesCommand, DeleteCommodityPricesResponse>
 {
     public async Task<DeleteCommodityPricesResponse> Handle(
@@ -26,7 +27,7 @@ public class DeleteCommodityPricesHandler(AppDbContext db, IAuditContext audit)
         foreach (var price in prices)
             audit.Deleted("CommodityPrice", price.Id);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
         return new DeleteCommodityPricesResponse(prices.Count);
     }
 }

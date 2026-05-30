@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Admin.Features.Settings;
@@ -14,7 +15,8 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly PatchSystemSettingsHandler _sut;
 
     public PatchSystemSettingsHandlerTests()
@@ -22,8 +24,11 @@ public class PatchSystemSettingsHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
-        _auditLogger = Substitute.For<IAuditLogger>();
-        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _auditLogger);
+        _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose()
@@ -49,7 +54,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         await _sut.Handle(request, TestContext.Current.CancellationToken);
 
-        _auditLogger.Received(1).LogCreated(
+        _audit.Received(1).Created(
             "AppSetting",
             AppSettingSnapshot.KeyToGuid(AppSetting.SystemModule));
     }

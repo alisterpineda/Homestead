@@ -6,7 +6,8 @@ using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.CreateProcessingSchedule;
 
-public class CreateProcessingScheduleHandler(AppDbContext db, ICurrentUserAccessor currentUser)
+public class CreateProcessingScheduleHandler(
+    AppDbContext db, ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<CreateProcessingScheduleCommand, CreateProcessingScheduleResponse>
 {
     public async Task<CreateProcessingScheduleResponse> Handle(
@@ -31,7 +32,7 @@ public class CreateProcessingScheduleHandler(AppDbContext db, ICurrentUserAccess
         };
 
         db.ProcessingSchedules.Add(schedule);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new CreateProcessingScheduleResponse
         {

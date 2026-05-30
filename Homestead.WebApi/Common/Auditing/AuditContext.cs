@@ -29,6 +29,13 @@ public class AuditContext : IAuditContext
         (_entries ??= []).Add(new TrackedUpdateEntry(entityType, entityId, parentEntityId, deferredDiff));
     }
 
+    public void TrackScalar(string entityType, Guid entityId, string field, string? oldValue,
+        string? newValue, Guid? parentEntityId = null)
+    {
+        var changes = new List<FieldChange> { new ScalarFieldChange(field, oldValue, newValue) };
+        (_entries ??= []).Add(new TrackedUpdateEntry(entityType, entityId, parentEntityId, () => changes));
+    }
+
     public void Deleted(string entityType, Guid entityId, string? description = null,
         Guid? parentEntityId = null)
     {

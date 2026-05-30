@@ -1,13 +1,13 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using Homestead.WebApi.Persistence;
 using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
 
 public class CreateTransferHandler(
-    AppDbContext db,
     ITransferService transfers,
-    IBalanceEntryReconciler reconciler)
+    IBalanceEntryReconciler reconciler,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<CreateTransferCommand, TransactionResponse>
 {
     public async Task<TransactionResponse> Handle(CreateTransferCommand request, CancellationToken ct)
@@ -23,7 +23,7 @@ public class CreateTransferHandler(
             ct);
 
         // Flush the primary change so the reconciler's DB queries see the new transfer.
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 

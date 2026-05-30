@@ -11,7 +11,8 @@ public class DeleteTransactionHandler(
     AppDbContext db,
     ITransferService transfers,
     IBalanceEntryService balanceEntries,
-    IBalanceEntryReconciler reconciler)
+    IBalanceEntryReconciler reconciler,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteTransactionCommand, Unit>
 {
     public async Task<Unit> Handle(DeleteTransactionCommand request, CancellationToken ct)
@@ -38,7 +39,7 @@ public class DeleteTransactionHandler(
                 $"Deletion is not supported for transactions of type {probeType}."),
         };
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(touched, ct);
 

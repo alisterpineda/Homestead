@@ -11,16 +11,20 @@ public class UpdateAiProviderHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UpdateAiProviderHandlerTests()
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
     }
 
     public void Dispose() => _db.Dispose();
 
-    private UpdateAiProviderHandler Sut() => new(_db, _audit);
+    private UpdateAiProviderHandler Sut() => new(_db, _audit, _unitOfWork);
 
     private async Task<AiProvider> SeedAsync(string config, AiProviderType type = AiProviderType.OpenAI)
     {

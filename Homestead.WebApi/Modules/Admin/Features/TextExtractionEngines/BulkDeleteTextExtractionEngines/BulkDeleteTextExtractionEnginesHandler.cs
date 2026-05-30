@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Common.Auditing;
 using MediatR;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
 
-public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, IAuditContext audit)
+public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<BulkDeleteTextExtractionEnginesCommand, BulkDeleteTextExtractionEnginesResponse>
 {
     public async Task<BulkDeleteTextExtractionEnginesResponse> Handle(BulkDeleteTextExtractionEnginesCommand request, CancellationToken ct)
@@ -30,7 +31,7 @@ public class BulkDeleteTextExtractionEnginesHandler(AppDbContext db, IAuditConte
 
         db.TextExtractionEngines.RemoveRange(engines);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new BulkDeleteTextExtractionEnginesResponse(engines.Count);
     }

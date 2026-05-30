@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.AiProviders.CreateAiProvider;
 
-public class CreateAiProviderHandler(AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit)
+public class CreateAiProviderHandler(
+    AppDbContext db, ICurrentUserAccessor currentUser, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<CreateAiProviderCommand, AiProviderResponse>
 {
     public async Task<AiProviderResponse> Handle(CreateAiProviderCommand request, CancellationToken ct)
@@ -42,7 +43,7 @@ public class CreateAiProviderHandler(AppDbContext db, ICurrentUserAccessor curre
 
         db.AiProviders.Add(provider);
         audit.Created("AiProvider", provider.Id);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var creatorName = userId.HasValue
             ? await db.Users.Where(u => u.Id == userId.Value).Select(u => u.DisplayName).FirstOrDefaultAsync(ct)

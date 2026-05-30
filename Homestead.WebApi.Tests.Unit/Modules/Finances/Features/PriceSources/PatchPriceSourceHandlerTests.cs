@@ -13,7 +13,8 @@ public class PatchPriceSourceHandlerTests : IDisposable
 {
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IAuditLogger _auditLogger;
+    private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IPriceProvider _provider;
     private readonly ServiceProvider _serviceProvider;
 
@@ -21,7 +22,10 @@ public class PatchPriceSourceHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         _currentUser = Substitute.For<ICurrentUserAccessor>();
-        _auditLogger = Substitute.For<IAuditLogger>();
+        _audit = Substitute.For<IAuditContext>();
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
         _provider = Substitute.For<IPriceProvider>();
         _provider.ConfigSchema.Returns(PriceProviderConfigSchema.Empty);
 
@@ -44,7 +48,7 @@ public class PatchPriceSourceHandlerTests : IDisposable
     }
 
     private PatchPriceSourceHandler Sut() =>
-        new(_db, _currentUser, _auditLogger, _serviceProvider);
+        new(_db, _currentUser, _audit, _unitOfWork, _serviceProvider);
 
     [Fact]
     public async Task SystemSource_Throws()

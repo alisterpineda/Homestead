@@ -1,4 +1,4 @@
-using MediatR;
+using Homestead.WebApi.Common;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.PatchAccount;
@@ -10,7 +10,7 @@ public class PatchAccountModel
     public bool IsArchived { get; set; }
 }
 
-public record PatchAccountCommand : IRequest<AccountResponse>
+public record PatchAccountCommand : ICommand<AccountResponse>
 {
     public Guid Id { get; init; }
     public required JsonPatchDocument<PatchAccountModel> PatchDocument { get; init; }

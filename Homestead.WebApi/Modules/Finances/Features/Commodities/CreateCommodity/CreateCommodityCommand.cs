@@ -1,8 +1,8 @@
-using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
 
-public record CreateCommodityCommand : IRequest<CommodityResponse>
+public record CreateCommodityCommand : ICommand<CommodityResponse>
 {
     public required string Symbol { get; init; }
     public required string Exchange { get; init; }

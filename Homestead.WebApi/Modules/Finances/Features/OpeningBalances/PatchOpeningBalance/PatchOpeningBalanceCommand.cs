@@ -1,8 +1,8 @@
-using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
 
-public record PatchOpeningBalanceCommand : IRequest<OpeningBalanceResponse>
+public record PatchOpeningBalanceCommand : ICommand<OpeningBalanceResponse>
 {
     public Guid AccountId { get; init; }
     public Guid CommodityId { get; init; }

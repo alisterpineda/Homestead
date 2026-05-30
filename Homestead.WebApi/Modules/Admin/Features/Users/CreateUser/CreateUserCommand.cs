@@ -1,9 +1,9 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Identity;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Users.CreateUser;
 
-public record CreateUserCommand : IRequest<UserResponse>
+public record CreateUserCommand : ICommand<UserResponse>
 {
     public required string Email { get; init; }
     public required string DisplayName { get; init; }

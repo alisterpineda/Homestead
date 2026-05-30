@@ -1,5 +1,5 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.CreateAccount;
 
@@ -9,7 +9,7 @@ public record InitialBalanceInput
     public required DateOnly AsOfDate { get; init; }
 }
 
-public record CreateAccountCommand : IRequest<AccountResponse>
+public record CreateAccountCommand : ICommand<AccountResponse>
 {
     public required string Name { get; init; }
     public required AccountKind Kind { get; init; }

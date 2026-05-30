@@ -15,7 +15,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettin
 public class PatchFinanceSettingsHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
-    IAuditLogger auditLogger)
+    IAuditContext audit,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchFinanceSettingsCommand, FinanceSettingsResponse>
 {
     public async Task<FinanceSettingsResponse> Handle(
@@ -49,7 +50,7 @@ public class PatchFinanceSettingsHandler(
             };
             db.AppSettings.Add(entity);
 
-            auditLogger.LogCreated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.FinancesModule));
+            audit.Created("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.FinancesModule));
         }
         else
         {
@@ -61,11 +62,11 @@ public class PatchFinanceSettingsHandler(
             var changes = before!.Diff(after);
 
             if (changes.Count > 0)
-                auditLogger.LogUpdated("AppSetting", AppSettingSnapshot.KeyToGuid(AppSetting.FinancesModule),
-                    changes);
+                audit.Track(() => changes, "AppSetting",
+                    AppSettingSnapshot.KeyToGuid(AppSetting.FinancesModule));
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new FinanceSettingsResponse
         {

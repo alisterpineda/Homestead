@@ -14,7 +14,8 @@ public class PatchAccountHandler(
     AppDbContext db,
     IAuditContext audit,
     ICurrentUserAccessor currentUser,
-    IValuationService valuations)
+    IValuationService valuations,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchAccountCommand, AccountResponse>
 {
     public async Task<AccountResponse> Handle(PatchAccountCommand request, CancellationToken ct)
@@ -50,7 +51,7 @@ public class PatchAccountHandler(
         account.UpdatedAt = DateTimeOffset.UtcNow;
         account.UpdatedByUserId = currentUser.UserId;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         var ctx = await valuations.LoadContextAsync(ct);
         var valuation = await valuations.ValueAccountAsync(account, ctx, ct);

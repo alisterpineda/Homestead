@@ -21,4 +21,4 @@ public class DeleteProcessingScheduleHandler(AppDbContext db)
     }
 }
 
-public record DeleteProcessingScheduleCommand(Guid Id) : IRequest<bool>;
+public record DeleteProcessingScheduleCommand(Guid Id) : ICommand<bool>;

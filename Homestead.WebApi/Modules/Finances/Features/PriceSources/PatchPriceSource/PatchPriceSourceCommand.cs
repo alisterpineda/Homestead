@@ -1,9 +1,9 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
-using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.PriceSources.PatchPriceSource;
 
-public record PatchPriceSourceCommand : IRequest<PatchPriceSourceResponse>
+public record PatchPriceSourceCommand : ICommand<PatchPriceSourceResponse>
 {
     public CommodityPriceSource Source { get; init; }
     public bool? IsEnabled { get; init; }

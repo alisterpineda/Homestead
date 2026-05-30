@@ -1,6 +1,5 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -8,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
 
-public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
+public class UpdateGroupMemberHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateGroupMemberCommand, GroupMemberResponse>
 {
     public async Task<GroupMemberResponse> Handle(UpdateGroupMemberCommand command, CancellationToken ct)
@@ -38,15 +37,12 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
 
         if (oldAccessLevel != command.Request.AccessLevel)
         {
-            auditLogger.LogUpdated("Group", command.GroupId,
-            [
-                new ScalarFieldChange("MemberAccessLevel",
-                    $"{member.User.DisplayName} as {oldAccessLevel}",
-                    $"{member.User.DisplayName} as {command.Request.AccessLevel}")
-            ]);
+            audit.TrackScalar("Group", command.GroupId, "MemberAccessLevel",
+                $"{member.User.DisplayName} as {oldAccessLevel}",
+                $"{member.User.DisplayName} as {command.Request.AccessLevel}");
         }
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new GroupMemberResponse
         {
@@ -58,7 +54,7 @@ public class UpdateGroupMemberHandler(AppDbContext db, IAuditLogger auditLogger)
     }
 }
 
-public record UpdateGroupMemberCommand : IRequest<GroupMemberResponse>
+public record UpdateGroupMemberCommand : ICommand<GroupMemberResponse>
 {
     public Guid GroupId { get; init; }
     public Guid UserId { get; init; }

@@ -1,8 +1,8 @@
-using MediatR;
+using Homestead.WebApi.Common;
 
 namespace Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodityPrice;
 
-public record CreateCommodityPriceCommand : IRequest<CommodityPriceResponse>
+public record CreateCommodityPriceCommand : ICommand<CommodityPriceResponse>
 {
     public required Guid CommodityId { get; init; }
     public required Guid QuoteCurrencyId { get; init; }

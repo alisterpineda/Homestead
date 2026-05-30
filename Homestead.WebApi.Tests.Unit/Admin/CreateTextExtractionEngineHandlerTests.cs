@@ -14,6 +14,7 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly CreateTextExtractionEngineHandler _sut;
 
     public CreateTextExtractionEngineHandlerTests()
@@ -22,7 +23,10 @@ public class CreateTextExtractionEngineHandlerTests : IDisposable
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(Guid.NewGuid());
         _audit = Substitute.For<IAuditContext>();
-        _sut = new CreateTextExtractionEngineHandler(_db, _currentUser, _audit);
+        _unitOfWork = Substitute.For<IUnitOfWork>();
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
+        _sut = new CreateTextExtractionEngineHandler(_db, _currentUser, _audit, _unitOfWork);
     }
 
     public void Dispose()

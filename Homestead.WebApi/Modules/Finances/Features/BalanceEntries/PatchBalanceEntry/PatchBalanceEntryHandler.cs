@@ -1,13 +1,13 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
-using Homestead.WebApi.Persistence;
 using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.BalanceEntries.PatchBalanceEntry;
 
 public class PatchBalanceEntryHandler(
-    AppDbContext db,
     IBalanceEntryService balanceEntries,
-    IBalanceEntryReconciler reconciler)
+    IBalanceEntryReconciler reconciler,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PatchBalanceEntryCommand, BalanceEntryResponse>
 {
     public async Task<BalanceEntryResponse> Handle(PatchBalanceEntryCommand request, CancellationToken ct)
@@ -22,7 +22,7 @@ public class PatchBalanceEntryHandler(
                 request.Memo),
             ct);
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 

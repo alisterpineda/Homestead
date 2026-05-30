@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.AiProviders.BulkDeleteAiProviders;
 
-public class BulkDeleteAiProvidersHandler(AppDbContext db, IAuditContext audit)
+public class BulkDeleteAiProvidersHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<BulkDeleteAiProvidersCommand, BulkDeleteAiProvidersResponse>
 {
     public async Task<BulkDeleteAiProvidersResponse> Handle(BulkDeleteAiProvidersCommand request, CancellationToken ct)
@@ -24,7 +25,7 @@ public class BulkDeleteAiProvidersHandler(AppDbContext db, IAuditContext audit)
             audit.Deleted("AiProvider", provider.Id);
 
         db.AiProviders.RemoveRange(providers);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new BulkDeleteAiProvidersResponse(providers.Count);
     }

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Accounts.DeleteAccount;
 
-public class DeleteAccountHandler(AppDbContext db, IAuditContext audit)
+public class DeleteAccountHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<DeleteAccountCommand, bool>
 {
     public async Task<bool> Handle(DeleteAccountCommand request, CancellationToken ct)
@@ -25,7 +25,7 @@ public class DeleteAccountHandler(AppDbContext db, IAuditContext audit)
 
         db.Accounts.Remove(account);
         audit.Deleted("Account", account.Id, account.Name);
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return true;
     }

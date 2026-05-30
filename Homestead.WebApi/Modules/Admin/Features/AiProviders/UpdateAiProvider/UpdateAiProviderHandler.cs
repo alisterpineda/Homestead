@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.AiProviders.UpdateAiProvider;
 
-public class UpdateAiProviderHandler(AppDbContext db, IAuditContext audit)
+public class UpdateAiProviderHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
     : IRequestHandler<UpdateAiProviderCommand, AiProviderResponse>
 {
     public async Task<AiProviderResponse> Handle(UpdateAiProviderCommand command, CancellationToken ct)
@@ -45,7 +45,7 @@ public class UpdateAiProviderHandler(AppDbContext db, IAuditContext audit)
         provider.IsEnabled = command.Request.IsEnabled;
         provider.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await db.SaveChangesAsync(ct);
+        await unitOfWork.SaveChangesAsync(ct);
 
         return new AiProviderResponse
         {
@@ -62,7 +62,7 @@ public class UpdateAiProviderHandler(AppDbContext db, IAuditContext audit)
     }
 }
 
-public record UpdateAiProviderCommand : IRequest<AiProviderResponse>
+public record UpdateAiProviderCommand : ICommand<AiProviderResponse>
 {
     public Guid Id { get; init; }
     public required UpdateAiProviderRequest Request { get; init; }
