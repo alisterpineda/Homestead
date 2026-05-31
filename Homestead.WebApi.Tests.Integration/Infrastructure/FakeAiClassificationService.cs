@@ -13,7 +13,34 @@ public sealed class FakeAiClassificationService : IAiClassificationService
 {
     public const string GeneratedSummary = "AI generated summary.";
 
-    public Task<ClassificationResult?> ClassifyAsync(
+    // Optional gate so a test can hold a classify/summarize call mid-flight and inspect server state (used
+    // by the idle-in-transaction acceptance test). Static because the service is registered scoped (new
+    // instance per request scope) and the whole integration suite runs serially, so only one test arms the
+    // gate at a time. Default: null = no gating, so every other test is unaffected. Always release/reset in
+    // a finally.
+    private static TaskCompletionSource? _entered;
+    private static TaskCompletionSource? _release;
+
+    /// <summary>
+    /// Arms the gate. The returned <c>Entered</c> task completes when a classify call reaches the gate;
+    /// calling <c>Release</c> lets that call proceed. Reset with <see cref="ResetGate"/> in a finally.
+    /// </summary>
+    public static (Task Entered, Action Release) ArmGate()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _entered = entered;
+        _release = release;
+        return (entered.Task, () => release.TrySetResult());
+    }
+
+    public static void ResetGate()
+    {
+        _entered = null;
+        _release = null;
+    }
+
+    public async Task<ClassificationResult?> ClassifyAsync(
         AiProvider provider,
         string documentName,
         string? extractedText,
@@ -22,8 +49,16 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         ClassificationScope scope,
         CancellationToken ct)
     {
+        // Snapshot the gate up front so a concurrent ResetGate() can't tear it out mid-call.
+        var entered = _entered;
+        var release = _release;
+        if (release is not null)
+        {
+            entered?.TrySetResult();
+            await release.Task.WaitAsync(ct);
+        }
+
         var summary = scope.HasFlag(ClassificationScope.Summary) ? GeneratedSummary : string.Empty;
-        return Task.FromResult<ClassificationResult?>(
-            new ClassificationResult([], [], summary, documentName));
+        return new ClassificationResult([], [], summary, documentName);
     }
 }

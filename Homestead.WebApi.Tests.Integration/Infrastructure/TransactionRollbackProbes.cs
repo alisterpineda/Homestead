@@ -5,6 +5,7 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 
@@ -70,6 +71,43 @@ public static class TransactionRollbackProbes
                 cancellationToken);
 
             throw new InvalidOperationException("rollback probe: intentional failure after enqueue");
+        }
+    }
+
+    /// <summary>
+    /// Reproduces the <c>DeleteGroupHandler</c> shape under lazy-tx: open the command transaction via
+    /// <see cref="IUnitOfWork.EnsureTransactionAsync"/>, run a change-tracker-bypassing
+    /// <c>ExecuteUpdateAsync</c> against a real table, stage a tracked write, then throw. Proves the seam
+    /// makes the bulk update atomic with the failure — without <c>EnsureTransactionAsync</c> the
+    /// <c>ExecuteUpdate</c> would autocommit independently and survive the rollback.
+    /// </summary>
+    public sealed record ExecuteUpdateRollbackProbeCommand(Guid GroupId, string MarkerName) : ICommand<Unit>;
+
+    public sealed class ExecuteUpdateRollbackProbeHandler(
+        AppDbContext db,
+        IUnitOfWork unitOfWork)
+        : IRequestHandler<ExecuteUpdateRollbackProbeCommand, Unit>
+    {
+        public async Task<Unit> Handle(ExecuteUpdateRollbackProbeCommand request, CancellationToken cancellationToken)
+        {
+            // Open the lazy command transaction before the bulk update, so both land in it.
+            await unitOfWork.EnsureTransactionAsync(cancellationToken);
+
+            await db.Groups
+                .Where(g => g.Id == request.GroupId)
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.Name, request.MarkerName), cancellationToken);
+
+            // A tracked write that shares the same transaction.
+            db.Users.Add(new AppUser
+            {
+                Id = Guid.NewGuid(),
+                Email = $"probe-{Guid.NewGuid():N}@test.local",
+                DisplayName = "execute-update rollback probe",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+
+            throw new InvalidOperationException(
+                "rollback probe: intentional failure after ExecuteUpdate + tracked write");
         }
     }
 }

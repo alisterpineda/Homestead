@@ -32,6 +32,12 @@ public class UnitOfWorkTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private static DbContextOptions<AppDbContext> NewInMemoryOptions() =>
+        new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
     [Fact]
     public async Task SaveChangesAsync_NoChangesNoAudit_IsNoOp()
     {
@@ -168,6 +174,289 @@ public class UnitOfWorkTests : IDisposable
         Assert.False(hookRan);
     }
 
+    [Fact]
+    public async Task ExecuteInTransactionAsync_LazyOpensTransaction_OnlyAfterWorkFlushes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        var beginDuringWork = -1;
+        await sut.ExecuteInTransactionAsync(() =>
+        {
+            // The entity is staged but not flushed mid-work, so no transaction is opened yet.
+            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            beginDuringWork = facade.BeginCount;
+            return Task.FromResult(0);
+        }, ct);
+
+        Assert.Equal(0, beginDuringWork);                 // lazy: nothing opened during the work
+        Assert.Equal(1, facade.BeginCount);               // opened by the trailing flush
+        await facade.Tx.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_NoOpCommand_OpensNoTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        var hookRan = false;
+        await sut.ExecuteInTransactionAsync(() =>
+        {
+            // No tracked changes, no audit: a true no-op command.
+            sut.OnAfterCommit(_ => { hookRan = true; return Task.CompletedTask; });
+            return Task.FromResult(0);
+        }, ct);
+
+        Assert.Equal(0, facade.BeginCount);
+        await facade.Tx.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+        Assert.True(hookRan, "after-commit hooks must still drain for a no-op command");
+    }
+
+    [Fact]
+    public async Task EnsureTransactionAsync_InsideScope_OpensBeforeFirstFlush()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        var beginInWork = -1;
+        IDbContextTransaction? txInWork = null;
+        await sut.ExecuteInTransactionAsync(async () =>
+        {
+            await sut.EnsureTransactionAsync(ct);   // force the tx open before any change is flushed
+            beginInWork = facade.BeginCount;
+            txInWork = db.Database.CurrentTransaction;
+            return 0;
+        }, ct);
+
+        Assert.Equal(1, beginInWork);
+        Assert.NotNull(txInWork);
+    }
+
+    [Fact]
+    public async Task EnsureTransactionAsync_IsIdempotent_DoesNotReBegin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        await sut.ExecuteInTransactionAsync(async () =>
+        {
+            await sut.EnsureTransactionAsync(ct);
+            await sut.EnsureTransactionAsync(ct);
+            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            await sut.SaveChangesAsync(ct);   // a real flush — must not re-begin (the _ownedTx guard)
+            return 0;
+        }, ct);
+
+        Assert.Equal(1, facade.BeginCount);
+    }
+
+    [Fact]
+    public async Task EnsureTransactionAsync_OutsideScope_IsNoOp()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        // No command frame is active, so this must neither open a transaction nor throw.
+        await sut.EnsureTransactionAsync(ct);
+
+        Assert.Equal(0, facade.BeginCount);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_NestedNonJoinFrameBeforeFirstFlush_OnlyOuterCommits()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        await sut.ExecuteInTransactionAsync(async () =>
+        {
+            // Nested send dispatched BEFORE any flush: CurrentTransaction is still null, so the inner frame
+            // does NOT join — it nests (depth 2). The inner flush opens the single tx; only the outer commits.
+            await sut.ExecuteInTransactionAsync(() =>
+            {
+                db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "inner@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                return Task.FromResult(0);
+            }, ct);
+            return 0;
+        }, ct);
+
+        Assert.Equal(1, facade.BeginCount);
+        await facade.Tx.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+        await facade.Tx.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_NestedAfterFirstFlush_JoinsViaCurrentTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        await sut.ExecuteInTransactionAsync(async () =>
+        {
+            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "outer@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            await sut.SaveChangesAsync(ct);   // outer flush opens the tx; CurrentTransaction now non-null
+
+            // Nested send now JOINS via CurrentTransaction (returns immediately, no second begin/commit).
+            await sut.ExecuteInTransactionAsync(() =>
+            {
+                db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "inner@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                return Task.FromResult(0);
+            }, ct);
+            return 0;
+        }, ct);
+
+        Assert.Equal(1, facade.BeginCount);
+        await facade.Tx.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+        await facade.Tx.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_NestedThrow_RollsBackExactlyOnce()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        // Two non-join frames (nested before the first flush): the inner opens the tx then throws, so BOTH
+        // catch frames run. The _rolledBack guard must collapse them to a single RollbackAsync (a second
+        // RollbackAsync on the same transaction would throw).
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ExecuteInTransactionAsync<int>(async () =>
+            {
+                await sut.ExecuteInTransactionAsync<int>(async () =>
+                {
+                    db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "inner@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                    await sut.SaveChangesAsync(ct);   // opens the tx
+                    throw new InvalidOperationException("boom");
+                }, ct);
+                return 0;
+            }, ct));
+
+        Assert.Equal(1, facade.BeginCount);
+        await facade.Tx.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+        await facade.Tx.DidNotReceive().CommitAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_Throws_DisposesAndResetsScope()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        // First scope opens a tx, flushes, then throws — the finally must dispose it and reset every scoped flag.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ExecuteInTransactionAsync<int>(async () =>
+            {
+                db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "first@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                await sut.SaveChangesAsync(ct);
+                throw new InvalidOperationException("boom");
+            }, ct));
+
+        // A second scope on the SAME sut must open a fresh transaction — proving the reset.
+        await sut.ExecuteInTransactionAsync<int>(async () =>
+        {
+            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "second@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            await sut.SaveChangesAsync(ct);
+            return 0;
+        }, ct);
+
+        Assert.Equal(2, facade.BeginCount);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_ThrowingAfterCommitHook_DoesNotRollBackCommittedTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+
+        // The work flushes (opening + committing the tx), then an after-commit hook throws. The commit
+        // already happened, so the failure must NOT trigger a rollback of committed data — and the hook's
+        // own exception must surface, not a rollback-after-commit error.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ExecuteInTransactionAsync<int>(() =>
+            {
+                db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                sut.OnAfterCommit(_ => throw new InvalidOperationException("hook failed"));
+                return Task.FromResult(0);
+            }, ct));
+
+        Assert.Equal("hook failed", ex.Message);
+        await facade.Tx.Received(1).CommitAsync(Arg.Any<CancellationToken>());
+        await facade.Tx.DidNotReceive().RollbackAsync(Arg.Any<CancellationToken>());
+        await facade.Tx.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_RolledBackCommandHook_DoesNotLeakToNextCommand()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var hookRuns = 0;
+
+        // First command registers an after-commit hook then throws → rolled back, hook must be discarded.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ExecuteInTransactionAsync<int>(() =>
+            {
+                sut.OnAfterCommit(_ => { hookRuns++; return Task.CompletedTask; });
+                throw new InvalidOperationException("boom");
+            }, ct));
+
+        // A second command on the SAME scoped unit of work commits — the rolled-back command's hook must
+        // not leak into it.
+        await sut.ExecuteInTransactionAsync(() =>
+        {
+            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+            return Task.FromResult(0);
+        }, ct);
+
+        Assert.Equal(0, hookRuns);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_RollbackFailure_DoesNotMaskOriginalException()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var facade = db.Facade;
+        facade.Tx.RollbackAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("rollback failed")));
+
+        // The handler throws (rollback trigger); the rollback itself then fails. The ORIGINAL handler
+        // exception must propagate, not the rollback's.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ExecuteInTransactionAsync<int>(async () =>
+            {
+                db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
+                await sut.SaveChangesAsync(ct);   // opens the tx
+                throw new InvalidOperationException("original failure");
+            }, ct));
+
+        Assert.Equal("original failure", ex.Message);
+        await facade.Tx.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
+    }
+
     /// <summary>
     /// A <see cref="TestAppDbContext"/> whose <see cref="DatabaseFacade"/> reports an open ambient
     /// transaction, used to exercise the join branch of <see cref="UnitOfWork.ExecuteInTransactionAsync{T}"/>
@@ -184,6 +473,46 @@ public class UnitOfWorkTests : IDisposable
         {
             public override IDbContextTransaction? CurrentTransaction { get; } =
                 Substitute.For<IDbContextTransaction>();
+        }
+    }
+
+    /// <summary>
+    /// A <see cref="TestAppDbContext"/> whose <see cref="DatabaseFacade"/> records
+    /// <c>BeginTransactionAsync</c> calls and exposes the begun transaction as
+    /// <see cref="DatabaseFacade.CurrentTransaction"/> (the InMemory provider keeps it null even after a
+    /// begin). The real InMemory store still backs <c>SaveChangesAsync</c> — only the transaction lifecycle
+    /// is observed — so lazy-open / commit / rollback / dispose can be asserted in a unit test.
+    /// </summary>
+    private sealed class RecordingTransactionDbContext(DbContextOptions<AppDbContext> options)
+        : TestAppDbContext(options)
+    {
+        private RecordingFacade? _database;
+        public RecordingFacade Facade => (RecordingFacade)Database;
+        public override DatabaseFacade Database => _database ??= new RecordingFacade(this);
+
+        internal sealed class RecordingFacade : DatabaseFacade
+        {
+            public int BeginCount { get; private set; }
+            public IDbContextTransaction Tx { get; }
+            private IDbContextTransaction? _current;
+
+            public RecordingFacade(DbContext context) : base(context)
+            {
+                Tx = Substitute.For<IDbContextTransaction>();
+                // Clear CurrentTransaction on dispose (mirrors a real provider) so a second command scope on
+                // the same SUT sees no ambient tx and opens a fresh one. When/Do keeps this a side effect
+                // only — it is not counted as a received DisposeAsync call.
+                Tx.When(t => t.DisposeAsync()).Do(_ => _current = null);
+            }
+
+            public override IDbContextTransaction? CurrentTransaction => _current;
+
+            public override Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default)
+            {
+                BeginCount++;
+                _current = Tx;   // visible as CurrentTransaction post-begin (like Npgsql)
+                return Task.FromResult(Tx);
+            }
         }
     }
 }

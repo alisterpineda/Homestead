@@ -29,7 +29,8 @@ public class JobQueue(AppDbContext db, IJobSignal signal, IUnitOfWork unitOfWork
         };
 
         db.ProcessingJobs.Add(job);
-        await db.SaveChangesAsync(ct);   // flushes into the ambient tx, or commits when there is none
+        await unitOfWork.EnsureTransactionAsync(ct);   // in-command: open the lazy tx so the row flushes INTO it
+        await db.SaveChangesAsync(ct);   // standalone scheduler scope: no-op above, this autocommits
 
         // The processor reads committed rows from a SEPARATE scope/connection, so the wakeup must fire
         // only once our work is durable. Inside a request transaction (the command pipeline) the save

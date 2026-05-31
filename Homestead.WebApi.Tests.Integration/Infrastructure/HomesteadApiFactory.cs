@@ -81,6 +81,9 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.AddTransient<
                 IRequestHandler<TransactionRollbackProbes.EnqueueRollbackProbeCommand, Unit>,
                 TransactionRollbackProbes.EnqueueRollbackProbeHandler>();
+            services.AddTransient<
+                IRequestHandler<TransactionRollbackProbes.ExecuteUpdateRollbackProbeCommand, Unit>,
+                TransactionRollbackProbes.ExecuteUpdateRollbackProbeHandler>();
 
             // Swap the system clock for a controllable one so scheduler tests can pin "now". This
             // replaces TimeProvider for EVERY DI consumer (the scheduler today, but also anything else

@@ -37,8 +37,22 @@ public interface IUnitOfWork
     /// no tracked changes and no pending audit entries, so a handler that already flushed is neither
     /// double-committed nor double-audited. Inside a command transaction this flushes rather than
     /// commits — durability comes from the transaction commit in <see cref="ExecuteInTransactionAsync{T}"/>.
+    /// <para>
+    /// <strong>No longer a pure flush:</strong> the command transaction now opens lazily on the first
+    /// real flush, so a mid-handler call here may open the transaction and lease a pooled connection.
+    /// Do slow external work (AI/HTTP) <em>before</em> the first flush so it holds no connection.
+    /// </para>
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Forces the command transaction open immediately, if a command scope is active and none is open yet.
+    /// Change-tracker-bypassing writes — <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>, or a direct
+    /// <c>db.SaveChangesAsync</c> such as <see cref="Processing.JobQueue"/> — must call this first so their
+    /// writes land inside the command transaction (and so a subsequent <c>CurrentTransaction</c> check is
+    /// accurate). A safe no-op outside a command scope or when a transaction is already open.
+    /// </summary>
+    Task EnsureTransactionAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Enqueues a side effect (SignalR notifications, file cleanup, thumbnails, job-processor signals)
