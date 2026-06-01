@@ -84,8 +84,8 @@ public class ImportCommodityPricesJobHandler(
                 payload.Source, result.Observations.Count, result.Warning ?? "(none)");
 
         // Fold the DB write + audit into the unit-of-work chokepoint. Runs in this job's DI scope, so the
-        // command handler shares the pooled AppDbContext (and the settings entity loaded above), and the
-        // UnitOfWorkBehavior commits once after the command. Scheduled imports stay system-attributed;
+        // command handler shares the same scoped AppDbContext (and the settings entity loaded above), and
+        // the UnitOfWorkBehavior commits once after the command. Scheduled imports stay system-attributed;
         // manual runs are attributed to the initiating user.
         await sender.Send(new ApplyCommodityPriceObservationsCommand
         {

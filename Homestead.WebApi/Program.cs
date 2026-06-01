@@ -76,14 +76,22 @@ void MapCsvEnvToConfigArray(string envVar, string configPrefix)
         builder.Configuration[$"{configPrefix}:{i}"] = values[i];
 }
 
-builder.AddNpgsqlDbContext<AppDbContext>(
-    connectionName: "postgresdb",
-    // Disable EF execution-strategy retries: the command pipeline wraps each command in an explicit
-    // transaction (UnitOfWork.ExecuteInTransactionAsync), and BeginTransactionAsync is only legal
-    // without a retrying execution strategy. The integration test factory already registers the
-    // DbContext without retry, so test and production execution-strategy behavior now match.
-    configureSettings: settings => settings.DisableRetry = true,
-    configureDbContextOptions: opts => opts
+// AppDbContext is registered NON-POOLED on purpose. The command-transaction interceptors are scoped
+// (their CommandTransactionCoordinator holds per-request transaction state), and a scoped interceptor
+// cannot be attached to a pooled context: pooling builds the DbContextOptions once as a singleton, so the
+// interceptors would be resolved a single time from the root provider — a no-op on every request (the
+// interceptor's coordinator is never the request's coordinator) and a scope-validation crash in
+// Development. A non-pooled context runs the (IServiceProvider, options) callback per request, so each
+// request gets its own interceptors bound to its own coordinator. EnrichNpgsqlDbContext below keeps
+// Aspire's health checks, telemetry, and retry configuration.
+var postgresConnectionString = builder.Configuration.GetConnectionString("postgresdb");
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    options.UseNpgsql(postgresConnectionString);
+    options.AddInterceptors(
+        sp.GetRequiredService<CommandSaveChangesInterceptor>(),
+        sp.GetRequiredService<CommandWriteCommandInterceptor>());
+    options
         .UseSeeding((ctx, created) =>
         {
             CurrencySeeder.Seed(ctx, created);
@@ -95,7 +103,13 @@ builder.AddNpgsqlDbContext<AppDbContext>(
             await CurrencySeeder.SeedAsync(ctx, created, ct);
             await SystemAccountSeeder.SeedAsync(ctx, created, ct);
             await CommodityPriceSourceSettingsSeeder.SeedAsync(ctx, created, ct);
-        }));
+        });
+});
+// Disable EF execution-strategy retries: the command pipeline wraps each command in an explicit
+// transaction (UnitOfWork.ExecuteInTransactionAsync), and BeginTransactionAsync is only legal without a
+// retrying execution strategy. Enrich (not Add) so Aspire augments the registration above instead of
+// registering its own pooled context.
+builder.EnrichNpgsqlDbContext<AppDbContext>(configureSettings: settings => settings.DisableRetry = true);
 
 // Serialize enums as strings in JSON responses and OpenAPI spec,
 // without interfering with query parameter binding (which uses Enum.TryParse).
@@ -116,6 +130,15 @@ builder.Services.AddScoped<IProcessingNotifier, ProcessingNotifier>();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 builder.Services.AddScoped<IAuditContext, AuditContext>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+// The scoped state machine + EF interceptors that make change-tracker-bypassing writes
+// (ExecuteUpdate/ExecuteDelete/direct db.SaveChangesAsync) atomic with the command transaction by
+// construction. The interceptors are attached per request by the non-pooled AddDbContext registration
+// above (its (sp, options) callback resolves them from the request scope, so each gets the request's
+// coordinator). DesignTimeDbContextFactory (migrations) has no service provider, so the interceptors are
+// intentionally absent there and migrations are unaffected.
+builder.Services.AddScoped<CommandTransactionCoordinator>();
+builder.Services.AddScoped<CommandSaveChangesInterceptor>();
+builder.Services.AddScoped<CommandWriteCommandInterceptor>();
 builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();

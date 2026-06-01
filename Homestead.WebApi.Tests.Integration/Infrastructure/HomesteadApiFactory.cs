@@ -1,11 +1,8 @@
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
-using Homestead.WebApi.Modules.Finances.Seeding;
-using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -72,9 +69,10 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // Register test-only force-login endpoint for inactive user authentication
             services.AddSingleton<IStartupFilter, TestForceLoginStartupFilter>();
 
-            // Register test-only probe handlers used by TransactionRollbackTests. The MediatR open
-            // behaviors (Authorization → Validation → UnitOfWork) are registered as open generics, so
-            // they wrap these requests automatically — the probe runs inside the real command transaction.
+            // Register test-only probe handlers used by the rollback/atomicity suites (TransactionRollbackTests,
+            // LazyTransactionTests, AtomicityByConstructionTests). The MediatR open behaviors
+            // (Authorization → Validation → UnitOfWork) are registered as open generics, so they wrap these
+            // requests automatically — each probe runs inside the real command transaction.
             services.AddTransient<
                 IRequestHandler<TransactionRollbackProbes.AuditedRollbackProbeCommand, Unit>,
                 TransactionRollbackProbes.AuditedRollbackProbeHandler>();
@@ -84,6 +82,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.AddTransient<
                 IRequestHandler<TransactionRollbackProbes.ExecuteUpdateRollbackProbeCommand, Unit>,
                 TransactionRollbackProbes.ExecuteUpdateRollbackProbeHandler>();
+            services.AddTransient<
+                IRequestHandler<TransactionRollbackProbes.ExecuteDeleteNoEnsureRollbackProbeCommand, Unit>,
+                TransactionRollbackProbes.ExecuteDeleteNoEnsureRollbackProbeHandler>();
+            services.AddTransient<
+                IRequestHandler<TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeCommand, Unit>,
+                TransactionRollbackProbes.DirectSaveChangesNoEnsureRollbackProbeHandler>();
 
             // Swap the system clock for a controllable one so scheduler tests can pin "now". This
             // replaces TimeProvider for EVERY DI consumer (the scheduler today, but also anything else
@@ -100,38 +104,14 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IAiClassificationService>();
             services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
 
-            // Remove ALL Aspire/EF Core DbContext-related registrations to avoid lifetime conflicts.
-            // Aspire's AddNpgsqlDbContext registers pooling services (singleton IDbContextPool)
-            // that conflict with a plain AddDbContext (scoped DbContextOptions).
-            var toRemove = services
-                .Where(d =>
-                    d.ServiceType == typeof(DbContextOptions<AppDbContext>) ||
-                    d.ServiceType == typeof(DbContextOptions) ||
-                    d.ServiceType == typeof(AppDbContext) ||
-                    (d.ServiceType.IsGenericType &&
-                        (d.ServiceType.GetGenericTypeDefinition().FullName?.Contains("IDbContextPool") == true ||
-                         d.ServiceType.GetGenericTypeDefinition().FullName?.Contains("IScopedDbContextLease") == true ||
-                         d.ServiceType.GetGenericTypeDefinition().FullName?.Contains("IDbContextOptionsConfiguration") == true)))
-                .ToList();
-            foreach (var d in toRemove)
-                services.Remove(d);
-
-            services.AddDbContext<AppDbContext>(options =>
-            {
-                options.UseNpgsql(_connectionString);
-                // Re-register the seeding hooks — ConfigureServices above stripped the
-                // Aspire DbContext registration that originally carried them.
-                options.UseSeeding((ctx, created) =>
-                {
-                    CurrencySeeder.Seed(ctx, created);
-                    SystemAccountSeeder.Seed(ctx, created);
-                });
-                options.UseAsyncSeeding(async (ctx, created, ct) =>
-                {
-                    await CurrencySeeder.SeedAsync(ctx, created, ct);
-                    await SystemAccountSeeder.SeedAsync(ctx, created, ct);
-                });
-            });
+            // NO DbContext swap. AppDbContext uses the REAL production registration from Program.cs
+            // (non-pooled AddDbContext + EnrichNpgsqlDbContext, with the command-transaction interceptors
+            // attached per request via the (sp, options) callback). UseSetting("ConnectionStrings:postgresdb")
+            // above redirects it to this test's Postgres container, so the integration suite exercises the
+            // exact wiring that ships — including that the scoped interceptors actually fire per request and
+            // that the host passes Development scope-validation. Production switched AppDbContext off EF
+            // DbContext pooling precisely so a scoped interceptor resolves per request, which also removed
+            // the pooling/lifetime conflict this block used to work around.
         });
     }
 

@@ -42,23 +42,26 @@ public interface IUnitOfWork
     /// real flush, so a mid-handler call here may open the transaction and lease a pooled connection.
     /// Do slow external work (AI/HTTP) <em>before</em> the first flush so it holds no connection.
     /// </para>
+    /// <para>
+    /// Change-tracker-bypassing writes (<c>ExecuteUpdate</c>/<c>ExecuteDelete</c>, or a direct
+    /// <c>db.SaveChangesAsync</c>) are made atomic with the command transaction <em>automatically</em> by
+    /// the command transaction interceptors (<see cref="CommandSaveChangesInterceptor"/> /
+    /// <see cref="CommandWriteCommandInterceptor"/>); no manual call is needed before them.
+    /// </para>
     /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Forces the command transaction open immediately, if a command scope is active and none is open yet.
-    /// Change-tracker-bypassing writes — <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>, or a direct
-    /// <c>db.SaveChangesAsync</c> such as <see cref="Processing.JobQueue"/> — must call this first so their
-    /// writes land inside the command transaction (and so a subsequent <c>CurrentTransaction</c> check is
-    /// accurate). A safe no-op outside a command scope or when a transaction is already open.
-    /// </summary>
-    Task EnsureTransactionAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Enqueues a side effect (SignalR notifications, file cleanup, thumbnails, job-processor signals)
     /// to run only after the work has durably committed. Hooks are drained by
     /// <see cref="ExecuteInTransactionAsync{T}"/> once the command's commit has completed, outside the
     /// transaction.
+    /// <para>
+    /// Hooks run <em>after</em> the command transaction has committed and ownership has been released, so a
+    /// hook must not perform a transactional database write: there is no live command transaction left to
+    /// enrol it in, so a tracked <see cref="SaveChangesAsync"/> would autocommit and a bulk write would bind
+    /// to the already-completed transaction. Keep hooks to non-transactional side effects.
+    /// </para>
     /// </summary>
     void OnAfterCommit(Func<CancellationToken, Task> hook);
 

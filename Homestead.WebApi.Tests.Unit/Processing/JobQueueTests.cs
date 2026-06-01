@@ -40,9 +40,9 @@ public class JobQueueTests : IDisposable
         Assert.Equal(ProcessingJobStatus.Pending, job!.Status);
         Assert.Equal(ProcessingJobType.UploadDocument, job.Type);
 
-        // The enqueue is a change-tracker-bypassing direct save, so it must open the lazy command
-        // transaction first (a no-op in the scheduler's own scope, which is what InMemory exercises here).
-        await _unitOfWork.Received(1).EnsureTransactionAsync(Arg.Any<CancellationToken>());
+        // The enqueue is a change-tracker-bypassing direct save; in-command the SavingChanges interceptor
+        // opens the lazy command tx so it lands atomically (a no-op in the scheduler's own scope, which is
+        // what InMemory exercises here — CurrentTransaction stays null, so the signal fires inline).
         _signal.Received(1).Signal();
     }
 

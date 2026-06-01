@@ -75,29 +75,29 @@ public static class TransactionRollbackProbes
     }
 
     /// <summary>
-    /// Reproduces the <c>DeleteGroupHandler</c> shape under lazy-tx: open the command transaction via
-    /// <see cref="IUnitOfWork.EnsureTransactionAsync"/>, run a change-tracker-bypassing
-    /// <c>ExecuteUpdateAsync</c> against a real table, stage a tracked write, then throw. Proves the seam
-    /// makes the bulk update atomic with the failure — without <c>EnsureTransactionAsync</c> the
-    /// <c>ExecuteUpdate</c> would autocommit independently and survive the rollback.
+    /// Reproduces the <c>DeleteGroupHandler</c> shape under by-construction atomicity: run a
+    /// change-tracker-bypassing <c>ExecuteUpdateAsync</c> against a real table with NO manual transaction
+    /// call, flush a tracked write into the same transaction, then throw. Proves
+    /// <c>CommandWriteCommandInterceptor</c> opens the command transaction before the bulk update reaches
+    /// the database and re-binds it onto the command transaction — so both the bulk update and the flushed
+    /// tracked write roll back with the failure. Without the interceptor the <c>ExecuteUpdate</c> would
+    /// autocommit independently and survive the rollback.
     /// </summary>
     public sealed record ExecuteUpdateRollbackProbeCommand(Guid GroupId, string MarkerName) : ICommand<Unit>;
 
-    public sealed class ExecuteUpdateRollbackProbeHandler(
-        AppDbContext db,
-        IUnitOfWork unitOfWork)
+    public sealed class ExecuteUpdateRollbackProbeHandler(AppDbContext db)
         : IRequestHandler<ExecuteUpdateRollbackProbeCommand, Unit>
     {
         public async Task<Unit> Handle(ExecuteUpdateRollbackProbeCommand request, CancellationToken cancellationToken)
         {
-            // Open the lazy command transaction before the bulk update, so both land in it.
-            await unitOfWork.EnsureTransactionAsync(cancellationToken);
-
+            // No manual EnsureTransaction call — the interceptor opens the command tx before this bulk
+            // update reaches the database, so it lands atomically.
             await db.Groups
                 .Where(g => g.Id == request.GroupId)
                 .ExecuteUpdateAsync(s => s.SetProperty(g => g.Name, request.MarkerName), cancellationToken);
 
-            // A tracked write that shares the same transaction.
+            // A tracked write FLUSHED into the same command tx (so its rollback is genuinely exercised, not
+            // left un-flushed in the change tracker). The SavingChanges interceptor keeps it in the open tx.
             db.Users.Add(new AppUser
             {
                 Id = Guid.NewGuid(),
@@ -105,9 +105,62 @@ public static class TransactionRollbackProbes
                 DisplayName = "execute-update rollback probe",
                 CreatedAt = DateTimeOffset.UtcNow,
             });
+            await db.SaveChangesAsync(cancellationToken);
 
             throw new InvalidOperationException(
-                "rollback probe: intentional failure after ExecuteUpdate + tracked write");
+                "rollback probe: intentional failure after ExecuteUpdate + flushed tracked write");
+        }
+    }
+
+    /// <summary>
+    /// Runs a change-tracker-bypassing <c>ExecuteDeleteAsync</c> against a real row with NO manual
+    /// transaction call, then throws. Proves <c>CommandWriteCommandInterceptor</c> makes the bulk delete
+    /// atomic with the command by construction: the deleted row must survive the rollback. Without the
+    /// interceptor the <c>ExecuteDelete</c> would autocommit on its own connection and the row would vanish.
+    /// </summary>
+    public sealed record ExecuteDeleteNoEnsureRollbackProbeCommand(Guid GroupId) : ICommand<Unit>;
+
+    public sealed class ExecuteDeleteNoEnsureRollbackProbeHandler(AppDbContext db)
+        : IRequestHandler<ExecuteDeleteNoEnsureRollbackProbeCommand, Unit>
+    {
+        public async Task<Unit> Handle(ExecuteDeleteNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
+        {
+            await db.Groups
+                .Where(g => g.Id == request.GroupId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            throw new InvalidOperationException(
+                "rollback probe: intentional failure after ExecuteDelete");
+        }
+    }
+
+    /// <summary>
+    /// Stages an <see cref="AppUser"/> and flushes it with a direct <c>db.SaveChangesAsync</c> (bypassing
+    /// <see cref="IUnitOfWork.SaveChangesAsync"/>) — NO manual transaction call — then throws. Proves
+    /// <c>CommandSaveChangesInterceptor</c> opens the command tx before EF builds its own autocommit batch,
+    /// so even a direct save lands inside the command transaction and rolls back with the failure.
+    /// </summary>
+    public sealed record DirectSaveChangesNoEnsureRollbackProbeCommand(Guid EntityId) : ICommand<Unit>;
+
+    public sealed class DirectSaveChangesNoEnsureRollbackProbeHandler(AppDbContext db)
+        : IRequestHandler<DirectSaveChangesNoEnsureRollbackProbeCommand, Unit>
+    {
+        public async Task<Unit> Handle(DirectSaveChangesNoEnsureRollbackProbeCommand request, CancellationToken cancellationToken)
+        {
+            db.Users.Add(new AppUser
+            {
+                Id = request.EntityId,
+                Email = $"probe-{request.EntityId:N}@test.local",
+                DisplayName = "direct-save rollback probe",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+
+            // Direct save (not unitOfWork.SaveChangesAsync): the SavingChanges interceptor must open the
+            // command tx so this flush is atomic with the command, not an independent autocommit.
+            await db.SaveChangesAsync(cancellationToken);
+
+            throw new InvalidOperationException(
+                "rollback probe: intentional failure after direct db.SaveChangesAsync");
         }
     }
 }

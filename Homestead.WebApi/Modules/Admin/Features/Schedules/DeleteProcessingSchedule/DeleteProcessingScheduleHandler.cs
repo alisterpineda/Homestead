@@ -5,15 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSchedule;
 
-public class DeleteProcessingScheduleHandler(AppDbContext db, IUnitOfWork unitOfWork)
+public class DeleteProcessingScheduleHandler(AppDbContext db)
     : IRequestHandler<DeleteProcessingScheduleCommand, bool>
 {
     public async Task<bool> Handle(DeleteProcessingScheduleCommand request, CancellationToken ct)
     {
-        // Open the lazy command transaction before the change-tracker-bypassing ExecuteDelete, so it stays
-        // transactional (today's eager tx wrapped it; under naive lazy-tx it would autocommit standalone).
-        await unitOfWork.EnsureTransactionAsync(ct);
-
+        // The change-tracker-bypassing ExecuteDelete is made transactional automatically:
+        // CommandWriteCommandInterceptor opens the command tx as the DELETE reaches the database (the match
+        // count is not yet known at that point), so it rolls back with the command on any later failure —
+        // e.g. the not-found throw below leaves no committed effect.
         var affected = await db.ProcessingSchedules
             .Where(s => s.Id == request.Id)
             .ExecuteDeleteAsync(ct);

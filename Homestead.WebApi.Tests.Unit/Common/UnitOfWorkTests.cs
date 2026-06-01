@@ -5,8 +5,6 @@ using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Common;
@@ -23,7 +21,7 @@ public class UnitOfWorkTests : IDisposable
     {
         // ForUser returns the same mock so we can assert which actor was resolved + the log calls on it.
         _auditLogger.ForUser(Arg.Any<Guid?>()).Returns(_auditLogger);
-        _sut = new UnitOfWork(_db, _auditContext, _auditLogger, _currentUser);
+        _sut = new UnitOfWork(_db, _auditContext, _auditLogger, _currentUser, new CommandTransactionCoordinator());
     }
 
     public void Dispose()
@@ -32,11 +30,7 @@ public class UnitOfWorkTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static DbContextOptions<AppDbContext> NewInMemoryOptions() =>
-        new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
-            .Options;
+    private static DbContextOptions<AppDbContext> NewInMemoryOptions() => TestDbContextOptions.NewInMemory();
 
     [Fact]
     public async Task SaveChangesAsync_NoChangesNoAudit_IsNoOp()
@@ -156,7 +150,7 @@ public class UnitOfWorkTests : IDisposable
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
         using var ambientTxDb = new AmbientTransactionDbContext(options);
-        var sut = new UnitOfWork(ambientTxDb, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(ambientTxDb, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
 
         var workRan = false;
         var hookRan = false;
@@ -179,7 +173,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         var beginDuringWork = -1;
@@ -201,7 +195,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         var hookRan = false;
@@ -218,67 +212,11 @@ public class UnitOfWorkTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureTransactionAsync_InsideScope_OpensBeforeFirstFlush()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
-        var facade = db.Facade;
-
-        var beginInWork = -1;
-        IDbContextTransaction? txInWork = null;
-        await sut.ExecuteInTransactionAsync(async () =>
-        {
-            await sut.EnsureTransactionAsync(ct);   // force the tx open before any change is flushed
-            beginInWork = facade.BeginCount;
-            txInWork = db.Database.CurrentTransaction;
-            return 0;
-        }, ct);
-
-        Assert.Equal(1, beginInWork);
-        Assert.NotNull(txInWork);
-    }
-
-    [Fact]
-    public async Task EnsureTransactionAsync_IsIdempotent_DoesNotReBegin()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
-        var facade = db.Facade;
-
-        await sut.ExecuteInTransactionAsync(async () =>
-        {
-            await sut.EnsureTransactionAsync(ct);
-            await sut.EnsureTransactionAsync(ct);
-            db.Users.Add(new AppUser { Id = Guid.NewGuid(), Email = "u@test.com", CreatedAt = DateTimeOffset.UtcNow });
-            await sut.SaveChangesAsync(ct);   // a real flush — must not re-begin (the _ownedTx guard)
-            return 0;
-        }, ct);
-
-        Assert.Equal(1, facade.BeginCount);
-    }
-
-    [Fact]
-    public async Task EnsureTransactionAsync_OutsideScope_IsNoOp()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
-        var facade = db.Facade;
-
-        // No command frame is active, so this must neither open a transaction nor throw.
-        await sut.EnsureTransactionAsync(ct);
-
-        Assert.Equal(0, facade.BeginCount);
-    }
-
-    [Fact]
     public async Task ExecuteInTransactionAsync_NestedNonJoinFrameBeforeFirstFlush_OnlyOuterCommits()
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         await sut.ExecuteInTransactionAsync(async () =>
@@ -303,7 +241,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         await sut.ExecuteInTransactionAsync(async () =>
@@ -330,7 +268,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         // Two non-join frames (nested before the first flush): the inner opens the tx then throws, so BOTH
@@ -358,7 +296,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         // First scope opens a tx, flushes, then throws — the finally must dispose it and reset every scoped flag.
@@ -386,7 +324,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
 
         // The work flushes (opening + committing the tx), then an after-commit hook throws. The commit
@@ -411,7 +349,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var hookRuns = 0;
 
         // First command registers an after-commit hook then throws → rolled back, hook must be discarded.
@@ -438,7 +376,7 @@ public class UnitOfWorkTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         using var db = new RecordingTransactionDbContext(NewInMemoryOptions());
-        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser);
+        var sut = new UnitOfWork(db, new AuditContext(), _auditLogger, _currentUser, new CommandTransactionCoordinator());
         var facade = db.Facade;
         facade.Tx.RollbackAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new InvalidOperationException("rollback failed")));
@@ -455,64 +393,5 @@ public class UnitOfWorkTests : IDisposable
 
         Assert.Equal("original failure", ex.Message);
         await facade.Tx.Received(1).RollbackAsync(Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// A <see cref="TestAppDbContext"/> whose <see cref="DatabaseFacade"/> reports an open ambient
-    /// transaction, used to exercise the join branch of <see cref="UnitOfWork.ExecuteInTransactionAsync{T}"/>
-    /// (the InMemory provider always reports <c>CurrentTransaction == null</c>, so the branch is otherwise
-    /// unreachable in a unit test).
-    /// </summary>
-    private sealed class AmbientTransactionDbContext(DbContextOptions<AppDbContext> options)
-        : TestAppDbContext(options)
-    {
-        private DatabaseFacade? _database;
-        public override DatabaseFacade Database => _database ??= new StubTransactionFacade(this);
-
-        private sealed class StubTransactionFacade(DbContext context) : DatabaseFacade(context)
-        {
-            public override IDbContextTransaction? CurrentTransaction { get; } =
-                Substitute.For<IDbContextTransaction>();
-        }
-    }
-
-    /// <summary>
-    /// A <see cref="TestAppDbContext"/> whose <see cref="DatabaseFacade"/> records
-    /// <c>BeginTransactionAsync</c> calls and exposes the begun transaction as
-    /// <see cref="DatabaseFacade.CurrentTransaction"/> (the InMemory provider keeps it null even after a
-    /// begin). The real InMemory store still backs <c>SaveChangesAsync</c> — only the transaction lifecycle
-    /// is observed — so lazy-open / commit / rollback / dispose can be asserted in a unit test.
-    /// </summary>
-    private sealed class RecordingTransactionDbContext(DbContextOptions<AppDbContext> options)
-        : TestAppDbContext(options)
-    {
-        private RecordingFacade? _database;
-        public RecordingFacade Facade => (RecordingFacade)Database;
-        public override DatabaseFacade Database => _database ??= new RecordingFacade(this);
-
-        internal sealed class RecordingFacade : DatabaseFacade
-        {
-            public int BeginCount { get; private set; }
-            public IDbContextTransaction Tx { get; }
-            private IDbContextTransaction? _current;
-
-            public RecordingFacade(DbContext context) : base(context)
-            {
-                Tx = Substitute.For<IDbContextTransaction>();
-                // Clear CurrentTransaction on dispose (mirrors a real provider) so a second command scope on
-                // the same SUT sees no ambient tx and opens a fresh one. When/Do keeps this a side effect
-                // only — it is not counted as a received DisposeAsync call.
-                Tx.When(t => t.DisposeAsync()).Do(_ => _current = null);
-            }
-
-            public override IDbContextTransaction? CurrentTransaction => _current;
-
-            public override Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default)
-            {
-                BeginCount++;
-                _current = Tx;   // visible as CurrentTransaction post-begin (like Npgsql)
-                return Task.FromResult(Tx);
-            }
-        }
     }
 }

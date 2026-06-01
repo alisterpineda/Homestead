@@ -3,15 +3,15 @@ using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using static Homestead.WebApi.Tests.Integration.Infrastructure.TransactionRollbackProbes;
 
 namespace Homestead.WebApi.Tests.Integration.Transactions;
 
 /// <summary>
-/// Validates the lazy-transaction seams that keep change-tracker-bypassing writes
-/// (<c>ExecuteUpdate</c>/<c>ExecuteDelete</c>) atomic with the rest of the command. Real transaction
-/// semantics need a relational provider, so these live in the integration suite (InMemory ignores them).
+/// Validates that change-tracker-bypassing writes (<c>ExecuteUpdate</c>/<c>ExecuteDelete</c>) are atomic
+/// with the rest of the command — now provided by the command-transaction interceptors (by construction),
+/// with the lazy-open seam governing the tracked-write side. Real transaction semantics need a relational
+/// provider, so these live in the integration suite (InMemory ignores them).
 /// </summary>
 public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase(fixture)
 {
@@ -21,8 +21,9 @@ public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase
         var adminClient = await CreateAdminClientAsync();
         var groupId = await CreateGroupAsync(adminClient, "Original Name");
 
-        // The probe opens the lazy tx via EnsureTransactionAsync, bulk-updates the group name, stages a
-        // tracked write, then throws. The bulk update must roll back with the failed command.
+        // The probe bulk-updates the group name (no manual transaction call), stages a tracked write, then
+        // throws. CommandWriteCommandInterceptor makes the bulk update atomic by construction, so it must
+        // roll back with the failed command.
         using (var scope = CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
@@ -35,14 +36,18 @@ public class LazyTransactionTests(PostgresFixture fixture) : IntegrationTestBase
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var group = await db.Groups.AsNoTracking().FirstAsync(g => g.Id == groupId, CT);
             Assert.Equal("Original Name", group.Name);
+
+            // The tracked probe write must have rolled back too — nothing from the failed command survives.
+            Assert.False(await db.Users.AsNoTracking()
+                .AnyAsync(u => u.DisplayName == "execute-update rollback probe", CT));
         }
     }
 
     [Fact]
     public async Task DeleteProcessingSchedule_RemovesRow_OnSuccess()
     {
-        // Behavior-preservation check for the mandatory EnsureTransactionAsync added to the handler: the
-        // single ExecuteDelete still deletes on the happy path (the trailing no-op SaveChanges commits it).
+        // Behavior-preservation check: the single ExecuteDelete still deletes on the happy path. The
+        // interceptor opens the command tx as the delete reaches the DB and the pipeline commits it.
         var scheduleId = await SeedScheduleAsync();
 
         using (var scope = CreateScope())

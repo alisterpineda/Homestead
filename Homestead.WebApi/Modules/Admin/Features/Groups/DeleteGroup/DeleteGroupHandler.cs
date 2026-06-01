@@ -15,10 +15,9 @@ public class DeleteGroupHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
         if (group is null)
             throw new EntityNotFoundException("Group not found.");
 
-        // Open the lazy command transaction before the change-tracker-bypassing bulk update below, so the
-        // ExecuteUpdate and the tracked Groups.Remove + flush share one transaction (else the bulk update
-        // would autocommit independently under lazy-tx).
-        await unitOfWork.EnsureTransactionAsync(ct);
+        // The change-tracker-bypassing bulk update and the tracked Groups.Remove + flush share one command
+        // transaction automatically — CommandWriteCommandInterceptor opens it before the ExecuteUpdate
+        // below reaches the database, so the two are atomic without any manual call.
 
         // Set GroupId to null on affected documents (including soft-deleted ones)
         await db.Documents.IgnoreQueryFilters()

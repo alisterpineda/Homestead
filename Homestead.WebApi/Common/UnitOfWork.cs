@@ -1,8 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Homestead.WebApi.Common;
 
@@ -11,42 +9,32 @@ public class UnitOfWork(
     AppDbContext db,
     IAuditContext auditContext,
     IAuditLogger auditLogger,
-    ICurrentUserAccessor currentUser) : IUnitOfWork
+    ICurrentUserAccessor currentUser,
+    CommandTransactionCoordinator coordinator) : IUnitOfWork
 {
     private Guid? _actorOverride;
     private List<Func<CancellationToken, Task>>? _afterCommitHooks;
-
-    private IDbContextTransaction? _ownedTx;
-    private bool _ownsTx;
-    private bool _inCommandScope;
-    private int _depth;
-    private bool _rolledBack;
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken)
     {
         // JOIN: a nested ISender.Send inside an already-open ambient transaction joins it and returns.
         // The outermost frame owns commit + hook draining. No depth/scope mutation on the join path.
-        if (db.Database.CurrentTransaction is not null)
+        if (coordinator.TryBeginScope(db.Database))
             return await work();
 
-        _inCommandScope = true;
-        _depth++;
         try
         {
             var result = await work();
-            // Lazy: SaveChangesAsync opens the tx on the first real flush (after its idempotent guard),
-            // so slow non-DB work in the handler holds no pooled connection.
+            // Lazy: SaveChangesAsync opens the tx on the first real flush (after its idempotent guard), and
+            // the CommandTransactionInterceptor opens it before any change-tracker-bypassing write — so slow
+            // non-DB work in the handler holds no pooled connection.
             await SaveChangesAsync(cancellationToken);
 
-            if (--_depth == 0)
+            if (coordinator.DecrementDepth() == 0)
             {
-                if (_ownsTx)
-                {
-                    await _ownedTx!.CommitAsync(cancellationToken);
-                    // Committed: release ownership BEFORE draining hooks so a throwing after-commit hook
-                    // cannot send the catch into a rollback of the already-committed transaction.
-                    _ownsTx = false;
-                }
+                // Commit releases ownership BEFORE draining hooks so a throwing after-commit hook cannot send
+                // the catch into a rollback of the already-committed transaction.
+                await coordinator.CommitAsync(cancellationToken);
                 await RunAfterCommitHooksAsync(cancellationToken);
             }
 
@@ -54,43 +42,20 @@ public class UnitOfWork(
         }
         catch
         {
-            if (_depth > 0)
-                _depth--;
+            coordinator.DecrementDepth();
             // Roll back at most once across nested catch frames; CancellationToken.None so cleanup runs
             // even when the request token is cancelled.
-            if (_ownsTx && !_rolledBack)
-            {
-                _rolledBack = true;
-                try
-                {
-                    await _ownedTx!.RollbackAsync(CancellationToken.None);
-                }
-                catch
-                {
-                    // A failed rollback (e.g. a broken connection) must not mask the original exception
-                    // that triggered it; the transaction is disposed in the finally regardless.
-                }
-            }
-
+            await coordinator.RollbackOnceAsync();
             throw;
         }
         finally
         {
-            if (_depth == 0 && _ownedTx is not null)
-            {
-                await _ownedTx.DisposeAsync();
-                _ownedTx = null;
-                _ownsTx = false;
-            }
+            await coordinator.DisposeAndResetIfTopAsync();
 
-            if (_depth == 0)
-            {
-                _inCommandScope = false;
-                _rolledBack = false;
+            if (coordinator.Depth == 0)
                 // Discard any hooks a rolled-back command registered so they cannot leak into the next
                 // command that reuses this scoped unit of work (the success path already drained them).
                 _afterCommitHooks = null;
-            }
         }
     }
 
@@ -102,8 +67,10 @@ public class UnitOfWork(
         if (!auditContext.HasEntries && !db.ChangeTracker.HasChanges())
             return 0;
 
-        // Lazy-open the command transaction on the first real flush.
-        await EnsureTransactionStartedCoreAsync(cancellationToken);
+        // Lazy-open the command transaction on the first real flush. Keeping this explicit call preserves
+        // the "no-op command opens no tx" property for the common tracked path; the interceptor is the
+        // safety net for the bypass paths and is idempotent, so it harmlessly no-ops when re-entered here.
+        await coordinator.EnsureStartedAsync(db.Database, cancellationToken);
 
         // Flush batched audit through the existing actor-threading seam. The actor is the request's
         // explicit ActorUserId when supplied (internal jobs), otherwise the signed-in user.
@@ -113,27 +80,12 @@ public class UnitOfWork(
         return await db.SaveChangesAsync(cancellationToken);
     }
 
-    public Task EnsureTransactionAsync(CancellationToken cancellationToken)
-        => EnsureTransactionStartedCoreAsync(cancellationToken);
-
     public void OnAfterCommit(Func<CancellationToken, Task> hook)
     {
         (_afterCommitHooks ??= []).Add(hook);
     }
 
     public void SetActor(Guid? actorUserId) => _actorOverride = actorUserId;
-
-    private async Task EnsureTransactionStartedCoreAsync(CancellationToken cancellationToken)
-    {
-        // Safe no-op outside a command scope (queries / a direct SaveChangesAsync with no ExecuteInTransaction
-        // frame). `_ownedTx is not null` makes this idempotent on InMemory (which keeps CurrentTransaction
-        // null after begin); the CurrentTransaction clause covers a joined frame / an ambient relational tx.
-        if (!_inCommandScope || _ownedTx is not null || db.Database.CurrentTransaction is not null)
-            return;
-
-        _ownedTx = await db.Database.BeginTransactionAsync(cancellationToken);
-        _ownsTx = true;
-    }
 
     private async Task RunAfterCommitHooksAsync(CancellationToken cancellationToken)
     {
