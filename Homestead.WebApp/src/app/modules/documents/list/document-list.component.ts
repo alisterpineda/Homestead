@@ -81,9 +81,8 @@ import { toast } from '@spartan-ng/brain/sonner';
             @if (!isInSelectionState() || !auth.canWrite()) {
               <div class="flex items-center gap-2 mb-3">
                 @if (auth.canWrite() && viewMode() === 'grid') {
-                  <button hlmBtn variant="outline" size="sm" (click)="enterSelectionMode()" aria-label="Enter selection mode">
+                  <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden" (click)="enterSelectionMode()" aria-label="Enter selection mode">
                     <ng-icon hlm name="lucideListChecks" size="sm" />
-                    <span class="hidden sm:inline">Select</span>
                   </button>
                 }
                 <div class="relative flex-1 min-w-0">
