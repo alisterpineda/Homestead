@@ -560,14 +560,17 @@ import { toast } from '@spartan-ng/brain/sonner';
               <p class="text-sm text-muted-foreground">{{ document()!.summary }}</p>
             </div>
           }
-          <textarea
-            hlmTextarea
-            aria-label="Extracted text"
-            class="min-h-0 flex-1 resize-none [field-sizing:fixed]"
-            placeholder="No extracted text available"
-            [value]="editExtractedText()"
-            (input)="editExtractedText.set(asInputValue($event))"
-          ></textarea>
+          <div class="flex min-h-0 flex-1 flex-col gap-1.5">
+            <label hlmLabel for="extracted-text">Extracted Text</label>
+            <textarea
+              hlmTextarea
+              id="extracted-text"
+              class="min-h-0 flex-1 resize-none [field-sizing:fixed]"
+              placeholder="No extracted text available"
+              [value]="editExtractedText()"
+              (input)="editExtractedText.set(asInputValue($event))"
+            ></textarea>
+          </div>
         </div>
       </ng-template>
 
