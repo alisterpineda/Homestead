@@ -200,7 +200,10 @@ public class GetPartiesHandlerTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var names = result.Items.Select(p => p.Name).ToList();
-        // All contain "a" (case-insensitive), sorted by name ascending
+        // GetPartiesHandler filters with Name.ToLower().Contains(search) (NOT EF.Functions.ILike). On EF
+        // InMemory that runs as CLR string ops; on PostgreSQL it lowercases both sides under the DB collation.
+        // With all-ASCII fixtures this only pins the query SHAPE / case-folding intent — it is NOT coverage of
+        // Postgres ICU collation / locale case-folding (e.g. Turkish-i, accents); that lives in integration.
         Assert.True(names.SequenceEqual(names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase)));
         foreach (var name in names)
             Assert.Contains("a", name, StringComparison.OrdinalIgnoreCase);

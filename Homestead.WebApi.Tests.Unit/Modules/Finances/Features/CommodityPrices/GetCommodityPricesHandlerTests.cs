@@ -144,54 +144,12 @@ public class GetCommodityPricesHandlerTests : IDisposable
         Assert.Equal([5m, 50m, 100m], result.Items.Select(p => p.Rate).ToArray());
     }
 
-    [Fact]
-    public async Task Handle_SortBySourceAsc_OrdersByEnumValue()
-    {
-        var now = DateTimeOffset.UtcNow;
-        await SeedAsync(
-            MakePrice(now.AddMinutes(-1), 1m, CommodityPriceSource.Manual),
-            MakePrice(now.AddMinutes(-2), 2m, CommodityPriceSource.Transaction),
-            MakePrice(now.AddMinutes(-3), 3m, CommodityPriceSource.AlphaVantage));
-
-        var result = await _sut.Handle(
-            new GetCommodityPricesQuery
-            {
-                CommodityId = _commodityId,
-                Page = 1,
-                PageSize = 10,
-                SortBy = CommodityPriceSortBy.Source,
-                SortDir = SortDirection.Asc,
-            }, Ct);
-
-        // Enum order: Transaction(0), Manual(1), BankOfCanada(2), AlphaVantage(3)
-        Assert.Equal(
-            [CommodityPriceSource.Transaction, CommodityPriceSource.Manual, CommodityPriceSource.AlphaVantage],
-            result.Items.Select(p => p.Source).ToArray());
-    }
-
-    [Fact]
-    public async Task Handle_SortBySourceDesc_OrdersByEnumValueDesc()
-    {
-        var now = DateTimeOffset.UtcNow;
-        await SeedAsync(
-            MakePrice(now.AddMinutes(-1), 1m, CommodityPriceSource.Manual),
-            MakePrice(now.AddMinutes(-2), 2m, CommodityPriceSource.Transaction),
-            MakePrice(now.AddMinutes(-3), 3m, CommodityPriceSource.AlphaVantage));
-
-        var result = await _sut.Handle(
-            new GetCommodityPricesQuery
-            {
-                CommodityId = _commodityId,
-                Page = 1,
-                PageSize = 10,
-                SortBy = CommodityPriceSortBy.Source,
-                SortDir = SortDirection.Desc,
-            }, Ct);
-
-        Assert.Equal(
-            [CommodityPriceSource.AlphaVantage, CommodityPriceSource.Manual, CommodityPriceSource.Transaction],
-            result.Items.Select(p => p.Source).ToArray());
-    }
+    // NOTE: sort-by-Source is intentionally NOT unit-tested here. CommodityPrice.Source is mapped
+    // HasConversion<string>(), so on PostgreSQL `OrderBy(p => p.Source)` sorts the TEXT column
+    // (alphabetical: AlphaVantage, BankOfCanada, Manual, Transaction), whereas the EF InMemory provider
+    // sorts the CLR enum by its integer value (Transaction=0, Manual=1, BankOfCanada=2, AlphaVantage=3).
+    // A unit test on InMemory cannot reproduce the real ordering, so source ordering is covered by
+    // CommodityPricesEndpointTests against real PostgreSQL instead.
 
     [Fact]
     public async Task Handle_SortByQuote_OrdersByQuoteCurrencyId()

@@ -69,6 +69,9 @@ public class GetTextExtractionEnginesHandlerTests : IDisposable
 
         var response = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
+        // GetTextExtractionEnginesHandler filters with Name.ToLower().Contains(search) (NOT EF.Functions.ILike),
+        // for both the in-memory built-in check and the DB query. With the ASCII "Custom" fixture this pins the
+        // query SHAPE only — not Postgres ICU collation / locale case-folding, which belongs in integration.
         Assert.Single(response.Items);
         Assert.False(response.Items[0].IsBuiltIn);
         Assert.Equal("Custom Engine", response.Items[0].Name);

@@ -123,4 +123,33 @@ public class TestAiProviderConnectionHandlerTests : IDisposable
                 Configuration = """{"apiKey":"sk-test","model":"gpt-4o"}""",
             }, ct));
     }
+
+    [Fact]
+    public async Task ResolvesById_ReusesStoredConfig_ReturnsSuccess()
+    {
+        // The only path that reads db.AiProviders: an id-based probe with no Configuration body resolves the
+        // stored provider and reuses its secret (AiProviderProbe.ResolveAsync). This is what justifies the
+        // live TestAppDbContext — the ad-hoc ProviderType-based cases above never touch the DB.
+        var ct = TestContext.Current.CancellationToken;
+        var id = Guid.NewGuid();
+        _db.AiProviders.Add(new AiProvider
+        {
+            Id = id,
+            Name = "OpenAI prod",
+            ProviderType = AiProviderType.OpenAI,
+            Configuration = """{"apiKey":"sk-stored","model":"gpt-4o"}""",
+            IsEnabled = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "pong"))));
+
+        var result = await Sut().Handle(new TestAiProviderConnectionCommand { Id = id }, ct);
+
+        Assert.True(result.Success);
+        _factory.Received(1).CreateClient(Arg.Any<AiProvider>());
+    }
 }

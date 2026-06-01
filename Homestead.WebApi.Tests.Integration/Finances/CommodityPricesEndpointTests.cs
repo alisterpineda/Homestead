@@ -57,6 +57,46 @@ public class CommodityPricesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task GetPrices_SortBySource_OrdersAlphabeticallyByText()
+    {
+        // CommodityPrice.Source is mapped HasConversion<string>(), so PostgreSQL ORDER BY "Source" sorts the
+        // TEXT representation alphabetically. This is the real behaviour the EF InMemory unit test cannot
+        // reproduce — InMemory sorts the CLR enum integer (Transaction, Manual, BankOfCanada, AlphaVantage) —
+        // which is why source ordering is pinned here against real Postgres rather than in the unit suite.
+        var client = await CreateAdminClientAsync();
+        var (usdId, cadId, _) = await SetupCommoditiesAsync(client);
+
+        var priceAtJan08 = new DateTimeOffset(2026, 1, 8, 0, 0, 0, TimeSpan.Zero);
+
+        // One price per Source, each at a DISTINCT instant (so the unique index never collides and the
+        // handler's ThenByDescending(PriceAt) tie-breaker never engages), seeded in NON-alphabetical order
+        // so the test would fail if the endpoint merely returned insertion order.
+        await SeedPriceAsync(usdId, cadId, PriceAtJan01, 1.30m, CommodityPriceSource.Transaction);
+        await SeedPriceAsync(usdId, cadId, PriceAtJan15, 1.31m, CommodityPriceSource.Manual);
+        await SeedPriceAsync(usdId, cadId, PriceAtJan31, 1.32m, CommodityPriceSource.BankOfCanada);
+        await SeedPriceAsync(usdId, cadId, priceAtJan08, 1.33m, CommodityPriceSource.AlphaVantage);
+
+        var ascResponse = await client.GetAsync(
+            $"/api/v1/finances/commodity-prices?page=1&pageSize=10&commodityId={usdId}&quoteCurrencyId={cadId}&sortBy=Source&sortDir=Asc",
+            CT);
+        Assert.Equal(HttpStatusCode.OK, ascResponse.StatusCode);
+        var ascBody = await ascResponse.Content.ReadFromJsonAsync<PaginatedResult<FinancePriceItem>>(CT);
+        Assert.Equal(4, ascBody!.TotalCount);
+        Assert.Equal(
+            new[] { "AlphaVantage", "BankOfCanada", "Manual", "Transaction" },
+            ascBody.Items.Select(i => i.Source).ToArray());
+
+        var descResponse = await client.GetAsync(
+            $"/api/v1/finances/commodity-prices?page=1&pageSize=10&commodityId={usdId}&quoteCurrencyId={cadId}&sortBy=Source&sortDir=Desc",
+            CT);
+        Assert.Equal(HttpStatusCode.OK, descResponse.StatusCode);
+        var descBody = await descResponse.Content.ReadFromJsonAsync<PaginatedResult<FinancePriceItem>>(CT);
+        Assert.Equal(
+            new[] { "Transaction", "Manual", "BankOfCanada", "AlphaVantage" },
+            descBody!.Items.Select(i => i.Source).ToArray());
+    }
+
+    [Fact]
     public async Task CreatePrice_ValidUsdToCad_Succeeds()
     {
         var client = await CreateAdminClientAsync();

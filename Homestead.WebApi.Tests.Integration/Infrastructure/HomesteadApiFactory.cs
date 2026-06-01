@@ -1,5 +1,7 @@
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Modules.Finances.PriceProviders;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -103,6 +105,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // existing test triggers); summarize/classify tests seed an enabled provider to exercise it.
             services.RemoveAll<IAiClassificationService>();
             services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
+
+            // Swap the Bank of Canada price provider for a network-free fake so the import-pipeline tests
+            // exercise the real DB queries + unique-index enforcement without hitting the live Valet API.
+            // Keyed registrations are additive and GetKeyedService returns the LAST registered for a key, so
+            // this fake wins over the production BankOfCanadaPriceProvider. SupportedPairs/ConfigSchema are
+            // kept non-empty/non-null so the provider-introspection endpoint test still passes, and any
+            // background ImportCommodityPrices job (e.g. a RunNow enqueue) now resolves the fake instead of
+            // making an outbound HTTP call.
+            services.AddKeyedScoped<IPriceProvider, FakePriceProvider>(CommodityPriceSource.BankOfCanada);
 
             // NO DbContext swap. AppDbContext uses the REAL production registration from Program.cs
             // (non-pooled AddDbContext + EnrichNpgsqlDbContext, with the command-transaction interceptors
