@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
@@ -8,6 +9,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { DocumentApiService } from '@/api/services/document-api.service';
+import { AuthService } from '@/shared/services/auth.service';
 import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
 import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
 import { persistedSignal } from '@/shared/utils/persisted-signal';
@@ -43,6 +45,7 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
     HlmSpinner,
     HlmSelectImports,
     HlmCheckboxImports,
+    RouterLink,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -58,6 +61,15 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
           @if (loadingProviders()) {
             <div class="flex justify-center py-2">
               <hlm-spinner />
+            </div>
+          } @else if (noProviders()) {
+            <div class="flex flex-col gap-2">
+              <p class="text-sm text-muted-foreground">{{ emptyStateMessage() }}</p>
+              @if (isAdmin()) {
+                <a hlmBtn variant="link" class="self-start px-0" routerLink="/admin/ai-providers" hlmDialogClose>
+                  Go to AI Providers
+                </a>
+              }
             </div>
           } @else {
             @if (loadError()) {
@@ -128,6 +140,8 @@ export class ClassifyOptionsDialogComponent {
   selectedProviderId = signal<string | null>(null);
   loadingProviders = signal(false);
   loadError = signal(false);
+  // True only after a successful fetch, so we can distinguish "not loaded yet" from "loaded zero".
+  providersLoaded = signal(false);
 
   // Remembered across surfaces (single/bulk classify) and sessions.
   fields = persistedSignal<ClassifyFieldSelection>({
@@ -137,11 +151,25 @@ export class ClassifyOptionsDialogComponent {
   });
 
   enabledProviders = computed(() => this.providers().filter(p => p.isEnabled));
+  // Loaded successfully but nothing usable: the "system default" can't resolve to an enabled
+  // provider either, so classification/summarization would silently no-op on the backend.
+  noProviders = computed(() => this.providersLoaded() && this.enabledProviders().length === 0);
   noFieldsSelected = computed(() => {
     const f = this.fields();
     return !f.tags && !f.parties && !f.name;
   });
-  confirmDisabled = computed(() => this.showFields() && this.noFieldsSelected());
+  confirmDisabled = computed(() =>
+    this.loadingProviders() || this.noProviders() || (this.showFields() && this.noFieldsSelected()),
+  );
+
+  isAdmin = inject(AuthService).isAdmin;
+
+  emptyStateMessage = computed(() => {
+    const action = this.showFields() ? 'classify documents' : 'generate summaries';
+    return this.isAdmin()
+      ? `No AI providers are configured. Add and enable one to ${action}.`
+      : `No AI providers are configured. An administrator must add and enable one before you can ${action}.`;
+  });
 
   private readonly verb = computed(() => (this.showFields() ? 'Classify' : 'Summarize'));
 
@@ -184,6 +212,7 @@ export class ClassifyOptionsDialogComponent {
     if (state === 'open') {
       this.selectedProviderId.set(null);
       this.loadError.set(false);
+      this.providersLoaded.set(false);
       this.loadProviders();
     }
   }
@@ -218,6 +247,7 @@ export class ClassifyOptionsDialogComponent {
     this.documentApi.getAiProviderSummaries().subscribe({
       next: (r) => {
         this.providers.set(r);
+        this.providersLoaded.set(true);
         this.loadingProviders.set(false);
       },
       error: () => {
