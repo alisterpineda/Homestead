@@ -1419,13 +1419,25 @@ export class DocumentDetailPageComponent implements OnDestroy {
     this.appliedTransientName.set(null);
     this.preClassifyName.set(this.preClassifyName() ?? this.editName());
     this.classifySub?.unsubscribe();
-    const toastId = toast.loading('Classifying document...');
+
+    // Bridge the (synchronous) classify request to a promise so a single toast
+    // tracks loading -> done, instead of dismissing the loading toast and
+    // flashing a separate success toast. finalize() settles the promise on
+    // error/unsubscribe too (handleMutationError swallows 4xx into a silent
+    // completion); rejecting after a resolve is a no-op. Omitting `error` from
+    // toast.promise means a rejection just dismisses the loading toast and
+    // leaves error toasting to handleMutationError / the interceptor.
+    let settle!: { resolve: (count: number) => void; reject: () => void };
+    const classified = new Promise<number>((resolve, reject) => {
+      settle = { resolve, reject };
+    });
+
     this.classifySub = this.documentApi.classifyPreview({
       documentId: id,
       body: { aiProviderId: options.aiProviderId, fields: options.fields },
     }).pipe(
       handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
-      finalize(() => toast.dismiss(toastId)),
+      finalize(() => settle.reject()),
     ).subscribe({
       next: (result) => {
         this.classifyingPreview.set(false);
@@ -1459,13 +1471,16 @@ export class DocumentDetailPageComponent implements OnDestroy {
             this.aiTransientPartyIds.set(new Set([...existing, ...newParties.map(p => p.id)]));
           }
         }
-        const count = (result.suggestedTitle ? 1 : 0) + newTagCount + newPartyCount;
-        if (count > 0) {
-          toast.success(`${count} suggestion${count === 1 ? '' : 's'} ready to review.`);
-        } else {
-          toast.info('No new suggestions.');
-        }
+        settle.resolve((result.suggestedTitle ? 1 : 0) + newTagCount + newPartyCount);
       },
+    });
+
+    toast.promise(classified, {
+      loading: 'Classifying document...',
+      success: (count) =>
+        count > 0
+          ? `${count} suggestion${count === 1 ? '' : 's'} ready to review.`
+          : 'No new suggestions.',
     });
   }
 
