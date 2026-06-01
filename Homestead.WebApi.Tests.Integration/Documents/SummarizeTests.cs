@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Auditing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -11,24 +10,6 @@ namespace Homestead.WebApi.Tests.Integration.Documents;
 public class SummarizeTests : IntegrationTestBase
 {
     public SummarizeTests(PostgresFixture fixture) : base(fixture) { }
-
-    private async Task<Guid> SeedEnabledProviderAsync()
-    {
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Test Provider {Guid.NewGuid():N}",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            IsEnabled = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AiProviders.Add(provider);
-        await db.SaveChangesAsync(CT);
-        return provider.Id;
-    }
 
     [Fact]
     public async Task Summarize_GeneratesSummary_Persisted_AndAudited()

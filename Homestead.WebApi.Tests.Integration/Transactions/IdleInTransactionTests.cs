@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Auditing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +25,13 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
         var providerId = await SeedEnabledProviderAsync();
 
         var (entered, release) = FakeAiClassificationService.ArmGate();
+        // Declared outside the try so the finally can drain it on every exit path (see below).
+        Task<HttpResponseMessage>? summarizeTask = null;
         try
         {
             // Fire the summarize without awaiting; it will block inside the fake AI call, which happens
             // BEFORE the handler's only flush — so the command transaction has not opened yet.
-            var summarizeTask = client.PostAsJsonAsync(
+            summarizeTask = client.PostAsJsonAsync(
                 $"/api/v1/documents/{docId}/summarize", new { aiProviderId = providerId }, CT);
 
             await entered.WaitAsync(TimeSpan.FromSeconds(15), CT);
@@ -51,6 +52,7 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
             // Release the AI call and let the command finish.
             release();
             var response = await summarizeTask;
+            summarizeTask = null; // fully drained on the happy path — nothing for the finally to re-await
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<SummarizeResult>(CT);
             Assert.Equal(FakeAiClassificationService.GeneratedSummary, result!.Summary);
@@ -59,6 +61,19 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
         {
             // Defensive: ensure the gate never lingers for the next test even if an assertion threw.
             release();
+
+            // Drain the in-flight summarize before resetting the gate. On an early-exit path (the
+            // entered-wait timing out, or any assertion before the happy-path await throwing) the request
+            // is still running; awaiting it here — after release() has unblocked the fake — keeps an
+            // orphaned request from faulting against the next test's Respawn wipe and surfacing as an
+            // unobserved-task exception mis-attributed to a later test. The real failure already propagates
+            // from the try block, so a fault drained here is cleanup-only and swallowed.
+            if (summarizeTask is not null)
+            {
+                try { await summarizeTask; }
+                catch { /* the try block owns the real failure; this is cleanup only */ }
+            }
+
             FakeAiClassificationService.ResetGate();
         }
 
@@ -69,23 +84,5 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
         Assert.Equal(FakeAiClassificationService.GeneratedSummary, doc.Summary);
         Assert.True(await db.AuditLogs.AsNoTracking().AnyAsync(
             a => a.EntityType == "Document" && a.EntityId == docId && a.Action == AuditAction.Updated, CT));
-    }
-
-    private async Task<Guid> SeedEnabledProviderAsync()
-    {
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Test Provider {Guid.NewGuid():N}",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            IsEnabled = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AiProviders.Add(provider);
-        await db.SaveChangesAsync(CT);
-        return provider.Id;
     }
 }
