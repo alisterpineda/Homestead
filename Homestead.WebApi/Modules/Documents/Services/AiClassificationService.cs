@@ -1,4 +1,6 @@
+using System.ClientModel;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
@@ -10,6 +12,10 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
 {
     private const int MaxTextLength = 12_000;
     private const int MaxPartyDescriptionLength = 200;
+
+    // Extraction/classification is essentially deterministic — pin sampling to 0 so runs are stable
+    // and prompt changes are measurable rather than lost in run-to-run variance.
+    private const float Temperature = 0f;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -46,17 +52,12 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
             new(ChatRole.User, userMessage)
         };
 
-        var options = new ChatOptions
-        {
-            ResponseFormat = ChatResponseFormat.Json
-        };
-
         logger.LogTrace("Classification system prompt:\n{SystemPrompt}", systemPrompt);
         logger.LogTrace("Classification user message:\n{UserMessage}", userMessage);
 
         try
         {
-            var response = await client.GetResponseAsync(messages, options, ct);
+            var response = await GetResponseWithFallbackAsync(client, messages, scope, documentName, ct);
             var content = response.Text;
 
             logger.LogTrace("Classification response:\n{Response}", content);
@@ -75,13 +76,15 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
             }
 
             // Gate each field by scope so out-of-scope model output is neutralized to a no-op downstream:
-            // tag/party lists -> [], summary -> "", title -> the unchanged document name.
+            // tag/party lists -> [], summary -> "", title -> the unchanged document name. The model
+            // references catalog items by position, so we map the returned indexes back to ids here —
+            // out-of-range indexes (a hallucinated position) are dropped, mirroring the old id safety net.
             var matchedTagIds = scope.HasFlag(ClassificationScope.Tags)
-                ? FilterToCatalog(parsed.TagIds, availableTags.Select(t => t.Id))
+                ? MapIndexes(parsed.TagIndexes, availableTags.Select(t => t.Id).ToList())
                 : [];
 
             var matchedPartyIds = scope.HasFlag(ClassificationScope.Parties)
-                ? FilterToCatalog(parsed.PartyIds, availableParties.Select(p => p.Id))
+                ? MapIndexes(parsed.PartyIndexes, availableParties.Select(p => p.Id).ToList())
                 : [];
 
             var summary = scope.HasFlag(ClassificationScope.Summary)
@@ -105,18 +108,112 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         }
     }
 
-    private static List<Guid> FilterToCatalog(List<Guid>? proposed, IEnumerable<Guid> catalog)
+    // We send two options that not every model/endpoint accepts:
+    //   * strict structured outputs (a json_schema response format) — rejected by self-hosted runtimes and older deployments;
+    //   * a custom temperature of 0 — rejected by reasoning (o-series) models, which only allow the default.
+    // Either can come back as an HTTP 400. Rather than fail the classify, we read the error to see which parameter the
+    // model complained about and drop only that one, then retry — so a temperature objection keeps structured outputs
+    // and a schema objection keeps the deterministic temperature. A 400 that does NOT name one of our optional
+    // parameters (context-length, content filter, bad model, malformed request) is left alone and propagates with the
+    // real cause intact — we never silently re-issue an oversized/invalid request. Each retry disables a still-enabled
+    // option, so the loop makes at most three attempts before there is nothing left to relax.
+    private async Task<ChatResponse> GetResponseWithFallbackAsync(
+        IChatClient client, List<ChatMessage> messages, ClassificationScope scope, string documentName, CancellationToken ct)
     {
-        var valid = new HashSet<Guid>(catalog);
-        return (proposed ?? [])
-            .Where(valid.Contains)
+        // Hard cap: with two optional parameters we degrade at most twice, so success or a terminal throw is always
+        // reached within three attempts. The explicit bound guarantees the retry can never spin even if a future
+        // change breaks that invariant.
+        const int maxAttempts = 3;
+
+        var schema = BuildResponseSchema(scope);
+        var useStructuredOutput = true;
+        var useTemperature = true;
+        ClientResultException lastError = null!;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var options = new ChatOptions
+            {
+                Temperature = useTemperature ? Temperature : null,
+                ResponseFormat = useStructuredOutput
+                    ? ChatResponseFormat.ForJsonSchema(
+                        schema,
+                        schemaName: "document_classification",
+                        schemaDescription: "Structured classification of the document.")
+                    : ChatResponseFormat.Json,
+                // Microsoft.Extensions.AI only emits OpenAI's strict:true (which makes the schema *enforced* rather
+                // than advisory) when this flag is present — ForJsonSchema alone leaves it unset.
+                AdditionalProperties = useStructuredOutput
+                    ? new AdditionalPropertiesDictionary { ["strict"] = true }
+                    : null
+            };
+
+            try
+            {
+                return await client.GetResponseAsync(messages, options, ct);
+            }
+            catch (ClientResultException ex) when (ex.Status == 400)
+            {
+                lastError = ex;
+                var (dropTemperature, dropStructuredOutput) =
+                    DiagnoseUnsupportedOption(ex.Message, useTemperature, useStructuredOutput);
+
+                // The 400 doesn't implicate (a still-enabled) temperature or structured output — surface the real error.
+                if (!dropTemperature && !dropStructuredOutput)
+                    throw;
+
+                useTemperature &= !dropTemperature;
+                useStructuredOutput &= !dropStructuredOutput;
+
+                logger.LogWarning(ex,
+                    "Classification request was rejected (HTTP 400) for document '{Name}'. Retrying with reduced " +
+                    "options (structuredOutput={UseStructuredOutput}, customTemperature={UseTemperature}).",
+                    documentName, useStructuredOutput, useTemperature);
+            }
+        }
+
+        // Retry budget exhausted while still hitting degradable 400s — not expected given the invariant above, but
+        // surface the last error rather than looping further.
+        throw lastError;
+    }
+
+    // Reads a 400 message to decide which still-enabled option the model rejected. Returns a drop only when the
+    // message positively names that parameter (and only for options still enabled) — an unrecognised 400 returns
+    // (false, false), so the caller propagates it rather than blindly retrying a request that failed for some other
+    // reason. This is deliberately conservative: better to surface "context length exceeded" than to mask it.
+    private static (bool DropTemperature, bool DropStructuredOutput) DiagnoseUnsupportedOption(
+        string? message, bool temperatureEnabled, bool structuredOutputEnabled)
+    {
+        var text = message ?? string.Empty;
+
+        var dropTemperature = temperatureEnabled &&
+            text.Contains("temperature", StringComparison.OrdinalIgnoreCase);
+        var dropStructuredOutput = structuredOutputEnabled &&
+            (text.Contains("response_format", StringComparison.OrdinalIgnoreCase)
+             || text.Contains("json_schema", StringComparison.OrdinalIgnoreCase)
+             || text.Contains("json schema", StringComparison.OrdinalIgnoreCase)
+             || text.Contains("structured output", StringComparison.OrdinalIgnoreCase));
+
+        return (dropTemperature, dropStructuredOutput);
+    }
+
+    // Maps model-returned catalog positions back to ids against the same order we serialized into the prompt.
+    // Out-of-range positions are dropped and duplicates collapsed — the structural equivalent of the old
+    // FilterToCatalog id check, but transcription errors are now impossible (a small int can't be garbled
+    // into a different valid item the way a long GUID could).
+    private static List<Guid> MapIndexes(List<int>? indexes, List<Guid> catalogIds)
+    {
+        return (indexes ?? [])
+            .Where(i => i >= 0 && i < catalogIds.Count)
+            .Select(i => catalogIds[i])
             .Distinct()
             .ToList();
     }
 
-    // The system prompt is assembled from fragments so it describes only the in-scope fields:
-    // each field contributes one numbered instruction, one JSON-schema line, and any guardrail rules.
-    // This keeps the model focused (and the JSON small) when only a subset of fields is requested.
+    // The system prompt is assembled from fragments so it describes only the in-scope fields: each field
+    // contributes one numbered instruction, one JSON-schema line, and any guardrail rules. The schema-by-example
+    // block and "valid JSON only" rule are retained deliberately — they are what the JSON-mode fallback relies
+    // on when a provider can't honour the structured-output schema.
     private static string BuildSystemPrompt(ClassificationScope scope)
     {
         var instructions = new List<string>();
@@ -125,18 +222,18 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
 
         if (scope.HasFlag(ClassificationScope.Tags))
         {
-            instructions.Add("Select applicable tags from the provided tag list by their IDs. Only select tags that are clearly relevant to the document content. Do not create new tags.");
-            schemaLines.Add("  \"tagIds\": [\"guid1\", \"guid2\"]");
-            rules.Add("- Only use tag IDs from the provided list");
-            rules.Add("- If no tags match, return an empty tagIds array");
+            instructions.Add("Select applicable tags from the provided tag list by their index. Only select tags that are clearly relevant to the document content. Do not create new tags.");
+            schemaLines.Add("  \"tagIndexes\": [0, 1]");
+            rules.Add("- Only use tag indexes that appear in the provided list");
+            rules.Add("- If no tags match, return an empty tagIndexes array");
         }
 
         if (scope.HasFlag(ClassificationScope.Parties))
         {
-            instructions.Add("Select applicable parties (people or organisations the document concerns) from the provided party list by their IDs. Only select parties that are clearly relevant to the document content. Do not create new parties.");
-            schemaLines.Add("  \"partyIds\": [\"guid1\", \"guid2\"]");
-            rules.Add("- Only use party IDs from the provided list");
-            rules.Add("- If no parties match, return an empty partyIds array");
+            instructions.Add("Select applicable parties (people or organisations the document concerns) from the provided party list by their index. Only select parties that are clearly relevant to the document content. Do not create new parties.");
+            schemaLines.Add("  \"partyIndexes\": [0, 1]");
+            rules.Add("- Only use party indexes that appear in the provided list");
+            rules.Add("- If no parties match, return an empty partyIndexes array");
         }
 
         if (scope.HasFlag(ClassificationScope.Summary))
@@ -171,6 +268,67 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
             rulesBlock;
     }
 
+    // Builds a JSON schema describing exactly the in-scope response fields. Shaped for OpenAI strict-mode
+    // structured outputs: an object with additionalProperties:false and every property listed in "required"
+    // (the model still satisfies "required" with empty arrays / empty strings when nothing applies).
+    private static JsonElement BuildResponseSchema(ClassificationScope scope)
+    {
+        var properties = new JsonObject();
+        var required = new JsonArray();
+
+        if (scope.HasFlag(ClassificationScope.Tags))
+        {
+            properties["tagIndexes"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["description"] = "Zero-based indexes into the provided tag list for every tag that applies. Empty array when none apply.",
+                ["items"] = new JsonObject { ["type"] = "integer" }
+            };
+            required.Add("tagIndexes");
+        }
+
+        if (scope.HasFlag(ClassificationScope.Parties))
+        {
+            properties["partyIndexes"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["description"] = "Zero-based indexes into the provided party list for every party that applies. Empty array when none apply.",
+                ["items"] = new JsonObject { ["type"] = "integer" }
+            };
+            required.Add("partyIndexes");
+        }
+
+        if (scope.HasFlag(ClassificationScope.Summary))
+        {
+            properties["summary"] = new JsonObject
+            {
+                ["type"] = "string",
+                ["description"] = "A concise 2-3 sentence summary of the document."
+            };
+            required.Add("summary");
+        }
+
+        if (scope.HasFlag(ClassificationScope.Name))
+        {
+            properties["suggestedTitle"] = new JsonObject
+            {
+                ["type"] = "string",
+                ["description"] = "A clear, human-readable title for the document."
+            };
+            required.Add("suggestedTitle");
+        }
+
+        var schema = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = properties,
+            ["required"] = required,
+            ["additionalProperties"] = false
+        };
+
+        return JsonSerializer.SerializeToElement(schema);
+    }
+
     private static string BuildUserMessage(
         string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties,
         ClassificationScope scope)
@@ -188,10 +346,12 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
             """;
 
         // The catalogs are only sent for the fields that consume them — this is the real token saving.
+        // Items are keyed by a short positional index rather than their GUID: indexes are cheap to emit and
+        // the model can copy them reliably, whereas long opaque ids are easy to garble.
         if (scope.HasFlag(ClassificationScope.Tags))
         {
             var tagsJson = JsonSerializer.Serialize(
-                tags.Select(t => new { t.Id, t.Name, t.Path }),
+                tags.Select((t, i) => new { Index = i, t.Name, t.Path }),
                 JsonOptions);
 
             message += $"""
@@ -205,9 +365,9 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         if (scope.HasFlag(ClassificationScope.Parties))
         {
             var partiesJson = JsonSerializer.Serialize(
-                parties.Select(p => new
+                parties.Select((p, i) => new
                 {
-                    p.Id,
+                    Index = i,
                     p.Name,
                     Description = p.Description is { Length: > MaxPartyDescriptionLength }
                         ? p.Description[..MaxPartyDescriptionLength]
@@ -228,8 +388,8 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
 
     private sealed class ClassificationResponse
     {
-        public List<Guid>? TagIds { get; set; }
-        public List<Guid>? PartyIds { get; set; }
+        public List<int>? TagIndexes { get; set; }
+        public List<int>? PartyIndexes { get; set; }
         public string? Summary { get; set; }
         public string? SuggestedTitle { get; set; }
     }
