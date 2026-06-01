@@ -258,45 +258,6 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </button>
               </hlm-dropdown-menu>
             </ng-template>
-
-            <hlm-alert-dialog>
-              <button hlmAlertDialogTrigger class="hidden" #deleteDialogTrigger></button>
-              <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
-                <div hlmAlertDialogHeader>
-                  <h2 hlmAlertDialogTitle>Delete document?</h2>
-                  <p hlmAlertDialogDescription>
-                    This action cannot be undone. This document and all its versions will be permanently deleted.
-                  </p>
-                </div>
-                <div hlmAlertDialogFooter>
-                  <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
-                  <button hlmAlertDialogAction variant="destructive" (click)="handleDelete(); ctx.close()" [disabled]="deleting()">
-                    {{ deleting() ? 'Deleting...' : 'Delete' }}
-                  </button>
-                </div>
-              </hlm-alert-dialog-content>
-            </hlm-alert-dialog>
-
-            <app-reprocess-dialog
-              #reprocessDialog
-              [documentId]="doc.id"
-              [versionId]="activeVersion()!.id"
-              (reprocessStarted)="onReprocessStarted($event)"
-            />
-
-            <app-classify-options-dialog
-              #classifyOptionsDialog
-              mode="single"
-              [showFields]="true"
-              (confirmed)="handleClassify($event)"
-            />
-
-            <app-classify-options-dialog
-              #summarizeOptionsDialog
-              mode="single"
-              [showFields]="false"
-              (confirmed)="handleSummarize($event)"
-            />
           }
         </div>
       </div>
@@ -323,6 +284,45 @@ import { toast } from '@spartan-ng/brain/sonner';
         #addVersionDialog
         [documentId]="doc.id"
         (versionCreated)="refreshTrigger.update(v => v + 1)"
+      />
+
+      <hlm-alert-dialog>
+        <button hlmAlertDialogTrigger class="hidden" #deleteDialogTrigger></button>
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Delete document?</h2>
+            <p hlmAlertDialogDescription>
+              This action cannot be undone. This document and all its versions will be permanently deleted.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction variant="destructive" (click)="handleDelete(); ctx.close()" [disabled]="deleting()">
+              {{ deleting() ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+
+      <app-reprocess-dialog
+        #reprocessDialog
+        [documentId]="doc.id"
+        [versionId]="activeVersion()!.id"
+        (reprocessStarted)="onReprocessStarted($event)"
+      />
+
+      <app-classify-options-dialog
+        #classifyOptionsDialog
+        mode="single"
+        [showFields]="true"
+        (confirmed)="handleClassify($event)"
+      />
+
+      <app-classify-options-dialog
+        #summarizeOptionsDialog
+        mode="single"
+        [showFields]="false"
+        (confirmed)="handleSummarize($event)"
       />
 
       <!-- Shared content templates -->
