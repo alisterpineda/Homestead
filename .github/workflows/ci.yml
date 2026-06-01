@@ -149,6 +149,7 @@ jobs:
   e2e-test:
     needs: build-image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -185,6 +186,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: Homestead.E2E
+        timeout-minutes: 5
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests

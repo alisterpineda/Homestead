@@ -10,7 +10,7 @@
     "e2e:mobile": "playwright test --project=documents-upload-mobile --project=documents-tags-mobile --project=documents-bulk-ops-mobile --project=documents-trash-mobile"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.0",
+    "@playwright/test": "^1.60.0",
     "pdf-lib": "^1.17.1",
     "testcontainers": "^11.12.0"
   }
