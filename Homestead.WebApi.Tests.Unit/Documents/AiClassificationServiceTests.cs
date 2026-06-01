@@ -405,6 +405,61 @@ public class AiClassificationServiceTests
             Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
     }
 
+    // A body long enough to exceed the default budget but well under the raised one, with whitespace-free
+    // start/end sentinels so we can assert verbatim inclusion.
+    private static string MakeLongText() =>
+        "DOC_START_SENTINEL" + new string('a', 20_000) + "DOC_END_SENTINEL";
+
+    [Fact]
+    public async Task ConfiguredMaxInputChars_RaisesBudget_SendsTextVerbatim_NoElision()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"summary":"S"}""");
+        var provider = new AiProvider
+        {
+            Id = Guid.NewGuid(), Name = "Big", ProviderType = AiProviderType.OpenAI,
+            Configuration = """{"maxInputChars":40000}""", IsEnabled = true
+        };
+
+        await _sut.ClassifyAsync(provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+
+        // 20k-char body fits inside the 40k budget -> sent whole, no elision, both ends present.
+        Assert.DoesNotContain("[...document text omitted...]", UserMessage);
+        Assert.Contains("DOC_START_SENTINEL", UserMessage);
+        Assert.Contains("DOC_END_SENTINEL", UserMessage);
+    }
+
+    [Fact]
+    public async Task DefaultBudget_LongText_IsSampledWithElisionMarker()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"summary":"S"}""");
+
+        // _provider has Configuration "{}" — no override, so the default budget applies and the 20k body is sampled.
+        await _sut.ClassifyAsync(_provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+
+        Assert.Contains("[...document text omitted...]", UserMessage);
+    }
+
+    [Fact]
+    public async Task SubFloorMaxInputChars_FallsBackToDefaultBudget_AndSamples()
+    {
+        // A degenerate value that bypassed the admin validator (e.g. a seeded row): the service floor ignores it
+        // and uses the default budget, so the long body is still sampled rather than sent at a 10-char budget.
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"summary":"S"}""");
+        var provider = new AiProvider
+        {
+            Id = Guid.NewGuid(), Name = "Degenerate", ProviderType = AiProviderType.OpenAI,
+            Configuration = """{"maxInputChars":10}""", IsEnabled = true
+        };
+
+        await _sut.ClassifyAsync(provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+
+        Assert.Contains("[...document text omitted...]", UserMessage);
+        Assert.Contains("DOC_START_SENTINEL", UserMessage);   // not truncated to ~10 chars
+    }
+
     [Fact]
     public async Task NonSchemaError_IsNotRetried_AndPropagates()
     {

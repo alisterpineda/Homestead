@@ -61,6 +61,12 @@ public static class AiProviderConfigValidator
         if (!AiProviderConfig.TryParse(configuration, out var config) || config is null)
             throw new BusinessRuleException("Invalid configuration JSON for the specified provider type.");
 
+        // Optional, but if supplied it must clear the floor — a smaller budget would be silently ignored by
+        // the classifier (it falls back to the default), so reject it on write rather than mislead the admin.
+        if (config.MaxInputChars is int max && max < AiProviderConfig.MinInputChars)
+            throw new BusinessRuleException(
+                $"Max input characters must be at least {AiProviderConfig.MinInputChars}.");
+
         return config;
     }
 }

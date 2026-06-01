@@ -110,6 +110,16 @@ import { toast } from '@spartan-ng/brain/sonner';
             </div>
           }
 
+          @if (selectedProviderType() === 'AzureAIFoundry' || selectedProviderType() === 'OpenAI') {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="create-max-input-chars">Max input characters (optional)</label>
+              <input hlmInput id="create-max-input-chars" type="number" min="1000" step="1000"
+                placeholder="Default (12000)"
+                [value]="maxInputChars()" (input)="maxInputChars.set(asInputValue($event))" />
+              <p class="text-xs text-muted-foreground">How much document text to send. Raise it for large-context models; leave blank for the default.</p>
+            </div>
+          }
+
           @if (canTest()) {
             <div class="flex flex-col gap-1.5">
               <button hlmBtn variant="outline" type="button" [disabled]="testing()" (click)="testConnection()">
@@ -152,6 +162,7 @@ export class CreateAiProviderDialogComponent {
   endpoint = signal('');
   apiKey = signal('');
   model = signal('');
+  maxInputChars = signal('');
   creating = signal(false);
   createError = signal('');
 
@@ -188,6 +199,7 @@ export class CreateAiProviderDialogComponent {
     this.endpoint.set('');
     this.apiKey.set('');
     this.model.set('');
+    this.maxInputChars.set('');
     this.models.set([]);
     this.fetchingModels.set(false);
     this.testing.set(false);
@@ -203,6 +215,7 @@ export class CreateAiProviderDialogComponent {
       endpoint: this.endpoint(),
       apiKey: this.apiKey(),
       model: this.model(),
+      maxInputChars: this.maxInputChars(),
     });
   }
 

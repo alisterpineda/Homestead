@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
 
 namespace Homestead.WebApi.Modules.Documents.Services;
@@ -10,8 +11,25 @@ namespace Homestead.WebApi.Modules.Documents.Services;
 public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiClassificationService> logger)
     : IAiClassificationService
 {
-    private const int MaxTextLength = 12_000;
     private const int MaxPartyDescriptionLength = 200;
+
+    // Head/tail split for the document-text sample. The head gets 2/3, the tail 1/3: a document's type,
+    // subject, and primary party are established early (letterhead, title block), while counterparties,
+    // totals, dates, and signatures cluster at the end — a leading-only window misses the latter entirely.
+    // Both ends now get coverage; the middle of a long document is the deliberate sacrifice, which suits the
+    // feature's precision-over-recall posture. The 2:1 ratio is an unvalidated heuristic — revisit once an
+    // eval set exists.
+    private const int HeadBudgetNumerator = 2;
+    private const int HeadBudgetDenominator = 3;
+
+    // When snapping a slice to a clean whitespace boundary, never walk further than this many characters.
+    // Bounds the budget sacrificed hunting for whitespace in a long unbroken run (single-line OCR, base64),
+    // where we fall back to a hard character cut. Negligible against any real budget (~1.6% of the default).
+    private const int BoundarySnapWindow = 200;
+
+    // Inserted between the head and tail slices so the model knows text was elided and does not read across
+    // the gap as if it were contiguous. Only present when truncation actually occurred.
+    private const string ElisionMarker = "\n\n[...document text omitted...]\n\n";
 
     // Extraction/classification is essentially deterministic — pin sampling to 0 so runs are stable
     // and prompt changes are measurable rather than lost in run-to-run variance.
@@ -44,7 +62,8 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         using var client = clientFactory.CreateClient(provider);
 
         var systemPrompt = BuildSystemPrompt(scope);
-        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope);
+        var budget = ResolveBudget(provider);
+        var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope, budget);
 
         var messages = new List<ChatMessage>
         {
@@ -329,13 +348,104 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         return JsonSerializer.SerializeToElement(schema);
     }
 
-    private static string BuildUserMessage(
-        string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties,
-        ClassificationScope scope)
+    // Resolves the document-text character budget for this provider: the value configured in the provider's
+    // Configuration blob (when it clears the floor) or the default. ClassifyAsync already receives the
+    // AiProvider, so the knob needs no interface change. An unparseable/absent config yields the default.
+    private static int ResolveBudget(AiProvider provider) =>
+        AiProviderConfig.TryParse(provider.Configuration, out var config) && config is not null
+            ? config.ResolveMaxInputChars()
+            : AiProviderConfig.DefaultMaxInputChars;
+
+    // Samples up to `budget` characters of document text for the prompt. Text within budget is returned
+    // verbatim. When it exceeds the budget we keep a head and a tail window joined by an elision marker —
+    // for many household documents the classifying signal (parties, totals, dates, signatures) lives at the
+    // end, which a leading-only window never sees. Slice boundaries snap to whitespace for clean word edges
+    // and never split a UTF-16 surrogate pair (a raw substring can orphan half a pair → U+FFFD downstream).
+    // Precondition: budget >= a few hundred chars (guaranteed by AiProviderConfig.MinInputChars upstream).
+    internal static string SampleText(string? extractedText, int budget)
     {
         var text = extractedText ?? string.Empty;
-        if (text.Length > MaxTextLength)
-            text = text[..MaxTextLength];
+        if (text.Length <= budget)
+            return text;
+
+        // Marginally over budget: a head+tail split would fragment the text and emit a marker to elide fewer
+        // characters than the marker itself costs, while a leading window already captures all but a sliver of
+        // the end. Send the leading budget verbatim, no marker — nothing meaningful was dropped.
+        if (text.Length - budget <= ElisionMarker.Length)
+            return text[..BackOffSurrogate(text, budget)].TrimEnd();
+
+        // Reserve room for the marker so head + marker + tail stays within budget. With head+tail summing to
+        // less than the text length (guaranteed by the guard above), the windows can never overlap.
+        var contentBudget = budget - ElisionMarker.Length;
+        // Divide before multiply so a very large configured budget can't overflow int on the *2.
+        var headBudget = contentBudget / HeadBudgetDenominator * HeadBudgetNumerator;
+        var tailBudget = contentBudget - headBudget;
+
+        var headCut = HeadCut(text, headBudget);
+        var tailStart = TailStart(text, text.Length - tailBudget);
+
+        var head = text[..headCut].TrimEnd();
+        var tail = text[tailStart..].TrimStart();
+        return head + ElisionMarker + tail;
+    }
+
+    // Exclusive end index for the head slice: targets `target`, snaps back to the nearest whitespace within
+    // the snap window for a clean word boundary, then guards the surrogate pair on the hard-cut fallback.
+    private static int HeadCut(string text, int target)
+    {
+        var snap = LastWhitespace(text, target - 1, target - BoundarySnapWindow);
+        return BackOffSurrogate(text, snap >= 0 ? snap : target);
+    }
+
+    // Inclusive start index for the tail slice: targets `target`, snaps forward to just past the nearest
+    // whitespace within the snap window, then guards against landing on an orphaned low surrogate.
+    private static int TailStart(string text, int target)
+    {
+        var snap = FirstWhitespace(text, target, target + BoundarySnapWindow);
+        return AdvanceOffSurrogate(text, snap >= 0 ? snap + 1 : target);
+    }
+
+    // A head slice ending (exclusive index `i`) on a high surrogate always orphans it — its low half sits at
+    // the excluded position `i`, or doesn't exist for already-malformed text — so retreat one unit. Covers both
+    // splitting a valid pair and propagating a pre-existing lone high surrogate, keeping the head well-formed.
+    private static int BackOffSurrogate(string text, int i) =>
+        i > 0 && char.IsHighSurrogate(text[i - 1])
+            ? i - 1
+            : i;
+
+    // If inclusive start index `i` lands on the low half of a surrogate pair, advance one unit past it.
+    private static int AdvanceOffSurrogate(string text, int i) =>
+        i > 0 && i < text.Length && char.IsLowSurrogate(text[i])
+            ? i + 1
+            : i;
+
+    // Index of the last whitespace char in [floor, from] (both clamped to the string), or -1 if none.
+    private static int LastWhitespace(string text, int from, int floor)
+    {
+        var lo = Math.Max(0, floor);
+        var hi = Math.Min(from, text.Length - 1);
+        for (var i = hi; i >= lo; i--)
+            if (char.IsWhiteSpace(text[i]))
+                return i;
+        return -1;
+    }
+
+    // Index of the first whitespace char in [from, ceil] (both clamped to the string), or -1 if none.
+    private static int FirstWhitespace(string text, int from, int ceil)
+    {
+        var lo = Math.Max(0, from);
+        var hi = Math.Min(ceil, text.Length - 1);
+        for (var i = lo; i <= hi; i++)
+            if (char.IsWhiteSpace(text[i]))
+                return i;
+        return -1;
+    }
+
+    private static string BuildUserMessage(
+        string documentName, string? extractedText, List<TagInfo> tags, List<PartyInfo> parties,
+        ClassificationScope scope, int budget)
+    {
+        var text = SampleText(extractedText, budget);
 
         // Every field needs the source, so name + extracted text are always present.
         var message = $"""

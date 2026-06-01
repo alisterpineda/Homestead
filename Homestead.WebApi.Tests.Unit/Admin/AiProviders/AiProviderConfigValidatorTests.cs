@@ -64,4 +64,28 @@ public class AiProviderConfigValidatorTests
             AiProviderConfigValidator.Validate(AiProviderType.Anthropic,
                 """{"apiKey":"k","model":"m"}"""));
     }
+
+    [Fact]
+    public void MaxInputChars_AboveFloor_Valid()
+    {
+        AiProviderConfigValidator.Validate(AiProviderType.OpenAI,
+            """{"apiKey":"sk-test","model":"gpt-4o","maxInputChars":40000}""");
+    }
+
+    [Fact]
+    public void MaxInputChars_BelowFloor_Throws()
+    {
+        // A budget the classifier would silently ignore is rejected on write rather than misleading the admin.
+        Assert.Throws<BusinessRuleException>(() =>
+            AiProviderConfigValidator.Validate(AiProviderType.OpenAI,
+                """{"apiKey":"sk-test","model":"gpt-4o","maxInputChars":10}"""));
+    }
+
+    [Fact]
+    public void MaxInputChars_Omitted_Valid()
+    {
+        // The common case — no override — stays valid (null = use the default budget).
+        AiProviderConfigValidator.Validate(AiProviderType.OpenAI,
+            """{"apiKey":"sk-test","model":"gpt-4o"}""");
+    }
 }

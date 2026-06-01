@@ -103,6 +103,16 @@ import { toast } from '@spartan-ng/brain/sonner';
               </div>
             }
 
+            @if (p.providerType === 'AzureAIFoundry' || p.providerType === 'OpenAI') {
+              <div class="flex flex-col gap-2">
+                <label hlmLabel for="edit-max-input-chars">Max input characters (optional)</label>
+                <input hlmInput id="edit-max-input-chars" type="number" min="1000" step="1000"
+                  placeholder="Default (12000)"
+                  [value]="editMaxInputChars()" (input)="editMaxInputChars.set(asInputValue($event))" />
+                <p class="text-xs text-muted-foreground">How much document text to send. Raise it for large-context models; leave blank for the default.</p>
+              </div>
+            }
+
             @if (canTest()) {
               <div class="flex flex-col gap-2">
                 <button hlmBtn variant="outline" type="button" [disabled]="testing()" (click)="testConnection()">
@@ -154,13 +164,14 @@ export class EditAiProviderSheetComponent {
     `${this.provider()?.id ?? ''}|${this.state() === 'open'}`,
   );
 
-  private seed = computed((): { endpoint: string; apiKey: string; model: string } | null => {
+  private seed = computed((): { endpoint: string; apiKey: string; model: string; maxInputChars: string } | null => {
     const p = this.provider();
     if (!p || this.state() !== 'open') return null;
 
     let endpoint = '';
     let apiKey = '';
     let model = '';
+    let maxInputChars = '';
     if (p.configuration) {
       try {
         const parsed = JSON.parse(p.configuration);
@@ -169,9 +180,11 @@ export class EditAiProviderSheetComponent {
         endpoint = parsed.endpoint ?? '';
         apiKey = parsed.apiKey ?? '';
         model = parsed.model ?? '';
+        // Stored as a number; the input edits it as a string. Absent -> blank (use the server default).
+        maxInputChars = parsed.maxInputChars != null ? String(parsed.maxInputChars) : '';
       } catch { /* empty */ }
     }
-    return { endpoint, apiKey, model };
+    return { endpoint, apiKey, model, maxInputChars };
   });
 
   editName = seededLinkedSignal(this.seedKey, () => {
@@ -190,6 +203,10 @@ export class EditAiProviderSheetComponent {
   editModel = seededLinkedSignal(this.seedKey, () => {
     const seed = this.seed();
     return seed?.model ?? '';
+  });
+  editMaxInputChars = seededLinkedSignal(this.seedKey, () => {
+    const seed = this.seed();
+    return seed?.maxInputChars ?? '';
   });
   editEnabled = seededLinkedSignal(this.seedKey, () => {
     const p = this.provider();
@@ -212,6 +229,7 @@ export class EditAiProviderSheetComponent {
         endpoint: this.editEndpoint(),
         apiKey: this.editApiKey(),
         model: this.editModel(),
+        maxInputChars: this.editMaxInputChars(),
       });
     }
     return p.configuration ?? null;
@@ -241,6 +259,7 @@ export class EditAiProviderSheetComponent {
       if (this.editEndpoint() !== seed.endpoint) return true;
       if (this.editApiKey() !== seed.apiKey) return true;
       if (this.editModel() !== seed.model) return true;
+      if (this.editMaxInputChars().trim() !== seed.maxInputChars) return true;
     }
     return false;
   });
