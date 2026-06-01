@@ -167,7 +167,7 @@ export class AccountPositionsTabComponent {
       const c = map[p.commodityId] ?? null;
       const quantityText = c
         ? formatMaskedCurrency(p.quantity, c, masked)
-        : (masked ? '•••••' : p.quantity.toString());
+        : (masked ? '•' : p.quantity.toString());
       const displayValueText = (p.displayValue != null && dc)
         ? formatMaskedCurrency(p.displayValue, dc, masked)
         : null;

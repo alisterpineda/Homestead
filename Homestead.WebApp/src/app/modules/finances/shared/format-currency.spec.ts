@@ -65,4 +65,35 @@ describe('formatMaskedCurrency', () => {
     const neg = formatMaskedCurrency(-500, cad, true, 'en-US');
     expect(pos).toBe(neg);
   });
+
+  it('produces a magnitude-independent masked string', () => {
+    const small = formatMaskedCurrency(5, cad, true, 'en-US');
+    const huge = formatMaskedCurrency(5_000_000.55, cad, true, 'en-US');
+    expect(small).toBe(huge);
+  });
+
+  it('masks to exactly one integer bullet with no grouping separator', () => {
+    const result = formatMaskedCurrency(5_000_000.55, cad, true, 'en-US');
+    expect(result).not.toMatch(/,/);
+    // Exactly one bullet precedes the decimal mark (single integer digit).
+    const integerPart = result.split('.')[0];
+    expect(integerPart.match(/•/g)?.length).toBe(1);
+  });
+
+  it('masks a zero-precision currency (JPY) to a single bullet with no decimal mark', () => {
+    const jpy: CommodityResponse = { ...cad, id: 'jpy', symbol: 'JPY', name: 'Japanese Yen', displayPrecision: 0 };
+    const result = formatMaskedCurrency(123456, jpy, true, 'en-US');
+    expect(result.match(/•/g)?.length).toBe(1);
+    expect(result).not.toMatch(/[.,]/);
+  });
+
+  it('masks a three-precision currency (BHD) to one bullet, a decimal mark, and three trailing bullets', () => {
+    const bhd: CommodityResponse = { ...cad, id: 'bhd', symbol: 'BHD', name: 'Bahraini Dinar', displayPrecision: 3 };
+    const result = formatMaskedCurrency(1234.567, bhd, true, 'en-US');
+    expect(result).not.toMatch(/,/);
+    const [integerPart, fractionPart] = result.split('.');
+    expect(integerPart.match(/•/g)?.length).toBe(1);
+    expect(fractionPart).toBeDefined();
+    expect(fractionPart.match(/•/g)?.length).toBe(3);
+  });
 });

@@ -29,9 +29,17 @@ export function formatCurrency(
   return `${formatted} ${commodity.symbol}`;
 }
 
-// Render a value with all digit characters replaced by '•', preserving the
-// currency symbol, grouping marks, and decimal mark so the result still reads
-// as currency at a glance (e.g. "$•••••.••", "CA$•••••.••", "••••• VEQT").
+// Constant placeholder formatted in place of the real value when masking. Zero
+// has exactly one integer digit and never triggers grouping separators, so the
+// masked output is a fixed shape (one integer bullet + `precision` fraction
+// bullets) that is independent of the real value's magnitude or sign — an
+// onlooker can't count bullets or separators to infer the order of magnitude.
+export const MASK_PLACEHOLDER = 0;
+
+// Render a fixed-shape masked value: the real value's digits are NOT shown.
+// Instead we format MASK_PLACEHOLDER at the commodity's precision and bullet its
+// parts, preserving the currency symbol and decimal mark so the result still
+// reads as currency at a glance (e.g. "CA$•.••", "¥•", "•.•••• VEQT").
 export function formatMaskedCurrency(
   value: number,
   commodity: CommodityResponse,
@@ -39,6 +47,7 @@ export function formatMaskedCurrency(
   locale?: string,
 ): string {
   if (!masked) return formatCurrency(value, commodity, locale);
+  // Masked output is intentionally value-independent — `value` is unused below.
   const precision = commodity.displayPrecision ?? 2;
   if (commodity.kind === 'Currency') {
     try {
@@ -47,7 +56,7 @@ export function formatMaskedCurrency(
         currency: commodity.symbol,
         minimumFractionDigits: precision,
         maximumFractionDigits: precision,
-      }).formatToParts(value);
+      }).formatToParts(MASK_PLACEHOLDER);
       return parts.map(maskDigitPart).join('');
     } catch {
       // Unknown currency code (shouldn't happen for ISO 4217, but defensive).
@@ -56,7 +65,7 @@ export function formatMaskedCurrency(
   const parts = new Intl.NumberFormat(locale, {
     minimumFractionDigits: precision,
     maximumFractionDigits: precision,
-  }).formatToParts(value);
+  }).formatToParts(MASK_PLACEHOLDER);
   return `${parts.map(maskDigitPart).join('')} ${commodity.symbol}`;
 }
 
