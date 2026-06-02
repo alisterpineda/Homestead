@@ -329,13 +329,6 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-
-    // Re-apply persisted log-level overrides synchronously at startup so there's no early-boot window where
-    // the saved verbosity isn't in effect. Same idempotent read-and-apply the SettingsChangeListener runs
-    // on every NOTIFY.
-    var runtimeLogLevelProvider = scope.ServiceProvider.GetRequiredService<RuntimeLogLevelProvider>();
-    await SystemSettingsLogLevelApplier.ApplyAsync(
-        db, runtimeLogLevelProvider, app.Logger, CancellationToken.None);
 }
 
 // Configure the HTTP request pipeline.

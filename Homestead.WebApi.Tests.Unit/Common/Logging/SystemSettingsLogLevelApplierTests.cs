@@ -6,10 +6,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Homestead.WebApi.Tests.Unit.Common.Logging;
 
 /// <summary>
-/// Covers the shared read-and-apply used by both startup and the SettingsChangeListener: it pushes the
-/// persisted blob's overrides into the provider, clears when no row exists, never throws on a bad blob, and
-/// — because <see cref="RuntimeLogLevelProvider.SetLevels"/> is idempotent — does not churn MEL's reload
-/// token when re-reading an unchanged row.
+/// Covers the shared read-and-apply the SettingsChangeListener runs on connect and on every NOTIFY / safety
+/// poll: it pushes the persisted blob's overrides into the provider, clears when no row exists, never throws
+/// on a bad blob, and — because <see cref="RuntimeLogLevelProvider.SetLevels"/> is idempotent — does not
+/// churn MEL's reload token when re-reading an unchanged row.
 /// </summary>
 public class SystemSettingsLogLevelApplierTests
 {

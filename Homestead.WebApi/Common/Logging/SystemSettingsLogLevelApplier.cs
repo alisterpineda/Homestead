@@ -9,9 +9,8 @@ namespace Homestead.WebApi.Common.Logging;
 
 /// <summary>
 /// Reads the persisted <c>system</c> settings blob and pushes its log-level overrides into the live
-/// <see cref="RuntimeLogLevelProvider"/>. The single shared read-and-apply used by both the synchronous
-/// startup re-apply (<c>Program.cs</c>) and the per-NOTIFY re-read (<c>SettingsChangeListener</c>), so
-/// every code path treats the committed row as the source of truth identically.
+/// <see cref="RuntimeLogLevelProvider"/>. The shared read-and-apply the <c>SettingsChangeListener</c> runs
+/// on connect and on every NOTIFY / safety poll, so the committed row is always the source of truth.
 /// </summary>
 /// <remarks>
 /// This is deliberately stateless and re-runnable on every signal: the committed row — not a timestamp
