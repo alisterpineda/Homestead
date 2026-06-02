@@ -2,7 +2,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using System.Text.Json;
 using Homestead.WebApi.Authentication;
-using Homestead.WebApi.Common.Logging;
+using Homestead.WebApi.Common.Settings;
 using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
@@ -17,7 +17,7 @@ public class PatchSystemSettingsHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork,
-    ILogLevelService logLevelService)
+    ISettingsChangeNotifier settingsChangeNotifier)
     : IRequestHandler<PatchSystemSettingsCommand, SystemSettingsResponse>
 {
     public async Task<SystemSettingsResponse> Handle(
@@ -69,16 +69,14 @@ public class PatchSystemSettingsHandler(
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        // Apply the new levels to the live MEL filters only AFTER the command transaction commits — running
-        // it inline here (post-flush, pre-commit) would permanently diverge the in-process loggers from the
-        // persisted blob if the commit later fails and rolls back. The override is in-process only; other
-        // replicas pick it up on their next restart via the startup load.
-        if (request.LogLevelOverrides is { } overrides)
-            unitOfWork.OnAfterCommit(_ =>
-            {
-                logLevelService.Apply(overrides);
-                return Task.CompletedTask;
-            });
+        // Fan the change out to every instance — including this one — only AFTER the command transaction
+        // commits. Listeners re-read the committed row on a separate connection, so a pre-commit NOTIFY could
+        // race ahead of the row's visibility (same reason the repo defers the job-processor signal). There's
+        // no privileged saving instance: it processes its own NOTIFY through the identical listener path, so
+        // all instances converge on the persisted blob. The response below still returns the written levels
+        // immediately.
+        if (request.LogLevelOverrides is not null)
+            unitOfWork.OnAfterCommit(hookCt => settingsChangeNotifier.NotifyAsync(AppSetting.SystemModule, hookCt));
 
         return new SystemSettingsResponse
         {

@@ -15,13 +15,13 @@ public class RuntimeLogLevelReloadTests
     [Fact]
     public void Apply_FlipsLoggerFilters_WithoutRebuild()
     {
-        var source = new RuntimeLogLevelSource();
-        var service = new LogLevelService(source.Provider);
+        var runtimeLevels = new RuntimeLogLevelProvider();
 
         var config = new ConfigurationManager();
-        // Baseline (appsettings-equivalent) added first; the runtime source added last wins over it.
+        // Baseline (appsettings-equivalent) added first; the runtime source added last wins over it. The
+        // provider is its own IConfigurationSource, so the config root reads the very instance we push to.
         config["Logging:LogLevel:Default"] = "Information";
-        ((IConfigurationBuilder)config).Add(source);
+        ((IConfigurationBuilder)config).Add(runtimeLevels);
 
         var services = new ServiceCollection();
         services.AddLogging(b =>
@@ -40,13 +40,13 @@ public class RuntimeLogLevelReloadTests
         Assert.True(logger.IsEnabled(LogLevel.Information));
 
         // Raise Default to Warning at runtime — no rebuild, same logger instance.
-        service.Apply(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning });
+        runtimeLevels.SetLevels(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning });
 
         Assert.False(logger.IsEnabled(LogLevel.Information));
         Assert.True(logger.IsEnabled(LogLevel.Warning));
 
-        // Clearing the override falls back to the baseline again.
-        service.Apply(null);
+        // Clearing the override (null) falls back to the baseline again.
+        runtimeLevels.SetLevels(null);
 
         Assert.True(logger.IsEnabled(LogLevel.Information));
     }

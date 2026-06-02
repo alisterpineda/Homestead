@@ -149,6 +149,7 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 | `/admin/schedules` | ScheduleListComponent |
 | `/admin/text-extraction` | TextExtractionEngineListComponent |
 | `/admin/ai-providers` | AiProviderListComponent |
+| `/admin/settings` | SystemSettingsComponent (runtime log-level controls; sidebar group "Configuration") |
 
 ### Admin-only surfaces (verify hidden/denied as `user@test.com`)
 
@@ -157,7 +158,8 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 
 ### API
 
-- Base path is `/api/v1/...` (e.g. `/api/v1/documents`, `/api/v1/documents/tags`), proxied through `:4200`
+- Base path is `/api/v1/...` (e.g. `/api/v1/documents`, `/api/v1/documents/tags`,
+  `/api/v1/admin/settings/system` — `GET`/`PATCH` for System Settings), proxied through `:4200`
   — use it when inspecting `browser_network_requests`.
 
 ### Known gotchas

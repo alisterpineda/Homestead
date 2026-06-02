@@ -1,14 +1,11 @@
-using System.Text.Json;
 using Asp.Versioning;
 using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Logging;
-using Homestead.WebApi.Domain.Auditing;
-using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Common.Settings;
 using Homestead.WebApi.Modules.Admin;
-using Homestead.WebApi.Modules.Admin.Features.Settings;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
@@ -34,13 +31,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-// Reloadable in-memory source for runtime log-level overrides. Registered LAST so it wins over
-// appsettings/env; MEL rebinds LoggerFilterOptions when its reload token fires, so an admin save takes
-// effect with no restart. The provider is also registered in DI so LogLevelService can push to it.
-var runtimeLogLevels = new RuntimeLogLevelSource();
+// Reloadable in-memory source for runtime log-level overrides. The provider is both the
+// IConfigurationSource and the ConfigurationProvider (Build(_) => this), so the same instance is added to
+// the config builder AND registered in DI — the apply path pushes to the very instance the config root
+// reads. Added LAST so it wins over appsettings/env; MEL rebinds LoggerFilterOptions when its reload token
+// fires, so a save takes effect with no restart.
+var runtimeLogLevels = new RuntimeLogLevelProvider();
 ((IConfigurationBuilder)builder.Configuration).Add(runtimeLogLevels);
-builder.Services.AddSingleton(runtimeLogLevels.Provider);
-builder.Services.AddSingleton<ILogLevelService, LogLevelService>();
+builder.Services.AddSingleton(runtimeLogLevels);
+
+// Multi-instance fan-out for settings changes: the writer NOTIFYs on a Postgres channel and every
+// instance (including the writer — Postgres echoes a channel's NOTIFY back to its own listeners) re-reads
+// the committed row and re-applies, so a save propagates with no restart. Postgres is the only shared
+// dependency the repo runs, so it doubles as the signal. Today this only covers logging; see
+// SettingsChangeListener for when to graduate to a real bus.
+builder.Services.AddSingleton<ISettingsChangeNotifier, PgNotifySettingsChangeNotifier>();
+builder.Services.AddHostedService<SettingsChangeListener>();
 
 // When running outside Aspire (e.g. Docker), map self-hoster-friendly env vars into .NET config
 if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")))
@@ -324,24 +330,12 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
-    // Re-apply persisted log-level overrides so they survive restarts. Read once from the existing
-    // "system" AppSetting blob — no DB access from the config layer, avoiding the startup-DbContext footgun.
-    var logLevels = scope.ServiceProvider.GetRequiredService<ILogLevelService>();
-    var systemSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
-    if (systemSetting is not null)
-    {
-        // A malformed/legacy blob must not brick startup — degrade to "no overrides" and log it instead.
-        try
-        {
-            var systemSettings = JsonSerializer.Deserialize<SystemSettings>(systemSetting.Value, FieldChange.JsonOptions);
-            logLevels.Apply(systemSettings?.GetLogLevelOverrides());
-        }
-        catch (JsonException ex)
-        {
-            app.Logger.LogWarning(ex,
-                "Could not parse the persisted system settings blob; runtime log-level overrides were not applied.");
-        }
-    }
+    // Re-apply persisted log-level overrides synchronously at startup so there's no early-boot window where
+    // the saved verbosity isn't in effect. Same idempotent read-and-apply the SettingsChangeListener runs
+    // on every NOTIFY.
+    var runtimeLogLevelProvider = scope.ServiceProvider.GetRequiredService<RuntimeLogLevelProvider>();
+    await SystemSettingsLogLevelApplier.ApplyAsync(
+        db, runtimeLogLevelProvider, app.Logger, CancellationToken.None);
 }
 
 // Configure the HTTP request pipeline.

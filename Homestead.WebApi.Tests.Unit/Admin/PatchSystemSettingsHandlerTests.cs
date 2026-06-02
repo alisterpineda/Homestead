@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Common.Logging;
+using Homestead.WebApi.Common.Settings;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Auditing;
@@ -21,7 +21,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogLevelService _logLevelService;
+    private readonly ISettingsChangeNotifier _notifier;
     private readonly PatchSystemSettingsHandler _sut;
 
     public PatchSystemSettingsHandlerTests()
@@ -36,8 +36,9 @@ public class PatchSystemSettingsHandlerTests : IDisposable
         // Drain after-commit hooks synchronously, mirroring a successful commit, so deferred side effects run.
         _unitOfWork.When(u => u.OnAfterCommit(Arg.Any<Func<CancellationToken, Task>>()))
             .Do(ci => ci.Arg<Func<CancellationToken, Task>>()(CancellationToken.None).GetAwaiter().GetResult());
-        _logLevelService = Substitute.For<ILogLevelService>();
-        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _audit, _unitOfWork, _logLevelService);
+        _notifier = Substitute.For<ISettingsChangeNotifier>();
+        _notifier.NotifyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        _sut = new PatchSystemSettingsHandler(_db, _currentUser, _audit, _unitOfWork, _notifier);
     }
 
     public void Dispose()
@@ -113,7 +114,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_WithLogLevelOverrides_AppliesToLogLevelService()
+    public async Task Handle_WithLogLevelOverrides_NotifiesSettingsChange()
     {
         var ct = TestContext.Current.CancellationToken;
         var overrides = new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning };
@@ -121,8 +122,9 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         await _sut.Handle(request, ct);
 
-        _logLevelService.Received(1).Apply(Arg.Is<IReadOnlyDictionary<string, LogLevel>>(
-            d => d.Count == 1 && d["Default"] == LogLevel.Warning));
+        // The change fans out via a NOTIFY on the system key; every instance (including this one) re-reads
+        // the committed row through its listener — there's no privileged inline apply.
+        await _notifier.Received(1).NotifyAsync(AppSetting.SystemModule, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -166,7 +168,7 @@ public class PatchSystemSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_WithLogLevelOverrides_DefersApplyToAfterCommit()
+    public async Task Handle_WithLogLevelOverrides_DefersNotifyToAfterCommit()
     {
         var ct = TestContext.Current.CancellationToken;
         var request = new PatchSystemSettingsCommand
@@ -176,23 +178,23 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         await _sut.Handle(request, ct);
 
-        // The live-logger mutation must be registered as an after-commit hook (not applied inline), so a
-        // later commit failure can't leave the in-process filters diverged from the persisted blob.
+        // The NOTIFY must be registered as an after-commit hook (not fired inline): peers re-read the
+        // committed row on a separate connection, so a pre-commit signal could race ahead of row visibility.
         _unitOfWork.Received(1).OnAfterCommit(Arg.Any<Func<CancellationToken, Task>>());
     }
 
     [Fact]
-    public async Task Handle_NullOverrides_DoesNotCallApply()
+    public async Task Handle_NullOverrides_DoesNotNotify()
     {
         var request = new PatchSystemSettingsCommand { LogLevelOverrides = null };
 
         await _sut.Handle(request, TestContext.Current.CancellationToken);
 
-        _logLevelService.DidNotReceive().Apply(Arg.Any<IReadOnlyDictionary<string, LogLevel>>());
+        await _notifier.DidNotReceive().NotifyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_EmptyOverrides_ClearsAndAppliesEmptyMap()
+    public async Task Handle_EmptyOverrides_ClearsAndNotifies()
     {
         var ct = TestContext.Current.CancellationToken;
         _db.AppSettings.Add(new AppSetting
@@ -209,8 +211,9 @@ public class PatchSystemSettingsHandlerTests : IDisposable
 
         var response = await _sut.Handle(request, ct);
 
+        // An empty map is still "overrides provided" — it clears the stored set, so the change must fan out.
         Assert.NotNull(response.LogLevelOverrides);
         Assert.Empty(response.LogLevelOverrides);
-        _logLevelService.Received(1).Apply(Arg.Is<IReadOnlyDictionary<string, LogLevel>>(d => d.Count == 0));
+        await _notifier.Received(1).NotifyAsync(AppSetting.SystemModule, Arg.Any<CancellationToken>());
     }
 }

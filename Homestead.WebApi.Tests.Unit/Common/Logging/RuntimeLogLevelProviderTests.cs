@@ -70,4 +70,43 @@ public class RuntimeLogLevelProviderTests
 
         Assert.False(provider.TryGet("Logging:LogLevel:Default", out _));
     }
+
+    [Fact]
+    public void SetLevels_SameData_DoesNotFireReload()
+    {
+        var provider = new RuntimeLogLevelProvider();
+        provider.SetLevels(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning });
+        var token = provider.GetReloadToken();
+
+        // Identical levels — must be a no-op so re-applies (reconnect heal, 60s safety poll, redundant save)
+        // don't churn MEL's filter pipeline.
+        provider.SetLevels(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning });
+
+        Assert.False(token.HasChanged);
+        Assert.Same(token, provider.GetReloadToken());
+    }
+
+    [Fact]
+    public void SetLevels_ChangedData_FiresReload()
+    {
+        var provider = new RuntimeLogLevelProvider();
+        provider.SetLevels(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Warning });
+        var token = provider.GetReloadToken();
+
+        provider.SetLevels(new Dictionary<string, LogLevel> { ["Default"] = LogLevel.Error });
+
+        Assert.True(token.HasChanged);
+    }
+
+    [Fact]
+    public void SetLevels_NullAfterEmpty_DoesNotFireReload()
+    {
+        var provider = new RuntimeLogLevelProvider();
+        var token = provider.GetReloadToken();
+
+        // Clearing when already empty (the absent-row case on a pristine DB) must not fire a reload token.
+        provider.SetLevels(null);
+
+        Assert.False(token.HasChanged);
+    }
 }
