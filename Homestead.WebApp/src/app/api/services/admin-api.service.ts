@@ -31,6 +31,8 @@ import { getProcessingJobs } from '@/api/generated/fn/processing/get-processing-
 import { getProcessingSchedules } from '@/api/generated/fn/admin/get-processing-schedules';
 import { createProcessingSchedule } from '@/api/generated/fn/admin/create-processing-schedule';
 import { deleteProcessingSchedule } from '@/api/generated/fn/admin/delete-processing-schedule';
+import { getSystemSettings } from '@/api/generated/fn/admin/get-system-settings';
+import { patchSystemSettings } from '@/api/generated/fn/admin/patch-system-settings';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { BulkDeleteUsersResponse } from '@/api/generated/models/bulk-delete-users-response';
@@ -49,6 +51,7 @@ import type { ListModelsResponse } from '@/api/generated/models/list-models-resp
 import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generated/models/paginated-response-of-get-processing-jobs-response';
 import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/generated/models/paginated-response-of-get-processing-schedules-response';
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
+import type { SystemSettingsResponse } from '@/api/generated/models/system-settings-response';
 
 export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
 export type { CreateUser$Params } from '@/api/generated/fn/admin/create-user';
@@ -78,6 +81,8 @@ export type { GetProcessingJobs$Params } from '@/api/generated/fn/processing/get
 export type { GetProcessingSchedules$Params } from '@/api/generated/fn/admin/get-processing-schedules';
 export type { CreateProcessingSchedule$Params } from '@/api/generated/fn/admin/create-processing-schedule';
 export type { DeleteProcessingSchedule$Params } from '@/api/generated/fn/admin/delete-processing-schedule';
+export type { GetSystemSettings$Params } from '@/api/generated/fn/admin/get-system-settings';
+export type { PatchSystemSettings$Params } from '@/api/generated/fn/admin/patch-system-settings';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -194,5 +199,13 @@ export class AdminApiService {
 
   deleteProcessingSchedule(params: Parameters<typeof deleteProcessingSchedule>[2]): Observable<void> {
     return deleteProcessingSchedule(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getSystemSettings(params?: Parameters<typeof getSystemSettings>[2]): Observable<SystemSettingsResponse> {
+    return getSystemSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchSystemSettings(params: Parameters<typeof patchSystemSettings>[2]): Observable<SystemSettingsResponse> {
+    return patchSystemSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 }

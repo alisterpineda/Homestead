@@ -106,6 +106,7 @@ export type { InitialBalanceInput } from './models/initial-balance-input';
 export type { JsonPatchDocument } from './models/json-patch-document';
 export type { ListAiProviderModelsRequest } from './models/list-ai-provider-models-request';
 export type { ListModelsResponse } from './models/list-models-response';
+export type { LogLevel } from './models/log-level';
 export type { NetWorthGranularity } from './models/net-worth-granularity';
 export type { NetWorthHistoryPoint } from './models/net-worth-history-point';
 export type { NetWorthRange } from './models/net-worth-range';

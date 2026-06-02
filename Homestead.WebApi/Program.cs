@@ -1,9 +1,14 @@
+using System.Text.Json;
 using Asp.Versioning;
 using FluentValidation;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Logging;
+using Homestead.WebApi.Domain.Auditing;
+using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Admin;
+using Homestead.WebApi.Modules.Admin.Features.Settings;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
 using Homestead.WebApi.Modules.Documents.Services;
@@ -28,6 +33,14 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+// Reloadable in-memory source for runtime log-level overrides. Registered LAST so it wins over
+// appsettings/env; MEL rebinds LoggerFilterOptions when its reload token fires, so an admin save takes
+// effect with no restart. The provider is also registered in DI so LogLevelService can push to it.
+var runtimeLogLevels = new RuntimeLogLevelSource();
+((IConfigurationBuilder)builder.Configuration).Add(runtimeLogLevels);
+builder.Services.AddSingleton(runtimeLogLevels.Provider);
+builder.Services.AddSingleton<ILogLevelService, LogLevelService>();
 
 // When running outside Aspire (e.g. Docker), map self-hoster-friendly env vars into .NET config
 if (string.IsNullOrEmpty(builder.Configuration.GetConnectionString("postgresdb")))
@@ -310,6 +323,25 @@ if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    // Re-apply persisted log-level overrides so they survive restarts. Read once from the existing
+    // "system" AppSetting blob — no DB access from the config layer, avoiding the startup-DbContext footgun.
+    var logLevels = scope.ServiceProvider.GetRequiredService<ILogLevelService>();
+    var systemSetting = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.SystemModule);
+    if (systemSetting is not null)
+    {
+        // A malformed/legacy blob must not brick startup — degrade to "no overrides" and log it instead.
+        try
+        {
+            var systemSettings = JsonSerializer.Deserialize<SystemSettings>(systemSetting.Value, FieldChange.JsonOptions);
+            logLevels.Apply(systemSettings?.GetLogLevelOverrides());
+        }
+        catch (JsonException ex)
+        {
+            app.Logger.LogWarning(ex,
+                "Could not parse the persisted system settings blob; runtime log-level overrides were not applied.");
+        }
+    }
 }
 
 // Configure the HTTP request pipeline.

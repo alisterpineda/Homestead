@@ -3,7 +3,7 @@ import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideScanText, lucideBrain } from '@ng-icons/lucide';
+import { lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideScanText, lucideBrain, lucideSettings } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { isNavItemActive } from '@/shared/utils';
@@ -17,7 +17,7 @@ import { isNavItemActive } from '@/shared/utils';
     HlmIconImports,
     HlmSidebarImports,
   ],
-  providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideScanText, lucideBrain })],
+  providers: [provideIcons({ lucideLayoutDashboard, lucideUsers, lucideUsers2, lucideActivity, lucideCalendarClock, lucideScanText, lucideBrain, lucideSettings })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupContent>
@@ -76,6 +76,20 @@ import { isNavItemActive } from '@/shared/utils';
       </div>
     </div>
 
+    <div hlmSidebarGroup>
+      <div hlmSidebarGroupLabel>Configuration</div>
+      <div hlmSidebarGroupContent>
+        <ul hlmSidebarMenu>
+          <li hlmSidebarMenuItem>
+            <a hlmSidebarMenuButton routerLink="/admin/settings" [isActive]="isActive('/admin/settings')">
+              <ng-icon hlm name="lucideSettings" size="sm" />
+              <span>System Settings</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
   `,
 })
 export class AdminSidebarComponent {
@@ -91,7 +105,7 @@ export class AdminSidebarComponent {
 
   private urlPath = computed(() => this.url().split('?')[0]);
 
-  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs', '/admin/schedules', '/admin/text-extraction', '/admin/ai-providers'];
+  private readonly navPaths = ['/admin', '/admin/users', '/admin/groups', '/admin/jobs', '/admin/schedules', '/admin/text-extraction', '/admin/ai-providers', '/admin/settings'];
 
   isActive(path: string): boolean {
     return isNavItemActive(this.urlPath(), path, this.navPaths);
