@@ -52,7 +52,7 @@ The job:
 
 Processing failures do not roll the upload back: the file remains, the row remains, and downstream artefacts (thumbnail, extracted text) may be missing. The user can reprocess to retry.
 
-When `AutoClassifyOnUpload` is enabled in the Documents settings and a default AI provider is configured and enabled, the upload job additionally enqueues a `ClassifyDocument` job after completing its own work. This is fire-and-forget — the upload job completes and notifies the user immediately; classification runs as a separate job and its failure does not affect the upload. See the [overview](overview.md#ai-classification-and-suggestions) for the classification flow.
+When `AutoClassifyOnUpload` is enabled in the Documents settings and a default AI provider is configured and enabled, the upload job additionally enqueues a `ClassifyDocument` job after completing its own work. This is fire-and-forget — the upload job completes and notifies the user immediately; classification runs as a separate job and its failure does not affect the upload. See the [overview](overview.md#ai-classification-and-summarization) for the classification flow.
 
 Two job handlers cover the two entry points:
 

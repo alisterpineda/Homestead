@@ -2,7 +2,7 @@
 
 This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list, an admin schedules list, and SignalR-driven toasts. Most jobs today are initiated by another module (currently Documents) on the user's behalf; some can be issued by a recurring schedule (system-attributed). Every job runs asynchronously in the same WebApi process and reports completion back through SignalR (when it has a user creator).
 
-This file lives under `references/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, downloads, and any recurring work all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
+This file lives under `docs/product-design/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, downloads, and any recurring work all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
 
 ## Purpose
 

@@ -2,7 +2,7 @@
 
 This document describes the Documents module within Homestead: what it is, what it does, what it does not do, and the design decisions that shape it. It is product-level, not implementation-level — see the repo's CLAUDE.md files for code structure and framework choices.
 
-Documents sits alongside Finances and the cross-cutting infrastructure modules listed in the top-level [SKILL.md](../../SKILL.md). This file governs *what* the module should do; defer to existing module patterns in the codebase for *how* it is wired up.
+Documents sits alongside Finances and the cross-cutting infrastructure modules listed in the [product-design index](../README.md). This file governs *what* the module should do; defer to existing module patterns in the codebase for *how* it is wired up.
 
 ## Purpose
 

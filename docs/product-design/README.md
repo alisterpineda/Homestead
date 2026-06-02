@@ -1,0 +1,26 @@
+# Homestead — Product Design
+
+Product-level requirements and design decisions for Homestead's modules: what each
+module should do, the user-facing concepts it exposes, the decisions that shape it,
+and what is deliberately deferred. This is the *what*, not the *how* — code
+structure, framework choices, and persistence/auth plumbing live in the repo's
+CLAUDE.md files (`/CLAUDE.md`, `Homestead.WebApi/CLAUDE.md`,
+`Homestead.WebApp/CLAUDE.md`).
+
+> The cross-cutting product principles and the agent routing table (which doc to
+> consult for which area of the codebase) live in the `product-design` skill at
+> [`.claude/skills/product-design/SKILL.md`](../../.claude/skills/product-design/SKILL.md).
+> The per-module deep dives below are the source of truth for each module's design.
+
+## Modules
+
+| Module | User-facing? | Docs |
+|---|---|---|
+| **Documents** | Yes | [overview](documents/overview.md) · [search](documents/search.md) · [tags](documents/tags.md) · [versions](documents/versions.md) |
+| **Finances** | Yes | [overview](finances/overview.md) · [accounts](finances/accounts.md) · [commodities](finances/commodities.md) · [transactions](finances/transactions.md) · [valuation](finances/valuation.md) |
+| **Processing** | Read-only status surface | [overview](processing/overview.md) |
+| **Admin**, **Identity**, **Status** | Admin-only · indirect · none | No product doc (infrastructure) — see the CLAUDE.md files. |
+
+## Cross-cutting
+
+- [shared/table-ux.md](shared/table-ux.md) — product/UX rules for every data-table screen (toolbars, the unified-popover filter pattern, selection state, responsive behaviour). Applies across modules.
