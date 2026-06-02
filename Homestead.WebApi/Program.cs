@@ -40,6 +40,10 @@ var runtimeLogLevels = new RuntimeLogLevelProvider();
 ((IConfigurationBuilder)builder.Configuration).Add(runtimeLogLevels);
 builder.Services.AddSingleton(runtimeLogLevels);
 
+// Read-only inspector over the live config + logger factory: reports the effective level for any namespace
+// and where it comes from (override / appsettings / env / code), for the admin "effective log levels" view.
+builder.Services.AddSingleton<ILogLevelInspector, LogLevelInspector>();
+
 // Multi-instance fan-out for settings changes: the writer NOTIFYs on a Postgres channel and every
 // instance (including the writer — Postgres echoes a channel's NOTIFY back to its own listeners) re-reads
 // the committed row and re-applies, so a save propagates with no restart. Postgres is the only shared

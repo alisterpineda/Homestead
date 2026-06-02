@@ -165,6 +165,8 @@ export type { GetSystemSettings$Params as GetSystemSettings$Params } from './fn/
 export { getSystemSettings as getSystemSettings } from './fn/admin/get-system-settings';
 export type { PatchSystemSettings$Params as PatchSystemSettings$Params } from './fn/admin/patch-system-settings';
 export { patchSystemSettings as patchSystemSettings } from './fn/admin/patch-system-settings';
+export type { GetLogLevels$Params as GetLogLevels$Params } from './fn/admin/get-log-levels';
+export { getLogLevels as getLogLevels } from './fn/admin/get-log-levels';
 export type { GetProcessingSchedules$Params as GetProcessingSchedules$Params } from './fn/admin/get-processing-schedules';
 export { getProcessingSchedules as getProcessingSchedules } from './fn/admin/get-processing-schedules';
 export type { CreateProcessingSchedule$Params as CreateProcessingSchedule$Params } from './fn/admin/create-processing-schedule';

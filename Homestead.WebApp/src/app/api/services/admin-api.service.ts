@@ -33,6 +33,7 @@ import { createProcessingSchedule } from '@/api/generated/fn/admin/create-proces
 import { deleteProcessingSchedule } from '@/api/generated/fn/admin/delete-processing-schedule';
 import { getSystemSettings } from '@/api/generated/fn/admin/get-system-settings';
 import { patchSystemSettings } from '@/api/generated/fn/admin/patch-system-settings';
+import { getLogLevels } from '@/api/generated/fn/admin/get-log-levels';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { BulkDeleteUsersResponse } from '@/api/generated/models/bulk-delete-users-response';
@@ -52,6 +53,7 @@ import type { PaginatedResponseOfGetProcessingJobsResponse } from '@/api/generat
 import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/generated/models/paginated-response-of-get-processing-schedules-response';
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
 import type { SystemSettingsResponse } from '@/api/generated/models/system-settings-response';
+import type { LogLevelsResponse } from '@/api/generated/models/log-levels-response';
 
 export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
 export type { CreateUser$Params } from '@/api/generated/fn/admin/create-user';
@@ -83,6 +85,7 @@ export type { CreateProcessingSchedule$Params } from '@/api/generated/fn/admin/c
 export type { DeleteProcessingSchedule$Params } from '@/api/generated/fn/admin/delete-processing-schedule';
 export type { GetSystemSettings$Params } from '@/api/generated/fn/admin/get-system-settings';
 export type { PatchSystemSettings$Params } from '@/api/generated/fn/admin/patch-system-settings';
+export type { GetLogLevels$Params } from '@/api/generated/fn/admin/get-log-levels';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -207,5 +210,9 @@ export class AdminApiService {
 
   patchSystemSettings(params: Parameters<typeof patchSystemSettings>[2]): Observable<SystemSettingsResponse> {
     return patchSystemSettings(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getLogLevels(category?: string): Observable<LogLevelsResponse> {
+    return getLogLevels(this.http, this.config.rootUrl, category ? { category } : undefined).pipe(map(r => r.body));
   }
 }

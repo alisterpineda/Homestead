@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, computed, viewChild, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideTrash2, lucideTriangleAlert, lucideSettings } from '@ng-icons/lucide';
@@ -14,6 +14,7 @@ import { AdminApiService } from '@/api/services/admin-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
 import type { LogLevel } from '@/api/generated/models/log-level';
+import { EffectiveLogLevelsComponent } from './effective-log-levels.component';
 
 interface LogLevelRow {
   category: string;
@@ -30,7 +31,7 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, NgIcon, HlmIconImports, HlmCardImports, HlmButton, HlmInput, HlmLabel,
-    HlmSpinner, HlmEmptyImports, HlmSelectImports,
+    HlmSpinner, HlmEmptyImports, HlmSelectImports, EffectiveLogLevelsComponent,
   ],
   providers: [provideIcons({ lucidePlus, lucideTrash2, lucideTriangleAlert, lucideSettings })],
   template: `
@@ -128,6 +129,8 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
             </button>
           </div>
         </div>
+
+        <app-effective-log-levels />
       }
     </div>
   `,
@@ -135,6 +138,8 @@ const WELL_KNOWN_CATEGORIES = [DEFAULT_CATEGORY, 'Microsoft.AspNetCore', 'Micros
 export class SystemSettingsComponent implements OnInit {
   private adminApi = inject(AdminApiService);
   private errorHandler = inject(ErrorHandlerService);
+
+  private effectiveLogLevels = viewChild(EffectiveLogLevelsComponent);
 
   readonly levels = LOG_LEVELS;
   levelLabel = (value: string): string => value;
@@ -224,8 +229,12 @@ export class SystemSettingsComponent implements OnInit {
     this.adminApi.patchSystemSettings({ body: { logLevelOverrides } }).subscribe({
       next: (res) => {
         this.saving.set(false);
-        this.seedRows(res.logLevelOverrides ?? null);
+        const savedOverrides = res.logLevelOverrides ?? {};
+        this.seedRows(savedOverrides);
         toast.success('Logging settings saved.');
+        // Overrides apply to this instance asynchronously (Postgres NOTIFY self-echo). Rather than guess a
+        // delay, let the effective view poll until its live table reflects exactly what we just saved.
+        this.effectiveLogLevels()?.refreshAfterSave(savedOverrides);
       },
       error: (err: unknown) => {
         this.saving.set(false);

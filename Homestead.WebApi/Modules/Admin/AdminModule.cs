@@ -25,6 +25,7 @@ using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.UpdateTextEx
 using Homestead.WebApi.Modules.Admin.Features.Schedules.CreateProcessingSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.GetProcessingSchedules;
+using Homestead.WebApi.Modules.Admin.Features.Settings.GetLogLevels;
 using Homestead.WebApi.Modules.Admin.Features.Settings.GetSystemSettings;
 using Homestead.WebApi.Modules.Admin.Features.Settings.PatchSystemSettings;
 using Homestead.WebApi.Modules.Admin.Features.Users.UpdateUser;
@@ -95,6 +96,7 @@ public static class AdminModule
 
         GetSystemSettingsEndpoint.Map(settings);
         PatchSystemSettingsEndpoint.Map(settings);
+        GetLogLevelsEndpoint.Map(settings);
 
         var schedules = app.MapGroup("/api/v{version:apiVersion}/admin/schedules")
             .HasApiVersion(1, 0)
