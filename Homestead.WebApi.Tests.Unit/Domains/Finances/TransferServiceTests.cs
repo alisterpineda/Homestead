@@ -179,4 +179,42 @@ public class TransferServiceTests : IAsyncLifetime
                 new CreateTransferRequest(a.Id, b.Id, -100m, null, new DateOnly(2026, 4, 23), null),
                 TestContext.Current.CancellationToken));
     }
+
+    [Fact]
+    public async Task Update_OnNonTransferNormal_Throws_ShapeIsImmutable()
+    {
+        var a = await AddAccount(AccountKind.Cash, _cad.Id, "A");
+        var b = await AddAccount(AccountKind.Cash, _cad.Id, "B");
+
+        // A 2-split normal that is NOT a transfer (e.g. an investment buy). The transfer editor must
+        // refuse it so it can't rewrite the splits while leaving NormalShape=InvestmentBuy.
+        var trade = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero),
+            Memo = "Buy",
+            Type = TransactionType.Normal,
+            NormalShape = NormalShape.InvestmentBuy,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = a.Id, CommodityId = _cad.Id, Quantity = -100m },
+                new() { Id = Guid.NewGuid(), AccountId = a.Id, CommodityId = _cad.Id, Quantity = 100m },
+            ],
+        };
+        _db.AccountTransactions.Add(trade);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.UpdateAsync(trade.Id,
+                new UpdateTransferRequest(a.Id, b.Id, 50m, null, new DateOnly(2026, 4, 23), null),
+                TestContext.Current.CancellationToken));
+
+        // The row is untouched: still an InvestmentBuy with both legs on account A.
+        var reloaded = await _db.AccountTransactions
+            .OfType<NormalTransaction>()
+            .Include(t => t.Splits)
+            .SingleAsync(t => t.Id == trade.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(NormalShape.InvestmentBuy, reloaded.NormalShape);
+        Assert.All(reloaded.Splits, s => Assert.Equal(a.Id, s.AccountId));
+    }
 }

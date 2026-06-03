@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using static Homestead.WebApi.Modules.Finances.Services.TransactionWriteHelpers;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
@@ -34,6 +35,7 @@ public class TransferService(
             OccurredAt = occurredAt,
             Memo = NormalizeMemo(request.Memo),
             Type = TransactionType.Normal,
+            NormalShape = NormalShape.Transfer,
             Splits = [sourceSplit, destSplit],
         };
 
@@ -52,6 +54,13 @@ public class TransferService(
         Guid transactionId, UpdateTransferRequest request, CancellationToken ct)
     {
         var transaction = await LoadTransferAsync(transactionId, ct);
+
+        // Shape is immutable on edit, and only reads/deletes are shape-agnostic: the transfer editor
+        // must refuse a trade or dividend (also 2-split normals) so it can't rewrite their splits into
+        // transfer legs while leaving NormalShape intact. (Delete deliberately stays shape-agnostic and
+        // reuses LoadTransferAsync, so the guard lives here, not in the loader.)
+        if (transaction.NormalShape != NormalShape.Transfer)
+            throw new BusinessRuleException("Transaction is not a transfer.");
 
         var (source, destination) = await LoadAccountsAsync(
             request.SourceAccountId, request.DestinationAccountId, ct);
@@ -237,12 +246,4 @@ public class TransferService(
         destinationAmount / sourceAmount;
 
     private static DateTimeOffset ResolveOccurredAt(DateOnly date) => date.ToStartOfDayUtc();
-
-    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
-
-    private static IEnumerable<TouchedPair> TouchedFor(AccountTransaction transaction)
-    {
-        foreach (var split in transaction.Splits)
-            yield return new TouchedPair(split.AccountId, split.CommodityId, transaction.OccurredAt);
-    }
 }

@@ -12,6 +12,9 @@ public enum TransactionShape
     Transfer,
     OpeningBalance,
     BalanceEntry,
+    InvestmentBuy,
+    InvestmentSell,
+    Dividend,
     Other,
 }
 
@@ -45,6 +48,8 @@ public record TransactionResponse
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(BalanceEntryDetails), "balanceEntry")]
 [JsonDerivedType(typeof(TransferDetails), "transfer")]
+[JsonDerivedType(typeof(TradeDetails), "trade")]
+[JsonDerivedType(typeof(DividendDetails), "dividend")]
 public abstract record TransactionDetails;
 
 public record TransferDetails(
@@ -59,3 +64,21 @@ public record BalanceEntryDetails(
     Guid AccountId,
     Guid AssertedCommodityId,
     decimal AssertedAmount) : TransactionDetails;
+
+/// <summary>
+/// Shape details for an investment Buy or Sell. Buy-vs-Sell is conveyed by the response
+/// <see cref="TransactionResponse.Shape"/> (<see cref="TransactionShape.InvestmentBuy"/> /
+/// <see cref="TransactionShape.InvestmentSell"/>), so no side field is needed here.
+/// All fields are reconstructed from the annotated (security) leg.
+/// </summary>
+public record TradeDetails(
+    Guid AccountId,
+    Guid SecurityId,
+    Guid FundingCurrencyId,
+    decimal Quantity,
+    decimal UnitPrice) : TransactionDetails;
+
+public record DividendDetails(
+    Guid AccountId,
+    Guid PaymentCurrencyId,
+    decimal Amount) : TransactionDetails;

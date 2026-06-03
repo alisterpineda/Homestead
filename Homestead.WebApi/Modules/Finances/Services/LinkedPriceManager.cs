@@ -115,6 +115,7 @@ public class LinkedPriceManager(AppDbContext db, IAuditContext audit) : ILinkedP
         if (exists)
             throw new BusinessRuleException(
                 $"A transaction-linked price for this commodity already exists at {priceAt:u}. "
-                + "Resolve the existing price row before proceeding.");
+                + "Two transactions can't both set the price for the same commodity at the same instant — "
+                + "change the date or time on one of them, or edit the existing price.");
     }
 }

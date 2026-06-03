@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using static Homestead.WebApi.Modules.Finances.Services.TransactionWriteHelpers;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
@@ -203,6 +204,4 @@ public class BalanceEntryService(
 
     private static DateTimeOffset MinInstant(DateTimeOffset a, DateTimeOffset b) =>
         a < b ? a : b;
-
-    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
 }

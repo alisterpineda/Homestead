@@ -23,6 +23,8 @@ Users never create "transactions" directly. They pick a **shape** — Transfer, 
 
 Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`. Two shapes get their own subtype: balance entries (`BalanceEntryTransaction`), because they extend the base contract with an asserted-quantity field; and opening balances (`OpeningBalanceTransaction`), which adds no fields but keeps a stable discriminator so the dedicated opening-balance editors and delete/re-reconcile logic can target opening-balance rows directly.
 
+Transfer, Investment buy, Investment sell, and Dividend are all 2-split `NormalTransaction`s, so split structure alone can't tell them apart. A second discriminator column — `NormalTransaction.NormalShape` (`Transfer | InvestmentBuy | InvestmentSell | Dividend`, stored as a string; NULL on non-normal TPH rows) — records the user-facing shape directly. The mapping reads it back O(1) with no commodity-kind joins, it's unambiguous, and it survives edits, mirroring the `Type`-discriminator philosophy.
+
 | Shape                 | Stored type              | Splits | Priced legs | Notes |
 |-----------------------|--------------------------|--------|-------------|-------|
 | Opening balance (cash or FX cash in investment) | `OpeningBalanceTransaction` | 2 | 0 | Both splits in same commodity — per-commodity balance. Counterpart = `Equity:Opening Balances`. See [accounts.md](accounts.md#initial-balance-mechanics). |

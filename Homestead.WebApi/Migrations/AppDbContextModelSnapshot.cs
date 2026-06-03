@@ -1227,6 +1227,11 @@ namespace Homestead.WebApi.Migrations
                 {
                     b.HasBaseType("Homestead.WebApi.Domain.Finances.AccountTransaction");
 
+                    b.Property<string>("NormalShape")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.HasDiscriminator().HasValue("Normal");
                 });
 

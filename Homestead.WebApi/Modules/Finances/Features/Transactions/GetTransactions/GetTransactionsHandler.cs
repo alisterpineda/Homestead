@@ -66,9 +66,16 @@ public class GetTransactionsHandler(AppDbContext db)
     {
         TransactionShape.BalanceEntry => query.OfType<BalanceEntryTransaction>(),
         TransactionShape.OpeningBalance => query.OfType<OpeningBalanceTransaction>(),
-        // Mirrors TransactionMapping.ResolveShape: a NormalTransaction is only classified as
-        // Transfer when it has exactly two splits. Any other split count maps to Other.
-        TransactionShape.Transfer => query.OfType<NormalTransaction>().Where(t => t.Splits.Count == 2),
+        // Mirrors TransactionMapping.ResolveShape: the NormalShape discriminator distinguishes the
+        // user-facing shape of a normal transaction (Transfer / Buy / Sell / Dividend).
+        TransactionShape.Transfer =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Transfer),
+        TransactionShape.InvestmentBuy =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.InvestmentBuy),
+        TransactionShape.InvestmentSell =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.InvestmentSell),
+        TransactionShape.Dividend =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Dividend),
         _ => query,
     };
 }

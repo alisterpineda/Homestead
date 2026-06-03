@@ -39,6 +39,10 @@ using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransactions;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.CreateTransfer;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Transfers.PatchTransfer;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.CreateTrade;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.PatchTrade;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.CreateDividend;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.PatchDividend;
 
 namespace Homestead.WebApi.Modules.Finances;
 
@@ -102,6 +106,14 @@ public static class FinancesModule
         var transfers = transactions.MapGroup("/transfers");
         CreateTransferEndpoint.Map(transfers);
         PatchTransferEndpoint.Map(transfers);
+
+        var trades = transactions.MapGroup("/trades");
+        CreateTradeEndpoint.Map(trades);
+        PatchTradeEndpoint.Map(trades);
+
+        var dividends = transactions.MapGroup("/dividends");
+        CreateDividendEndpoint.Map(dividends);
+        PatchDividendEndpoint.Map(dividends);
 
         var settings = v1.MapGroup("/settings");
         GetFinanceSettingsEndpoint.Map(settings);

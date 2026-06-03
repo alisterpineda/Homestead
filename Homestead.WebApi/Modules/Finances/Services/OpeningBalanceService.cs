@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using static Homestead.WebApi.Modules.Finances.Services.TransactionWriteHelpers;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
@@ -148,8 +149,6 @@ public class OpeningBalanceService(
             throw new BusinessRuleException(
                 "An opening balance already exists for this account and commodity. Edit it instead.");
     }
-
-    private static string NormalizeMemo(string? memo) => memo?.Trim() ?? "";
 
     private async Task EnsureOpeningBalanceRemainsEarliestAsync(Guid accountId, Guid commodityId,
         Guid openingBalanceTransactionId, DateTimeOffset newOccurredAt, CancellationToken ct)
