@@ -1,4 +1,4 @@
-import { displaySign, toUserAmount, netWorth, formatAccountBalance } from './sign';
+import { displaySign, toUserAmount, formatAccountBalance } from './sign';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
@@ -56,21 +56,6 @@ describe('toUserAmount', () => {
   });
   it('returns null for null', () => {
     expect(toUserAmount(null, 'Asset')).toBeNull();
-  });
-});
-
-describe('netWorth', () => {
-  it('sums displayValue across accounts (Beancount sign collapses by itself)', () => {
-    expect(netWorth([
-      account({ accountType: 'Asset', displayValue: 1000 }),
-      account({ accountType: 'Liability', displayValue: -500 }),
-    ])).toBe(500);
-  });
-  it('skips unpriced (null displayValue) holdings', () => {
-    expect(netWorth([
-      account({ displayValue: 1000 }),
-      account({ displayValue: null }),
-    ])).toBe(1000);
   });
 });
 

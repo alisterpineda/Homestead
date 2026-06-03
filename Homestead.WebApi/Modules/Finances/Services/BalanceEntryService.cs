@@ -60,7 +60,7 @@ public class BalanceEntryService(
             ],
         };
 
-        validator.Validate(entry);
+        await validator.ValidateAsync(entry, ct);
 
         db.AccountTransactions.Add(entry);
         audit.Created("AccountTransaction", entry.Id);
@@ -110,7 +110,7 @@ public class BalanceEntryService(
         accountSplit.CommodityId = newCommodity.Id;
         adjustmentsSplit.CommodityId = newCommodity.Id;
 
-        validator.Validate(entry);
+        await validator.ValidateAsync(entry, ct);
 
         // Touched pairs cover both old and new (account, commodity) chains. Earliest-affected
         // for the new pair is the earlier of old/new instants so any entries between them are

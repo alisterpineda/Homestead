@@ -64,7 +64,7 @@ See [commodities.md](commodities.md) for the full design: seeding, creation flow
 
 A transaction is one event at one point in time. It has an **occurred-at** timestamp (`DateTimeOffset`, stored UTC), a description, and one or more splits. There is no transaction-level currency — a transaction balances per-commodity, with price annotations on individual splits bridging cross-commodity movements.
 
-Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date and expose an optional time input for users who want intra-day precision. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
+Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date; an optional time input for intra-day precision is planned but not yet exposed in v1, so the built *Add position* flow uses the fixed `12:00 UTC` default. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
 
 Users do not create "transactions" directly. They pick a transaction **shape** (see *Transaction shapes*) and fill in its fields. The system assembles the underlying transaction and its splits.
 
@@ -178,18 +178,18 @@ All derived from splits and prices at read time. None are cached at the data lay
 - **Position** (per account, per commodity, as of a date): sum of split quantities.
 - **Account value** (per account, as of a date, in display currency): sum over positions of (quantity × carry-forward price in display currency).
 - **Net worth** (as of a date, in display currency): sum of asset-account values, less sum of liability-account values.
-- **Equity:Adjustments balance** (in display currency): surfaced in the UI as *"Unrecorded wealth changes."* Useful both as a running total and as a tracking-quality signal — a growing balance relative to explicit transactions means the user is relying more on reconciliation and less on itemisation.
+- **Equity:Adjustments balance** (in display currency): intended to surface in the UI as *"Unrecorded wealth changes"* — useful both as a running total and as a tracking-quality signal (a growing balance relative to explicit transactions means the user is relying more on reconciliation and less on itemisation). _**Planned, not yet built in v1:** the Adjustments account is maintained internally by the reconciler, but no read endpoint returns its balance and no UI surfaces it yet._
 
 See [valuation.md](valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
 
 ## Distinctive UX decisions worth preserving
 
-1. **Balance entries are first-class.** They are not a utility hidden behind a reconciliation menu. They are a primary way to record monthly activity and appear prominently in account detail views.
+1. **Balance entries are first-class.** They are a primary transaction shape — selectable from the New-transaction action alongside Transfer, not relegated to a separate "reconcile account" tool — and a primary way to record monthly activity. They appear inline in the account's Activity list, differentiated by label rather than separated out.
 2. **Sign conventions are hidden.** Liability balances show as positive amounts owed, not negative assets. Dividends show as positive inflows, not negative income-account credits.
 3. **No debit/credit terminology in the UI, anywhere, ever.**
 4. **Users pick a transaction shape, not a transaction.** The underlying balanced transaction is constructed from the shape.
 5. **The display currency is the user's reality.** Every balance, every total, every chart axis is in display currency by default. Native-currency amounts appear where faithful (positions held in a multi-commodity account show native quantity and display-currency value side by side).
-6. **Equity:Adjustments is visible.** The UI surfaces its running balance as a metric. A large balance is not presented as an error — it is presented as context about tracking style.
+6. **Equity:Adjustments is visible.** _(Planned, not yet built in v1.)_ The UI is intended to surface its running balance as a metric. A large balance is not presented as an error — it is presented as context about tracking style.
 
 ## Future-compatibility
 

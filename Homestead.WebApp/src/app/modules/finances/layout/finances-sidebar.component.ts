@@ -7,6 +7,7 @@ import { lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChev
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
+import { AuthService } from '@/shared/services/auth.service';
 import { isNavItemActive } from '@/shared/utils';
 
 @Component({
@@ -61,15 +62,17 @@ import { isNavItemActive } from '@/shared/utils';
                       <span>General</span>
                     </a>
                   </li>
-                  <li hlmSidebarMenuSubItem>
-                    <a
-                      hlmSidebarMenuSubButton
-                      routerLink="/finances/settings/price-sources"
-                      [isActive]="isActive('/finances/settings/price-sources')"
-                    >
-                      <span>Price sources</span>
-                    </a>
-                  </li>
+                  @if (isAdmin()) {
+                    <li hlmSidebarMenuSubItem>
+                      <a
+                        hlmSidebarMenuSubButton
+                        routerLink="/finances/settings/price-sources"
+                        [isActive]="isActive('/finances/settings/price-sources')"
+                      >
+                        <span>Price sources</span>
+                      </a>
+                    </li>
+                  }
                 </ul>
               </div>
             </div>
@@ -81,6 +84,7 @@ import { isNavItemActive } from '@/shared/utils';
 })
 export class FinancesSidebarComponent {
   private router = inject(Router);
+  protected readonly isAdmin = inject(AuthService).isAdmin;
 
   private url = toSignal(
     this.router.events.pipe(

@@ -76,19 +76,25 @@ export class NetWorthChartComponent {
       z: 3,
     };
 
-    const breakdownConfigs: { name: string; field: 'assets' | 'liabilities'; color: string }[] = [
-      { name: SERIES.Assets, field: 'assets', color: colors.assetBar },
-      { name: SERIES.Liabilities, field: 'liabilities', color: colors.destructive },
+    // Liabilities are stored Beancount-negative; flip them to a positive "amount owed"
+    // magnitude at render time so both series sit above zero (per the hidden-sign rule).
+    const breakdownConfigs: { name: string; field: 'assets' | 'liabilities'; color: string; flip: boolean }[] = [
+      { name: SERIES.Assets, field: 'assets', color: colors.assetBar, flip: false },
+      { name: SERIES.Liabilities, field: 'liabilities', color: colors.destructive, flip: true },
     ];
     const breakdownSeries = breakdownConfigs.map(b => ({
       name: b.name,
       type: 'line',
       smooth: true,
       showSymbol: false,
-      data: points.map(p => [p.asOf, p[b.field] ?? null]),
+      data: points.map(p => {
+        const raw = p[b.field];
+        return [p.asOf, raw == null ? null : (b.flip ? -raw : raw)];
+      }),
       lineStyle: { color: b.color, width: 1, opacity: 0.6 },
       itemStyle: { color: b.color },
-      areaStyle: { color: b.color, opacity: 0.22 },
+      // No area fill on the breakdown lines: with liabilities flipped to a positive
+      // magnitude, asset/liability fills would occupy the same band above zero and blend.
       z: 1,
     }));
 
@@ -212,14 +218,14 @@ function formatTooltip(
     return `<div style="font-size:12px">${head}${first.marker}<strong>${fmt(first.data[1])}</strong></div>`;
   }
 
-  // Liabilities are beancount-signed (negative); render as a negated magnitude
-  // so the tooltip reads like "−$50,000.00" rather than the raw negative.
-  const negate = (v: number | null) =>
-    v === null ? '—' : v === 0 ? fmt(0) : `−${fmt(Math.abs(v))}`;
+  // The liabilities series is already flipped to a positive "amount owed" magnitude
+  // upstream, so render it as a plain positive amount (abs guards any residual sign).
+  const owed = (v: number | null) =>
+    v === null ? '—' : fmt(Math.abs(v));
   const rows: { name: string; label: string; format: (v: number | null) => string }[] = [
     { name: SERIES.NetWorth, label: 'Net worth', format: fmt },
     { name: SERIES.Assets, label: 'Assets', format: fmt },
-    { name: SERIES.Liabilities, label: 'Liabilities', format: negate },
+    { name: SERIES.Liabilities, label: 'Liabilities', format: owed },
   ];
   const byName = new Map<string, AxisTooltipParam>();
   for (const p of arr) {

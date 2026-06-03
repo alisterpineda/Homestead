@@ -95,12 +95,9 @@ The list endpoint projects the per-row aggregates the table needs — `PriceCoun
 
 Route: `/finances/commodities/:id`.
 
-**Header:** breadcrumb · symbol · exchange badge (securities only) · name · kind.
+**Header:** breadcrumb · symbol · exchange badge (securities only) · kind · read-only badge (system-managed commodities) · name.
 
-**Tabs:**
-
-- **Info** — metadata: symbol, exchange (securities only), name, kind, display precision, system-managed badge.
-- **Prices** — chronological list of price observations across all sources. The table has a `Source` column (filterable) so the user can inspect what each provider has contributed; the row currently winning the lookup at "now" gets a subtle marker. Section header above the table carries the *New manual price* action (which always writes a `Manual`-source row), rendered with the table body — not in the page-header strip — so the header stays stable as the user toggles tabs.
+**Layout.** The detail page is a flat header card followed by a single **Prices** section — there is no tabbed Info/Prices split, and display precision is not surfaced in v1 (the header carries the rest of the metadata). The Prices section is a chronological list of price observations across all sources, with a `Source` column (filterable) so the user can inspect what each provider has contributed. The section header carries the *New manual price* action (which always writes a `Manual`-source row).
 
 Seeded currencies render read-only throughout.
 
@@ -176,7 +173,7 @@ CommodityPriceSourceSettings {
 
 `PriceAt` is a `DateTimeOffset`, stored UTC. This gives well-defined ordering for same-day observations, alignment with transaction timestamps (see the *Transactions* section in [overview.md](overview.md#transactions)), and a single axis for carry-forward lookups.
 
-Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date with an optional time; the frontend defaults the time to `00:00 UTC` on the entered date when the user only picks a date. The API accepts a raw `PriceAt: DateTimeOffset` — the server does not default or normalise the time. On a day that has both a 00:00-UTC manual price and a 12:00-UTC transaction-linked price, carry-forward at instants ≥ 12:00 UTC picks the transaction-linked row (most recent `PriceAt ≤ T`).
+Transaction-linked prices inherit the source transaction's `OccurredAt`. Manual entry collects a date and a **required** time; the frontend pre-fills the time with the user's current local clock and combines the entered local date+time into a single instant that is stored as UTC. The API accepts a raw `PriceAt: DateTimeOffset` — the server does not default or normalise the time. When a day carries two observations at different instants — say a manual price and a 12:00-UTC transaction-linked price — carry-forward at any instant ≥ the later one picks that most-recent row (`PriceAt ≤ T`); the `Manual > Transaction > External` source tiebreaker applies only when two rows share the exact same `PriceAt`.
 
 Daily-resolution providers (e.g., end-of-day FX or stock close) store `PriceAt` as **midnight UTC of the trade date**. Carry-forward semantics make the exact instant largely irrelevant — anything in the trade-day window resolves to that day's observation — and the convention keeps providers from having to know each exchange's local close time and timezone.
 
@@ -279,7 +276,7 @@ The list is statically the set of registered enum values — there is no "create
 
 **Config field types.** The schema supports four field types: `String`, `Integer`, `Boolean`, and `Secret`. `Secret` fields (e.g., API keys) are rendered as `type="password"` in the form, masked in the source-detail GET response (`••••` plus the last 4 chars when long enough), and treated as no-op on PATCH when the submitted value is empty or matches the masked form — so an admin saving the form without re-entering the key keeps the existing value.
 
-**System sources** (`Transaction`, `Manual`) appear in the list for visibility — clicking opens a read-only detail page showing their prices and aggregate stats but offering no edit/disable actions. There is no settings row to edit.
+**System sources** (`Transaction`, `Manual`) appear in the list for visibility — clicking opens a read-only detail page showing aggregate stats (the number of prices that source has contributed) but offering no edit/disable actions. There is no settings row to edit.
 
 **Per-source detail page** (external only) also hosts the source's recurring schedule (a single cron expression, optional) and a *Run now* button that enqueues an ad-hoc import attributed to the admin who clicked it. Schedule edits write through to the existing `processing.schedules` table — the schedule's identity is `(JobType=ImportCommodityPrices, Payload.Source=<enum value>)`, at most one schedule per source. The page is the user-friendly facade over that table for finance-specific schedules. The central admin schedules list (`/admin/schedules`) still shows the same rows as a fallback view.
 

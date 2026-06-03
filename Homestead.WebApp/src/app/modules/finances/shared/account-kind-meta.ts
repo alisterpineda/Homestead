@@ -39,19 +39,6 @@ export const KIND_ICONS: Record<UserAccountKind, string> = {
   OtherLiability: 'lucideCircleMinus',
 };
 
-// Display order of groups on the account list (Cash first, liabilities last).
-export const KIND_GROUPS: ReadonlyArray<{
-  kind: UserAccountKind;
-  sectionLabel: string;
-}> = [
-  { kind: 'Cash', sectionLabel: 'Cash' },
-  { kind: 'Investment', sectionLabel: 'Investments' },
-  { kind: 'OtherAsset', sectionLabel: 'Other Assets' },
-  { kind: 'CreditCard', sectionLabel: 'Credit Cards' },
-  { kind: 'Loan', sectionLabel: 'Loans' },
-  { kind: 'OtherLiability', sectionLabel: 'Other Liabilities' },
-];
-
 export function isUserAccountKind(kind: AccountKind | null | undefined): kind is UserAccountKind {
   return kind != null && USER_ACCOUNT_KINDS.includes(kind);
 }

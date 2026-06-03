@@ -128,7 +128,7 @@ Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
 
 Weight balance: USD = +5000 − 5000 = 0 ✓. Cash opening balances — even foreign-currency cash in a differently-reporting Investment account — always balance per-commodity: no annotation, no price row.
 
-**Invariant: one opening-balance transaction per `(account, commodity)` pair.** *Add position* for a commodity that already has an opening balance in that account becomes *Edit opening balance* instead.
+**Invariant: one opening-balance transaction per `(account, commodity)` pair.** *Add position* hides commodities the account already holds, so it only ever creates a new position; to change an existing one, use *Edit opening balance* from the Positions tab. The backend also rejects a duplicate `(account, commodity)` opening balance as a safeguard.
 
 ## Editing opening balances
 
@@ -144,37 +144,39 @@ Rules:
 
 ## Add position (Investment only)
 
-Modal: commodity picker · quantity · as-of date. If the commodity is a security, the modal additionally requires a price-per-unit and emits a `CommodityPrice` row. If the selected commodity already has a position in this account, the modal switches to *Edit opening balance* for that position.
+Modal: commodity picker · quantity · as-of date. If the commodity is a security, the modal additionally requires a price-per-unit and emits a `CommodityPrice` row. Commodities the account already holds are hidden from the picker, so the modal only adds new positions; an existing position is changed via *Edit opening balance* on the Positions tab.
 
 ## Account list
 
 Route: `/finances/accounts`.
 
-- Header: title + *New Account* action.
-- Net-worth summary card: total in Display Currency, with asset / liability subtotals.
-- Grouped by Kind, in this order: Cash, Investments, Other Assets, Credit Cards, Loans, Other Liabilities.
-- Group header shows the signed group total (liabilities displayed as positive amounts owed).
-- Per row: name · institution · balance in display currency · native amount where it differs.
-- Archived accounts are hidden by default, collapsed under "Archived (N)" per group.
+- Header: title + *New account* action. When no display currency is configured, a banner links to Settings; when no accounts exist, an empty state prompts the first one.
+- A flat, sortable list — **no Kind grouping, summary card, or group totals**. System accounts are hidden. Net worth (the household total and asset / liability breakdown) lives on the Reports page (`/finances/reports`), sourced from the net-worth time-series rather than rolled up here.
+- Two view modes, toggled in the toolbar and remembered as a user preference (cards on mobile, table on desktop by default):
+  - **Table** — columns: name (institution beneath) · type · latest transaction · balance in display currency · row-actions menu. Headers sort.
+  - **Cards** — name, `institution · type` subtitle, balance, latest transaction date.
+- Sort (toolbar): by name, type, latest transaction, or total balance, ascending or descending. Balances render in the display currency only (no native amount); an account whose holdings are entirely unpriced shows *Unpriced* / *—*.
+- Archived accounts are hidden by default; a single global *Show archived accounts (N)* toggle in the Filter popover reveals them.
 - Row actions (kebab): Edit, Archive / Unarchive. Delete is offered only when the account has zero transactions.
 
 ## Account detail
 
 Route: `/finances/accounts/:id`.
 
-**Header:** breadcrumb · name · kind badge · institution · reporting currency · current balance in display currency, with native amount beside it where different.
+**Header:** breadcrumb · name · kind badge · institution · current balance in display currency, with native amount beside it where different.
 
-**Primary actions:**
+**Primary actions** (non-archived accounts):
 
-- **Record Balance** (balance entry) — the prominent primary action.
-- **New Transaction** — dropdown of shapes allowed for this Kind.
+- **New Transaction** — a dropdown of the transaction shapes allowed for this Kind. Balance entry (*Record balance*) and Transfer are the shapes available today; investment shapes are added to this menu as they land.
 - **Add position** — Investment accounts only.
+- **Add opening balance** — non-Investment accounts only, and only when the account has no opening balance yet.
 
-**Tabs:**
+**Layout.** The detail page is a stack of cards, not a tabbed view:
 
-- **Activity** — unified chronological list of every transaction affecting this account, including opening balances and balance entries. Differentiated by icon / label, not by separation.
-- **Positions** — Investment accounts only. Table: commodity · quantity · native value · display value · share of account. Each row has an *Edit opening balance* action when one exists.
-- **Info** — kind, reporting currency, institution, created / updated timestamps.
+- **Positions** (Investment accounts only) — a card with a table: commodity · quantity · display value · share of account. Quantity is the native amount (there is no separate native-value column). Each row has an *Edit opening balance* action when one exists.
+- **Activity** — a unified chronological list of every transaction affecting this account, including opening balances and balance entries, differentiated by icon / label rather than by separation.
+
+Reporting currency, institution detail, and created / updated timestamps are not surfaced on the detail page in v1 (there is no Info section).
 
 Archived accounts render read-only. Primary actions disappear; Edit and Unarchive remain.
 

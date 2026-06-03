@@ -40,8 +40,9 @@ import { FinancesTransactionApiService } from '@/api/services/finances-transacti
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { FinanceSettingsService } from '../shared/finance-settings.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { displaySign } from '../shared/sign';
-import { formatCurrency } from '../shared/format-currency';
+import { formatMaskedCurrency } from '../shared/format-currency';
 import { toDateOnly } from '../shared/date';
 import {
   isDetailsOfKind,
@@ -230,6 +231,7 @@ export class AccountActivityTabComponent {
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private settingsService = inject(FinanceSettingsService);
+  private prefs = inject(UserPreferencesService);
   private destroyRef = inject(DestroyRef);
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / PAGE_SIZE)));
@@ -381,6 +383,7 @@ export class AccountActivityTabComponent {
 
   private toViewModel(tx: TransactionResponse, account: AccountResponse): ActivityRowViewModel {
     const dc = this.settingsService.displayCurrency();
+    const masked = this.prefs.financesPrivacyMasked();
     const signed = signedAmountForAccount(tx, account.id) * displaySign(account.accountType);
 
     // The account-side leg's commodity is the right unit for the row amount —
@@ -391,8 +394,8 @@ export class AccountActivityTabComponent {
       ? this.commodities()[accountSplit.commodityId] ?? null
       : this.commodities()[account.reportingCurrencyId] ?? null;
     const amountText = commodityForAmount
-      ? formatCurrency(signed, commodityForAmount)
-      : (dc ? formatCurrency(signed, dc) : null);
+      ? formatMaskedCurrency(signed, commodityForAmount, masked)
+      : (dc ? formatMaskedCurrency(signed, dc, masked) : null);
 
     const dateText = toDateOnly(tx.occurredAt);
 
@@ -406,7 +409,7 @@ export class AccountActivityTabComponent {
     } else if (isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(tx.details, 'balanceEntry')) {
       const assertedCommodity = this.commodities()[tx.details.assertedCommodityId] ?? null;
       if (assertedCommodity) {
-        typeSubtitle = formatCurrency(tx.details.assertedAmount, assertedCommodity);
+        typeSubtitle = formatMaskedCurrency(tx.details.assertedAmount, assertedCommodity, masked);
       }
     }
 

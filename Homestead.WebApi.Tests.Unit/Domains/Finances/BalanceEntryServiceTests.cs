@@ -41,7 +41,7 @@ public class BalanceEntryServiceTests : IAsyncLifetime
         _systemAccounts.GetAdjustmentsAsync(Arg.Any<CancellationToken>()).Returns(_adjustments);
 
         _audit = Substitute.For<IAuditContext>();
-        _sut = new BalanceEntryService(_db, _systemAccounts, new TransactionValidator(), _audit);
+        _sut = new BalanceEntryService(_db, _systemAccounts, new TransactionValidator(_db), _audit);
         _reconciler = new BalanceEntryReconciler(_db, _systemAccounts, _audit);
     }
 

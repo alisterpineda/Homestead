@@ -83,6 +83,31 @@ public class PatchPriceSourceHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task PairAllowList_SecuritySymbol_Accepted()
+    {
+        _db.Commodities.Add(new Commodity
+        {
+            Id = Guid.NewGuid(),
+            Symbol = "VEQT",
+            Name = "Vanguard All-Equity ETF",
+            Kind = CommodityKind.Security,
+            Exchange = "TSX",
+            DisplayPrecision = 4,
+        });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Sut().Handle(
+            new PatchPriceSourceCommand
+            {
+                Source = CommodityPriceSource.BankOfCanada,
+                PairAllowList = new[] { "VEQT" },
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains("VEQT", _db.CommodityPriceSourceSettings.Single().PairAllowList);
+    }
+
+    [Fact]
     public async Task EnableUpdates_PersistsAndReturnsResponse()
     {
         var response = await Sut().Handle(

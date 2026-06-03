@@ -55,7 +55,7 @@ public class OpeningBalanceService(
             Splits = [accountSplit, equitySplit],
         };
 
-        validator.Validate(transaction);
+        await validator.ValidateAsync(transaction, ct);
 
         db.AccountTransactions.Add(transaction);
         audit.Created("AccountTransaction", transaction.Id);
@@ -99,7 +99,7 @@ public class OpeningBalanceService(
 
         ApplyShape(account, commodity, request.ValuePerUnit, accountSplit, equitySplit);
 
-        validator.Validate(transaction);
+        await validator.ValidateAsync(transaction, ct);
 
         await linkedPrices.SyncForTransactionAsync(transaction, ct);
 

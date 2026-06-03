@@ -50,7 +50,7 @@ public class OpeningBalanceServiceTests : IAsyncLifetime
         _audit = Substitute.For<IAuditContext>();
 
         var linkedPrices = new LinkedPriceManager(_db, _audit);
-        _sut = new OpeningBalanceService(_db, _systemAccounts, new TransactionValidator(), linkedPrices, _audit);
+        _sut = new OpeningBalanceService(_db, _systemAccounts, new TransactionValidator(_db), linkedPrices, _audit);
     }
 
     public ValueTask DisposeAsync()

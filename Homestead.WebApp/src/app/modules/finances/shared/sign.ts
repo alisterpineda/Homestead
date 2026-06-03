@@ -44,16 +44,3 @@ export function formatNativeBalance(
   if (raw === null) return null;
   return formatMaskedCurrency(toUserAmount(raw, account.accountType) ?? 0, reportingCurrency, masked);
 }
-
-// Net worth = sum of stored displayValue across all accounts (Beancount sign already
-// makes this work without per-type arithmetic). Caller is responsible for filtering
-// out system accounts.
-export function netWorth(
-  accounts: ReadonlyArray<Pick<AccountResponse, 'displayValue'>>,
-): number {
-  let total = 0;
-  for (const a of accounts) {
-    if (a.displayValue != null) total += a.displayValue;
-  }
-  return total;
-}

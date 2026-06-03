@@ -4,5 +4,5 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 
 public interface ITransactionValidator
 {
-    void Validate(AccountTransaction transaction);
+    Task ValidateAsync(AccountTransaction transaction, CancellationToken ct);
 }

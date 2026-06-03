@@ -8,6 +8,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, tap, catchError, combineLatest, EMPTY } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -37,6 +38,7 @@ interface PositionRow {
   commodity: CommodityResponse | null;
   quantityText: string;
   displayValueText: string | null;
+  isUnpriced: boolean;
   shareText: string | null;
 }
 
@@ -44,6 +46,7 @@ interface PositionRow {
   selector: 'app-account-positions-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmButton,
@@ -111,7 +114,21 @@ interface PositionRow {
                   }
                 </td>
                 <td hlmTd class="text-right tabular-nums">{{ row.quantityText }}</td>
-                <td hlmTd class="text-right tabular-nums">{{ row.displayValueText ?? '—' }}</td>
+                <td hlmTd class="text-right tabular-nums">
+                  @if (row.displayValueText !== null) {
+                    {{ row.displayValueText }}
+                  } @else if (row.isUnpriced) {
+                    <div class="flex flex-col items-end">
+                      <span>—</span>
+                      <a
+                        [routerLink]="['/finances/commodities', row.position.commodityId]"
+                        class="text-xs font-normal text-primary hover:underline"
+                      >Add price</a>
+                    </div>
+                  } @else {
+                    —
+                  }
+                </td>
                 <td hlmTd class="text-right tabular-nums text-muted-foreground">{{ row.shareText ?? '—' }}</td>
                 <td hlmTd class="text-right">
                   <button
@@ -147,6 +164,8 @@ export class AccountPositionsTabComponent {
   refreshKey = input(0);
 
   editOpeningBalance = output<{ commodityId: string }>();
+  // Held commodity IDs, surfaced so the parent can hide them from the Add-position picker.
+  heldCommodityIdsChange = output<string[]>();
 
   loading = signal(false);
   error = signal(false);
@@ -174,7 +193,10 @@ export class AccountPositionsTabComponent {
       const shareText = p.shareOfAccount != null
         ? `${(p.shareOfAccount * 100).toFixed(1)}%`
         : null;
-      return { position: p, commodity: c, quantityText, displayValueText, shareText };
+      // Genuinely unpriced (no resolvable price) vs. merely missing a display currency:
+      // only the former warrants the "Add price" prompt.
+      const isUnpriced = p.displayValue == null;
+      return { position: p, commodity: c, quantityText, displayValueText, isUnpriced, shareText };
     });
   });
 
@@ -201,6 +223,7 @@ export class AccountPositionsTabComponent {
           this.loading.set(false);
           this.raw.set(items);
           this.resolveCommodities(items);
+          this.heldCommodityIdsChange.emit(items.map(p => p.commodityId));
         }),
       ),
       { initialValue: [] as PositionResponse[] },

@@ -48,8 +48,11 @@ public class PatchPriceSourceHandler(
 
         if (request.PairAllowList is not null)
         {
-            await ValidatePairAllowListAsync(request.PairAllowList, ct);
-            entity.PairAllowList = JsonSerializer.Serialize(request.PairAllowList);
+            // Persist the normalized (trimmed + de-duplicated) list, not the raw request — a
+            // stored entry with surrounding whitespace or a duplicate would otherwise pass
+            // validation here yet silently fail to match in the importer's symbol lookup.
+            var normalized = await ValidatePairAllowListAsync(request.PairAllowList, ct);
+            entity.PairAllowList = JsonSerializer.Serialize(normalized);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -113,17 +116,22 @@ public class PatchPriceSourceHandler(
         }
     }
 
-    private async Task ValidatePairAllowListAsync(IReadOnlyList<string> symbols, CancellationToken ct)
+    // Validates the requested allow-list and returns the normalized (trimmed + de-duplicated)
+    // symbols the caller should persist.
+    private async Task<List<string>> ValidatePairAllowListAsync(IReadOnlyList<string> symbols, CancellationToken ct)
     {
-        if (symbols.Count == 0) return;
         var distinct = symbols
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Select(s => s.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        if (distinct.Count == 0) return distinct;
 
+        // Resolve against all commodities (currencies and securities) — the importer matches
+        // allow-list symbols against every held/known commodity and then filters by provider
+        // coverage, so a watched security like VEQT is valid here too.
         var resolved = await db.Commodities
-            .Where(c => c.Kind == CommodityKind.Currency && distinct.Contains(c.Symbol))
+            .Where(c => distinct.Contains(c.Symbol))
             .Select(c => c.Symbol)
             .ToListAsync(ct);
 
@@ -131,6 +139,8 @@ public class PatchPriceSourceHandler(
         var missing = distinct.Where(s => !resolvedSet.Contains(s)).ToList();
         if (missing.Count > 0)
             throw new BusinessRuleException(
-                $"Pair allow-list contains unknown currency symbols: {string.Join(", ", missing)}.");
+                $"Pair allow-list contains unknown symbols: {string.Join(", ", missing)}.");
+
+        return distinct;
     }
 }

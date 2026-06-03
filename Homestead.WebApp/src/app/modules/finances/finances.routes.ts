@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from '@/shared/guards/admin.guard';
 import { FinancesLayoutComponent } from './layout/finances-layout.component';
 import { AccountListPageComponent } from './accounts/account-list-page.component';
 import { AccountDetailPageComponent } from './accounts/account-detail-page.component';
@@ -22,8 +23,8 @@ export const FINANCES_ROUTES: Routes = [
       { path: 'reports', component: ReportsPageComponent, data: { title: 'Reports' } },
       { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
       { path: 'settings/general', component: GeneralSettingsComponent, data: { title: 'General' } },
-      { path: 'settings/price-sources', component: PriceSourceListComponent, data: { title: 'Price sources' } },
-      { path: 'settings/price-sources/:source', component: PriceSourceDetailComponent, data: { title: 'Price source' } },
+      { path: 'settings/price-sources', component: PriceSourceListComponent, canActivate: [adminGuard], data: { title: 'Price sources' } },
+      { path: 'settings/price-sources/:source', component: PriceSourceDetailComponent, canActivate: [adminGuard], data: { title: 'Price source' } },
     ],
   },
 ];

@@ -84,12 +84,12 @@ All timestamps stored UTC. Defaults per shape:
 | Shape                                    | Default time on chosen date | User-overridable? |
 |------------------------------------------|-----------------------------|-------------------|
 | Opening balance (non-Investment)         | `00:00 UTC`                 | No                |
-| Opening balance (Investment, Add position) | `12:00 UTC`               | Yes               |
+| Opening balance (Investment, Add position) | `12:00 UTC`               | No (v1)           |
 | Transfer (any)                           | `00:00 UTC`                 | No                |
 | Investment buy / sell / dividend / DRIP  | `12:00 UTC`                 | Yes               |
 | Balance entry                            | `23:59:59 UTC`              | No                |
 
-Investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
+In v1 the only built investment write — **Add position** — stores the fixed `12:00 UTC` default and exposes no time input; the *user-overridable* entries marked above are a planned affordance that ships with the remaining investment shapes (buy / sell / dividend / DRIP). When exposed, investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
 
 `OccurredAt` may be up to **one day past current UTC** to tolerate timezone drift between client and server (Homestead supports cross-timezone households). Further-future timestamps are rejected.
 

@@ -156,6 +156,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 <ng-icon hlm name="lucidePackagePlus" size="sm" />
                 Add position
               </button>
+            } @else if (openingBalanceExists() === false) {
+              <button hlmBtn variant="outline" size="sm" (click)="openAddOpeningBalance()">
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Add opening balance
+              </button>
             }
 
             <button hlmBtn size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
@@ -186,6 +191,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               [account]="a"
               [refreshKey]="refreshTrigger()"
               (editOpeningBalance)="onPositionEditRequested($event.commodityId)"
+              (heldCommodityIdsChange)="heldCommodityIds.set($event)"
             />
           </div>
         }
@@ -238,6 +244,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     <app-add-position-sheet
       [account]="account()"
       [state]="addPositionSheetState()"
+      [excludedCommodityIds]="heldCommodityIds()"
       (saved)="onAddPositionSaved()"
       (closed)="onAddPositionSheetClosed()"
     />
@@ -273,6 +280,7 @@ export class AccountDetailPageComponent implements OnDestroy {
   openingBalanceSheetExisting = signal<OpeningBalanceResponse | null>(null);
 
   addPositionSheetState = signal<BrnDialogState>('closed');
+  heldCommodityIds = signal<string[]>([]);
 
   reportingCurrency = signal<CommodityResponse | null>(null);
 
@@ -303,6 +311,24 @@ export class AccountDetailPageComponent implements OnDestroy {
       }),
     ),
     { initialValue: null as AccountResponse | null },
+  );
+
+  // For non-Investment accounts, probe whether an opening balance already exists at
+  // (account, reporting currency). Drives the "Add opening balance" action, which is
+  // only offered when none exists (Investment accounts use "Add position" per commodity).
+  // null = unknown / not applicable (Investment, archived, or in-flight); false = none; true = exists.
+  openingBalanceExists = toSignal<boolean | null, boolean | null>(
+    toObservable(this.account).pipe(
+      switchMap(a => {
+        if (!a || a.kind === 'Investment' || a.isArchived) return of<boolean | null>(null);
+        return this.txApi.getOpeningBalance({ accountId: a.id, commodityId: a.reportingCurrencyId }).pipe(
+          map(() => true),
+          catchError((err: unknown) =>
+            of<boolean | null>((err as { status?: number })?.status === 404 ? false : null)),
+        );
+      }),
+    ),
+    { initialValue: null },
   );
 
   displayText = computed(() => {
@@ -370,6 +396,12 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   openAddPosition(): void {
     this.addPositionSheetState.set('open');
+  }
+
+  openAddOpeningBalance(): void {
+    this.openingBalanceSheetMode.set('create-missing');
+    this.openingBalanceSheetExisting.set(null);
+    this.openingBalanceSheetState.set('open');
   }
 
   // ─── Activity-row clicks ─────────────────────────────────────────────────

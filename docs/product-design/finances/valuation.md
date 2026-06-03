@@ -20,7 +20,7 @@ Two read paths are exposed:
 - **Inline on `AccountResponse`** — `GET /finances/accounts` and `GET /finances/accounts/{id}` carry the account's "as of now" valuation directly. One round trip serves the dominant page.
 - **Sub-resource for positions** — `GET /finances/accounts/{id}/positions` returns the per-commodity breakdown for Investment accounts. Single-position accounts do not need this endpoint; their entire position is already captured by `nativeBalance`.
 
-Per-account rollups (Kind subtotals, asset / liability totals, household net worth) are computed in the frontend from the inline values. The summation is trivial at household scale and avoids forcing a parallel summary shape onto the list response.
+Household net worth — the total plus the asset / liability breakdown — is delivered by a dedicated net-worth time-series endpoint and surfaced on the Reports page, not rolled up in the frontend from these inline values. The account list itself is a flat list and computes no per-account subtotals, so no parallel summary shape is forced onto the list response.
 
 ## `AccountResponse` additions
 
@@ -78,8 +78,8 @@ If profiling later shows the list endpoint is too slow, options in priority orde
 
 - **No historical-balance endpoint.** The only v1 surface that needs point-in-time per-account valuation is the net-worth chart, which has its own time-series endpoint (specced separately). Endpoints like `GET /finances/balances?asOf=...` or an `?asOf=` parameter on the account / positions endpoints are deliberately not added — they would expand the contract for no v1 caller.
 - **No per-account historical positions.** Same reasoning. The Positions tab is "as of now" only per [accounts.md](accounts.md#account-detail).
-- **No server-computed rollups.** Kind subtotals, asset / liability totals, and household net worth are frontend rollups over the inline values. The dashboard's net-worth headline pulls from the time-series endpoint instead (most-recent point).
-- **No per-commodity Equity:Adjustments breakdown.** The Adjustments balance is surfaced as a single display-currency total — see [overview.md](overview.md#distinctive-ux-decisions-worth-preserving). A per-commodity decomposition is a v2 affordance.
+- **No server-computed rollups on the account read path.** `GET /finances/accounts` carries only per-account inline valuations — no `/finances/summary`-style Kind subtotals or household totals, and the account list does not compute them client-side either. Net worth (total + asset / liability breakdown) is computed server-side by the separate net-worth time-series endpoint and shown on the Reports page; the headline is that series' most-recent point.
+- **No per-commodity Equity:Adjustments breakdown.** The Adjustments balance is intended to surface as a single display-currency total (_planned, not yet built in v1_ — see [overview.md](overview.md#distinctive-ux-decisions-worth-preserving)). A per-commodity decomposition is a v2 affordance.
 
 ## Future-compatibility
 

@@ -1,11 +1,13 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
-public class TransactionValidator : ITransactionValidator
+public class TransactionValidator(AppDbContext db) : ITransactionValidator
 {
-    public void Validate(AccountTransaction transaction)
+    public async Task ValidateAsync(AccountTransaction transaction, CancellationToken ct)
     {
         switch (transaction)
         {
@@ -20,6 +22,28 @@ public class TransactionValidator : ITransactionValidator
                 throw new InvalidOperationException(
                     $"Unknown transaction type: {transaction.GetType().Name}");
         }
+
+        await ValidateAnnotationCommodityKindsAsync(transaction, ct);
+    }
+
+    // A price annotation's quote commodity must be a currency (Kind=Currency), mirroring the
+    // rule on CommodityPrice.QuoteCurrencyId. Existence of the commodity is enforced by the FK
+    // at persist time; here we only check the kind of any annotation commodities present.
+    private async Task ValidateAnnotationCommodityKindsAsync(
+        AccountTransaction transaction, CancellationToken ct)
+    {
+        var annotationIds = transaction.Splits
+            .Where(s => s.UnitPriceCommodityId is not null)
+            .Select(s => s.UnitPriceCommodityId!.Value)
+            .Distinct()
+            .ToList();
+        if (annotationIds.Count == 0) return;
+
+        var hasNonCurrency = await db.Commodities
+            .AnyAsync(c => annotationIds.Contains(c.Id) && c.Kind != CommodityKind.Currency, ct);
+        if (hasNonCurrency)
+            throw new BusinessRuleException(
+                "A split's unit-price annotation commodity must be a currency (Kind=Currency).");
     }
 
     private static void ValidateNormal(AccountTransaction transaction)

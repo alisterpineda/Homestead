@@ -37,7 +37,7 @@ public class TransferService(
             Splits = [sourceSplit, destSplit],
         };
 
-        validator.Validate(transaction);
+        await validator.ValidateAsync(transaction, ct);
 
         db.AccountTransactions.Add(transaction);
         audit.Created("AccountTransaction", transaction.Id);
@@ -92,7 +92,7 @@ public class TransferService(
             destSlot.UnitPriceCommodityId = null;
         }
 
-        validator.Validate(transaction);
+        await validator.ValidateAsync(transaction, ct);
 
         await linkedPrices.SyncForTransactionAsync(transaction, ct);
 

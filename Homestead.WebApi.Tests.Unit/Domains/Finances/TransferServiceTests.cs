@@ -25,7 +25,7 @@ public class TransferServiceTests : IAsyncLifetime
         await _db.SaveChangesAsync();
 
         _audit = Substitute.For<IAuditContext>();
-        var validator = new TransactionValidator();
+        var validator = new TransactionValidator(_db);
         var linkedPrices = new LinkedPriceManager(_db, _audit);
         _sut = new TransferService(_db, validator, linkedPrices, _audit);
     }
