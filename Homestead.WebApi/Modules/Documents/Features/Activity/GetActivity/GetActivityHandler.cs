@@ -14,8 +14,6 @@ public class GetActivityHandler(AppDbContext db)
     {
         ["Name"] = "name",
         ["DocumentDate"] = "document date",
-        ["ValidFrom"] = "valid from",
-        ["ValidUntil"] = "valid until",
         ["ExpiryDate"] = "expiry date",
         ["Notes"] = "notes",
         ["Summary"] = "summary",
