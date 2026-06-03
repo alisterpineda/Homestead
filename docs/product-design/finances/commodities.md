@@ -51,7 +51,7 @@ Inline creation from transaction flows (e.g., `Add position`) is deferred to v2 
 
 ## Edit / Delete
 
-**Edit (modal):**
+**Edit (right-side sheet):**
 - Editable: Name, DisplayPrecision.
 - Immutable: Symbol, Exchange, Kind — shown but disabled.
 
@@ -81,13 +81,13 @@ Single sortable table following the cross-cutting `table-ux.md` toolbar pattern:
 | # prices | yes | `—` (sortUndefined: 'last') |
 | Latest price | yes | `—` (sortUndefined: 'last') — relative-age formatter for securities |
 
-Every column uses `Symbol asc` as a stable secondary sort axis so row order stays deterministic across re-fetches.
+Every column uses **Symbol** as its stable secondary sort axis, keeping row order deterministic across re-fetches. The tie-break is embedded inside each column's comparator, and TanStack negates the whole comparator for a descending sort, so the secondary axis **follows the primary direction**: ties resolve Symbol-ascending under an ascending primary sort and Symbol-descending under a descending one.
 
 **Row interaction.** Clicking a row navigates to `/finances/commodities/:id`. The row-actions cell stops propagation. Row actions are Edit and Delete (when `canDelete`); both are hidden entirely on system-managed (seeded) rows.
 
 **State.** Filter, sort, and search are URL-encoded — `?kind=Security|Currency|all|none&search=…&sortBy=…&sortDir=…` — and a per-route `CommodityListStateService` restores the last-used params when the user returns from a detail page.
 
-**Fetch shape.** With ~150 active ISO 4217 currencies plus a handful of securities, the full set fits in a single client-side fetch (no `Kind` parameter sent; client-side filter and TanStack sort). A runtime guard logs a warning if `totalCount` exceeds the page size so we catch growth before users do.
+**Fetch shape.** With ~150 active ISO 4217 currencies plus a handful of securities, the full set is small enough to load entirely into the client and filter/sort in the browser (no `Kind` parameter sent; client-side filter and TanStack sort). The client fetches in pages of 100 and concatenates them — so ~150 commodities is two requests, not one — up to a fixed **1000-row cap** (10 pages). A runtime guard logs a warning and truncates the list if `totalCount` exceeds that 1000-row cap, so we catch growth before users do.
 
 The list endpoint projects the per-row aggregates the table needs — `PriceCount`, `LatestPriceAt`, and `CanDelete` — onto `CommodityResponse` so the table renders in a single round-trip. `CanDelete` mirrors the same reference predicate `DeleteCommodityHandler` enforces (account reporting currency, splits, split price annotations, price rows on either side); the row's Delete affordance hides when it's false. Seeded currencies always have `CanDelete=false` and `IsSystemManaged=true`, so they render with no row-actions kebab at all.
 
@@ -157,7 +157,7 @@ CommodityPriceSourceSettings {
   Config: jsonb?                  (provider-specific; schema declared by the IPriceProvider impl)
   PairAllowList: jsonb?           (opt-in fixed list — see Import scope)
   LastImportAt: DateTimeOffset?
-  LastImportStatus: string?       (Success | PartialSuccess | Failed | NeverRun)
+  LastImportStatus: string?       (Success | PartialSuccess | Failed; null until first run)
   LastImportMessage: string?      (free-form on failed or partially-successful runs; null on Success)
   audit fields
 }
@@ -185,7 +185,7 @@ A row's source determines its edit/delete affordances in the prices UI.
 
 **Transaction-source rows** (`Source == Transaction`) are **read-only**. The row is labelled with the source name and has no edit or delete affordance. The label carries a tooltip explaining that the price is edited via its source transaction. (A clickable deep-link to the originating transaction is deferred to a later pass — there is no per-transaction route today, and resolving the price's account context for navigation needs an extra fetch the v1 prices tab does not perform.) The row is materialised from a **split price annotation** (`Split.UnitPriceRate` + `Split.UnitPriceCommodityId`) on the source transaction — every annotated split emits exactly one `CommodityPrice` row. Editing the annotation updates the row in place; deleting the transaction deletes the row.
 
-**Manual-source rows** (`Source == Manual`): only **Rate** is editable after creation. Changing Commodity, Quote Currency, or `PriceAt` is conceptually a new observation — delete and re-add.
+**Manual-source rows** (`Source == Manual`): both **Rate** and **`PriceAt`** are editable after creation. Changing the Commodity or Quote Currency is conceptually a new observation — delete and re-add (the edit contract exposes only `Rate` and `PriceAt`). A `PriceAt` edit is bounded to at most one day in the future and is rejected if another row **from the same source** already occupies the target `(commodity, quote, instant)` slot.
 
 **External-source rows** (`Source` is any External enum value): **Rate is not editable** — imported observations are managed in bulk via the source's settings row (see *Source management UI*), not per-row. **Delete is allowed** for ad-hoc cleanup of clearly-bad observations, but note that if the source remains enabled the next scheduled (or *Run now*) import may re-fetch the deleted row, since the importer upserts by `(Commodity, Quote, PriceAt, Source)` and has no record that the row was previously deleted. Delete is therefore best understood as a transient correction, not a durable suppression. To override an imported price durably while keeping the source enabled, add a `Manual` row at the same instant — cross-source rows at the same `PriceAt` are allowed and the lookup tiebreaker prefers `Manual` (see *Lookup and carry-forward*). To stop a source from contributing rows entirely, disable it on its settings row.
 
@@ -295,13 +295,18 @@ On failure, the handler updates the settings row's `LastImportStatus = Failed` /
 
 **Idempotency.** Re-running an import for an overlapping date window updates rates in place, never duplicates. Providers correcting historical observations is the normal case; the upsert preserves that. The handler is also re-entry safe: a crash mid-run leaves a partial set of upserts already committed, and the next run re-fetches and re-upserts those rows without harm.
 
-**Partial success.** A provider that hits a recoverable limit mid-run (rate-limit throttling, transient single-symbol errors) returns whatever observations it gathered before the limit and surfaces a warning string. The handler commits the partial set as normal, sets `LastImportStatus = PartialSuccess`, and stores the warning in `LastImportMessage`. The next scheduled run re-fetches with `FromAt = settings.LastImportAt` exactly as for a clean Success run — so the unfetched window is naturally retried. The source list distinguishes partial success from clean success in the status pill, but otherwise treats both as the source being healthy enough to keep auto-running.
+**Partial success.** A provider that hits a recoverable limit mid-run (rate-limit throttling, transient single-symbol errors) returns whatever observations it gathered before the limit and surfaces a warning string. The handler commits the partial set as normal, sets `LastImportStatus = PartialSuccess`, and stores the warning in `LastImportMessage`. The next scheduled run re-derives its `FromAt` from the data watermark exactly as for a clean Success run (see *Backfill window*) — so the unfetched window is naturally retried: the pairs that didn't get fresh observations leave the watermark behind the fully-imported ones, pulling the next window back to cover them. The source list distinguishes partial success from clean success in the status pill, but otherwise treats both as the source being healthy enough to keep auto-running.
 
 **Recurring imports** use the existing `processing.schedules` table — at most one schedule per source. The schedule's `Payload` carries the `Source` enum value; `JobType = ImportCommodityPrices`. The admin schedules endpoint's `JobType` allow-list expands to include this type. Per-source schedule UX lives on the source detail page (see *Source management UI*).
 
 **Notifications: always silent in v1.** Both scheduled (system-attributed) and *Run now* (admin-attributed) runs surface only in the admin job list and through the source-list "last import status" pill. No SignalR toast, even for *Run now*. The admin job list carries the full error string for failed runs. Per-user toasts can be added later as an opt-in if it turns out admins miss failures.
 
-**v1 providers.** Bank of Canada Valet (FX, free, no API key). Registers an enum value and an `IPriceProvider` implementation, and declares its supported pairs so import scope can intersect with the household's holdings.
+**v1 providers.** Two providers ship in v1, covering FX and equities respectively:
+
+- **Bank of Canada Valet** — FX rates; free, no API key. Declares an explicit `SupportedPairs` currency list.
+- **Alpha Vantage** — equity quotes for NASDAQ / NYSE / AMEX (quoted in USD) and TSX (quoted in CAD); requires a free API key (configured per-source via its `ConfigSchema`). Declares `CoveredSecurityExchanges` for those exchanges and owns the Homestead-code → API-suffix translation.
+
+Each registers a `CommodityPriceSource` enum value and an `IPriceProvider` implementation, and declares its coverage (`SupportedPairs` and/or `CoveredSecurityExchanges` — see *Provider coverage model*) so import scope can intersect with the household's holdings.
 
 ## Provider coverage model
 
@@ -314,7 +319,7 @@ The handler accepts a held commodity into the import set if `(Symbol, Exchange) 
 
 ## Import scope
 
-Each import asks the provider for the **commodities the household actually holds** — the set of commodities referenced by any non-archived account split — intersected with the provider's supported pairs. This keeps the per-run network cost small (one AlphaVantage call per held security, not the entire NASDAQ universe) and avoids accumulating prices for commodities the household will never need.
+Each import asks the provider for the **commodities the household actually holds**, intersected with the provider's coverage. The held set is the union of three sources across non-archived accounts: every split's `CommodityId`, every split's price-annotation commodity (`UnitPriceCommodityId`), **and every non-archived account's `ReportingCurrencyId`**. Including reporting currencies means an account's FX/quote currency gets priced even before it first appears in a split (e.g. a USD-reporting account on a CAD-display household pulls `USD` into scope immediately). This keeps the per-run network cost small (one AlphaVantage call per held security, not the entire NASDAQ universe) and avoids accumulating prices for commodities the household will never need.
 
 **Opt-in `PairAllowList`** on the source's settings row lets users track an instrument they don't yet hold (e.g., watching VEQT before buying). The handler unions the held set with `PairAllowList` before calling the provider.
 
@@ -322,7 +327,7 @@ Each import asks the provider for the **commodities the household actually holds
 
 **Exchange-code translation.** Homestead's `Commodity.Exchange` is a free-text user-entered string (see *Exchange qualifier (securities)*). When a provider's external API uses a different code system (suffixes, MIC codes, vendor-specific tickers), the provider owns the translation table from Homestead codes to its own format. Recommended common Homestead codes for clarity: `NASDAQ`, `NYSE`, `NYSEARCA`, `TSX`, `TSXV`, `LSE`, `XETRA`, `JPX`, `HKEX`, `ASX`. Users are not constrained to these — any string works — but a provider that doesn't recognise the user's exchange code will skip that security.
 
-**Backfill window.** First run for a new source backfills from the household's earliest user activity (the existing rule — see the conceptual model). Subsequent scheduled runs use `FromAt = settings.LastImportAt`, `ToAt = now()`. *Run now* lets the admin override `FromAt`/`ToAt` for narrower one-off backfills (e.g., "re-fetch the last 30 days because the provider corrected its data").
+**Backfill window.** Subsequent scheduled runs anchor `FromAt` to a **data watermark**, not to `LastImportAt`. The handler computes `min(max(PriceAt))` across the currently-held `(commodity, quote)` pairs for the source — the latest known price of whichever held pair has lagged furthest behind — then subtracts the provider's `RevisionLookback`, and uses `ToAt = now()`. This is deliberately more robust than `LastImportAt`: it starts the window far enough back to pick up provider revisions and to backfill any held pair that lagged the others (e.g. a newly-held commodity), and it ignores frozen pairs (only currently-held commodities count, so a delisted/archived holding can't drag the anchor backwards). When no rows yet exist for any held pair (first run for a new source), the anchor falls back to the household's earliest user activity (the existing rule — see the conceptual model). `LastImportAt` is still stamped on each successful run, but only as the "last run at" timestamp shown in the source UI — it does not drive the window. *Run now* lets the admin override `FromAt`/`ToAt` for narrower one-off backfills (e.g., "re-fetch the last 30 days because the provider corrected its data").
 
 This honours the existing rule: *Prices are captured forward from the user's earliest recorded activity. There is no backfill for dates before the user began tracking.*
 

@@ -55,8 +55,7 @@ Returns the per-commodity breakdown for an Investment account, "as of now." Avai
 | Field           | Type        | Meaning                                                                                                       |
 |-----------------|-------------|---------------------------------------------------------------------------------------------------------------|
 | `commodityId`   | `Guid`      | The held commodity.                                                                                           |
-| `quantity`      | `decimal`   | Native quantity, signed per the Beancount convention (always positive for assets in v1's transaction shapes). |
-| `nativeValue`   | `decimal?`  | Quantity expressed in the *commodity's own units*. Always equals `quantity` — included as a labelled field for symmetry with the Positions tab columns. May be dropped if the frontend doesn't need both. |
+| `quantity`      | `decimal`   | Native quantity (the amount in the commodity's own units), signed per the Beancount convention (always positive for assets in v1's transaction shapes). The Positions tab renders the native amount straight from this field. |
 | `displayValue`  | `decimal?`  | Position value in the household display currency. `null` when no price resolves for this commodity.            |
 | `shareOfAccount`| `decimal?`  | This position's share of the account's *priced* total, as a fraction in `[0, 1]`. `null` when the position itself is unpriced. The priced positions sum to `1.0`; unpriced positions render `—` in the UI. |
 

@@ -18,7 +18,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - A small, fixed set of transaction shapes: transfers between owned accounts, investment purchases and sales, dividends and DRIPs, and balance entries.
 - Monthly reconciliation against institutional statements as the primary recurring user action.
 - Historical net-worth computation and display in a user-chosen currency.
-- Manual commodity price entry.
+- Commodity prices: manual entry **and** automated import from external sources (e.g. Bank of Canada Valet for FX rates, Alpha Vantage for equity quotes), with per-source scheduling and an admin management UI — see [commodities.md](commodities.md#price-sources--model).
 
 ## Out of scope for v1
 
@@ -26,7 +26,6 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Tags on transactions or splits.
 - Recurring or scheduled transactions.
 - Budgeting.
-- Automated price feeds.
 - Corporate actions on securities (stock splits, spin-offs, mergers, ticker changes). Households that experience one mid-v1 work around it by recording a balance entry on the effective date asserting the new unit count (the delta lands in `Equity:Adjustments`) **and** a new price observation at the post-action rate — both steps are required, otherwise carry-forward of the pre-action price against the new unit count distorts net worth. The workaround leaves residue in `Equity:Adjustments`; v2's commodity-scoped corporate-action model should include a one-time pass to retire those phantom splits in favour of a real action row. See *Future-compatibility*.
 - Soft delete, user-visible change history, undo. (Back-end audit logs *are* written — see *Data integrity and audit trail*.)
 - Multi-user permissions.
@@ -95,7 +94,7 @@ If the user later adds, edits, or removes a transaction dated on or before an ex
 
 Price data is required to express balances in the user's display currency. Each price is a tuple of `(commodity, quote currency, priceAt, rate)` — *"1 unit of commodity was worth rate units of quote currency at priceAt."* USD→CAD FX rates and VEQT-in-CAD security prices are represented identically. `priceAt` is a `DateTimeOffset` (stored UTC), giving stable same-day ordering and alignment with transaction timestamps.
 
-Prices come from two sources — **manual** entry and **transaction-linked** side-effects derived from split price annotations. Every cross-commodity split annotation (on a Buy's security leg, a cross-currency Transfer's source leg, a DRIP's buy half, an optionally-priced security opening balance) materialises one `CommodityPrice` row. Transaction-linked prices are edited through the source transaction and are read-only in the prices UI; manual prices are editable directly (rate only). Missing prices on a given date resolve by carrying forward the most recently known price, with up to two-hop chaining through intermediary currencies. Holdings with no resolvable price render as *unpriced* — never silently zero.
+Prices come from two sources — **manual** entry and **transaction-linked** side-effects derived from split price annotations. Every cross-commodity split annotation (on a Buy's security leg, a cross-currency Transfer's source leg, a DRIP's buy half, an optionally-priced security opening balance) materialises one `CommodityPrice` row. Transaction-linked prices are edited through the source transaction and are read-only in the prices UI; manual prices are editable directly (rate and `priceAt`). Missing prices on a given date resolve by carrying forward the most recently known price, with up to two-hop chaining through intermediary currencies. Holdings with no resolvable price render as *unpriced* — never silently zero.
 
 Prices are captured forward from when the user first tracks a commodity. New commodities need a price entered on the day they first appear in any transaction.
 
@@ -113,7 +112,7 @@ But this implementation detail does not leak into the UI. Users do not see debit
 
 Transactions balance per-commodity, with price annotations on individual splits bridging cross-commodity legs. A same-currency transfer balances in that currency; a cross-currency transfer carries a price annotation on one leg that resolves the bridge. No split carries a "value in a transaction currency" field — the transaction has no privileged currency.
 
-There is no household-wide "base currency" at the data layer. A **display currency** is stored as a user preference and applied at read time. Changing the display currency re-values everything on read; it does not rewrite any data.
+There is no household-wide "base currency" at the data layer. A **display currency** is stored as a single household-wide setting (`FinanceSettings`, one row per household — not per user) and applied at read time; see [valuation.md](valuation.md#accountresponse-additions). Changing the display currency re-values everything on read; it does not rewrite any data. (Per-user display-currency selection would be a deliberate v2 multi-user feature; it is not built in v1, where multi-user is out of scope.)
 
 This is load-bearing for the household's relocation scenarios. Moving from Canada to another country must not require re-denominating historical data.
 

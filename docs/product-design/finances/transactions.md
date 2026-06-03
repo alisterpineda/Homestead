@@ -21,12 +21,12 @@ Users never create "transactions" directly. They pick a **shape** — Transfer, 
 
 ## Storage shapes
 
-Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`; only balance entries get their own subtype because they extend the base contract with an asserted-quantity field.
+Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`. Two shapes get their own subtype: balance entries (`BalanceEntryTransaction`), because they extend the base contract with an asserted-quantity field; and opening balances (`OpeningBalanceTransaction`), which adds no fields but keeps a stable discriminator so the dedicated opening-balance editors and delete/re-reconcile logic can target opening-balance rows directly.
 
 | Shape                 | Stored type              | Splits | Priced legs | Notes |
 |-----------------------|--------------------------|--------|-------------|-------|
-| Opening balance (cash or FX cash in investment) | `NormalTransaction` | 2 | 0 | Both splits in same commodity — per-commodity balance. Counterpart = `Equity:Opening Balances`. See [accounts.md](accounts.md#initial-balance-mechanics). |
-| Opening balance (security) | `NormalTransaction` | 2 | 0 or 1 | Priced only when the user supplies a per-unit price at Add-position time. Unpriced positions balance per-commodity (both splits in the security). |
+| Opening balance (cash or FX cash in investment) | `OpeningBalanceTransaction` | 2 | 0 | Both splits in same commodity — per-commodity balance. Counterpart = `Equity:Opening Balances`. See [accounts.md](accounts.md#initial-balance-mechanics). |
+| Opening balance (security) | `OpeningBalanceTransaction` | 2 | 0 or 1 | Priced only when the user supplies a per-unit price at Add-position time. Unpriced positions balance per-commodity (both splits in the security). |
 | Transfer (same-currency) | `NormalTransaction`   | 2 | 0 | Both splits same commodity. |
 | Transfer (cross-currency)| `NormalTransaction`   | 2 | 1 | Annotation on the source leg. |
 | Investment buy        | `NormalTransaction`      | 2 | 1 | Annotation on the security leg. Both splits on the investment account. |
@@ -285,7 +285,7 @@ All shapes (other than opening balances, which use dedicated per-account / per-p
 - **Splits** cascade via FK (`OnDelete(Cascade)`).
 - **Linked price rows** cascade via FK (`OnDelete(Cascade)` on `CommodityPrice.CreatedByTransactionId`). The handler emits an explicit `audit.Deleted("CommodityPrice", ...)` so the FK cascade isn't silent in the audit log (matching the pattern in `OpeningBalanceService.DeleteAsync`).
 - **Related transactions** (DRIP) — see *DRIP*.
-- **Opening balances** — only deletable when no other transactions reference `(account, commodity)`. Already enforced in `OpeningBalanceService`.
+- **Opening balances** — delete is **always allowed** (no guard against other transactions referencing the `(account, commodity)` pair). Deletion retroactively shifts the running balance by the removed quantity and triggers re-reconciliation of any downstream balance entries on that pair, with the difference absorbed into `Equity:Adjustments` — see [accounts.md](accounts.md#editing-opening-balances). `OpeningBalanceService.DeleteAsync` returns the touched `(account, commodity)` pairs so the caller re-reconciles.
 - **Balance-entry re-reconciliation** fires for any balance entry on `(account, commodity)` at or after the deleted transaction's `OccurredAt`.
 - **Audit**: `IAuditLogger.Deleted(...)` for the transaction itself.
 
