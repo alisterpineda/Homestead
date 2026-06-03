@@ -144,7 +144,7 @@ Rules:
 
 ## Add position (Investment only)
 
-Modal: commodity picker · quantity · as-of date. If the commodity is a security, the modal additionally requires a price-per-unit and emits a `CommodityPrice` row. Commodities the account already holds are hidden from the picker, so the modal only adds new positions; an existing position is changed via *Edit opening balance* on the Positions tab.
+Right-side sheet: commodity picker · quantity · as-of date. If the commodity is a security, the sheet additionally requires a price-per-unit and emits a `CommodityPrice` row. Commodities the account already holds are hidden from the picker, so the sheet only adds new positions; an existing position is changed via *Edit opening balance* on the Positions tab.
 
 ## Account list
 
@@ -182,7 +182,7 @@ Archived accounts render read-only. Primary actions disappear; Edit and Unarchiv
 
 ## Edit / Archive / Delete
 
-**Edit** (modal):
+**Edit** (right-side sheet):
 - Editable fields: Name, Institution, Archived flag.
 - Immutable fields: Kind, Reporting currency — shown but disabled.
 
