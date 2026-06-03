@@ -2,7 +2,6 @@ using System.Text.Json;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domain.Auditing;
-using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +17,8 @@ public class GetActivityHandler(AppDbContext db)
         ["ValidFrom"] = "valid from",
         ["ValidUntil"] = "valid until",
         ["ExpiryDate"] = "expiry date",
+        ["Notes"] = "notes",
+        ["Summary"] = "summary",
         ["TagPaths"] = "tags",
         ["PartyIds"] = "parties",
         ["Label"] = "label",

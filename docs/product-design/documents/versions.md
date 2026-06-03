@@ -43,16 +43,18 @@ Patches respect the split. The document patch endpoint accepts only document-sco
 
 Document and version uploads share the same shape: the API stages the file, persists a row, and enqueues an asynchronous job to finish processing. The synchronous request returns once the row is persisted — the user sees the document on the list right away — but the file hash, thumbnail, and extracted text materialise once the job completes.
 
-The job:
+The job, in order:
 
-1. Computes the SHA-256 hash of the staged file. The hash is unique across the household (enforced by an index on `DocumentVersion.FileHash`); an upload that hashes to an existing version's hash is rejected as a duplicate. The duplicate check looks across **all** versions, including those belonging to soft-deleted documents in Trash.
-2. Generates a thumbnail where the file type allows.
-3. Runs text extraction (see *Text extraction* below).
-4. Updates the document's `SearchVector` so the new content is reflected in FTS results.
+1. Runs text extraction (best-effort — a failure logs a warning and the upload still proceeds without extracted text). See *Text extraction* below.
+2. Computes the SHA-256 hash of the staged file. The hash is unique across the household (enforced by an index on `DocumentVersion.FileHash`); an upload that hashes to an existing version's hash is rejected as a duplicate. The duplicate check looks across **all** versions, including those belonging to soft-deleted documents in Trash.
+3. Moves the file to its final hash-addressed location, persists the document/version row, and sends the completion notification to the user.
+4. Generates a thumbnail where the file type allows — this runs **after** the completion notification and is best-effort.
+
+The job never updates `Document.SearchVector` itself: the column is maintained by database triggers (see [search.md](search.md#weighting)), so persisting the new name and version content refreshes the FTS index automatically.
 
 Processing failures do not roll the upload back: the file remains, the row remains, and downstream artefacts (thumbnail, extracted text) may be missing. The user can reprocess to retry.
 
-When `AutoClassifyOnUpload` is enabled in the Documents settings and a default AI provider is configured and enabled, the upload job additionally enqueues a `ClassifyDocument` job after completing its own work. This is fire-and-forget — the upload job completes and notifies the user immediately; classification runs as a separate job and its failure does not affect the upload. See the [overview](overview.md#ai-classification-and-summarization) for the classification flow.
+When `AutoClassifyOnUpload` is enabled in the Documents settings and a default AI provider is configured and enabled, the upload job runs classification **in-memory, before it reports completion** — it is not a separate `ClassifyDocument` job. After extracting text, the job calls the classifier over the document name and extracted text (full `All` scope) and folds the result into the document-creation command, so the document is created with its AI-suggested name, tags, parties, and summary already applied — a single `Created` audit entry, no suppressed `Updated`. Completion is therefore **held** until classification finishes: the SignalR completion notification carries the AI-suggested name, so the user sees the final name as soon as the document appears in the list. Classification is non-fatal — if it fails (or no provider is configured), the failure is logged and the upload still completes with the user-supplied name. The standalone `ClassifyDocument` job type is used only by bulk classification. See the [overview](overview.md#ai-classification-and-summarization) for the classification flow.
 
 Two job handlers cover the two entry points:
 
@@ -74,7 +76,7 @@ The asymmetry is deliberate. Uploads prioritise capturing the file safely; repro
 
 Two reprocess paths:
 
-- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline.
+- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline. It may optionally pin a specific extraction engine for that one run — the reprocess dialog exposes an engine selector (`ReprocessDocumentVersionBody.TextExtractionEngineId`); when none is chosen it uses the household-wide default.
 - **Bulk reprocess.** Enqueues a parent job that fans out to one child reprocess job per selected document, targeting each document's *latest* version. Older versions of a selected document are not reprocessed in bulk. Optionally pins an extraction engine for the entire run; otherwise each child uses the household-wide default. Progress is observable through the standard processing UI; the user is not blocked on completion.
 
 Bulk reprocess is the recovery path when the extraction engine has been swapped, the previous engine had a defect, or a batch of uploads failed extraction silently.
@@ -85,7 +87,7 @@ The Documents module has a household-wide `DefaultTextExtractionEngineId` settin
 
 A built-in fallback engine always exists and is used when no preference has been set. The setting is shared by the entire household — there is no per-user override.
 
-Engines are an extensibility point at the model layer (new engines can be registered without touching the upload or reprocess paths), but in v1 the user-facing surface is intentionally small: a single household-wide preference, plus an optional one-shot override on a bulk reprocess run.
+Engines are an extensibility point at the model layer (new engines can be registered without touching the upload or reprocess paths), but in v1 the user-facing surface is intentionally small: a single household-wide preference, plus an optional one-shot engine override on a reprocess run — available on both single-version and bulk reprocess.
 
 ## Version delete
 

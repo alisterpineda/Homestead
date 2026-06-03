@@ -10,7 +10,7 @@ This means:
 
 - Tag identity is the path, not a `(name, parent)` pair. Renaming a tag is a path change.
 - Path uniqueness is global: there is only one `Finances/Investments` per household.
-- Parent/child is *derived* from the path on write — a `ParentId` foreign key is set so descendant queries are cheap, but the path is the source of truth.
+- Parent/child is *derived* from the path on write — a `ParentId` foreign key is set so descendant queries are cheap. The path is the source of truth **on create and upsert**, where the user supplies the full path. On **edit** the direction reverses: the leaf `Name` and `ParentId` are the inputs and the path is re-derived from them (see *Create / edit / delete*).
 
 Tags are referenced by id at the join level (`DocumentTag`), so a document keeps its tag link across path renames without rewriting the join row.
 
@@ -30,7 +30,7 @@ Colour is opt-in: a tag with no ancestor colour renders as a colourless badge, n
 Whenever a tag's own colour changes, its parent changes (path move), or it is deleted, the effective-colour chain must be repaired for every descendant. The module does this in a single pass driven by `EffectiveColorResolver`:
 
 - **Set or clear `Color`** — recompute this tag's `EffectiveColor`, then recompute every descendant whose `EffectiveColor` was inherited through this tag.
-- **Move (path change)** — the same recomputation runs against the new parent's `EffectiveColor`. Path moves also re-derive `Path`, `Name`, and `ParentId` for the moved tag and re-derive `Path` for all descendants.
+- **Move (path change)** — the same recomputation runs against the new parent's `EffectiveColor`. A move is requested by changing the moved tag's leaf `Name` and/or `ParentId`; the handler then re-derives `Path` for the moved tag and for every descendant.
 - **Delete** — the tag row is removed, every `DocumentTag` join referencing it is removed, and former descendants' effective colour is recomputed against the next surviving ancestor.
 
 Path moves are not naive string replacements: the resolver re-walks the new parent chain so a tag promoted to root or moved under a new parent picks up that subtree's colour rules cleanly.
@@ -52,14 +52,14 @@ A bulk download (`DownloadDocumentsCommand`) groups documents in the resulting Z
 - A document with two tags appears in **both** folders with duplicated content. The duplication is intentional: each tag is an independent organisational view of the same document.
 - A document with no tags is placed in a top-level `_Untagged/` folder.
 - Linked party names are appended to the filename (`<docname> - <party1>, <party2><ext>`), truncated past 200 characters.
-- Within any folder, filename collisions are resolved by appending a counter (`file 1.pdf`, `file 2.pdf`).
+- Within any folder, filename collisions are resolved by leaving the first occurrence unchanged and appending a parenthesised counter to each subsequent one, starting at 2 (`file.pdf`, `file (2).pdf`, `file (3).pdf`).
 
 ZIP organisation is the only place where the *full tag path* is materialised in user-visible output. Everywhere else (badges, filters), tags are referred to by their leaf identity with the path implicit in their colour and structure.
 
 ## Create / edit / delete
 
-- **Create** — a user creates a tag by providing its full path, an optional colour, and an optional description. Missing ancestors in the path are created in the same operation. Creation is idempotent on the path: re-submitting an existing path returns the existing tag without resetting its other fields.
-- **Edit** — `Path`, `ParentId`, `Color`, and `Description` are all editable. Path changes propagate the effective-colour cascade to descendants. Renames have no special history record on the tag row; the audit log captures the change.
+- **Create** — a user creates a tag by providing its full path, an optional colour, and an optional description. Missing ancestors in the path are created in the same operation. Creation is idempotent on the path: re-submitting an existing path returns the existing tag, updating the `Color` and `Description` that are supplied and leaving omitted (null) fields untouched.
+- **Edit** — the editable inputs are the leaf `Name`, `ParentId`, `Color`, and `Description` (there is no direct `Path` field on the edit model). Changing `Name` or `ParentId` moves the tag: the handler re-derives its `Path` and every descendant's `Path`, and propagates the effective-colour cascade. Renames have no special history record on the tag row; the audit log captures the change.
 - **Delete** — destructive. Removes the tag, every `DocumentTag` join, and triggers the cascade on former descendants. Documents are not deleted. There is no soft delete for tags.
 
 Bulk delete on tags has the same semantics as repeated single deletes, applied in one transaction.

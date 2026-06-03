@@ -76,7 +76,7 @@ Parties live inside the Documents module and have no meaning outside it in v1.
 
 A document has a single combined **activity stream** that interleaves two sources in chronological order:
 
-- **Audit log entries** — system-generated, one per field-level change to the document or its versions (Name, DocumentDate, ExpiryDate, ExtractedText, TagPaths, PartyIds, Label). Recorded automatically on every mutation via the shared `auditing.audit_logs` table; field display names and human summaries are formatted at read time.
+- **Audit log entries** — system-generated, one per field-level change to the document or its versions (Name, DocumentDate, ExpiryDate, Notes, Summary, ExtractedText, TagPaths, PartyIds, Label). Recorded automatically on every mutation via the shared `auditing.audit_logs` table; field display names and human summaries are formatted at read time.
 - **Comments** — user-authored free text. In v1 comments are immutable: they cannot be edited or deleted from the UI.
 
 The activity stream is the user-facing projection of the audit log with comments interleaved. There is no separate field-level diff surface in v1.
@@ -109,7 +109,7 @@ Trash retention is unbounded in v1 — nothing auto-purges. Configurable retenti
 
 ### Search
 
-The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in five OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, case-insensitive ILIKE on attached tag names, case-insensitive ILIKE on linked party names, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B), with prefix-expansion on user input. The tag and party branches federate the search bar with the filter popover so typing `invoices` finds documents tagged **Invoice** without opening the filter. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search. When the primary search returns no results, the list surfaces "Did you mean…?" chips drawn from a `pg_trgm` fuzzy match against document names — opt-in, never silent.
+The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in five OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, case-insensitive ILIKE on attached tag names, case-insensitive ILIKE on linked party names, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B, Summary = C), with prefix-expansion on user input. The tag and party branches federate the search bar with the filter popover so typing `invoices` finds documents tagged **Invoice** without opening the filter. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search. When the primary search returns no results, the list surfaces "Did you mean…?" chips drawn from a `pg_trgm` fuzzy match against document names — opt-in, never silent.
 
 See [search.md](search.md) for the query mechanics, weighting, prefix expansion, sort interaction, and the filter taxonomy.
 
@@ -136,7 +136,7 @@ A bulk download enqueues a job that packages the selected documents into a singl
 - Linked party names are appended to the filename (`<docname> - <party1>, <party2><ext>`), truncated past 200 characters.
 - Within any folder, filename collisions are resolved by appending a counter.
 
-The job writes the resulting ZIP to a downloads area with a 7-day expiration; the client polls for completion before downloading. Only one active download per user is permitted at a time.
+The job writes the resulting ZIP to a downloads area with a 7-day expiration; the client awaits a real-time SignalR completion notification (it registers the job with the processing hub and subscribes to its status — no polling) before downloading. Only one active download per user is permitted at a time.
 
 ## Design principles
 
@@ -167,7 +167,7 @@ Versions can be explicitly deleted by the user except for the only remaining ver
 
 ### Activity is the audit log made visible
 
-The activity stream is not a separate "what happened" log; it is a curated read of the existing field-level audit log, interleaved with user comments. There is exactly one source of truth for "what changed and when" — the audit log — and the activity feed is its user-facing projection. New auditable events show up automatically in the feed once their field has a display name registered; nothing has to be double-written.
+The activity stream is not a separate "what happened" log; it is a curated read of the existing field-level audit log, interleaved with user comments. There is exactly one source of truth for "what changed and when" — the audit log — and the activity feed is its user-facing projection. New auditable events show up in the feed automatically; registering a display name for a field just gives it a friendly label (an unregistered field falls back to its raw, lower-cased name), and nothing has to be double-written.
 
 The audit log itself is written for every mutation across every module via the shared `IAuditLogger`. Documents is the only v1 module that surfaces it to users.
 

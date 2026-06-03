@@ -50,16 +50,12 @@ The `tsvector` index combines three fields with explicit weights:
 
 Older versions' extracted text does not contribute to the search vector. This keeps the index small and ensures the document's "current" identity drives ranking. Reprocessing a version that happens to be the latest version updates the search vector; reprocessing an older version does not.
 
-The vector is materialised on `Document.SearchVector` and indexed with a GIN index. It is rewritten by `SearchVectorUpdater` on every operation that could change the indexed content:
+The vector is materialised on `Document.SearchVector` and indexed with a GIN index. It is maintained **entirely by database triggers** (migration `AddSearchVectorTriggers`) — there is no application-side updater. Because the indexed content spans two tables (Name and Summary live on `documents`; the latest version's ExtractedText lives on `document_versions`), a single `GENERATED ALWAYS AS … STORED` column is not sufficient, so two triggers keep the column in sync:
 
-- Document creation (after the upload job extracts text).
-- Document name patch.
-- New version upload (against the new latest version).
-- Version reprocess that changes the extracted text.
-- AI classification (which may set or change the document's name and summary).
-- Suggestion decline that reverts a name or clears a summary.
+- A **`BEFORE INSERT OR UPDATE OF Name, Summary`** trigger on `documents` recomputes `NEW.SearchVector` in place whenever a document is created or its `Name`/`Summary` changes.
+- An **`AFTER INSERT OR DELETE OR UPDATE OF ExtractedText, VersionNumber`** trigger on `document_versions` re-derives the parent document's vector whenever the latest version's extracted text changes, or a version is added or removed (which can change *which* version is the latest).
 
-Updates happen as part of the same job or handler that produced the new content, so the search index is consistent with the version state by the time the operation completes. The application code is the only writer — there is no database trigger maintaining the column.
+Because the database owns the column, the vector stays consistent with the document and version state regardless of which command produced the change — document creation, a name patch, a new version upload, a reprocess of the latest version, AI classification that sets the name or summary, or a suggestion decline that reverts them. EF Core is configured to **never** write the column (`SearchVector` is mapped Ignore on save), so a save that doesn't touch `Name`/`Summary` can't clobber the trigger-computed value with null.
 
 ## Filters
 
@@ -82,22 +78,22 @@ In other words, rank ordering is the *default* during search, not an absolute ov
 
 ## "Did you mean…?" suggestions
 
-When the primary search returns zero results, the list endpoint runs a second, narrow query over `Document.Name` to find names that are *close* to the typed query and surfaces them as explicit "Did you mean…?" chips above the empty-state. The user clicks a chip to retry the search with the suggested name; nothing is silently re-ranked or auto-corrected.
+When the primary search returns zero results, the list endpoint runs a second, narrow query that finds document, tag, and party names that are *close* to the typed query and surfaces them as explicit "Did you mean…?" chips above the empty-state. The user clicks a chip to retry the search with the suggested name; nothing is silently re-ranked or auto-corrected.
 
-The suggestion query uses PostgreSQL `pg_trgm` `word_similarity()` against the document name. `word_similarity` finds the best-matching continuous extent of trigrams within the name, which tolerates typos against long filenames (e.g., `mazdo` → `Mazda Receipt 2023.pdf`) where plain `similarity()` would score below the threshold because of the surrounding text. The threshold is calibrated so single-letter mid-word typos still surface; unrelated strings score well below the threshold and produce no chips. Up to five distinct names are returned, ordered by descending score.
+The suggestion query uses PostgreSQL `pg_trgm` `word_similarity()` against three sources — `Document.Name`, `Tag.Name`, and `Party.Name` — each scoped to documents the user can already see. `word_similarity` finds the best-matching continuous extent of trigrams within a name, which tolerates typos against long filenames (e.g., `mazdo` → `Mazda Receipt 2023.pdf`) where plain `similarity()` would score below the threshold because of the surrounding text. The threshold (0.3) is calibrated so single-letter mid-word typos still surface; unrelated strings score well below it and produce no chips. The three result sets are unioned and **deduplicated by name** — a name keeps its highest score across the sources — and the top five by descending score are returned.
 
 Rules:
 
 - **Only when there are zero results.** A successful primary match never shows suggestions — they are a recovery affordance, not an always-on signal.
 - **Only when the query is at least three characters.** Two-character queries produce too much trigram noise to be useful.
 - **Filters apply.** Group, party, tag, and trash scoping run on the suggestion query exactly as they do on the primary query — clicking a chip never produces a "ghost" result that disappears on retry because the filter excluded it.
-- **Source is `Document.Name` only.** Extracted text, tag names, and party names are not sources of suggestions. The primary search already federates over tag and party names, so a typo against a tag still matches via the trigram suggestion path against any document name that happens to overlap; dedicated fuzzy suggestions over tag/party names are a follow-up that would benefit from trigram indexes on those columns.
-- **Distinct.** Two documents with the same name produce one chip, not two.
+- **Federated over `Document.Name`, `Tag.Name`, and `Party.Name`.** All three are sources of suggestions (extracted text is not). A typo against a tag or party name surfaces the closest tag/party name directly — not only via an overlapping document name — and clicking the chip re-runs the primary search, which federates over those same names.
+- **Distinct.** A name that appears more than once — two documents with the same name, or a document name that coincides with a tag name — produces one chip, not several.
 
-The trigram GIN index on `Document.Name` (added alongside this feature) accelerates both the suggestion query and the primary `ILIKE` substring match described above.
+Trigram GIN indexes on `Document.Name`, `Tag.Name`, and `Party.Name` (the latter two added in migration `AddTagAndPartyNameTrigramIndexes`) accelerate the suggestion query; the `Document.Name` index additionally backs the primary `ILIKE` substring match described above.
 
 ## Index maintenance and direct edits
 
-`Document.SearchVector` is maintained by application code only. A direct database edit to a document's name or to a version's extracted text — outside the application's command handlers — leaves the search vector stale. The audit log will not capture such edits either; the application's command handlers are the only supported way to mutate documents.
+`Document.SearchVector` is maintained entirely by database triggers (see [§Weighting](#weighting)), so a direct database edit to a document's `Name`/`Summary` or to a version's `ExtractedText`/`VersionNumber` — even one made outside the application's command handlers — keeps the search vector consistent automatically. The audit log, however, only captures changes made *through* the command handlers: a direct database edit is not audited even though the vector stays correct. The command handlers therefore remain the only supported way to mutate documents.
 
-In practice this only matters for migrations or operator interventions; ordinary use stays consistent.
+In practice direct edits only happen during migrations or operator interventions; ordinary use stays consistent on both fronts.

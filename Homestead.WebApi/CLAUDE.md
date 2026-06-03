@@ -45,7 +45,7 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 - **Modules/{Module}/Features/{SubDomain}/{Operation}/**: Each operation has up to four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
 - **Modules** map to frontend areas: `Admin`, `Documents`, `Identity`, `Processing`, `Status`
 - **Sub-domains** group related operations within a module (e.g., `Documents/Features/Tags/`, `Admin/Features/Groups/`)
-- **Services** (`Modules/{Module}/Services/`): Module-scoped service interfaces and implementations shared across features (e.g., `ISearchVectorUpdater`, `ITagPathResolver`)
+- **Services** (`Modules/{Module}/Services/`): Module-scoped service interfaces and implementations shared across features (e.g., `ITagPathResolver`, `IAiClassificationService`)
 - **Processing** (`Modules/Documents/Processing/`): Background job handlers, payloads, and exceptions — not vertical slices
 - **Naming convention**: Use `*Command` suffix for mutations (POST/PUT/PATCH/DELETE) and `*Query` suffix for reads (GET). Both implement `IRequest<TResponse>` from MediatR
 - **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
