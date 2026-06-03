@@ -132,7 +132,7 @@ Weight balance: USD = +5000 − 5000 = 0 ✓. Cash opening balances — even for
 
 ## Editing opening balances
 
-Opening-balance transactions are edited only via dedicated per-account (non-Investment) or per-position (Investment) affordances — never through the generic transaction editor.
+Opening-balance transactions are edited only via dedicated per-account (non-Investment) or per-position (Investment) affordances, separate from the New-transaction shape editors.
 
 Rules:
 

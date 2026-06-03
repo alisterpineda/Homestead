@@ -189,7 +189,7 @@ Transaction B: Type=Normal, Description="Reinvest VFV dividend", OccurredAt=2026
 
 Each half balances independently. A: USD = +5 − 5 = 0. B: USD = -5 + (0.05 × 100) = 0. The Buy half's annotation emits `CommodityPrice (VFV, USD, 2026-04-23T12:00:00Z, 100)`.
 
-**Editing:** the generic editor surfaces the pair as a single logical event. Edits to amount/units/date apply to both halves atomically.
+**Editing:** the DRIP editor surfaces the pair as a single logical event. Edits to amount/units/date apply to both halves atomically.
 
 **Deleting:** deleting either half prompts the user to delete both. If they decline, the survivor's `RelatedTransactionId` is cleared and it remains a valid standalone Dividend or Buy.
 
@@ -270,7 +270,13 @@ The household-level "+ New Transaction" entry point (when added) offers the unio
 
 ## Editing transactions
 
-All shapes (other than opening balances, which use dedicated per-account / per-position editors — see [accounts.md](accounts.md#editing-opening-balances)) edit through a generic transaction editor. Rules:
+Each transaction shape edits through its **own dedicated editor**, not a single generic one:
+
+- **Transfer** — `PatchTransfer`, via `transfer-sheet`.
+- **Balance entry** — `PatchBalanceEntry`, via `balance-entry-sheet`.
+- **Opening balance** — `PatchOpeningBalance`, via the per-account (non-Investment) / per-position (Investment) sheets — see [accounts.md](accounts.md#editing-opening-balances).
+
+The investment shapes (Buy / Sell / Dividend / DRIP) will add their own editors when built; whether those later consolidate into a unified editor is an open decision, deferred until enough shapes share edit behaviour to justify it. Only the **reads** (`GetTransaction` / `GetTransactions`) and **delete** (`DeleteTransaction`) are shape-agnostic. Every per-shape editor honours the same rules:
 
 - **Shape (`TransactionType` and the underlying construction)** is immutable. A Transfer cannot become a Buy mid-edit. Convert by deleting and re-creating.
 - **All other fields are editable**: date/time, description, accounts, commodities, quantities/amounts, per-unit price (where applicable). The server re-validates the resulting splits against the shape's contract and the per-commodity balance invariant.
@@ -310,7 +316,7 @@ Two surfaces:
 
 ## Split memo
 
-`AccountTransactionSplit.Memo` (≤1024 chars, optional) is exposed in the generic transaction editor as an optional per-leg note. It is **not** rendered in v1's transaction lists or activity views — those show the transaction-level `Description` only. The field exists today so v2 surfaces (filters, exports, list-row annotations) can use it without a schema migration.
+`AccountTransactionSplit.Memo` (≤1024 chars, optional) is a **latent per-leg field** — no v1 editor surfaces it. The per-shape editors expose only the transaction-level memo (`AccountTransaction.Memo`, ≤512), and the split memo is **not** rendered in v1's transaction lists or activity views either. The field exists today so v2 surfaces (filters, exports, list-row annotations, a per-leg note input) can use it without a schema migration.
 
 The server is also free to populate `Memo` for system-generated context — for example, balance-entry reconciliation could write *"Delta vs prior balance entry on 2026-03-31"* on the Adjustments split. Whether to actually write such notes is a per-shape decision; the field accommodates it.
 

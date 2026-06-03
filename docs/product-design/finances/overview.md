@@ -144,7 +144,7 @@ The UI exposes a small, closed set of shapes. Each shape is a template that prod
 
 ### Opening balance
 
-Captures wealth that existed before tracking began. For single-position kinds (Cash, Credit Card, Loan, Other Liability, Other Asset) a single opening balance is captured at account creation. For Investment accounts an opening balance is captured per commodity via the *Add position* action on the account detail page — each position's opening balance is independent, one transaction per `(account, commodity)` pair. All opening balances produce a two-split transaction against `Equity:Opening Balances`. Opening-balance transactions are edited through dedicated per-account / per-position affordances, not through the generic transaction editor. See [accounts.md](accounts.md).
+Captures wealth that existed before tracking began. For single-position kinds (Cash, Credit Card, Loan, Other Liability, Other Asset) a single opening balance is captured at account creation. For Investment accounts an opening balance is captured per commodity via the *Add position* action on the account detail page — each position's opening balance is independent, one transaction per `(account, commodity)` pair. All opening balances produce a two-split transaction against `Equity:Opening Balances`. Opening-balance transactions are edited through dedicated per-account / per-position affordances, separate from the other shapes' editors. See [accounts.md](accounts.md).
 
 ### Transfer
 
@@ -164,7 +164,7 @@ Cash dividend received into an investment account. UI asks for the investment ac
 
 ### DRIP / reinvestment
 
-Dividend-reinvestment variant that results in additional security units rather than cash. Modelled as two linked `NormalTransaction`s at the same `OccurredAt` — a Dividend half and a Buy half, paired via `RelatedTransactionId`. This matches brokerage statements and keeps each half an ordinary shape. The generic editor surfaces the pair as one logical event.
+Dividend-reinvestment variant that results in additional security units rather than cash. Modelled as two linked `NormalTransaction`s at the same `OccurredAt` — a Dividend half and a Buy half, paired via `RelatedTransactionId`. This matches brokerage statements and keeps each half an ordinary shape. The DRIP editor surfaces the pair as one logical event.
 
 ### Balance entry
 
