@@ -3,7 +3,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Download;
 public static class DownloadCleanupHelper
 {
     public const string DownloadsSubroot = "documents/downloads";
-    public static readonly TimeSpan ExpirationPeriod = TimeSpan.FromHours(1);
+    public static readonly TimeSpan ExpirationPeriod = TimeSpan.FromDays(7);
 
     public static string GetDownloadPath(string mediaPath, Guid jobId)
         => Path.Combine(mediaPath, DownloadsSubroot, $"{jobId}.zip");

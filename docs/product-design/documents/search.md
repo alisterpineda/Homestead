@@ -74,11 +74,11 @@ Date-based filtering (e.g., "documents with DocumentDate between X and Y") is no
 
 ## Sort
 
-Sort fields: `CreatedAt`, `UpdatedAt`, `DeletedAt`, `Name`, `DocumentDate`, `ExpiryDate`. Direction: ascending or descending.
+Sort fields: `Name`, `FileSize`, `ContentType`, `DocumentDate`, `CreatedAt`, `UpdatedAt`, `DeletedAt`. Direction: ascending or descending. (`ExpiryDate` is a displayable document field but is not currently a sort option.)
 
-When the user has typed a search term, sort is overridden by FTS rank — the most relevant matches come first regardless of the chosen sort field. When the search box is empty, the user's chosen sort applies.
+When the user has typed a search term *and has not picked an explicit sort*, results are ordered by FTS rank — the most relevant matches come first. This is the default: the search-first design means a bare query implies "show me what's most relevant." If the user has explicitly chosen a sort field, that choice is respected and persists through the search (it is not overridden by rank); clearing the search leaves the chosen sort in place. When the search box is empty, the user's chosen sort (or the `UpdatedAt` default) applies.
 
-The "search hides sort" rule is intentional: the search-first design means a query implies "show me what's most relevant," and any other ordering would defeat that. The rule is consistent across the live list and the trash list.
+In other words, rank ordering is the *default* during search, not an absolute override — an explicit sort always wins. This behaviour is consistent across the live list and the trash list.
 
 ## "Did you mean…?" suggestions
 

@@ -252,10 +252,30 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <ng-icon hlm name="lucideRefreshCw" size="sm" />
                   <span>Reprocess Text</span>
                 </button>
-                <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
-                  <ng-icon hlm name="lucideTrash2" size="sm" />
-                  <span>Delete</span>
-                </button>
+                @if (hasMultipleVersions()) {
+                  <button hlmDropdownMenuItem variant="destructive" [hlmDropdownMenuTrigger]="deleteSubMenu" [disabled]="deleting() || deletingVersion()">
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <span>Delete</span>
+                    <hlm-dropdown-menu-item-sub-indicator />
+                  </button>
+                  <ng-template #deleteSubMenu>
+                    <hlm-dropdown-menu-sub>
+                      <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteVersionDialogTrigger.click()" [disabled]="deletingVersion()">
+                        <ng-icon hlm name="lucideTrash2" size="sm" />
+                        <span>This version</span>
+                      </button>
+                      <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
+                        <ng-icon hlm name="lucideTrash2" size="sm" />
+                        <span>Entire document</span>
+                      </button>
+                    </hlm-dropdown-menu-sub>
+                  </ng-template>
+                } @else {
+                  <button hlmDropdownMenuItem variant="destructive" (triggered)="deleteDialogTrigger.click()" [disabled]="deleting()">
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    <span>Delete</span>
+                  </button>
+                }
               </hlm-dropdown-menu>
             </ng-template>
           }
@@ -299,6 +319,24 @@ import { toast } from '@spartan-ng/brain/sonner';
             <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
             <button hlmAlertDialogAction variant="destructive" (click)="handleDelete(); ctx.close()" [disabled]="deleting()">
               {{ deleting() ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+        </hlm-alert-dialog-content>
+      </hlm-alert-dialog>
+
+      <hlm-alert-dialog>
+        <button hlmAlertDialogTrigger class="hidden" #deleteVersionDialogTrigger></button>
+        <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+          <div hlmAlertDialogHeader>
+            <h2 hlmAlertDialogTitle>Delete version?</h2>
+            <p hlmAlertDialogDescription>
+              This action cannot be undone. {{ selectedVersionLabel() }} of this document will be permanently deleted.
+            </p>
+          </div>
+          <div hlmAlertDialogFooter>
+            <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+            <button hlmAlertDialogAction variant="destructive" (click)="handleDeleteVersion(); ctx.close()" [disabled]="deletingVersion()">
+              {{ deletingVersion() ? 'Deleting...' : 'Delete' }}
             </button>
           </div>
         </hlm-alert-dialog-content>
@@ -363,7 +401,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
               <span class="text-muted-foreground">AI suggestions ({{ totalSuggestionCount() }})</span>
               <span class="ml-auto flex items-center gap-1">
-                @if (pendingSuggestionCount() > 0) {
+                @if (pendingSuggestionCount() >= 2) {
                   <button hlmBtn variant="ghost" size="sm" (click)="approveAllSuggestions()">Approve all</button>
                   <button hlmBtn variant="ghost" size="sm" (click)="declineAllSuggestions()">Decline all</button>
                 }
@@ -746,6 +784,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   editExtractedText = signal('');
   saving = signal(false);
   deleting = signal(false);
+  deletingVersion = signal(false);
   loading = signal(false);
   notFound = signal(false);
   refreshTrigger = signal(0);
@@ -1374,6 +1413,25 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.openDocumentsService.removeDocument(id);
         toast.success('Document deleted.');
         this.router.navigate(['/documents']);
+      },
+    });
+  }
+
+  handleDeleteVersion(): void {
+    const docId = this.documentId();
+    const ver = this.activeVersion();
+    if (!docId || !ver) return;
+    this.deletingVersion.set(true);
+    this.versionApi.deleteDocumentVersion({ documentId: docId, id: ver.id }).pipe(
+      handleMutationError(this.errorHandler, this.deletingVersion, 'Failed to delete version.'),
+    ).subscribe({
+      next: () => {
+        this.deletingVersion.set(false);
+        toast.success('Version deleted.');
+        // The active version is gone; reset version-edit state and show the new latest.
+        this.initializedVersionId = null;
+        this.navigateToLatestVersion();
+        this.refreshTrigger.update(v => v + 1);
       },
     });
   }

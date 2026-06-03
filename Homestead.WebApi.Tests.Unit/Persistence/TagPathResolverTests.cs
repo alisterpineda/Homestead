@@ -170,6 +170,52 @@ public class TagPathResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task LeafColor_RecolorExistingTag_CascadesToInheritingDescendants()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // finance (coloured) → invoices → 2024; neither descendant has its own colour
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        await _sut.ResolveOrCreateAsync("finance/invoices/2024", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        // Recolour the existing root via the upsert path
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#ef4444", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var invoices = await _db.Tags.SingleAsync(t => t.Path == "finance/invoices", ct);
+        var year = await _db.Tags.SingleAsync(t => t.Path == "finance/invoices/2024", ct);
+
+        Assert.Null(invoices.Color);
+        Assert.Equal("#ef4444", invoices.EffectiveColor);
+        Assert.Null(year.Color);
+        Assert.Equal("#ef4444", year.EffectiveColor);
+    }
+
+    [Fact]
+    public async Task LeafColor_RecolorExistingTag_StopsCascadeAtDescendantWithOwnColor()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#3b82f6", ct: ct);
+        // invoices has its own colour; 2024 inherits from invoices
+        await _sut.ResolveOrCreateAsync("finance/invoices", leafColor: "#22c55e", ct: ct);
+        await _sut.ResolveOrCreateAsync("finance/invoices/2024", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        // Recolour the root — the cascade must not cross a descendant that owns a colour
+        await _sut.ResolveOrCreateAsync("finance", leafColor: "#ef4444", ct: ct);
+        await _db.SaveChangesAsync(ct);
+
+        var invoices = await _db.Tags.SingleAsync(t => t.Path == "finance/invoices", ct);
+        var year = await _db.Tags.SingleAsync(t => t.Path == "finance/invoices/2024", ct);
+
+        Assert.Equal("#22c55e", invoices.Color);
+        Assert.Equal("#22c55e", invoices.EffectiveColor);
+        Assert.Equal("#22c55e", year.EffectiveColor);
+    }
+
+    [Fact]
     public async Task LeafColor_Null_DoesNotOverwriteExistingColor()
     {
         var ct = TestContext.Current.CancellationToken;

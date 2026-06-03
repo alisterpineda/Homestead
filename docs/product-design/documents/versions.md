@@ -89,7 +89,7 @@ Engines are an extensibility point at the model layer (new engines can be regist
 
 ## Version delete
 
-A user can delete an individual version from the version list on the document detail page. The delete is destructive — the row is removed, the file is deleted from disk, an audit entry is recorded, and the document's `SearchVector` is refreshed if the deleted version was the latest (so search reflects the new latest version's extracted text).
+A user can delete an individual version of a document from the document detail page. The user selects the version to act on via the breadcrumb version dropdown, then chooses **Delete → This version** from the detail-page actions (⋮) menu; for a single-version document that menu offers a plain document delete instead. The delete is destructive — the row is removed, the file is deleted from disk, an audit entry is recorded, and the document's `SearchVector` is refreshed if the deleted version was the latest (so search reflects the new latest version's extracted text).
 
 The **only-remaining-version guard**: deleting the last surviving version of a document is rejected. To get rid of a document entirely, soft-delete the document itself (which moves it to Trash) and then permanently delete it from there — that path removes every version's file along with the document.
 

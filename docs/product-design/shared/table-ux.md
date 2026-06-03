@@ -137,8 +137,10 @@ One footer row, three slots, all rendered by `<app-pagination>` (`shared/compone
 |---|---|
 | Default page size | 50 |
 | Page-size options | 10 / 20 / 50 / 100 |
-| Backend max page size | 100 (clamped server-side in `PaginatedRequest`) |
+| Backend max page size | 1000 (clamped server-side in `PaginatedRequest`) |
 | Numbered-strip cap | 7 items including ellipses |
+
+The UI page-size dropdown caps at 100, but the backend clamp is deliberately higher (1000) so a view can request a larger single page programmatically when it needs the full set in one shot — e.g. the accounts list fetches `PageSize: 200` (including archived) and the jobs list fetches `PageSize: 500` for a parent's child jobs.
 
 ### URL state & reset rule
 

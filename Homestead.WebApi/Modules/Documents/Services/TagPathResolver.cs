@@ -26,10 +26,15 @@ public class TagPathResolver(AppDbContext db) : ITagPathResolver
 
             if (existingTags.TryGetValue(currentPath, out tag))
             {
-                if (isLeaf && leafColor is not null)
+                if (isLeaf && leafColor is not null && tag.Color != leafColor)
                 {
+                    // Recoloring an existing tag must repair the effective-colour chain for
+                    // every descendant that inherits it (mirrors PatchTagHandler).
                     tag.Color = leafColor;
-                    tag.EffectiveColor = leafColor;
+                    var descendants = await db.Tags
+                        .Where(t => t.Path.StartsWith(tag.Path + "/"))
+                        .ToListAsync(ct);
+                    EffectiveColorResolver.Recompute(tag, parent?.EffectiveColor, descendants);
                 }
                 if (isLeaf && leafDescription is not null)
                     tag.Description = leafDescription;
