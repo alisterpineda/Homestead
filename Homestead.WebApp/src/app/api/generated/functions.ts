@@ -243,6 +243,12 @@ export type { CreateDividend$Params as CreateDividend$Params } from './fn/financ
 export { createDividend as createDividend } from './fn/finances/create-dividend';
 export type { PatchDividend$Params as PatchDividend$Params } from './fn/finances/patch-dividend';
 export { patchDividend as patchDividend } from './fn/finances/patch-dividend';
+export type { CreateDrip$Params as CreateDrip$Params } from './fn/finances/create-drip';
+export { createDrip as createDrip } from './fn/finances/create-drip';
+export type { DeleteDrip$Params as DeleteDrip$Params } from './fn/finances/delete-drip';
+export { deleteDrip as deleteDrip } from './fn/finances/delete-drip';
+export type { PatchDrip$Params as PatchDrip$Params } from './fn/finances/patch-drip';
+export { patchDrip as patchDrip } from './fn/finances/patch-drip';
 export type { GetFinanceSettings$Params as GetFinanceSettings$Params } from './fn/finances/get-finance-settings';
 export { getFinanceSettings as getFinanceSettings } from './fn/finances/get-finance-settings';
 export type { PatchFinanceSettings$Params as PatchFinanceSettings$Params } from './fn/finances/patch-finance-settings';

@@ -49,6 +49,7 @@ export type { CreateCommodityPriceCommand } from './models/create-commodity-pric
 export type { CreateDividendCommand } from './models/create-dividend-command';
 export type { CreateDocumentResponse } from './models/create-document-response';
 export type { CreateDocumentVersionResponse } from './models/create-document-version-response';
+export type { CreateDripCommand } from './models/create-drip-command';
 export type { CreateGroupCommand } from './models/create-group-command';
 export type { CreateOpeningBalanceCommand } from './models/create-opening-balance-command';
 export type { CreatePartyCommand } from './models/create-party-command';
@@ -137,6 +138,7 @@ export type { PatchBalanceEntryCommand } from './models/patch-balance-entry-comm
 export type { PatchDividendCommand } from './models/patch-dividend-command';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';
+export type { PatchDripCommand } from './models/patch-drip-command';
 export type { PatchOpeningBalanceCommand } from './models/patch-opening-balance-command';
 export type { PatchPriceSourceBody } from './models/patch-price-source-body';
 export type { PatchPriceSourceResponse } from './models/patch-price-source-response';

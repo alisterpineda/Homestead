@@ -60,6 +60,34 @@ describe('FinancesTransactionApiService', () => {
     req.flush(null);
   });
 
+  it('createDrip sends POST to the drips group', () => {
+    const mockBody = { id: 'tx-div', shape: 'Dividend', splits: [], memo: '', occurredAt: '', relatedTransactionId: 'tx-buy' };
+    service.createDrip({
+      body: { accountId: 'inv', securityId: 'vfv', paymentCurrencyId: 'usd', amount: 5, units: 0.05, occurredAt: '2026-04-23T12:00:00.000Z', description: null },
+    }).subscribe(r => expect(r).toEqual(mockBody));
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/drips');
+    expect(req.request.method).toBe('POST');
+    req.flush(mockBody);
+  });
+
+  it('patchDrip sends PATCH with path id', () => {
+    const mockBody = { id: 'tx-div', shape: 'Dividend', splits: [], memo: '', occurredAt: '', relatedTransactionId: 'tx-buy' };
+    service.patchDrip({
+      transactionId: 'tx-div',
+      body: { accountId: 'inv', securityId: 'vfv', paymentCurrencyId: 'usd', amount: 6, units: 0.06, occurredAt: '2026-04-23T12:00:00.000Z', description: null },
+    }).subscribe(r => expect(r).toEqual(mockBody));
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/drips/tx-div');
+    expect(req.request.method).toBe('PATCH');
+    req.flush(mockBody);
+  });
+
+  it('deleteDrip sends DELETE on the drips group', () => {
+    service.deleteDrip({ transactionId: 'tx-div' }).subscribe();
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/drips/tx-div');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
   it('createBalanceEntry sends POST under account', () => {
     const mockBody = { transactionId: 'tx', accountId: 'acc', commodityId: 'cad', assertedAmount: 10, date: '2026-04-23' };
     service.createBalanceEntry({

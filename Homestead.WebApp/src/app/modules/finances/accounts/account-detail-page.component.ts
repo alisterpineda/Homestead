@@ -25,6 +25,7 @@ import {
   lucideTrendingUp,
   lucideTrendingDown,
   lucideBanknote,
+  lucideRepeat,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -45,6 +46,7 @@ import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balanc
 import { TransferSheetComponent, type TransferSheetMode } from './transfer-sheet/transfer-sheet.component';
 import { TradeSheetComponent, type TradeSheetMode } from './trade-sheet/trade-sheet.component';
 import { DividendSheetComponent, type DividendSheetMode } from './dividend-sheet/dividend-sheet.component';
+import { DripSheetComponent, type DripSheetMode } from './drip-sheet/drip-sheet.component';
 import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
 import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
@@ -81,13 +83,14 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     TransferSheetComponent,
     TradeSheetComponent,
     DividendSheetComponent,
+    DripSheetComponent,
     OpeningBalanceSheetComponent,
     AddPositionSheetComponent,
   ],
   providers: [provideIcons({
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
     lucideChevronDown, lucidePackagePlus,
-    lucideTrendingUp, lucideTrendingDown, lucideBanknote,
+    lucideTrendingUp, lucideTrendingDown, lucideBanknote, lucideRepeat,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -205,7 +208,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                       <ng-icon hlm name="lucideBanknote" size="sm" />
                       Dividend
                     </button>
-                    <!-- DRIP slots here later -->
+                    <button hlmDropdownMenuItem (triggered)="openNewDrip()">
+                      <ng-icon hlm name="lucideRepeat" size="sm" />
+                      Reinvest dividend
+                    </button>
                   </hlm-dropdown-menu-group>
                 }
               </hlm-dropdown-menu>
@@ -282,6 +288,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (closed)="onDividendSheetClosed()"
     />
 
+    <app-drip-sheet
+      [account]="account()"
+      [state]="dripSheetState()"
+      [mode]="dripSheetMode()"
+      [existing]="dripSheetExisting()"
+      (saved)="onDripSaved()"
+      (deleted)="onDripDeleted()"
+      (closed)="onDripSheetClosed()"
+    />
+
     <app-opening-balance-sheet
       [account]="account()"
       [state]="openingBalanceSheetState()"
@@ -334,6 +350,10 @@ export class AccountDetailPageComponent implements OnDestroy {
   dividendSheetState = signal<BrnDialogState>('closed');
   dividendSheetMode = signal<DividendSheetMode>('create');
   dividendSheetExisting = signal<TransactionResponse | null>(null);
+
+  dripSheetState = signal<BrnDialogState>('closed');
+  dripSheetMode = signal<DripSheetMode>('create');
+  dripSheetExisting = signal<TransactionResponse | null>(null);
 
   // PC1: held currency IDs (from the positions tab). The trade funding-currency
   // picker is revealed only when the account holds cash in a non-reporting currency.
@@ -475,6 +495,12 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.dividendSheetState.set('open');
   }
 
+  openNewDrip(): void {
+    this.dripSheetMode.set('create');
+    this.dripSheetExisting.set(null);
+    this.dripSheetState.set('open');
+  }
+
   openAddPosition(): void {
     this.addPositionSheetState.set('open');
   }
@@ -490,6 +516,13 @@ export class AccountDetailPageComponent implements OnDestroy {
   onTransactionClicked(tx: TransactionResponse): void {
     const a = this.account();
     if (!a) return;
+    // A DRIP is two linked halves with no dedicated shape (K1): route either clicked half
+    // to the DRIP editor before the shape switch, so standalone Dividend/Buy rows still
+    // reach their own editors.
+    if (tx.relatedTransactionId != null) {
+      this.openDripEditor(tx);
+      return;
+    }
     switch (tx.shape) {
       case 'BalanceEntry':
         this.openBalanceEntryEditor(tx);
@@ -545,6 +578,14 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.dividendSheetMode.set('edit');
     this.dividendSheetExisting.set(tx);
     this.dividendSheetState.set('open');
+  }
+
+  private openDripEditor(tx: TransactionResponse): void {
+    // The sheet seeds from the Buy half: clicking the Buy row needs no fetch, the Dividend
+    // row fetches its partner. Either clicked half is passed through as `existing`.
+    this.dripSheetMode.set('edit');
+    this.dripSheetExisting.set(tx);
+    this.dripSheetState.set('open');
   }
 
   private openOpeningBalanceEditor(tx: TransactionResponse): void {
@@ -635,6 +676,18 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
   onDividendSheetClosed(): void {
     this.dividendSheetState.set('closed');
+  }
+
+  onDripSaved(): void {
+    this.dripSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onDripDeleted(): void {
+    this.dripSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onDripSheetClosed(): void {
+    this.dripSheetState.set('closed');
   }
 
   onOpeningBalanceSaved(): void {

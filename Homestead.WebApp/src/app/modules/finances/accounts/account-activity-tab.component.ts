@@ -387,10 +387,20 @@ export class AccountActivityTabComponent {
   }
 
   private toViewModel(tx: TransactionResponse, account: AccountResponse): ActivityRowViewModel {
-    if (tx.shape === 'InvestmentBuy' || tx.shape === 'InvestmentSell') {
-      return this.tradeViewModel(tx, account);
-    }
+    const vm = (tx.shape === 'InvestmentBuy' || tx.shape === 'InvestmentSell')
+      ? this.tradeViewModel(tx, account)
+      : this.genericViewModel(tx, account);
 
+    // A DRIP renders as two rows (K2): the Dividend half + the Buy half, each carrying a
+    // non-null relatedTransactionId. Cue the pairing in the subtitle so it reads legibly in
+    // the list — "Reinvested" on the otherwise-bare Dividend row, "… · reinvested" on the Buy row.
+    if (tx.relatedTransactionId != null) {
+      vm.typeSubtitle = vm.typeSubtitle ? `${vm.typeSubtitle} · reinvested` : 'Reinvested';
+    }
+    return vm;
+  }
+
+  private genericViewModel(tx: TransactionResponse, account: AccountResponse): ActivityRowViewModel {
     const dc = this.settingsService.displayCurrency();
     const masked = this.prefs.financesPrivacyMasked();
     const signed = signedAmountForAccount(tx, account.id) * displaySign(account.accountType);

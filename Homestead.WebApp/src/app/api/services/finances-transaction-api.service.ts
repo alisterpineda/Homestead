@@ -12,6 +12,9 @@ import { createTrade } from '@/api/generated/fn/finances/create-trade';
 import { patchTrade } from '@/api/generated/fn/finances/patch-trade';
 import { createDividend } from '@/api/generated/fn/finances/create-dividend';
 import { patchDividend } from '@/api/generated/fn/finances/patch-dividend';
+import { createDrip } from '@/api/generated/fn/finances/create-drip';
+import { patchDrip } from '@/api/generated/fn/finances/patch-drip';
+import { deleteDrip } from '@/api/generated/fn/finances/delete-drip';
 import { createBalanceEntry } from '@/api/generated/fn/finances/create-balance-entry';
 import { patchBalanceEntry } from '@/api/generated/fn/finances/patch-balance-entry';
 import { getBalanceEntry } from '@/api/generated/fn/finances/get-balance-entry';
@@ -35,6 +38,9 @@ export type { CreateTrade$Params } from '@/api/generated/fn/finances/create-trad
 export type { PatchTrade$Params } from '@/api/generated/fn/finances/patch-trade';
 export type { CreateDividend$Params } from '@/api/generated/fn/finances/create-dividend';
 export type { PatchDividend$Params } from '@/api/generated/fn/finances/patch-dividend';
+export type { CreateDrip$Params } from '@/api/generated/fn/finances/create-drip';
+export type { PatchDrip$Params } from '@/api/generated/fn/finances/patch-drip';
+export type { DeleteDrip$Params } from '@/api/generated/fn/finances/delete-drip';
 export type { CreateBalanceEntry$Params } from '@/api/generated/fn/finances/create-balance-entry';
 export type { PatchBalanceEntry$Params } from '@/api/generated/fn/finances/patch-balance-entry';
 export type { GetBalanceEntry$Params } from '@/api/generated/fn/finances/get-balance-entry';
@@ -84,6 +90,18 @@ export class FinancesTransactionApiService {
 
   patchDividend(params: Parameters<typeof patchDividend>[2]): Observable<TransactionResponse> {
     return patchDividend(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createDrip(params: Parameters<typeof createDrip>[2]): Observable<TransactionResponse> {
+    return createDrip(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchDrip(params: Parameters<typeof patchDrip>[2]): Observable<TransactionResponse> {
+    return patchDrip(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  deleteDrip(params: Parameters<typeof deleteDrip>[2]): Observable<void> {
+    return deleteDrip(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   createBalanceEntry(params: Parameters<typeof createBalanceEntry>[2]): Observable<BalanceEntryResponse> {
