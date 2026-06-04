@@ -174,6 +174,7 @@ builder.Services.AddScoped<IOpeningBalanceService, OpeningBalanceService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<ITradeService, TradeService>();
 builder.Services.AddScoped<IDividendService, DividendService>();
+builder.Services.AddScoped<IDripService, DripService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddScoped<IPriceSourceScheduleStore, PriceSourceScheduleStore>();

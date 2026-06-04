@@ -49,6 +49,13 @@ public class TradeService(
     {
         var transaction = await LoadTradeAsync(transactionId, ct);
 
+        // A DRIP half is an ordinary InvestmentBuy row, so this editor would otherwise let a user
+        // rewrite one half on its own and break the pair's balance. Route DRIP edits through the
+        // reinvestment editor (defense-in-depth for the raw API; the frontend already routes there).
+        if (transaction.RelatedTransactionId is not null)
+            throw new BusinessRuleException(
+                "This trade is part of a dividend reinvestment; edit it via the reinvestment editor.");
+
         // Side is immutable mid-edit: switching Buy<->Sell would invert both legs' signs and is
         // semantically a different transaction. The editor disables the toggle in edit mode.
         var existingSide = FromNormalShape(transaction.NormalShape);

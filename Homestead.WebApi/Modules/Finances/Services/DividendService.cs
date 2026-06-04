@@ -65,6 +65,14 @@ public class DividendService(
         Guid transactionId, UpdateDividendRequest request, CancellationToken ct)
     {
         var transaction = await LoadDividendAsync(transactionId, ct);
+
+        // A DRIP half is an ordinary Dividend row, so this editor would otherwise let a user rewrite
+        // one half on its own and break the pair's balance. Route DRIP edits through the reinvestment
+        // editor (defense-in-depth for the raw API; the frontend already routes there).
+        if (transaction.RelatedTransactionId is not null)
+            throw new BusinessRuleException(
+                "This dividend is part of a reinvestment; edit it via the reinvestment editor.");
+
         var income = await systemAccounts.GetIncomeAsync(ct);
 
         // LoadDividendAsync guarantees two splits; confirm exactly one is the Income counterpart so the

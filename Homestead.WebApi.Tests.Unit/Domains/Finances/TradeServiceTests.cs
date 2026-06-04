@@ -194,6 +194,24 @@ public class TradeServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Update_OnDripHalf_Throws()
+    {
+        // A trade that is half of a DRIP (RelatedTransactionId set) must not be editable via the
+        // standalone trade editor — that would desync the pair's balance.
+        var investment = await AddAccount(AccountKind.Investment, _cad.Id, "Drip-RRSP");
+
+        var created = await _sut.CreateAsync(BuyRequest(investment.Id), TestContext.Current.CancellationToken);
+        created.Transaction!.RelatedTransactionId = Guid.NewGuid();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.UpdateAsync(created.Transaction!.Id,
+                new UpdateTradeRequest(investment.Id, TradeSide.Buy, _veqt.Id, _cad.Id, 3m, 60m,
+                    new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero), null),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Update_SideChange_Throws()
     {
         var investment = await AddAccount(AccountKind.Investment, _cad.Id, "RRSP");

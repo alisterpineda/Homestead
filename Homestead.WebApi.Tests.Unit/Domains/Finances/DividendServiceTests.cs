@@ -173,6 +173,27 @@ public class DividendServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Update_OnDripHalf_Throws()
+    {
+        // A dividend that is half of a DRIP (RelatedTransactionId set) must not be editable via the
+        // standalone dividend editor — that would desync the pair's balance.
+        var investment = await AddInvestmentAsync(_cad.Id);
+
+        var created = await _sut.CreateAsync(
+            new CreateDividendRequest(investment.Id, _cad.Id, 10m,
+                new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero), null),
+            TestContext.Current.CancellationToken);
+        created.Transaction!.RelatedTransactionId = Guid.NewGuid();
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.UpdateAsync(created.Transaction!.Id,
+                new UpdateDividendRequest(investment.Id, _cad.Id, 15m,
+                    new DateTimeOffset(2026, 4, 23, 12, 0, 0, TimeSpan.Zero), null),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Update_ChangesAmountAndCurrency_RebindsBothLegs()
     {
         var investment = await AddInvestmentAsync(_cad.Id);
