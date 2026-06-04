@@ -167,14 +167,14 @@ Route: `/finances/accounts/:id`.
 
 **Primary actions** (non-archived accounts):
 
-- **New Transaction** — a dropdown of the transaction shapes allowed for this Kind. Balance entry (*Record balance*) and Transfer are the shapes available today; investment shapes are added to this menu as they land.
+- **New Transaction** — a dropdown of the transaction shapes allowed for this Kind. A base group always offers **Transfer** and **Record balance**. For Investment accounts the menu adds a separated, labelled **Trade** group with **Buy**, **Sell**, and **Dividend** — Buy/Sell open the trade sheet in create mode (with the chosen side); Dividend opens the dividend sheet. (Further investment shapes such as DRIP are reserved for later.)
 - **Add position** — Investment accounts only.
 - **Add opening balance** — non-Investment accounts only, and only when the account has no opening balance yet.
 
 **Layout.** The detail page is a stack of cards, not a tabbed view:
 
-- **Positions** (Investment accounts only) — a card with a table: commodity · quantity · display value · share of account. Quantity is the native amount (there is no separate native-value column). Each row has an *Edit opening balance* action when one exists.
-- **Activity** — a unified chronological list of every transaction affecting this account, including opening balances and balance entries, differentiated by icon / label rather than by separation.
+- **Positions** (Investment accounts only) — a card with a table: commodity · quantity · display value · share of account. Quantity is the native amount (there is no separate native-value column). Each row has an *Edit opening balance* action when one exists. The Positions card also surfaces the set of held commodities whose kind is a currency; the detail page uses this signal to decide whether the Trade (Buy/Sell) sheet reveals its funding-currency picker — it stays hidden unless the account holds cash in a currency other than its reporting currency.
+- **Activity** — a unified chronological list of every transaction affecting this account, including opening balances, balance entries, transfers, and — on Investment accounts — trades (Buy / Sell) and dividends, differentiated by icon / label rather than by separation. Trades park both legs on this account, so the row disambiguates them by annotation: it shows the signed cash movement (Buy negative, Sell positive) in the funding currency, with a `<quantity> @ <unit price>` subtitle drawn from the priced security leg.
 
 Reporting currency, institution detail, and created / updated timestamps are not surfaced on the detail page in v1 (there is no Info section).
 

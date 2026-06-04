@@ -63,7 +63,7 @@ See [commodities.md](commodities.md) for the full design: seeding, creation flow
 
 A transaction is one event at one point in time. It has an **occurred-at** timestamp (`DateTimeOffset`, stored UTC), a description, and one or more splits. There is no transaction-level currency — a transaction balances per-commodity, with price annotations on individual splits bridging cross-commodity movements.
 
-Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date; an optional time input for intra-day precision is planned but not yet exposed in v1, so the built *Add position* flow uses the fixed `12:00 UTC` default. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
+Non-investment transactions collect a date only and store time as `00:00:00 UTC`. Investment transactions default to `12:00:00 UTC` on the chosen date; the Investment Buy/Sell and Dividend editors now expose an optional time input for intra-day precision (a collapsible "Add time" control — a date-only entry composes to the `12:00 UTC` anchor, while an explicit time is interpreted as the browser's local wall clock and stored UTC). The *Add position* (opening-balance) flow still collects a date only and uses the fixed `12:00 UTC` default. Balance entries store time as `23:59:59 UTC` so a balance-on-date trumps same-date activity during carry-forward.
 
 Users do not create "transactions" directly. They pick a transaction **shape** (see *Transaction shapes*) and fill in its fields. The system assembles the underlying transaction and its splits.
 
@@ -152,7 +152,7 @@ Movement between two of the household's own accounts. The UI asks for source acc
 
 ### Investment buy
 
-Purchase of a security. The UI asks for the investment account, the security, quantity, per-unit price, total (derived), the funding account (typically cash within the same investment account), and date. Produces a two-split transaction: cash out, security in.
+Purchase of a security. The UI asks for the investment account, the side (Buy/Sell), the security, quantity, per-unit price, total (derived), the funding currency (defaulting to the account's reporting currency; revealed only when the account holds cash in another currency), and date. Produces a two-split transaction on the same investment account: cash out (in the funding currency), security in. The security leg carries the per-unit price annotation, which also materialises one transaction-linked `CommodityPrice` row.
 
 ### Investment sell
 

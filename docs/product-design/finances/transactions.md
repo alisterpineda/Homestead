@@ -91,7 +91,7 @@ All timestamps stored UTC. Defaults per shape:
 | Investment buy / sell / dividend / DRIP  | `12:00 UTC`                 | Yes               |
 | Balance entry                            | `23:59:59 UTC`              | No                |
 
-In v1 the only built investment write — **Add position** — stores the fixed `12:00 UTC` default and exposes no time input; the *user-overridable* entries marked above are a planned affordance that ships with the remaining investment shapes (buy / sell / dividend / DRIP). When exposed, investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
+Investment buy, sell, and dividend writes now expose a user-overridable time: a `12:00 UTC` default on a date-only entry, with a collapsible "Add time" affordance for a precise wall-clock instant (see *Editing transactions*). **Add position** (opening balance on an Investment account) still stores the fixed `12:00 UTC` default and exposes no time input in v1; DRIP will gain the overridable affordance when it ships. Investment-shape time inputs are entered in the user's browser timezone and converted to UTC server-side: a date-only entry pins to noon UTC, while an expanded time is interpreted as the browser's local wall clock. The server accepts a `DateTimeOffset` and stores it as UTC. The frontend is responsible for converting browser-local times before sending.
 
 `OccurredAt` may be up to **one day past current UTC** to tolerate timezone drift between client and server (Homestead supports cross-timezone households). Further-future timestamps are rejected.
 
@@ -135,7 +135,7 @@ Source and destination quantities are always `-amount` and `+amount` respectivel
 
 ### Investment buy
 
-Purchase of a security funded from a cash position **inside the same investment account**. To buy from external cash, the user does a Transfer first, then a Buy. UI collects: investment account, security, quantity, per-unit price, derived total (read-only), funding currency (defaults to the investment account's reporting currency), date, optional time.
+Purchase of a security funded from a cash position **inside the same investment account**. To buy from external cash, the user does a Transfer first, then a Buy. UI collects: a Buy/Sell side toggle (disabled when editing — side is immutable), investment account (read-only), security, quantity, per-unit price, derived total (read-only, formatted in the funding currency), funding currency, date, optional time, optional memo. The funding-currency picker is **smart-revealed**: it defaults to the investment account's reporting currency and stays hidden in create mode unless the account holds cash in a currency other than its reporting currency — and is always shown when editing, or whenever the selected funding currency differs from reporting.
 
 Example (Buy 2 VEQT @ 50.00 CAD on 2026-04-23):
 
@@ -155,7 +155,7 @@ Mirror of Buy. Quantities and signs flip; emits a price row identically.
 
 ### Dividend (cash)
 
-Cash dividend received into an investment account. UI collects: investment account, payment commodity (currency the dividend was paid in), amount, date, optional time, optional description (defaults to "Dividend").
+Cash dividend received into an investment account. UI collects: investment account (shown read-only), payment commodity (currency the dividend was paid in — always shown, unlike Buy/Sell's funding picker which is revealed only when needed), amount, date, optional time, optional description (defaults to "Dividend"). On edit the account cannot be changed; payment currency and amount remain editable.
 
 Example ($5 USD dividend from VFV on 2026-04-23):
 
@@ -315,7 +315,7 @@ Cross-shape constraints, beyond the per-shape rules above:
 
 Two surfaces:
 
-- **Account detail → Activity tab** — already specified in [accounts.md](accounts.md#account-detail). Per-account chronological list of every transaction touching that account.
+- **Account detail → Activity tab** — already specified in [accounts.md](accounts.md#account-detail). Per-account chronological list of every transaction touching that account. Trades are a special case: both legs (cash and security) sit on the same investment account, so the row disambiguates them by annotation — the cash leg is the unpriced split, the security leg is the priced one. The signed row amount comes from the cash leg (Buy negative, Sell positive) formatted in the funding currency, and the subtitle reads `<abs quantity> @ <unit price>` (quantity in the security, price in the funding currency). Buy / Sell / Dividend rows use the "Buy" / "Sell" / "Dividend" labels with trending-up / trending-down / banknote icons.
 - **`/finances/transactions`** — household-wide filterable list. Reserved route for v1; full UI deferred. When implemented: filters for date range, account, kind, shape, commodity, description search, with cursor pagination.
 
 ## Split memo
