@@ -235,6 +235,14 @@ export type { CreateTransfer$Params as CreateTransfer$Params } from './fn/financ
 export { createTransfer as createTransfer } from './fn/finances/create-transfer';
 export type { PatchTransfer$Params as PatchTransfer$Params } from './fn/finances/patch-transfer';
 export { patchTransfer as patchTransfer } from './fn/finances/patch-transfer';
+export type { CreateTrade$Params as CreateTrade$Params } from './fn/finances/create-trade';
+export { createTrade as createTrade } from './fn/finances/create-trade';
+export type { PatchTrade$Params as PatchTrade$Params } from './fn/finances/patch-trade';
+export { patchTrade as patchTrade } from './fn/finances/patch-trade';
+export type { CreateDividend$Params as CreateDividend$Params } from './fn/finances/create-dividend';
+export { createDividend as createDividend } from './fn/finances/create-dividend';
+export type { PatchDividend$Params as PatchDividend$Params } from './fn/finances/patch-dividend';
+export { patchDividend as patchDividend } from './fn/finances/patch-dividend';
 export type { GetFinanceSettings$Params as GetFinanceSettings$Params } from './fn/finances/get-finance-settings';
 export { getFinanceSettings as getFinanceSettings } from './fn/finances/get-finance-settings';
 export type { PatchFinanceSettings$Params as PatchFinanceSettings$Params } from './fn/finances/patch-finance-settings';

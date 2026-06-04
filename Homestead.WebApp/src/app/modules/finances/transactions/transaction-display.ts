@@ -16,6 +16,9 @@ export function shapeLabel(shape: TransactionShape): string {
     case 'Transfer': return 'Transfer';
     case 'BalanceEntry': return 'Balance entry';
     case 'OpeningBalance': return 'Opening balance';
+    case 'InvestmentBuy': return 'Buy';
+    case 'InvestmentSell': return 'Sell';
+    case 'Dividend': return 'Dividend';
     case 'Other': return 'Transaction';
   }
 }
@@ -25,6 +28,9 @@ export function shapeIconName(shape: TransactionShape): string {
     case 'Transfer': return 'lucideArrowRightLeft';
     case 'BalanceEntry': return 'lucideScale';
     case 'OpeningBalance': return 'lucideFlag';
+    case 'InvestmentBuy': return 'lucideTrendingUp';
+    case 'InvestmentSell': return 'lucideTrendingDown';
+    case 'Dividend': return 'lucideBanknote';
     case 'Other': return 'lucideCircleDashed';
   }
 }

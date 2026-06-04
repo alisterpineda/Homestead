@@ -8,6 +8,10 @@ import { getTransaction } from '@/api/generated/fn/finances/get-transaction';
 import { deleteTransaction } from '@/api/generated/fn/finances/delete-transaction';
 import { createTransfer } from '@/api/generated/fn/finances/create-transfer';
 import { patchTransfer } from '@/api/generated/fn/finances/patch-transfer';
+import { createTrade } from '@/api/generated/fn/finances/create-trade';
+import { patchTrade } from '@/api/generated/fn/finances/patch-trade';
+import { createDividend } from '@/api/generated/fn/finances/create-dividend';
+import { patchDividend } from '@/api/generated/fn/finances/patch-dividend';
 import { createBalanceEntry } from '@/api/generated/fn/finances/create-balance-entry';
 import { patchBalanceEntry } from '@/api/generated/fn/finances/patch-balance-entry';
 import { getBalanceEntry } from '@/api/generated/fn/finances/get-balance-entry';
@@ -27,6 +31,10 @@ export type { GetTransaction$Params } from '@/api/generated/fn/finances/get-tran
 export type { DeleteTransaction$Params } from '@/api/generated/fn/finances/delete-transaction';
 export type { CreateTransfer$Params } from '@/api/generated/fn/finances/create-transfer';
 export type { PatchTransfer$Params } from '@/api/generated/fn/finances/patch-transfer';
+export type { CreateTrade$Params } from '@/api/generated/fn/finances/create-trade';
+export type { PatchTrade$Params } from '@/api/generated/fn/finances/patch-trade';
+export type { CreateDividend$Params } from '@/api/generated/fn/finances/create-dividend';
+export type { PatchDividend$Params } from '@/api/generated/fn/finances/patch-dividend';
 export type { CreateBalanceEntry$Params } from '@/api/generated/fn/finances/create-balance-entry';
 export type { PatchBalanceEntry$Params } from '@/api/generated/fn/finances/patch-balance-entry';
 export type { GetBalanceEntry$Params } from '@/api/generated/fn/finances/get-balance-entry';
@@ -60,6 +68,22 @@ export class FinancesTransactionApiService {
 
   patchTransfer(params: Parameters<typeof patchTransfer>[2]): Observable<TransactionResponse> {
     return patchTransfer(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createTrade(params: Parameters<typeof createTrade>[2]): Observable<TransactionResponse> {
+    return createTrade(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchTrade(params: Parameters<typeof patchTrade>[2]): Observable<TransactionResponse> {
+    return patchTrade(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createDividend(params: Parameters<typeof createDividend>[2]): Observable<TransactionResponse> {
+    return createDividend(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchDividend(params: Parameters<typeof patchDividend>[2]): Observable<TransactionResponse> {
+    return patchDividend(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   createBalanceEntry(params: Parameters<typeof createBalanceEntry>[2]): Observable<BalanceEntryResponse> {

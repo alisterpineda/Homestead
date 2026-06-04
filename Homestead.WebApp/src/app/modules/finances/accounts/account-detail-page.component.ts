@@ -22,6 +22,9 @@ import {
   lucideArrowRightLeft,
   lucideChevronDown,
   lucidePackagePlus,
+  lucideTrendingUp,
+  lucideTrendingDown,
+  lucideBanknote,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -40,6 +43,8 @@ import { AccountActivityTabComponent } from './account-activity-tab.component';
 import { AccountPositionsTabComponent } from './account-positions-tab.component';
 import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balance-entry-sheet/balance-entry-sheet.component';
 import { TransferSheetComponent, type TransferSheetMode } from './transfer-sheet/transfer-sheet.component';
+import { TradeSheetComponent, type TradeSheetMode } from './trade-sheet/trade-sheet.component';
+import { DividendSheetComponent, type DividendSheetMode } from './dividend-sheet/dividend-sheet.component';
 import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
 import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
@@ -53,6 +58,7 @@ import type { TransactionResponse } from '@/api/generated/models/transaction-res
 import type { TransactionDetailsBalanceEntryDetails } from '@/api/generated/models/transaction-details-balance-entry-details';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
+import type { TradeSide } from '@/api/generated/models/trade-side';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 @Component({
@@ -73,12 +79,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     EditAccountSheetComponent,
     BalanceEntrySheetComponent,
     TransferSheetComponent,
+    TradeSheetComponent,
+    DividendSheetComponent,
     OpeningBalanceSheetComponent,
     AddPositionSheetComponent,
   ],
   providers: [provideIcons({
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
     lucideChevronDown, lucidePackagePlus,
+    lucideTrendingUp, lucideTrendingDown, lucideBanknote,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -169,7 +178,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <ng-icon hlm name="lucideChevronDown" size="sm" />
             </button>
             <ng-template #newTxMenu>
-              <hlm-dropdown-menu class="w-48">
+              <hlm-dropdown-menu class="w-52">
                 <hlm-dropdown-menu-group>
                   <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
                     <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
@@ -180,6 +189,25 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                     Record balance
                   </button>
                 </hlm-dropdown-menu-group>
+                @if (a.kind === 'Investment') {
+                  <hlm-dropdown-menu-separator />
+                  <hlm-dropdown-menu-label>Trade</hlm-dropdown-menu-label>
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuItem (triggered)="openTrade('Buy')">
+                      <ng-icon hlm name="lucideTrendingUp" size="sm" />
+                      Buy
+                    </button>
+                    <button hlmDropdownMenuItem (triggered)="openTrade('Sell')">
+                      <ng-icon hlm name="lucideTrendingDown" size="sm" />
+                      Sell
+                    </button>
+                    <button hlmDropdownMenuItem (triggered)="openNewDividend()">
+                      <ng-icon hlm name="lucideBanknote" size="sm" />
+                      Dividend
+                    </button>
+                    <!-- DRIP slots here later -->
+                  </hlm-dropdown-menu-group>
+                }
               </hlm-dropdown-menu>
             </ng-template>
           </div>
@@ -192,6 +220,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               [refreshKey]="refreshTrigger()"
               (editOpeningBalance)="onPositionEditRequested($event.commodityId)"
               (heldCommodityIdsChange)="heldCommodityIds.set($event)"
+              (heldCurrencyIdsChange)="heldCurrencyIds.set($event)"
             />
           </div>
         }
@@ -229,6 +258,28 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (saved)="onTransferSaved()"
       (deleted)="onTransferDeleted()"
       (closed)="onTransferSheetClosed()"
+    />
+
+    <app-trade-sheet
+      [account]="account()"
+      [state]="tradeSheetState()"
+      [mode]="tradeSheetMode()"
+      [side]="tradeSheetSide()"
+      [existing]="tradeSheetExisting()"
+      [showFundingCcy]="tradeShowFundingCcy()"
+      (saved)="onTradeSaved()"
+      (deleted)="onTradeDeleted()"
+      (closed)="onTradeSheetClosed()"
+    />
+
+    <app-dividend-sheet
+      [account]="account()"
+      [state]="dividendSheetState()"
+      [mode]="dividendSheetMode()"
+      [existing]="dividendSheetExisting()"
+      (saved)="onDividendSaved()"
+      (deleted)="onDividendDeleted()"
+      (closed)="onDividendSheetClosed()"
     />
 
     <app-opening-balance-sheet
@@ -274,6 +325,23 @@ export class AccountDetailPageComponent implements OnDestroy {
   transferSheetState = signal<BrnDialogState>('closed');
   transferSheetMode = signal<TransferSheetMode>('create');
   transferSheetExisting = signal<TransactionResponse | null>(null);
+
+  tradeSheetState = signal<BrnDialogState>('closed');
+  tradeSheetMode = signal<TradeSheetMode>('create');
+  tradeSheetSide = signal<TradeSide>('Buy');
+  tradeSheetExisting = signal<TransactionResponse | null>(null);
+
+  dividendSheetState = signal<BrnDialogState>('closed');
+  dividendSheetMode = signal<DividendSheetMode>('create');
+  dividendSheetExisting = signal<TransactionResponse | null>(null);
+
+  // PC1: held currency IDs (from the positions tab). The trade funding-currency
+  // picker is revealed only when the account holds cash in a non-reporting currency.
+  heldCurrencyIds = signal<string[]>([]);
+  tradeShowFundingCcy = computed(() => {
+    const reporting = this.account()?.reportingCurrencyId;
+    return this.heldCurrencyIds().some(id => id !== reporting);
+  });
 
   openingBalanceSheetState = signal<BrnDialogState>('closed');
   openingBalanceSheetMode = signal<OpeningBalanceSheetMode>('edit');
@@ -394,6 +462,19 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.transferSheetState.set('open');
   }
 
+  openTrade(side: TradeSide): void {
+    this.tradeSheetSide.set(side);
+    this.tradeSheetMode.set('create');
+    this.tradeSheetExisting.set(null);
+    this.tradeSheetState.set('open');
+  }
+
+  openNewDividend(): void {
+    this.dividendSheetMode.set('create');
+    this.dividendSheetExisting.set(null);
+    this.dividendSheetState.set('open');
+  }
+
   openAddPosition(): void {
     this.addPositionSheetState.set('open');
   }
@@ -419,6 +500,13 @@ export class AccountDetailPageComponent implements OnDestroy {
       case 'OpeningBalance':
         this.openOpeningBalanceEditor(tx);
         break;
+      case 'InvestmentBuy':
+      case 'InvestmentSell':
+        this.openTradeEditor(tx);
+        break;
+      case 'Dividend':
+        this.openDividendEditor(tx);
+        break;
       // 'Other' is read-only on single-position account surfaces.
     }
   }
@@ -443,6 +531,20 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.transferSheetMode.set('edit');
     this.transferSheetExisting.set(tx);
     this.transferSheetState.set('open');
+  }
+
+  private openTradeEditor(tx: TransactionResponse): void {
+    // In edit mode the sheet derives the (disabled) side from the stored shape, so the
+    // `side` input is unused here — only `existing` matters.
+    this.tradeSheetMode.set('edit');
+    this.tradeSheetExisting.set(tx);
+    this.tradeSheetState.set('open');
+  }
+
+  private openDividendEditor(tx: TransactionResponse): void {
+    this.dividendSheetMode.set('edit');
+    this.dividendSheetExisting.set(tx);
+    this.dividendSheetState.set('open');
   }
 
   private openOpeningBalanceEditor(tx: TransactionResponse): void {
@@ -509,6 +611,30 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
   onTransferSheetClosed(): void {
     this.transferSheetState.set('closed');
+  }
+
+  onTradeSaved(): void {
+    this.tradeSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onTradeDeleted(): void {
+    this.tradeSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onTradeSheetClosed(): void {
+    this.tradeSheetState.set('closed');
+  }
+
+  onDividendSaved(): void {
+    this.dividendSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onDividendDeleted(): void {
+    this.dividendSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onDividendSheetClosed(): void {
+    this.dividendSheetState.set('closed');
   }
 
   onOpeningBalanceSaved(): void {

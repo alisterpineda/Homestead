@@ -21,13 +21,19 @@ describe('shapeLabel', () => {
     expect(shapeLabel('Transfer')).toBe('Transfer');
     expect(shapeLabel('BalanceEntry')).toBe('Balance entry');
     expect(shapeLabel('OpeningBalance')).toBe('Opening balance');
+    expect(shapeLabel('InvestmentBuy')).toBe('Buy');
+    expect(shapeLabel('InvestmentSell')).toBe('Sell');
+    expect(shapeLabel('Dividend')).toBe('Dividend');
     expect(shapeLabel('Other')).toBe('Transaction');
   });
 });
 
 describe('shapeIconName', () => {
   it('returns a lucide* name for every shape', () => {
-    for (const s of ['Transfer', 'BalanceEntry', 'OpeningBalance', 'Other'] as const) {
+    for (const s of [
+      'Transfer', 'BalanceEntry', 'OpeningBalance',
+      'InvestmentBuy', 'InvestmentSell', 'Dividend', 'Other',
+    ] as const) {
       expect(shapeIconName(s)).toMatch(/^lucide/);
     }
   });

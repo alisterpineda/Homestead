@@ -7,6 +7,7 @@ import {
   output,
   signal,
   computed,
+  effect,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -166,6 +167,10 @@ export class AccountPositionsTabComponent {
   editOpeningBalance = output<{ commodityId: string }>();
   // Held commodity IDs, surfaced so the parent can hide them from the Add-position picker.
   heldCommodityIdsChange = output<string[]>();
+  // Held *currency* IDs (a subset, resolved once each commodity's kind is known),
+  // surfaced so the parent can decide whether to reveal the trade funding-currency
+  // picker (PC1: only when cash is held in a non-reporting currency).
+  heldCurrencyIdsChange = output<string[]>();
 
   loading = signal(false);
   error = signal(false);
@@ -202,7 +207,23 @@ export class AccountPositionsTabComponent {
 
   unpricedCount = computed(() => this.raw().filter(p => p.displayValue == null).length);
 
+  // Held positions whose commodity has resolved to a currency. Recomputes as the
+  // per-commodity GETs land, so the value is eventually consistent. The array-content
+  // `equal` comparator keeps it from churning the parent on every unrelated commodity
+  // resolution — it only fires the emit effect when the currency-id set actually changes.
+  private heldCurrencyIds = computed(
+    () => {
+      const map = this.commodities();
+      return this.raw()
+        .map(p => p.commodityId)
+        .filter(id => map[id]?.kind === 'Currency');
+    },
+    { equal: (a, b) => a.length === b.length && a.every(id => b.includes(id)) },
+  );
+
   constructor() {
+    effect(() => this.heldCurrencyIdsChange.emit(this.heldCurrencyIds()));
+
     toSignal(
       combineLatest([
         toObservable(this.account),

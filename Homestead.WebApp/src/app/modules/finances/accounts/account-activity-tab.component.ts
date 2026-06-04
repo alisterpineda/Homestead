@@ -17,6 +17,9 @@ import {
   lucideScale,
   lucideFlag,
   lucideCircleDashed,
+  lucideTrendingUp,
+  lucideTrendingDown,
+  lucideBanknote,
   lucideChevronLeft,
   lucideChevronRight,
   lucideCircleAlert,
@@ -74,6 +77,7 @@ interface ActivityRowViewModel {
   imports: [NgIcon, HlmIconImports],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
+    lucideTrendingUp, lucideTrendingDown, lucideBanknote,
   })],
   template: `
     <div class="flex items-center gap-2">
@@ -126,6 +130,7 @@ class ActivityAmountCell {
   imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, FlexRenderDirective],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
+    lucideTrendingUp, lucideTrendingDown, lucideBanknote,
     lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideListTodo,
   })],
   template: `
@@ -382,6 +387,10 @@ export class AccountActivityTabComponent {
   }
 
   private toViewModel(tx: TransactionResponse, account: AccountResponse): ActivityRowViewModel {
+    if (tx.shape === 'InvestmentBuy' || tx.shape === 'InvestmentSell') {
+      return this.tradeViewModel(tx, account);
+    }
+
     const dc = this.settingsService.displayCurrency();
     const masked = this.prefs.financesPrivacyMasked();
     const signed = signedAmountForAccount(tx, account.id) * displaySign(account.accountType);
@@ -421,6 +430,45 @@ export class AccountActivityTabComponent {
       signed,
       amountText,
       dateText,
+    };
+  }
+
+  // Trades park BOTH legs on this account, so the generic same-account-leg logic
+  // (sum / first-match) misbehaves. Disambiguate by annotation: the security leg
+  // is the priced one (`unitPriceRate`), the cash leg is the plain one. The row
+  // shows the signed cash movement (Buy −, Sell +) in the funding currency; the
+  // subtitle shows the share count @ unit price.
+  private tradeViewModel(tx: TransactionResponse, account: AccountResponse): ActivityRowViewModel {
+    const masked = this.prefs.financesPrivacyMasked();
+    const cash = tx.splits.find(s => s.unitPriceRate == null);
+    const sec = tx.splits.find(s => s.unitPriceRate != null);
+    const fundingCommodity = cash ? this.commodities()[cash.commodityId] ?? null : null;
+
+    const signed = (cash?.quantity ?? 0) * displaySign(account.accountType);
+    const amountText = cash && fundingCommodity
+      ? formatMaskedCurrency(signed, fundingCommodity, masked)
+      : null;
+
+    let typeSubtitle = '';
+    if (sec) {
+      const securityCommodity = this.commodities()[sec.commodityId] ?? null;
+      const qtyText = securityCommodity
+        ? formatMaskedCurrency(Math.abs(sec.quantity), securityCommodity, masked)
+        : (masked ? '•' : String(Math.abs(sec.quantity)));
+      const priceText = sec.unitPriceRate != null && fundingCommodity
+        ? formatMaskedCurrency(sec.unitPriceRate, fundingCommodity, masked)
+        : '';
+      typeSubtitle = priceText ? `${qtyText} @ ${priceText}` : qtyText;
+    }
+
+    return {
+      tx,
+      iconName: shapeIconName(tx.shape),
+      shapeLabel: shapeLabel(tx.shape),
+      typeSubtitle,
+      signed,
+      amountText,
+      dateText: toDateOnly(tx.occurredAt),
     };
   }
 }

@@ -277,8 +277,10 @@ Each transaction shape edits through its **own dedicated editor**, not a single 
 - **Transfer** — `PatchTransfer`, via `transfer-sheet`.
 - **Balance entry** — `PatchBalanceEntry`, via `balance-entry-sheet`.
 - **Opening balance** — `PatchOpeningBalance`, via the per-account (non-Investment) / per-position (Investment) sheets — see [accounts.md](accounts.md#editing-opening-balances).
+- **Investment buy / sell** — `PatchTrade`, via `trade-sheet` (one sheet, Buy/Sell toggle disabled in edit).
+- **Dividend** — `PatchDividend`, via `dividend-sheet`.
 
-The investment shapes (Buy / Sell / Dividend / DRIP) will add their own editors when built; whether those later consolidate into a unified editor is an open decision, deferred until enough shapes share edit behaviour to justify it. Only the **reads** (`GetTransaction` / `GetTransactions`) and **delete** (`DeleteTransaction`) are shape-agnostic. Every per-shape editor honours the same rules:
+The date/time of these investment shapes is set via a native date picker plus a collapsible "Add time" affordance: a date-only entry pins the instant to noon UTC, and expanding the time field records a precise wall-clock instant (useful for multiple same-day trades of one security). DRIP will add its own editor when built; whether the per-shape editors later consolidate into a unified one is an open decision, deferred until enough shapes share edit behaviour to justify it. Only the **reads** (`GetTransaction` / `GetTransactions`) and **delete** (`DeleteTransaction`) are shape-agnostic. Every per-shape editor honours the same rules:
 
 - **Shape (`TransactionType` and the underlying construction)** is immutable. A Transfer cannot become a Buy mid-edit. Convert by deleting and re-creating.
 - **All other fields are editable**: date/time, description, accounts, commodities, quantities/amounts, per-unit price (where applicable). The server re-validates the resulting splits against the shape's contract and the per-commodity balance invariant.
