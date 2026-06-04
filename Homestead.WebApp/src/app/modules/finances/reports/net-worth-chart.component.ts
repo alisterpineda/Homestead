@@ -72,7 +72,10 @@ export class NetWorthChartComponent {
       data: points.map(p => [p.asOf, p.value ?? null]),
       lineStyle: { color: colors.primary, width: 2 },
       itemStyle: { color: colors.primary },
-      areaStyle: { color: colors.primary, opacity: 0.12 },
+      // The 12% area fill gives the lone net-worth line some body, but it spans from
+      // the line down to zero — directly over the breakdown bars — and tints them.
+      // Drop it when the bars are showing; keep it for the net-worth-only view.
+      ...(showBreakdown ? {} : { areaStyle: { color: colors.primary, opacity: 0.12 } }),
       z: 3,
     };
 
@@ -84,17 +87,17 @@ export class NetWorthChartComponent {
     ];
     const breakdownSeries = breakdownConfigs.map(b => ({
       name: b.name,
-      type: 'line',
-      smooth: true,
-      showSymbol: false,
+      type: 'bar',
       data: points.map(p => {
         const raw = p[b.field];
         return [p.asOf, raw == null ? null : (b.flip ? -raw : raw)];
       }),
-      lineStyle: { color: b.color, width: 1, opacity: 0.6 },
-      itemStyle: { color: b.color },
-      // No area fill on the breakdown lines: with liabilities flipped to a positive
-      // magnitude, asset/liability fills would occupy the same band above zero and blend.
+      // Solid, slightly translucent fill so the net-worth line/area (z:3) stays
+      // legible where it crosses the bars. ECharts places the asset and liability
+      // bar series side-by-side per period; barGap tunes the gap within each group.
+      itemStyle: { color: b.color, opacity: 0.85 },
+      barGap: '20%',
+      barMaxWidth: 18,
       z: 1,
     }));
 
@@ -104,7 +107,7 @@ export class NetWorthChartComponent {
       grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
       tooltip: {
         trigger: 'axis',
-        axisPointer: { z: 1 },
+        axisPointer: { type: showBreakdown ? 'shadow' : 'line', z: 1 },
         confine: true,
         backgroundColor: colors.popover,
         borderColor: colors.border,
