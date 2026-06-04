@@ -119,14 +119,19 @@ public class DripService(
         audit.Track<AccountTransactionSnapshot, AccountTransaction>(buy, "AccountTransaction", buy.Id);
 
         dividend.OccurredAt = request.OccurredAt;
-        dividend.Memo = DividendMemo(request.Description);
         buy.OccurredAt = request.OccurredAt;
-        // BuyMemo only uses the symbol for its blank-description default, so skip the lookup query when
-        // the user supplied a description (the security is immutable here anyway).
-        var buySymbol = string.IsNullOrWhiteSpace(request.Description)
-            ? await SecuritySymbolAsync(existingSecurityId, ct)
-            : "";
-        buy.Memo = BuyMemo(request.Description, buySymbol);
+        // The DRIP editor seeds its single description field from the Buy half's memo, which for a
+        // blank-description DRIP is the auto-generated "Reinvest <symbol> dividend". Treat an incoming
+        // description equal to that auto-default as blank, so a re-save regenerates the asymmetric
+        // per-half defaults (the Dividend half stays "Dividend") instead of promoting the Buy phrasing
+        // onto the Dividend half on an otherwise no-op edit. The symbol is needed both for this check
+        // and for BuyMemo's own blank-default, so it is always looked up here.
+        var buySymbol = await SecuritySymbolAsync(existingSecurityId, ct);
+        var description = request.Description;
+        if (!string.IsNullOrWhiteSpace(description) && description.Trim() == BuyMemo(null, buySymbol))
+            description = null;
+        dividend.Memo = DividendMemo(description);
+        buy.Memo = BuyMemo(description, buySymbol);
 
         // Rewrite both halves' splits in place, preserving split Ids.
         dividendAccountSlot.CommodityId = existingPaymentId;

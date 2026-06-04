@@ -301,6 +301,33 @@ public class DripServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Update_ResavingSeededAutoMemo_KeepsAsymmetricDefaults_NoDriftOntoDividend()
+    {
+        // A blank-description DRIP stores asymmetric default memos ("Dividend" on the dividend half,
+        // "Reinvest VFV dividend" on the buy half). The editor seeds its single description field from
+        // the Buy half's memo, so an edit that leaves the description untouched sends that auto-string
+        // back. The service must treat it as blank and regenerate the defaults, NOT promote
+        // "Reinvest VFV dividend" onto the dividend half.
+        var investment = await AddInvestmentAsync();
+
+        var created = await _sut.CreateAsync(Request(investment.Id), TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Equal("Dividend", created.DividendHalf!.Memo);
+        Assert.Equal("Reinvest VFV dividend", created.BuyHalf!.Memo);
+
+        // Re-save with the seeded Buy-half memo as the description, changing only the date.
+        var updated = await _sut.UpdateAsync(created.DividendHalf!.Id,
+            new UpdateDripRequest(investment.Id, _vfv.Id, _usd.Id, 5m, 0.05m,
+                new DateTimeOffset(2026, 5, 1, 12, 0, 0, TimeSpan.Zero), "Reinvest VFV dividend"),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // No drift: the dividend half keeps its "Dividend" default; the buy half is unchanged.
+        Assert.Equal("Dividend", updated.DividendHalf!.Memo);
+        Assert.Equal("Reinvest VFV dividend", updated.BuyHalf!.Memo);
+    }
+
+    [Fact]
     public async Task Update_ChangingAccount_Throws()
     {
         var investment = await AddInvestmentAsync();
