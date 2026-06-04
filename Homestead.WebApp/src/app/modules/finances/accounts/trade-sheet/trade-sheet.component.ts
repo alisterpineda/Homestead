@@ -13,13 +13,12 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep, formatMaskedCurrency } from '../../shared/format-currency';
+import { commodityStep, formatCurrency } from '../../shared/format-currency';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
 import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { commodityResource } from '../../shared/commodity-resource';
@@ -292,7 +291,6 @@ export class TradeSheetComponent {
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
-  private prefs = inject(UserPreferencesService);
 
   security = commodityResource(
     this.commodityApi,
@@ -312,7 +310,7 @@ export class TradeSheetComponent {
   totalText = computed(() => {
     const c = this.fundingCcy.value();
     if (!c) return '';
-    return formatMaskedCurrency(this.total(), c, this.prefs.financesPrivacyMasked());
+    return formatCurrency(this.total(), c);
   });
 
   // PC1 reveal (host-driven) is for the create common case. Always reveal in edit so a

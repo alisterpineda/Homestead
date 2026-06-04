@@ -17,13 +17,12 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep, formatMaskedCurrency } from '../../shared/format-currency';
+import { commodityStep, formatCurrency } from '../../shared/format-currency';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
 import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { commodityResource } from '../../shared/commodity-resource';
@@ -236,7 +235,6 @@ export class DripSheetComponent {
   private txApi = inject(FinancesTransactionApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private errorHandler = inject(ErrorHandlerService);
-  private prefs = inject(UserPreferencesService);
 
   // Edit seeds entirely from the Buy half (K6): it carries account/security/currency/units/price,
   // and amount = units × unitPrice exactly. Clicking the Buy row needs no fetch; clicking the
@@ -371,7 +369,7 @@ export class DripSheetComponent {
   pricePerUnitText = computed(() => {
     const c = this.paymentCcy.value();
     if (!c || this.pricePerUnit() <= 0) return '';
-    return formatMaskedCurrency(this.pricePerUnit(), c, this.prefs.financesPrivacyMasked());
+    return formatCurrency(this.pricePerUnit(), c);
   });
 
   headerTitle = computed(() => (this.mode() === 'edit' ? 'Edit reinvested dividend' : 'Reinvest dividend'));
