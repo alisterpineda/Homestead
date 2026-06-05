@@ -685,15 +685,17 @@ export class CommodityPricesSectionComponent {
   }
 
   onSortChange(event: { sortBy: CommodityPriceSortBy; sortDir: SortDirection }): void {
+    this.clearSelection();
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { sortBy: event.sortBy, sortDir: event.sortDir },
+      queryParams: { sortBy: event.sortBy, sortDir: event.sortDir, page: 1 },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   }
 
   onPageChange(newPage: number): void {
+    this.clearSelection();
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { page: newPage },
@@ -704,6 +706,7 @@ export class CommodityPricesSectionComponent {
 
   onPageSizeChange(newSize: number): void {
     this.prefs.pageSize.set(newSize);
+    this.clearSelection();
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { page: 1, pageSize: newSize },
