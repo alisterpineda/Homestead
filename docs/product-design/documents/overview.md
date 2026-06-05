@@ -19,7 +19,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - A user-visible activity stream that interleaves field-level audit log entries and user comments.
 - Trash with restore and permanent-delete (soft-delete only for documents; everywhere else delete is destructive).
 - Bulk operations: bulk soft-delete, bulk metadata edit (tags and parties only), bulk reprocess, bulk classify, bulk summarize, bulk download.
-- PostgreSQL full-text search across document name (weighted A), the latest version's extracted text (weighted B), and document summary (weighted C), with ILIKE fallbacks on name and extracted text, and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document names via `pg_trgm`.
+- PostgreSQL full-text search across document name (weighted A), the latest version's extracted text (weighted B), and document summary (weighted C), with ILIKE fallbacks on name and extracted text, and prefix-expansion on user input. Zero-result searches surface fuzzy "Did you mean…?" suggestions over document, tag, and party names via `pg_trgm`.
 - ZIP download organised by tag path, with a dedicated `_Untagged/` folder and party names embedded in filenames.
 - Household-wide choice of text-extraction engine, with a built-in fallback.
 - AI-powered document classification and summarization: user-configured LLM providers classify documents by selecting matching tags, linking matching parties, and suggesting a title, and — as a separate action — generate a document summary. Classification is **field-scoped** — the user picks which of tags, parties, and name to (re)classify, and the prompt is built only for those fields. Tags, parties, and name are tracked via a generic suggestion system with per-field approve/decline; the summary is written directly without a suggestion record (no approve/decline — purely AI-managed). Both classify and summarize run on a single document or in bulk.
@@ -29,7 +29,7 @@ The module is not a collaborative editor, a signing platform, a workflow tool, o
 - Configurable retention policies and auto-purge — both trash and version history accumulate indefinitely. (Planned, see *Future-compatibility*.)
 - Editing or deleting comments — comments are immutable in v1. (Planned, see *Future-compatibility*.)
 - Bulk-editing fields beyond tags and parties (no bulk rename, bulk-set date, bulk-set notes). (Planned, see *Future-compatibility*.)
-- Document grouping / scoping beyond a single household — the data model carries a `GroupId` field, plumbed through endpoints and filters, but it is not user-facing in v1. Reserved for future use, not necessarily multi-household.
+- Document grouping / scoping beyond a single household — the `GroupId` field is live server-side (accepted and validated on create/patch, plumbed through endpoints and filters) and the detail page shows a read-only group badge, but there is no group-assignment UI in v1. Richer scoping is reserved for future use, not necessarily multi-household.
 - In-document collaborative editing, signing flows, approval workflows.
 - Inline preview / annotation beyond a thumbnail.
 - Version diffs and version revert. (Version *delete* is supported — see [versions.md](versions.md) → *Version delete*.)
@@ -109,7 +109,7 @@ Trash retention is unbounded in v1 — nothing auto-purges. Configurable retenti
 
 ### Search
 
-The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in five OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, case-insensitive ILIKE on attached tag names, case-insensitive ILIKE on linked party names, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B, Summary = C), with prefix-expansion on user input. The tag and party branches federate the search bar with the filter popover so typing `invoices` finds documents tagged **Invoice** without opening the filter. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search. When the primary search returns no results, the list surfaces "Did you mean…?" chips drawn from a `pg_trgm` fuzzy match against document names — opt-in, never silent.
+The list page is search-first: a single text box at the top drives both content search and result ranking. Behind the scenes the query runs in five OR'd modes — case-insensitive ILIKE on document name, case-insensitive ILIKE on any version's extracted text, case-insensitive ILIKE on attached tag names, case-insensitive ILIKE on linked party names, and PostgreSQL full-text search via `ts_rank_cd` against a weighted `tsvector` (Name = A, latest version's ExtractedText = B, Summary = C), with prefix-expansion on user input. The tag and party branches federate the search bar with the filter popover so typing `invoice` finds documents tagged **Invoice** without opening the filter. When a search term is present, results are ordered by FTS rank; otherwise by the user's chosen sort field. Filters layer on top of search. When the primary search returns no results, the list surfaces "Did you mean…?" chips drawn from a `pg_trgm` fuzzy match against document, tag, and party names — opt-in, never silent.
 
 See [search.md](search.md) for the query mechanics, weighting, prefix expansion, sort interaction, and the filter taxonomy.
 
@@ -150,7 +150,7 @@ The asymmetry is deliberate: uploads prioritise capturing the file safely; repro
 
 What belongs to the document and what belongs to the version is a contract, not an implementation detail:
 
-- **Document-scoped:** Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, GroupId (deferred), trash state.
+- **Document-scoped:** Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, GroupId, trash state.
 - **Version-scoped:** the file blob, ContentType, FileSize, FileExtension, FileHash, ExtractedText, Label.
 
 This split is what makes "uploading a corrected version of the same document" coherent: metadata you have already curated stays attached to the document, while file content rolls forward. Code paths and UI must respect the split — moving a field across the boundary is a deliberate decision, not an offhand patch.
@@ -200,11 +200,11 @@ The following must be addable later without re-migrating documents, versions, ta
 - **Configurable retention** for trash, old versions, and the audit log. The current "indefinite" stance lets retention be added as a policy applied at read/cleanup time without changing the data shape.
 - **Editable / deletable comments.** Comments are persisted with author and timestamps; adding edit/delete is a UI and endpoint concern, not a data migration.
 - **Wider bulk-edit surface** — bulk rename, bulk set date, bulk set notes. The bulk command pattern is already in place; new fields slot into the existing tri-state UI.
-- **Document grouping / scoping** via the existing `GroupId` field. Reserved for future use; the column already exists on the document, the filter is already plumbed through the query, but no UI surfaces it in v1.
+- **Document grouping / scoping** via the existing `GroupId` field. The column, create/patch validation, query filter, and a read-only group badge on the detail page already ship; what remains future is the group-assignment UI and any richer scoping semantics.
 - **A user-facing field-level change-history view** beyond the activity feed — a per-field diff surface sourced from the existing audit log. No backfill required.
 - **In-document preview, annotation, version diffs, version revert.**
 - **Document-to-document relationships** (supersedes, derived-from, etc.) beyond the party link.
-- **Additional AI providers** (Anthropic Claude, OpenAI, Ollama) as new `AiProviderType` enum values and config records — the `IChatClient` abstraction and factory pattern make this additive.
+- **Additional AI providers** (Anthropic Claude, Ollama). Anthropic already has an `AiProviderType` enum value but no client implementation — `AiClientFactory` throws for it; Ollama would be a new enum value and config record. The `IChatClient` abstraction and factory pattern make both additive. (Azure AI Foundry and OpenAI are already supported.)
 - **New AI-suggested fields** (document date, expiry date) via new `DocumentSuggestionField` enum values, prompt updates, and UI — no schema changes needed (tags, name, and parties already use this).
 - **AI-driven tag creation** — v1 limits AI to picking from existing tags; suggesting new tags requires a new prompt strategy and a creation flow.
 - **External-source ingestion** — cloud-storage import, scanner uploads, email forwarding.

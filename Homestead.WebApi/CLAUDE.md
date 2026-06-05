@@ -33,7 +33,7 @@ OIDC is the only sign-in method. ASP.NET Core Identity has been removed — `App
 OIDC is a startup requirement — the app throws at `IHostedService` start-up (`OidcStartupValidator`) if `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` are not all set. The validator skips itself when the entry assembly is `GetDocument.Insider` (build-time OpenAPI generation).
 
 - Config in `Authentication/OidcOptions.cs` — bound from `Oidc:*` config section. `IsConfigured` is true when Authority, ClientId, and ClientSecret are all set
-- Docker env vars: `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME`, `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_CLAIM_VALUES` (comma-separated), `OIDC_ADDITIONAL_SCOPES` — mapped in `Program.cs`
+- Docker env vars: `OIDC_AUTHORITY`, `OIDC_METADATA_ADDRESS`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME`, `OIDC_ROLE_CLAIM`, `OIDC_ADMIN_CLAIM_VALUES` (comma-separated), `OIDC_ADDITIONAL_SCOPES` — mapped in `Program.cs` (full table in the root `README.md`)
 - Endpoints registered in `IdentityModule`: `/api/auth/oidc/login`, `/api/auth/oidc/callback`, `/api/auth/oidc/logout`
 - `OidcUserProvisioner` auto-provisions users from OIDC claims, matches by email, and syncs the Admin role from a configurable claim — OIDC is the source of truth (claim value matches any `AdminClaimValues` entry → Role=Admin; no match → demoted to Contributor)
 - The OIDC handler writes to a short-lived `ExternalOidc` bridge cookie; the callback reads it, provisions the user, then signs in to the main app cookie scheme
@@ -43,10 +43,10 @@ OIDC is a startup requirement — the app throws at `IHostedService` start-up (`
 The WebApi uses vertical slice architecture organized by module, with MediatR for CQRS handler dispatch:
 
 - **Modules/{Module}/Features/{SubDomain}/{Operation}/**: Each operation has up to four files: `Endpoint.cs`, `Handler.cs`, `Command.cs` or `Query.cs`, `Response.cs`
-- **Modules** map to frontend areas: `Admin`, `Documents`, `Identity`, `Processing`, `Status`
+- **Modules** map to frontend areas: `Admin`, `Documents`, `Finances`, `Identity`, `Processing`, `Status`
 - **Sub-domains** group related operations within a module (e.g., `Documents/Features/Tags/`, `Admin/Features/Groups/`)
 - **Services** (`Modules/{Module}/Services/`): Module-scoped service interfaces and implementations shared across features (e.g., `ITagPathResolver`, `IAiClassificationService`)
-- **Processing** (`Modules/Documents/Processing/`): Background job handlers, payloads, and exceptions — not vertical slices
+- **Processing** (`Modules/{Module}/Processing/`, e.g. `Modules/Documents/Processing/`, `Modules/Finances/Processing/`): Background job handlers, payloads, and exceptions — not vertical slices
 - **Naming convention**: Use `*Command` suffix for mutations (POST/PUT/PATCH/DELETE) and `*Query` suffix for reads (GET). Both implement `IRequest<TResponse>` from MediatR
 - **Handlers** implement `IRequestHandler<TRequest, TResponse>` from MediatR and are auto-registered via `AddMediatR()` assembly scanning in `Program.cs`
 - **Endpoints** are static classes with a `Map(RouteGroupBuilder)` method — no controllers. They inject `ISender` from MediatR and dispatch requests via `sender.Send(request, ct)`
@@ -63,7 +63,7 @@ The WebApi uses vertical slice architecture organized by module, with MediatR fo
 | `Common/` | Cross-cutting concerns: exceptions (`Exceptions/`), MediatR behaviors (`Behaviors/`), audit infrastructure (`Auditing/`), pagination, query extensions |
 | `Domain/` | Domain model layer: EF entities, enums, value objects, audit snapshots |
 | `Modules/` | Modules with explicit `Features/`, `Services/`, and `Processing/` subdirectories |
-| `Infrastructure/` | External integrations: `TextExtraction/` (OCR engines), `Thumbnails/` (generation) |
+| `Infrastructure/` | External integrations: `Ai/` (AI-provider chat clients), `TextExtraction/` (OCR engines), `Thumbnails/` (generation) |
 | `Persistence/` | EF Core: `AppDbContext`, `DesignTimeDbContextFactory`, entity `Configurations/` |
 | `Processing/` | Generic job queue framework, SignalR hub for real-time updates |
 
@@ -119,7 +119,6 @@ All error responses use RFC 9457 Problem Details (`application/problem+json`). A
 | `AccessDeniedException` | 403 | Insufficient permissions |
 | `DuplicateEntityException` | 409 | Uniqueness constraint violation |
 | `ValidationException` (FluentValidation) | 400 | Request validation failure |
-| `IdentityValidationException` | 400 | ASP.NET Identity operation failure |
 
 Exceptions have **no knowledge of HTTP status codes** — the mapping lives exclusively in `DomainExceptionHandler` and `ProblemDetailsFactory`.
 

@@ -32,7 +32,7 @@ The split between document-scoped and version-scoped fields is a contract:
 
 | Scope | Fields |
 |---|---|
-| Document | Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, `GroupId` (deferred), trash state |
+| Document | Name, Notes, DocumentDate, ExpiryDate, Summary, Tags, Parties, Suggestions, `GroupId`, trash state |
 | Version | File blob, ContentType, FileSize, FileExtension, FileHash, ExtractedText, Label |
 
 Document-scoped fields persist across uploads — replacing a file with a corrected version does not reset the document's name, notes, dates, or tag/party graph. Version-scoped fields belong to the specific upload that produced them; reprocessing a version updates only that version's `ExtractedText`.

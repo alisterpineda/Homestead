@@ -42,7 +42,7 @@ The list query accepts a set of tag ids and a boolean `IncludeChildTags`:
 - `IncludeChildTags = false` — documents are matched only against the exact selected tags.
 - `IncludeChildTags = true` — the selected tags expand to include every descendant by path prefix (`Path = selectedPath OR Path LIKE selectedPath/%`). A query for `Finances` with descendant expansion returns documents tagged `Finances`, `Finances/Investments`, `Finances/Investments/2024`, etc.
 
-Multiple selected tags are OR'd. Tags do **not** contribute to the FTS `tsvector` — they are a structural filter, not a contributor to relevance ranking. The search bar does, however, match tag names via a federated ILIKE join (typing `invoices` finds documents tagged **Invoice**), so a tag rename takes effect immediately without re-indexing any documents. See [search.md](search.md) for how tag filters interact with search and sort.
+Multiple selected tags are OR'd. Tags do **not** contribute to the FTS `tsvector` — they are a structural filter, not a contributor to relevance ranking. The search bar does, however, match tag names via a federated ILIKE join (typing `invoice` finds documents tagged **Invoice** — a case-insensitive substring match), so a tag rename takes effect immediately without re-indexing any documents. See [search.md](search.md) for how tag filters interact with search and sort.
 
 ## Tag participation in ZIP download
 

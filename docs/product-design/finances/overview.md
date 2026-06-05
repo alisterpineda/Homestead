@@ -197,7 +197,7 @@ The following must be addable later without rewriting history:
 - Income and expense accounts as categories; category reporting and drill-down. This is also when a parent-child account hierarchy would be introduced (categories are naturally hierarchical, e.g. Food → Groceries → Produce).
 - Tags at the split level for cross-cutting labels (e.g. tax-relevant, trip-specific).
 - Adjusted cost basis and tax-lot tracking for non-registered accounts.
-- Automated price ingestion from external providers.
+- Additional automated price providers beyond the shipped Bank of Canada Valet and Alpha Vantage integrations (see in-scope list above).
 - Multi-commodity income/expense accounts (relevant post-relocation when expenses might naturally denominate in multiple currencies).
 - Scheduled and recurring transactions.
 - Soft delete and user-facing change-history views (the back-end audit log already exists).

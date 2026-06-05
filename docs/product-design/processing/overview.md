@@ -1,6 +1,6 @@
 # Processing — Architecture
 
-This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list, an admin schedules list, and SignalR-driven toasts. Most jobs today are initiated by another module (currently Documents) on the user's behalf; some can be issued by a recurring schedule (system-attributed). Every job runs asynchronously in the same WebApi process and reports completion back through SignalR (when it has a user creator).
+This document describes Homestead's background-job processing subsystem: what it is, what it runs, and the design decisions that shape it. Processing is an **infrastructure** module — there is no user-facing product surface beyond a read-only admin job list, an admin schedules list, and SignalR-driven toasts. Most jobs today are initiated by another module (Documents and Finances) on the user's behalf; some can be issued by a recurring schedule (attributed to the schedule's creator). Every job runs asynchronously in the same WebApi process and reports completion back through SignalR (when it has a user creator).
 
 This file lives under `docs/product-design/processing/` because it is consulted from product work in other modules — uploads, reprocessing, bulk operations, downloads, and any recurring work all flow through this queue, and adding new async work means extending it. Treat this doc as the source of truth for *what the queue guarantees and what it deliberately does not*; defer to the repo's CLAUDE.md files for code structure and framework choices.
 
@@ -21,8 +21,8 @@ The module is a **job-execution engine** plus a **cron-style schedule emitter** 
 - One in-process worker (the WebApi itself) that claims pending jobs, runs them with bounded concurrency, and writes their terminal status back to the database.
 - A small, closed set of job **types** known to the worker, each backed by a handler class (see *Job catalog*).
 - A two-level **parent/child** hierarchy for fan-out work, with the parent's status derived from the aggregate of its children.
-- A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules can be system-attributed (no `CreatedByUserId`). Admins can create and delete schedules via `POST` / `DELETE /api/v1/admin/schedules`; the create endpoint is generic over `JobType` but currently allow-lists `NoOp` only.
-- Per-user, per-job real-time notifications over a SignalR hub. System-initiated runs (schedules with no creator) emit no SignalR — failures surface only in the admin job list.
+- A separate **schedule emitter** (`processing.schedules` table + `JobSchedulerService` background tick loop) that turns cron expressions into Pending jobs in the same `processing.jobs` table. Schedules carry a nullable `CreatedByUserId` — both current creation endpoints stamp the creating admin; a creator-less (system-attributed) schedule is schema-supported but not yet produced by any endpoint. Admins can create and delete schedules via `POST` / `DELETE /api/v1/admin/schedules`; the create endpoint is generic over `JobType` but accepts only `NoOp` — `ImportCommodityPrices` is deliberately rejected with a pointer to its per-module surface (`PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule`), and no other type is schedulable yet.
+- Per-user, per-job real-time notifications over a SignalR hub. Schedule-spawned jobs inherit the schedule's creator and notify them like any other job; only a job with no creator (system-attributed — schema-supported, not yet produced by any endpoint) would emit no SignalR, its failures surfacing only in the admin job list.
 - A read-only HTTP endpoint that lists jobs, scoped to the caller's identity (admins see all jobs; non-admins see only their own).
 - Admin-only HTTP endpoints to list, create, and delete schedules.
 - A best-effort orphaned-job recovery sweep at process startup.
@@ -66,7 +66,7 @@ Indexes worth knowing:
 
 ### `processing.schedules`
 
-One row per recurring trigger. Owned by the Processing module but populated by other modules (via migrations or future per-module endpoints). The columns:
+One row per recurring trigger. Owned by the Processing module but populated by other modules (via migrations or per-module endpoints — Finances' price-source schedule endpoints are the first). The columns:
 
 - **Identity:** `Id` (Guid PK), `Name` (display string), `Description` (optional admin note).
 - **What to enqueue:** `JobType` (same enum as `processing.jobs.Type`), `Payload` (jsonb, opaque to the scheduler), `Priority` (int, copied to the spawned job).
@@ -176,7 +176,7 @@ The frontend hub client (`ProcessingHubService`) distinguishes **managed** jobs 
 
 ## Authorization and visibility
 
-- **Enqueue** is gated by whichever endpoint accepts the user's request. The queue itself does not check authorization — the calling feature's handler does, and `CreatedByUserId` is filled from the current user. There are no "system" jobs without a creator.
+- **Enqueue** is gated by whichever endpoint accepts the user's request. The queue itself does not check authorization — the calling feature's handler does. `CreatedByUserId` is filled from the current user for user-initiated enqueues; schedule-spawned jobs inherit the schedule's `CreatedByUserId`, which may be null (system-attributed).
 - **Listing** is gated by `AuthPolicies.RequireContributor` (the standard authenticated-user policy). The `GetProcessingJobs` handler then narrows the result set:
   - Non-admin users see only jobs where `CreatedByUserId == currentUser.UserId`.
   - Admins see all jobs.
@@ -191,7 +191,7 @@ This exists for **tests and for any future operation that needs the queue quiesc
 
 ## Job catalog
 
-The v1 domain job types are all initiated by the Documents module. Each has a handler under `Modules/Documents/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
+Most v1 domain job types are initiated by the Documents module, with handlers under `Modules/Documents/Processing/`; Finances contributes `ImportCommodityPrices`, with its handler under `Modules/Finances/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
 
 ### `UploadDocument`
 
@@ -255,6 +255,18 @@ Packages a set of documents into a ZIP for download. The handler reads metadata 
 
 This is the only v1 job type whose `Payload` carries result data after completion — most jobs use `EntityId` to point back to the produced entity.
 
+### `ImportCommodityPrices`
+
+The Finances module's commodity-price import (handler under `Modules/Finances/Processing/`). Enqueued ad-hoc by the admin *Run import now* action (`POST /api/v1/finances/settings/price-sources/{source}/runs`) and recurringly by per-source schedules managed via `PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule`. The payload names the price source plus optional commodity-ID and date-window overrides. The handler:
+
+1. Verifies the source is external and enabled (`CommodityPriceSourceSettings`).
+2. Resolves the source's keyed `IPriceProvider` (Bank of Canada Valet for FX, Alpha Vantage for equities).
+3. Builds the commodity set: held commodities (split commodities, unit-price commodities, reporting currencies) plus the source's pair allow-list, filtered to provider-supported pairs/exchanges.
+4. Computes the import window — explicit payload override, else a watermark anchor (the earliest of each held pair's latest price, minus the provider's revision lookback), else earliest account activity.
+5. Imports observations and applies them via `ApplyCommodityPriceObservationsCommand` through the standard unit-of-work pipeline. Scheduled runs stay system-attributed in the audit log; manual runs are attributed to the initiating user.
+
+It emits no SignalR success notification of its own — import status surfaces on the price-source settings row (`LastImportStatus` / `LastImportMessage`). See [finances/commodities.md](../finances/commodities.md#price-sources--model).
+
 ### `NoOp`
 
 A trivial handler that returns immediately. Exists so the queue + scheduler pipelines can be smoke-tested end-to-end (cron tick → enqueue → worker dispatch → terminal status) without depending on any real domain handler — particularly useful for integration / E2E test scaffolding and for an admin verifying a deployment. Reads no payload, writes no DB rows, emits no SignalR. The processor still flips the row to `Completed` automatically, so admins see it land in the read-only job list. Lives at `Homestead.WebApi/Processing/NoOpJobHandler.cs` rather than under a module — it has no domain coupling.
@@ -312,7 +324,7 @@ A second `BackgroundService` (`JobSchedulerService`) ticks once per minute (conf
 
 **Pause behaviour:** `IJobProcessorControl.PauseAsync()` only pauses the *worker*. The scheduler keeps ticking and may queue Pending jobs during a pause; they drain when pause is released. Tests that need the scheduler quiet set `JobSchedulingOptions.Enabled = false`.
 
-Schedules can be created and deleted via admin endpoints: `POST /api/v1/admin/schedules` and `DELETE /api/v1/admin/schedules/{id}`. The create endpoint is shaped generically over `JobType` but currently allow-lists `NoOp` only — relaxing this is additive when other recurring handlers come online. There is no update endpoint yet (toggling `IsEnabled` requires delete + recreate). Per-module CRUD with richer module-specific UX remains a future option (see *Future-compatibility*).
+Schedules can be created and deleted via admin endpoints: `POST /api/v1/admin/schedules` and `DELETE /api/v1/admin/schedules/{id}`. The create endpoint is shaped generically over `JobType` but accepts only `NoOp` — `ImportCommodityPrices` is deliberately rejected with a message pointing to its per-module surface, and no other recurring handler exists yet. There is no update endpoint (toggling `IsEnabled` requires delete + recreate). Per-module CRUD is no longer hypothetical: Finances manages its import schedules via `PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule`, upserting rows in the same shared table (see *Future-compatibility*).
 
 ## Future-compatibility
 
@@ -321,7 +333,7 @@ The following must be addable without rewriting the tables or breaking existing 
 - **Retries with backoff** as an opt-in property of a job type. The `Error` column already stores the latest failure; adding `Attempt` / `MaxAttempts` / `NextAttemptAt` columns is the natural extension.
 - **Per-schedule retry/backoff for failed runs** — today a failed scheduled run is terminal; the next tick fires at the next normal occurrence. Adding a `RetryPolicy` column on `processing.schedules` (or job-type-level) is the natural place.
 - **Scheduled one-off jobs** (`RunAt` on `processing.jobs`) — the claim query becomes `WHERE Status = Pending AND (RunAt IS NULL OR RunAt <= now())`. Distinct from recurring schedules: this would be "remind me in 10 minutes" semantics.
-- **Per-module schedule CRUD endpoints** — the admin endpoints (`GET`/`POST`/`DELETE /api/v1/admin/schedules`) are the generic surface in v1; per-module endpoints (e.g., `/api/v1/finances/schedules`) would filter the same shared table by `JobType`, render module-friendly forms, and manage their own seeded singletons. The admin endpoint is intentionally minimal — schedule update / `IsEnabled` toggle and a `Payload` field on create are deliberate omissions to be added when there is a consumer that needs them.
+- **Per-module schedule CRUD endpoints** — shipped for Finances: `PUT`/`DELETE /api/v1/finances/settings/price-sources/{source}/schedule` filter the shared table by `JobType = ImportCommodityPrices` and render module-friendly forms, while the generic admin create deliberately rejects that type. New modules adding recurring work should follow the same pattern. The admin endpoint stays intentionally minimal — schedule update / `IsEnabled` toggle and a `Payload` field on create are deliberate omissions to be added when there is a consumer that needs them.
 - **Per-schedule timezone honour** — `TimeZone` column already exists; v1 always treats it as `Etc/UTC`. Honouring it changes only the Cronos `GetNextOccurrence` call.
 - **Per-job-type concurrency caps** (e.g., one OCR at a time, but ten ZIPs at a time). Today's single semaphore would split into per-type semaphores.
 - **Cancel from the admin UI** — the worker would need to expose a per-job cancellation token, and the API would set a `CancelRequested` flag the worker checks.

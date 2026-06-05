@@ -1,10 +1,10 @@
 # Homestead
 
-A document management application with a .NET 10 backend API and Angular frontend. Features OCR processing, full-text search, document versioning, tagging, and multi-user support with OIDC authentication.
+A household management application for documents and personal finances, with a .NET 10 backend API and Angular frontend. Features OCR processing, full-text search, document versioning, tagging, net-worth tracking across multi-currency accounts, and multi-user support with OIDC authentication.
 
 ## Docker Deployment
 
-Homestead ships as a single Docker image containing both the API and frontend. It requires a PostgreSQL database and optionally an OIDC provider (e.g., Authentik, Keycloak, Auth0) for single sign-on.
+Homestead ships as a single Docker image containing both the API and frontend. It requires a PostgreSQL database and an OIDC provider (e.g., Authentik, Keycloak, Auth0). OIDC is the only sign-in method — the application refuses to start without it.
 
 ### Quick Start
 
@@ -24,6 +24,9 @@ services:
     environment:
       DB_HOST: postgres
       DB_PASSWORD: changeme
+      OIDC_AUTHORITY: https://idp.example.com/...
+      OIDC_CLIENT_ID: your-client-id
+      OIDC_CLIENT_SECRET: your-client-secret
     volumes:
       - media:/media
       - cache:/cache
@@ -55,37 +58,37 @@ volumes:
 docker compose up -d
 ```
 
-3. Visit `https://homestead.example.com` — you'll be greeted by the setup page to create your admin account.
+3. Visit `https://homestead.example.com` and sign in with your OIDC provider — the first user to sign in is automatically activated and granted the admin role.
 
 ### Single Sign-On (OIDC)
 
-Homestead supports any OpenID Connect provider. To enable SSO, add the OIDC environment variables to the `homestead` service:
+Homestead authenticates exclusively through OpenID Connect; any compliant provider works. The three core variables (`OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`) are required — see the Quick Start compose above. Optional variables customize the integration:
 
 ```yaml
 services:
   homestead:
-    # ... same as above, plus:
+    # ... same as above, plus optionally:
     environment:
-      DB_HOST: postgres
-      DB_PASSWORD: changeme
-      OIDC_AUTHORITY: https://idp.example.com/...
-      OIDC_CLIENT_ID: your-client-id
-      OIDC_CLIENT_SECRET: your-client-secret
       OIDC_DISPLAY_NAME: Sign in with SSO
+      OIDC_ROLE_CLAIM: groups
+      OIDC_ADMIN_CLAIM_VALUES: homestead-admins
 ```
 
 #### Provider Setup
 
 1. In your OIDC provider, create a new client/application:
-   - **Redirect / Callback URI:** `https://homestead.example.com/api/auth/oidc/callback`
+   - **Redirect / Callback URI:** `https://homestead.example.com/signin-oidc`
+   - **Post-logout Redirect URI** (if your provider requires one): `https://homestead.example.com/signout-callback-oidc`
    - **Scopes:** `openid`, `email`, `profile`
    - Note the **Client ID** and **Client Secret**
 
 2. Set `OIDC_AUTHORITY` to the provider's issuer URL (the base URL where `/.well-known/openid-configuration` is served).
 
-3. (Optional) To map provider groups/roles to the Homestead admin role, set `OIDC_ROLE_CLAIM` to the claim type your provider uses (e.g., `groups`, `roles`) and `OIDC_ADMIN_CLAIM_VALUES` to a comma-separated list of values that should grant admin access. Users whose claim matches any listed value will automatically receive admin privileges on login.
+3. To map provider groups/roles to the Homestead admin role, set `OIDC_ROLE_CLAIM` to the claim type your provider uses (e.g., `groups`, `roles`) and `OIDC_ADMIN_CLAIM_VALUES` to a comma-separated list of values that should grant admin access.
 
-Users logging in via OIDC are automatically provisioned — no manual account creation needed.
+   > **The provider is the source of truth for the admin role on every sign-in:** a matching claim grants Admin, a missing one revokes it (the user drops back to Contributor). This sync runs even when the mapping is **not** configured — without `OIDC_ROLE_CLAIM`/`OIDC_ADMIN_CLAIM_VALUES`, every admin (including the auto-promoted first user, and anyone promoted from `/admin`) is demoted to Contributor on their next sign-in. Configure the mapping in any deployment that needs a durable admin.
+
+Users signing in via OIDC are automatically provisioned — no manual account creation needed. New accounts start **deactivated** — sign-in is refused with an "account inactive" notice on the login page — until an admin activates them from `/admin`; only the very first user is activated automatically.
 
 ### Environment Variables
 
@@ -99,19 +102,19 @@ Users logging in via OIDC are automatically provisioned — no manual account cr
 | `DB_NAME` | `homestead` | Database name |
 | `DB_USER` | `postgres` | PostgreSQL username |
 
-#### OIDC (optional)
+#### OIDC (required)
 
-All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must be set to enable OIDC. If any are missing, OIDC is disabled and only local login is available.
+All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must be set — OIDC is the only sign-in method, and the application fails at startup if any of them are missing.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OIDC_AUTHORITY` | — | OIDC provider authority URL |
-| `OIDC_CLIENT_ID` | — | OIDC client ID |
-| `OIDC_CLIENT_SECRET` | — | OIDC client secret |
+| `OIDC_AUTHORITY` | — | OIDC provider authority URL **(required)** |
+| `OIDC_CLIENT_ID` | — | OIDC client ID **(required)** |
+| `OIDC_CLIENT_SECRET` | — | OIDC client secret **(required)** |
+| `OIDC_METADATA_ADDRESS` | — | Explicit metadata document URL, if it isn't at the authority's `/.well-known/openid-configuration` |
 | `OIDC_DISPLAY_NAME` | `SSO` | Label shown on the login button |
 | `OIDC_ROLE_CLAIM` | — | Claim type used for role mapping (e.g., `groups`) |
 | `OIDC_ADMIN_CLAIM_VALUES` | — | Comma-separated claim values that grant the admin role |
-| `OIDC_DISABLE_LOCAL_LOGIN` | `false` | Set to `true` to hide the local login form |
 | `OIDC_ADDITIONAL_SCOPES` | — | Comma-separated additional OAuth scopes |
 
 #### Other
@@ -138,9 +141,9 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 
 ### First-Time Setup
 
-On the first visit, the application detects that no users exist and presents a setup page. Create your admin account here — this endpoint is automatically disabled once the first user is created.
+There is no setup wizard. The first user to sign in via OIDC bootstraps the system: that account is automatically activated and granted the admin role. (To *keep* the admin role across sign-ins, configure the role-claim mapping — see the note in Provider Setup.) Every subsequent OIDC sign-in is provisioned **deactivated** — as a Contributor, or as an Admin when their claim matches `OIDC_ADMIN_CLAIM_VALUES` — and must be activated by an admin from `/admin`.
 
-After setup, additional users can be created from the admin panel at `/admin`, or they can log in via OIDC and be auto-provisioned.
+Admins can also pre-create users from the admin panel at `/admin` — pre-created accounts are matched by email (an exact, case-sensitive match against the email claim your IdP sends) and are active immediately when the user first signs in via OIDC.
 
 ### Notes
 

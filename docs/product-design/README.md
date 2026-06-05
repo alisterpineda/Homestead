@@ -24,3 +24,7 @@ CLAUDE.md files (`/CLAUDE.md`, `Homestead.WebApi/CLAUDE.md`,
 ## Cross-cutting
 
 - [shared/table-ux.md](shared/table-ux.md) — product/UX rules for every data-table screen (toolbars, the unified-popover filter pattern, selection state, responsive behaviour). Applies across modules.
+
+## Maintenance
+
+When something listed under a doc's *Future-compatibility* / *Out of scope* section ships, move it into the in-scope description **in the same change**. Stale "future" entries for already-shipped features (with the in-scope section updated but the future section forgotten) were the most common form of doc drift found in the 2026-06 docs-vs-code audit.

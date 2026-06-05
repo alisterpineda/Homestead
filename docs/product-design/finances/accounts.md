@@ -81,7 +81,7 @@ Creating a non-Investment account with an initial balance emits one opening-bala
 **Cash account, $1,000 CAD on 2026-04-23:**
 
 ```
-Transaction: Type=Normal, Description="Opening balance", OccurredAt=2026-04-23T00:00:00Z
+Transaction: Type=OpeningBalance, OccurredAt=2026-04-23T00:00:00Z
   Split 1: Account=<cash>,      Commodity=CAD, Quantity=+1000
   Split 2: Account=<Equity:OB>, Commodity=CAD, Quantity=-1000
 ```
@@ -91,7 +91,7 @@ Weight balance: CAD = +1000 − 1000 = 0 ✓. No annotation — both splits are 
 **Credit Card, $500 CAD owed on 2026-04-23** — the server flips the sign because Kind is a liability:
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T00:00:00Z
+Transaction: Type=OpeningBalance, OccurredAt=2026-04-23T00:00:00Z
   Split 1: Account=<credit card>, Commodity=CAD, Quantity=-500
   Split 2: Account=<Equity:OB>,   Commodity=CAD, Quantity=+500
 ```
@@ -101,7 +101,7 @@ Weight balance: CAD = -500 + 500 = 0 ✓.
 **Investment *Add position* — 100 shares of VEQT @ $35.12 CAD on 2026-04-23** (investment shapes default to `12:00 UTC` on the chosen date — see [commodities.md](commodities.md#price-time-semantics)):
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+Transaction: Type=OpeningBalance, OccurredAt=2026-04-23T12:00:00Z
   Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100 @ 35.12 CAD
   Split 2: Account=<Equity:OB>,  Commodity=CAD,  Quantity=-3512
 ```
@@ -111,7 +111,7 @@ Weight balance: CAD = (+100 × 35.12) + (-3512) = 0 ✓. The security leg's anno
 **Investment *Add position* — 100 shares of VEQT on 2026-04-23 without a per-unit price** (unpriced — the user asserts holdings but hasn't pinned down historical value):
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+Transaction: Type=OpeningBalance, OccurredAt=2026-04-23T12:00:00Z
   Split 1: Account=<investment>, Commodity=VEQT, Quantity=+100
   Split 2: Account=<Equity:OB>,  Commodity=VEQT, Quantity=-100
 ```
@@ -121,7 +121,7 @@ Weight balance: VEQT = +100 − 100 = 0 ✓. Both splits sit in VEQT; the transa
 **Investment *Add position* — $5,000 USD cash on 2026-04-23** (foreign-currency cash in a CAD-reporting account):
 
 ```
-Transaction: Type=Normal, OccurredAt=2026-04-23T12:00:00Z
+Transaction: Type=OpeningBalance, OccurredAt=2026-04-23T12:00:00Z
   Split 1: Account=<investment>, Commodity=USD, Quantity=+5000
   Split 2: Account=<Equity:OB>,  Commodity=USD, Quantity=-5000
 ```
@@ -157,7 +157,7 @@ Route: `/finances/accounts`.
   - **Cards** — name, `institution · type` subtitle, balance, latest transaction date.
 - Sort (toolbar): by name, type, latest transaction, or total balance, ascending or descending. Balances render in the display currency only (no native amount); an account whose holdings are entirely unpriced shows *Unpriced* / *—*.
 - Archived accounts are hidden by default; a single global *Show archived accounts (N)* toggle in the Filter popover reveals them.
-- Row actions (kebab): Edit, Archive / Unarchive. Delete is offered only when the account has zero transactions.
+- Row actions (kebab): Edit, Archive / Unarchive, Delete. The Delete item is always present but renders disabled when the account has any transactions.
 
 ## Account detail
 
@@ -167,14 +167,14 @@ Route: `/finances/accounts/:id`.
 
 **Primary actions** (non-archived accounts):
 
-- **New Transaction** — a dropdown of the transaction shapes allowed for this Kind. A base group always offers **Transfer** and **Record balance**. For Investment accounts the menu adds a separated, labelled **Trade** group with **Buy**, **Sell**, and **Dividend** — Buy/Sell open the trade sheet in create mode (with the chosen side); Dividend opens the dividend sheet. (Further investment shapes such as DRIP are reserved for later.)
+- **New Transaction** — a dropdown of the transaction shapes allowed for this Kind. A base group always offers **Transfer** and **Record balance**. For Investment accounts the menu adds a separated, labelled **Trade** group with **Buy**, **Sell**, **Dividend**, and **Reinvest dividend** — Buy/Sell open the trade sheet in create mode (with the chosen side); Dividend opens the dividend sheet; Reinvest dividend opens the DRIP sheet.
 - **Add position** — Investment accounts only.
 - **Add opening balance** — non-Investment accounts only, and only when the account has no opening balance yet.
 
 **Layout.** The detail page is a stack of cards, not a tabbed view:
 
 - **Positions** (Investment accounts only) — a card with a table: commodity · quantity · display value · share of account. Quantity is the native amount (there is no separate native-value column). Each row has an *Edit opening balance* action when one exists. The Positions card also surfaces the set of held commodities whose kind is a currency; the detail page uses this signal to decide whether the Trade (Buy/Sell) sheet reveals its funding-currency picker — it stays hidden unless the account holds cash in a currency other than its reporting currency.
-- **Activity** — a unified chronological list of every transaction affecting this account, including opening balances, balance entries, transfers, and — on Investment accounts — trades (Buy / Sell) and dividends, differentiated by icon / label rather than by separation. Trades park both legs on this account, so the row disambiguates them by annotation: it shows the signed cash movement (Buy negative, Sell positive) in the funding currency, with a `<quantity> @ <unit price>` subtitle drawn from the priced security leg.
+- **Activity** — a unified chronological list of every transaction affecting this account, including opening balances, balance entries, transfers, and — on Investment accounts — trades (Buy / Sell), dividends, and dividend reinvestments (DRIPs), differentiated by icon / label rather than by separation. Trades park both legs on this account, so the row disambiguates them by annotation: it shows the signed cash movement (Buy negative, Sell positive) in the funding currency, with a `<quantity> @ <unit price>` subtitle drawn from the priced security leg.
 
 Reporting currency, institution detail, and created / updated timestamps are not surfaced on the detail page in v1 (there is no Info section).
 
@@ -188,7 +188,7 @@ Archived accounts render read-only. Primary actions disappear; Edit and Unarchiv
 
 **Archive / Unarchive:** toggles the `IsArchived` flag. Archived accounts are read-only; balance-entry, transaction, and add-position actions are not offered.
 
-**Delete:** allowed only when the account has zero transactions (opening balance included). Otherwise the menu offers Archive only.
+**Delete:** allowed only when the account has zero transactions (opening balance included). Otherwise the Delete menu item renders disabled, leaving Archive as the available action.
 
 ## Privacy mask
 

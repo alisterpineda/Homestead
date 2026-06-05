@@ -75,14 +75,14 @@ If profiling later shows the list endpoint is too slow, options in priority orde
 
 ## Out of scope for v1
 
-- **No historical-balance endpoint.** The only v1 surface that needs point-in-time per-account valuation is the net-worth chart, which has its own time-series endpoint (specced separately). Endpoints like `GET /finances/balances?asOf=...` or an `?asOf=` parameter on the account / positions endpoints are deliberately not added — they would expand the contract for no v1 caller.
+- **No historical-balance endpoint.** The only v1 surface that needs point-in-time per-account valuation is the net-worth chart, which has its own time-series endpoint (specced separately). A bulk `GET /finances/balances?asOf=...` endpoint is deliberately not added — it would expand the contract for no v1 caller. (The account read endpoints *do* accept an optional `?asOf=` — see *Future-compatibility* below; only the Positions endpoint lacks it.)
 - **No per-account historical positions.** Same reasoning. The Positions tab is "as of now" only per [accounts.md](accounts.md#account-detail).
 - **No server-computed rollups on the account read path.** `GET /finances/accounts` carries only per-account inline valuations — no `/finances/summary`-style Kind subtotals or household totals, and the account list does not compute them client-side either. Net worth (total + asset / liability breakdown) is computed server-side by the separate net-worth time-series endpoint and shown on the Reports page; the headline is that series' most-recent point.
 - **No per-commodity Equity:Adjustments breakdown.** The Adjustments balance is intended to surface as a single display-currency total (_planned, not yet built in v1_ — see [overview.md](overview.md#distinctive-ux-decisions-worth-preserving)). A per-commodity decomposition is a v2 affordance.
 
 ## Future-compatibility
 
-- **`?asOf=` parameter.** Both the account read endpoints and the Positions endpoint can accept an optional `asOf: DateTimeOffset` later without breaking existing callers. The handler already does an "as of now" lookup; parameterising the lookup instant is a localised change.
+- **`?asOf=` on Positions.** The account read endpoints (`GET /finances/accounts`, `GET /finances/accounts/{id}`) already accept an optional `asOf: DateTimeOffset` that parameterises the valuation instant — the frontend sends local end-of-day today on every request. The Positions endpoint does not accept it yet; adding it later is a localised, non-breaking change.
 - **Dedicated `/finances/balances?asOf=` endpoint.** If statement reconciliation or a "balance after this transaction" column on the Activity tab arrives in v2, a bulk historical-balance endpoint can be added without changing the inline shape.
 - **Server-side rollups.** A `/finances/summary` endpoint can be introduced if the frontend rollup logic needs to be shared across more pages. The inline valuations remain the source of truth.
 - **Background-cached valuations.** A `valuations` table keyed by `(accountId, asOf)` with eventual-consistency invalidation can be added without contract change — handlers continue to expose `displayValue`, just sourced from cache.

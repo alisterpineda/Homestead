@@ -26,8 +26,8 @@ Classic Material puts the overflow `⋯` at the absolute right and the primary a
 | State | Toolbar |
 |---|---|
 | Default | Leading: `Search`, `Filter`, `Sort`, `Columns`, `View`. Trailing: `Export` (or other secondary action), `⋯`, primary CTA (e.g. `+ Upload`, `+ New Account`). |
-| Empty | Toolbar persists; modifiers feel inert (faded). The empty canvas hoists a duplicate primary CTA centred for first-time users. Repeat users still find the CTA where they expect it. |
-| Selection | Toolbar swaps. Bulk actions (`Edit tags`, `Archive`, `Delete`) anchor to the leading edge next to an `N selected` counter. `Clear` sits trailing as the escape hatch. Destructive actions get red text rather than red buttons — colour signals intent without forcing confirmation emphasis. |
+| Empty (no items, no active filters) | Toolbar hidden entirely; the empty canvas owns the screen with a single centred primary CTA for first-time users. (Zero results *with* filters active keeps the toolbar — the user needs it to un-filter.) Known non-compliant: the commodity-prices section on the commodity detail page predates this rule and keeps its toolbar when empty. |
+| Selection | Toolbar swaps. Bulk actions (`Edit tags`, `Archive`, `Delete`) anchor to the leading edge next to an `N selected` counter; `Clear` sits trailing as the escape hatch. (Mechanism varies: tag/party lists fade the standard controls to inert; the documents list swaps them out structurally.) Destructive actions get red text rather than red buttons — colour signals intent without forcing confirmation emphasis. |
 
 ## Responsive behaviour
 
@@ -145,8 +145,7 @@ The UI page-size dropdown caps at 100, but the backend clamp is deliberately hig
 ### URL state & reset rule
 
 - **`page` and `pageSize` live in URL query params**, alongside filter/sort params. Same rationale as filters: shareable, refresh-safe, browser back/forward navigates pagination history.
-- **Filter and search changes reset `page=1`** while preserving `pageSize`. Don't strand the user on page 5 of a result set that no longer has 5 pages.
-- **Sort changes** preserve the page number — sorting a 50-row page is still a 50-row page; the user's reading position carries.
+- **Filter, search, and sort changes all reset `page=1`** while preserving `pageSize`. Filter/search changes shrink or grow the result set — don't strand the user on page 5 of a result set that no longer has 5 pages. Sort changes reorder it — page 5 of a re-sorted list holds arbitrary rows, so jump back to the top of the new order.
 
 ### Page-size persistence
 
@@ -158,14 +157,14 @@ The footer flex-wraps. On narrow viewports the numbered nav drops to a full-widt
 
 ### When NOT to paginate
 
-If a dataset is **intrinsically bounded** to fit comfortably in a single page (e.g., currencies — ~150 active ISO 4217 codes), fetch it all and sort client-side. Add a runtime guard that warns when `totalCount > pageSize` so you catch growth before users do. The canonical example is `finances/commodities.md`; copy that pattern rather than inventing a new one.
+If a dataset is **intrinsically bounded** to fit comfortably in memory (e.g., currencies — ~150 active ISO 4217 codes), skip server pagination: load the full set up to a fixed cap and sort client-side, with a runtime guard that warns and truncates when `totalCount` exceeds the cap so you catch growth before users do (the commodity list loads pages of 100 up to a 1000-row cap). The canonical example is `finances/commodities.md`; copy that pattern rather than inventing a new one.
 
 ## Adopted patterns (already in place across the app)
 
 These are not future considerations — apply them in any new table.
 
 - **URL-encoded filter state.** Active filters and sort live in query params (`?tagIds=…&sortBy=…&sortDir=…`). Enables shareable filtered links, refresh-without-loss, and browser back/forward through filter history. .NET model binding handles this cleanly on the backend; on the frontend, read via `route.queryParamMap` and write via `router.navigate({ queryParamsHandling: 'merge' })`.
-- **URL-encoded pagination state.** `page` and `pageSize` live alongside filter/sort params. Filter/search changes reset `page=1`; sort changes preserve it. Page size also persists via `UserPreferencesService.pageSize` so the URL fallback respects user preference.
+- **URL-encoded pagination state.** `page` and `pageSize` live alongside filter/sort params. Filter, search, and sort changes all reset `page=1`. Page size also persists via `UserPreferencesService.pageSize` so the URL fallback respects user preference.
 - **Debounced search.** Search input is a writable signal; URL update is debounced 300ms. Don't fire on every keystroke.
 - **Persistent column visibility.** Use `persistedSignal()` (via `UserPreferencesService` for cross-cutting prefs) so column choices survive sessions.
 
@@ -183,7 +182,7 @@ These are not future considerations — apply them in any new table.
 | Toolbar split | Leading = modifiers, trailing = actions |
 | Within-edge order | Prominence radiates outward toward the edge |
 | Primary CTA position | Absolute rightmost |
-| Empty state | Toolbar persists (modifiers faded); CTA also duplicated in canvas |
+| Empty state | Toolbar hidden (truly-empty only); single CTA centred in canvas |
 | Selection state | Bulk actions leading, `Clear` trailing |
 | Filter UI (desktop) | `HlmPopover` anchored to trigger |
 | Filter UI (mobile) | `HlmSheet` from bottom |
@@ -195,6 +194,6 @@ These are not future considerations — apply them in any new table.
 | Default page size | 50 — options 10 / 20 / 50 / 100 |
 | Pagination state location | URL query params (`page`, `pageSize`) |
 | Page-size persistence | `UserPreferencesService.pageSize` — URL fallback |
-| Page reset rule | Filter/search → `page=1`; sort → preserve page |
-| Bounded datasets | Single fetch + client-side sort + runtime guard |
+| Page reset rule | Filter/search/sort → `page=1` |
+| Bounded datasets | Paged fetch to a fixed cap + client-side sort + warn-and-truncate guard |
 | Mobile breakpoint | 768px (matches sidebar primitive) |
