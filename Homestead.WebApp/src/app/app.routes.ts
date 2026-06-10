@@ -43,6 +43,11 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./modules/finances/finances.routes').then((m) => m.FINANCES_ROUTES),
       },
+      {
+        path: 'inventory',
+        loadChildren: () =>
+          import('./modules/inventory/inventory.routes').then((m) => m.INVENTORY_ROUTES),
+      },
     ],
   },
 ];

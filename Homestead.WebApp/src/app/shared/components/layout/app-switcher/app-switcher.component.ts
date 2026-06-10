@@ -7,6 +7,7 @@ import {
   lucideSettings,
   lucideFileText,
   lucideWallet,
+  lucidePackage,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
@@ -20,7 +21,7 @@ import { AuthService } from '@/shared/services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports, HlmDropdownMenuImports],
   providers: [
-    provideIcons({ lucideChevronsUpDown, lucideLayoutGrid, lucideSettings, lucideFileText, lucideWallet }),
+    provideIcons({ lucideChevronsUpDown, lucideLayoutGrid, lucideSettings, lucideFileText, lucideWallet, lucidePackage }),
   ],
   template: `
     <ul hlmSidebarMenu>

@@ -3,6 +3,7 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Identity;
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Domain.Settings;
@@ -39,6 +40,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AccountTransactionSplit> AccountTransactionSplits { get; set; }
     public DbSet<CommodityPrice> CommodityPrices { get; set; }
     public DbSet<CommodityPriceSourceSettings> CommodityPriceSourceSettings { get; set; }
+
+    public DbSet<Area> Areas { get; set; }
+    public DbSet<Item> Items { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

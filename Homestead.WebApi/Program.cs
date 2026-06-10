@@ -13,6 +13,7 @@ using Homestead.WebApi.Modules.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Modules.Inventory;
 using Homestead.WebApi.Modules.Processing;
 using Homestead.WebApi.Modules.Status;
 using Homestead.WebApi.Processing;
@@ -330,6 +331,7 @@ versionedApi.MapDocumentsEndpoints();
 versionedApi.MapProcessingEndpoints();
 versionedApi.MapAdminEndpoints();
 versionedApi.MapFinancesEndpoints();
+versionedApi.MapInventoryEndpoints();
 
 if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
 {

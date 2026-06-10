@@ -2,6 +2,7 @@ import type { ModuleDefinition } from '@/shared/types/modules';
 import { AdminSidebarComponent } from './admin/admin-sidebar/admin-sidebar.component';
 import { DocumentsSidebarComponent } from './documents/layout/documents-sidebar.component';
 import { FinancesSidebarComponent } from './finances/layout/finances-sidebar.component';
+import { InventorySidebarComponent } from './inventory/layout/inventory-sidebar.component';
 
 export const modules: ModuleDefinition[] = [
   {
@@ -28,6 +29,14 @@ export const modules: ModuleDefinition[] = [
     icon: 'lucideWallet',
     basePath: '/finances',
     sidebarComponent: FinancesSidebarComponent,
+  },
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    labelColor: 'amber',
+    icon: 'lucidePackage',
+    basePath: '/inventory',
+    sidebarComponent: InventorySidebarComponent,
   },
 ];
 

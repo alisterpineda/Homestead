@@ -849,6 +849,141 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Area", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("areas", "inventory");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly?>("AcquiredOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Compartment")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fungibility")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<bool>("IsContainer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LentTo")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ParentItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("RestockThreshold")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Serial")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Value")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("ValueCurrencyId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ParentItemId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ValueCurrencyId");
+
+                    b.ToTable("items", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_items_fungible_fields", "\"Fungibility\" = 'Fungible' OR (\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_items_fungible_status", "\"Fungibility\" = 'NonFungible' OR \"Status\" IN ('Active', 'Archived')");
+
+                            t.HasCheckConstraint("CK_items_lent_to_requires_lent", "\"LentTo\" IS NULL OR \"Status\" = 'Lent'");
+
+                            t.HasCheckConstraint("CK_items_location_not_both", "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" = FALSE)");
+
+                            t.HasCheckConstraint("CK_items_value_currency_pair", "(\"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL) OR (\"Value\" IS NOT NULL AND \"ValueCurrencyId\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
                 {
                     b.Property<Guid>("DocumentId")
@@ -1575,6 +1710,44 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "ParentItem")
+                        .WithMany()
+                        .HasForeignKey("ParentItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "ValueCurrency")
+                        .WithMany()
+                        .HasForeignKey("ValueCurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Area");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ParentItem");
+
+                    b.Navigation("UpdatedByUser");
+
+                    b.Navigation("ValueCurrency");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
