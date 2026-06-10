@@ -14,6 +14,17 @@ public class ItemsEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
     }
 
+    private static Task<ItemItem> CreateContainerAsync(
+        HttpClient client, string name, Guid? areaId = null, Guid? parentItemId = null) =>
+        CreateItemAsync(client, new { name, areaId, parentItemId, isContainer = true });
+
+    private static async Task<ItemItem> GetItemAsync(HttpClient client, Guid id)
+    {
+        var resp = await client.GetAsync($"/api/v1/inventory/items/{id}", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+    }
+
     private static async Task<Guid> CreateAreaAsync(HttpClient client, string name)
     {
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/areas", new { name }, CT);
@@ -134,5 +145,385 @@ public class ItemsEndpointTests : IntegrationTestBase
         var deleteResp = await client.DeleteAsync($"/api/v1/inventory/items/{item.Id}", CT);
 
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+    }
+
+    // ----- Containment: happy paths -----
+
+    [Fact]
+    public async Task CreateItem_InContainerWithCompartment_ResolvesPath()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+
+        var wrench = await CreateItemAsync(client,
+            new { name = "Wrench", parentItemId = chest.Id, compartment = "Top drawer" });
+
+        Assert.Equal(chest.Id, wrench.ParentItemId);
+        Assert.Null(wrench.AreaId);
+        Assert.Equal("Top drawer", wrench.Compartment);
+        Assert.Equal(garageId, wrench.ResolvedAreaId);
+        Assert.NotNull(wrench.Path);
+        Assert.Equal(2, wrench.Path!.Count);
+        Assert.Equal(garageId, wrench.Path[0].Id);
+        Assert.Equal("Area", wrench.Path[0].Kind);
+        Assert.Equal(chest.Id, wrench.Path[1].Id);
+        Assert.Equal("Container", wrench.Path[1].Kind);
+    }
+
+    [Fact]
+    public async Task PatchItem_MoveAreaToContainer_ViaOpPair()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: officeId);
+        var drill = await CreateItemAsync(client, new { name = "Drill", areaId = garageId });
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{drill.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/areaId", value = (object?)null },
+                new { op = "replace", path = "/parentItemId", value = (object)chest.Id },
+            });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var moved = (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        Assert.Null(moved.AreaId);
+        Assert.Equal(chest.Id, moved.ParentItemId);
+        Assert.Equal(officeId, moved.ResolvedAreaId);
+    }
+
+    [Fact]
+    public async Task PatchItem_MoveContainer_ChildResolvedPathFollows()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+
+        Assert.Equal(garageId, wrench.ResolvedAreaId);
+
+        // Move only the container's own location; the child follows by derivation (one row written).
+        var moveResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/areaId", value = (object)officeId } });
+        Assert.Equal(HttpStatusCode.OK, moveResp.StatusCode);
+
+        var reloaded = await GetItemAsync(client, wrench.Id);
+        Assert.Equal(officeId, reloaded.ResolvedAreaId);
+        Assert.Equal(chest.Id, reloaded.ParentItemId);
+    }
+
+    [Fact]
+    public async Task GetItems_ParentItemIdFilter_ReturnsDirectChildrenOnly()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var bin = await CreateContainerAsync(client, "Bin", parentItemId: chest.Id);
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+        var screw = await CreateItemAsync(client, new { name = "Screw", parentItemId = bin.Id });
+
+        var list = await (await client.GetAsync(
+                $"/api/v1/inventory/items?page=1&pageSize=200&parentItemId={chest.Id}", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<ItemItem>>(CT);
+
+        Assert.Contains(list!.Items, i => i.Id == bin.Id);
+        Assert.Contains(list.Items, i => i.Id == wrench.Id);
+        Assert.DoesNotContain(list.Items, i => i.Id == screw.Id);
+    }
+
+    [Fact]
+    public async Task GetItems_IsContainerFilter_ReturnsContainersOnly()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", areaId = garageId });
+
+        var list = await (await client.GetAsync(
+                "/api/v1/inventory/items?page=1&pageSize=200&isContainer=true", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<ItemItem>>(CT);
+
+        Assert.Contains(list!.Items, i => i.Id == chest.Id);
+        Assert.DoesNotContain(list.Items, i => i.Id == wrench.Id);
+    }
+
+    [Fact]
+    public async Task GetItem_NestedThreeDeep_ResolvesPathAndKinds()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var cupboard = await CreateContainerAsync(client, "Cupboard", areaId: garageId);
+        var bin = await CreateContainerAsync(client, "Bin", parentItemId: cupboard.Id);
+        var screw = await CreateItemAsync(client, new { name = "Screw", parentItemId = bin.Id });
+
+        var resp = await GetItemAsync(client, screw.Id);
+
+        Assert.Equal(garageId, resp.ResolvedAreaId);
+        Assert.NotNull(resp.Path);
+        Assert.Equal(3, resp.Path!.Count);
+        Assert.Equal(garageId, resp.Path[0].Id);
+        Assert.Equal("Area", resp.Path[0].Kind);
+        Assert.Equal(cupboard.Id, resp.Path[1].Id);
+        Assert.Equal("Container", resp.Path[1].Kind);
+        Assert.Equal(bin.Id, resp.Path[2].Id);
+        Assert.Equal("Container", resp.Path[2].Kind);
+    }
+
+    [Fact]
+    public async Task GetItem_UnplacedRootedChain_ResolvesToUnplaced()
+    {
+        var client = await CreateAdminClientAsync();
+        var cupboard = await CreateContainerAsync(client, "Cupboard"); // unplaced
+        var bin = await CreateContainerAsync(client, "Bin", parentItemId: cupboard.Id);
+        var screw = await CreateItemAsync(client, new { name = "Screw", parentItemId = bin.Id });
+
+        var resp = await GetItemAsync(client, screw.Id);
+
+        Assert.Null(resp.ResolvedAreaId);
+        Assert.NotNull(resp.Path);
+        Assert.Equal(2, resp.Path!.Count);
+        Assert.Equal("Container", resp.Path[0].Kind);
+        Assert.Equal(cupboard.Id, resp.Path[0].Id);
+        Assert.Equal(bin.Id, resp.Path[1].Id);
+    }
+
+    [Fact]
+    public async Task GetItem_ChainThroughTerminalContainer_StillResolves()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+
+        // Seal the (empty) container, then place a live item inside it — the API permits placing
+        // into a terminal container, and the resolver walks straight through it.
+        var sealResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        Assert.Equal(HttpStatusCode.OK, sealResp.StatusCode);
+
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+
+        Assert.Equal(garageId, wrench.ResolvedAreaId);
+        Assert.NotNull(wrench.Path);
+        Assert.Equal(2, wrench.Path!.Count);
+        Assert.Equal(garageId, wrench.Path[0].Id);
+        Assert.Equal(chest.Id, wrench.Path[1].Id);
+    }
+
+    // ----- Containment: rejections (400) -----
+
+    [Fact]
+    public async Task CreateItem_AreaAndParent_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items",
+            new { name = "Wrench", areaId = garageId, parentItemId = chest.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateItem_ParentMissing_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items",
+            new { name = "Wrench", parentItemId = Guid.NewGuid() }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateItem_ParentNotContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var plain = await CreateItemAsync(client, new { name = "Hammer" });
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items",
+            new { name = "Wrench", parentItemId = plain.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateItem_CompartmentWithoutParent_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items",
+            new { name = "Wrench", compartment = "Top drawer" }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_ParentWhileInArea_SingleOp_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var drill = await CreateItemAsync(client, new { name = "Drill", areaId = garageId });
+
+        // Setting a parent without clearing the area leaves both location FKs set.
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{drill.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object)chest.Id } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_SelfParent_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var chest = await CreateContainerAsync(client, "Tool chest");
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object)chest.Id } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_CycleViaDescendant_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var a = await CreateContainerAsync(client, "A"); // unplaced
+        var b = await CreateContainerAsync(client, "B", parentItemId: a.Id);
+        var c = await CreateContainerAsync(client, "C", parentItemId: b.Id);
+
+        // Placing A inside its own grandchild C forms a cycle.
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{a.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object)c.Id } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_RoleOffWithChildren_Returns400_EvenAfterArchivingChild()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+
+        var firstAttempt = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+        Assert.Equal(HttpStatusCode.BadRequest, firstAttempt.StatusCode);
+
+        // Archiving the child does not release the role-off block (Rule B: ANY child blocks).
+        var archiveResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{wrench.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        Assert.Equal(HttpStatusCode.OK, archiveResp.StatusCode);
+
+        var retry = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+        Assert.Equal(HttpStatusCode.BadRequest, retry.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_TerminalWithLiveChildren_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Sold" } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchItem_TerminalWithOnlyTerminalChildren_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateItemAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+
+        await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{wrench.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+
+        var sellResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Sold" } });
+        Assert.Equal(HttpStatusCode.OK, sellResp.StatusCode);
+        var sold = (await sellResp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        Assert.Equal("Sold", sold.Status);
+        Assert.True(sold.IsContainer); // role stays on, preserving the invariant for leftovers.
+    }
+
+    // ----- Containment: escape hatch -----
+
+    [Fact]
+    public async Task PatchItem_TransitionToTerminal_IgnoresLocationOps()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var drill = await CreateItemAsync(client, new { name = "Drill", areaId = garageId });
+
+        // Sell-and-move in one patch: the move ops are ignored for the live→terminal transition.
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{drill.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Sold" },
+                new { op = "replace", path = "/areaId", value = (object?)null },
+                new { op = "replace", path = "/parentItemId", value = (object)chest.Id },
+            });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var sold = (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        Assert.Equal("Sold", sold.Status);
+        Assert.Equal(garageId, sold.AreaId);
+        Assert.Null(sold.ParentItemId);
+    }
+
+    [Fact]
+    public async Task PatchItem_AlreadyTerminal_MoveOutThenRoleOff_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateItemAsync(client,
+            new { name = "Wrench", parentItemId = chest.Id, compartment = "Top drawer" });
+
+        // Make the child terminal (it stays inside the container).
+        await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{wrench.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+
+        // Escape hatch: the already-terminal record can be moved out; compartment auto-clears.
+        var moveResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{wrench.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object?)null } });
+        Assert.Equal(HttpStatusCode.OK, moveResp.StatusCode);
+        var moved = (await moveResp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        Assert.Null(moved.ParentItemId);
+        Assert.Null(moved.Compartment);
+
+        // With the container now empty, role-off succeeds.
+        var roleOffResp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/items/{chest.Id}",
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+        Assert.Equal(HttpStatusCode.OK, roleOffResp.StatusCode);
+        var noLongerContainer = (await roleOffResp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        Assert.False(noLongerContainer.IsContainer);
     }
 }

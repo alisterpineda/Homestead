@@ -115,6 +115,8 @@ export type { ItemStatus } from './models/item-status';
 export type { JsonPatchDocument } from './models/json-patch-document';
 export type { ListAiProviderModelsRequest } from './models/list-ai-provider-models-request';
 export type { ListModelsResponse } from './models/list-models-response';
+export type { LocationSegmentKind } from './models/location-segment-kind';
+export type { LocationSegmentResponse } from './models/location-segment-response';
 export type { LogLevel } from './models/log-level';
 export type { LogLevelRule } from './models/log-level-rule';
 export type { LogLevelSource } from './models/log-level-source';

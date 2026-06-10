@@ -4,6 +4,7 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ public class PatchItemHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
+    IItemLocationResolver locationResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<PatchItemCommand, ItemResponse>
 {
@@ -40,6 +42,9 @@ public class PatchItemHandler(
             Status = item.Status,
             LentTo = item.LentTo,
             AreaId = item.AreaId,
+            ParentItemId = item.ParentItemId,
+            IsContainer = item.IsContainer,
+            Compartment = item.Compartment,
         };
 
         request.PatchDocument.ApplyOrThrow(model);
@@ -52,6 +57,8 @@ public class PatchItemHandler(
             throw new BusinessRuleException("Serial must be 128 characters or fewer.");
         if (model.LentTo is { Length: > 256 })
             throw new BusinessRuleException("LentTo must be 256 characters or fewer.");
+        if (model.Compartment is { Length: > 256 })
+            throw new BusinessRuleException("Compartment must be 256 characters or fewer.");
 
         if (model.AcquiredOn is { } acquired && DateOnlyValidationRules.IsInFuture(acquired))
             throw new BusinessRuleException("AcquiredOn cannot be in the future.");
@@ -83,14 +90,81 @@ public class PatchItemHandler(
             lentTo = null;
         }
 
-        // Terminal statuses keep their last location: ignore any AreaId change in the same patch.
-        var targetAreaId = model.Status.IsTerminal() ? item.AreaId : model.AreaId;
+        // Transition lock: a live→terminal transition keeps the item's existing location (area,
+        // parent, compartment) — location ops in the same patch are ignored. An item that is
+        // ALREADY terminal applies location edits normally (the escape hatch for moving leftovers).
+        var transitioningToTerminal = !item.Status.IsTerminal() && model.Status.IsTerminal();
+        var targetAreaId = transitioningToTerminal ? item.AreaId : model.AreaId;
+        var targetParentId = transitioningToTerminal ? item.ParentItemId : model.ParentItemId;
+        var targetCompartment = transitioningToTerminal ? item.Compartment : model.Compartment;
+
+        // At most one location: an item sits in an area, in a container, or nowhere.
+        if (targetAreaId is not null && targetParentId is not null)
+            throw new BusinessRuleException("An item can be in an area or a container, not both.");
+
         if (targetAreaId is { } areaId && areaId != item.AreaId)
         {
             var areaExists = await db.Areas.AnyAsync(a => a.Id == areaId, ct);
             if (!areaExists)
                 throw new BusinessRuleException("AreaId must reference an existing area.");
         }
+
+        if (targetParentId is { } newParentId && newParentId != item.ParentItemId)
+        {
+            // Typing: a parent must be a non-fungible container.
+            var parent = await db.Items.AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == newParentId, ct);
+            if (parent is null)
+                throw new BusinessRuleException("ParentItemId must reference an existing item.");
+            if (parent.Fungibility != Fungibility.NonFungible || !parent.IsContainer)
+                throw new BusinessRuleException("ParentItemId must reference a container item.");
+
+            // Cycle: an item cannot be placed inside itself or inside any of its own descendants.
+            if (newParentId == item.Id)
+                throw new BusinessRuleException("An item cannot be placed inside itself.");
+
+            var containerLinks = await db.Items.AsNoTracking()
+                .Where(i => i.IsContainer)
+                .Select(i => new { i.Id, i.ParentItemId })
+                .ToDictionaryAsync(i => i.Id, i => i.ParentItemId, ct);
+
+            var visited = new HashSet<Guid>();
+            var cursor = parent.ParentItemId;
+            while (cursor is { } ancestorId)
+            {
+                if (ancestorId == item.Id)
+                    throw new BusinessRuleException("An item cannot be placed inside one of its own descendants.");
+                if (!visited.Add(ancestorId) || !containerLinks.TryGetValue(ancestorId, out var next))
+                    break;
+                cursor = next;
+            }
+        }
+
+        // Children gates — one query, only when a relevant change is requested.
+        var roleOff = item.IsContainer && !model.IsContainer;
+        var sealingContainer = transitioningToTerminal && item.IsContainer;
+        if (roleOff || sealingContainer)
+        {
+            var childStatuses = await db.Items.AsNoTracking()
+                .Where(i => i.ParentItemId == item.Id)
+                .Select(i => i.Status)
+                .ToListAsync(ct);
+
+            // Role-off (Rule B): blocked while ANY child references the item — live or terminal.
+            // (Stock entries join this gate when the stock model lands.)
+            if (roleOff && childStatuses.Count > 0)
+                throw new BusinessRuleException(
+                    "Cannot turn off the container role while the item still has contents (including inactive records). Empty it first.");
+
+            // Taking a container terminal: only LIVE children block; terminal leftovers don't, so
+            // the flag stays on and the parent-is-container invariant is preserved.
+            if (sealingContainer && childStatuses.Any(s => !s.IsTerminal()))
+                throw new BusinessRuleException(
+                    "Cannot mark a container Sold/Discarded/Archived while it has active contents.");
+        }
+
+        // Compartment is a sub-position within a container — silently cleared when there is no parent.
+        targetCompartment = targetParentId is null ? null : Normalize(targetCompartment);
 
         item.Name = model.Name.Trim();
         item.Notes = Normalize(model.Notes);
@@ -101,16 +175,21 @@ public class PatchItemHandler(
         item.Status = model.Status;
         item.LentTo = lentTo;
         item.AreaId = targetAreaId;
+        item.ParentItemId = targetParentId;
+        item.IsContainer = model.IsContainer;
+        item.Compartment = targetCompartment;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByUserId = currentUser.UserId;
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        return await db.Items
+        var response = await db.Items
             .AsNoTracking()
             .Where(i => i.Id == item.Id)
             .Select(ItemResponseMapper.Projection)
             .FirstAsync(ct);
+
+        return await locationResolver.EnrichAsync(response, ct);
     }
 
     private static string? Normalize(string? value) =>

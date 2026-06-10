@@ -126,13 +126,22 @@ An item's `Status` records the state of the physical object. Non-fungible items 
 
 **Lent** additionally carries a free-text `LentTo` ("Dave next door") — there is no contacts graph in v1. Lending is a status, not a move: a lent item keeps its location (you still know where it normally lives), and lending a *container* does not cascade any status onto its contents — the contents' effective state is derived at read time, not written. (Pack a bag, lend the bag; the items inside are "with the bag," not individually re-statused.)
 
-**Terminal statuses keep their last location.** A `Sold` or `Discarded` item retains the `AreaId`/`ParentItemId` it had, so "where did I last keep the camera I sold?" stays answerable. This is why location is *at most one*, not *exactly one* — a terminal item is free to keep a real location or to have been Unplaced; both are valid.
+**Terminal statuses keep their last location by default.** A `Sold` or `Discarded` item retains the `AreaId`/`ParentItemId` it had, so "where did I last keep the camera I sold?" stays answerable. This is why location is *at most one*, not *exactly one* — a terminal item is free to keep a real location or to have been Unplaced; both are valid. The location is *kept*, not *frozen*: a terminal item's location remains editable afterwards (see the escape hatch below), so a leftover record can still be moved out of a container you want to empty.
 
 **Hidden-by-default, revealed by a toggle.** Terminal items drop out of default lists and out of a container's default contents view, and a single "Show inactive (N)" filter brings them back — the same affordance Finances uses for archived accounts, not a global query filter. (A global hidden-row filter would also be wrong here for a concrete technical reason: it would sever the parent chain when resolving an item that sits inside an archived or sold container, breaking the walk.)
 
 ### Container emptiness and terminal status
 
-A container can be taken terminal (`Sold`/`Discarded`/`Archived`) or have its container role switched off **only when it is empty of *live* contents** — no `Active`/`Lent`/`InRepair` children and no stock entries. Terminal children (an already-sold thing that was in the box) do **not** block this and are not shown in the default contents view, so they cannot strand the parent. "Empty" therefore means "no live contents," not "no rows ever referenced it."
+Two operations on a container guard against stranding its contents, and they guard differently:
+
+- **Taking the container terminal** (`Sold`/`Discarded`/`Archived`) is blocked **only by *live* contents** — `Active`/`Lent`/`InRepair` children and any stock entries. Terminal children (an already-sold thing that was in the box) do **not** block it: they are hidden from the default contents view and so cannot strand the parent, and the container's role **stays on** when it goes terminal, preserving the parent-is-container invariant for those leftovers.
+- **Switching the container role off** (`IsContainer` → false) is stricter: it is blocked while **any** child item — live *or* terminal — still points at the container (and, later, any stock entry). This is the conservative rule, because turning off the role removes the container concept entirely, and a dangling `ParentItemId` on a sold record would have nothing valid to reference. Empty it first.
+
+The asymmetry is deliberate. A terminal container is still a container (its role is intact), so a terminal leftover inside it remains coherent. A role-off erases the container, so nothing may still be pointing in.
+
+**The escape hatch — terminal records stay movable.** Keeping the role-off rule strict would otherwise dead-end: a container holding only sold/discarded leftovers could never have its role turned off, because those leftovers block it and a terminal item's location looks frozen. It is not frozen. The location lock applies **only to the live→terminal transition patch itself** (so a "sell and move" in one step keeps the item where it was); an **already-terminal** item's `AreaId`/`ParentItemId`/`Compartment` are freely editable afterwards. So the path to emptying such a container is: move each leftover record out (to an area or to Unplaced), then switch the role off.
+
+*Future work:* a one-click "release N inactive records" action could unplace all terminal children of a container in a single step, so a user does not have to move each leftover by hand before turning the role off. Not built in this slice — the per-record escape hatch above is the supported path today.
 
 ### Delete vs archive
 

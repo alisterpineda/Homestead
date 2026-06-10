@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, computed } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2 } from '@ng-icons/lucide';
+import { lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2, lucidePackageOpen } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -11,7 +11,7 @@ import type { ItemResponse } from '@/api/generated/models/item-response';
   selector: 'app-item-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
-  providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2 })],
+  providers: [provideIcons({ lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2, lucidePackageOpen })],
   template: `
     <button
       hlmBtn
@@ -31,6 +31,12 @@ import type { ItemResponse } from '@/api/generated/models/item-response';
             <ng-icon hlm name="lucidePencil" size="sm" />
             Edit
           </button>
+          @if (item().isContainer) {
+            <button hlmDropdownMenuItem (triggered)="viewContents.emit(item())">
+              <ng-icon hlm name="lucidePackageOpen" size="sm" />
+              View contents
+            </button>
+          }
           <button hlmDropdownMenuItem (triggered)="archiveRestore.emit(item())">
             <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
             {{ terminal() ? 'Restore' : 'Archive' }}
@@ -52,6 +58,7 @@ import type { ItemResponse } from '@/api/generated/models/item-response';
 export class ItemRowActionsComponent {
   item = input.required<ItemResponse>();
   edit = output<ItemResponse>();
+  viewContents = output<ItemResponse>();
   archiveRestore = output<ItemResponse>();
   delete = output<ItemResponse>();
 

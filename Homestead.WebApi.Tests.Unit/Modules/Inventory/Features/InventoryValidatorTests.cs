@@ -102,4 +102,47 @@ public class CreateItemCommandValidatorTests
             new CreateItemCommand { Name = "Drill", Value = 100m, ValueCurrencyId = Guid.NewGuid() }, Ct);
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public async Task AreaAndParentBothSet_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemCommand { Name = "Drill", AreaId = Guid.NewGuid(), ParentItemId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "ParentItemId");
+    }
+
+    [Fact]
+    public async Task CompartmentWithoutParent_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemCommand { Name = "Drill", Compartment = "Top drawer" }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Compartment");
+    }
+
+    [Fact]
+    public async Task CompartmentOver256_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemCommand { Name = "Drill", ParentItemId = Guid.NewGuid(), Compartment = new string('a', 257) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Compartment");
+    }
+
+    [Fact]
+    public async Task ParentWithCompartment_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemCommand { Name = "Drill", ParentItemId = Guid.NewGuid(), Compartment = "Top drawer" }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task IsContainerAlone_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateItemCommand { Name = "Tool chest", IsContainer = true }, Ct);
+        Assert.True(result.IsValid);
+    }
 }

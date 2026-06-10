@@ -13,8 +13,9 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
-import { AreaPickerComponent } from '../../shared/area-picker/area-picker.component';
+import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { tomorrowIso } from '../../shared/date';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -22,7 +23,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 @Component({
   selector: 'app-create-item-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, AreaPickerComponent],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports, LocationPickerComponent],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
@@ -52,13 +53,36 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label hlmLabel>Area</label>
-            <app-area-picker
-              [value]="areaId()"
-              (valueChange)="areaId.set($event)"
-              ariaLabel="Area"
+            <label hlmLabel>Location</label>
+            <app-location-picker
+              [value]="locationValue()"
+              (valueChange)="onLocationChange($event)"
+              ariaLabel="Location"
             />
           </div>
+
+          @if (parentItemId() !== null) {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel for="create-item-compartment">Compartment (optional)</label>
+              <input
+                hlmInput
+                id="create-item-compartment"
+                maxlength="256"
+                placeholder="e.g. Top drawer"
+                [value]="compartment()"
+                (input)="compartment.set(asValue($event))"
+              />
+            </div>
+          }
+
+          <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
+            <hlm-checkbox
+              [checked]="isContainer()"
+              (checkedChange)="isContainer.set($event === true)"
+              [aria-label]="'This item is a container'"
+            />
+            <span>This item is a container</span>
+          </label>
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="create-item-serial">Serial (optional)</label>
@@ -117,6 +141,9 @@ export class CreateItemDialogComponent {
 
   name = signal('');
   areaId = signal<string | null>(null);
+  parentItemId = signal<string | null>(null);
+  isContainer = signal(false);
+  compartment = signal('');
   serial = signal('');
   acquiredOn = signal('');
   notes = signal('');
@@ -131,6 +158,32 @@ export class CreateItemDialogComponent {
 
   canSubmit = computed(() => this.name().trim().length > 0);
 
+  /** The location pair as a single discriminated value for the picker. */
+  locationValue = computed<ItemLocationValue>(() => {
+    const parentId = this.parentItemId();
+    if (parentId) return { kind: 'container', id: parentId };
+    const areaId = this.areaId();
+    if (areaId) return { kind: 'area', id: areaId };
+    return { kind: 'unplaced' };
+  });
+
+  onLocationChange(value: ItemLocationValue): void {
+    switch (value.kind) {
+      case 'unplaced':
+        this.areaId.set(null);
+        this.parentItemId.set(null);
+        break;
+      case 'area':
+        this.areaId.set(value.id);
+        this.parentItemId.set(null);
+        break;
+      case 'container':
+        this.parentItemId.set(value.id);
+        this.areaId.set(null);
+        break;
+    }
+  }
+
   asValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
@@ -139,6 +192,9 @@ export class CreateItemDialogComponent {
     if (state === 'open') {
       this.name.set('');
       this.areaId.set(null);
+      this.parentItemId.set(null);
+      this.isContainer.set(false);
+      this.compartment.set('');
       this.serial.set('');
       this.acquiredOn.set('');
       this.notes.set('');
@@ -154,10 +210,15 @@ export class CreateItemDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
+    const parentItemId = this.parentItemId();
     this.itemApi.createItem({
       body: {
         name: this.name().trim(),
         areaId: this.areaId(),
+        parentItemId,
+        isContainer: this.isContainer(),
+        // Compartment is only valid inside a container; the server rejects it otherwise.
+        compartment: parentItemId && this.compartment().trim() ? this.compartment().trim() : null,
         serial: this.serial().trim() ? this.serial().trim() : null,
         acquiredOn: this.acquiredOn() ? this.acquiredOn() : null,
         notes: this.notes().trim() ? this.notes().trim() : null,

@@ -21,6 +21,7 @@ function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
     fungibility: 'NonFungible',
     status: 'Active',
     isContainer: false,
+    path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -73,6 +74,63 @@ describe('EditItemSheetComponent', () => {
       expect(component.editValue()).toBe('');
       expect(component.editCurrencyId()).toBeNull();
       expect(component.editAreaId()).toBeNull();
+    });
+
+    it('seeds the container / parent / compartment fields from the item', () => {
+      open(makeItem({
+        parentItemId: 'chest', isContainer: true, compartment: 'Top drawer',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'chest', name: 'Tool chest', kind: 'Container' },
+        ],
+      }));
+      expect(component.editParentItemId()).toBe('chest');
+      expect(component.editIsContainer()).toBe(true);
+      expect(component.editCompartment()).toBe('Top drawer');
+    });
+  });
+
+  describe('containment buildOps', () => {
+    it('moves area→container by emitting the [/areaId:null, /parentItemId] pair', () => {
+      open(makeItem({ areaId: 'garage', areaName: 'Garage' }));
+      component['onLocationChange']({ kind: 'container', id: 'chest' });
+      expect(ops()).toEqual([
+        { op: 'replace', path: '/areaId', value: null },
+        { op: 'replace', path: '/parentItemId', value: 'chest' },
+      ]);
+    });
+
+    it('moves container→area by emitting the [/areaId, /parentItemId:null] pair', () => {
+      open(makeItem({ parentItemId: 'chest' }));
+      component['onLocationChange']({ kind: 'area', id: 'garage' });
+      expect(ops()).toEqual([
+        { op: 'replace', path: '/areaId', value: 'garage' },
+        { op: 'replace', path: '/parentItemId', value: null },
+      ]);
+    });
+
+    it('unplaces from a container by emitting only /parentItemId:null', () => {
+      open(makeItem({ parentItemId: 'chest', compartment: 'Top drawer' }));
+      component['onLocationChange']({ kind: 'unplaced' });
+      expect(ops()).toEqual([{ op: 'replace', path: '/parentItemId', value: null }]);
+    });
+
+    it('emits a /compartment op only while in a container', () => {
+      open(makeItem({ parentItemId: 'chest', compartment: 'Top drawer' }));
+      component.editCompartment.set('Bottom shelf');
+      expect(ops()).toEqual([{ op: 'replace', path: '/compartment', value: 'Bottom shelf' }]);
+    });
+
+    it('suppresses the /compartment op when the item is not in a container', () => {
+      open(makeItem({ areaId: 'garage' }));
+      component.editCompartment.set('orphan note');
+      expect(ops()).toEqual([]);
+    });
+
+    it('emits an /isContainer op when the role toggles', () => {
+      open(makeItem({ isContainer: false }));
+      component.editIsContainer.set(true);
+      expect(ops()).toEqual([{ op: 'replace', path: '/isContainer', value: true }]);
     });
   });
 

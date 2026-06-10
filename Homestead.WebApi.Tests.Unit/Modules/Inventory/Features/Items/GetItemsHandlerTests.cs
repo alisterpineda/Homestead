@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItems;
+using Homestead.WebApi.Modules.Inventory.Services;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features.Items;
 
@@ -17,7 +18,7 @@ public class GetItemsHandlerTests : IAsyncLifetime
         _office = new Area { Id = Guid.NewGuid(), Name = "Office" };
         _db.Areas.AddRange(_garage, _office);
         await _db.SaveChangesAsync();
-        _sut = new GetItemsHandler(_db);
+        _sut = new GetItemsHandler(_db, new ItemLocationResolver(_db));
     }
 
     public ValueTask DisposeAsync()
@@ -28,7 +29,9 @@ public class GetItemsHandlerTests : IAsyncLifetime
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private async Task<Item> AddItemAsync(string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null)
+    private async Task<Item> AddItemAsync(
+        string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
+        Guid? parentItemId = null, bool isContainer = false)
     {
         var item = new Item
         {
@@ -37,6 +40,8 @@ public class GetItemsHandlerTests : IAsyncLifetime
             Fungibility = Fungibility.NonFungible,
             Status = status,
             AreaId = areaId,
+            ParentItemId = parentItemId,
+            IsContainer = isContainer,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(Ct);
@@ -104,5 +109,35 @@ public class GetItemsHandlerTests : IAsyncLifetime
 
         Assert.Single(resp.Items);
         Assert.Equal("Cordless drill", resp.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByParentItemId_ReturnsDirectChildrenOnly()
+    {
+        var chest = await AddItemAsync("Tool chest", areaId: _garage.Id, isContainer: true);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        await AddItemAsync("Wrench", parentItemId: chest.Id); // direct child
+        await AddItemAsync("Screw driver", parentItemId: bin.Id); // grandchild
+
+        var resp = await _sut.Handle(
+            new GetItemsQuery { Page = 1, PageSize = 50, ParentItemId = chest.Id }, Ct);
+
+        Assert.Equal(2, resp.Items.Count); // bin + wrench, not the grandchild
+        Assert.Contains(resp.Items, i => i.Name == "Bin");
+        Assert.Contains(resp.Items, i => i.Name == "Wrench");
+        Assert.DoesNotContain(resp.Items, i => i.Name == "Screw driver");
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByIsContainer()
+    {
+        await AddItemAsync("Tool chest", areaId: _garage.Id, isContainer: true);
+        await AddItemAsync("Wrench", areaId: _garage.Id);
+
+        var resp = await _sut.Handle(
+            new GetItemsQuery { Page = 1, PageSize = 50, IsContainer = true }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal("Tool chest", resp.Items[0].Name);
     }
 }

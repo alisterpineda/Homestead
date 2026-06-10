@@ -8,6 +8,9 @@ import {
   LOCALE_ID,
 } from '@angular/core';
 import { formatDate } from '@angular/common';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideBox } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
@@ -31,10 +34,45 @@ export interface ItemSortState {
   readonly desc: boolean;
 }
 
+/**
+ * Flattens an item's resolved location path to display/sort text ("Garage › Cupboard › Bin"). A
+ * directly-unplaced item, or one whose chain resolves to Unplaced, is prefixed with "Unplaced".
+ */
+export function formatPath(item: ItemResponse): string {
+  const names = (item.path ?? []).map(s => s.name);
+  if (names.length === 0) return 'Unplaced';
+  return (item.resolvedAreaId == null ? ['Unplaced', ...names] : names).join(' › ');
+}
+
 interface ItemTableMeta {
   onEdit: (item: ItemResponse) => void;
+  onViewContents: (item: ItemResponse) => void;
   onArchiveRestore: (item: ItemResponse) => void;
   onDelete: (item: ItemResponse) => void;
+}
+
+@Component({
+  selector: 'app-item-name-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({ lucideBox })],
+  template: `
+    <div class="flex min-w-0 items-center gap-2">
+      @if (item.isContainer) {
+        <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+      }
+      <div class="min-w-0">
+        <span class="block truncate text-sm font-medium">{{ item.name }}</span>
+        @if (item.serial) {
+          <span class="block truncate text-xs text-muted-foreground">{{ item.serial }}</span>
+        }
+      </div>
+    </div>
+  `,
+})
+export class ItemNameCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<ItemResponse, unknown>>();
+  protected get item(): ItemResponse { return this.ctx.row.original; }
 }
 
 @Component({
@@ -70,6 +108,7 @@ export class ItemDateCell {
     <app-item-row-actions
       [item]="item"
       (edit)="onEdit($event)"
+      (viewContents)="onViewContents($event)"
       (archiveRestore)="onArchiveRestore($event)"
       (delete)="onDelete($event)"
     />
@@ -80,6 +119,7 @@ export class ItemActionsCell {
   private get meta(): ItemTableMeta { return this.ctx.table.options.meta as ItemTableMeta; }
   protected get item(): ItemResponse { return this.ctx.row.original; }
   protected onEdit(i: ItemResponse): void { this.meta.onEdit(i); }
+  protected onViewContents(i: ItemResponse): void { this.meta.onViewContents(i); }
   protected onArchiveRestore(i: ItemResponse): void { this.meta.onArchiveRestore(i); }
   protected onDelete(i: ItemResponse): void { this.meta.onDelete(i); }
 }
@@ -132,12 +172,14 @@ export class ItemTableComponent {
   sortState = input<ItemSortState>({ id: 'name', desc: false });
 
   edit = output<ItemResponse>();
+  viewContents = output<ItemResponse>();
   archiveRestore = output<ItemResponse>();
   delete = output<ItemResponse>();
   sortChange = output<ItemSortState>();
 
   private readonly _meta: ItemTableMeta = {
     onEdit: (i) => this.edit.emit(i),
+    onViewContents: (i) => this.viewContents.emit(i),
     onArchiveRestore: (i) => this.archiveRestore.emit(i),
     onDelete: (i) => this.delete.emit(i),
   };
@@ -147,14 +189,7 @@ export class ItemTableComponent {
       accessorKey: 'name',
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
-      cell: (info) => {
-        const item = info.row.original;
-        const name = `<span class="text-sm font-medium">${escapeHtml(item.name)}</span>`;
-        const serial = item.serial
-          ? `<span class="block truncate text-xs text-muted-foreground">${escapeHtml(item.serial)}</span>`
-          : '';
-        return `<div class="min-w-0">${name}${serial}</div>`;
-      },
+      cell: () => flexRenderComponent(ItemNameCell),
     },
     {
       id: 'status',
@@ -164,13 +199,21 @@ export class ItemTableComponent {
     },
     {
       id: 'location',
-      accessorFn: (row) => row.areaName ?? '',
+      accessorFn: (row) => formatPath(row),
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Location' } }),
       cell: (info) => {
-        const name = info.row.original.areaName;
-        return name
-          ? `<span class="text-sm">${escapeHtml(name)}</span>`
-          : '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
+        const item = info.row.original;
+        const path = item.path ?? [];
+        if (path.length === 0) {
+          return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
+        }
+        const names = path.map(s => escapeHtml(s.name)).join(' › ');
+        // A chain rooted at an unplaced container has no area segment — flag that visually.
+        const prefix = item.resolvedAreaId == null
+          ? '<span class="italic text-muted-foreground">Unplaced</span> › '
+          : '';
+        const title = escapeHtml(formatPath(item));
+        return `<span class="block truncate text-sm" title="${title}">${prefix}${names}</span>`;
       },
     },
     {

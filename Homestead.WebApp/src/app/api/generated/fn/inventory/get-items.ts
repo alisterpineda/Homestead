@@ -11,6 +11,8 @@ import { PaginatedResponseOfItemResponse } from '../../models/paginated-response
 
 export interface GetItems$Params {
   AreaId?: string;
+  ParentItemId?: string;
+  IsContainer?: boolean;
   Unplaced?: boolean;
   IncludeInactive?: boolean;
   Search?: string;
@@ -22,6 +24,8 @@ export function getItems(http: HttpClient, rootUrl: string, params: GetItems$Par
   const rb = new RequestBuilder(rootUrl, getItems.PATH, 'get');
   if (params) {
     rb.query('AreaId', params.AreaId, {});
+    rb.query('ParentItemId', params.ParentItemId, {});
+    rb.query('IsContainer', params.IsContainer, {});
     rb.query('Unplaced', params.Unplaced, {});
     rb.query('IncludeInactive', params.IncludeInactive, {});
     rb.query('Search', params.Search, {});

@@ -6,7 +6,9 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Items.PatchItem;
 
 /// <summary>
 /// Patchable fields of a non-fungible item. Moving and unplacing are expressed as
-/// <c>replace('/areaId', guid-or-null)</c> — there is no dedicated move endpoint in v1.
+/// <c>replace('/areaId', guid-or-null)</c> or <c>replace('/parentItemId', guid-or-null)</c> — a
+/// cross-kind move naturally emits the op pair, and the server enforces at-most-one location.
+/// There is no dedicated move endpoint in v1.
 /// </summary>
 public class PatchItemModel
 {
@@ -19,6 +21,9 @@ public class PatchItemModel
     public ItemStatus Status { get; set; }
     public string? LentTo { get; set; }
     public Guid? AreaId { get; set; }
+    public Guid? ParentItemId { get; set; }
+    public bool IsContainer { get; set; }
+    public string? Compartment { get; set; }
 }
 
 public record PatchItemCommand : ICommand<ItemResponse>

@@ -1,7 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { ItemTableComponent, type ItemSortState } from './item-table.component';
+import { ItemTableComponent, formatPath, type ItemSortState } from './item-table.component';
 import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { ItemStatus } from '@/api/generated/models/item-status';
 
 function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
   return {
@@ -10,6 +9,7 @@ function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
     fungibility: 'NonFungible',
     status: 'Active',
     isContainer: false,
+    path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -41,25 +41,72 @@ describe('ItemTableComponent', () => {
     expect(ids).toEqual(['name', 'status', 'location', 'acquiredOn', 'updatedAt', 'actions']);
   });
 
-  it('renders the area name in the location cell', () => {
-    const col = component['_columns']().find(c => c.id === 'location')!;
-    const html = renderCell(col.cell, makeItem({ areaName: 'Garage' }));
-    expect(html).toContain('Garage');
-    expect(html).not.toContain('Unplaced');
+  describe('location cell', () => {
+    const col = () => component['_columns']().find(c => c.id === 'location')!;
+
+    it('renders the resolved path joined with ›', () => {
+      const item = makeItem({
+        resolvedAreaId: 'garage',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'cupboard', name: 'Cupboard', kind: 'Container' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      });
+      const html = renderCell(col().cell, item);
+      expect(html).toContain('Garage › Cupboard › Bin');
+      expect(html).toContain('title="Garage › Cupboard › Bin"');
+    });
+
+    it('prepends an italic Unplaced for a chain that resolves to Unplaced', () => {
+      const item = makeItem({
+        resolvedAreaId: null,
+        path: [
+          { id: 'cupboard', name: 'Cupboard', kind: 'Container' },
+          { id: 'bin', name: 'Bin', kind: 'Container' },
+        ],
+      });
+      const html = renderCell(col().cell, item);
+      expect(html).toContain('Unplaced');
+      expect(html).toContain('italic');
+      expect(html).toContain('Cupboard › Bin');
+    });
+
+    it('renders an italic Unplaced label when the item is directly unplaced', () => {
+      const html = renderCell(col().cell, makeItem({ path: [] }));
+      expect(html).toContain('Unplaced');
+      expect(html).toContain('italic');
+    });
   });
 
-  it('renders an italic Unplaced label when the item has no area', () => {
-    const col = component['_columns']().find(c => c.id === 'location')!;
-    const html = renderCell(col.cell, makeItem({ areaName: null }));
-    expect(html).toContain('Unplaced');
-    expect(html).toContain('italic');
+  describe('formatPath', () => {
+    it('joins names and prefixes Unplaced for an unplaced-rooted chain', () => {
+      expect(formatPath(makeItem({ path: [] }))).toBe('Unplaced');
+      expect(formatPath(makeItem({
+        resolvedAreaId: 'g', path: [{ id: 'g', name: 'Garage', kind: 'Area' }],
+      }))).toBe('Garage');
+      expect(formatPath(makeItem({
+        resolvedAreaId: null, path: [{ id: 'c', name: 'Cupboard', kind: 'Container' }],
+      }))).toBe('Unplaced › Cupboard');
+    });
   });
 
-  it('renders the serial as a subtitle in the name cell', () => {
-    const col = component['_columns']().find(c => c.id === 'name')!;
-    const html = renderCell(col.cell, makeItem({ name: 'Camera', serial: 'SN-9' }));
-    expect(html).toContain('Camera');
-    expect(html).toContain('SN-9');
+  describe('name cell (DOM render)', () => {
+    it('renders the name, serial subtitle, and a container icon for container rows', () => {
+      fixture.componentRef.setInput('items', [makeItem({ name: 'Camera', serial: 'SN-9', isContainer: true })]);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.textContent).toContain('Camera');
+      expect(host.textContent).toContain('SN-9');
+      expect(host.querySelector('app-item-name-cell ng-icon')).toBeTruthy();
+    });
+
+    it('omits the container icon for non-container rows', () => {
+      fixture.componentRef.setInput('items', [makeItem({ isContainer: false })]);
+      fixture.detectChanges();
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('app-item-name-cell ng-icon')).toBeNull();
+    });
   });
 
   it('marks terminal-status rows as muted/italic', () => {
@@ -82,18 +129,22 @@ describe('ItemTableComponent', () => {
   it('emits row-action outputs through the table meta', () => {
     const item = makeItem();
     let edited: ItemResponse | undefined;
+    let viewed: ItemResponse | undefined;
     let archived: ItemResponse | undefined;
     let deleted: ItemResponse | undefined;
     component.edit.subscribe(v => (edited = v));
+    component.viewContents.subscribe(v => (viewed = v));
     component.archiveRestore.subscribe(v => (archived = v));
     component.delete.subscribe(v => (deleted = v));
 
     const meta = component['_meta'];
     meta.onEdit(item);
+    meta.onViewContents(item);
     meta.onArchiveRestore(item);
     meta.onDelete(item);
 
     expect(edited).toBe(item);
+    expect(viewed).toBe(item);
     expect(archived).toBe(item);
     expect(deleted).toBe(item);
   });

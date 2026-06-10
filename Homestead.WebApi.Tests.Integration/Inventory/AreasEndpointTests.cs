@@ -9,7 +9,11 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 internal record AreaItem(Guid Id, string Name, int LiveItemCount, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 internal record ItemItem(
     Guid Id, string Name, string Fungibility, string Status,
-    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool IsContainer);
+    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool IsContainer,
+    Guid? ParentItemId, string? Compartment, Guid? ResolvedAreaId,
+    IReadOnlyList<LocationSegmentItem>? Path);
+// Enum serializes as a string server-side, so Kind is "Area" | "Container".
+internal record LocationSegmentItem(Guid Id, string Name, string Kind);
 
 [Collection("Integration")]
 public class AreasEndpointTests : IntegrationTestBase

@@ -3,6 +3,7 @@
 
 import { Fungibility } from '../models/fungibility';
 import { ItemStatus } from '../models/item-status';
+import { LocationSegmentResponse } from '../models/location-segment-response';
 export interface ItemResponse {
   acquiredOn?: (string | null);
   areaId?: (string | null);
@@ -16,6 +17,8 @@ export interface ItemResponse {
   name: string;
   notes?: (string | null);
   parentItemId?: (string | null);
+  path?: Array<LocationSegmentResponse>;
+  resolvedAreaId?: (string | null);
   restockThreshold?: (number | null);
   serial?: (string | null);
   status: ItemStatus;

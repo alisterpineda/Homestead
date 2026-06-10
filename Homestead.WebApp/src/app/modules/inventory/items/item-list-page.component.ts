@@ -6,7 +6,7 @@ import {
   computed,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, of, catchError, firstValueFrom } from 'rxjs';
+import { switchMap, map, of, catchError, firstValueFrom, forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePlus,
@@ -16,6 +16,8 @@ import {
   lucideArrowUp,
   lucideArrowDown,
   lucideCheck,
+  lucideChevronRight,
+  lucideX,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -29,7 +31,7 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { ItemTableComponent, type ItemSortId, type ItemSortState } from './item-table.component';
+import { ItemTableComponent, formatPath, type ItemSortId, type ItemSortState } from './item-table.component';
 import { CreateItemDialogComponent } from './create-item-dialog/create-item-dialog.component';
 import { EditItemSheetComponent } from './edit-item-sheet/edit-item-sheet.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
@@ -37,6 +39,7 @@ import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { ItemResponse } from '@/api/generated/models/item-response';
+import type { LocationSegmentKind } from '@/api/generated/models/location-segment-kind';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -49,6 +52,14 @@ interface ItemSortFieldOption {
 
 /** 'all' | 'unplaced' | an area id. */
 type AreaFilter = string;
+
+/** Server-fetched payload for a container drill-down: the container itself plus its direct children. */
+interface DrillData {
+  container: ItemResponse | null;
+  children: ItemResponse[];
+}
+
+const EMPTY_DRILL: DrillData = { container: null, children: [] };
 
 function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, b: T) => number): number {
   if (av === bv) return 0;
@@ -84,6 +95,8 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     lucideArrowUp,
     lucideArrowDown,
     lucideCheck,
+    lucideChevronRight,
+    lucideX,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -134,7 +147,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
                   <div class="flex items-center justify-between px-3 py-2">
                     <span class="text-sm font-medium">Filters</span>
-                    @if (showInactive() || areaFilter() !== 'all') {
+                    @if (showInactive() || areaFilter() !== 'all' || containerFilter()) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -161,27 +174,27 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                     <button
                       type="button"
                       class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                      (click)="areaFilter.set('all')"
+                      (click)="selectAreaFilter('all')"
                     >
                       <span>All areas</span>
-                      @if (areaFilter() === 'all') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                      @if (areaFilter() === 'all' && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                     </button>
                     <button
                       type="button"
                       class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                      (click)="areaFilter.set('unplaced')"
+                      (click)="selectAreaFilter('unplaced')"
                     >
                       <span class="italic text-muted-foreground">Unplaced</span>
-                      @if (areaFilter() === 'unplaced') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                      @if (areaFilter() === 'unplaced' && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                     </button>
                     @for (area of areas(); track area.id) {
                       <button
                         type="button"
                         class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                        (click)="areaFilter.set(area.id)"
+                        (click)="selectAreaFilter(area.id)"
                       >
                         <span class="truncate">{{ area.name }}</span>
-                        @if (areaFilter() === area.id) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                        @if (areaFilter() === area.id && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                       </button>
                     }
                   </div>
@@ -228,7 +241,40 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
             </app-create-item-dialog>
           </div>
 
-          @if (sortedVisibleItems().length === 0) {
+          @if (containerFilter()) {
+            <div class="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+              @for (seg of breadcrumb(); track seg.id; let last = $last) {
+                @if (last) {
+                  <span class="font-medium text-foreground">{{ seg.name }}</span>
+                } @else {
+                  <button
+                    type="button"
+                    class="hover:text-foreground hover:underline"
+                    (click)="onBreadcrumbSegment(seg)"
+                  >{{ seg.name }}</button>
+                  <ng-icon hlm name="lucideChevronRight" size="xs" class="shrink-0" />
+                }
+              } @empty {
+                <span class="italic">Container contents</span>
+              }
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="ml-1 size-6"
+                aria-label="Exit container view"
+                (click)="clearContainerFilter()"
+              >
+                <ng-icon hlm name="lucideX" size="sm" />
+              </button>
+            </div>
+          }
+
+          @if (drillLoading() && sortedVisibleItems().length === 0) {
+            <div class="flex justify-center py-16">
+              <hlm-spinner />
+            </div>
+          } @else if (sortedVisibleItems().length === 0) {
             <div hlmEmpty>
               <div hlmEmptyHeader>
                 <div hlmEmptyMedia variant="icon">
@@ -244,6 +290,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
               [sortState]="sortState()"
               (sortChange)="sortState.set($event)"
               (edit)="onEdit($event)"
+              (viewContents)="onViewContents($event)"
               (archiveRestore)="onArchiveRestore($event)"
               (delete)="onDeleteRequest($event)"
             />
@@ -298,8 +345,11 @@ export class ItemListPageComponent {
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
+  drillLoading = signal(false);
   showInactive = signal(false);
   areaFilter = signal<AreaFilter>('all');
+  /** When set, the list is scoped to the direct children of this container (drill-down). */
+  containerFilter = signal<string | null>(null);
 
   sortState = signal<ItemSortState>({ id: 'name', desc: false });
 
@@ -346,20 +396,69 @@ export class ItemListPageComponent {
 
   allItems = computed(() => this.data() ?? []);
 
-  /** Items in the selected area scope, before the inactive (terminal) filter. */
-  private areaScoped = computed(() => {
+  // Drill-down is fetched server-side (the container by id + its direct children via the
+  // ParentItemId filter), so contents are complete rather than reconstructed from the capped
+  // all-items page. Re-runs on refresh and whenever the drilled container changes.
+  private drillKey = computed(() => ({ id: this.containerFilter(), tick: this.refreshTrigger() }));
+
+  private drillData = toSignal(
+    toObservable(this.drillKey).pipe(
+      switchMap(({ id }) => {
+        if (!id) {
+          this.drillLoading.set(false);
+          return of(EMPTY_DRILL);
+        }
+        this.drillLoading.set(true);
+        return forkJoin({
+          container: this.itemApi.getItem({ id }).pipe(catchError(() => of<ItemResponse | null>(null))),
+          children: this.itemApi
+            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true, ParentItemId: id })
+            .pipe(map(r => (r.items ?? []) as ItemResponse[]), catchError(() => of<ItemResponse[]>([]))),
+        }).pipe(
+          map(result => {
+            this.drillLoading.set(false);
+            return result;
+          }),
+          catchError(() => {
+            this.drillLoading.set(false);
+            return of(EMPTY_DRILL);
+          }),
+        );
+      }),
+    ),
+    { initialValue: EMPTY_DRILL },
+  );
+
+  /** The container the list is drilled into (server-fetched), or null when not drilled in. */
+  containerItem = computed(() => (this.containerFilter() ? this.drillData().container : null));
+
+  /** Items in the current scope, before the inactive (terminal) filter. */
+  private scopedItems = computed(() => {
+    // Drill-down wins: the container's direct children, fetched server-side (not capped by the
+    // all-items page).
+    if (this.containerFilter()) return this.drillData().children;
+
+    // Area filter uses RESOLVED area, so a nested item shows under the area it walks up to.
     const all = this.allItems();
     const af = this.areaFilter();
     if (af === 'all') return all;
-    if (af === 'unplaced') return all.filter(i => !i.areaId);
-    return all.filter(i => i.areaId === af);
+    if (af === 'unplaced') return all.filter(i => !i.resolvedAreaId);
+    return all.filter(i => i.resolvedAreaId === af);
   });
 
-  inactiveCount = computed(() => this.areaScoped().filter(i => isTerminalStatus(i.status)).length);
+  inactiveCount = computed(() => this.scopedItems().filter(i => isTerminalStatus(i.status)).length);
 
   visibleItems = computed(() => {
-    const scoped = this.areaScoped();
+    const scoped = this.scopedItems();
     return this.showInactive() ? scoped : scoped.filter(i => !isTerminalStatus(i.status));
+  });
+
+  /** Breadcrumb to the drilled-in container: its resolved path plus its own (current) name. */
+  breadcrumb = computed<{ id: string; name: string; kind: LocationSegmentKind }[]>(() => {
+    const container = this.containerItem();
+    if (!container) return [];
+    const path = (container.path ?? []).map(s => ({ id: s.id, name: s.name, kind: s.kind }));
+    return [...path, { id: container.id, name: container.name, kind: 'Container' as LocationSegmentKind }];
   });
 
   sortedVisibleItems = computed(() => {
@@ -373,7 +472,7 @@ export class ItemListPageComponent {
         case 'status':
           return itemStatusLabel(a.status).localeCompare(itemStatusLabel(b.status)) * dir;
         case 'location':
-          return (a.areaName ?? '').localeCompare(b.areaName ?? '') * dir;
+          return formatPath(a).localeCompare(formatPath(b)) * dir;
         case 'acquiredOn':
           return compareNullable(a.acquiredOn ?? null, b.acquiredOn ?? null, dir, (x, y) => (x < y ? -1 : 1));
         case 'updatedAt':
@@ -389,6 +488,7 @@ export class ItemListPageComponent {
     this.sortFields.find(f => f.id === this.sortState().id)?.label ?? 'Sort');
 
   filterLabel = computed(() => {
+    if (this.containerFilter()) return `In: ${this.containerItem()?.name ?? 'container'}`;
     const af = this.areaFilter();
     if (af === 'unplaced') return 'Filter: Unplaced';
     if (af !== 'all') {
@@ -398,9 +498,30 @@ export class ItemListPageComponent {
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
 
+  /** Picking an area drops any container drill-down (they are mutually exclusive scopes). */
+  selectAreaFilter(af: AreaFilter): void {
+    this.containerFilter.set(null);
+    this.areaFilter.set(af);
+  }
+
+  clearContainerFilter(): void {
+    this.containerFilter.set(null);
+    this.areaFilter.set('all');
+  }
+
+  onBreadcrumbSegment(seg: { id: string; kind: LocationSegmentKind }): void {
+    if (seg.kind === 'Area') {
+      this.containerFilter.set(null);
+      this.areaFilter.set(seg.id);
+    } else {
+      this.containerFilter.set(seg.id);
+    }
+  }
+
   resetFilters(): void {
     this.showInactive.set(false);
     this.areaFilter.set('all');
+    this.containerFilter.set(null);
   }
 
   onSortByChange(id: ItemSortId): void {
@@ -419,6 +540,10 @@ export class ItemListPageComponent {
   onEdit(item: ItemResponse): void {
     this.selectedItem.set(item);
     this.sheetState.set('open');
+  }
+
+  onViewContents(item: ItemResponse): void {
+    this.containerFilter.set(item.id);
   }
 
   onSheetSaved(_: ItemResponse): void {

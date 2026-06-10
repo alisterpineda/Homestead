@@ -4,8 +4,11 @@
 export interface CreateItemCommand {
   acquiredOn?: (string | null);
   areaId?: (string | null);
+  compartment?: (string | null);
+  isContainer?: boolean;
   name: string;
   notes?: (string | null);
+  parentItemId?: (string | null);
   serial?: (string | null);
   value?: (number | null);
   valueCurrencyId?: (string | null);

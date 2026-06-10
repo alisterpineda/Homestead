@@ -3,7 +3,9 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Features.Items;
 using Homestead.WebApi.Modules.Inventory.Features.Items.CreateItem;
+using Homestead.WebApi.Modules.Inventory.Services;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features.Items;
@@ -25,7 +27,23 @@ public class CreateItemHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateItemHandler(_db, _currentUser, _audit, _unitOfWork);
+        _sut = new CreateItemHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), _unitOfWork);
+    }
+
+    private async Task<Item> AddContainerAsync(Guid? areaId = null)
+    {
+        var container = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Tool chest",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Active,
+            IsContainer = true,
+            AreaId = areaId,
+        };
+        _db.Items.Add(container);
+        await _db.SaveChangesAsync(Ct);
+        return container;
     }
 
     public void Dispose() => _db.Dispose();
@@ -114,5 +132,62 @@ public class CreateItemHandlerTests : IDisposable
         Assert.Equal(1200m, result.Value);
         Assert.Equal(cad.Id, result.ValueCurrencyId);
         Assert.Equal("CAD", result.ValueCurrencySymbol);
+    }
+
+    [Fact]
+    public async Task Handle_WithIsContainer_CreatesContainer()
+    {
+        var result = await _sut.Handle(new CreateItemCommand { Name = "Tool chest", IsContainer = true }, Ct);
+
+        Assert.True(result.IsContainer);
+        Assert.True(_db.Items.Single().IsContainer);
+    }
+
+    [Fact]
+    public async Task Handle_InContainerWithCompartment_PlacesAndResolvesPath()
+    {
+        var area = new Area { Id = Guid.NewGuid(), Name = "Garage" };
+        _db.Areas.Add(area);
+        await _db.SaveChangesAsync(Ct);
+        var chest = await AddContainerAsync(areaId: area.Id);
+
+        var result = await _sut.Handle(
+            new CreateItemCommand { Name = "Wrench", ParentItemId = chest.Id, Compartment = "Top drawer" }, Ct);
+
+        Assert.Equal(chest.Id, result.ParentItemId);
+        Assert.Null(result.AreaId);
+        Assert.Equal("Top drawer", result.Compartment);
+        // Path resolves root→immediate-parent: Garage(Area) → Tool chest(Container).
+        Assert.Equal(area.Id, result.ResolvedAreaId);
+        Assert.Equal(2, result.Path.Count);
+        Assert.Equal(area.Id, result.Path[0].Id);
+        Assert.Equal(LocationSegmentKind.Area, result.Path[0].Kind);
+        Assert.Equal(chest.Id, result.Path[1].Id);
+        Assert.Equal(LocationSegmentKind.Container, result.Path[1].Kind);
+    }
+
+    [Fact]
+    public async Task Handle_WithMissingParent_Throws()
+    {
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new CreateItemCommand { Name = "Wrench", ParentItemId = Guid.NewGuid() }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_WithParentNotContainer_Throws()
+    {
+        var plain = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hammer",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Active,
+            IsContainer = false,
+        };
+        _db.Items.Add(plain);
+        await _db.SaveChangesAsync(Ct);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new CreateItemCommand { Name = "Wrench", ParentItemId = plain.Id }, Ct));
     }
 }

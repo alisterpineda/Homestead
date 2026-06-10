@@ -14,6 +14,20 @@ public class CreateItemCommandValidator : AbstractValidator<CreateItemCommand>
         RuleFor(x => x.Serial)
             .MaximumLength(128).WithMessage("Serial must be 128 characters or fewer.");
 
+        // At most one location: an item is created in an area, in a container, or nowhere.
+        RuleFor(x => x.ParentItemId)
+            .Null().WithMessage("An item can be created in an area or a container, not both.")
+            .When(x => x.AreaId.HasValue);
+
+        RuleFor(x => x.Compartment)
+            .MaximumLength(256).WithMessage("Compartment must be 256 characters or fewer.");
+
+        // Compartment is a sub-position within a container — it makes no sense without one.
+        // (Auto-clearing on unplace is a patch-only idiom; on create we hard-reject.)
+        RuleFor(x => x.Compartment)
+            .Null().WithMessage("Compartment can only be set when the item is in a container.")
+            .When(x => !x.ParentItemId.HasValue);
+
         RuleFor(x => x.AcquiredOn!.Value)
             .NotInFuture()
             .OverridePropertyName(nameof(CreateItemCommand.AcquiredOn))

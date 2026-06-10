@@ -14,12 +14,13 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { CurrencyPickerComponent } from '@/modules/finances/shared/currency-picker/currency-picker.component';
 import { commodityResource } from '@/modules/finances/shared/commodity-resource';
-import { AreaPickerComponent } from '../../shared/area-picker/area-picker.component';
-import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
+import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
+import { ALL_ITEM_STATUSES, itemStatusLabel, isTerminalStatus } from '../../shared/item-status-meta';
 import { tomorrowIso } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
@@ -42,8 +43,9 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
     HlmLabel,
     HlmInput,
     HlmSelectImports,
+    HlmCheckboxImports,
     CurrencyPickerComponent,
-    AreaPickerComponent,
+    LocationPickerComponent,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -124,13 +126,43 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 
             <div class="space-y-2">
               <label hlmLabel>Location</label>
-              <app-area-picker
-                [value]="editAreaId()"
-                (valueChange)="editAreaId.set($event)"
-                [selectedAreaName]="it.areaName ?? null"
-                ariaLabel="Area"
+              <app-location-picker
+                [value]="locationValue()"
+                (valueChange)="onLocationChange($event)"
+                [selectedLabel]="selectedLocationLabel()"
+                [excludeItemId]="it.id"
+                ariaLabel="Location"
               />
+              @if (terminalLocationHint()) {
+                <p class="text-xs text-muted-foreground">
+                  Location changes are ignored when marking an item Sold/Discarded/Archived.
+                </p>
+              }
             </div>
+
+            @if (editParentItemId() !== null) {
+              <div class="space-y-2">
+                <label hlmLabel for="item-compartment">Compartment</label>
+                <input
+                  hlmInput
+                  id="item-compartment"
+                  class="w-full"
+                  maxlength="256"
+                  placeholder="e.g. Top drawer"
+                  [value]="editCompartment()"
+                  (input)="editCompartment.set(asValue($event))"
+                />
+              </div>
+            }
+
+            <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
+              <hlm-checkbox
+                [checked]="editIsContainer()"
+                (checkedChange)="editIsContainer.set($event === true)"
+                [aria-label]="'This item is a container'"
+              />
+              <span>This item is a container</span>
+            </label>
 
             <div class="space-y-2">
               <label hlmLabel>Status</label>
@@ -213,6 +245,10 @@ export class EditItemSheetComponent {
     this.seedKey, () => this.openItem()?.valueCurrencyId ?? null);
   editAreaId = seededLinkedSignal<string, string | null>(
     this.seedKey, () => this.openItem()?.areaId ?? null);
+  editParentItemId = seededLinkedSignal<string, string | null>(
+    this.seedKey, () => this.openItem()?.parentItemId ?? null);
+  editCompartment = seededLinkedSignal(this.seedKey, () => this.openItem()?.compartment ?? '');
+  editIsContainer = seededLinkedSignal(this.seedKey, () => this.openItem()?.isContainer ?? false);
   editStatus = seededLinkedSignal<string, ItemStatus>(
     this.seedKey, () => this.openItem()?.status ?? 'Active');
   editLentTo = seededLinkedSignal(this.seedKey, () => this.openItem()?.lentTo ?? '');
@@ -235,6 +271,59 @@ export class EditItemSheetComponent {
 
   private openItem(): ItemResponse | null {
     return this.state() === 'open' ? this.item() : null;
+  }
+
+  /** The location pair as a single discriminated value for the picker. */
+  protected locationValue = computed<ItemLocationValue>(() => {
+    const parentId = this.editParentItemId();
+    if (parentId) return { kind: 'container', id: parentId };
+    const areaId = this.editAreaId();
+    if (areaId) return { kind: 'area', id: areaId };
+    return { kind: 'unplaced' };
+  });
+
+  /** Known label of the current location, shown before the picker's lists load. */
+  protected selectedLocationLabel = computed<string | null>(() => {
+    const it = this.item();
+    if (!it) return null;
+    if (this.editParentItemId() && this.editParentItemId() === (it.parentItemId ?? null)) {
+      return it.path?.[it.path.length - 1]?.name ?? null;
+    }
+    if (this.editAreaId() && this.editAreaId() === (it.areaId ?? null)) {
+      return it.areaName ?? null;
+    }
+    return null;
+  });
+
+  // A non-blocking warning: the server keeps the location on a live→terminal transition, so any
+  // pending move/compartment edit in the same save is silently dropped.
+  protected terminalLocationHint = computed<boolean>(() => {
+    const it = this.item();
+    if (!it || isTerminalStatus(it.status) || !isTerminalStatus(this.editStatus())) return false;
+    const areaMoved = this.editAreaId() !== (it.areaId ?? null);
+    const parentMoved = this.editParentItemId() !== (it.parentItemId ?? null);
+    const compartmentChanged =
+      this.editParentItemId() !== null &&
+      (this.editCompartment().trim() || null) !== (it.compartment ?? null);
+    return areaMoved || parentMoved || compartmentChanged;
+  });
+
+  /** Apply a picked location to the area/parent pair atomically (they are mutually exclusive). */
+  protected onLocationChange(value: ItemLocationValue): void {
+    switch (value.kind) {
+      case 'unplaced':
+        this.editAreaId.set(null);
+        this.editParentItemId.set(null);
+        break;
+      case 'area':
+        this.editAreaId.set(value.id);
+        this.editParentItemId.set(null);
+        break;
+      case 'container':
+        this.editParentItemId.set(value.id);
+        this.editAreaId.set(null);
+        break;
+    }
   }
 
   /** Value/currency normalised as a both-or-neither pair. */
@@ -300,8 +389,21 @@ export class EditItemSheetComponent {
       if (lentTo !== (it.lentTo ?? '')) ops.push(replace('/lentTo', lentTo));
     }
 
+    // Area + parent are a mutually-exclusive pair; a cross-kind move naturally emits both ops, so
+    // the server's at-most-one rule never trips.
     const areaId = this.editAreaId();
     if (areaId !== (it.areaId ?? null)) ops.push(replace('/areaId', areaId));
+
+    const parentItemId = this.editParentItemId();
+    if (parentItemId !== (it.parentItemId ?? null)) ops.push(replace('/parentItemId', parentItemId));
+
+    if (this.editIsContainer() !== it.isContainer) ops.push(replace('/isContainer', this.editIsContainer()));
+
+    // Compartment only travels while in a container; the server auto-clears it on unplace.
+    if (parentItemId !== null) {
+      const compartment = this.editCompartment().trim() ? this.editCompartment().trim() : null;
+      if (compartment !== (it.compartment ?? null)) ops.push(replace('/compartment', compartment));
+    }
 
     return ops;
   }
