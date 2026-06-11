@@ -23,7 +23,7 @@ import {
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { CommodityRowActionsComponent } from './commodity-row-actions.component';
-import { formatRelativeAge } from './relative-age';
+import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { escapeHtml } from '@/shared/utils';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 

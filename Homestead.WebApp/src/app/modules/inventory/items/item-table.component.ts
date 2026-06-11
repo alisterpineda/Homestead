@@ -151,7 +151,14 @@ export class ItemActionsCell {
           </thead>
           <tbody hlmTBody>
             @for (row of table.getRowModel().rows; track row.id) {
-              <tr hlmTr [class]="getRowClass(row.original)">
+              <tr
+                hlmTr
+                [class]="getRowClass(row.original)"
+                tabindex="0"
+                (click)="open.emit(row.original)"
+                (keydown.enter)="open.emit(row.original)"
+                (keydown.space)="onRowSpace($event, row.original)"
+              >
                 @for (cell of row.getVisibleCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
@@ -171,6 +178,7 @@ export class ItemTableComponent {
   items = input.required<ItemResponse[]>();
   sortState = input<ItemSortState>({ id: 'name', desc: false });
 
+  open = output<ItemResponse>();
   edit = output<ItemResponse>();
   viewContents = output<ItemResponse>();
   archiveRestore = output<ItemResponse>();
@@ -280,6 +288,12 @@ export class ItemTableComponent {
   }
 
   protected getRowClass(item: ItemResponse): string {
-    return isTerminalStatus(item.status) ? 'italic text-muted-foreground' : '';
+    const base = 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset';
+    return isTerminalStatus(item.status) ? `${base} italic text-muted-foreground` : base;
+  }
+
+  protected onRowSpace(event: Event, item: ItemResponse): void {
+    event.preventDefault(); // keep Space from scrolling the page
+    this.open.emit(item);
   }
 }

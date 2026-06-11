@@ -109,10 +109,63 @@ describe('ItemTableComponent', () => {
     });
   });
 
-  it('marks terminal-status rows as muted/italic', () => {
+  it('marks terminal-status rows as muted/italic and all rows as clickable', () => {
     expect(component['getRowClass'](makeItem({ status: 'Sold' }))).toContain('italic');
     expect(component['getRowClass'](makeItem({ status: 'Archived' }))).toContain('italic');
-    expect(component['getRowClass'](makeItem({ status: 'Active' }))).toBe('');
+    expect(component['getRowClass'](makeItem({ status: 'Active' }))).not.toContain('italic');
+    expect(component['getRowClass'](makeItem({ status: 'Active' }))).toContain('cursor-pointer');
+    expect(component['getRowClass'](makeItem({ status: 'Sold' }))).toContain('cursor-pointer');
+  });
+
+  describe('row click', () => {
+    it('emits open with the row item when a body row is clicked', () => {
+      const item = makeItem({ id: 'clicked', name: 'Camera' });
+      fixture.componentRef.setInput('items', [item]);
+      fixture.detectChanges();
+
+      let opened: ItemResponse | undefined;
+      component.open.subscribe(v => (opened = v));
+
+      const row = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+      row.click();
+
+      expect(opened).toBe(item);
+    });
+
+    it('emits open via keyboard (Enter and Space) on a focused row', () => {
+      const item = makeItem({ id: 'kbd' });
+      fixture.componentRef.setInput('items', [item]);
+      fixture.detectChanges();
+
+      const opened: ItemResponse[] = [];
+      component.open.subscribe(v => opened.push(v));
+
+      const row = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+      expect(row.getAttribute('tabindex')).toBe('0');
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+
+      expect(opened).toEqual([item, item]);
+    });
+
+    it('does not emit open when the row-actions trigger is clicked', async () => {
+      const item = makeItem({ id: 'clicked' });
+      fixture.componentRef.setInput('items', [item]);
+      fixture.detectChanges();
+
+      let opened: ItemResponse | undefined;
+      component.open.subscribe(v => (opened = v));
+
+      const trigger = fixture.nativeElement.querySelector(
+        'tbody tr app-item-row-actions button',
+      ) as HTMLButtonElement;
+      trigger.click();
+      // The dropdown trigger schedules a 0-delay timeout on open that touches the overlay —
+      // let it run before the fixture is torn down so it doesn't surface as an unhandled error.
+      await new Promise(resolve => setTimeout(resolve));
+
+      expect(opened).toBeUndefined();
+    });
   });
 
   it('emits sortChange when sorting changes via the table', () => {

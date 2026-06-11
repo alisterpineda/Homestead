@@ -98,7 +98,11 @@ Kind = 'Flow' AND source is set AND destination is null
 
 — Flow outflows. Inflows (Flow, destination only) are acquisitions; transfers (Flow, both set) net to zero and are excluded automatically; `Adjustment` and `Conversion` are excluded by kind. This is the query that makes "how fast are we going through this" trustworthy, and it is the reason the kinds exist.
 
-### Ledger vs audit log
+### One movement per gesture, not per click
+
+The supplies quick panel changes stock primarily through per-location **− / + steppers**. Taps are debounced, and each burst commits as **one `Flow` movement of the net delta** — tapping + three times records a single inflow of 3, not three inflows of 1; a − then a + in the same burst nets to zero and **writes nothing at all**. A net-positive burst lands as one receive (inflow), a net-negative burst as one consume (outflow); "Correct" remains a distinct action and still writes an `Adjustment`.
+
+This is deliberate ledger-granularity policy, not a UI accident: a ledger row should record a household event at the granularity of user *intent* ("used 3 rolls"), so rapid clicking never fragments history into click-sized rows or inflates the movement count that burn-rate analytics read. The coalescing happens before the write — the single-service funnel below still receives ordinary receive/consume commands and is unaware of it.
 
 The movement ledger is **distinct from the system audit log**, and both are kept:
 

@@ -135,7 +135,10 @@ export class SupplyActionsCell {
               <tr
                 hlmTr
                 [class]="getRowClass(row.original)"
+                tabindex="0"
                 (click)="open.emit(row.original)"
+                (keydown.enter)="open.emit(row.original)"
+                (keydown.space)="onRowSpace($event, row.original)"
               >
                 @for (cell of row.getVisibleCells(); track cell.id) {
                   <td hlmTd [class]="getTdClass(cell.column.id)">
@@ -235,7 +238,12 @@ export class SupplyTableComponent {
   protected getTdClass(columnId: string): string { return this.TD_CLASSES[columnId] ?? ''; }
 
   protected getRowClass(supply: SupplyResponse): string {
-    const base = 'cursor-pointer';
+    const base = 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset';
     return isTerminalStatus(supply.status) ? `${base} italic text-muted-foreground` : base;
+  }
+
+  protected onRowSpace(event: Event, supply: SupplyResponse): void {
+    event.preventDefault(); // keep Space from scrolling the page
+    this.open.emit(supply);
   }
 }

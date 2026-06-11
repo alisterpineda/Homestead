@@ -5,7 +5,6 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -31,6 +30,7 @@ import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.s
 import { SupplyTableComponent, type SupplySortId, type SupplySortState } from './supply-table.component';
 import { CreateSupplyDialogComponent } from './create-supply-dialog/create-supply-dialog.component';
 import { EditSupplySheetComponent } from './edit-supply-sheet/edit-supply-sheet.component';
+import { SupplyQuickPanelComponent } from './supply-quick-panel/supply-quick-panel.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -63,6 +63,7 @@ interface SupplySortFieldOption {
     SupplyTableComponent,
     CreateSupplyDialogComponent,
     EditSupplySheetComponent,
+    SupplyQuickPanelComponent,
   ],
   providers: [provideIcons({
     lucidePlus,
@@ -218,6 +219,13 @@ interface SupplySortFieldOption {
       }
     </div>
 
+    <app-supply-quick-panel
+      [supply]="quickPanelSupply()"
+      [state]="quickPanelState()"
+      (changed)="onChanged()"
+      (closed)="onQuickPanelClosed()"
+    />
+
     <app-edit-supply-sheet
       [supply]="selectedSupply()"
       [state]="sheetState()"
@@ -251,7 +259,6 @@ interface SupplySortFieldOption {
 export class SupplyListPageComponent {
   private supplyApi = inject(InventorySupplyApiService);
   private errorHandler = inject(ErrorHandlerService);
-  private router = inject(Router);
 
   readonly sortFields: readonly SupplySortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
@@ -270,6 +277,9 @@ export class SupplyListPageComponent {
 
   selectedSupply = signal<SupplyResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
+
+  quickPanelSupply = signal<SupplyResponse | null>(null);
+  quickPanelState = signal<BrnDialogState>('closed');
 
   pendingDelete = signal<SupplyResponse | null>(null);
   deleteState = signal<BrnDialogState>('closed');
@@ -353,7 +363,14 @@ export class SupplyListPageComponent {
   }
 
   onOpen(supply: SupplyResponse): void {
-    this.router.navigate(['/inventory/supplies', supply.id]);
+    this.quickPanelSupply.set(supply);
+    this.quickPanelState.set('open');
+  }
+
+  // Keeps quickPanelSupply set: a close-triggered stepper flush may still be committing, and the
+  // panel needs the supply id until it settles. Reopening reseeds the panel via its open-keyed state.
+  onQuickPanelClosed(): void {
+    this.quickPanelState.set('closed');
   }
 
   onEdit(supply: SupplyResponse): void {

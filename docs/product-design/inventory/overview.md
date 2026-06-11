@@ -81,6 +81,8 @@ For a fungible item, **stock** is the per-location breakdown of how much is wher
 
 Users see supplies two ways: a global **supplies list** showing each fungible item's total on-hand with low-stock surfaced (so consumables don't require digging through rooms), and in-context inside an area or container, showing the local quantity sitting there. Per-location quantity controls let a user record using some, transferring stock between locations, or correcting a count.
 
+Day-to-day changes happen in a **quick panel**: clicking a supply row opens a side panel over the list showing the total, the per-location breakdown, and − / + steppers per location, with move/correct/assign-to-a-place as inline expansions. Stepper bursts are coalesced into single ledger movements (see [stock.md](stock.md#one-movement-per-gesture-not-per-click)). The supply **detail page** remains the home of the full movement history and the conversion operations (*Track this one individually* and *Collapse*).
+
 See [stock.md](stock.md) for stock entries, the unique-per-location rule, thresholds, and the supplies-list UX.
 
 ### Stock movements and usage
@@ -162,6 +164,7 @@ Like Documents and Finances, Inventory has no per-item owner and no per-user sco
 5. **Low-stock is surfaced, not buried.** Items at or below their restock threshold are flagged in the supplies list rather than requiring the user to go looking, turning the list into a de-facto reorder view.
 6. **"Track this one individually" is one action, not a conversion ceremony.** Pulling a unit out to track it on its own is a single, lossless, atomic action that feels like flipping a switch — the user never sees stock and item tables being reconciled.
 7. **Terminal items leave quietly.** Selling, discarding, or archiving an item removes it from the default picture without deleting its record, and a single reveal toggle brings the inactive items back when the user wants the full history.
+8. **Day-to-day changes happen in a quick panel, not a page.** Clicking a row in the supplies or items list opens a side panel over the list — steppers for stock, quick move, quick status change (marking something Lent collects *to whom* inline before the status applies) — so routine updates never cost a navigation. Two rules shape the panel: **nothing stacks on it** (every sub-interaction is an inline expansion, never a second sheet), and **full editing is deliberately excluded** (edit stays on the row actions and the detail page, keeping the panel a fast read-and-adjust surface). The supply detail page survives as the history/conversions home; non-fungible items have no detail page — the panel is their whole quick surface. An archived supply's panel is read-only.
 
 ## Future-compatibility
 

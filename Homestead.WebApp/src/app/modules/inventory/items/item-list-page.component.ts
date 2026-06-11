@@ -34,6 +34,7 @@ import { InventoryAreaApiService } from '@/api/services/inventory-area-api.servi
 import { ItemTableComponent, formatPath, type ItemSortId, type ItemSortState } from './item-table.component';
 import { CreateItemDialogComponent } from './create-item-dialog/create-item-dialog.component';
 import { EditItemSheetComponent } from './edit-item-sheet/edit-item-sheet.component';
+import { ItemQuickPanelComponent } from './item-quick-panel/item-quick-panel.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -86,6 +87,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     ItemTableComponent,
     CreateItemDialogComponent,
     EditItemSheetComponent,
+    ItemQuickPanelComponent,
   ],
   providers: [provideIcons({
     lucidePlus,
@@ -289,6 +291,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
               [items]="sortedVisibleItems()"
               [sortState]="sortState()"
               (sortChange)="sortState.set($event)"
+              (open)="onOpen($event)"
               (edit)="onEdit($event)"
               (viewContents)="onViewContents($event)"
               (archiveRestore)="onArchiveRestore($event)"
@@ -298,6 +301,14 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
         }
       }
     </div>
+
+    <app-item-quick-panel
+      [item]="quickPanelItem()"
+      [state]="quickPanelState()"
+      (changed)="onChanged()"
+      (closed)="onQuickPanelClosed()"
+      (viewContents)="onQuickPanelViewContents($event)"
+    />
 
     <app-edit-item-sheet
       [item]="selectedItem()"
@@ -355,6 +366,9 @@ export class ItemListPageComponent {
 
   selectedItem = signal<ItemResponse | null>(null);
   sheetState = signal<BrnDialogState>('closed');
+
+  quickPanelItem = signal<ItemResponse | null>(null);
+  quickPanelState = signal<BrnDialogState>('closed');
 
   pendingDelete = signal<ItemResponse | null>(null);
   deleteState = signal<BrnDialogState>('closed');
@@ -535,6 +549,20 @@ export class ItemListPageComponent {
 
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);
+  }
+
+  onOpen(item: ItemResponse): void {
+    this.quickPanelItem.set(item);
+    this.quickPanelState.set('open');
+  }
+
+  onQuickPanelClosed(): void {
+    this.quickPanelState.set('closed');
+  }
+
+  onQuickPanelViewContents(item: ItemResponse): void {
+    this.onQuickPanelClosed();
+    this.onViewContents(item);
   }
 
   onEdit(item: ItemResponse): void {

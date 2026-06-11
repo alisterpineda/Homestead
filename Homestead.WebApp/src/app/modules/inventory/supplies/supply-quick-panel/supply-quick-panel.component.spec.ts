@@ -1,0 +1,436 @@
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { Subject, of, throwError, type Observable } from 'rxjs';
+import { SupplyQuickPanelComponent } from './supply-quick-panel.component';
+import { stockLocationKey } from './stock-stepper.engine';
+import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { SupplyDetailResponse } from '@/api/generated/models/supply-detail-response';
+import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
+
+function makeSupply(over: Partial<SupplyResponse> = {}): SupplyResponse {
+  return {
+    id: 's1',
+    name: 'Paper towels',
+    unit: 'rolls',
+    status: 'Active',
+    totalOnHand: 5.5,
+    isLow: false,
+    restockThreshold: 2,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-06-01T00:00:00Z',
+    ...over,
+  };
+}
+
+const PANTRY: StockEntryResponse = {
+  id: 'e1', areaId: 'pantry', containerItemId: null, locationLabel: 'Pantry', path: [], quantity: 5,
+};
+const BIN: StockEntryResponse = {
+  id: 'e2', areaId: null, containerItemId: 'bin', locationLabel: 'Bin', path: [], quantity: 0.5,
+};
+
+function makeDetail(over: Partial<SupplyDetailResponse> = {}): SupplyDetailResponse {
+  return { supply: makeSupply(), locations: [PANTRY, BIN], ...over };
+}
+
+interface ApiCall {
+  method: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any;
+}
+
+class StubSupplyApi {
+  calls: ApiCall[] = [];
+  detail = makeDetail();
+  failNext: unknown = null;
+
+  private respond(method: string, params: unknown): Observable<SupplyDetailResponse> {
+    this.calls.push({ method, params });
+    if (this.failNext) {
+      const err = this.failNext;
+      this.failNext = null;
+      return throwError(() => err);
+    }
+    return of(this.detail);
+  }
+
+  // Detail responses mirror the requested id so identity guards can be asserted.
+  getSupply = (p: { id: string }): Observable<SupplyDetailResponse> => {
+    this.calls.push({ method: 'getSupply', params: p });
+    if (this.failNext) {
+      const err = this.failNext;
+      this.failNext = null;
+      return throwError(() => err);
+    }
+    return of({ ...this.detail, supply: { ...this.detail.supply, id: p.id } });
+  };
+  receiveStock = (p: unknown) => this.respond('receiveStock', p);
+  consumeStock = (p: unknown) => this.respond('consumeStock', p);
+  transferStock = (p: unknown) => this.respond('transferStock', p);
+  adjustStock = (p: unknown) => this.respond('adjustStock', p);
+
+  callsOf(method: string): ApiCall[] {
+    return this.calls.filter((c) => c.method === method);
+  }
+}
+
+class StubErrorHandler {
+  handled: unknown[] = [];
+  isServerOrNetworkError = () => false;
+  handleError = (err: unknown) => this.handled.push(err);
+  getErrorMessage = () => 'error';
+}
+
+describe('SupplyQuickPanelComponent', () => {
+  let fixture: ComponentFixture<SupplyQuickPanelComponent>;
+  let component: SupplyQuickPanelComponent;
+  let api: StubSupplyApi;
+  let errorHandler: StubErrorHandler;
+
+  const KEY_PANTRY = stockLocationKey(PANTRY);
+
+  beforeEach(() => {
+    api = new StubSupplyApi();
+    errorHandler = new StubErrorHandler();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: InventorySupplyApiService, useValue: api },
+        { provide: ErrorHandlerService, useValue: errorHandler },
+      ],
+    });
+    fixture = TestBed.createComponent(SupplyQuickPanelComponent);
+    component = fixture.componentInstance;
+  });
+
+  async function open(supply = makeSupply()): Promise<void> {
+    fixture.componentRef.setInput('supply', supply);
+    fixture.componentRef.setInput('state', 'open');
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  // Engine taps debounce on real 800ms timers; tests commit them deterministically via flush.
+  function flushSteppers(): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).engine.flushAll();
+  }
+
+  describe('detail fetch', () => {
+    it('does not fetch while closed', async () => {
+      fixture.componentRef.setInput('supply', makeSupply());
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(api.callsOf('getSupply').length).toBe(0);
+    });
+
+    it('fetches the detail when opened and exposes its locations', async () => {
+      await open();
+      expect(api.callsOf('getSupply')).toEqual([{ method: 'getSupply', params: { id: 's1' } }]);
+      expect(component.entries()).toEqual([PANTRY, BIN]);
+      expect(component.supplyView()).toEqual(makeSupply());
+    });
+
+    it('falls back to the row data for the header before the fetch lands', () => {
+      fixture.componentRef.setInput('supply', makeSupply({ name: 'Row name' }));
+      expect(component.supplyView()?.name).toBe('Row name');
+    });
+  });
+
+  describe('steppers', () => {
+    it('shows optimistic per-entry and total quantities', async () => {
+      await open();
+      component.onTap(PANTRY, -1);
+      component.onTap(PANTRY, -1);
+      expect(component.displayedQty(PANTRY)).toBe(3);
+      expect(component.displayedQty(BIN)).toBe(0.5);
+      expect(component.displayedTotal()).toBe(3.5);
+    });
+
+    it('commits a positive net delta as one receiveStock call shaped like the stock-op sheet', async () => {
+      await open();
+      let changedCount = 0;
+      component.changed.subscribe(() => changedCount++);
+
+      component.onTap(PANTRY, 1);
+      component.onTap(PANTRY, 1);
+      component.onTap(PANTRY, 1);
+      flushSteppers();
+
+      expect(api.callsOf('receiveStock')).toEqual([{
+        method: 'receiveStock',
+        params: {
+          id: 's1',
+          body: {
+            areaId: 'pantry',
+            containerItemId: null,
+            quantity: 3,
+            unitCost: null,
+            unitCostCurrencyId: null,
+            note: null,
+          },
+        },
+      }]);
+      expect(changedCount).toBe(1);
+      expect(component.displayedQty(PANTRY)).toBe(5); // response is the new base, delta cleared
+    });
+
+    it('commits a negative net delta as one consumeStock call', async () => {
+      await open();
+      component.onTap(BIN, -1);
+      flushSteppers();
+
+      expect(api.callsOf('consumeStock')).toEqual([{
+        method: 'consumeStock',
+        params: {
+          id: 's1',
+          body: { areaId: null, containerItemId: 'bin', quantity: 1, note: null },
+        },
+      }]);
+    });
+
+    it('makes no API call for a net-zero burst', async () => {
+      await open();
+      component.onTap(PANTRY, 1);
+      component.onTap(PANTRY, -1);
+      flushSteppers();
+      expect(api.callsOf('receiveStock').length).toBe(0);
+      expect(api.callsOf('consumeStock').length).toBe(0);
+    });
+
+    it('clears the optimistic delta, toasts, and refetches when a commit fails', async () => {
+      await open();
+      api.failNext = { status: 400 };
+      component.onTap(PANTRY, -1);
+      flushSteppers();
+      await fixture.whenStable();
+
+      expect(errorHandler.handled.length).toBe(1);
+      expect(component.displayedQty(PANTRY)).toBe(5);
+      expect(api.callsOf('getSupply').length).toBe(2); // initial + resync
+    });
+  });
+
+  describe('summary derivations', () => {
+    it('clamps restockPercent to 100 and tracks optimistic taps', async () => {
+      await open(); // total 5.5, threshold 2 → way past 100
+      expect(component.restockPercent()).toBe(100);
+
+      component.onTap(PANTRY, -1);
+      component.onTap(PANTRY, -1);
+      component.onTap(PANTRY, -1);
+      component.onTap(PANTRY, -1);
+      // displayed total 1.5 of threshold 2 → 75
+      expect(component.restockPercent()).toBe(75);
+      expect(component.isLowNow()).toBe(true);
+    });
+
+    it('returns null restockPercent when no threshold is set', async () => {
+      api.detail = makeDetail({ supply: makeSupply({ restockThreshold: null }) });
+      await open(makeSupply({ restockThreshold: null }));
+      expect(component.restockPercent()).toBeNull();
+      expect(component.isLowNow()).toBe(false);
+    });
+
+    it('flags terminal supplies as archived (read-only)', async () => {
+      api.detail = makeDetail({ supply: makeSupply({ status: 'Archived' }) });
+      await open(makeSupply({ status: 'Archived' }));
+      expect(component.archived()).toBe(true);
+    });
+  });
+
+  describe('inline assign form', () => {
+    it('requires a destination and positive quantity, then receives into the picked place', async () => {
+      await open();
+      component.openAssign();
+      expect(component.formError()).toBe('Enter a quantity.');
+
+      component.assignQty.set('2');
+      expect(component.formError()).toBe('Pick a location.');
+
+      component.assignDest.set({ kind: 'container', id: 'shelf' });
+      expect(component.canSubmitForm()).toBe(true);
+
+      component.submitForm();
+      expect(api.callsOf('receiveStock')[0].params).toEqual({
+        id: 's1',
+        body: {
+          areaId: null,
+          containerItemId: 'shelf',
+          quantity: 2,
+          unitCost: null,
+          unitCostCurrencyId: null,
+          note: null,
+        },
+      });
+      expect(component['inlineForm']()).toBeNull(); // closed on success
+    });
+  });
+
+  describe('inline move form', () => {
+    it('prefills the full on-hand and blocks a same-as-source destination', async () => {
+      await open();
+      component.openMove(PANTRY);
+      expect(component.moveQty()).toBe('5');
+
+      component.moveDest.set({ kind: 'area', id: 'pantry' });
+      expect(component.formError()).toBe('Destination must differ from the source.');
+
+      component.moveDest.set({ kind: 'area', id: 'garage' });
+      expect(component.canSubmitForm()).toBe(true);
+
+      component.submitForm();
+      expect(api.callsOf('transferStock')[0].params).toEqual({
+        id: 's1',
+        body: {
+          fromAreaId: 'pantry',
+          fromContainerItemId: null,
+          toAreaId: 'garage',
+          toContainerItemId: null,
+          quantity: 5,
+          note: null,
+        },
+      });
+    });
+
+    it('flushes pending taps before opening and snapshots the displayed quantity', async () => {
+      await open();
+      component.onTap(PANTRY, 1);
+      component.openMove(PANTRY);
+
+      // The pending +1 was flushed as its own commit...
+      expect(api.callsOf('receiveStock').length).toBe(1);
+      // ...and the prefill reflects the optimistic quantity at click time.
+      expect(component.moveQty()).toBe('6');
+    });
+  });
+
+  describe('inline correct form', () => {
+    it('prefills the current quantity and blocks the no-op the server would reject', async () => {
+      await open();
+      component.openCorrect(BIN);
+      expect(component.correctQty()).toBe('0.5');
+      expect(component.formError()).toBe('Enter a different quantity to correct.');
+
+      component.correctQty.set('-1');
+      expect(component.formError()).toBe('Quantity must be zero or positive.');
+
+      component.correctQty.set('3');
+      component.submitForm();
+      expect(api.callsOf('adjustStock')[0].params).toEqual({
+        id: 's1',
+        body: { areaId: null, containerItemId: 'bin', newQuantity: 3, note: null },
+      });
+    });
+  });
+
+  describe('stale-state guards', () => {
+    it('queued commits use the supply id captured at tap time, not the current panel subject', async () => {
+      await open(); // s1
+      const first = new Subject<SupplyDetailResponse>();
+      const received: { id: string }[] = [];
+      api.receiveStock = ((p: { id: string }) => {
+        received.push(p);
+        return received.length === 1 ? first.asObservable() : of(api.detail);
+      }) as StubSupplyApi['receiveStock'];
+
+      component.onTap(PANTRY, 1);
+      flushSteppers(); // commit 1 in flight
+      component.onTap(BIN, 1);
+      flushSteppers(); // commit 2 queued behind it
+
+      // Panel moves on to another supply while the queue is still draining.
+      fixture.componentRef.setInput('supply', makeSupply({ id: 's2', name: 'Other' }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      first.next(makeDetail());
+      first.complete();
+
+      expect(received.map((p) => p.id)).toEqual(['s1', 's1']);
+    });
+
+    it('ignores a late commit response for a supply the panel no longer shows', async () => {
+      await open(); // s1
+      const pending = new Subject<SupplyDetailResponse>();
+      api.receiveStock = (() => pending.asObservable()) as StubSupplyApi['receiveStock'];
+
+      component.onTap(PANTRY, 1);
+      flushSteppers(); // in flight for s1
+
+      fixture.componentRef.setInput('supply', makeSupply({ id: 's2', name: 'Other' }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component.supplyView()?.id).toBe('s2');
+
+      pending.next(makeDetail()); // s1's truth, arriving late
+      pending.complete();
+
+      expect(component.supplyView()?.id).toBe('s2'); // not clobbered by s1's response
+    });
+
+    it('commits the destination validated at submit time even if the form is cancelled while queued', async () => {
+      await open();
+      const pending = new Subject<SupplyDetailResponse>();
+      api.consumeStock = ((p: unknown) => {
+        api.calls.push({ method: 'consumeStock', params: p });
+        return pending.asObservable();
+      }) as StubSupplyApi['consumeStock'];
+
+      component.onTap(PANTRY, -1);
+      flushSteppers(); // holds the queue
+
+      component.openAssign();
+      component.assignQty.set('2');
+      component.assignDest.set({ kind: 'area', id: 'garage' });
+      component.submitForm(); // queued behind the consume
+      component.closeForm();  // reseeds assignDest to 'unplaced'
+
+      pending.next(makeDetail());
+      pending.complete(); // queue advances → receive runs
+
+      const receive = api.callsOf('receiveStock')[0].params as { body: { areaId: string | null } };
+      expect(receive.body.areaId).toBe('garage');
+    });
+
+    it('discards a stale open fetch that resolves after a newer commit response', async () => {
+      const pendingGet = new Subject<SupplyDetailResponse>();
+      api.getSupply = ((p: { id: string }) => {
+        api.calls.push({ method: 'getSupply', params: p });
+        return pendingGet.asObservable();
+      }) as StubSupplyApi['getSupply'];
+
+      fixture.componentRef.setInput('supply', makeSupply());
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+      await fixture.whenStable(); // open GET still in flight
+
+      component.onTap(PANTRY, 1);
+      flushSteppers(); // commit lands synchronously → detail = [PANTRY, BIN]
+      expect(component.entries().length).toBe(2);
+
+      pendingGet.next(makeDetail({ locations: [PANTRY] })); // pre-commit snapshot
+      pendingGet.complete();
+
+      expect(component.entries().length).toBe(2); // stale GET discarded
+    });
+  });
+
+  describe('close behaviour', () => {
+    it('flushes pending taps and emits closed when the sheet closes', async () => {
+      await open();
+      let closedCount = 0;
+      component.closed.subscribe(() => closedCount++);
+
+      component.onTap(PANTRY, 1);
+      component.onStateChanged('closed');
+
+      expect(api.callsOf('receiveStock').length).toBe(1);
+      expect(closedCount).toBe(1);
+    });
+  });
+});
