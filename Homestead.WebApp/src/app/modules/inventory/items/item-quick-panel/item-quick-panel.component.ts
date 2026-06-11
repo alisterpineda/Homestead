@@ -26,6 +26,7 @@ import {
 } from '../../shared/location-picker/location-picker.component';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
+import { injectSheetSide } from '../../shared/sheet-side';
 import { formatPath } from '../item-table.component';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
@@ -64,8 +65,8 @@ type InlineForm = 'move' | 'lent' | null;
   ],
   providers: [provideIcons({ lucideBox, lucideArrowRight })],
   template: `
-    <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
-      <hlm-sheet-content *hlmSheetPortal class="sm:max-w-md">
+    <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
+      <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
           <h3 hlmSheetTitle class="flex items-center gap-2">
             @if (view()?.isContainer) {
@@ -88,7 +89,7 @@ type InlineForm = 'move' | 'lent' | null;
               </div>
               @if (inlineForm() !== 'move') {
                 <div hlmItemActions>
-                  <button hlmBtn variant="ghost" size="sm" (click)="openMove()">Move</button>
+                  <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="openMove()">Move</button>
                 </div>
               }
 
@@ -179,7 +180,7 @@ type InlineForm = 'move' | 'lent' | null;
                   </span>
                 </div>
                 <div hlmItemActions>
-                  <button hlmBtn variant="ghost" size="sm" (click)="onViewContents()">
+                  <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="onViewContents()">
                     View contents
                     <ng-icon hlm name="lucideArrowRight" size="sm" />
                   </button>
@@ -225,6 +226,8 @@ export class ItemQuickPanelComponent {
   private itemApi = inject(InventoryItemApiService);
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
+
+  protected sheetSide = injectSheetSide();
 
   protected readonly statuses = ALL_ITEM_STATUSES;
   protected readonly statusLabel = itemStatusLabel;

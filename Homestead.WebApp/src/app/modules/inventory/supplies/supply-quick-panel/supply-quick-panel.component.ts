@@ -29,6 +29,7 @@ import {
 } from '../../shared/location-picker/location-picker.component';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { isTerminalStatus } from '../../shared/item-status-meta';
+import { injectSheetSide } from '../../shared/sheet-side';
 import { formatQty } from '../supply-shared';
 import { StockStepperEngine, stockLocationKey } from './stock-stepper.engine';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
@@ -85,8 +86,8 @@ interface StepperPayload {
   ],
   providers: [provideIcons({ lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight })],
   template: `
-    <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
-      <hlm-sheet-content *hlmSheetPortal class="sm:max-w-md">
+    <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
+      <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
           <h3 hlmSheetTitle>{{ supplyView()?.name }}</h3>
         </hlm-sheet-header>
@@ -155,6 +156,7 @@ interface StepperPayload {
                       hlmInput
                       id="panel-assign-qty"
                       type="number"
+                      inputmode="decimal"
                       step="0.001"
                       min="0.001"
                       class="w-full"
@@ -181,7 +183,7 @@ interface StepperPayload {
             } @else {
               @for (entry of entries(); track stockLocationKey(entry)) {
                 <div hlmItem variant="outline" size="sm">
-                  <div hlmItemContent class="min-w-0">
+                  <div hlmItemContent class="min-w-0 max-md:basis-full">
                     <div hlmItemTitle class="w-full min-w-0">
                       <span class="truncate">{{ entry.locationLabel ?? '(unknown)' }}</span>
                     </div>
@@ -192,33 +194,37 @@ interface StepperPayload {
                     }
                   </div>
                   @if (!archived()) {
-                    <div hlmItemActions>
+                    <div hlmItemActions class="max-md:basis-full max-md:justify-between">
                       <div hlmButtonGroup>
                         <button
                           hlmBtn
                           variant="outline"
                           size="icon-sm"
+                          class="max-md:size-11"
                           [disabled]="displayedQty(entry) < 1"
                           [attr.aria-label]="'Use one ' + s.unit"
                           (click)="onTap(entry, -1)"
                         >
                           <ng-icon hlm name="lucideMinus" size="sm" />
                         </button>
-                        <span hlmButtonGroupText class="min-w-16 justify-center px-2 text-sm tabular-nums">
+                        <span hlmButtonGroupText class="min-w-16 justify-center px-2 text-sm tabular-nums max-md:h-11">
                           {{ formatQty(displayedQty(entry)) }} {{ s.unit }}
                         </span>
                         <button
                           hlmBtn
                           variant="outline"
                           size="icon-sm"
+                          class="max-md:size-11"
                           [attr.aria-label]="'Receive one ' + s.unit"
                           (click)="onTap(entry, 1)"
                         >
                           <ng-icon hlm name="lucidePlus" size="sm" />
                         </button>
                       </div>
-                      <button hlmBtn variant="ghost" size="sm" (click)="openMove(entry)">Move</button>
-                      <button hlmBtn variant="ghost" size="sm" (click)="openCorrect(entry)">Correct</button>
+                      <div class="flex items-center gap-2">
+                        <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="openMove(entry)">Move</button>
+                        <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="openCorrect(entry)">Correct</button>
+                      </div>
                     </div>
                   }
 
@@ -242,6 +248,7 @@ interface StepperPayload {
                               hlmInput
                               id="panel-move-qty"
                               type="number"
+                              inputmode="decimal"
                               step="0.001"
                               min="0.001"
                               class="w-full"
@@ -259,6 +266,7 @@ interface StepperPayload {
                               hlmInput
                               id="panel-correct-qty"
                               type="number"
+                              inputmode="decimal"
                               step="0.001"
                               min="0"
                               class="w-full"
@@ -318,6 +326,8 @@ export class SupplyQuickPanelComponent {
   private supplyApi = inject(InventorySupplyApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
+
+  protected sheetSide = injectSheetSide();
 
   // Engine commits deliberately outlive the component (close-flush must land), but emitting on a
   // destroyed OutputRef warns (NG0953) — late results still apply to signals, just don't emit.
