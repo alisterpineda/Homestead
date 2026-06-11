@@ -984,6 +984,136 @@ namespace Homestead.WebApi.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ContainerItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("ContainerItemId");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("ItemId", "AreaId", "ContainerItemId")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ItemId", "AreaId", "ContainerItemId"), false);
+
+                    b.ToTable("stock_entries", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_stock_entries_location_exactly_one", "(\"AreaId\" IS NOT NULL AND \"ContainerItemId\" IS NULL) OR (\"AreaId\" IS NULL AND \"ContainerItemId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_stock_entries_quantity_non_negative", "\"Quantity\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FromAreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FromContainerItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("RelatedItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ToAreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ToContainerItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("UnitCostCurrencyId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("FromAreaId");
+
+                    b.HasIndex("FromContainerItemId");
+
+                    b.HasIndex("Kind");
+
+                    b.HasIndex("RelatedItemId");
+
+                    b.HasIndex("ToAreaId");
+
+                    b.HasIndex("ToContainerItemId");
+
+                    b.HasIndex("UnitCostCurrencyId");
+
+                    b.HasIndex("ItemId", "OccurredAt");
+
+                    b.ToTable("stock_movements", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_stock_movements_quantity_positive", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_stock_movements_unit_cost_currency_pair", "(\"UnitCost\" IS NULL AND \"UnitCostCurrencyId\" IS NULL) OR (\"UnitCost\" IS NOT NULL AND \"UnitCostCurrencyId\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
                 {
                     b.Property<Guid>("DocumentId")
@@ -1750,6 +1880,91 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("ValueCurrency");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "ContainerItem")
+                        .WithMany()
+                        .HasForeignKey("ContainerItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "Item")
+                        .WithMany("StockEntries")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+
+                    b.Navigation("ContainerItem");
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockMovement", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "FromArea")
+                        .WithMany()
+                        .HasForeignKey("FromAreaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "FromContainerItem")
+                        .WithMany()
+                        .HasForeignKey("FromContainerItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "RelatedItem")
+                        .WithMany()
+                        .HasForeignKey("RelatedItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "ToArea")
+                        .WithMany()
+                        .HasForeignKey("ToAreaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "ToContainerItem")
+                        .WithMany()
+                        .HasForeignKey("ToContainerItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "UnitCostCurrency")
+                        .WithMany()
+                        .HasForeignKey("UnitCostCurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("FromArea");
+
+                    b.Navigation("FromContainerItem");
+
+                    b.Navigation("Item");
+
+                    b.Navigation("RelatedItem");
+
+                    b.Navigation("ToArea");
+
+                    b.Navigation("ToContainerItem");
+
+                    b.Navigation("UnitCostCurrency");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domain.Documents.Document", "Document")
@@ -1874,6 +2089,11 @@ namespace Homestead.WebApi.Migrations
             modelBuilder.Entity("Homestead.WebApi.Domain.Groups.Group", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
+                {
+                    b.Navigation("StockEntries");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.Party", b =>

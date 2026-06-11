@@ -150,15 +150,19 @@ public class PatchItemHandler(
                 .Select(i => i.Status)
                 .ToListAsync(ct);
 
-            // Role-off (Rule B): blocked while ANY child references the item — live or terminal.
-            // (Stock entries join this gate when the stock model lands.)
-            if (roleOff && childStatuses.Count > 0)
+            // Fungible stock pointing at this container is live contents — it joins both gates. A
+            // stock entry exists only while there is quantity there, so its mere presence blocks.
+            var hasStock = await db.StockEntries.AnyAsync(e => e.ContainerItemId == item.Id, ct);
+
+            // Role-off (Rule B): blocked while ANY child references the item — live or terminal — or
+            // any stock sits in it.
+            if (roleOff && (childStatuses.Count > 0 || hasStock))
                 throw new BusinessRuleException(
                     "Cannot turn off the container role while the item still has contents (including inactive records). Empty it first.");
 
             // Taking a container terminal: only LIVE children block; terminal leftovers don't, so
-            // the flag stays on and the parent-is-container invariant is preserved.
-            if (sealingContainer && childStatuses.Any(s => !s.IsTerminal()))
+            // the flag stays on and the parent-is-container invariant is preserved. Live stock blocks too.
+            if (sealingContainer && (childStatuses.Any(s => !s.IsTerminal()) || hasStock))
                 throw new BusinessRuleException(
                     "Cannot mark a container Sold/Discarded/Archived while it has active contents.");
         }

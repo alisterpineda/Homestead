@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -11,15 +12,23 @@ public class DeleteItemHandler(AppDbContext db, IAuditContext audit, IUnitOfWork
 {
     public async Task<bool> Handle(DeleteItemCommand request, CancellationToken ct)
     {
-        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == request.Id, ct);
+        // This endpoint is the non-fungible items surface; a fungible supply id is "not found" here
+        // (supplies delete through DeleteSupply, which gates on ledger history). Without this filter a
+        // supply with movements would reach Remove and trip the StockMovement Restrict FK as a raw 500.
+        var item = await db.Items.FirstOrDefaultAsync(
+            i => i.Id == request.Id && i.Fungibility == Fungibility.NonFungible, ct);
         if (item is null)
             return false;
 
         // Delete is the mistake-eraser; an item that has held contents carries history and can only
-        // be archived. (The stock-ledger half of this check joins later, with the stock model.)
+        // be archived. Contents are nested items or fungible stock entries pointing at this container.
         var hasChildren = await db.Items.AnyAsync(i => i.ParentItemId == item.Id, ct);
         if (hasChildren)
             throw new BusinessRuleException("Item has contents and cannot be deleted. Archive it instead.");
+
+        var hasStock = await db.StockEntries.AnyAsync(e => e.ContainerItemId == item.Id, ct);
+        if (hasStock)
+            throw new BusinessRuleException("Item holds stock and cannot be deleted. Move or use it up first.");
 
         db.Items.Remove(item);
         audit.Deleted("Item", item.Id, item.Name);

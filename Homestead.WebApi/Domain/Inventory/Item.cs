@@ -58,4 +58,10 @@ public class Item
 
     /// <summary>Optional global low-stock trigger compared against total on-hand.</summary>
     public decimal? RestockThreshold { get; set; }
+
+    /// <summary>
+    /// Per-location stock of this fungible item. Empty for non-fungible items. The total on-hand is
+    /// the sum of these entries' quantities — no denormalised total is stored on the item.
+    /// </summary>
+    public ICollection<StockEntry> StockEntries { get; set; } = [];
 }

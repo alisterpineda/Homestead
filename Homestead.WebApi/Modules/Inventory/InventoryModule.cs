@@ -9,6 +9,16 @@ using Homestead.WebApi.Modules.Inventory.Features.Items.DeleteItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItems;
 using Homestead.WebApi.Modules.Inventory.Features.Items.PatchItem;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.AdjustStock;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.ConsumeStock;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.CreateSupply;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.DeleteSupply;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.GetSupplies;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.GetSupply;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.GetSupplyMovements;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.PatchSupply;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.ReceiveStock;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.TransferStock;
 
 namespace Homestead.WebApi.Modules.Inventory;
 
@@ -35,6 +45,18 @@ public static class InventoryModule
         CreateItemEndpoint.Map(items);
         PatchItemEndpoint.Map(items);
         DeleteItemEndpoint.Map(items);
+
+        var supplies = v1.MapGroup("/supplies");
+        GetSuppliesEndpoint.Map(supplies);
+        GetSupplyEndpoint.Map(supplies);
+        GetSupplyMovementsEndpoint.Map(supplies);
+        CreateSupplyEndpoint.Map(supplies);
+        PatchSupplyEndpoint.Map(supplies);
+        DeleteSupplyEndpoint.Map(supplies);
+        ReceiveStockEndpoint.Map(supplies);
+        ConsumeStockEndpoint.Map(supplies);
+        TransferStockEndpoint.Map(supplies);
+        AdjustStockEndpoint.Map(supplies);
 
         return app;
     }

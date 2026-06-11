@@ -118,5 +118,75 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             Kind = LocationSegmentKind.Area,
         };
 
+    public async Task<IReadOnlyDictionary<HoldingLocation, LocationPath>> ResolveHoldingLocationsAsync(
+        IReadOnlyCollection<HoldingLocation> locations, CancellationToken ct = default)
+    {
+        var distinct = locations.Where(l => !l.IsEmpty).Distinct().ToList();
+        if (distinct.Count == 0)
+            return new Dictionary<HoldingLocation, LocationPath>();
+
+        // The container ids referenced directly as holding locations — loaded by id as well as by
+        // role so a container whose role was switched off after a historical movement still shows
+        // its own name (its ancestors may then break the chain, which renders gracefully).
+        var referencedContainerIds = distinct
+            .Where(l => l.ContainerItemId is not null)
+            .Select(l => l.ContainerItemId!.Value)
+            .ToHashSet();
+
+        var containers = await db.Items.AsNoTracking()
+            .Where(i => i.IsContainer || referencedContainerIds.Contains(i.Id))
+            .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
+            .ToDictionaryAsync(c => c.Id, ct);
+
+        var areaNames = await db.Areas.AsNoTracking()
+            .ToDictionaryAsync(a => a.Id, a => a.Name, ct);
+
+        var result = new Dictionary<HoldingLocation, LocationPath>(distinct.Count);
+        foreach (var location in distinct)
+            result[location] = ResolveHolding(location, containers, areaNames);
+
+        return result;
+    }
+
+    // Like Resolve, but the holding container is INCLUDED as the path's last segment (stock sits in
+    // it, not under it). For an area holding location the path is just that area.
+    private static LocationPath ResolveHolding(
+        HoldingLocation location,
+        IReadOnlyDictionary<Guid, ContainerNode> containers,
+        IReadOnlyDictionary<Guid, string> areaNames)
+    {
+        if (location.AreaId is { } areaId)
+            return new LocationPath([AreaSegment(areaId, areaNames, null)]);
+
+        var chain = new List<LocationSegmentResponse>();
+        var visited = new HashSet<Guid>();
+        LocationSegmentResponse? areaSegment = null;
+
+        var currentId = location.ContainerItemId;
+        while (currentId is { } id)
+        {
+            if (!visited.Add(id) || !containers.TryGetValue(id, out var node))
+                break;
+
+            chain.Add(new LocationSegmentResponse
+            {
+                Id = node.Id,
+                Name = node.Name,
+                Kind = LocationSegmentKind.Container,
+            });
+
+            if (node.AreaId is { } chainAreaId)
+            {
+                areaSegment = AreaSegment(chainAreaId, areaNames, null);
+                break;
+            }
+
+            currentId = node.ParentItemId;
+        }
+
+        chain.Reverse(); // root container → holding container
+        return new LocationPath(areaSegment is null ? chain : [areaSegment, .. chain]);
+    }
+
     private readonly record struct ContainerNode(Guid Id, string Name, Guid? AreaId, Guid? ParentItemId);
 }

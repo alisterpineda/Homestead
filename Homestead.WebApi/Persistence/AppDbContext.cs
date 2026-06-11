@@ -43,6 +43,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Area> Areas { get; set; }
     public DbSet<Item> Items { get; set; }
+    public DbSet<StockEntry> StockEntries { get; set; }
+    public DbSet<StockMovement> StockMovements { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -24,6 +24,12 @@ public class DeleteAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork
         if (hasLiveItems)
             throw new BusinessRuleException("Area has items in it and cannot be deleted. Move or retire them first.");
 
+        // Stock currently sitting in the area also blocks deletion (a stock entry exists only while
+        // there is quantity there). Historical movements through the area survive via SET NULL.
+        var hasStock = await db.StockEntries.AnyAsync(e => e.AreaId == area.Id, ct);
+        if (hasStock)
+            throw new BusinessRuleException("Area has stock in it and cannot be deleted. Move or use it up first.");
+
         db.Areas.Remove(area);
         audit.Deleted("Area", area.Id, area.Name);
         await unitOfWork.SaveChangesAsync(ct);

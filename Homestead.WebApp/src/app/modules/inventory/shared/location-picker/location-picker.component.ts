@@ -57,7 +57,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
         @if (displayLabel(); as label) {
           <span class="truncate">{{ label }}</span>
         } @else {
-          <span class="truncate text-muted-foreground italic">Unplaced</span>
+          <span class="truncate text-muted-foreground italic">{{ allowUnplaced() ? 'Unplaced' : (placeholder() ?? 'Select location') }}</span>
         }
         <ng-icon hlm name="lucideChevronDown" size="sm" class="text-muted-foreground" />
       </button>
@@ -77,16 +77,18 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
           @if (loading()) {
             <div class="flex justify-center py-4"><hlm-spinner class="size-4" /></div>
           } @else {
-            <button
-              type="button"
-              class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-              (click)="onSelectUnplaced()"
-            >
-              <span class="truncate italic text-muted-foreground">Unplaced</span>
-              @if (value().kind === 'unplaced') {
-                <ng-icon hlm name="lucideCheck" size="sm" />
-              }
-            </button>
+            @if (allowUnplaced()) {
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                (click)="onSelectUnplaced()"
+              >
+                <span class="truncate italic text-muted-foreground">Unplaced</span>
+                @if (value().kind === 'unplaced') {
+                  <ng-icon hlm name="lucideCheck" size="sm" />
+                }
+              </button>
+            }
 
             @if (filteredAreas().length > 0) {
               <span class="block px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">Areas</span>
@@ -145,6 +147,10 @@ export class LocationPickerComponent {
   selectedLabel = input<string | null>(null);
   /** Edited item to exclude (with its whole subtree) from the container options. */
   excludeItemId = input<string | null>(null);
+  /** Offer the "Unplaced" option. Stock locations require a real place, so they pass false. */
+  allowUnplaced = input(true);
+  /** Trigger text when nothing is selected and Unplaced is not offered. */
+  placeholder = input<string | null>(null);
 
   valueChange = output<ItemLocationValue>();
 
