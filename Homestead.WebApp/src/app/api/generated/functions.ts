@@ -305,3 +305,7 @@ export type { TransferStock$Params as TransferStock$Params } from './fn/inventor
 export { transferStock as transferStock } from './fn/inventory/transfer-stock';
 export type { AdjustStock$Params as AdjustStock$Params } from './fn/inventory/adjust-stock';
 export { adjustStock as adjustStock } from './fn/inventory/adjust-stock';
+export type { TrackItemIndividually$Params as TrackItemIndividually$Params } from './fn/inventory/track-item-individually';
+export { trackItemIndividually as trackItemIndividually } from './fn/inventory/track-item-individually';
+export type { CollapseItems$Params as CollapseItems$Params } from './fn/inventory/collapse-items';
+export { collapseItems as collapseItems } from './fn/inventory/collapse-items';

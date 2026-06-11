@@ -32,6 +32,20 @@ public interface IStockService
 
     /// <summary>Correct the recorded count at a location to an absolute value (a recount/Adjustment).</summary>
     Task AdjustAsync(Guid itemId, StockAdjustRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Carve one unit out of fungible stock to be tracked individually: decrement by 1 at a location
+    /// and append a <see cref="Domain.Inventory.MovementKind.Conversion"/> outflow carrying the new
+    /// non-fungible item's id. Lossless and atomic; requires a whole-number quantity ≥ 1 at the source.
+    /// </summary>
+    Task ConvertOutAsync(Guid itemId, StockConvertOutRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Collapse individually-tracked instances back into fungible stock: add their count at a location
+    /// and append one quantity-1 <see cref="Domain.Inventory.MovementKind.Conversion"/> inflow per
+    /// instance, each carrying its item id. The caller archives the instances in the same transaction.
+    /// </summary>
+    Task ConvertInAsync(Guid itemId, StockConvertInRequest request, CancellationToken ct);
 }
 
 public record StockReceiveRequest(
@@ -58,5 +72,17 @@ public record StockTransferRequest(
 public record StockAdjustRequest(
     StockLocation Location,
     decimal NewQuantity,
+    DateTimeOffset? OccurredAt,
+    string? Note);
+
+public record StockConvertOutRequest(
+    StockLocation From,
+    Guid RelatedItemId,
+    DateTimeOffset? OccurredAt,
+    string? Note);
+
+public record StockConvertInRequest(
+    StockLocation To,
+    IReadOnlyList<Guid> RelatedItemIds,
     DateTimeOffset? OccurredAt,
     string? Note);

@@ -36,7 +36,9 @@ import {
   type StockOpMode,
   type StockOpLocation,
 } from './stock-op-sheet/stock-op-sheet.component';
-import { formatQty, movementDirection } from './supply-shared';
+import { TrackItemSheetComponent } from './track-item-sheet/track-item-sheet.component';
+import { CollapseItemsDialogComponent } from './collapse-items-dialog/collapse-items-dialog.component';
+import { formatQty, movementDirection, isWholeCount } from './supply-shared';
 import type { SupplyResponse } from '@/api/generated/models/supply-response';
 import type { SupplyDetailResponse } from '@/api/generated/models/supply-detail-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
@@ -57,6 +59,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     ItemStatusBadgeComponent,
     EditSupplySheetComponent,
     StockOpSheetComponent,
+    TrackItemSheetComponent,
+    CollapseItemsDialogComponent,
   ],
   providers: [provideIcons({
     lucideArrowLeft,
@@ -118,6 +122,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <ng-icon hlm name="lucidePencil" size="sm" />
               Edit
             </button>
+            @if (s.status === 'Active') {
+              <button hlmBtn variant="outline" size="sm" (click)="openCollapse()">
+                <ng-icon hlm name="lucideBoxes" size="sm" />
+                Collapse items
+              </button>
+            }
             <button hlmBtn size="sm" (click)="openReceive()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               Receive
@@ -151,6 +161,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                         <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>
                         <button hlmBtn variant="ghost" size="sm" (click)="openTransfer(entry)">Move</button>
                         <button hlmBtn variant="ghost" size="sm" (click)="openAdjust(entry)">Correct</button>
+                        @if (s.status === 'Active' && isWholeCount(entry.quantity)) {
+                          <button hlmBtn variant="ghost" size="sm" (click)="openTrackOne(entry)">Track one</button>
+                        }
                       </td>
                     </tr>
                   }
@@ -205,6 +218,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                       </td>
                       <td hlmTd>
                         <span class="text-xs text-muted-foreground">{{ kindLabel(m) }}</span>
+                        @if (m.kind === 'Conversion' && m.relatedItemName) {
+                          <span class="block truncate text-xs text-muted-foreground">{{ m.relatedItemName }}</span>
+                        }
                       </td>
                       <td hlmTd class="whitespace-nowrap text-right tabular-nums" [class]="amountClass(m)">
                         {{ amountPrefix(m) }}{{ formatQty(m.quantity) }} {{ s.unit }}
@@ -247,6 +263,25 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         (updated)="onStockUpdated()"
         (closed)="stockOpState.set('closed')"
       />
+
+      <app-track-item-sheet
+        [supplyId]="s.id"
+        [supplyName]="s.name"
+        [unit]="s.unit"
+        [fromLocation]="trackLocation()"
+        [state]="trackState()"
+        (created)="onTracked()"
+        (closed)="trackState.set('closed')"
+      />
+
+      <app-collapse-items-dialog
+        [supplyId]="s.id"
+        [supplyName]="s.name"
+        [unit]="s.unit"
+        [state]="collapseState()"
+        (collapsed)="onCollapsed()"
+        (closed)="collapseState.set('closed')"
+      />
     }
 
     <app-edit-supply-sheet
@@ -263,6 +298,7 @@ export class SupplyDetailPageComponent {
   private locale = inject(LOCALE_ID);
 
   protected readonly formatQty = formatQty;
+  protected readonly isWholeCount = isWholeCount;
 
   private supplyId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), { initialValue: null });
 
@@ -324,6 +360,13 @@ export class SupplyDetailPageComponent {
   stockOpLocation = signal<StockOpLocation | null>(null);
   stockOpState = signal<BrnDialogState>('closed');
 
+  // Track-one sheet state.
+  trackLocation = signal<StockOpLocation | null>(null);
+  trackState = signal<BrnDialogState>('closed');
+
+  // Collapse-items dialog state.
+  collapseState = signal<BrnDialogState>('closed');
+
   // Edit sheet state.
   editSupply = signal<SupplyResponse | null>(null);
   editState = signal<BrnDialogState>('closed');
@@ -363,6 +406,26 @@ export class SupplyDetailPageComponent {
 
   onStockUpdated(): void {
     this.stockOpState.set('closed');
+    this.refreshTrigger.update((v) => v + 1);
+  }
+
+  openTrackOne(entry: StockEntryResponse): void {
+    this.trackLocation.set(this.toOpLocation(entry));
+    this.trackState.set('open');
+  }
+
+  // Refreshes the detail and the movements table (which now carries the new Conversion outflow).
+  onTracked(): void {
+    this.trackState.set('closed');
+    this.refreshTrigger.update((v) => v + 1);
+  }
+
+  openCollapse(): void {
+    this.collapseState.set('open');
+  }
+
+  onCollapsed(): void {
+    this.collapseState.set('closed');
     this.refreshTrigger.update((v) => v + 1);
   }
 

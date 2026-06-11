@@ -144,15 +144,17 @@ Carving a single tracked instance out of bulk stock, in one transaction:
 2. **Append a `Conversion` movement** — an outflow of 1 at that location — with `RelatedItemId` pointing at the new item.
 3. **Create a non-fungible item** at the **same location** (the carved-out instance inherits where it came from), in `Active` status.
 
-The result is lossless and atomic: the count drops by one, a new individually-tracked thing appears where the stock was, and the ledger explains the change as a conversion rather than consumption (so it never pollutes burn rate). It is offered **only for count-like units** — carving "one" out of `2.5 kg` of flour is meaningless, so the action is hidden for non-count units. Traceability runs both ways: the movement's `RelatedItemId` links the stock change to the instance it produced.
+The result is lossless and atomic: the count drops by one, a new individually-tracked thing appears where the stock was, and the ledger explains the change as a conversion rather than consumption (so it never pollutes burn rate). It is offered **only when the source location holds a whole number of units (≥ 1)** — carving "one" out of `2.5 kg` of flour is meaningless. There is no per-item "count-like" flag: a whole-number on-hand is the proxy. The backend enforces the same rule (rejecting fractional or below-one source quantities); the UI simply hides the action when the row's quantity is not a whole number. Traceability runs both ways: the movement's `RelatedItemId` links the stock change to the instance it produced.
 
 ## Collapse back to a count
 
 The reverse — folding several individually-tracked instances back into a fungible count:
 
 1. **Increment** the fungible stock by N at the target location.
-2. **Append a `Conversion` movement** — an inflow of N.
-3. **Archive** the collapsed non-fungible instances (do **not** hard-delete them).
+2. **Append N `Conversion` inflow movements of quantity 1** — one per collapsed instance, each carrying its own `RelatedItemId`. Traceability therefore runs both ways here too, mirroring *track-this-one-individually*: every collapsed instance leaves its own ledger row pointing back at the item it came from, rather than a single anonymous inflow of N.
+3. **Archive** the collapsed non-fungible instances (do **not** hard-delete them), keeping their location.
+
+Only **`Active`** instances are eligible: `Lent` / `InRepair` ones are physically elsewhere, so folding them back would inflate on-hand and silently drop their `LentTo`. A container can be collapsed only once it is empty (no live children, no stock inside) — the same sealing gate that guards taking a container terminal — and it cannot be its own collapse target.
 
 This is mechanically simple but **lossy**: per-instance serials, values, compartments, and individual history have nowhere to live on a bulk count. So the operation **warns** before proceeding, and it **archives** the source instances rather than deleting them, so their records and any attachments survive for later reference. The asymmetry with *track-this-one-individually* (which is lossless) is intrinsic: splitting adds identity, collapsing discards it.
 

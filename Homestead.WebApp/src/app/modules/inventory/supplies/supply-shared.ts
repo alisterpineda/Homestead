@@ -16,6 +16,15 @@ export function formatQtyWithUnit(value: number, unit: string): string {
   return `${formatQty(value)} ${unit}`.trim();
 }
 
+/**
+ * Whole-number proxy for "count-like": track-one-individually is only offered when a location holds
+ * a whole number of discrete units (≥ 1). The backend enforces the same rule; the UI hides the
+ * action for fractional/continuous units rather than disabling it.
+ */
+export function isWholeCount(q: number): boolean {
+  return Number.isInteger(q) && q >= 1;
+}
+
 export type MovementDirection = 'inflow' | 'outflow' | 'transfer' | 'unknown';
 
 /** Direction is structural — read from which of the From/To ids are populated. */

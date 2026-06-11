@@ -10,6 +10,7 @@ using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItems;
 using Homestead.WebApi.Modules.Inventory.Features.Items.PatchItem;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.AdjustStock;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.CollapseItems;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.ConsumeStock;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.CreateSupply;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.DeleteSupply;
@@ -18,6 +19,7 @@ using Homestead.WebApi.Modules.Inventory.Features.Supplies.GetSupply;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.GetSupplyMovements;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.PatchSupply;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.ReceiveStock;
+using Homestead.WebApi.Modules.Inventory.Features.Supplies.TrackItem;
 using Homestead.WebApi.Modules.Inventory.Features.Supplies.TransferStock;
 
 namespace Homestead.WebApi.Modules.Inventory;
@@ -57,6 +59,8 @@ public static class InventoryModule
         ConsumeStockEndpoint.Map(supplies);
         TransferStockEndpoint.Map(supplies);
         AdjustStockEndpoint.Map(supplies);
+        TrackItemEndpoint.Map(supplies);
+        CollapseItemsEndpoint.Map(supplies);
 
         return app;
     }

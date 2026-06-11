@@ -114,6 +114,48 @@ public class StockService(
             relatedItemId: null, request.Note);
     }
 
+    public async Task ConvertOutAsync(Guid itemId, StockConvertOutRequest request, CancellationToken ct)
+    {
+        var item = await LoadConvertibleItemAsync(itemId, ct);
+        await ValidateLocationAsync(request.From, ct);
+        var occurredAt = ResolveOccurredAt(request.OccurredAt);
+
+        // Whole-number proxy for "count-like": track-one only makes sense when the source holds a
+        // whole number of discrete units. This is an advisory pre-check — the guarded decrement below
+        // is what actually prevents an over-draw under a concurrent fractional consume.
+        var entry = await FindEntryAsync(itemId, request.From, ct);
+        if (entry is null)
+            throw new BusinessRuleException("There is no stock of this item at the source location.");
+        if (entry.Quantity < 1m || entry.Quantity % 1m != 0m)
+            throw new BusinessRuleException(
+                "Track one individually requires a whole-number quantity of at least 1 at this location.");
+
+        await ApplyDeltaAsync(itemId, request.From, -1m, occurredAt, ct);
+
+        AppendMovement(item, MovementKind.Conversion, from: request.From, to: null, 1m,
+            unitCost: null, unitCostCurrencyId: null, occurredAt,
+            relatedItemId: request.RelatedItemId, request.Note);
+    }
+
+    public async Task ConvertInAsync(Guid itemId, StockConvertInRequest request, CancellationToken ct)
+    {
+        var item = await LoadConvertibleItemAsync(itemId, ct);
+        await ValidateLocationAsync(request.To, ct);
+        if (request.RelatedItemIds.Count == 0)
+            throw new BusinessRuleException("At least one item must be selected to collapse.");
+        var occurredAt = ResolveOccurredAt(request.OccurredAt);
+
+        await ApplyDeltaAsync(itemId, request.To, request.RelatedItemIds.Count, occurredAt, ct);
+
+        // One quantity-1 inflow per collapsed instance, each carrying its id — full two-way
+        // traceability, symmetric with track-one.
+        foreach (var relatedItemId in request.RelatedItemIds)
+        {
+            AppendMovement(item, MovementKind.Conversion, from: null, to: request.To, 1m,
+                unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId, request.Note);
+        }
+    }
+
     /// <summary>
     /// Applies a signed delta to the entry at a location, creating/merging on increment and
     /// deleting on reaching zero. A decrement is a guarded atomic update; an over-draw is rejected.
@@ -230,6 +272,17 @@ public class StockService(
             ?? throw new EntityNotFoundException("Supply not found.");
         if (item.Fungibility != Fungibility.Fungible)
             throw new BusinessRuleException("Stock operations apply only to fungible supplies.");
+        return item;
+    }
+
+    // Conversions additionally require the supply to be Active — unlike receive/consume/transfer/
+    // adjust, converting an Archived supply has no meaning (you can't carve from or refill a retired
+    // record). The other ops don't yet share this gate (see the plan's accepted tradeoff).
+    private async Task<Item> LoadConvertibleItemAsync(Guid itemId, CancellationToken ct)
+    {
+        var item = await LoadFungibleItemAsync(itemId, ct);
+        if (item.Status != ItemStatus.Active)
+            throw new BusinessRuleException("Conversions require an Active supply.");
         return item;
     }
 

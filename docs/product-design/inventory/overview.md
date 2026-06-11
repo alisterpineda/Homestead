@@ -113,11 +113,11 @@ See [locations.md](locations.md) for the full lifecycle: terminal-status handlin
 
 ### Track this one individually (and the reverse)
 
-A household often keeps something in bulk and then wants to track one unit on its own — pull one bin from a case of twelve and start logging it individually. **"Track this one individually"** does exactly that, atomically: it decrements the fungible stock by one at that location, writes a `Conversion` movement recording the change, and creates a non-fungible item at the same location, linked back to the supply it came from. Nothing is lost and the books stay balanced — it is a normal "start tracking this one" action, not a schema conversion. It is offered only for count-like supplies (carving "one" out of 2.5 kg of flour is meaningless).
+A household often keeps something in bulk and then wants to track one unit on its own — pull one bin from a case of twelve and start logging it individually. **"Track this one individually"** does exactly that, atomically: it decrements the fungible stock by one at that location, writes a `Conversion` movement recording the change, and creates a non-fungible item at the same location, linked back to the supply it came from. Nothing is lost and the books stay balanced — it is a normal "start tracking this one" action, not a schema conversion. It is offered only when the source location holds a whole number of units (carving "one" out of 2.5 kg of flour is meaningless) — a whole-number on-hand is the proxy for "count-like", with no separate per-supply flag.
 
-The **reverse** — collapsing several individually-tracked instances back into a fungible count — is mechanically simple (+N to stock, a `Conversion` movement) but **lossy**: per-instance serial numbers, values, and history have nowhere to go. So it warns, and it **archives** the collapsed instances rather than hard-deleting them, so their records survive.
+The **reverse** — collapsing several individually-tracked instances back into a fungible count — is mechanically simple (+N to stock, written as N quantity-1 `Conversion` inflows, one per instance) but **lossy**: per-instance serial numbers, values, and history have nowhere to go. So it warns, and it **archives** the collapsed instances rather than hard-deleting them, so their records survive.
 
-See [stock.md](stock.md) for both operations step by step, including the count-like-unit restriction and traceability.
+See [stock.md](stock.md) for both operations step by step, including the whole-number restriction and traceability.
 
 ## Design principles
 

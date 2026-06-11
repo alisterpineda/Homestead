@@ -13,10 +13,13 @@ import { receiveStock } from '@/api/generated/fn/inventory/receive-stock';
 import { consumeStock } from '@/api/generated/fn/inventory/consume-stock';
 import { transferStock } from '@/api/generated/fn/inventory/transfer-stock';
 import { adjustStock } from '@/api/generated/fn/inventory/adjust-stock';
+import { trackItemIndividually } from '@/api/generated/fn/inventory/track-item-individually';
+import { collapseItems } from '@/api/generated/fn/inventory/collapse-items';
 import type { PaginatedResponseOfSupplyResponse } from '@/api/generated/models/paginated-response-of-supply-response';
 import type { PaginatedResponseOfStockMovementResponse } from '@/api/generated/models/paginated-response-of-stock-movement-response';
 import type { SupplyResponse } from '@/api/generated/models/supply-response';
 import type { SupplyDetailResponse } from '@/api/generated/models/supply-detail-response';
+import type { TrackItemResponse } from '@/api/generated/models/track-item-response';
 
 export type { GetSupplies$Params } from '@/api/generated/fn/inventory/get-supplies';
 export type { GetSupply$Params } from '@/api/generated/fn/inventory/get-supply';
@@ -28,6 +31,8 @@ export type { ReceiveStock$Params } from '@/api/generated/fn/inventory/receive-s
 export type { ConsumeStock$Params } from '@/api/generated/fn/inventory/consume-stock';
 export type { TransferStock$Params } from '@/api/generated/fn/inventory/transfer-stock';
 export type { AdjustStock$Params } from '@/api/generated/fn/inventory/adjust-stock';
+export type { TrackItemIndividually$Params } from '@/api/generated/fn/inventory/track-item-individually';
+export type { CollapseItems$Params } from '@/api/generated/fn/inventory/collapse-items';
 
 @Injectable({ providedIn: 'root' })
 export class InventorySupplyApiService {
@@ -74,5 +79,13 @@ export class InventorySupplyApiService {
 
   adjustStock(params: Parameters<typeof adjustStock>[2]): Observable<SupplyDetailResponse> {
     return adjustStock(this.http, this.config.rootUrl, params).pipe(map((r) => r.body));
+  }
+
+  trackItem(params: Parameters<typeof trackItemIndividually>[2]): Observable<TrackItemResponse> {
+    return trackItemIndividually(this.http, this.config.rootUrl, params).pipe(map((r) => r.body));
+  }
+
+  collapseItems(params: Parameters<typeof collapseItems>[2]): Observable<SupplyDetailResponse> {
+    return collapseItems(this.http, this.config.rootUrl, params).pipe(map((r) => r.body));
   }
 }
