@@ -22,7 +22,7 @@ import {
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
+import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -63,6 +63,7 @@ type AreaFilter = string;
 
 /** One-tap presets over the row kind: everything, only items, or only supplies. */
 type KindFilter = 'all' | 'items' | 'supplies';
+const isKindFilter = (v: unknown): v is KindFilter => v === 'all' || v === 'items' || v === 'supplies';
 
 /** Both lists fetched together; null until the first load resolves. */
 interface ListData {
@@ -92,7 +93,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     NgIcon,
     HlmIconImports,
     HlmButton,
-    HlmButtonGroup,
+    HlmToggleGroupImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -160,26 +161,18 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
         } @else {
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2">
-              <div hlmButtonGroup aria-label="Kind filter">
-                <button
-                  hlmBtn
-                  [variant]="kindFilter() === 'all' ? 'secondary' : 'outline'"
-                  size="sm"
-                  (click)="kindFilter.set('all')"
-                >All</button>
-                <button
-                  hlmBtn
-                  [variant]="kindFilter() === 'items' ? 'secondary' : 'outline'"
-                  size="sm"
-                  (click)="kindFilter.set('items')"
-                >Items</button>
-                <button
-                  hlmBtn
-                  [variant]="kindFilter() === 'supplies' ? 'secondary' : 'outline'"
-                  size="sm"
-                  (click)="kindFilter.set('supplies')"
-                >Supplies</button>
-              </div>
+              <hlm-toggle-group
+                type="single"
+                variant="outline"
+                size="sm"
+                aria-label="Kind filter"
+                [value]="kindFilter()"
+                (valueChange)="onKindFilterChange($event)"
+              >
+                <button hlmToggleGroupItem value="all">All</button>
+                <button hlmToggleGroupItem value="items">Items</button>
+                <button hlmToggleGroupItem value="supplies">Supplies</button>
+              </hlm-toggle-group>
 
               <div hlmPopover>
                 <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
@@ -620,6 +613,10 @@ export class InventoryListPageComponent {
     if (this.lowStockOnly()) return 'Filter: Low stock';
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
+
+  onKindFilterChange(value: unknown): void {
+    if (isKindFilter(value)) this.kindFilter.set(value);
+  }
 
   /** Picking an area drops any container drill-down (they are mutually exclusive scopes). */
   selectAreaFilter(af: AreaFilter): void {
