@@ -287,7 +287,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             }
           </div>
         } @else {
-          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3" aria-hidden="true">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3" aria-hidden="true">
             @for (_ of skeletonCards; track $index) {
               <div hlmCard class="relative aspect-[3/4] overflow-hidden p-0 gap-0">
                 <div hlmSkeleton class="absolute inset-0 rounded-none"></div>
@@ -416,7 +416,7 @@ export class DocumentListComponent {
   private destroyRef = inject(DestroyRef);
   private prefs = inject(UserPreferencesService);
 
-  readonly skeletonCards = Array(12);
+  readonly skeletonCards = Array(24);
   hideableColumns = HIDEABLE_COLUMNS;
   readonly sortOptions: { value: DocumentSortBy; label: string }[] = [
     { value: 'CreatedAt', label: 'Date Added' },

@@ -46,7 +46,7 @@ import { MatchSnippetComponent } from '../match-snippet/match-snippet.component'
     }
   `,
   template: `
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
       @for (doc of documents(); track doc.id) {
         <div
           hlmCard
