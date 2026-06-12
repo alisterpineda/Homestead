@@ -4,6 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Services;
 
+/// <summary>
+/// <see cref="InventoryPlacementService"/> duplicates this walk's chain semantics (unfiltered
+/// ancestor statuses; broken or cyclic chain ⇒ unplaced) for aggregate area counts — any change
+/// to the rules here must be mirrored there, or counts will disagree with per-item resolution.
+/// </summary>
 public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
 {
     public async Task<ItemResponse> EnrichAsync(ItemResponse item, CancellationToken ct = default)

@@ -2,6 +2,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.DeleteArea;
+using Homestead.WebApi.Modules.Inventory.Services;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features.Areas;
@@ -20,7 +21,7 @@ public class DeleteAreaHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new DeleteAreaHandler(_db, _audit, _unitOfWork);
+        _sut = new DeleteAreaHandler(_db, _audit, _unitOfWork, new InventoryPlacementService(_db));
     }
 
     public void Dispose() => _db.Dispose();
@@ -77,6 +78,37 @@ public class DeleteAreaHandlerTests : IDisposable
         var result = await _sut.Handle(new DeleteAreaCommand(area.Id), Ct);
 
         Assert.True(result);
+    }
+
+    [Fact]
+    public async Task Handle_LiveItemNestedInTerminalContainer_Throws()
+    {
+        // Resolved semantics: the live item RESOLVES to the area through the terminal container,
+        // so it blocks deletion the same way the areas-table count and delete button report it.
+        var area = await AddAreaWithItemAsync(itemStatus: null);
+        var bin = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sold bin",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Sold,
+            AreaId = area.Id,
+            IsContainer = true,
+        };
+        _db.Items.AddRange(bin, new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Nested pliers",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Active,
+            ParentItemId = bin.Id,
+        });
+        await _db.SaveChangesAsync(Ct);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new DeleteAreaCommand(area.Id), Ct));
+
+        Assert.Contains(_db.Areas, a => a.Id == area.Id);
     }
 
     [Fact]

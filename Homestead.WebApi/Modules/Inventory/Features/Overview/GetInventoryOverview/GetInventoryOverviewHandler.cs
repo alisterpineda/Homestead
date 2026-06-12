@@ -1,11 +1,12 @@
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 
-public class GetInventoryOverviewHandler(AppDbContext db)
+public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementService placementService)
     : IRequestHandler<GetInventoryOverviewQuery, GetInventoryOverviewResponse>
 {
     private const int PreviewCount = 5;
@@ -60,7 +61,29 @@ public class GetInventoryOverviewHandler(AppDbContext db)
             .Select(i => new LentItemPreview { Id = i.Id, Name = i.Name, LentTo = i.LentTo })
             .ToListAsync(ct);
 
-        var (unplacedCount, unplacedItems) = await ComputeUnplacedAsync(ct);
+        var placement = await placementService.ComputeAsync(ct);
+
+        // SQL ordering for collation parity with GetAreasHandler. Zero-item areas are included —
+        // an empty area is still a browse target.
+        var areas = await db.Areas.AsNoTracking()
+            .OrderBy(a => a.Name)
+            .Select(a => new { a.Id, a.Name })
+            .ToListAsync(ct);
+
+        var areaSummaries = areas
+            .Select(a => new AreaSummary
+            {
+                Id = a.Id,
+                Name = a.Name,
+                ItemCount = placement.AreaItemCounts.GetValueOrDefault(a.Id),
+            })
+            .ToList();
+
+        var unplacedItems = placement.UnplacedItems
+            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(PreviewCount)
+            .Select(i => new UnplacedItemPreview { Id = i.Id, Name = i.Name })
+            .ToList();
 
         return new GetInventoryOverviewResponse
         {
@@ -68,65 +91,9 @@ public class GetInventoryOverviewHandler(AppDbContext db)
             LowStockSupplies = lowStockSupplies,
             LentCount = lentCount,
             LentItems = lentItems,
-            UnplacedCount = unplacedCount,
+            UnplacedCount = placement.UnplacedItems.Count,
             UnplacedItems = unplacedItems,
+            Areas = areaSummaries,
         };
-    }
-
-    /// <summary>
-    /// Resolved-Unplaced semantics: an item is unplaced when no area is reachable up its container
-    /// chain — including items nested inside an unplaced container. This mirrors the parent-chain
-    /// walk in <see cref="Services.ItemLocationResolver"/> (broken or cyclic chain ⇒ unplaced),
-    /// which must match what the deep-linked items list shows; keep the two in sync.
-    /// </summary>
-    private async Task<(int Count, IReadOnlyList<UnplacedItemPreview> Preview)> ComputeUnplacedAsync(
-        CancellationToken ct)
-    {
-        // Every valid ancestor is a container; deliberately not status-filtered (a chain may pass
-        // through terminal containers), same as the resolver.
-        var containers = await db.Items.AsNoTracking()
-            .Where(i => i.IsContainer)
-            .Select(i => new { i.Id, i.AreaId, i.ParentItemId })
-            .ToDictionaryAsync(c => c.Id, ct);
-
-        // A directly-placed item can never be resolved-unplaced, so filter those out in SQL.
-        var candidates = await db.Items.AsNoTracking()
-            .Where(i => i.Fungibility == Fungibility.NonFungible
-                && i.AreaId == null
-                && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
-            .Select(i => new { i.Id, i.Name, i.ParentItemId })
-            .ToListAsync(ct);
-
-        var unplaced = new List<UnplacedItemPreview>();
-        foreach (var item in candidates)
-        {
-            var isUnplaced = true;
-            var visited = new HashSet<Guid> { item.Id };
-            var currentId = item.ParentItemId;
-            while (currentId is { } id)
-            {
-                // Broken or cyclic chain ⇒ unplaced from this point.
-                if (!visited.Add(id) || !containers.TryGetValue(id, out var node))
-                    break;
-
-                if (node.AreaId is not null)
-                {
-                    isUnplaced = false;
-                    break;
-                }
-
-                currentId = node.ParentItemId;
-            }
-
-            if (isUnplaced)
-                unplaced.Add(new UnplacedItemPreview { Id = item.Id, Name = item.Name });
-        }
-
-        var preview = unplaced
-            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(PreviewCount)
-            .ToList();
-
-        return (unplaced.Count, preview);
     }
 }

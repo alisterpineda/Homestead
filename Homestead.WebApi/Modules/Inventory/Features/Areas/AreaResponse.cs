@@ -7,6 +7,9 @@ public record AreaResponse
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 
-    /// <summary>Count of live (directly-placed, non-terminal) items currently in this area.</summary>
+    /// <summary>
+    /// Resolved count of live rows the area-filtered items list shows: items resolving here
+    /// (directly placed + nested in containers) plus distinct supplies with stock here.
+    /// </summary>
     public required int LiveItemCount { get; init; }
 }

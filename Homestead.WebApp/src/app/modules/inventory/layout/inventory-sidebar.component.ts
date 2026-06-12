@@ -15,7 +15,6 @@ import { isNavItemActive } from '@/shared/utils';
   providers: [provideIcons({ lucidePackage, lucideMapPin, lucideLayoutDashboard })],
   template: `
     <div hlmSidebarGroup>
-      <div hlmSidebarGroupLabel>Inventory</div>
       <div hlmSidebarGroupContent>
         <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
@@ -24,6 +23,14 @@ import { isNavItemActive } from '@/shared/utils';
               <span>Overview</span>
             </a>
           </li>
+        </ul>
+      </div>
+    </div>
+
+    <div hlmSidebarGroup>
+      <div hlmSidebarGroupLabel>Manage</div>
+      <div hlmSidebarGroupContent>
+        <ul hlmSidebarMenu>
           <li hlmSidebarMenuItem>
             <a hlmSidebarMenuButton routerLink="/inventory/items" [isActive]="isActive('/inventory/items')">
               <ng-icon hlm name="lucidePackage" size="sm" />

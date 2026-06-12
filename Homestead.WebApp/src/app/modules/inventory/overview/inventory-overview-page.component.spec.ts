@@ -13,6 +13,7 @@ const ALL_QUIET: GetInventoryOverviewResponse = {
   lentItems: [],
   unplacedCount: 0,
   unplacedItems: [],
+  areas: [],
 };
 
 const BUSY: GetInventoryOverviewResponse = {
@@ -27,6 +28,10 @@ const BUSY: GetInventoryOverviewResponse = {
   unplacedItems: [
     { id: 'wrench', name: 'Adrift wrench' },
     { id: 'bin', name: 'Floating bin' },
+  ],
+  areas: [
+    { id: 'garage', name: 'Garage', itemCount: 12 },
+    { id: 'office', name: 'Office', itemCount: 0 },
   ],
 };
 
@@ -97,7 +102,58 @@ describe('InventoryOverviewPageComponent', () => {
     expect(content).toContain('Nothing running low');
     expect(content).toContain('Nothing lent out');
     expect(content).toContain('Everything has a place');
-    expect((fixture.nativeElement as HTMLElement).querySelectorAll('a[href]').length).toBe(0);
+    // The only link on an all-quiet dashboard is the browse-by-place empty-state hint.
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
+    ).map(a => a.getAttribute('href'));
+    expect(links).toEqual(['/inventory/areas']);
+  });
+
+  it('renders a browse-by-place card per area with name and count', async () => {
+    api.response = BUSY;
+    const fixture = await create();
+
+    const content = text(fixture);
+    expect(content).toContain('Browse by place');
+    expect(content).toContain('Garage');
+    expect(content).toContain('12');
+    expect(content).toContain('Office');
+
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
+    ).map(a => a.getAttribute('href'));
+    expect(links).toContain('/inventory/items?area=garage');
+    expect(links).toContain('/inventory/items?area=office');
+  });
+
+  it('shows the Unplaced card only when there are unplaced items', async () => {
+    api.response = BUSY;
+    let fixture = await create();
+    let links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
+    ).map(a => a.getAttribute('href'));
+    // Tile view-all link + place card share the same target — both present.
+    expect(links.filter(l => l === '/inventory/items?area=unplaced&kind=items').length).toBe(2);
+
+    api.response = { ...BUSY, unplacedCount: 0, unplacedItems: [] };
+    fixture = await create();
+    links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('a[href]'),
+    ).map(a => a.getAttribute('href'));
+    expect(links).not.toContain('/inventory/items?area=unplaced&kind=items');
+    // Area cards still render without the Unplaced card.
+    expect(links).toContain('/inventory/items?area=garage');
+  });
+
+  it('shows an empty hint linking to the Areas page when there is nothing to browse', async () => {
+    const fixture = await create();
+
+    const content = text(fixture);
+    expect(content).toContain('No areas yet');
+    const hint = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'a[href="/inventory/areas"]',
+    );
+    expect(hint).not.toBeNull();
   });
 
   it('shows the error state when the fetch fails', async () => {

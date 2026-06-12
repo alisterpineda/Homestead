@@ -8,6 +8,7 @@ import {
   LOCALE_ID,
 } from '@angular/core';
 import { formatDate } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
@@ -20,7 +21,6 @@ import {
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { AreaRowActionsComponent } from './area-row-actions.component';
-import { escapeHtml } from '@/shared/utils';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 
 export type AreaSortId = 'name' | 'liveItemCount' | 'createdAt';
@@ -32,6 +32,23 @@ export interface AreaSortState {
 interface AreaTableMeta {
   onEdit: (area: AreaResponse) => void;
   onDelete: (area: AreaResponse) => void;
+}
+
+@Component({
+  selector: 'app-area-name-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink],
+  template: `
+    <a
+      routerLink="/inventory/items"
+      [queryParams]="{ area: area.id }"
+      class="block min-w-0 truncate text-sm font-medium"
+    >{{ area.name }}</a>
+  `,
+})
+export class AreaNameCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<AreaResponse, unknown>>();
+  protected get area(): AreaResponse { return this.ctx.row.original; }
 }
 
 @Component({
@@ -129,7 +146,7 @@ export class AreaTableComponent {
       accessorKey: 'name',
       id: 'name',
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
-      cell: (info) => `<span class="text-sm font-medium">${escapeHtml(info.row.original.name)}</span>`,
+      cell: () => flexRenderComponent(AreaNameCell),
     },
     {
       id: 'liveItemCount',

@@ -11,6 +11,7 @@ export type { AiProviderSummary } from './models/ai-provider-summary';
 export type { AiProviderType } from './models/ai-provider-type';
 export type { AppRole } from './models/app-role';
 export type { AreaResponse } from './models/area-response';
+export type { AreaSummary } from './models/area-summary';
 export type { BalanceEntryResponse } from './models/balance-entry-response';
 export type { BulkClassifyDocumentsCommand } from './models/bulk-classify-documents-command';
 export type { BulkClassifyDocumentsResponse } from './models/bulk-classify-documents-response';

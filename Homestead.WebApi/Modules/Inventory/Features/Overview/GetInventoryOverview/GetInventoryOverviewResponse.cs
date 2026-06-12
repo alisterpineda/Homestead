@@ -8,6 +8,19 @@ public record GetInventoryOverviewResponse
     public required IReadOnlyList<LentItemPreview> LentItems { get; init; }
     public required int UnplacedCount { get; init; }
     public required IReadOnlyList<UnplacedItemPreview> UnplacedItems { get; init; }
+    public required IReadOnlyList<AreaSummary> Areas { get; init; }
+}
+
+public record AreaSummary
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>
+    /// Resolved count — items resolving here (incl. nested in containers) plus distinct supplies
+    /// with stock here; matches what the area-filtered items list shows.
+    /// </summary>
+    public required int ItemCount { get; init; }
 }
 
 public record LowStockSupplyPreview

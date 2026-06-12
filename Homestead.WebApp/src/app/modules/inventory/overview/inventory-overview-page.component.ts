@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, input, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { tap } from 'rxjs';
@@ -6,6 +6,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideTriangleAlert,
   lucideUserRound,
+  lucideMapPin,
   lucideMapPinOff,
   lucideSearch,
   lucideCircleCheck,
@@ -20,6 +21,14 @@ import { InventoryOverviewApiService } from '@/api/services/inventory-overview-a
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { formatQty } from '../supplies/supply-shared';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
+
+interface PlaceCard {
+  readonly id: string;
+  readonly name: string;
+  readonly icon: string;
+  readonly count: number;
+  readonly queryParams: Record<string, string>;
+}
 
 /**
  * One "needs attention" tile: icon + title + count, the projected preview rows, a "+N more"
@@ -75,6 +84,7 @@ export class InventoryOverviewTileComponent {
   selector: 'app-inventory-overview-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmInput,
@@ -85,6 +95,7 @@ export class InventoryOverviewTileComponent {
   providers: [provideIcons({
     lucideTriangleAlert,
     lucideUserRound,
+    lucideMapPin,
     lucideMapPinOff,
     lucideSearch,
     lucideCircleCheck,
@@ -174,6 +185,32 @@ export class InventoryOverviewTileComponent {
             }
           </app-inventory-overview-tile>
         </div>
+
+        <section>
+          <h2 class="mb-3 text-sm font-medium text-muted-foreground">Browse by place</h2>
+          @if (placeCards().length === 0) {
+            <p class="text-sm text-muted-foreground">
+              No areas yet — set up rooms and places on the
+              <a routerLink="/inventory/areas" class="underline underline-offset-4 hover:text-foreground">Areas page</a>.
+            </p>
+          } @else {
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              @for (card of placeCards(); track card.id) {
+                <a
+                  routerLink="/inventory/items"
+                  [queryParams]="card.queryParams"
+                  class="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:bg-accent"
+                >
+                  <span class="flex min-w-0 items-center gap-2">
+                    <ng-icon hlm [name]="card.icon" size="sm" class="shrink-0 text-muted-foreground" />
+                    <span class="truncate text-sm font-medium">{{ card.name }}</span>
+                  </span>
+                  <span class="shrink-0 text-sm text-muted-foreground tabular-nums">{{ card.count }}</span>
+                </a>
+              }
+            </div>
+          }
+        </section>
       }
     </div>
   `,
@@ -197,6 +234,29 @@ export class InventoryOverviewPageComponent {
     ),
     { initialValue: null },
   );
+
+  /** One card per area, plus the Unplaced pseudo-place when it has contents (items-only lens). */
+  placeCards = computed<PlaceCard[]>(() => {
+    const overview = this.data();
+    if (!overview) return [];
+    const cards: PlaceCard[] = overview.areas.map(area => ({
+      id: area.id,
+      name: area.name,
+      icon: 'lucideMapPin',
+      count: area.itemCount,
+      queryParams: { area: area.id },
+    }));
+    if (overview.unplacedCount > 0) {
+      cards.push({
+        id: 'unplaced',
+        name: 'Unplaced',
+        icon: 'lucideMapPinOff',
+        count: overview.unplacedCount,
+        queryParams: { area: 'unplaced', kind: 'items' },
+      });
+    }
+    return cards;
+  });
 
   /** Hands the term off to the items list — no debounce, it's a one-shot navigation. */
   onSearchSubmit(event: Event): void {

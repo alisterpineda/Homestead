@@ -2,13 +2,18 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Areas.PatchArea;
 
-public class PatchAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
+public class PatchAreaHandler(
+    AppDbContext db,
+    IAuditContext audit,
+    IUnitOfWork unitOfWork,
+    IInventoryPlacementService placementService)
     : IRequestHandler<PatchAreaCommand, AreaResponse>
 {
     public async Task<AreaResponse> Handle(PatchAreaCommand request, CancellationToken ct)
@@ -32,11 +37,11 @@ public class PatchAreaHandler(AppDbContext db, IAuditContext audit, IUnitOfWork 
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        var liveItemCount = await db.Items
-            .AsNoTracking()
-            .CountAsync(i => i.AreaId == area.Id
-                && ItemStatusExtensions.LiveStatuses.Contains(i.Status), ct);
+        // Same resolved count as GetAreas — the field means one thing regardless of which
+        // endpoint produced the response.
+        var placement = await placementService.ComputeAsync(ct);
 
-        return AreaResponseMapper.ToResponse(area, liveItemCount);
+        return AreaResponseMapper.ToResponse(
+            area, placement.AreaItemCounts.GetValueOrDefault(area.Id));
     }
 }

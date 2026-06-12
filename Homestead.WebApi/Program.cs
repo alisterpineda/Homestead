@@ -167,6 +167,7 @@ builder.Services.AddScoped<CommandWriteCommandInterceptor>();
 builder.Services.AddScoped<IDocumentQueryService, DocumentQueryService>();
 builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IItemLocationResolver, ItemLocationResolver>();
+builder.Services.AddScoped<IInventoryPlacementService, InventoryPlacementService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();

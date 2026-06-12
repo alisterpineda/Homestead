@@ -5,7 +5,8 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 internal record OverviewResult(
     int LowStockCount, IReadOnlyList<LowStockPreviewItem> LowStockSupplies,
     int LentCount, IReadOnlyList<LentPreviewItem> LentItems,
-    int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedItems);
+    int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedItems,
+    IReadOnlyList<AreaSummaryItem> Areas);
 
 internal record LowStockPreviewItem(
     Guid Id, string Name, decimal TotalOnHand, string Unit, decimal RestockThreshold);
@@ -13,6 +14,8 @@ internal record LowStockPreviewItem(
 internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
 
 internal record UnplacedPreviewItem(Guid Id, string Name);
+
+internal record AreaSummaryItem(Guid Id, string Name, int ItemCount);
 
 [Collection("Integration")]
 public class OverviewEndpointTests : IntegrationTestBase
@@ -55,10 +58,11 @@ public class OverviewEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<SupplyItem>(CT))!;
     }
 
-    private static async Task ReceiveAsync(HttpClient client, Guid supplyId, Guid areaId, decimal quantity)
+    private static async Task ReceiveAsync(
+        HttpClient client, Guid supplyId, Guid? areaId, decimal quantity, Guid? containerItemId = null)
     {
         var resp = await client.PostAsJsonAsync($"/api/v1/inventory/supplies/{supplyId}/receive",
-            new { areaId, quantity }, CT);
+            new { areaId, containerItemId, quantity }, CT);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
@@ -94,6 +98,7 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.Empty(overview.LentItems);
         Assert.Equal(0, overview.UnplacedCount);
         Assert.Empty(overview.UnplacedItems);
+        Assert.Empty(overview.Areas);
     }
 
     [Fact]
@@ -192,6 +197,82 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.Contains(noLocation.Id, ids);
         Assert.Contains(floatingBin.Id, ids);
         Assert.Contains(nested.Id, ids);
+    }
+
+    [Fact]
+    public async Task Overview_Areas_CountsResolvedItems()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+
+        // Direct item + placed container + item nested in it ⇒ 3 resolved to the garage.
+        await CreateItemAsync(client, new { name = "Direct drill", areaId = garageId });
+        var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
+        await CreateItemAsync(client, new { name = "Nested pliers", parentItemId = bin.Id });
+
+        // Lent is live and counts; Sold is terminal and doesn't.
+        var lent = await CreateItemAsync(client, new { name = "Lent ladder", areaId = garageId });
+        await PatchStatusAsync(client, lent.Id, "Lent", lentTo: "Dave");
+        var sold = await CreateItemAsync(client, new { name = "Sold bike", areaId = garageId });
+        await PatchStatusAsync(client, sold.Id, "Sold");
+
+        // An item in an unplaced container counts toward no area but is still unplaced.
+        var floatingBin = await CreateContainerAsync(client, "Floating bin");
+        await CreateItemAsync(client, new { name = "Adrift wrench", parentItemId = floatingBin.Id });
+
+        var overview = await GetOverviewAsync(client);
+
+        var garage = Assert.Single(overview.Areas);
+        Assert.Equal("Garage", garage.Name);
+        Assert.Equal(4, garage.ItemCount); // direct + bin + nested + lent
+        Assert.Equal(2, overview.UnplacedCount); // floating bin + adrift wrench
+    }
+
+    [Fact]
+    public async Task Overview_Areas_CountsDistinctSuppliesViaResolvedStock()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var pantryId = await CreateAreaAsync(client, "Pantry");
+
+        var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
+
+        // Stock both directly in the garage and in a container resolving there ⇒ one type, counted
+        // once for the garage; stock in the pantry counts the same type there too.
+        var batteries = await CreateSupplyAsync(client, "Batteries", "cells");
+        await ReceiveAsync(client, batteries.Id, garageId, 4m);
+        await ReceiveAsync(client, batteries.Id, areaId: null, 6m, containerItemId: bin.Id);
+        await ReceiveAsync(client, batteries.Id, pantryId, 2m);
+
+        // Archived supplies keep their stock entries but are hidden from the list — excluded.
+        var archived = await CreateSupplyAsync(client, "Archived screws", "boxes");
+        await ReceiveAsync(client, archived.Id, garageId, 10m);
+        await PatchSupplyStatusAsync(client, archived.Id, "Archived");
+
+        var overview = await GetOverviewAsync(client);
+
+        Assert.Equal(2, overview.Areas.Count);
+        var garage = overview.Areas.Single(a => a.Id == garageId);
+        Assert.Equal(2, garage.ItemCount); // the bin (a live item) + batteries once
+        var pantry = overview.Areas.Single(a => a.Id == pantryId);
+        Assert.Equal(1, pantry.ItemCount); // batteries
+    }
+
+    [Fact]
+    public async Task Overview_Areas_IncludesZeroItemAreasOrderedByName()
+    {
+        var client = await CreateAdminClientAsync();
+        var officeId = await CreateAreaAsync(client, "Office");
+        var atticId = await CreateAreaAsync(client, "Attic");
+        await CreateItemAsync(client, new { name = "Stapler", areaId = officeId });
+
+        var overview = await GetOverviewAsync(client);
+
+        Assert.Equal(2, overview.Areas.Count);
+        Assert.Equal(atticId, overview.Areas[0].Id);
+        Assert.Equal(0, overview.Areas[0].ItemCount);
+        Assert.Equal(officeId, overview.Areas[1].Id);
+        Assert.Equal(1, overview.Areas[1].ItemCount);
     }
 
     [Fact]
