@@ -269,6 +269,21 @@ describe('SupplyQuickPanelComponent', () => {
       });
       expect(component['inlineForm']()).toBeNull(); // closed on success
     });
+
+    it('reseeds a blank form when assign is reopened after a successful submit', async () => {
+      await open();
+      component.openAssign();
+      component.assignQty.set('40');
+      component.assignDest.set({ kind: 'area', id: 'garage' });
+      component.submitForm();
+      expect(component['inlineForm']()).toBeNull();
+
+      // Close→reopen round-trips the seed key to the same string; the per-open nonce must still
+      // force a reseed so the previous draft (40) does not leak into the new opening.
+      component.openAssign();
+      expect(component.assignQty()).toBe('');
+      expect(component.assignDest()).toEqual({ kind: 'unplaced' });
+    });
   });
 
   describe('inline move form', () => {
@@ -306,6 +321,16 @@ describe('SupplyQuickPanelComponent', () => {
       expect(api.callsOf('receiveStock').length).toBe(1);
       // ...and the prefill reflects the optimistic quantity at click time.
       expect(component.moveQty()).toBe('6');
+    });
+
+    it('re-prefills from the entry when move is reopened on the same location', async () => {
+      await open();
+      component.openMove(PANTRY);
+      component.moveQty.set('1');
+      component.closeForm();
+
+      component.openMove(PANTRY);
+      expect(component.moveQty()).toBe('5'); // fresh prefill, not the abandoned draft
     });
   });
 

@@ -4,7 +4,8 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Supplies;
 
 /// <summary>
 /// A fungible item ("supply") — a type of consumable, with its total on-hand summed across all
-/// stock entries and a derived low-stock flag. Per-location breakdown lives in
+/// stock entries and a derived low-stock flag. The per-location breakdown is attached on list
+/// reads (<see cref="StockLocations"/>) and on the detail read via
 /// <see cref="SupplyDetailResponse"/>; the movement ledger has its own endpoint.
 /// </summary>
 public record SupplyResponse
@@ -28,4 +29,10 @@ public record SupplyResponse
 
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
+
+    /// <summary>
+    /// Resolved per-location breakdown. Filled by the list read only — create/patch reload
+    /// responses leave it empty because their consumers don't render locations.
+    /// </summary>
+    public IReadOnlyList<StockEntryResponse> StockLocations { get; init; } = [];
 }

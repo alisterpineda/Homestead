@@ -8,7 +8,8 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 internal record SupplyItem(
     Guid Id, string Name, string Status, string Unit, decimal? RestockThreshold,
-    decimal TotalOnHand, bool IsLow, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    decimal TotalOnHand, bool IsLow, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    IReadOnlyList<StockEntryItem>? StockLocations);
 
 internal record StockEntryItem(
     Guid Id, decimal Quantity, Guid? AreaId, Guid? ContainerItemId,
@@ -196,6 +197,43 @@ public class SuppliesEndpointTests : IntegrationTestBase
 
         Assert.Contains(lowList!.Items, s => s.Id == low.Id && s.IsLow);
         Assert.DoesNotContain(lowList.Items, s => s.Id == ample.Id);
+    }
+
+    [Fact]
+    public async Task GetSupplies_ReturnsResolvedStockLocations()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Parts bin", areaId: garageId);
+        var supply = await CreateSupplyAsync(client);
+        await ReceiveAsync(client, supply.Id, new { areaId = garageId, quantity = 10m });
+        await ReceiveAsync(client, supply.Id, new { containerItemId = bin.Id, quantity = 4m });
+
+        var list = await (await client.GetAsync("/api/v1/inventory/supplies?page=1&pageSize=200", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<SupplyItem>>(CT);
+
+        var listed = list!.Items.Single(s => s.Id == supply.Id);
+        Assert.NotNull(listed.StockLocations);
+        Assert.Equal(2, listed.StockLocations!.Count);
+
+        // Ordered largest quantity first, exactly like the detail breakdown.
+        var areaEntry = listed.StockLocations[0];
+        Assert.Equal(10m, areaEntry.Quantity);
+        Assert.Equal(garageId, areaEntry.AreaId);
+        Assert.Equal("Garage", areaEntry.LocationLabel);
+        var seg = Assert.Single(areaEntry.Path);
+        Assert.Equal("Area", seg.Kind);
+        Assert.Equal(garageId, seg.Id);
+
+        // Stock in a nested container resolves the full root-area → container path.
+        var containerEntry = listed.StockLocations[1];
+        Assert.Equal(4m, containerEntry.Quantity);
+        Assert.Equal(bin.Id, containerEntry.ContainerItemId);
+        Assert.Null(containerEntry.AreaId);
+        Assert.Equal("Garage › Parts bin", containerEntry.LocationLabel);
+        Assert.Equal(2, containerEntry.Path.Count);
+        Assert.Equal("Area", containerEntry.Path[0].Kind);
+        Assert.Equal(garageId, containerEntry.Path[0].Id);
     }
 
     [Fact]

@@ -25,31 +25,16 @@ internal static class SupplyDetailReader
 
         var entries = await db.StockEntries.AsNoTracking()
             .Where(e => e.ItemId == id)
-            .Select(e => new { e.Id, e.Quantity, e.AreaId, e.ContainerItemId })
+            .Select(e => new StockEntrySource(e.Id, e.Quantity, e.AreaId, e.ContainerItemId))
             .ToListAsync(ct);
 
         var paths = await locationResolver.ResolveHoldingLocationsAsync(
             entries.Select(e => new HoldingLocation(e.AreaId, e.ContainerItemId)).ToList(), ct);
 
-        var locations = entries
-            .Select(e =>
-            {
-                var path = paths.GetValueOrDefault(
-                    new HoldingLocation(e.AreaId, e.ContainerItemId), LocationPath.Empty);
-                return new StockEntryResponse
-                {
-                    Id = e.Id,
-                    Quantity = e.Quantity,
-                    AreaId = e.AreaId,
-                    ContainerItemId = e.ContainerItemId,
-                    Path = path.Segments,
-                    LocationLabel = path.Label,
-                };
-            })
-            .OrderByDescending(e => e.Quantity)
-            .ThenBy(e => e.LocationLabel)
-            .ToList();
-
-        return new SupplyDetailResponse { Supply = supply, Locations = locations };
+        return new SupplyDetailResponse
+        {
+            Supply = supply,
+            Locations = StockEntryResponseBuilder.Build(entries, paths),
+        };
     }
 }

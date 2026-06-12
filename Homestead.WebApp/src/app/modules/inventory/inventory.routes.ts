@@ -1,8 +1,7 @@
 import { Routes } from '@angular/router';
 import { InventoryLayoutComponent } from './layout/inventory-layout.component';
-import { ItemListPageComponent } from './items/item-list-page.component';
+import { InventoryListPageComponent } from './list/inventory-list-page.component';
 import { AreaListPageComponent } from './areas/area-list-page.component';
-import { SupplyListPageComponent } from './supplies/supply-list-page.component';
 import { SupplyDetailPageComponent } from './supplies/supply-detail-page.component';
 
 export const INVENTORY_ROUTES: Routes = [
@@ -11,9 +10,10 @@ export const INVENTORY_ROUTES: Routes = [
     component: InventoryLayoutComponent,
     children: [
       { path: '', redirectTo: 'items', pathMatch: 'full' },
-      { path: 'items', component: ItemListPageComponent, data: { title: 'Items' } },
+      { path: 'items', component: InventoryListPageComponent, data: { title: 'Items' } },
       { path: 'areas', component: AreaListPageComponent, data: { title: 'Areas' } },
-      { path: 'supplies', component: SupplyListPageComponent, data: { title: 'Supplies' } },
+      // Supplies merged into the unified Items list; deep links keep working.
+      { path: 'supplies', redirectTo: 'items', pathMatch: 'full' },
       { path: 'supplies/:id', component: SupplyDetailPageComponent, data: { title: 'Supply' } },
     ],
   },

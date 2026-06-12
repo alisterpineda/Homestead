@@ -25,7 +25,7 @@ export class ErrorHandlerService {
 
     if (err.status === 0) return STATUS_MESSAGES[0];
 
-    const body = err.error as ApiProblemDetails | undefined;
+    const body = this.getProblemDetails(err);
     if (body) {
       if (body.detail) return body.detail;
       if (body.errors) {
@@ -38,15 +38,31 @@ export class ErrorHandlerService {
   }
 
   getValidationErrors(err: unknown): Record<string, string[]> | null {
-    if (!(err instanceof HttpErrorResponse) || !err.error) return null;
-    const body = err.error as ApiProblemDetails;
-    if (body.errors && Object.keys(body.errors).length > 0) return body.errors;
+    const body = this.getProblemDetails(err);
+    if (body?.errors && Object.keys(body.errors).length > 0) return body.errors;
     return null;
   }
 
   getErrorCode(err: unknown): string | null {
-    if (!(err instanceof HttpErrorResponse) || !err.error) return null;
-    return (err.error as ApiProblemDetails).errorCode ?? null;
+    return this.getProblemDetails(err)?.errorCode ?? null;
+  }
+
+  /**
+   * The problem-details body of a failed request. Void-returning endpoints are generated with
+   * `responseType: 'text'`, so their problem+json body arrives as an UNPARSED string — parse it
+   * here so callers read `detail`/`errors`/`errorCode` uniformly.
+   */
+  private getProblemDetails(err: unknown): ApiProblemDetails | null {
+    if (!(err instanceof HttpErrorResponse) || err.error == null) return null;
+    const raw: unknown = err.error;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw) as ApiProblemDetails;
+      } catch {
+        return null;
+      }
+    }
+    return raw as ApiProblemDetails;
   }
 
   handleError(err: unknown, fallback: string): void {

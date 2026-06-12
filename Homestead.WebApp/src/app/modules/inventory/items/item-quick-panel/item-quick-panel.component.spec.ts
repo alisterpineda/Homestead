@@ -160,6 +160,18 @@ describe('ItemQuickPanelComponent', () => {
       component.openMove();
       expect(component.moveDest()).toEqual({ kind: 'container', id: 'chest' });
     });
+
+    it('reseeds the destination when move is reopened after a cancel', async () => {
+      await open(makeItem({ areaId: null, areaName: null, parentItemId: 'chest' }));
+      component.openMove();
+      component.moveDest.set({ kind: 'area', id: 'garage' });
+      component.closeForm();
+
+      // Close→reopen round-trips the seed key to the same string; the per-open nonce must still
+      // force a reseed so the abandoned draft does not leak into the new opening.
+      component.openMove();
+      expect(component.moveDest()).toEqual({ kind: 'container', id: 'chest' });
+    });
   });
 
   describe('status flow', () => {

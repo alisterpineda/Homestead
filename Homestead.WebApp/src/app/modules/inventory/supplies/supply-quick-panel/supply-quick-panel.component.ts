@@ -460,10 +460,16 @@ export class SupplyQuickPanelComponent {
 
   protected inlineForm = seededLinkedSignal<string, InlineForm | null>(this.seedKey, () => null);
 
+  // Bumped on every open*() so each opening gets a fresh seed key. Without it, close→reopen of the
+  // same form round-trips formSeedKey to an identical string — and since nothing reads the key
+  // while the form is closed, the linked signals never observe the intermediate value and keep the
+  // previously typed draft instead of reseeding.
+  private formOpenCount = signal(0);
+
   private formSeedKey = computed(() => {
     const f = this.inlineForm();
     const key = f && f.kind !== 'assign' ? f.key : '';
-    return `${this.seedKey()}|${f?.kind ?? ''}|${key}`;
+    return `${this.seedKey()}|${this.formOpenCount()}|${f?.kind ?? ''}|${key}`;
   });
 
   assignDest = seededLinkedSignal<string, ItemLocationValue>(this.formSeedKey, () => ({ kind: 'unplaced' }));
@@ -500,18 +506,21 @@ export class SupplyQuickPanelComponent {
 
   openAssign(): void {
     this.engine.flushAll();
+    this.formOpenCount.update(n => n + 1);
     this.inlineForm.set({ kind: 'assign' });
   }
 
   openMove(entry: StockEntryResponse): void {
     const src = this.toOpSource(entry);
     this.engine.flushAll();
+    this.formOpenCount.update(n => n + 1);
     this.inlineForm.set({ kind: 'move', key: stockLocationKey(entry), src });
   }
 
   openCorrect(entry: StockEntryResponse): void {
     const src = this.toOpSource(entry);
     this.engine.flushAll();
+    this.formOpenCount.update(n => n + 1);
     this.inlineForm.set({ kind: 'correct', key: stockLocationKey(entry), src });
   }
 

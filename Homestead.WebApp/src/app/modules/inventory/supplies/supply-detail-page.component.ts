@@ -77,9 +77,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
-      <a routerLink="/inventory/supplies" class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <a routerLink="/inventory/items" class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ng-icon hlm name="lucideArrowLeft" size="sm" />
-        All supplies
+        All items
       </a>
 
       @if (loading() && !detail()) {

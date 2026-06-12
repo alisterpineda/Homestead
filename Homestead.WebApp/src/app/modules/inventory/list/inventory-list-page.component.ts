@@ -5,8 +5,9 @@ import {
   signal,
   computed,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, of, catchError, firstValueFrom, forkJoin } from 'rxjs';
+import { switchMap, map, of, catchError, forkJoin, type Observable } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePlus,
@@ -21,6 +22,7 @@ import {
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -31,28 +33,42 @@ import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { ItemTableComponent, formatPath, type ItemSortId, type ItemSortState } from './item-table.component';
-import { CreateItemDialogComponent } from './create-item-dialog/create-item-dialog.component';
-import { EditItemSheetComponent } from './edit-item-sheet/edit-item-sheet.component';
-import { ItemQuickPanelComponent } from './item-quick-panel/item-quick-panel.component';
+import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
+import { InventoryTableComponent, type InventorySortId, type InventorySortState } from './inventory-table.component';
+import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-dialog.component';
+import { EditItemSheetComponent } from '../items/edit-item-sheet/edit-item-sheet.component';
+import { ItemQuickPanelComponent } from '../items/item-quick-panel/item-quick-panel.component';
+import { EditSupplySheetComponent } from '../supplies/edit-supply-sheet/edit-supply-sheet.component';
+import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
+import { itemToRow, supplyToRow, supplyToDrillRow, type InventoryRow } from './inventory-row';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { ItemResponse } from '@/api/generated/models/item-response';
+import type { SupplyResponse } from '@/api/generated/models/supply-response';
 import type { LocationSegmentKind } from '@/api/generated/models/location-segment-kind';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
-interface ItemSortFieldOption {
-  readonly id: ItemSortId;
+interface InventorySortFieldOption {
+  readonly id: InventorySortId;
   readonly label: string;
   readonly defaultDesc: boolean;
 }
 
 /** 'all' | 'unplaced' | an area id. */
 type AreaFilter = string;
+
+/** One-tap presets over the row kind: everything, only items, or only supplies. */
+type KindFilter = 'all' | 'items' | 'supplies';
+
+/** Both lists fetched together; null until the first load resolves. */
+interface ListData {
+  items: ItemResponse[];
+  supplies: SupplyResponse[];
+}
 
 /** Server-fetched payload for a container drill-down: the container itself plus its direct children. */
 interface DrillData {
@@ -70,12 +86,13 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
 }
 
 @Component({
-  selector: 'app-item-list-page',
+  selector: 'app-inventory-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmButtonGroup,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -84,10 +101,12 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     HlmPopoverImports,
     HlmSeparatorImports,
     HlmDropdownMenuImports,
-    ItemTableComponent,
-    CreateItemDialogComponent,
+    InventoryTableComponent,
+    CreateEntryDialogComponent,
     EditItemSheetComponent,
     ItemQuickPanelComponent,
+    EditSupplySheetComponent,
+    SupplyQuickPanelComponent,
   ],
   providers: [provideIcons({
     lucidePlus,
@@ -122,25 +141,46 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
       }
 
       @if (data() !== null) {
-        @if (allItems().length === 0) {
+        @if (allItems().length === 0 && allSupplies().length === 0) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
                 <ng-icon name="lucidePackage" />
               </div>
               <div hlmEmptyTitle>No items yet</div>
-              <div hlmEmptyDescription>Add your first item to start tracking what you own and where it lives.</div>
+              <div hlmEmptyDescription>Add your first item or supply to start tracking what you own, where it lives, and how much is left.</div>
             </div>
             <div hlmEmptyContent>
-              <app-create-item-dialog (created)="onChanged()">
+              <app-create-entry-dialog (created)="onChanged()">
                 <ng-icon hlm name="lucidePlus" size="sm" />
-                New item
-              </app-create-item-dialog>
+                New
+              </app-create-entry-dialog>
             </div>
           </div>
         } @else {
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <div hlmButtonGroup aria-label="Kind filter">
+                <button
+                  hlmBtn
+                  [variant]="kindFilter() === 'all' ? 'secondary' : 'outline'"
+                  size="sm"
+                  (click)="kindFilter.set('all')"
+                >All</button>
+                <button
+                  hlmBtn
+                  [variant]="kindFilter() === 'items' ? 'secondary' : 'outline'"
+                  size="sm"
+                  (click)="kindFilter.set('items')"
+                >Items</button>
+                <button
+                  hlmBtn
+                  [variant]="kindFilter() === 'supplies' ? 'secondary' : 'outline'"
+                  size="sm"
+                  (click)="kindFilter.set('supplies')"
+                >Supplies</button>
+              </div>
+
               <div hlmPopover>
                 <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
                   <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
@@ -149,7 +189,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
                   <div class="flex items-center justify-between px-3 py-2">
                     <span class="text-sm font-medium">Filters</span>
-                    @if (showInactive() || areaFilter() !== 'all' || containerFilter()) {
+                    @if (showInactive() || lowStockOnly() || areaFilter() !== 'all' || containerFilter()) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -160,14 +200,22 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                     }
                   </div>
                   <span hlmSeparator></span>
-                  <div class="p-2">
+                  <div class="space-y-1 p-2">
                     <label class="flex items-center gap-2 px-1 py-1.5 text-sm cursor-pointer" hlmLabel>
                       <hlm-checkbox
                         [checked]="showInactive()"
                         (checkedChange)="showInactive.set($event === true)"
-                        [aria-label]="'Show inactive items'"
+                        [aria-label]="'Show inactive'"
                       />
                       <span>Show inactive ({{ inactiveCount() }})</span>
+                    </label>
+                    <label class="flex items-center gap-2 px-1 py-1.5 text-sm cursor-pointer" hlmLabel>
+                      <hlm-checkbox
+                        [checked]="lowStockOnly()"
+                        (checkedChange)="lowStockOnly.set($event === true)"
+                        [aria-label]="'Low stock only'"
+                      />
+                      <span>Low stock only ({{ lowCount() }})</span>
                     </label>
                   </div>
                   <span hlmSeparator></span>
@@ -237,10 +285,10 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 </hlm-dropdown-menu>
               </ng-template>
             </div>
-            <app-create-item-dialog triggerSize="sm" (created)="onChanged()">
+            <app-create-entry-dialog triggerSize="sm" (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
-              New item
-            </app-create-item-dialog>
+              New
+            </app-create-entry-dialog>
           </div>
 
           @if (containerFilter()) {
@@ -272,28 +320,29 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
             </div>
           }
 
-          @if (drillLoading() && sortedVisibleItems().length === 0) {
+          @if (drillLoading() && sortedVisibleRows().length === 0) {
             <div class="flex justify-center py-16">
               <hlm-spinner />
             </div>
-          } @else if (sortedVisibleItems().length === 0) {
+          } @else if (sortedVisibleRows().length === 0) {
             <div hlmEmpty>
               <div hlmEmptyHeader>
                 <div hlmEmptyMedia variant="icon">
                   <ng-icon name="lucidePackage" />
                 </div>
-                <div hlmEmptyTitle>No items match</div>
-                <div hlmEmptyDescription>No items match the current filters.</div>
+                <div hlmEmptyTitle>Nothing matches</div>
+                <div hlmEmptyDescription>No items or supplies match the current filters.</div>
               </div>
             </div>
           } @else {
-            <app-item-table
-              [items]="sortedVisibleItems()"
+            <app-inventory-table
+              [rows]="sortedVisibleRows()"
               [sortState]="sortState()"
               (sortChange)="sortState.set($event)"
               (open)="onOpen($event)"
               (edit)="onEdit($event)"
               (viewContents)="onViewContents($event)"
+              (viewDetails)="onViewDetails($event)"
               (archiveRestore)="onArchiveRestore($event)"
               (delete)="onDeleteRequest($event)"
             />
@@ -304,27 +353,48 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
 
     <app-item-quick-panel
       [item]="quickPanelItem()"
-      [state]="quickPanelState()"
+      [state]="itemQuickPanelState()"
       (changed)="onChanged()"
-      (closed)="onQuickPanelClosed()"
+      (closed)="onItemQuickPanelClosed()"
       (viewContents)="onQuickPanelViewContents($event)"
+    />
+
+    <app-supply-quick-panel
+      [supply]="quickPanelSupply()"
+      [state]="supplyQuickPanelState()"
+      (changed)="onChanged()"
+      (closed)="onSupplyQuickPanelClosed()"
     />
 
     <app-edit-item-sheet
       [item]="selectedItem()"
-      [state]="sheetState()"
-      (saved)="onSheetSaved($event)"
-      (closed)="onSheetClosed()"
+      [state]="itemSheetState()"
+      (saved)="onItemSheetSaved()"
+      (closed)="onItemSheetClosed()"
+    />
+
+    <app-edit-supply-sheet
+      [supply]="selectedSupply()"
+      [state]="supplySheetState()"
+      (saved)="onSupplySheetSaved()"
+      (closed)="onSupplySheetClosed()"
     />
 
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
         <div hlmAlertDialogHeader>
-          <h2 hlmAlertDialogTitle>Delete {{ pendingDelete()?.name ?? 'item' }}?</h2>
+          <h2 hlmAlertDialogTitle>Delete {{ pendingDelete()?.name ?? 'entry' }}?</h2>
           <p hlmAlertDialogDescription>
-            This permanently removes the item. Items with contents cannot be deleted — archive them instead.
+            @if (pendingDelete()?.kind === 'supply') {
+              This permanently removes the supply. Supplies with stock history cannot be deleted — archive them instead.
+            } @else {
+              This permanently removes the item. Items with contents cannot be deleted — archive them instead.
+            }
           </p>
         </div>
+        @if (deleteError()) {
+          <p class="text-sm text-destructive">{{ deleteError() }}</p>
+        }
         <div hlmAlertDialogFooter>
           <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
           <button
@@ -340,16 +410,18 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     </hlm-alert-dialog>
   `,
 })
-export class ItemListPageComponent {
+export class InventoryListPageComponent {
   private itemApi = inject(InventoryItemApiService);
+  private supplyApi = inject(InventorySupplyApiService);
   private areaApi = inject(InventoryAreaApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private router = inject(Router);
 
-  readonly sortFields: readonly ItemSortFieldOption[] = [
+  readonly sortFields: readonly InventorySortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
     { id: 'status', label: 'Status', defaultDesc: false },
     { id: 'location', label: 'Location', defaultDesc: false },
-    { id: 'acquiredOn', label: 'Acquired', defaultDesc: true },
+    { id: 'onHand', label: 'On hand', defaultDesc: true },
     { id: 'updatedAt', label: 'Updated', defaultDesc: true },
   ];
 
@@ -358,36 +430,46 @@ export class ItemListPageComponent {
   error = signal(false);
   drillLoading = signal(false);
   showInactive = signal(false);
+  lowStockOnly = signal(false);
+  kindFilter = signal<KindFilter>('all');
   areaFilter = signal<AreaFilter>('all');
-  /** When set, the list is scoped to the direct children of this container (drill-down). */
+  /** When set, the list is scoped to the direct contents of this container (drill-down). */
   containerFilter = signal<string | null>(null);
 
-  sortState = signal<ItemSortState>({ id: 'name', desc: false });
+  sortState = signal<InventorySortState>({ id: 'name', desc: false });
 
   selectedItem = signal<ItemResponse | null>(null);
-  sheetState = signal<BrnDialogState>('closed');
+  itemSheetState = signal<BrnDialogState>('closed');
+  selectedSupply = signal<SupplyResponse | null>(null);
+  supplySheetState = signal<BrnDialogState>('closed');
 
   quickPanelItem = signal<ItemResponse | null>(null);
-  quickPanelState = signal<BrnDialogState>('closed');
+  itemQuickPanelState = signal<BrnDialogState>('closed');
+  quickPanelSupply = signal<SupplyResponse | null>(null);
+  supplyQuickPanelState = signal<BrnDialogState>('closed');
 
-  pendingDelete = signal<ItemResponse | null>(null);
+  pendingDelete = signal<InventoryRow | null>(null);
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
+  deleteError = signal('');
   archiving = signal(false);
 
-  data = toSignal<ItemResponse[] | null, ItemResponse[] | null>(
+  data = toSignal<ListData | null, ListData | null>(
     toObservable(this.refreshTrigger).pipe(
       switchMap(() => {
         this.loading.set(true);
         this.error.set(false);
-        return this.itemApi.getItems({
-          Page: 1,
-          PageSize: 200,
-          IncludeInactive: true,
+        return forkJoin({
+          items: this.itemApi
+            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true })
+            .pipe(map(r => (r.items ?? []) as ItemResponse[])),
+          supplies: this.supplyApi
+            .getSupplies({ Page: 1, PageSize: 200, IncludeInactive: true })
+            .pipe(map(r => (r.items ?? []) as SupplyResponse[])),
         }).pipe(
-          map(r => {
+          map(d => {
             this.loading.set(false);
-            return (r.items ?? []) as ItemResponse[] | null;
+            return d as ListData | null;
           }),
           handleQueryError(this.loading, this.error, null),
         );
@@ -408,7 +490,8 @@ export class ItemListPageComponent {
     { initialValue: [] as AreaResponse[] },
   );
 
-  allItems = computed(() => this.data() ?? []);
+  allItems = computed(() => this.data()?.items ?? []);
+  allSupplies = computed(() => this.data()?.supplies ?? []);
 
   // Drill-down is fetched server-side (the container by id + its direct children via the
   // ParentItemId filter), so contents are complete rather than reconstructed from the capped
@@ -446,25 +529,49 @@ export class ItemListPageComponent {
   /** The container the list is drilled into (server-fetched), or null when not drilled in. */
   containerItem = computed(() => (this.containerFilter() ? this.drillData().container : null));
 
-  /** Items in the current scope, before the inactive (terminal) filter. */
-  private scopedItems = computed(() => {
-    // Drill-down wins: the container's direct children, fetched server-side (not capped by the
-    // all-items page).
-    if (this.containerFilter()) return this.drillData().children;
+  /** Rows in the current scope (drill-down or area filter), before the kind/inactive/low filters. */
+  private scopedRows = computed<InventoryRow[]>(() => {
+    // Drill-down wins: the container's direct item children (server-fetched, not capped by the
+    // all-items page) plus supplies holding stock in it (client-side from the full supplies fetch).
+    const drillId = this.containerFilter();
+    if (drillId) {
+      return [
+        ...this.drillData().children.map(itemToRow),
+        ...this.allSupplies()
+          .map(s => supplyToDrillRow(s, drillId))
+          .filter((r): r is InventoryRow => r !== null),
+      ];
+    }
 
-    // Area filter uses RESOLVED area, so a nested item shows under the area it walks up to.
-    const all = this.allItems();
+    // Area filter uses RESOLVED areas, so a nested item — or supply stock inside a nested
+    // container — shows under the area it walks up to. Zero-stock supplies only appear under
+    // "All areas".
+    const rows = [...this.allItems().map(itemToRow), ...this.allSupplies().map(supplyToRow)];
     const af = this.areaFilter();
-    if (af === 'all') return all;
-    if (af === 'unplaced') return all.filter(i => !i.resolvedAreaId);
-    return all.filter(i => i.resolvedAreaId === af);
+    if (af === 'all') return rows;
+    if (af === 'unplaced') return rows.filter(r => r.resolvedAreaIds.includes(null));
+    return rows.filter(r => r.resolvedAreaIds.includes(af));
   });
 
-  inactiveCount = computed(() => this.scopedItems().filter(i => isTerminalStatus(i.status)).length);
+  private kindRows = computed(() => {
+    const kf = this.kindFilter();
+    if (kf === 'all') return this.scopedRows();
+    const kind = kf === 'items' ? 'item' : 'supply';
+    return this.scopedRows().filter(r => r.kind === kind);
+  });
 
-  visibleItems = computed(() => {
-    const scoped = this.scopedItems();
-    return this.showInactive() ? scoped : scoped.filter(i => !isTerminalStatus(i.status));
+  inactiveCount = computed(() => this.kindRows().filter(r => isTerminalStatus(r.status)).length);
+  // Counts what the low-stock filter would actually show: archived low supplies count only while
+  // "Show inactive" reveals them.
+  lowCount = computed(() => this.kindRows()
+    .filter(r => r.isLow && (this.showInactive() || !isTerminalStatus(r.status))).length);
+
+  visibleRows = computed(() => {
+    let rows = this.kindRows();
+    if (!this.showInactive()) rows = rows.filter(r => !isTerminalStatus(r.status));
+    // Only supplies carry a low flag, so this doubles as the reorder view.
+    if (this.lowStockOnly()) rows = rows.filter(r => r.isLow);
+    return rows;
   });
 
   /** Breadcrumb to the drilled-in container: its resolved path plus its own (current) name. */
@@ -475,27 +582,28 @@ export class ItemListPageComponent {
     return [...path, { id: container.id, name: container.name, kind: 'Container' as LocationSegmentKind }];
   });
 
-  sortedVisibleItems = computed(() => {
-    const items = [...this.visibleItems()];
+  sortedVisibleRows = computed(() => {
+    const rows = [...this.visibleRows()];
     const { id, desc } = this.sortState();
     const dir: 1 | -1 = desc ? -1 : 1;
-    items.sort((a, b) => {
+    rows.sort((a, b) => {
       switch (id) {
         case 'name':
           return a.name.localeCompare(b.name) * dir;
         case 'status':
           return itemStatusLabel(a.status).localeCompare(itemStatusLabel(b.status)) * dir;
         case 'location':
-          return formatPath(a).localeCompare(formatPath(b)) * dir;
-        case 'acquiredOn':
-          return compareNullable(a.acquiredOn ?? null, b.acquiredOn ?? null, dir, (x, y) => (x < y ? -1 : 1));
+          return a.locationText.localeCompare(b.locationText) * dir;
+        case 'onHand':
+          // Items have no quantity and always sort last, whatever the direction.
+          return compareNullable(a.onHand, b.onHand, dir, (x, y) => x - y);
         case 'updatedAt':
           return compareNullable(a.updatedAt ?? null, b.updatedAt ?? null, dir, (x, y) => (x < y ? -1 : 1));
         default:
           return 0;
       }
     });
-    return items;
+    return rows;
   });
 
   sortFieldLabel = computed(() =>
@@ -509,6 +617,7 @@ export class ItemListPageComponent {
       const name = this.areas().find(a => a.id === af)?.name;
       return name ? `Filter: ${name}` : 'Filter';
     }
+    if (this.lowStockOnly()) return 'Filter: Low stock';
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
 
@@ -534,11 +643,12 @@ export class ItemListPageComponent {
 
   resetFilters(): void {
     this.showInactive.set(false);
+    this.lowStockOnly.set(false);
     this.areaFilter.set('all');
     this.containerFilter.set(null);
   }
 
-  onSortByChange(id: ItemSortId): void {
+  onSortByChange(id: InventorySortId): void {
     const field = this.sortFields.find(f => f.id === id);
     this.sortState.set({ id, desc: field?.defaultDesc ?? false });
   }
@@ -551,75 +661,117 @@ export class ItemListPageComponent {
     this.refreshTrigger.update(v => v + 1);
   }
 
-  onOpen(item: ItemResponse): void {
-    this.quickPanelItem.set(item);
-    this.quickPanelState.set('open');
+  onOpen(row: InventoryRow): void {
+    if (row.kind === 'supply' && row.supply) {
+      this.quickPanelSupply.set(row.supply);
+      this.supplyQuickPanelState.set('open');
+    } else if (row.item) {
+      this.quickPanelItem.set(row.item);
+      this.itemQuickPanelState.set('open');
+    }
   }
 
-  onQuickPanelClosed(): void {
-    this.quickPanelState.set('closed');
+  onItemQuickPanelClosed(): void {
+    this.itemQuickPanelState.set('closed');
+  }
+
+  // Keeps quickPanelSupply set: a close-triggered stepper flush may still be committing, and the
+  // panel needs the supply id until it settles. Reopening reseeds the panel via its open-keyed state.
+  onSupplyQuickPanelClosed(): void {
+    this.supplyQuickPanelState.set('closed');
   }
 
   onQuickPanelViewContents(item: ItemResponse): void {
-    this.onQuickPanelClosed();
-    this.onViewContents(item);
-  }
-
-  onEdit(item: ItemResponse): void {
-    this.selectedItem.set(item);
-    this.sheetState.set('open');
-  }
-
-  onViewContents(item: ItemResponse): void {
+    this.onItemQuickPanelClosed();
     this.containerFilter.set(item.id);
   }
 
-  onSheetSaved(_: ItemResponse): void {
-    this.sheetState.set('closed');
+  onEdit(row: InventoryRow): void {
+    if (row.kind === 'supply' && row.supply) {
+      this.selectedSupply.set(row.supply);
+      this.supplySheetState.set('open');
+    } else if (row.item) {
+      this.selectedItem.set(row.item);
+      this.itemSheetState.set('open');
+    }
+  }
+
+  onViewContents(row: InventoryRow): void {
+    this.containerFilter.set(row.id);
+  }
+
+  onViewDetails(row: InventoryRow): void {
+    void this.router.navigate(['/inventory/supplies', row.id]);
+  }
+
+  onItemSheetSaved(): void {
+    this.itemSheetState.set('closed');
     this.onChanged();
   }
 
-  onSheetClosed(): void {
-    this.sheetState.set('closed');
+  onItemSheetClosed(): void {
+    this.itemSheetState.set('closed');
     this.selectedItem.set(null);
   }
 
-  onArchiveRestore(item: ItemResponse): void {
-    const terminal = isTerminalStatus(item.status);
+  onSupplySheetSaved(): void {
+    this.supplySheetState.set('closed');
+    this.onChanged();
+  }
+
+  onSupplySheetClosed(): void {
+    this.supplySheetState.set('closed');
+    this.selectedSupply.set(null);
+  }
+
+  onArchiveRestore(row: InventoryRow): void {
+    const terminal = isTerminalStatus(row.status);
     const newStatus = terminal ? 'Active' : 'Archived';
+    const isSupply = row.kind === 'supply';
+    const noun = isSupply ? 'Supply' : 'Item';
     this.archiving.set(true);
-    this.itemApi.patchItem({
-      id: item.id,
-      body: [replace('/status', newStatus)],
-    }).pipe(
-      handleMutationError(this.errorHandler, this.archiving, 'Failed to update item.'),
+    const request$: Observable<unknown> = isSupply
+      ? this.supplyApi.patchSupply({ id: row.id, body: [replace('/status', newStatus)] })
+      : this.itemApi.patchItem({ id: row.id, body: [replace('/status', newStatus)] });
+    request$.pipe(
+      handleMutationError(this.errorHandler, this.archiving, `Failed to update ${noun.toLowerCase()}.`),
     ).subscribe(() => {
       this.archiving.set(false);
-      toast.success(terminal ? 'Item restored.' : 'Item archived.');
+      toast.success(terminal ? `${noun} restored.` : `${noun} archived.`);
       this.onChanged();
     });
   }
 
-  onDeleteRequest(item: ItemResponse): void {
-    this.pendingDelete.set(item);
+  onDeleteRequest(row: InventoryRow): void {
+    this.pendingDelete.set(row);
+    this.deleteError.set('');
     this.deleteState.set('open');
   }
 
   confirmDelete(ctx: { close: () => void }): void {
-    const item = this.pendingDelete();
-    if (!item) return;
+    const row = this.pendingDelete();
+    if (!row) return;
+    const isSupply = row.kind === 'supply';
     this.deleting.set(true);
-    const result$ = this.itemApi.deleteItem({ id: item.id }).pipe(
-      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete item.'),
-    );
-    firstValueFrom(result$).then(() => {
-      this.deleting.set(false);
-      ctx.close();
-      this.pendingDelete.set(null);
-      this.onChanged();
-      toast.success('Item deleted.');
-    }).catch(() => {
-      this.deleting.set(false);
+    this.deleteError.set('');
+    const request$ = isSupply
+      ? this.supplyApi.deleteSupply({ id: row.id })
+      : this.itemApi.deleteItem({ id: row.id });
+    request$.subscribe({
+      next: () => {
+        this.deleting.set(false);
+        ctx.close();
+        this.pendingDelete.set(null);
+        this.onChanged();
+        toast.success(isSupply ? 'Supply deleted.' : 'Item deleted.');
+      },
+      // Inline, not a toast: the open dialog overlay would obscure a toast, and the rejection
+      // reason ("has stock history — archive instead") is what the user needs to read here.
+      error: (err: unknown) => {
+        this.deleting.set(false);
+        this.deleteError.set(
+          this.errorHandler.getErrorMessage(err, `Failed to delete ${isSupply ? 'supply' : 'item'}.`));
+      },
     });
   }
 }

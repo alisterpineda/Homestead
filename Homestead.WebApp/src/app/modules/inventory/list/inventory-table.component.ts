@@ -1,0 +1,334 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  computed,
+  inject,
+  input,
+  output,
+  LOCALE_ID,
+} from '@angular/core';
+import { formatDate } from '@angular/common';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideBox, lucideBoxes, lucideTriangleAlert } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmTableImports } from '@/shared/components/spartan/table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createAngularTable,
+  flexRenderComponent,
+  FlexRenderDirective,
+  getCoreRowModel,
+  injectFlexRenderContext,
+} from '@tanstack/angular-table';
+import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
+import { InventoryRowActionsComponent } from './inventory-row-actions.component';
+import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
+import { isTerminalStatus } from '../shared/item-status-meta';
+import { formatQty } from '../supplies/supply-shared';
+import { escapeHtml } from '@/shared/utils';
+import type { InventoryRow } from './inventory-row';
+import { formatPath } from './inventory-row';
+
+export type InventorySortId = 'name' | 'status' | 'location' | 'onHand' | 'updatedAt';
+export interface InventorySortState {
+  readonly id: InventorySortId;
+  readonly desc: boolean;
+}
+
+interface InventoryTableMeta {
+  onEdit: (row: InventoryRow) => void;
+  onViewContents: (row: InventoryRow) => void;
+  onViewDetails: (row: InventoryRow) => void;
+  onArchiveRestore: (row: InventoryRow) => void;
+  onDelete: (row: InventoryRow) => void;
+}
+
+@Component({
+  selector: 'app-inventory-name-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({ lucideBox, lucideBoxes })],
+  template: `
+    <div class="flex min-w-0 items-center gap-2">
+      @if (row.item?.isContainer) {
+        <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+      } @else if (row.kind === 'supply') {
+        <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" aria-label="Supply" />
+      }
+      <div class="min-w-0">
+        <span class="block truncate text-sm font-medium">{{ row.name }}</span>
+        @if (row.item?.serial) {
+          <span class="block truncate text-xs text-muted-foreground">{{ row.item?.serial }}</span>
+        }
+      </div>
+    </div>
+  `,
+})
+export class InventoryNameCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  protected get row(): InventoryRow { return this.ctx.row.original; }
+}
+
+@Component({
+  selector: 'app-inventory-status-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ItemStatusBadgeComponent],
+  template: `<app-item-status-badge [status]="row.status" />`,
+})
+export class InventoryStatusCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  protected get row(): InventoryRow { return this.ctx.row.original; }
+}
+
+@Component({
+  selector: 'app-inventory-onhand-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports],
+  providers: [provideIcons({ lucideTriangleAlert })],
+  template: `
+    @if (row.kind === 'supply') {
+      <div class="flex items-center gap-2">
+        <span class="text-sm tabular-nums">{{ qty }}</span>
+        <span class="text-xs text-muted-foreground">{{ row.unit }}</span>
+        @if (row.onHandHint) {
+          <span class="text-xs text-muted-foreground">{{ row.onHandHint }}</span>
+        }
+        @if (row.isLow) {
+          <span
+            class="inline-flex h-5 w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+          >
+            <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+            Low
+          </span>
+        }
+      </div>
+    } @else {
+      <span class="text-sm text-muted-foreground">—</span>
+    }
+  `,
+})
+export class InventoryOnHandCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  protected get row(): InventoryRow { return this.ctx.row.original; }
+  protected get qty(): string { return formatQty(this.row.onHand ?? 0); }
+}
+
+@Component({
+  selector: 'app-inventory-date-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<span class="text-muted-foreground">{{ formatted }}</span>`,
+})
+export class InventoryDateCell {
+  private readonly locale = inject(LOCALE_ID);
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, string | null | undefined>>();
+  protected get formatted(): string {
+    const value = this.ctx.getValue();
+    return value ? formatDate(value, 'mediumDate', this.locale) : '—';
+  }
+}
+
+@Component({
+  selector: 'app-inventory-actions-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [InventoryRowActionsComponent],
+  template: `
+    <app-inventory-row-actions
+      [row]="row"
+      (edit)="meta.onEdit($event)"
+      (viewContents)="meta.onViewContents($event)"
+      (viewDetails)="meta.onViewDetails($event)"
+      (archiveRestore)="meta.onArchiveRestore($event)"
+      (delete)="meta.onDelete($event)"
+    />
+  `,
+})
+export class InventoryActionsCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  protected get meta(): InventoryTableMeta { return this.ctx.table.options.meta as InventoryTableMeta; }
+  protected get row(): InventoryRow { return this.ctx.row.original; }
+}
+
+@Component({
+  selector: 'app-inventory-table',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTableImports, FlexRenderDirective],
+  template: `
+    <div class="overflow-clip rounded-md border">
+      <div hlmTableContainer>
+        <table hlmTable class="w-full">
+          <thead hlmTHead class="bg-background">
+            @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
+              <tr hlmTr>
+                @for (header of headerGroup.headers; track header.id) {
+                  <th hlmTh [class]="getThClass(header.column.id)" [attr.colSpan]="header.colSpan">
+                    @if (!header.isPlaceholder) {
+                      <ng-container
+                        *flexRender="header.column.columnDef.header; props: header.getContext(); let headerText"
+                      >
+                        <div [innerHTML]="headerText"></div>
+                      </ng-container>
+                    }
+                  </th>
+                }
+              </tr>
+            }
+          </thead>
+          <tbody hlmTBody>
+            @for (row of table.getRowModel().rows; track row.id) {
+              <tr
+                hlmTr
+                [class]="getRowClass(row.original)"
+                tabindex="0"
+                (click)="open.emit(row.original)"
+                (keydown.enter)="open.emit(row.original)"
+                (keydown.space)="onRowSpace($event, row.original)"
+              >
+                @for (cell of row.getVisibleCells(); track cell.id) {
+                  <td hlmTd [class]="getTdClass(cell.column.id)">
+                    <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let cellText">
+                      <div [innerHTML]="cellText"></div>
+                    </ng-container>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `,
+})
+export class InventoryTableComponent {
+  rows = input.required<InventoryRow[]>();
+  sortState = input<InventorySortState>({ id: 'name', desc: false });
+
+  open = output<InventoryRow>();
+  edit = output<InventoryRow>();
+  viewContents = output<InventoryRow>();
+  viewDetails = output<InventoryRow>();
+  archiveRestore = output<InventoryRow>();
+  delete = output<InventoryRow>();
+  sortChange = output<InventorySortState>();
+
+  private readonly _meta: InventoryTableMeta = {
+    onEdit: (r) => this.edit.emit(r),
+    onViewContents: (r) => this.viewContents.emit(r),
+    onViewDetails: (r) => this.viewDetails.emit(r),
+    onArchiveRestore: (r) => this.archiveRestore.emit(r),
+    onDelete: (r) => this.delete.emit(r),
+  };
+
+  private readonly _columns = computed<ColumnDef<InventoryRow>[]>(() => [
+    {
+      accessorKey: 'name',
+      id: 'name',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Name' } }),
+      cell: () => flexRenderComponent(InventoryNameCell),
+    },
+    {
+      id: 'status',
+      accessorFn: (row) => row.status,
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Status' } }),
+      cell: () => flexRenderComponent(InventoryStatusCell),
+    },
+    {
+      id: 'location',
+      accessorFn: (row) => row.locationText,
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Location' } }),
+      cell: (info) => {
+        const row = info.row.original;
+        const item = row.item;
+        if (item) {
+          const path = item.path ?? [];
+          if (path.length === 0) {
+            return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
+          }
+          const names = path.map(s => escapeHtml(s.name)).join(' › ');
+          // A chain rooted at an unplaced container has no area segment — flag that visually.
+          const prefix = item.resolvedAreaId == null
+            ? '<span class="italic text-muted-foreground">Unplaced</span> › '
+            : '';
+          const title = escapeHtml(formatPath(item));
+          return `<span class="block truncate text-sm" title="${title}">${prefix}${names}</span>`;
+        }
+        const text = row.locationText;
+        if (text === '—' || text === 'Unplaced') {
+          return `<span class="text-sm italic text-muted-foreground">${text}</span>`;
+        }
+        const escaped = escapeHtml(text);
+        return `<span class="block truncate text-sm" title="${escaped}">${escaped}</span>`;
+      },
+    },
+    {
+      id: 'onHand',
+      accessorFn: (row) => row.onHand ?? undefined,
+      sortUndefined: 'last',
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'On hand' } }),
+      cell: () => flexRenderComponent(InventoryOnHandCell),
+    },
+    {
+      id: 'updatedAt',
+      accessorFn: (row) => row.updatedAt,
+      header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Updated' } }),
+      cell: () => flexRenderComponent(InventoryDateCell),
+    },
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: () => flexRenderComponent(InventoryActionsCell),
+    },
+  ]);
+
+  protected readonly table = createAngularTable<InventoryRow>(() => ({
+    data: this.rows(),
+    columns: this._columns(),
+    getRowId: (row) => row.id,
+    enableSorting: true,
+    enableMultiSort: false,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel(),
+    onSortingChange: (updater) => {
+      const current = [this.sortState()];
+      const next = updater instanceof Function ? updater(current) : updater;
+      const first = next[0] ?? { id: 'name', desc: false };
+      const prev = this.sortState();
+      if (prev.id === first.id && prev.desc === first.desc) return;
+      this.sortChange.emit({ id: first.id as InventorySortId, desc: first.desc });
+    },
+    state: {
+      sorting: [this.sortState()],
+    },
+    meta: this._meta,
+  }));
+
+  private readonly TH_CLASSES: Record<string, string> = {
+    actions: 'w-12',
+  };
+
+  private readonly TD_CLASSES: Record<string, string> = {
+    name: 'overflow-hidden',
+    location: 'overflow-hidden',
+    updatedAt: 'overflow-hidden',
+    actions: 'w-12',
+  };
+
+  protected getThClass(columnId: string): string {
+    return this.TH_CLASSES[columnId] ?? '';
+  }
+
+  protected getTdClass(columnId: string): string {
+    return this.TD_CLASSES[columnId] ?? '';
+  }
+
+  protected getRowClass(row: InventoryRow): string {
+    const base = 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset';
+    return isTerminalStatus(row.status) ? `${base} italic text-muted-foreground` : base;
+  }
+
+  protected onRowSpace(event: Event, row: InventoryRow): void {
+    event.preventDefault(); // keep Space from scrolling the page
+    this.open.emit(row);
+  }
+}

@@ -5,6 +5,7 @@ import {
   output,
   computed,
   inject,
+  signal,
   DestroyRef,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
@@ -27,7 +28,7 @@ import {
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
-import { formatPath } from '../item-table.component';
+import { formatPath } from '../../list/inventory-row';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -273,7 +274,13 @@ export class ItemQuickPanelComponent {
 
   protected inlineForm = seededLinkedSignal<string, InlineForm>(this.seedKey, () => null);
 
-  private formSeedKey = computed(() => `${this.seedKey()}|${this.inlineForm() ?? ''}`);
+  // Bumped on every form open so each opening gets a fresh seed key. Without it, close→reopen of
+  // the same form round-trips formSeedKey to an identical string — and since nothing reads the key
+  // while the form is closed, the linked signals never observe the intermediate value and keep the
+  // previously typed draft instead of reseeding. (Same mechanism as in supply-quick-panel.)
+  private formOpenCount = signal(0);
+
+  private formSeedKey = computed(() => `${this.seedKey()}|${this.formOpenCount()}|${this.inlineForm() ?? ''}`);
 
   moveDest = seededLinkedSignal<string, ItemLocationValue>(this.formSeedKey, () => {
     const it = this.view();
@@ -301,6 +308,7 @@ export class ItemQuickPanelComponent {
   });
 
   openMove(): void {
+    this.formOpenCount.update(n => n + 1);
     this.inlineForm.set('move');
   }
 
@@ -347,6 +355,7 @@ export class ItemQuickPanelComponent {
     if (!it || status === it.status) return;
     if (status === 'Lent') {
       // Lent requires a non-empty /lentTo in the same patch — collect it inline first.
+      this.formOpenCount.update(n => n + 1);
       this.inlineForm.set('lent');
       return;
     }

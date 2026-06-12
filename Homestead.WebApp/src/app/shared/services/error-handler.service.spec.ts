@@ -52,6 +52,18 @@ describe('ErrorHandlerService', () => {
       const err = httpError(400, { detail: 'Custom message', errors: { name: ['Required'] } });
       expect(service.getErrorMessage(err, 'fallback')).toBe('Custom message');
     });
+
+    // Void-returning endpoints are generated with responseType: 'text', so their problem+json
+    // body arrives as an unparsed string.
+    it('should parse a string problem+json body (responseType text endpoints)', () => {
+      const err = httpError(400, JSON.stringify({ detail: 'Supply has stock history and cannot be deleted.' }));
+      expect(service.getErrorMessage(err, 'fallback')).toBe('Supply has stock history and cannot be deleted.');
+    });
+
+    it('should fall back to the status message for a non-JSON string body', () => {
+      const err = httpError(400, '<html>Bad Request</html>');
+      expect(service.getErrorMessage(err, 'fallback')).toBe('The request was invalid.');
+    });
   });
 
   describe('getValidationErrors', () => {
@@ -64,6 +76,12 @@ describe('ErrorHandlerService', () => {
     it('should return null when errors is empty', () => {
       const err = httpError(400, { errors: {} });
       expect(service.getValidationErrors(err)).toBeNull();
+    });
+
+    it('should parse a string problem+json body', () => {
+      const errors = { name: ['Required'] };
+      const err = httpError(400, JSON.stringify({ errors }));
+      expect(service.getValidationErrors(err)).toEqual(errors);
     });
 
     it('should return null when no error body', () => {
@@ -85,6 +103,11 @@ describe('ErrorHandlerService', () => {
     it('should return null when errorCode is absent', () => {
       const err = httpError(403, { detail: 'Forbidden' });
       expect(service.getErrorCode(err)).toBeNull();
+    });
+
+    it('should parse a string problem+json body', () => {
+      const err = httpError(403, JSON.stringify({ errorCode: 'account_inactive' }));
+      expect(service.getErrorCode(err)).toBe('account_inactive');
     });
 
     it('should return null for non-HttpErrorResponse', () => {

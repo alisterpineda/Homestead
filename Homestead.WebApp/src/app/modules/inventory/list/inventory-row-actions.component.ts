@@ -6,20 +6,28 @@ import {
   lucideArchive,
   lucideArchiveRestore,
   lucideTrash2,
+  lucidePackageOpen,
+  lucideExternalLink,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { isTerminalStatus } from '../shared/item-status-meta';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { InventoryRow } from './inventory-row';
 
 @Component({
-  selector: 'app-supply-row-actions',
+  selector: 'app-inventory-row-actions',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
-  providers: [
-    provideIcons({ lucideEllipsisVertical, lucidePencil, lucideArchive, lucideArchiveRestore, lucideTrash2 }),
-  ],
+  providers: [provideIcons({
+    lucideEllipsisVertical,
+    lucidePencil,
+    lucideArchive,
+    lucideArchiveRestore,
+    lucideTrash2,
+    lucidePackageOpen,
+    lucideExternalLink,
+  })],
   template: `
     <button
       hlmBtn
@@ -27,7 +35,7 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
       size="icon-sm"
       type="button"
       [hlmDropdownMenuTrigger]="menu"
-      aria-label="Supply actions"
+      [aria-label]="row().kind === 'supply' ? 'Supply actions' : 'Item actions'"
       (click)="onTriggerClick($event)"
     >
       <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
@@ -35,16 +43,32 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
     <ng-template #menu>
       <hlm-dropdown-menu class="w-44">
         <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="edit.emit(supply())">
+          <button hlmDropdownMenuItem (triggered)="edit.emit(row())">
             <ng-icon hlm name="lucidePencil" size="sm" />
             Edit
           </button>
-          <button hlmDropdownMenuItem (triggered)="archiveRestore.emit(supply())">
+          @if (row().item?.isContainer) {
+            <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
+              <ng-icon hlm name="lucidePackageOpen" size="sm" />
+              View contents
+            </button>
+          }
+          @if (row().kind === 'supply') {
+            <button hlmDropdownMenuItem (triggered)="viewDetails.emit(row())">
+              <ng-icon hlm name="lucideExternalLink" size="sm" />
+              View details
+            </button>
+          }
+          <button hlmDropdownMenuItem (triggered)="archiveRestore.emit(row())">
             <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
             {{ terminal() ? 'Restore' : 'Archive' }}
           </button>
           <hlm-dropdown-menu-separator />
-          <button hlmDropdownMenuItem variant="destructive" (triggered)="delete.emit(supply())">
+          <button
+            hlmDropdownMenuItem
+            variant="destructive"
+            (triggered)="delete.emit(row())"
+          >
             <ng-icon hlm name="lucideTrash2" size="sm" />
             Delete
           </button>
@@ -53,13 +77,15 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
     </ng-template>
   `,
 })
-export class SupplyRowActionsComponent {
-  supply = input.required<SupplyResponse>();
-  edit = output<SupplyResponse>();
-  archiveRestore = output<SupplyResponse>();
-  delete = output<SupplyResponse>();
+export class InventoryRowActionsComponent {
+  row = input.required<InventoryRow>();
+  edit = output<InventoryRow>();
+  viewContents = output<InventoryRow>();
+  viewDetails = output<InventoryRow>();
+  archiveRestore = output<InventoryRow>();
+  delete = output<InventoryRow>();
 
-  protected terminal = computed(() => isTerminalStatus(this.supply().status));
+  protected terminal = computed(() => isTerminalStatus(this.row().status));
 
   protected onTriggerClick(event: MouseEvent): void {
     event.stopPropagation();
