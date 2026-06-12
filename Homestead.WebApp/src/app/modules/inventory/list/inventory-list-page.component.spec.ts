@@ -68,6 +68,7 @@ const BIN = makeItem({
 const SCREW = makeItem({ id: 'screw', name: 'Screw', parentItemId: 'bin', resolvedAreaId: GARAGE });
 const ARCHIVED = makeItem({ id: 'archived', name: 'Old rag', status: 'Archived' as ItemStatus, parentItemId: 'chest', resolvedAreaId: GARAGE });
 const FLOATING = makeItem({ id: 'floating', name: 'Floating thing' });
+const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemStatus, areaId: GARAGE, resolvedAreaId: GARAGE, lentTo: 'Dave' });
 
 // tape: stocked in the garage area ; screws: split chest(4) + garage(6), low ;
 // glue: zero stock ; loose: stocked in an unplaced container (no area root)
@@ -132,7 +133,7 @@ class StubAreaApi {
   getAreas = () => of({ items: AREAS, page: 1, pageSize: 200, totalCount: AREAS.length });
 }
 
-const ITEMS: ItemResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING];
+const ITEMS: ItemResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING, LADDER];
 const SUPPLIES: SupplyResponse[] = [TAPE, SCREWS, GLUE, LOOSE];
 const AREAS: AreaResponse[] = [{ id: GARAGE, name: 'Garage', liveItemCount: 0, createdAt: '', updatedAt: '' }];
 
@@ -181,7 +182,7 @@ describe('InventoryListPageComponent', () => {
 
   it('kind filter narrows to items or supplies', () => {
     component.kindFilter.set('items');
-    expect(ids(component['kindRows']())).toEqual(['archived', 'bin', 'chest', 'floating', 'screw', 'wrench']);
+    expect(ids(component['kindRows']())).toEqual(['archived', 'bin', 'chest', 'floating', 'ladder', 'screw', 'wrench']);
 
     component.kindFilter.set('supplies');
     expect(ids(component['kindRows']())).toEqual(['glue', 'loose', 'screws', 'tape']);
@@ -194,7 +195,7 @@ describe('InventoryListPageComponent', () => {
     component.areaFilter.set(GARAGE);
     // Items that walk up to Garage plus supplies with stock resolving to Garage —
     // including screws, whose second entry sits inside the chest container.
-    expect(ids(scopedRows())).toEqual(['archived', 'bin', 'chest', 'screw', 'screws', 'tape', 'wrench']);
+    expect(ids(scopedRows())).toEqual(['archived', 'bin', 'chest', 'ladder', 'screw', 'screws', 'tape', 'wrench']);
     // The zero-stock supply only appears under "All areas".
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
   });
@@ -392,6 +393,68 @@ describe('InventoryListPageComponent', () => {
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
     expect(component.lowStockOnly()).toBe(false);
     expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+  });
+
+  it('lent-only filter keeps only Lent rows', () => {
+    component.lentOnly.set(true);
+    expect(ids(component.visibleRows())).toEqual(['ladder']);
+    expect(component.lentCount()).toBe(1);
+  });
+
+  it('resetFilters clears the lent-only filter', () => {
+    component.lentOnly.set(true);
+    component.resetFilters();
+    expect(component.lentOnly()).toBe(false);
+  });
+
+  // Deep links from the overview tiles: params seed the filter signals once at construction and
+  // are then stripped from the URL.
+  describe('deep-link param seeding', () => {
+    async function createWithParams(params: Record<string, string>): Promise<InventoryListPageComponent> {
+      await TestBed.inject(Router).navigate([], { queryParams: params });
+      const f = TestBed.createComponent(InventoryListPageComponent);
+      f.detectChanges();
+      await f.whenStable();
+      f.detectChanges();
+      return f.componentInstance;
+    }
+
+    it('?lowStock=true seeds the low-stock filter and strips the param', async () => {
+      const c = await createWithParams({ lowStock: 'true' });
+      expect(c.lowStockOnly()).toBe(true);
+      expect(ids(c.visibleRows())).toEqual(['screws']);
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['lowStock']).toBeUndefined();
+    });
+
+    it('?lent=true seeds the lent filter and shows only Lent rows', async () => {
+      const c = await createWithParams({ lent: 'true' });
+      expect(c.lentOnly()).toBe(true);
+      expect(ids(c.visibleRows())).toEqual(['ladder']);
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['lent']).toBeUndefined();
+    });
+
+    it('?area and ?kind seed their filters together (the unplaced tile link)', async () => {
+      const c = await createWithParams({ area: 'unplaced', kind: 'items' });
+      expect(c.areaFilter()).toBe('unplaced');
+      expect(c.kindFilter()).toBe('items');
+      expect(ids(c.visibleRows())).toEqual(['floating']);
+      const stripped = TestBed.inject(Router).routerState.snapshot.root.queryParams;
+      expect(stripped['area']).toBeUndefined();
+      expect(stripped['kind']).toBeUndefined();
+    });
+
+    it('an unknown ?kind value falls back to all kinds', async () => {
+      const c = await createWithParams({ kind: 'bogus' });
+      expect(c.kindFilter()).toBe('all');
+    });
+
+    it('param stripping preserves an accompanying ?search', async () => {
+      const c = await createWithParams({ lowStock: 'true', search: 'screw' });
+      expect(c.lowStockOnly()).toBe(true);
+      const params = TestBed.inject(Router).routerState.snapshot.root.queryParams;
+      expect(params['lowStock']).toBeUndefined();
+      expect(params['search']).toBe('screw');
+    });
   });
 
   it('dispatches open and edit by row kind', () => {

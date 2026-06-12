@@ -97,6 +97,8 @@ resolveArea(item):
 
 Walk up the parent chain to the first item that sits directly in an area; that area is the answer. If the chain ends at an item that is itself Unplaced (no area, no parent), the whole chain resolves to **Unplaced**. The resolved location may be presented as a path for context (`Garage › Workbench cupboard › Small-parts bin`), but only the leaf item's own one-step location is ever stored.
 
+Resolved-Unplaced is the semantics every Unplaced surface uses — the area filter's Unplaced bucket and the overview landing page's Unplaced tile both count an item nested inside an unplaced container, not just items with no direct location — so a tile count and the list it deep-links to always agree.
+
 **Never denormalise this.** Caching a resolved `AreaId` onto nested rows is explicitly disallowed — it is precisely the optimisation that reintroduces move-with-contents drift. The walk is short and cheap at household scale; the codebase already resolves hierarchies in application code rather than via stored rollups or recursive SQL, and Inventory follows that idiom. The *mechanism* (in-memory walk, a recursive query, or a mapped view) is an implementation choice left open; the **invariant — resolved location is derived, never stored — is locked.**
 
 ## Move-with-contents

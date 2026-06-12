@@ -267,6 +267,8 @@ export type { RunPriceSourceImportNow$Params as RunPriceSourceImportNow$Params }
 export { runPriceSourceImportNow as runPriceSourceImportNow } from './fn/finances/run-price-source-import-now';
 export type { GetNetWorthHistory$Params as GetNetWorthHistory$Params } from './fn/finances/get-net-worth-history';
 export { getNetWorthHistory as getNetWorthHistory } from './fn/finances/get-net-worth-history';
+export type { GetInventoryOverview$Params as GetInventoryOverview$Params } from './fn/inventory/get-inventory-overview';
+export { getInventoryOverview as getInventoryOverview } from './fn/inventory/get-inventory-overview';
 export type { GetAreas$Params as GetAreas$Params } from './fn/inventory/get-areas';
 export { getAreas as getAreas } from './fn/inventory/get-areas';
 export type { CreateArea$Params as CreateArea$Params } from './fn/inventory/create-area';

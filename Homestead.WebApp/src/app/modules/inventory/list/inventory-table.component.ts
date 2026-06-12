@@ -74,7 +74,16 @@ export class InventoryNameCell {
   selector: 'app-inventory-status-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ItemStatusBadgeComponent],
-  template: `<app-item-status-badge [status]="row.status" />`,
+  template: `
+    <div class="flex min-w-0 items-center gap-2">
+      <app-item-status-badge [status]="row.status" />
+      @if (row.item?.lentTo) {
+        <!-- Explicit cap: in the auto-layout table the cell grows to fit nowrap content, so
+             truncate only engages against a fixed max-width. -->
+        <span class="max-w-48 truncate text-xs text-muted-foreground">{{ row.item?.lentTo }}</span>
+      }
+    </div>
+  `,
 })
 export class InventoryStatusCell {
   private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();

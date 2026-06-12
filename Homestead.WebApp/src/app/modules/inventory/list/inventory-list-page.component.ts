@@ -76,6 +76,31 @@ type AreaFilter = string;
 /** One-tap presets over the row kind: everything, only items, or only supplies. */
 type KindFilter = 'all' | 'items' | 'supplies';
 const isKindFilter = (v: unknown): v is KindFilter => v === 'all' || v === 'items' || v === 'supplies';
+const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilter(v) ? v : 'all');
+
+/**
+ * Reads the named deep-link query params once and immediately strips them from the URL
+ * (merge-null + replaceUrl, so ?search survives) — later merge navigations (the search debounce)
+ * would otherwise keep re-applying stale values. Reading and stripping share the one name list,
+ * so a param can't be seeded but left lingering: register a new deep-link param only by adding
+ * its name at the call site.
+ */
+function seedDeepLinkParams(
+  route: ActivatedRoute,
+  router: Router,
+  names: readonly string[],
+): Record<string, string | null> {
+  const params = route.snapshot.queryParamMap;
+  if (names.some(n => params.has(n))) {
+    void router.navigate([], {
+      relativeTo: route,
+      queryParams: Object.fromEntries(names.map(n => [n, null])),
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+  return Object.fromEntries(names.map(n => [n, params.get(n)]));
+}
 
 /** Both lists fetched together; null until the first load resolves. */
 interface ListData {
@@ -209,7 +234,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
                   <div class="flex items-center justify-between px-3 py-2">
                     <span class="text-sm font-medium">Filters</span>
-                    @if (showInactive() || lowStockOnly() || areaFilter() !== 'all' || containerFilter() || searchTerm()) {
+                    @if (showInactive() || lowStockOnly() || lentOnly() || areaFilter() !== 'all' || containerFilter() || searchTerm()) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -236,6 +261,14 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                         [aria-label]="'Low stock only'"
                       />
                       <span>Low stock only ({{ lowCount() }})</span>
+                    </label>
+                    <label class="flex items-center gap-2 px-1 py-1.5 text-sm cursor-pointer" hlmLabel>
+                      <hlm-checkbox
+                        [checked]="lentOnly()"
+                        (checkedChange)="lentOnly.set($event === true)"
+                        [aria-label]="'Lent only'"
+                      />
+                      <span>Lent only ({{ lentCount() }})</span>
                     </label>
                   </div>
                   <span hlmSeparator></span>
@@ -451,10 +484,16 @@ export class InventoryListPageComponent {
   loading = signal(false);
   error = signal(false);
   drillLoading = signal(false);
+  // Deep-link params from the overview tiles, seeded once into the filter signals below and
+  // stripped from the URL (read-once, not two-way synced — that's the lenses feature).
+  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area']);
+
   showInactive = signal(false);
-  lowStockOnly = signal(false);
-  kindFilter = signal<KindFilter>('all');
-  areaFilter = signal<AreaFilter>('all');
+  lowStockOnly = signal(this.deepLink['lowStock'] === 'true');
+  /** Lent-only lens: rows whose status is Lent. */
+  lentOnly = signal(this.deepLink['lent'] === 'true');
+  kindFilter = signal<KindFilter>(kindFilterFromParam(this.deepLink['kind']));
+  areaFilter = signal<AreaFilter>(this.deepLink['area'] ?? 'all');
   /** When set, the list is scoped to the direct contents of this container (drill-down). */
   containerFilter = signal<string | null>(null);
 
@@ -612,12 +651,15 @@ export class InventoryListPageComponent {
   // "Show inactive" reveals them.
   lowCount = computed(() => this.kindRows()
     .filter(r => r.isLow && (this.showInactive() || !isTerminalStatus(r.status))).length);
+  // Lent is a live status, so the inactive toggle can't hide these rows.
+  lentCount = computed(() => this.kindRows().filter(r => r.status === 'Lent').length);
 
   visibleRows = computed(() => {
     let rows = this.kindRows();
     if (!this.showInactive()) rows = rows.filter(r => !isTerminalStatus(r.status));
     // Only supplies carry a low flag, so this doubles as the reorder view.
     if (this.lowStockOnly()) rows = rows.filter(r => r.isLow);
+    if (this.lentOnly()) rows = rows.filter(r => r.status === 'Lent');
     return rows;
   });
 
@@ -665,6 +707,7 @@ export class InventoryListPageComponent {
       return name ? `Filter: ${name}` : 'Filter';
     }
     if (this.lowStockOnly()) return 'Filter: Low stock';
+    if (this.lentOnly()) return 'Filter: Lent';
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
 
@@ -745,6 +788,7 @@ export class InventoryListPageComponent {
     this.clearSearch();
     this.showInactive.set(false);
     this.lowStockOnly.set(false);
+    this.lentOnly.set(false);
     this.areaFilter.set('all');
     this.containerFilter.set(null);
   }

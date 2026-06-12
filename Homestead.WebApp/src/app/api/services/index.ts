@@ -13,5 +13,6 @@ export { FinancesSettingsApiService } from './finances-settings-api.service';
 export { FinancesPriceSourcesApiService } from './finances-price-sources-api.service';
 export { FinancesTransactionApiService } from './finances-transaction-api.service';
 export { InventoryItemApiService } from './inventory-item-api.service';
+export { InventoryOverviewApiService } from './inventory-overview-api.service';
 export { InventoryAreaApiService } from './inventory-area-api.service';
 export { InventorySupplyApiService } from './inventory-supply-api.service';
