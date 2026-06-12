@@ -1,13 +1,23 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  DestroyRef,
   inject,
   signal,
   computed,
 } from '@angular/core';
-import { Router } from '@angular/router';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, of, catchError, forkJoin, type Observable } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import {
+  switchMap,
+  map,
+  of,
+  catchError,
+  forkJoin,
+  debounceTime,
+  filter,
+  type Observable,
+} from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePlus,
@@ -18,10 +28,12 @@ import {
   lucideArrowDown,
   lucideCheck,
   lucideChevronRight,
+  lucideSearch,
   lucideX,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -69,6 +81,8 @@ const isKindFilter = (v: unknown): v is KindFilter => v === 'all' || v === 'item
 interface ListData {
   items: ItemResponse[];
   supplies: SupplyResponse[];
+  /** The search term this payload was fetched with — lets consumers detect stale data mid-search. */
+  term: string;
 }
 
 /** Server-fetched payload for a container drill-down: the container itself plus its direct children. */
@@ -93,6 +107,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     NgIcon,
     HlmIconImports,
     HlmButton,
+    HlmInput,
     HlmToggleGroupImports,
     HlmSpinner,
     HlmEmptyImports,
@@ -118,6 +133,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     lucideArrowDown,
     lucideCheck,
     lucideChevronRight,
+    lucideSearch,
     lucideX,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -142,7 +158,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
       }
 
       @if (data() !== null) {
-        @if (allItems().length === 0 && allSupplies().length === 0) {
+        @if (allItems().length === 0 && allSupplies().length === 0 && !searchTerm()) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
@@ -161,6 +177,17 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
         } @else {
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2">
+              <div class="relative w-full min-w-0 sm:w-56 lg:w-64">
+                <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  hlmInput
+                  placeholder="Search items..."
+                  class="h-8 w-full min-w-0 pl-8"
+                  aria-label="Search items and supplies"
+                  [value]="searchInput()"
+                  (input)="searchInput.set($any($event.target).value)"
+                />
+              </div>
               <hlm-toggle-group
                 type="single"
                 variant="outline"
@@ -182,7 +209,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
                   <div class="flex items-center justify-between px-3 py-2">
                     <span class="text-sm font-medium">Filters</span>
-                    @if (showInactive() || lowStockOnly() || areaFilter() !== 'all' || containerFilter()) {
+                    @if (showInactive() || lowStockOnly() || areaFilter() !== 'all' || containerFilter() || searchTerm()) {
                       <button
                         hlmBtn
                         variant="ghost"
@@ -409,6 +436,8 @@ export class InventoryListPageComponent {
   private areaApi = inject(InventoryAreaApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   readonly sortFields: readonly InventorySortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
@@ -429,6 +458,14 @@ export class InventoryListPageComponent {
   /** When set, the list is scoped to the direct contents of this container (drill-down). */
   containerFilter = signal<string | null>(null);
 
+  /** What the user is typing (immediate); synced to the URL after a 300ms debounce. */
+  searchInput = signal((this.route.snapshot.queryParamMap.get('search') ?? '').trim());
+  /** The committed (trimmed) search term from the URL — the source of truth for the server fetch. */
+  searchTerm = toSignal(
+    this.route.queryParamMap.pipe(map(p => (p.get('search') ?? '').trim())),
+    { initialValue: this.searchInput() },
+  );
+
   sortState = signal<InventorySortState>({ id: 'name', desc: false });
 
   selectedItem = signal<ItemResponse | null>(null);
@@ -447,22 +484,25 @@ export class InventoryListPageComponent {
   deleteError = signal('');
   archiving = signal(false);
 
+  // Server-side search: matches stay correct beyond the 200-row page cap.
+  private listKey = computed(() => ({ tick: this.refreshTrigger(), term: this.searchTerm() }));
+
   data = toSignal<ListData | null, ListData | null>(
-    toObservable(this.refreshTrigger).pipe(
-      switchMap(() => {
+    toObservable(this.listKey).pipe(
+      switchMap(({ term }) => {
         this.loading.set(true);
         this.error.set(false);
         return forkJoin({
           items: this.itemApi
-            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true })
+            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
             .pipe(map(r => (r.items ?? []) as ItemResponse[])),
           supplies: this.supplyApi
-            .getSupplies({ Page: 1, PageSize: 200, IncludeInactive: true })
+            .getSupplies({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
             .pipe(map(r => (r.items ?? []) as SupplyResponse[])),
         }).pipe(
           map(d => {
             this.loading.set(false);
-            return d as ListData | null;
+            return { ...d, term } as ListData | null;
           }),
           handleQueryError(this.loading, this.error, null),
         );
@@ -528,18 +568,32 @@ export class InventoryListPageComponent {
     // all-items page) plus supplies holding stock in it (client-side from the full supplies fetch).
     const drillId = this.containerFilter();
     if (drillId) {
+      // Supplies come from the all-list fetch; right after leaving a search, that fetch is still
+      // term-filtered, so suppress supplies until the unfiltered payload lands rather than show
+      // an incomplete set.
+      const suppliesStale = (this.data()?.term ?? '') !== '';
       return [
         ...this.drillData().children.map(itemToRow),
-        ...this.allSupplies()
-          .map(s => supplyToDrillRow(s, drillId))
-          .filter((r): r is InventoryRow => r !== null),
+        ...(suppliesStale
+          ? []
+          : this.allSupplies()
+              .map(s => supplyToDrillRow(s, drillId))
+              .filter((r): r is InventoryRow => r !== null)),
       ];
     }
 
     // Area filter uses RESOLVED areas, so a nested item — or supply stock inside a nested
     // container — shows under the area it walks up to. Zero-stock supplies only appear under
     // "All areas".
-    const rows = [...this.allItems().map(itemToRow), ...this.allSupplies().map(supplyToRow)];
+    let rows = [...this.allItems().map(itemToRow), ...this.allSupplies().map(supplyToRow)];
+    // While a freshly committed term's fetch is in flight, the cached rows were fetched with a
+    // different term; mirror the server's name filter client-side so the unfiltered set never
+    // flashes between commit and response.
+    const term = this.searchTerm();
+    if (term && (this.data()?.term ?? '') !== term) {
+      const needle = term.toLowerCase();
+      rows = rows.filter(r => r.name.toLowerCase().includes(needle));
+    }
     const af = this.areaFilter();
     if (af === 'all') return rows;
     if (af === 'unplaced') return rows.filter(r => r.resolvedAreaIds.includes(null));
@@ -614,22 +668,71 @@ export class InventoryListPageComponent {
     return this.showInactive() ? 'Filter: Inactive' : 'Filter';
   });
 
+  constructor() {
+    // Debounced URL sync for the search box: commit the trimmed term once typing pauses. No
+    // distinctUntilChanged here — its memory survives programmatic clears (clearSearch) and would
+    // swallow a re-typed identical term; comparing against the live URL param is the real dedupe.
+    toObservable(this.searchInput).pipe(
+      debounceTime(300),
+      map(value => value.trim()),
+      filter(term => term !== (this.route.snapshot.queryParamMap.get('search') ?? '').trim()),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(term => this.syncSearchParam(term || null));
+
+    // Commit-point enforcement: however a term lands in the URL (typing, history traversal,
+    // external navigation), search is a global scope — drop any drill/area scope and keep the
+    // input box in step. Living here rather than in the debounce subscriber, it also covers
+    // commits that never went through the box (e.g. popstate restoring ?search=).
+    toObservable(this.searchTerm).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(term => {
+      if (term) {
+        this.containerFilter.set(null);
+        this.areaFilter.set('all');
+      }
+      if (term !== this.searchInput().trim()) this.searchInput.set(term);
+    });
+  }
+
+  /**
+   * Drops an active search immediately (no debounce). Clearing the box discards any pending
+   * debounced keystrokes; the trailing '' emission is a no-op once the param is gone, because the
+   * pipe's filter drops it.
+   */
+  private clearSearch(): void {
+    this.searchInput.set('');
+    if (this.searchTerm()) this.syncSearchParam(null);
+  }
+
+  /** Single URL-sync point for the search param — keep navigation options identical everywhere. */
+  private syncSearchParam(term: string | null): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { search: term },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
   onKindFilterChange(value: unknown): void {
     if (isKindFilter(value)) this.kindFilter.set(value);
   }
 
-  /** Picking an area drops any container drill-down (they are mutually exclusive scopes). */
+  /** Picking an area drops any container drill-down and search (mutually exclusive scopes). */
   selectAreaFilter(af: AreaFilter): void {
+    if (af !== 'all') this.clearSearch();
     this.containerFilter.set(null);
     this.areaFilter.set(af);
   }
 
   clearContainerFilter(): void {
+    // A committed search can't coexist with the drill, but a pending debounced one can — drop it
+    // so a keystroke from <300ms ago doesn't override this click.
+    this.clearSearch();
     this.containerFilter.set(null);
     this.areaFilter.set('all');
   }
 
   onBreadcrumbSegment(seg: { id: string; kind: LocationSegmentKind }): void {
+    this.clearSearch();
     if (seg.kind === 'Area') {
       this.containerFilter.set(null);
       this.areaFilter.set(seg.id);
@@ -639,6 +742,7 @@ export class InventoryListPageComponent {
   }
 
   resetFilters(): void {
+    this.clearSearch();
     this.showInactive.set(false);
     this.lowStockOnly.set(false);
     this.areaFilter.set('all');
@@ -680,6 +784,7 @@ export class InventoryListPageComponent {
 
   onQuickPanelViewContents(item: ItemResponse): void {
     this.onItemQuickPanelClosed();
+    this.clearSearch();
     this.containerFilter.set(item.id);
   }
 
@@ -694,6 +799,7 @@ export class InventoryListPageComponent {
   }
 
   onViewContents(row: InventoryRow): void {
+    this.clearSearch();
     this.containerFilter.set(row.id);
   }
 

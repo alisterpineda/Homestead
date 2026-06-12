@@ -2,7 +2,7 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { InventoryListPageComponent } from './inventory-list-page.component';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
@@ -105,9 +105,10 @@ const LOOSE = makeSupply({
 });
 
 class StubItemApi {
-  // Honors the server-side ParentItemId filter the drill-down uses.
-  getItems = (p: { ParentItemId?: string }) => {
-    const items = p?.ParentItemId ? ITEMS.filter(i => i.parentItemId === p.ParentItemId) : ITEMS;
+  // Honors the server-side filters the page uses: ParentItemId (drill-down) and Search.
+  getItems = (p: { ParentItemId?: string; Search?: string }) => {
+    let items = p?.ParentItemId ? ITEMS.filter(i => i.parentItemId === p.ParentItemId) : ITEMS;
+    if (p?.Search) items = items.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase()));
     return of({ items, page: 1, pageSize: 200, totalCount: items.length });
   };
   getItem = (p: { id: string }) => {
@@ -118,7 +119,12 @@ class StubItemApi {
   deleteItem = () => of(undefined);
 }
 class StubSupplyApi {
-  getSupplies = () => of({ items: SUPPLIES, page: 1, pageSize: 200, totalCount: SUPPLIES.length });
+  getSupplies = (p?: { Search?: string }) => {
+    const items = p?.Search
+      ? SUPPLIES.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()))
+      : SUPPLIES;
+    return of({ items, page: 1, pageSize: 200, totalCount: items.length });
+  };
   patchSupply = () => of(makeSupply({}));
   deleteSupply = () => of(undefined);
 }
@@ -284,6 +290,108 @@ describe('InventoryListPageComponent', () => {
     // Re-requesting a delete starts with a clean slate.
     component.onDeleteRequest(supplyToRow(TAPE));
     expect(component.deleteError()).toBe('');
+  });
+
+  // Drive the committed term the way the app does — through the URL.
+  async function navigateSearch(term: string | null): Promise<void> {
+    await TestBed.inject(Router).navigate([], { queryParams: { search: term } });
+    await settle();
+  }
+
+  // Let the 300ms searchInput debounce fire and the resulting navigation/fetch settle.
+  async function flushDebounce(): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 350));
+    await settle();
+  }
+
+  it('passes the committed search term to both server fetches', async () => {
+    await navigateSearch('screw');
+    expect(ids(component.allItems().map(itemToRow))).toEqual(['screw']);
+    expect(ids(component.allSupplies().map(supplyToRow))).toEqual(['screws']);
+    expect(ids(scopedRows())).toEqual(['screw', 'screws']);
+  });
+
+  it('keeps the toolbar with "Nothing matches" on a zero-result search', async () => {
+    await navigateSearch('zzz-no-such-thing');
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Nothing matches');
+    expect(text).not.toContain('No items yet');
+    // The toolbar (and with it the search box) must stay reachable to clear the search.
+    expect((fixture.nativeElement as HTMLElement).querySelector('input[hlmInput]')).not.toBeNull();
+  });
+
+  it('committing a typed search drops drill-down and area scope and syncs the URL', async () => {
+    component.containerFilter.set('chest');
+    component.areaFilter.set(GARAGE);
+    component.searchInput.set('screw');
+    await flushDebounce();
+
+    expect(component.containerFilter()).toBeNull();
+    expect(component.areaFilter()).toBe('all');
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
+    expect(ids(scopedRows())).toEqual(['screw', 'screws']);
+  });
+
+  it('entering a drill-down clears an active search', async () => {
+    await navigateSearch('screw');
+    component.searchInput.set('screw');
+
+    component.onViewContents(itemToRow(CHEST));
+    await settle();
+    expect(component.searchInput()).toBe('');
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
+    expect(ids(scopedRows())).toEqual(['archived', 'bin', 'screws', 'wrench']);
+
+    // The debounced '' emission must not re-trigger anything after the immediate clear.
+    await flushDebounce();
+    expect(component.containerFilter()).toBe('chest');
+  });
+
+  it('re-committing the same term immediately after a programmatic clear still searches', async () => {
+    await navigateSearch('screw');
+    component.onViewContents(itemToRow(CHEST)); // clears search, enters drill
+    await settle();
+    expect(component.searchInput()).toBe('');
+
+    // Re-typed before the clear's own debounce window closes — must not be swallowed.
+    component.searchInput.set('screw');
+    await flushDebounce();
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
+    expect(component.containerFilter()).toBeNull();
+    expect(ids(scopedRows())).toEqual(['screw', 'screws']);
+  });
+
+  it('keeps the search box in step with externally-driven URL changes', async () => {
+    await navigateSearch('screw');
+    expect(component.searchInput()).toBe('screw');
+
+    // e.g. a sidebar link or history traversal removing the param while the component is reused.
+    await navigateSearch(null);
+    expect(component.searchInput()).toBe('');
+    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+  });
+
+  it('never commits whitespace-only or untrimmed terms to the URL', async () => {
+    component.searchInput.set('   ');
+    await flushDebounce();
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
+    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+
+    component.searchInput.set('screw ');
+    await flushDebounce();
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
+  });
+
+  it('resetFilters clears the committed search along with the other filters', async () => {
+    await navigateSearch('screw');
+    component.lowStockOnly.set(true);
+
+    component.resetFilters();
+    await settle();
+    expect(component.searchInput()).toBe('');
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
+    expect(component.lowStockOnly()).toBe(false);
+    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
   });
 
   it('dispatches open and edit by row kind', () => {
