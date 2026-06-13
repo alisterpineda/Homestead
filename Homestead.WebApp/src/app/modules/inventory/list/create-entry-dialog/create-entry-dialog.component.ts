@@ -99,6 +99,7 @@ type EntryKind = 'item' | 'supply';
               <app-location-picker
                 [value]="locationValue()"
                 (valueChange)="onLocationChange($event)"
+                [selectedLabel]="initialLocationLabel()"
                 ariaLabel="Location"
               />
             </div>
@@ -206,6 +207,10 @@ type EntryKind = 'item' | 'supply';
 })
 export class CreateEntryDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
+  /** Pre-selected item location on open ("Add item here" from a drilled place); null = unplaced. */
+  initialLocation = input<ItemLocationValue | null>(null);
+  /** Display name for the pre-selected location, shown before the picker's lazy lists load. */
+  initialLocationLabel = input<string | null>(null);
   created = output();
 
   kind = signal<EntryKind>('item');
@@ -275,8 +280,7 @@ export class CreateEntryDialogComponent {
       this.kind.set('item');
       this.name.set('');
       this.notes.set('');
-      this.areaId.set(null);
-      this.parentItemId.set(null);
+      this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
       this.isContainer.set(false);
       this.compartment.set('');
       this.serial.set('');

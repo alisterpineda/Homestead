@@ -269,6 +269,8 @@ export type { GetNetWorthHistory$Params as GetNetWorthHistory$Params } from './f
 export { getNetWorthHistory as getNetWorthHistory } from './fn/finances/get-net-worth-history';
 export type { GetInventoryOverview$Params as GetInventoryOverview$Params } from './fn/inventory/get-inventory-overview';
 export { getInventoryOverview as getInventoryOverview } from './fn/inventory/get-inventory-overview';
+export type { GetPlaceContents$Params as GetPlaceContents$Params } from './fn/inventory/get-place-contents';
+export { getPlaceContents as getPlaceContents } from './fn/inventory/get-place-contents';
 export type { GetAreas$Params as GetAreas$Params } from './fn/inventory/get-areas';
 export { getAreas as getAreas } from './fn/inventory/get-areas';
 export type { CreateArea$Params as CreateArea$Params } from './fn/inventory/create-area';

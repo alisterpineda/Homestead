@@ -37,28 +37,9 @@ public class GetSuppliesHandler(AppDbContext db, IItemLocationResolver locationR
 
         // Attach the resolved per-location breakdown for the page's supplies — same post-query
         // enrichment pattern as GetItemsHandler.
-        if (page.Items.Count == 0)
-            return page;
-
-        var supplyIds = page.Items.Select(s => s.Id).ToList();
-        var entries = await db.StockEntries.AsNoTracking()
-            .Where(e => supplyIds.Contains(e.ItemId))
-            .Select(e => new { e.ItemId, Source = new StockEntrySource(e.Id, e.Quantity, e.AreaId, e.ContainerItemId) })
-            .ToListAsync(ct);
-
-        var paths = await locationResolver.ResolveHoldingLocationsAsync(
-            entries.Select(e => new HoldingLocation(e.Source.AreaId, e.Source.ContainerItemId)).ToList(), ct);
-
-        var entriesBySupply = entries.ToLookup(e => e.ItemId, e => e.Source);
-
         return page with
         {
-            Items = page.Items
-                .Select(s => s with
-                {
-                    StockLocations = StockEntryResponseBuilder.Build(entriesBySupply[s.Id], paths),
-                })
-                .ToList(),
+            Items = await SupplyStockLocationLoader.AttachStockLocationsAsync(db, locationResolver, page.Items, ct),
         };
     }
 }

@@ -21,6 +21,9 @@ public record AreaSummary
     /// with stock here; matches what the area-filtered items list shows.
     /// </summary>
     public required int ItemCount { get; init; }
+
+    /// <summary>Distinct low-stock supplies with stock resolving here (same resolved semantics).</summary>
+    public required int LowStockCount { get; init; }
 }
 
 public record LowStockSupplyPreview

@@ -4,5 +4,6 @@
 export interface AreaSummary {
   id: string;
   itemCount: number;
+  lowStockCount: number;
   name: string;
 }

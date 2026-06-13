@@ -76,6 +76,7 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
                 Id = a.Id,
                 Name = a.Name,
                 ItemCount = placement.AreaItemCounts.GetValueOrDefault(a.Id),
+                LowStockCount = placement.AreaLowStockCounts.GetValueOrDefault(a.Id),
             })
             .ToList();
 

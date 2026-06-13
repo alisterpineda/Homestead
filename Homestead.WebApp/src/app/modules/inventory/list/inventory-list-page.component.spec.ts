@@ -448,6 +448,13 @@ describe('InventoryListPageComponent', () => {
       expect(c.kindFilter()).toBe('all');
     });
 
+    it('?container seeds the drill-down scope and strips the param', async () => {
+      const c = await createWithParams({ container: 'chest' });
+      expect(c.containerFilter()).toBe('chest');
+      expect(ids(c.visibleRows())).toEqual(['bin', 'screws', 'wrench']);
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['container']).toBeUndefined();
+    });
+
     it('param stripping preserves an accompanying ?search', async () => {
       const c = await createWithParams({ lowStock: 'true', search: 'screw' });
       expect(c.lowStockOnly()).toBe(true);

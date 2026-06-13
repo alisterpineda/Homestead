@@ -15,7 +15,7 @@ internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
 
 internal record UnplacedPreviewItem(Guid Id, string Name);
 
-internal record AreaSummaryItem(Guid Id, string Name, int ItemCount);
+internal record AreaSummaryItem(Guid Id, string Name, int ItemCount, int LowStockCount);
 
 [Collection("Integration")]
 public class OverviewEndpointTests : IntegrationTestBase
@@ -256,6 +256,34 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.Equal(2, garage.ItemCount); // the bin (a live item) + batteries once
         var pantry = overview.Areas.Single(a => a.Id == pantryId);
         Assert.Equal(1, pantry.ItemCount); // batteries
+    }
+
+    [Fact]
+    public async Task Overview_Areas_CarryResolvedLowStockCounts()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var pantryId = await CreateAreaAsync(client, "Pantry");
+
+        var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
+
+        // Low stock inside a container resolves to the container's area.
+        var lowGlue = await CreateSupplyAsync(client, "Glue", "tubes", threshold: 5m);
+        await ReceiveAsync(client, lowGlue.Id, areaId: null, 2m, containerItemId: bin.Id);
+
+        // Ample stock and archived-low stock count toward no area's low badge.
+        var ampleTape = await CreateSupplyAsync(client, "Tape", "rolls", threshold: 5m);
+        await ReceiveAsync(client, ampleTape.Id, pantryId, 50m);
+        var archived = await CreateSupplyAsync(client, "Archived screws", "boxes", threshold: 5m);
+        await ReceiveAsync(client, archived.Id, pantryId, 1m);
+        await PatchSupplyStatusAsync(client, archived.Id, "Archived");
+
+        var overview = await GetOverviewAsync(client);
+
+        var garage = overview.Areas.Single(a => a.Id == garageId);
+        Assert.Equal(1, garage.LowStockCount);
+        var pantry = overview.Areas.Single(a => a.Id == pantryId);
+        Assert.Equal(0, pantry.LowStockCount);
     }
 
     [Fact]

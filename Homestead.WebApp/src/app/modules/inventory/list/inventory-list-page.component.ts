@@ -484,9 +484,11 @@ export class InventoryListPageComponent {
   loading = signal(false);
   error = signal(false);
   drillLoading = signal(false);
-  // Deep-link params from the overview tiles, seeded once into the filter signals below and
-  // stripped from the URL (read-once, not two-way synced — that's the lenses feature).
-  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area']);
+  // Deep-link params from the overview tiles and place browser, seeded once into the filter
+  // signals below and stripped from the URL (read-once, not two-way synced — that's the lenses
+  // feature). When both ?area= and ?container= arrive, the container drill wins via scopedRows'
+  // existing precedence — no extra handling needed here.
+  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area', 'container']);
 
   showInactive = signal(false);
   lowStockOnly = signal(this.deepLink['lowStock'] === 'true');
@@ -495,7 +497,7 @@ export class InventoryListPageComponent {
   kindFilter = signal<KindFilter>(kindFilterFromParam(this.deepLink['kind']));
   areaFilter = signal<AreaFilter>(this.deepLink['area'] ?? 'all');
   /** When set, the list is scoped to the direct contents of this container (drill-down). */
-  containerFilter = signal<string | null>(null);
+  containerFilter = signal<string | null>(this.deepLink['container'] ?? null);
 
   /** What the user is typing (immediate); synced to the URL after a 300ms debounce. */
   searchInput = signal((this.route.snapshot.queryParamMap.get('search') ?? '').trim());

@@ -21,6 +21,26 @@ public record InventoryPlacement
 
     /// <summary>Live non-fungible items whose container chain reaches no area (resolved-unplaced).</summary>
     public required IReadOnlyList<UnplacedItemInfo> UnplacedItems { get; init; }
+
+    /// <summary>
+    /// areaId → distinct low-stock supplies (Active, threshold set, total at or below it) with at
+    /// least one stock entry resolving to the area. Areas with none are absent.
+    /// </summary>
+    public required IReadOnlyDictionary<Guid, int> AreaLowStockCounts { get; init; }
+
+    /// <summary>
+    /// containerId → resolved subtree stats, attributed upward: a nested item counts toward every
+    /// container in its chain, a supply once per container its entries sit in (the holding
+    /// container included). Containers with empty subtrees are absent.
+    /// </summary>
+    public required IReadOnlyDictionary<Guid, ContainerStats> ContainerStats { get; init; }
 }
 
 public readonly record struct UnplacedItemInfo(Guid Id, string Name);
+
+/// <summary>
+/// Subtree stats for one container, mirroring <see cref="InventoryPlacement.AreaItemCounts"/>
+/// semantics: live non-fungible items anywhere below it + distinct live supplies with stock
+/// anywhere below it (or in it), and the low-stock subset of those supplies.
+/// </summary>
+public readonly record struct ContainerStats(int ResolvedContentsCount, int LowStockCount);
