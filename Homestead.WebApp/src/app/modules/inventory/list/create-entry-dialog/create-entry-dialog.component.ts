@@ -11,14 +11,13 @@ import {
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
+import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
-import { tomorrowIso } from '../../shared/date';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
@@ -26,7 +25,8 @@ type EntryKind = 'item' | 'supply';
 
 /**
  * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the item fields
- * (location, container flag, serial, acquired on) and the supply fields (unit, restock threshold).
+ * (location, container flag) and the supply fields (unit, restock threshold). Both forms stay to the
+ * essentials so the dialog barely changes height on toggle — the rest is set later from the Edit sheet.
  */
 @Component({
   selector: 'app-create-entry-dialog',
@@ -34,7 +34,7 @@ type EntryKind = 'item' | 'supply';
   imports: [
     HlmDialogImports,
     HlmButton,
-    HlmButtonGroup,
+    HlmToggleGroupImports,
     HlmInput,
     HlmLabel,
     HlmCheckboxImports,
@@ -54,32 +54,25 @@ type EntryKind = 'item' | 'supply';
           <h2 hlmDialogTitle>{{ kind() === 'supply' ? 'New supply' : 'New item' }}</h2>
           <p hlmDialogDescription>
             @if (kind() === 'supply') {
-              Define a consumable type. Add stock to it afterwards.
+              Define a consumable type, counted in bulk. Add stock to it afterwards.
             } @else {
-              Add a tracked item. You can set value and currency after creating it.
+              Add a tracked item — one specific thing. Set serial, value, and more after creating.
             }
           </p>
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
-          <div hlmButtonGroup class="w-full" aria-label="What are you adding?">
-            <button
-              hlmBtn
-              type="button"
-              [variant]="kind() === 'item' ? 'secondary' : 'outline'"
-              size="sm"
-              class="flex-1"
-              (click)="kind.set('item')"
-            >Item — tracked individually</button>
-            <button
-              hlmBtn
-              type="button"
-              [variant]="kind() === 'supply' ? 'secondary' : 'outline'"
-              size="sm"
-              class="flex-1"
-              (click)="kind.set('supply')"
-            >Supply — counted in bulk</button>
-          </div>
+          <hlm-toggle-group
+            type="single"
+            variant="outline"
+            [value]="kind()"
+            (valueChange)="onKindChange($event)"
+            class="w-full"
+            aria-label="What are you adding?"
+          >
+            <button hlmToggleGroupItem value="item" class="flex-1">Item</button>
+            <button hlmToggleGroupItem value="supply" class="flex-1">Supply</button>
+          </hlm-toggle-group>
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="create-entry-name">Name</label>
@@ -104,20 +97,6 @@ type EntryKind = 'item' | 'supply';
               />
             </div>
 
-            @if (parentItemId() !== null) {
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel for="create-entry-compartment">Compartment (optional)</label>
-                <input
-                  hlmInput
-                  id="create-entry-compartment"
-                  maxlength="256"
-                  placeholder="e.g. Top drawer"
-                  [value]="compartment()"
-                  (input)="compartment.set(asValue($event))"
-                />
-              </div>
-            }
-
             <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
               <hlm-checkbox
                 [checked]="isContainer()"
@@ -126,30 +105,6 @@ type EntryKind = 'item' | 'supply';
               />
               <span>This item is a container</span>
             </label>
-
-            <div class="flex flex-col gap-1.5">
-              <label hlmLabel for="create-entry-serial">Serial (optional)</label>
-              <input
-                hlmInput
-                id="create-entry-serial"
-                maxlength="128"
-                placeholder="e.g. SN-12345"
-                [value]="serial()"
-                (input)="serial.set(asValue($event))"
-              />
-            </div>
-
-            <div class="flex flex-col gap-1.5">
-              <label hlmLabel for="create-entry-acquired">Acquired on (optional)</label>
-              <input
-                hlmInput
-                id="create-entry-acquired"
-                type="date"
-                [max]="maxAcquiredDate"
-                [value]="acquiredOn()"
-                (input)="acquiredOn.set(asValue($event))"
-              />
-            </div>
           } @else {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel for="create-entry-unit">Unit</label>
@@ -195,8 +150,8 @@ type EntryKind = 'item' | 'supply';
           }
 
           <div hlmDialogFooter>
-            <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
-            <button hlmBtn type="submit" [disabled]="!canSubmit() || creating()">
+            <button hlmBtn variant="secondary" type="button" class="w-full sm:w-auto" hlmDialogClose>Cancel</button>
+            <button hlmBtn type="submit" class="w-full sm:w-auto" [disabled]="!canSubmit() || creating()">
               {{ creating() ? 'Creating...' : (kind() === 'supply' ? 'Create supply' : 'Create item') }}
             </button>
           </div>
@@ -220,9 +175,6 @@ export class CreateEntryDialogComponent {
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
   isContainer = signal(false);
-  compartment = signal('');
-  serial = signal('');
-  acquiredOn = signal('');
   // Supply fields
   unit = signal('');
   threshold = signal('');
@@ -234,8 +186,6 @@ export class CreateEntryDialogComponent {
   private itemApi = inject(InventoryItemApiService);
   private supplyApi = inject(InventorySupplyApiService);
   private errorHandler = inject(ErrorHandlerService);
-
-  readonly maxAcquiredDate = tomorrowIso();
 
   canSubmit = computed(() => {
     if (this.name().trim().length === 0) return false;
@@ -275,6 +225,11 @@ export class CreateEntryDialogComponent {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
 
+  /** The toggle-group emits `unknown` (it's non-nullable, but the value type is wide) — narrow it. */
+  onKindChange(value: unknown): void {
+    if (value === 'item' || value === 'supply') this.kind.set(value);
+  }
+
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.kind.set('item');
@@ -282,9 +237,6 @@ export class CreateEntryDialogComponent {
       this.notes.set('');
       this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
       this.isContainer.set(false);
-      this.compartment.set('');
-      this.serial.set('');
-      this.acquiredOn.set('');
       this.unit.set('');
       this.threshold.set('');
       this.creating.set(false);
@@ -315,17 +267,12 @@ export class CreateEntryDialogComponent {
       return;
     }
 
-    const parentItemId = this.parentItemId();
     this.itemApi.createItem({
       body: {
         name: this.name().trim(),
         areaId: this.areaId(),
-        parentItemId,
+        parentItemId: this.parentItemId(),
         isContainer: this.isContainer(),
-        // Compartment is only valid inside a container; the server rejects it otherwise.
-        compartment: parentItemId && this.compartment().trim() ? this.compartment().trim() : null,
-        serial: this.serial().trim() ? this.serial().trim() : null,
-        acquiredOn: this.acquiredOn() ? this.acquiredOn() : null,
         notes: this.notes().trim() ? this.notes().trim() : null,
       },
     }).subscribe({

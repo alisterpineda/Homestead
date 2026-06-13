@@ -66,4 +66,21 @@ describe('CreateEntryDialogComponent', () => {
     expect(component.parentItemId()).toBeNull();
     expect(component.locationValue()).toEqual({ kind: 'unplaced' });
   });
+
+  it('defaults to the item kind and flips to supply via the segmented control', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+
+    expect(component.kind()).toBe('item');
+
+    component.onKindChange('supply');
+    expect(component.kind()).toBe('supply');
+
+    component.onKindChange('item');
+    expect(component.kind()).toBe('item');
+
+    // A stray value from the toggle-group's wide type must be ignored, not crash or clear the kind.
+    component.onKindChange(undefined);
+    expect(component.kind()).toBe('item');
+  });
 });
