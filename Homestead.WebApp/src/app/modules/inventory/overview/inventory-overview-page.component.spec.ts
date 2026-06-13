@@ -241,13 +241,13 @@ describe('InventoryOverviewPageComponent', () => {
     expect(text(fixture)).toContain('Browse by place');
   });
 
-  it('keeps the attention tiles and search visible while drilled', async () => {
+  it('hides the attention tiles but keeps search visible while drilled', async () => {
     api.response = BUSY;
     const fixture = await create({ place: 'area:garage' });
 
     const content = text(fixture);
-    expect(content).toContain('Low stock');
-    expect(content).toContain('Lent out');
+    expect(content).not.toContain('Lent out');
+    expect(content).not.toContain('Low stock');
     const search = (fixture.nativeElement as HTMLElement)
       .querySelector('input[aria-label="Search items and supplies"]');
     expect(search).not.toBeNull();

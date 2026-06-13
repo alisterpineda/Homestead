@@ -11,9 +11,9 @@ import {
   lucideSearch,
   lucideCircleCheck,
   lucideCircleAlert,
+  lucideChevronRight,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -39,36 +39,34 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-inventory-overview-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, NgIcon, HlmIconImports, HlmButton],
+  imports: [RouterLink, NgIcon, HlmIconImports],
   template: `
-    <section class="flex h-full flex-col rounded-lg border border-border bg-card p-4 text-card-foreground">
-      <div class="flex items-center gap-2">
-        <ng-icon hlm [name]="icon()" size="sm" class="text-muted-foreground" />
+    @if (count() === 0) {
+      <section class="flex h-full items-center gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground">
+        <ng-icon hlm name="lucideCircleCheck" size="sm" class="shrink-0 text-muted-foreground" />
         <h2 class="text-sm font-medium">{{ title() }}</h2>
-      </div>
-      <p class="mt-1 text-2xl font-semibold tabular-nums">{{ count() }}</p>
-      @if (count() === 0) {
-        <p class="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
-          <ng-icon hlm name="lucideCircleCheck" size="sm" />
-          {{ emptyText() }}
-        </p>
-      } @else {
+        <span class="truncate text-sm text-muted-foreground">{{ emptyText() }}</span>
+      </section>
+    } @else {
+      <a
+        class="flex h-full flex-col rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:bg-accent"
+        routerLink="/inventory/items"
+        [queryParams]="viewAllParams()"
+      >
+        <div class="flex items-center gap-2">
+          <ng-icon hlm [name]="icon()" size="sm" class="text-muted-foreground" />
+          <h2 class="text-sm font-medium">{{ title() }}</h2>
+          <ng-icon hlm name="lucideChevronRight" size="sm" class="ml-auto text-muted-foreground" />
+        </div>
+        <p class="mt-1 text-2xl font-semibold tabular-nums">{{ count() }}</p>
         <ul class="mt-2 flex-1 space-y-1">
           <ng-content />
         </ul>
         @if (count() > previewCount()) {
           <p class="mt-1 text-xs text-muted-foreground">+{{ count() - previewCount() }} more</p>
         }
-        <a
-          hlmBtn
-          variant="outline"
-          size="sm"
-          class="mt-3 self-start"
-          routerLink="/inventory/items"
-          [queryParams]="viewAllParams()"
-        >View all</a>
-      }
-    </section>
+      </a>
+    }
   `,
 })
 export class InventoryOverviewTileComponent {
@@ -103,6 +101,7 @@ export class InventoryOverviewTileComponent {
     lucideSearch,
     lucideCircleCheck,
     lucideCircleAlert,
+    lucideChevronRight,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -138,6 +137,7 @@ export class InventoryOverviewTileComponent {
       }
 
       @if (data(); as overview) {
+        @if (!placeRef()) {
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <app-inventory-overview-tile
             icon="lucideTriangleAlert"
@@ -188,6 +188,7 @@ export class InventoryOverviewTileComponent {
             }
           </app-inventory-overview-tile>
         </div>
+        }
 
         <app-place-browser
           [overview]="overview"
