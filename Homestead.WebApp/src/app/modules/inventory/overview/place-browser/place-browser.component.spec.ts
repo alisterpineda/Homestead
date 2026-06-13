@@ -138,9 +138,9 @@ describe('PlaceBrowserComponent', () => {
     expect(content).toContain('Unplaced'); // unplacedCount > 0
 
     const links = hrefs(fixture);
-    expect(links).toContain('/?place=area:garage');
-    expect(links).toContain('/?place=area:office');
-    expect(links).toContain('/?place=unplaced');
+    expect(links).toContain('/inventory/browse/area/garage');
+    expect(links).toContain('/inventory/browse/area/office');
+    expect(links).toContain('/inventory/browse/unplaced');
 
     // One badge for Garage (3 low), none for Office (0).
     const badges = el(fixture).querySelectorAll('[aria-label$="low stock"]');
@@ -150,26 +150,11 @@ describe('PlaceBrowserComponent', () => {
 
   it('hides the Unplaced card at zero and shows the no-areas hint when empty', async () => {
     let fixture = await create(null, null, { ...OVERVIEW, unplacedCount: 0 });
-    expect(hrefs(fixture)).not.toContain('/?place=unplaced');
+    expect(hrefs(fixture)).not.toContain('/inventory/browse/unplaced');
 
     fixture = await create(null, null, { ...OVERVIEW, areas: [], unplacedCount: 0 });
     expect(el(fixture).textContent).toContain('No areas yet');
     expect(hrefs(fixture)).toContain('/inventory/areas');
-  });
-
-  it('renders the breadcrumb from segment kinds with the last segment as plain text', async () => {
-    const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
-
-    const links = hrefs(fixture);
-    expect(links).toContain('/?place=area:garage');
-    expect(links).toContain('/?place=item:chest');
-    // The drilled place itself is plain text — no self link.
-    expect(links).not.toContain('/?place=item:bin');
-    // "All places" clears the param entirely.
-    const anchors = Array.from(el(fixture).querySelectorAll<HTMLAnchorElement>('a'));
-    const allPlaces = anchors.find(a => a.textContent?.trim() === 'All places');
-    expect(allPlaces).toBeTruthy();
-    expect(allPlaces!.getAttribute('href')).toBe('/');
   });
 
   it('shows the counts line with the nested part hidden at zero', async () => {
@@ -191,7 +176,7 @@ describe('PlaceBrowserComponent', () => {
     const content = el(fixture).textContent ?? '';
     expect(content).toContain('Tray');
     expect(content).toContain('Bits, Glue');
-    expect(hrefs(fixture)).toContain('/?place=item:tray');
+    expect(hrefs(fixture)).toContain('/inventory/browse/item/tray');
     const badges = el(fixture).querySelectorAll('[aria-label$="low stock"]');
     expect(badges.length).toBe(1);
   });
@@ -270,11 +255,10 @@ describe('PlaceBrowserComponent', () => {
     expect(detailsBtn).toBeUndefined();
   });
 
-  it('labels an Unplaced drill without a breadcrumb path', async () => {
+  it('labels an Unplaced drill from its place ref', async () => {
     const fixture = await create({ kind: 'unplaced' }, makeContents({ directItemCount: 1 }));
 
     const content = el(fixture).textContent ?? '';
-    expect(content).toContain('All places');
     expect(content).toContain('Unplaced');
     expect(content).toContain('1 here');
   });

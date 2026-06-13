@@ -5,7 +5,6 @@ import {
   lucideMapPin,
   lucideMapPinOff,
   lucideBox,
-  lucideChevronRight,
   lucideTriangleAlert,
   lucideCircleAlert,
   lucidePackage,
@@ -16,22 +15,22 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { PlaceCardComponent } from './place-card.component';
-import { formatPlaceParam, type PlaceRef } from './place-param';
+import { placeRefToLink, placeDisplayName, type PlaceRef } from './place-param';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatQty } from '../../supplies/supply-shared';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { LocationSegmentResponse } from '@/api/generated/models/location-segment-response';
 import type { ItemResponse } from '@/api/generated/models/item-response';
 import type { SupplyResponse } from '@/api/generated/models/supply-response';
 
 /**
- * The overview's browse-by-place section: at root, a card grid of areas (+ Unplaced); drilled in
- * (`place` set), a breadcrumb, drillable child-container cards, and an inline list of the place's
- * direct items/supplies. Presentational — the page owns the URL state and the data fetches; row
- * clicks bubble up so the page can open its quick panels in place.
+ * The browse-by-place surface: at root, a card grid of areas (+ Unplaced); drilled in
+ * (`place` set), drillable child-container cards and an inline list of the place's direct
+ * items/supplies. Presentational — the page owns the route state and the data fetches; the
+ * ancestor breadcrumb lives in the page header, and row clicks bubble up so the page can open
+ * its quick panels in place.
  */
 @Component({
   selector: 'app-place-browser',
@@ -51,7 +50,6 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
     lucideMapPin,
     lucideMapPinOff,
     lucideBox,
-    lucideChevronRight,
     lucideTriangleAlert,
     lucideCircleAlert,
     lucidePackage,
@@ -60,33 +58,6 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
   template: `
     @if (place(); as ref) {
       <section class="flex flex-col gap-4">
-        <nav class="flex flex-wrap items-center gap-1 text-sm text-muted-foreground" aria-label="Place breadcrumb">
-          <a
-            [routerLink]="[]"
-            [queryParams]="{ place: null }"
-            queryParamsHandling="merge"
-            class="hover:text-foreground hover:underline"
-          >All places</a>
-          @for (seg of breadcrumb(); track seg.id; let last = $last) {
-            <ng-icon hlm name="lucideChevronRight" size="xs" class="shrink-0" />
-            @if (last) {
-              <span class="font-medium text-foreground">{{ seg.name }}</span>
-            } @else {
-              <a
-                [routerLink]="[]"
-                [queryParams]="segmentParams(seg)"
-                queryParamsHandling="merge"
-                class="hover:text-foreground hover:underline"
-              >{{ seg.name }}</a>
-            }
-          } @empty {
-            @if (contents()) {
-              <ng-icon hlm name="lucideChevronRight" size="xs" class="shrink-0" />
-              <span class="font-medium text-foreground">{{ placeName() }}</span>
-            }
-          }
-        </nav>
-
         @if (error()) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
@@ -159,7 +130,7 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
                     [count]="container.itemCount"
                     [lowStockCount]="container.lowStockCount"
                     [previewNames]="container.previewNames"
-                    [queryParams]="{ place: 'item:' + container.id }"
+                    [link]="placeRefToLink({ kind: 'container', id: container.id })"
                     [chevron]="true"
                   />
                 }
@@ -207,31 +178,31 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
           }
         }
       </section>
-    } @else {
+    } @else if (overview(); as ov) {
       <section>
         <h2 class="mb-3 text-sm font-medium text-muted-foreground">Browse by place</h2>
-        @if (overview().areas.length === 0 && overview().unplacedCount === 0) {
+        @if (ov.areas.length === 0 && ov.unplacedCount === 0) {
           <p class="text-sm text-muted-foreground">
             No areas yet — set up rooms and places on the
             <a routerLink="/inventory/areas" class="underline underline-offset-4 hover:text-foreground">Areas page</a>.
           </p>
         } @else {
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            @for (area of overview().areas; track area.id) {
+            @for (area of ov.areas; track area.id) {
               <app-place-card
                 [name]="area.name"
                 icon="lucideMapPin"
                 [count]="area.itemCount"
                 [lowStockCount]="area.lowStockCount"
-                [queryParams]="{ place: 'area:' + area.id }"
+                [link]="placeRefToLink({ kind: 'area', id: area.id })"
               />
             }
-            @if (overview().unplacedCount > 0) {
+            @if (ov.unplacedCount > 0) {
               <app-place-card
                 name="Unplaced"
                 icon="lucideMapPinOff"
-                [count]="overview().unplacedCount"
-                [queryParams]="{ place: 'unplaced' }"
+                [count]="ov.unplacedCount"
+                [link]="placeRefToLink({ kind: 'unplaced' })"
               />
             }
           </div>
@@ -241,7 +212,8 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
   `,
 })
 export class PlaceBrowserComponent {
-  overview = input.required<GetInventoryOverviewResponse>();
+  /** The area grid's source; null while the root overview is still loading (drilled views ignore it). */
+  overview = input<GetInventoryOverviewResponse | null>(null);
   /** Drill-down target; null renders the root grid. */
   place = input.required<PlaceRef>();
   /**
@@ -260,16 +232,9 @@ export class PlaceBrowserComponent {
   changed = output<void>();
 
   protected readonly formatQty = formatQty;
+  protected readonly placeRefToLink = placeRefToLink;
 
-  protected breadcrumb = computed<LocationSegmentResponse[]>(() => this.contents()?.path ?? []);
-
-  protected placeName = computed(() => {
-    const ref = this.place();
-    if (!ref) return '';
-    if (ref.kind === 'unplaced') return 'Unplaced';
-    const path = this.breadcrumb();
-    return path.length > 0 ? path[path.length - 1].name : (this.contents()?.containerItem?.name ?? '');
-  });
+  protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
 
   protected placeIcon = computed(() => {
     const ref = this.place();
@@ -293,13 +258,4 @@ export class PlaceBrowserComponent {
     if (ref?.kind === 'container') return { container: ref.id } as Record<string, string>;
     return { area: 'unplaced', kind: 'items' };
   });
-
-  /** Breadcrumb targets come from the segment's KIND, never its position in the path. */
-  protected segmentParams(seg: LocationSegmentResponse): Record<string, string | null> {
-    return {
-      place: formatPlaceParam(seg.kind === 'Area'
-        ? { kind: 'area', id: seg.id }
-        : { kind: 'container', id: seg.id }),
-    };
-  }
 }

@@ -6,8 +6,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 
 /**
  * One drillable place card: root areas, the Unplaced pseudo-place, and child containers in a
- * drilled view. A real anchor (cmd-click, history entries) that merges its `?place=` target onto
- * the current URL. Container cards add a contents preview line and a chevron.
+ * drilled view. A real anchor (cmd-click, history entries) routing to the place's own
+ * `/inventory/browse/...` node. Container cards add a contents preview line and a chevron.
  */
 @Component({
   selector: 'app-place-card',
@@ -16,9 +16,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   providers: [provideIcons({ lucideTriangleAlert, lucideChevronRight })],
   template: `
     <a
-      [routerLink]="[]"
-      [queryParams]="queryParams()"
-      queryParamsHandling="merge"
+      [routerLink]="link()"
       class="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:bg-accent"
     >
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -56,8 +54,8 @@ export class PlaceCardComponent {
   lowStockCount = input(0);
   /** Muted truncated contents-preview line; hidden when empty. */
   previewNames = input<readonly string[]>([]);
-  /** Merged onto the current URL — `{ place: 'area:<id>' | 'item:<id>' | 'unplaced' }`. */
-  queryParams = input.required<Record<string, string>>();
+  /** The place's own browse route — e.g. `['/inventory/browse/area', id]` (see {@link placeRefToLink}). */
+  link = input.required<unknown[]>();
   /** Container cards show a drill chevron. */
   chevron = input(false);
 }
