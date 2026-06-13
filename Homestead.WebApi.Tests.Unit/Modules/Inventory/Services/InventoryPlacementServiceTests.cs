@@ -26,6 +26,14 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private async Task<Area> AddAreaAsync(string name, Guid? parentAreaId = null)
+    {
+        var area = new Area { Id = Guid.NewGuid(), Name = name, ParentAreaId = parentAreaId };
+        _db.Areas.Add(area);
+        await _db.SaveChangesAsync(Ct);
+        return area;
+    }
+
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
         Guid? parentItemId = null, bool isContainer = false)
@@ -241,5 +249,124 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
         var nested = placement.ContainerStats[chest.Id].ResolvedContentsCount;
         Assert.Equal(placement.AreaItemCounts[_garage.Id], direct + nested);
         Assert.Equal(5, placement.AreaItemCounts[_garage.Id]);
+    }
+
+    [Fact]
+    public async Task Compute_NestedAreas_ItemCountsRollUpToEveryAncestor()
+    {
+        // House › Basement › Bedroom, one item directly in each.
+        var house = await AddAreaAsync("House");
+        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: basement.Id);
+        await AddItemAsync("Painting", areaId: house.Id);
+        await AddItemAsync("Boiler", areaId: basement.Id);
+        await AddItemAsync("Lamp", areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        // The leaf keeps its own count; ancestors include all descendants additively.
+        Assert.Equal(1, placement.AreaItemCounts[bedroom.Id]);
+        Assert.Equal(2, placement.AreaItemCounts[basement.Id]); // boiler + lamp
+        Assert.Equal(3, placement.AreaItemCounts[house.Id]);    // painting + boiler + lamp
+    }
+
+    [Fact]
+    public async Task Compute_NestedAreas_SameSupplyTypeInTwoSubAreas_CountsOnceForAncestor()
+    {
+        // The dedup across sub-areas is load-bearing: one supply type in two children of House
+        // must count once toward House, matching what the House-filtered list shows.
+        var house = await AddAreaAsync("House");
+        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        var batteries = await AddSupplyAsync("Batteries");
+        await AddStockAsync(batteries.Id, 4m, areaId: basement.Id);
+        await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaItemCounts[basement.Id]);
+        Assert.Equal(1, placement.AreaItemCounts[bedroom.Id]);
+        Assert.Equal(1, placement.AreaItemCounts[house.Id]); // batteries once, not twice
+    }
+
+    [Fact]
+    public async Task Compute_NestedAreas_LowStockRollsUpAndDedups()
+    {
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        var glue = await AddSupplyAsync("Glue", threshold: 5m);
+        await AddStockAsync(glue.Id, 1m, areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaLowStockCounts[bedroom.Id]);
+        Assert.Equal(1, placement.AreaLowStockCounts[house.Id]); // rolled up to the ancestor
+    }
+
+    [Fact]
+    public async Task Compute_NestedAreas_ItemNestedInContainerRollsUpThroughAreaAncestors()
+    {
+        // Mixes both walks: an item in a container in Bedroom rolls up the container chain to
+        // Bedroom, then up the area chain to House.
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        var chest = await AddItemAsync("Chest", areaId: bedroom.Id, isContainer: true);
+        await AddItemAsync("Watch", parentItemId: chest.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(2, placement.AreaItemCounts[bedroom.Id]); // chest + watch
+        Assert.Equal(2, placement.AreaItemCounts[house.Id]);   // rolled up
+    }
+
+    [Fact]
+    public async Task Compute_AreaOwnItemCounts_ExcludeDescendantsButRollUpForAreaItemCounts()
+    {
+        // House (1 direct item) › Bedroom (1 direct item). Own counts are leaf-only; AreaItemCounts roll up.
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        await AddItemAsync("Painting", areaId: house.Id);
+        await AddItemAsync("Lamp", areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaOwnItemCounts[house.Id]);    // Painting only — excludes Bedroom
+        Assert.Equal(1, placement.AreaOwnItemCounts[bedroom.Id]);  // Lamp
+        Assert.Equal(2, placement.AreaItemCounts[house.Id]);       // rolled: Painting + Lamp
+    }
+
+    [Fact]
+    public async Task Compute_AreaOwnItemCounts_DedupSupplyTypeWithinOwnScopeOnly()
+    {
+        // Same supply type stocked directly in House and in a sub-area: House's OWN count includes it
+        // once (its own direct entry); the sub-area's entry is NOT folded into House's own count.
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        var batteries = await AddSupplyAsync("Batteries");
+        await AddStockAsync(batteries.Id, 4m, areaId: house.Id);
+        await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaOwnItemCounts[house.Id]);   // Batteries once (House's own entry)
+        Assert.Equal(1, placement.AreaOwnItemCounts[bedroom.Id]); // Batteries once
+        Assert.Equal(1, placement.AreaItemCounts[house.Id]);      // rolled, still deduped to once
+    }
+
+    [Fact]
+    public async Task Compute_AreaParentCycle_DoesNotLoop()
+    {
+        // A manually-introduced area cycle (House ↔ Basement) must terminate, not hang.
+        var house = await AddAreaAsync("House");
+        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
+        house.ParentAreaId = basement.Id;
+        await _db.SaveChangesAsync(Ct);
+        await AddItemAsync("Lamp", areaId: basement.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        // The cycle guard caps the climb at the visited set — both members get the count, once.
+        Assert.Equal(1, placement.AreaItemCounts[basement.Id]);
+        Assert.Equal(1, placement.AreaItemCounts[house.Id]);
     }
 }

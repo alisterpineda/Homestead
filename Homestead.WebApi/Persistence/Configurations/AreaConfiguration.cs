@@ -23,5 +23,15 @@ public class AreaConfiguration : IEntityTypeConfiguration<Area>
         builder.Property(a => a.UpdatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        // Self-referencing parent (nested areas). Restrict mirrors the container chain
+        // (ItemConfiguration) — a parent area can't be deleted while sub-areas reference it; the
+        // handler raises a friendly message ahead of this FK backstop.
+        builder.HasOne(a => a.ParentArea)
+            .WithMany()
+            .HasForeignKey(a => a.ParentAreaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(a => a.ParentAreaId);
     }
 }

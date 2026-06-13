@@ -3,9 +3,11 @@
 
 import { ItemResponse } from '../models/item-response';
 import { LocationSegmentResponse } from '../models/location-segment-response';
+import { PlaceChildAreaSummary } from '../models/place-child-area-summary';
 import { PlaceContainerSummary } from '../models/place-container-summary';
 import { PlaceSupplyResponse } from '../models/place-supply-response';
 export interface PlaceContentsResponse {
+  childAreas: Array<PlaceChildAreaSummary>;
   containerItem?: (null | ItemResponse);
   containers: Array<PlaceContainerSummary>;
   directItemCount: number;

@@ -3,4 +3,5 @@
 
 export interface CreateAreaCommand {
   name: string;
+  parentAreaId?: (string | null);
 }

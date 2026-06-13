@@ -67,7 +67,7 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
         // an empty area is still a browse target.
         var areas = await db.Areas.AsNoTracking()
             .OrderBy(a => a.Name)
-            .Select(a => new { a.Id, a.Name })
+            .Select(a => new { a.Id, a.Name, a.ParentAreaId })
             .ToListAsync(ct);
 
         var areaSummaries = areas
@@ -75,6 +75,7 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
             {
                 Id = a.Id,
                 Name = a.Name,
+                ParentAreaId = a.ParentAreaId,
                 ItemCount = placement.AreaItemCounts.GetValueOrDefault(a.Id),
                 LowStockCount = placement.AreaLowStockCounts.GetValueOrDefault(a.Id),
             })

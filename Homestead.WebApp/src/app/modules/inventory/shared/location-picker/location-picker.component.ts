@@ -18,6 +18,7 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { isTerminalStatus } from '../item-status-meta';
+import { orderAreaTree, type AreaTreeNode } from '../area-tree';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { ItemResponse } from '@/api/generated/models/item-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -92,14 +93,14 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
 
             @if (filteredAreas().length > 0) {
               <span class="block px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">Areas</span>
-              @for (area of filteredAreas(); track area.id) {
+              @for (node of filteredAreas(); track node.area.id) {
                 <button
                   type="button"
                   class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                  (click)="onSelectArea(area)"
+                  (click)="onSelectArea(node.area)"
                 >
-                  <span class="truncate">{{ area.name }}</span>
-                  @if (isSelectedArea(area.id)) {
+                  <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
+                  @if (isSelectedArea(node.area.id)) {
                     <ng-icon hlm name="lucideCheck" size="sm" />
                   }
                 </button>
@@ -229,10 +230,12 @@ export class LocationPickerComponent {
     return excluded;
   });
 
-  protected filteredAreas = computed(() => {
+  // Areas indented by depth so nesting is visible; all areas stay selectable ("any level"
+  // placement — no subtree exclusion for areas, unlike containers).
+  protected filteredAreas = computed<AreaTreeNode[]>(() => {
+    const tree = orderAreaTree(this.areas());
     const term = this.searchTerm().trim().toLowerCase();
-    const all = this.areas();
-    return term ? all.filter(a => a.name.toLowerCase().includes(term)) : all;
+    return term ? tree.filter(n => n.area.name.toLowerCase().includes(term)) : tree;
   });
 
   protected filteredContainers = computed(() => {

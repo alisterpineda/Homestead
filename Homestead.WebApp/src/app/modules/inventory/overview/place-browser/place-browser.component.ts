@@ -100,14 +100,14 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
             </div>
           </div>
 
-          @if (c.containers.length === 0 && c.items.length === 0 && c.supplies.length === 0) {
+          @if (c.childAreas.length === 0 && c.containers.length === 0 && c.items.length === 0 && c.supplies.length === 0) {
             <div hlmEmpty>
               <div hlmEmptyHeader>
                 <div hlmEmptyMedia variant="icon">
                   <ng-icon name="lucidePackage" />
                 </div>
                 <div hlmEmptyTitle>Nothing here yet</div>
-                <div hlmEmptyDescription>This place has no items or supplies in it.</div>
+                <div hlmEmptyDescription>This place has no sub-areas, items, or supplies in it.</div>
               </div>
               <div hlmEmptyContent>
                 <app-create-entry-dialog
@@ -121,6 +121,21 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
               </div>
             </div>
           } @else {
+            @if (c.childAreas.length > 0) {
+              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                @for (childArea of c.childAreas; track childArea.id) {
+                  <app-place-card
+                    [name]="childArea.name"
+                    icon="lucideMapPin"
+                    [count]="childArea.itemCount"
+                    [lowStockCount]="childArea.lowStockCount"
+                    [link]="placeRefToLink({ kind: 'area', id: childArea.id })"
+                    [chevron]="true"
+                  />
+                }
+              </div>
+            }
+
             @if (c.containers.length > 0) {
               <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 @for (container of c.containers; track container.id) {
@@ -181,14 +196,14 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
     } @else if (overview(); as ov) {
       <section>
         <h2 class="mb-3 text-sm font-medium text-muted-foreground">Browse by place</h2>
-        @if (ov.areas.length === 0 && ov.unplacedCount === 0) {
+        @if (rootAreas().length === 0 && ov.unplacedCount === 0) {
           <p class="text-sm text-muted-foreground">
             No areas yet — set up rooms and places on the
             <a routerLink="/inventory/areas" class="underline underline-offset-4 hover:text-foreground">Areas page</a>.
           </p>
         } @else {
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            @for (area of ov.areas; track area.id) {
+            @for (area of rootAreas(); track area.id) {
               <app-place-card
                 [name]="area.name"
                 icon="lucideMapPin"
@@ -233,6 +248,10 @@ export class PlaceBrowserComponent {
 
   protected readonly formatQty = formatQty;
   protected readonly placeRefToLink = placeRefToLink;
+
+  /** Top-level areas only; nested areas surface by drilling into their parent. */
+  protected rootAreas = computed(() =>
+    (this.overview()?.areas ?? []).filter(a => a.parentAreaId == null));
 
   protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
 

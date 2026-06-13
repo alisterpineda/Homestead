@@ -40,6 +40,7 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
   containerItem: null,
   directItemCount: 2,
   nestedItemCount: 1,
+  childAreas: [],
   containers: [
     { id: 'chest', name: 'Tool chest', status: 'Active', itemCount: 1, lowStockCount: 0, previewNames: ['Wrench'] },
   ],
@@ -64,6 +65,7 @@ const BIN_CONTENTS: PlaceContentsResponse = {
   },
   directItemCount: 0,
   nestedItemCount: 0,
+  childAreas: [],
   containers: [],
   items: [],
   supplies: [],

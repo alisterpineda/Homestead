@@ -16,6 +16,9 @@ public record AreaSummary
     public required Guid Id { get; init; }
     public required string Name { get; init; }
 
+    /// <summary>Parent area, or null for a top-level area. The browse root grid shows roots only.</summary>
+    public Guid? ParentAreaId { get; init; }
+
     /// <summary>
     /// Resolved count — items resolving here (incl. nested in containers) plus distinct supplies
     /// with stock here; matches what the area-filtered items list shows.

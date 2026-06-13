@@ -24,13 +24,48 @@ public class PatchAreaHandler(
 
         audit.Track<AreaSnapshot, Area>(area, "Area", area.Id);
 
-        var model = new PatchAreaModel { Name = area.Name };
+        var model = new PatchAreaModel { Name = area.Name, ParentAreaId = area.ParentAreaId };
         request.PatchDocument.ApplyOrThrow(model);
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");
         if (model.Name.Length > 128)
             throw new BusinessRuleException("Name must be 128 characters or fewer.");
+
+        // Re-parenting (move-with-contents is automatic — resolution is derived, nothing cascades).
+        // A null parent promotes to root. The cycle guard mirrors PatchItemHandler's container check.
+        if (model.ParentAreaId != area.ParentAreaId)
+        {
+            if (model.ParentAreaId is { } newParentId)
+            {
+                if (newParentId == area.Id)
+                    throw new BusinessRuleException("An area cannot be its own parent.");
+
+                var parent = await db.Areas.AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.Id == newParentId, ct);
+                if (parent is null)
+                    throw new BusinessRuleException("ParentAreaId must reference an existing area.");
+
+                // An area cannot be moved under itself or any of its own descendants: walk up from
+                // the proposed parent and reject if the chain reaches this area.
+                var areaLinks = await db.Areas.AsNoTracking()
+                    .Select(a => new { a.Id, a.ParentAreaId })
+                    .ToDictionaryAsync(a => a.Id, a => a.ParentAreaId, ct);
+
+                var visited = new HashSet<Guid>();
+                var cursor = parent.ParentAreaId;
+                while (cursor is { } ancestorId)
+                {
+                    if (ancestorId == area.Id)
+                        throw new BusinessRuleException("An area cannot be moved inside one of its own descendants.");
+                    if (!visited.Add(ancestorId) || !areaLinks.TryGetValue(ancestorId, out var next))
+                        break;
+                    cursor = next;
+                }
+            }
+
+            area.ParentAreaId = model.ParentAreaId;
+        }
 
         area.Name = model.Name.Trim();
         area.UpdatedAt = DateTimeOffset.UtcNow;
@@ -41,7 +76,11 @@ public class PatchAreaHandler(
         // endpoint produced the response.
         var placement = await placementService.ComputeAsync(ct);
 
+        var parentAreaName = area.ParentAreaId is { } pid
+            ? await db.Areas.Where(a => a.Id == pid).Select(a => a.Name).FirstOrDefaultAsync(ct)
+            : null;
+
         return AreaResponseMapper.ToResponse(
-            area, placement.AreaItemCounts.GetValueOrDefault(area.Id));
+            area, placement.AreaItemCounts.GetValueOrDefault(area.Id), parentAreaName);
     }
 }

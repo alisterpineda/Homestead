@@ -32,6 +32,7 @@ export interface AreaSortState {
 interface AreaTableMeta {
   onEdit: (area: AreaResponse) => void;
   onDelete: (area: AreaResponse) => void;
+  hasChildren: (area: AreaResponse) => boolean;
 }
 
 @Component({
@@ -44,6 +45,9 @@ interface AreaTableMeta {
       [queryParams]="{ area: area.id }"
       class="block min-w-0 truncate text-sm font-medium"
     >{{ area.name }}</a>
+    @if (area.parentAreaName) {
+      <span class="block min-w-0 truncate text-xs text-muted-foreground">in {{ area.parentAreaName }}</span>
+    }
   `,
 })
 export class AreaNameCell {
@@ -72,6 +76,7 @@ export class AreaCreatedCell {
   template: `
     <app-area-row-actions
       [area]="area"
+      [hasChildren]="hasChildren"
       (edit)="onEdit($event)"
       (delete)="onDelete($event)"
     />
@@ -81,6 +86,7 @@ export class AreaActionsCell {
   private readonly ctx = injectFlexRenderContext<CellContext<AreaResponse, unknown>>();
   private get meta(): AreaTableMeta { return this.ctx.table.options.meta as AreaTableMeta; }
   protected get area(): AreaResponse { return this.ctx.row.original; }
+  protected get hasChildren(): boolean { return this.meta.hasChildren(this.area); }
   protected onEdit(a: AreaResponse): void { this.meta.onEdit(a); }
   protected onDelete(a: AreaResponse): void { this.meta.onDelete(a); }
 }
@@ -136,9 +142,18 @@ export class AreaTableComponent {
   delete = output<AreaResponse>();
   sortChange = output<AreaSortState>();
 
+  /** Area ids that have at least one child — drives the delete gate (parents can't be deleted). */
+  private readonly childParentIds = computed(() => {
+    const ids = new Set<string>();
+    for (const a of this.areas())
+      if (a.parentAreaId) ids.add(a.parentAreaId);
+    return ids;
+  });
+
   private readonly _meta: AreaTableMeta = {
     onEdit: (a) => this.edit.emit(a),
     onDelete: (a) => this.delete.emit(a),
+    hasChildren: (a) => this.childParentIds().has(a.id),
   };
 
   private readonly _columns = computed<ColumnDef<AreaResponse>[]>(() => [

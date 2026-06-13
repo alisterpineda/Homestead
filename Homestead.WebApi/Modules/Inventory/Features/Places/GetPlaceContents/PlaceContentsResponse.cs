@@ -33,6 +33,12 @@ public record PlaceContentsResponse
     /// </summary>
     public required int NestedItemCount { get; init; }
 
+    /// <summary>
+    /// Direct child areas (area scope only; always empty for container/Unplaced scopes), name-ordered.
+    /// These render as drill cards alongside containers; each carries its own rolled subtree count.
+    /// </summary>
+    public required IReadOnlyList<PlaceChildAreaSummary> ChildAreas { get; init; }
+
     /// <summary>Direct live child containers, name-ordered.</summary>
     public required IReadOnlyList<PlaceContainerSummary> Containers { get; init; }
 
@@ -45,6 +51,19 @@ public record PlaceContentsResponse
     /// container), so no supply can sit directly nowhere.
     /// </summary>
     public required IReadOnlyList<PlaceSupplyResponse> Supplies { get; init; }
+}
+
+/// <summary>A drillable child-area card: the area's rolled subtree counts (same semantics as the overview cards).</summary>
+public record PlaceChildAreaSummary
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>Rolled resolved count for the child area (its own contents plus its descendants').</summary>
+    public required int ItemCount { get; init; }
+
+    /// <summary>Distinct low-stock supplies resolving anywhere inside the child area's subtree.</summary>
+    public required int LowStockCount { get; init; }
 }
 
 /// <summary>A drillable child-container card: resolved subtree stats plus a contents preview.</summary>

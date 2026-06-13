@@ -6,5 +6,7 @@ export interface AreaResponse {
   id: string;
   liveItemCount: number;
   name: string;
+  parentAreaId?: (string | null);
+  parentAreaName?: (string | null);
   updatedAt: string;
 }

@@ -865,12 +865,17 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid?>("ParentAreaId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ParentAreaId");
 
                     b.ToTable("areas", "inventory");
                 });
@@ -1840,6 +1845,16 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Group");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Area", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "ParentArea")
+                        .WithMany()
+                        .HasForeignKey("ParentAreaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentArea");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>

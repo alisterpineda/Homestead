@@ -30,6 +30,14 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private async Task<Area> AddAreaAsync(string name, Guid? parentAreaId = null)
+    {
+        var area = new Area { Id = Guid.NewGuid(), Name = name, ParentAreaId = parentAreaId };
+        _db.Areas.Add(area);
+        await _db.SaveChangesAsync(Ct);
+        return area;
+    }
+
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
         Guid? parentItemId = null, bool isContainer = false)
@@ -279,5 +287,71 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         Assert.Empty(resp.Supplies);
         Assert.Equal(0, resp.DirectItemCount);
         Assert.Equal(0, resp.NestedItemCount);
+    }
+
+    [Fact]
+    public async Task Handle_AreaScope_RendersChildAreaCardsWithFullBreadcrumb()
+    {
+        var house = await AddAreaAsync("House");
+        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: basement.Id);
+        await AddItemAsync("Lamp", areaId: bedroom.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = basement.Id }, Ct);
+
+        // Full ancestor breadcrumb, and Bedroom as a child-area card carrying its rolled count.
+        Assert.Equal(["House", "Basement"], resp.Path.Select(s => s.Name));
+        var childCard = Assert.Single(resp.ChildAreas);
+        Assert.Equal(bedroom.Id, childCard.Id);
+        Assert.Equal(1, childCard.ItemCount);
+        // The child-area card counts as a direct card; nothing is nested in Basement's own containers.
+        Assert.Equal(1, resp.DirectItemCount);
+        Assert.Equal(0, resp.NestedItemCount);
+    }
+
+    [Fact]
+    public async Task Handle_AreaScope_SupplyTypeSharedWithSubArea_NestedCountStaysCorrect()
+    {
+        // Regression: a supply type stocked both directly in House AND in a sub-area must not be
+        // double-subtracted from the nested figure (the old `total - sum(childRolled) - …` math did,
+        // and Math.Max(0,…) hid it). Nested must reflect ONLY House's own container nesting.
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+
+        var batteries = await AddSupplyAsync("Batteries");
+        await AddStockAsync(batteries.Id, 4m, areaId: house.Id);   // direct in House
+        await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id); // also in the sub-area
+
+        var chest = await AddItemAsync("Chest", areaId: house.Id, isContainer: true);
+        await AddItemAsync("Watch", parentItemId: chest.Id);
+        await AddItemAsync("Ring", parentItemId: chest.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = house.Id }, Ct);
+
+        // Direct cards: Chest (container) + Batteries (direct supply row) + Bedroom (child-area card).
+        Assert.Equal(chest.Id, Assert.Single(resp.Containers).Id);
+        Assert.Equal(batteries.Id, Assert.Single(resp.Supplies).Supply.Id);
+        Assert.Equal(bedroom.Id, Assert.Single(resp.ChildAreas).Id);
+        Assert.Equal(3, resp.DirectItemCount);
+        // Nested = Watch + Ring inside Chest. Pre-fix this was 1 (Batteries stolen a slot).
+        Assert.Equal(2, resp.NestedItemCount);
+    }
+
+    [Fact]
+    public async Task Handle_AreaScope_OnlySubAreas_CountsCardsNotNested()
+    {
+        var house = await AddAreaAsync("House");
+        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
+        await AddItemAsync("Boiler", areaId: basement.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = house.Id }, Ct);
+
+        Assert.Empty(resp.Containers);
+        Assert.Empty(resp.Items);
+        Assert.Empty(resp.Supplies);
+        var childCard = Assert.Single(resp.ChildAreas);
+        Assert.Equal(1, childCard.ItemCount); // Boiler rolls up to Basement
+        Assert.Equal(1, resp.DirectItemCount); // the Basement card
+        Assert.Equal(0, resp.NestedItemCount); // House has no containers of its own
     }
 }

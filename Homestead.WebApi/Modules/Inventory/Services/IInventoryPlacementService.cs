@@ -15,9 +15,18 @@ public record InventoryPlacement
     /// <summary>
     /// areaId → count of live rows the area-filtered list shows: non-fungible live items resolving
     /// to the area (directly placed + via container chain) + distinct fungible types with at least
-    /// one stock entry resolving there. Areas with no rows are absent.
+    /// one stock entry resolving there. Rolled up the area-parent chain — a count includes every
+    /// descendant area's contents. Areas with no rows are absent.
     /// </summary>
     public required IReadOnlyDictionary<Guid, int> AreaItemCounts { get; init; }
+
+    /// <summary>
+    /// areaId → the same count as <see cref="AreaItemCounts"/> but for the area's OWN contents only
+    /// (leaf-keyed; descendant-area contents excluded). Computed with set-union dedup, so it can be
+    /// subtracted from the direct-card counts to get "deeper inside this area's own containers"
+    /// without the double-count a naive subtraction of rolled child sums would introduce.
+    /// </summary>
+    public required IReadOnlyDictionary<Guid, int> AreaOwnItemCounts { get; init; }
 
     /// <summary>Live non-fungible items whose container chain reaches no area (resolved-unplaced).</summary>
     public required IReadOnlyList<UnplacedItemInfo> UnplacedItems { get; init; }

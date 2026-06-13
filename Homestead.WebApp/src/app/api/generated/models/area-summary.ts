@@ -6,4 +6,5 @@ export interface AreaSummary {
   itemCount: number;
   lowStockCount: number;
   name: string;
+  parentAreaId?: (string | null);
 }

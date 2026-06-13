@@ -23,6 +23,12 @@ public interface IItemLocationResolver
     /// </summary>
     Task<IReadOnlyDictionary<HoldingLocation, LocationPath>> ResolveHoldingLocationsAsync(
         IReadOnlyCollection<HoldingLocation> locations, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an area's full ancestor path (House › Basement › Bedroom), root→leaf with the area
+    /// itself as the last segment. Used for the browse breadcrumb. Cycle-guarded.
+    /// </summary>
+    Task<LocationPath> ResolveAreaPathAsync(Guid areaId, CancellationToken ct = default);
 }
 
 /// <summary>A place stock can sit: an area, or a container item. Both null means "deleted/unknown".</summary>

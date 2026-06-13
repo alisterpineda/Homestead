@@ -54,6 +54,7 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
     containerItem: null,
     directItemCount: 0,
     nestedItemCount: 0,
+    childAreas: [],
     containers: [],
     items: [],
     supplies: [],

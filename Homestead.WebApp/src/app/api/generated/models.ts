@@ -169,6 +169,7 @@ export type { PatchTradeCommand } from './models/patch-trade-command';
 export type { PatchTransferCommand } from './models/patch-transfer-command';
 export type { PermanentlyDeleteDocumentsCommand } from './models/permanently-delete-documents-command';
 export type { PermanentlyDeleteDocumentsResponse } from './models/permanently-delete-documents-response';
+export type { PlaceChildAreaSummary } from './models/place-child-area-summary';
 export type { PlaceContainerSummary } from './models/place-container-summary';
 export type { PlaceContentsResponse } from './models/place-contents-response';
 export type { PlaceSupplyResponse } from './models/place-supply-response';

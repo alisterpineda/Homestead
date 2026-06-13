@@ -162,8 +162,8 @@ interface AreaSortFieldOption {
         <div hlmAlertDialogHeader>
           <h2 hlmAlertDialogTitle>Delete {{ pendingDelete()?.name ?? 'area' }}?</h2>
           <p hlmAlertDialogDescription>
-            This permanently removes the area. Areas with items in them cannot be deleted —
-            move or retire the items first.
+            This permanently removes the area. Areas with sub-areas or items in them cannot be
+            deleted — move or remove those first.
           </p>
         </div>
         <div hlmAlertDialogFooter>

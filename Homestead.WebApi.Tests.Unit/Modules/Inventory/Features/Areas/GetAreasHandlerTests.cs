@@ -114,6 +114,61 @@ public class GetAreasHandlerTests : IAsyncLifetime
         Assert.Equal(["Attic", "Office"], resp.Items.Select(a => a.Name));
     }
 
+    [Fact]
+    public async Task Handle_IncludesParentFields()
+    {
+        var house = new Area { Id = Guid.NewGuid(), Name = "House" };
+        var basement = new Area { Id = Guid.NewGuid(), Name = "Basement", ParentAreaId = house.Id };
+        _db.Areas.AddRange(house, basement);
+        await _db.SaveChangesAsync(Ct);
+
+        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+
+        var basementResp = resp.Items.Single(a => a.Name == "Basement");
+        Assert.Equal(house.Id, basementResp.ParentAreaId);
+        Assert.Equal("House", basementResp.ParentAreaName);
+
+        var houseResp = resp.Items.Single(a => a.Name == "House");
+        Assert.Null(houseResp.ParentAreaId);
+        Assert.Null(houseResp.ParentAreaName);
+    }
+
+    [Fact]
+    public async Task Handle_EmitsTreeOrder_ParentsBeforeChildren()
+    {
+        // House › {Basement › Bedroom, Garage}; Attic is a separate root. Pre-order DFS, siblings
+        // name-sorted: Attic, House, Basement, Bedroom, Garage.
+        var attic = new Area { Id = Guid.NewGuid(), Name = "Attic" };
+        var house = new Area { Id = Guid.NewGuid(), Name = "House" };
+        var basement = new Area { Id = Guid.NewGuid(), Name = "Basement", ParentAreaId = house.Id };
+        var bedroom = new Area { Id = Guid.NewGuid(), Name = "Bedroom", ParentAreaId = basement.Id };
+        var garage = new Area { Id = Guid.NewGuid(), Name = "Garage", ParentAreaId = house.Id };
+        _db.Areas.AddRange(attic, house, basement, bedroom, garage);
+        await _db.SaveChangesAsync(Ct);
+
+        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+
+        Assert.Equal(["Attic", "House", "Basement", "Bedroom", "Garage"], resp.Items.Select(a => a.Name));
+    }
+
+    [Fact]
+    public async Task Handle_LiveItemCount_RollsUpThroughNestedAreas()
+    {
+        var house = new Area { Id = Guid.NewGuid(), Name = "House" };
+        var bedroom = new Area { Id = Guid.NewGuid(), Name = "Bedroom", ParentAreaId = house.Id };
+        _db.Areas.AddRange(house, bedroom);
+        _db.Items.AddRange(
+            Item(house.Id, ItemStatus.Active),
+            Item(bedroom.Id, ItemStatus.Active),
+            Item(bedroom.Id, ItemStatus.Active));
+        await _db.SaveChangesAsync(Ct);
+
+        var resp = await _sut.Handle(new GetAreasQuery { Page = 1, PageSize = 50 }, Ct);
+
+        Assert.Equal(2, resp.Items.Single(a => a.Name == "Bedroom").LiveItemCount);
+        Assert.Equal(3, resp.Items.Single(a => a.Name == "House").LiveItemCount); // own + nested
+    }
+
     private static Item Item(Guid? areaId, ItemStatus status) => new()
     {
         Id = Guid.NewGuid(),

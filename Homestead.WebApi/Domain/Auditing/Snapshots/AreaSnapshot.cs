@@ -5,10 +5,12 @@ namespace Homestead.WebApi.Domain.Auditing.Snapshots;
 public record AreaSnapshot : IAuditSnapshot<AreaSnapshot, Area>
 {
     public required string Name { get; init; }
+    public Guid? ParentAreaId { get; init; }
 
     public static AreaSnapshot From(Area source) => new()
     {
         Name = source.Name,
+        ParentAreaId = source.ParentAreaId,
     };
 
     public List<FieldChange> Diff(AreaSnapshot other)
@@ -17,6 +19,9 @@ public record AreaSnapshot : IAuditSnapshot<AreaSnapshot, Area>
 
         if (Name != other.Name)
             changes.Add(new ScalarFieldChange("Name", Name, other.Name));
+
+        if (ParentAreaId != other.ParentAreaId)
+            changes.Add(new ScalarFieldChange("ParentAreaId", ParentAreaId?.ToString(), other.ParentAreaId?.ToString()));
 
         return changes;
     }

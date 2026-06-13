@@ -96,7 +96,7 @@ describe('LocationPickerComponent', () => {
     component['searchTerm'].set('gar');
     fixture.detectChanges();
 
-    expect(component['filteredAreas']().map(a => a.id)).toEqual(['garage']);
+    expect(component['filteredAreas']().map(n => n.area.id)).toEqual(['garage']);
     expect(component['filteredContainers']().map(c => c.id)).toEqual(['garageShelf']);
   });
 });

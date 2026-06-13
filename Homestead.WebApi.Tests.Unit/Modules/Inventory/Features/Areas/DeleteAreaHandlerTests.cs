@@ -118,4 +118,19 @@ public class DeleteAreaHandlerTests : IDisposable
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task Handle_WithSubAreas_Throws()
+    {
+        var house = new Area { Id = Guid.NewGuid(), Name = "House" };
+        var basement = new Area { Id = Guid.NewGuid(), Name = "Basement", ParentAreaId = house.Id };
+        _db.Areas.AddRange(house, basement);
+        await _db.SaveChangesAsync(Ct);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new DeleteAreaCommand(house.Id), Ct));
+
+        Assert.Contains("sub-areas", ex.Message);
+        Assert.Contains(_db.Areas, a => a.Id == house.Id);
+    }
 }

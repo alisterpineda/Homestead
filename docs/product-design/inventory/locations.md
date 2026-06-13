@@ -8,25 +8,30 @@ The fungible side — stock entries, the movement ledger, thresholds, and the co
 
 Three structural facts drive everything here:
 
-1. An **Area** is fixed structure — a place that exists independent of what is in it.
+1. An **Area** is fixed structure — a place that exists independent of what is in it. Areas nest into a hierarchy (`House › Basement › Bedroom`).
 2. An **Item** is anything owned. A non-fungible item lives in exactly one location, or nowhere.
 3. A **location** for a non-fungible item is *either* an area *or* another item acting as a container — never both, and now optionally neither.
 
-Because a container is just a non-fungible item with its container role enabled, "what's in the garage" and "what's in this bin" are the same query at different depths, and an item's true area is found by walking up until structure (an area) is reached.
+Because a container is just a non-fungible item with its container role enabled, "what's in the garage" and "what's in this bin" are the same query at different depths, and an item's true area is found by walking up until structure (an area) is reached. Area nesting applies that same upward walk a second time — to the area's own parent chain — so resolution climbs containers to a leaf area, then climbs that area's ancestors to the root.
 
 ## Areas
 
-An area is a flat, named place. In v1 it carries only:
+An area is a named place that optionally nests inside another area. In v1 it carries:
 
 | Field | Notes |
 |---|---|
 | `Id` | uuid |
 | `Name` | "Garage", "Home Office", "Pantry" |
+| `ParentAreaId` | nullable self-reference; `null` = a top-level (root) area. Mirrors `ParentItemId` on items |
 | `CreatedAt`, `UpdatedAt` | UTC |
 
-Areas are **flat** — no parent area, no nesting — in v1. (Nested areas are a named future addition; see [overview.md](overview.md#future-compatibility).) There is intentionally no `Kind` (Room/Area/Building) field: nothing in v1 branches on it, so it is omitted rather than carried unused.
+Areas form a **hierarchy** via the optional `ParentAreaId` (`House › Basement › Bedroom`). Nesting is additive over the flat model: an existing flat area is simply a root (null parent), so there is no backfill. There is intentionally no `Kind` (Room/Area/Building) field: nothing in v1 branches on it, so it is omitted rather than carried unused.
 
-**Creating** an area needs only a name. **Editing** changes the name. **Deleting** is governed by what currently points at it — see *Area lifecycle* below.
+**Placement is any-level**: an area can hold sub-areas *and* its own direct items/containers at the same time — there is no leaf-only restriction (an area behaves like a container in this respect). **Nesting depth is unbounded** (mirroring "containers nest to any depth"); the only structural guard is cycle prevention.
+
+**Resolution & roll-up.** `ResolvedAreaId` stays the **leaf** area an item/stock directly sits in (e.g. Bedroom) — unchanged by nesting. What changes is that the displayed **path** gains the full area-ancestor chain above the leaf (`House › Basement › Bedroom › Chest › Bin`), and **counts roll up**: every ancestor area's count includes its descendant areas' contents (a drill in Bedroom counts toward Bedroom, Basement, *and* House). A supply type stocked in two sub-areas counts **once** for a shared ancestor (set-union dedup), so the rolled card count still equals what the area-filtered list shows. This is computed at read time by two walks that must stay in lock-step — `ItemLocationResolver` (per-item path) and `InventoryPlacementService` (aggregate counts).
+
+**Creating** an area needs a name and an optional parent. **Editing** changes the name and/or re-parents the area (including promoting it to a root by clearing the parent); re-parenting moves the whole subtree with it automatically, since resolution is derived and nothing cascades. **Deleting** is governed by what currently points at it — see *Area lifecycle* below.
 
 ## The item record
 
@@ -158,8 +163,11 @@ This mirrors `accounts.md`'s rule that Delete is present but disabled once an ac
 
 Deleting an area is governed by what references it:
 
+- **Blocked while it has sub-areas** — a parent can't be removed out from under its children. The handler raises a friendly "Area has sub-areas and cannot be deleted. Move or delete them first." ahead of the FK (`ParentAreaId` is `Restrict`, the same backstop the container chain uses). Checked first — it's the cheapest guard. Re-parent or delete the children first.
 - **Blocked while anything live resolves to it** — the same resolved count the areas table and the overview's place cards show (live items resolving there directly or via container chains, plus distinct supplies with live stock resolving there), so the UI's delete gating and the backend rule can't disagree. Additionally blocked by **any stock entry directly in the area regardless of supply status** — an archived supply's stock is hidden from counts and lists but still sits there (a stock entry requires exactly one location), so it must be moved or used up first. Move or retire the rest first.
 - **Historical movement references survive a deletion.** The movement ledger records the area an inflow/outflow/transfer happened at; those references are cleared (set null) rather than blocking the delete, so the quantity history and what happened to it persist even though the now-deleted area's label is gone.
+
+**Re-parenting** is a metadata edit (PATCH `/parentAreaId`), not a move of contents: because an item's area is *derived* by walking up, moving an area to a new parent automatically takes its whole subtree with it — nothing cascades. The only rule is a **cycle guard**: an area cannot be set as its own parent, nor moved underneath any of its own descendants. The walk climbs from the proposed parent up its `ParentAreaId` chain and rejects (`BusinessRuleException`) if it reaches the area being moved — exactly mirroring the container cycle check on `ParentItemId`. Setting the parent to `null` promotes the area to a root.
 
 There is no area archive in v1 (areas carry no lifecycle status); an area is either present or deleted. If a household stops using a room, the practical path is to empty it and delete it, accepting that historical movements that happened there lose their location label. (An area archive/rename-only path is a natural future addition if losing those labels proves annoying.)
 

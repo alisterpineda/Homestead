@@ -54,6 +54,10 @@ public class GetPlaceContentsHandler(
 
         var containers = await BuildContainerSummariesAsync(childContainers, placement, ct);
 
+        // Direct sub-areas (area scope only) render as drill cards beside the containers, each
+        // carrying its own rolled subtree count.
+        var childAreas = await LoadChildAreasAsync(request, placement, ct);
+
         // The scope's resolved total uses the exact semantics that drive the overview cards, so
         // direct + nested always reconciles with the count the user clicked.
         var total = request switch
@@ -65,18 +69,54 @@ public class GetPlaceContentsHandler(
                     : 0,
             _ => placement.UnplacedItems.Count,
         };
-        var directCount = containers.Count + items.Count + supplies.Count;
+
+        // Child-area cards count as direct cards (like containers): each is one drillable thing shown
+        // here, carrying its own rolled subtree count. The "+N nested" badge means only things deeper
+        // inside THIS place's OWN containers, so it's derived from the place's own (non-rolled) count
+        // minus the direct leaf cards. For an area that's AreaOwnItemCounts (descendant areas
+        // excluded, set-deduped — NOT a sum of rolled child counts, which would double-subtract any
+        // supply type shared between this area and a sub-area); for a container/Unplaced scope there
+        // are no child areas, so the own count is just the rolled total.
+        var ownCount = request.AreaId is { } scopeAreaId
+            ? placement.AreaOwnItemCounts.GetValueOrDefault(scopeAreaId)
+            : total;
+        var directCount = containers.Count + items.Count + supplies.Count + childAreas.Count;
+        var nestedItemCount = Math.Max(0, ownCount - containers.Count - items.Count - supplies.Count);
 
         return new PlaceContentsResponse
         {
             Path = path,
             ContainerItem = containerItem,
             DirectItemCount = directCount,
-            NestedItemCount = Math.Max(0, total - directCount),
+            NestedItemCount = nestedItemCount,
+            ChildAreas = childAreas,
             Containers = containers,
             Items = items,
             Supplies = supplies,
         };
+    }
+
+    private async Task<List<PlaceChildAreaSummary>> LoadChildAreasAsync(
+        GetPlaceContentsQuery request, InventoryPlacement placement, CancellationToken ct)
+    {
+        if (request.AreaId is not { } areaId)
+            return [];
+
+        var children = await db.Areas.AsNoTracking()
+            .Where(a => a.ParentAreaId == areaId)
+            .OrderBy(a => a.Name)
+            .Select(a => new { a.Id, a.Name })
+            .ToListAsync(ct);
+
+        return children
+            .Select(a => new PlaceChildAreaSummary
+            {
+                Id = a.Id,
+                Name = a.Name,
+                ItemCount = placement.AreaItemCounts.GetValueOrDefault(a.Id),
+                LowStockCount = placement.AreaLowStockCounts.GetValueOrDefault(a.Id),
+            })
+            .ToList();
     }
 
     /// <summary>Validates the scoped place exists and resolves its breadcrumb path.</summary>
@@ -85,17 +125,13 @@ public class GetPlaceContentsHandler(
     {
         if (request.AreaId is { } areaId)
         {
-            var area = await db.Areas.AsNoTracking()
-                .Where(a => a.Id == areaId)
-                .Select(a => new { a.Id, a.Name })
-                .FirstOrDefaultAsync(ct)
-                ?? throw new EntityNotFoundException("Area not found.");
-            return ([new LocationSegmentResponse
-            {
-                Id = area.Id,
-                Name = area.Name,
-                Kind = LocationSegmentKind.Area,
-            }], null);
+            var areaExists = await db.Areas.AsNoTracking().AnyAsync(a => a.Id == areaId, ct);
+            if (!areaExists)
+                throw new EntityNotFoundException("Area not found.");
+
+            // Full ancestor breadcrumb (House › Basement › Bedroom), not just the leaf segment.
+            var areaPath = await locationResolver.ResolveAreaPathAsync(areaId, ct);
+            return (areaPath.Segments, null);
         }
 
         if (request.ContainerItemId is { } containerId)

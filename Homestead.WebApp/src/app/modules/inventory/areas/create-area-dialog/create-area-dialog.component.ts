@@ -16,11 +16,12 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { AreaParentPickerComponent } from '../../shared/area-parent-picker/area-parent-picker.component';
 
 @Component({
   selector: 'app-create-area-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, AreaParentPickerComponent],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn [size]="triggerSize()" hlmDialogTrigger>
@@ -46,6 +47,16 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
             />
           </div>
 
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Parent area</label>
+            <app-area-parent-picker
+              [value]="parentAreaId()"
+              ariaLabel="Parent area"
+              (valueChange)="parentAreaId.set($event)"
+            />
+            <p class="text-xs text-muted-foreground">Nest this area inside another, or leave as top-level.</p>
+          </div>
+
           @if (createError()) {
             <p class="text-sm text-destructive">{{ createError() }}</p>
           }
@@ -66,6 +77,7 @@ export class CreateAreaDialogComponent {
   created = output();
 
   name = signal('');
+  parentAreaId = signal<string | null>(null);
   creating = signal(false);
   createError = signal('');
 
@@ -82,6 +94,7 @@ export class CreateAreaDialogComponent {
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
       this.name.set('');
+      this.parentAreaId.set(null);
       this.creating.set(false);
       this.createError.set('');
     }
@@ -94,7 +107,7 @@ export class CreateAreaDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    this.areaApi.createArea({ body: { name: this.name().trim() } }).subscribe({
+    this.areaApi.createArea({ body: { name: this.name().trim(), parentAreaId: this.parentAreaId() } }).subscribe({
       next: () => {
         this.creating.set(false);
         toast.success('Area created.');

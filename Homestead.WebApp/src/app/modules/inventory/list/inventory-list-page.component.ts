@@ -54,6 +54,7 @@ import { EditSupplySheetComponent } from '../supplies/edit-supply-sheet/edit-sup
 import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
 import { itemToRow, supplyToRow, supplyToDrillRow, type InventoryRow } from './inventory-row';
+import { orderAreaTree, buildDescendantMap, type AreaTreeNode } from '../shared/area-tree';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -290,14 +291,14 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                       <span class="italic text-muted-foreground">Unplaced</span>
                       @if (areaFilter() === 'unplaced' && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                     </button>
-                    @for (area of areas(); track area.id) {
+                    @for (node of areaTree(); track node.area.id) {
                       <button
                         type="button"
                         class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                        (click)="selectAreaFilter(area.id)"
+                        (click)="selectAreaFilter(node.area.id)"
                       >
-                        <span class="truncate">{{ area.name }}</span>
-                        @if (areaFilter() === area.id && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                        <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
+                        @if (areaFilter() === node.area.id && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                       </button>
                     }
                   </div>
@@ -564,6 +565,11 @@ export class InventoryListPageComponent {
     { initialValue: [] as AreaResponse[] },
   );
 
+  /** Areas indented by depth for the filter dropdown. */
+  protected areaTree = computed<AreaTreeNode[]>(() => orderAreaTree(this.areas()));
+  /** Each area id → its descendant set (inclusive), so the area filter matches nested areas too. */
+  private areaDescendants = computed(() => buildDescendantMap(this.areas()));
+
   allItems = computed(() => this.data()?.items ?? []);
   allSupplies = computed(() => this.data()?.supplies ?? []);
 
@@ -638,7 +644,10 @@ export class InventoryListPageComponent {
     const af = this.areaFilter();
     if (af === 'all') return rows;
     if (af === 'unplaced') return rows.filter(r => r.resolvedAreaIds.includes(null));
-    return rows.filter(r => r.resolvedAreaIds.includes(af));
+    // Match the selected area AND all its descendants, so the list mirrors the (rolled-up) area
+    // card count: a row whose resolved leaf area is the area itself or any sub-area of it shows.
+    const descendants = this.areaDescendants().get(af) ?? new Set([af]);
+    return rows.filter(r => r.resolvedAreaIds.some(id => id != null && descendants.has(id)));
   });
 
   private kindRows = computed(() => {

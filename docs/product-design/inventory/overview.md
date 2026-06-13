@@ -27,7 +27,6 @@ The module is not an asset-management system, a warehouse/WMS, a shopping-list a
 ## Out of scope for v1
 
 - **Item categories.** A user-curated category taxonomy (Hardware, Electronics, Sentimental, …) is deferred. Areas, containers, and search organise items in v1; categorisation lands later as a user-editable lookup. (Planned, see *Future-compatibility*.)
-- **Nested areas.** Areas are flat in v1 — no building → floor → room hierarchy. (Planned, see *Future-compatibility*.)
 - **Photos / attachments** on items — important for non-fungible items and insurance, but deferred to its own table. (Planned, see *Future-compatibility*.)
 - **Barcode / QR scanning** and **printable container labels** ("scan a bin → see its contents").
 - **Expiry / perishables and per-category custom fields** (food best-before dates, medication, filter service dates) — these feed reminders and belong with a future Calendar/Maintenance surface.
@@ -44,9 +43,9 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 ### Area
 
-An **Area** is a fixed structural location — a room or zone the household thinks of as a place: "Garage," "Home Office," "Pantry." Areas are a flat list in v1; an item or a unit of stock is ultimately *in* an area, either directly or by sitting inside a container that is in that area. An area carries just a name. Deleting an area is blocked while any live item or stock currently sits in it; historical references to it from the movement ledger survive a deletion (the recorded quantity and what happened to it persist; only the now-meaningless location label is cleared).
+An **Area** is a fixed structural location — a room or zone the household thinks of as a place: "Garage," "Home Office," "Pantry." Areas form a **hierarchy** (`House › Basement › Bedroom`) via an optional parent area; a flat list is just the case where every area is a root. An item or a unit of stock is ultimately *in* a leaf area, either directly or by sitting inside a container that is in that area — and that placement **rolls up**: it counts toward the leaf area and every ancestor above it (something in Bedroom counts toward Bedroom, Basement, and House). An area carries a name and an optional parent, and can hold sub-areas and its own direct items/containers at the same time. Deleting an area is blocked while it has sub-areas, or while any live item or stock currently sits in it; re-parenting an area moves its whole subtree with it (resolution is derived, so nothing cascades), guarded only against cycles. Historical references to it from the movement ledger survive a deletion (the recorded quantity and what happened to it persist; only the now-meaningless location label is cleared).
 
-See [locations.md](locations.md) for the area model, the containment tree, resolved-location derivation, move-with-contents, the Unplaced state, and area lifecycle rules.
+See [locations.md](locations.md) for the area model, the area hierarchy and roll-up, the containment tree, resolved-location derivation, move-with-contents, re-parenting and the cycle guard, the Unplaced state, and area lifecycle rules.
 
 ### Item and fungibility
 
@@ -172,7 +171,6 @@ Like Documents and Finances, Inventory has no per-item owner and no per-user sco
 The following must be addable later without re-migrating items, areas, stock, or movement history:
 
 - **Item categories** as a user-curated taxonomy — added as a flat lookup (the Documents Party pattern) referenced from items, with no change to the item table beyond an optional foreign key. Nothing in v1 branches on category, so it slots in additively.
-- **Nested areas** via an optional parent-area reference. The resolved-location walk already terminates at "the area an item sits in"; giving areas their own parents extends the same derivation upward without touching items or stock.
 - **Photos / attachments** on items, in their own table keyed by `Item.Id` — important for non-fungible items and insurance claims.
 - **Barcode / QR scanning** and **printable container labels**, keyed off the stable item and area IDs.
 - **Expiry / perishables and per-category custom fields**, feeding reminders through a future Calendar/Maintenance module.

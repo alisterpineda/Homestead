@@ -20,6 +20,12 @@ public class DeleteAreaHandler(
         if (area is null)
             return false;
 
+        // Sub-areas block deletion (a friendly message ahead of the FK Restrict backstop): a parent
+        // can't be removed out from under its children. Checked first — it's the cheapest guard.
+        var hasChildren = await db.Areas.AnyAsync(a => a.ParentAreaId == area.Id, ct);
+        if (hasChildren)
+            throw new BusinessRuleException("Area has sub-areas and cannot be deleted. Move or delete them first.");
+
         // Anything live RESOLVING to the area blocks deletion — the same count the areas table
         // shows and the delete button gates on, so the UI and this rule can't disagree. Terminal
         // items don't block (the FK is SetNull, so their stale label clears on delete).

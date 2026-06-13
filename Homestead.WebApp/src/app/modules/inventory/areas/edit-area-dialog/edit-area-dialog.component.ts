@@ -13,10 +13,11 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { replace } from '@/shared/json-patch';
+import { replace, type JsonPatchOperation } from '@/shared/json-patch';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { AreaParentPickerComponent } from '../../shared/area-parent-picker/area-parent-picker.component';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -24,13 +25,13 @@ import { toast } from '@spartan-ng/brain/sonner';
 @Component({
   selector: 'app-edit-area-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, AreaParentPickerComponent],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[420px]">
         <div hlmDialogHeader>
-          <h2 hlmDialogTitle>Rename area</h2>
-          <p hlmDialogDescription>Change the name of this area.</p>
+          <h2 hlmDialogTitle>Edit area</h2>
+          <p hlmDialogDescription>Rename this area or move it under a different parent.</p>
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
@@ -43,6 +44,18 @@ import { toast } from '@spartan-ng/brain/sonner';
               [value]="editName()"
               (input)="editName.set(asValue($event))"
             />
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Parent area</label>
+            <app-area-parent-picker
+              [value]="editParentId()"
+              [excludeSubtreeOf]="area()?.id ?? null"
+              [selectedLabel]="area()?.parentAreaName ?? null"
+              ariaLabel="Parent area"
+              (valueChange)="editParentId.set($event)"
+            />
+            <p class="text-xs text-muted-foreground">Moving an area takes its contents with it.</p>
           </div>
 
           <div hlmDialogFooter>
@@ -69,6 +82,11 @@ export class EditAreaDialogComponent {
     if (!a || this.state() !== 'open') return '';
     return a.name;
   });
+  editParentId = seededLinkedSignal(this.seedKey, (): string | null => {
+    const a = this.area();
+    if (!a || this.state() !== 'open') return null;
+    return a.parentAreaId ?? null;
+  });
   saving = seededLinkedSignal(this.seedKey, () => false);
 
   private areaApi = inject(InventoryAreaApiService);
@@ -77,8 +95,12 @@ export class EditAreaDialogComponent {
 
   canSubmit = computed(() => {
     const a = this.area();
+    if (!a) return false;
     const name = this.editName().trim();
-    return !!a && name.length > 0 && name !== a.name;
+    if (name.length === 0) return false;
+    const nameChanged = name !== a.name;
+    const parentChanged = (this.editParentId() ?? null) !== (a.parentAreaId ?? null);
+    return nameChanged || parentChanged;
   });
 
   asValue(event: Event): string {
@@ -90,14 +112,21 @@ export class EditAreaDialogComponent {
     const a = this.area();
     if (!a || !this.canSubmit()) return;
 
+    const name = this.editName().trim();
+    const parentId = this.editParentId() ?? null;
+    const ops: JsonPatchOperation[] = [];
+    if (name !== a.name) ops.push(replace('/name', name));
+    if (parentId !== (a.parentAreaId ?? null)) ops.push(replace('/parentAreaId', parentId));
+    if (ops.length === 0) return;
+
     this.saving.set(true);
-    this.areaApi.patchArea({ id: a.id, body: [replace('/name', this.editName().trim())] }).pipe(
+    this.areaApi.patchArea({ id: a.id, body: ops }).pipe(
       takeUntilDestroyed(this.destroyRef),
-      handleMutationError(this.errorHandler, this.saving, 'Failed to rename area.'),
+      handleMutationError(this.errorHandler, this.saving, 'Failed to save area.'),
     ).subscribe({
       next: (updated) => {
         this.saving.set(false);
-        toast.success('Area renamed.');
+        toast.success('Area saved.');
         this.saved.emit(updated);
       },
     });

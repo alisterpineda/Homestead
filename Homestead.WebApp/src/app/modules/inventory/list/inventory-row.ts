@@ -59,10 +59,17 @@ export function itemToRow(item: ItemResponse): InventoryRow {
   };
 }
 
-/** Root area of one stock entry: the path root when it is an area, else unplaced. */
+/**
+ * Resolved (leaf) area of one stock entry: the LAST Area-kind segment of the path. The path now
+ * carries the full area-ancestor chain (House › Basement › Bedroom) before any container segments,
+ * so the leaf area — the one the entry literally resolves to — is the last Area segment, not the
+ * first. Null when the entry resolves to no area (an Unplaced container chain).
+ */
 function entryResolvedAreaId(entry: StockEntryResponse): string | null {
-  const root = entry.path[0];
-  return root?.kind === 'Area' ? root.id : null;
+  let resolved: string | null = null;
+  for (const seg of entry.path)
+    if (seg.kind === 'Area') resolved = seg.id;
+  return resolved;
 }
 
 function supplyLocationText(locations: readonly StockEntryResponse[]): string {

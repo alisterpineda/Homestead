@@ -7,8 +7,10 @@ namespace Homestead.WebApi.Modules.Inventory.Services;
 /// <summary>
 /// Resolved semantics: an item counts toward the area its container chain reaches (broken or
 /// cyclic chain ⇒ unplaced); a fungible type counts once per area any of its stock entries
-/// resolves to. This mirrors the parent-chain walk in <see cref="ItemLocationResolver"/>, which
-/// must match what the area-filtered items list shows; keep the two in sync.
+/// resolves to. Counts then roll up the area-parent chain — Bedroom's contents also count toward
+/// Basement and House. This mirrors the parent-chain walk in <see cref="ItemLocationResolver"/>
+/// (both the container climb and the area-ancestor climb), which must match what the area-filtered
+/// items list shows; keep the two in sync.
 /// </summary>
 public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementService
 {
@@ -21,8 +23,9 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             .Select(i => new { i.Id, i.AreaId, i.ParentItemId })
             .ToDictionaryAsync(c => c.Id, c => new ContainerNode(c.AreaId, c.ParentItemId), ct);
 
-        // Directly-placed live non-fungible items need no walk — tally in SQL.
-        var areaCounts = await db.Items.AsNoTracking()
+        // Directly-placed live non-fungible items need no walk — tally in SQL. Leaf-keyed (by the
+        // area the item literally sits in); the ancestor roll-up happens once at the end.
+        var areaItemCounts = await db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.NonFungible
                 && i.AreaId != null
                 && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
@@ -44,7 +47,7 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
         {
             var (areaId, chain) = WalkContainerChain(item.ParentItemId, containers, [item.Id]);
             if (areaId is { } resolved)
-                areaCounts[resolved] = areaCounts.GetValueOrDefault(resolved) + 1;
+                areaItemCounts[resolved] = areaItemCounts.GetValueOrDefault(resolved) + 1;
             else
                 unplaced.Add(new UnplacedItemInfo(item.Id, item.Name));
 
@@ -112,8 +115,43 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             }
         }
 
+        // Roll leaf-keyed tallies up the area-parent chain: contents of Bedroom also count toward
+        // Basement and House. Items are additive; supply/low TYPE sets are union'd so the same
+        // supply type stocked in two sub-areas counts once for a shared ancestor (the dedup is
+        // load-bearing — it keeps the rolled card count equal to what the area-filtered list shows).
+        // Mirrors the container subtree attribution above, applied to the area's own ancestors.
+        var areaParents = await db.Areas.AsNoTracking()
+            .Select(a => new { a.Id, a.ParentAreaId })
+            .ToDictionaryAsync(a => a.Id, a => a.ParentAreaId, ct);
+
+        var rolledItems = new Dictionary<Guid, int>();
+        foreach (var (areaId, count) in areaItemCounts)
+            foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
+                rolledItems[ancestor] = rolledItems.GetValueOrDefault(ancestor) + count;
+
+        var rolledSupplyTypes = new Dictionary<Guid, HashSet<Guid>>();
         foreach (var (areaId, types) in areaSupplyTypes)
-            areaCounts[areaId] = areaCounts.GetValueOrDefault(areaId) + types.Count;
+            foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
+                UnionTypes(rolledSupplyTypes, ancestor, types);
+
+        var rolledLowTypes = new Dictionary<Guid, HashSet<Guid>>();
+        foreach (var (areaId, types) in areaLowTypes)
+            foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
+                UnionTypes(rolledLowTypes, ancestor, types);
+
+        var areaCounts = new Dictionary<Guid, int>();
+        foreach (var areaId in rolledItems.Keys.Union(rolledSupplyTypes.Keys))
+            areaCounts[areaId] = rolledItems.GetValueOrDefault(areaId)
+                + (rolledSupplyTypes.TryGetValue(areaId, out var supplyTypes) ? supplyTypes.Count : 0);
+
+        // The same count for the area's OWN contents only (no roll-up) — the deduped leaf tally.
+        // GetPlaceContents subtracts the direct-card counts from this to get the container-nested
+        // figure; using the leaf count (not a sum of rolled child counts) keeps the supply-type
+        // dedup intact, so a type shared between an area and its sub-areas isn't subtracted twice.
+        var areaOwnCounts = new Dictionary<Guid, int>();
+        foreach (var areaId in areaItemCounts.Keys.Union(areaSupplyTypes.Keys))
+            areaOwnCounts[areaId] = areaItemCounts.GetValueOrDefault(areaId)
+                + (areaSupplyTypes.TryGetValue(areaId, out var ownSupplyTypes) ? ownSupplyTypes.Count : 0);
 
         var containerIds = new HashSet<Guid>(containerItemCounts.Keys);
         containerIds.UnionWith(containerSupplyTypes.Keys);
@@ -129,8 +167,9 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
         return new InventoryPlacement
         {
             AreaItemCounts = areaCounts,
+            AreaOwnItemCounts = areaOwnCounts,
             UnplacedItems = unplaced,
-            AreaLowStockCounts = areaLowTypes.ToDictionary(kv => kv.Key, kv => kv.Value.Count),
+            AreaLowStockCounts = rolledLowTypes.ToDictionary(kv => kv.Key, kv => kv.Value.Count),
             ContainerStats = containerStats,
         };
     }
@@ -140,6 +179,29 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
         if (!typesByKey.TryGetValue(key, out var types))
             typesByKey[key] = types = [];
         types.Add(typeId);
+    }
+
+    private static void UnionTypes(Dictionary<Guid, HashSet<Guid>> typesByKey, Guid key, HashSet<Guid> types)
+    {
+        if (!typesByKey.TryGetValue(key, out var existing))
+            typesByKey[key] = existing = [];
+        existing.UnionWith(types);
+    }
+
+    /// <summary>
+    /// Yields an area plus all of its ancestor areas (leaf→root), cycle-guarded. A missing parent
+    /// link (the root, or a deleted area) ends the walk; a cycle is broken by the visited set.
+    /// </summary>
+    private static IEnumerable<Guid> AncestorsInclusive(
+        Guid areaId, IReadOnlyDictionary<Guid, Guid?> areaParents)
+    {
+        var visited = new HashSet<Guid>();
+        Guid? currentId = areaId;
+        while (currentId is { } id && visited.Add(id))
+        {
+            yield return id;
+            currentId = areaParents.GetValueOrDefault(id);
+        }
     }
 
     /// <summary>
