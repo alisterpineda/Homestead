@@ -43,6 +43,18 @@ describe('InventoryItemApiService', () => {
     req.flush(mockBody);
   });
 
+  it('getItemActivity sends GET with paging params and unwraps body', () => {
+    const mockBody = { items: [], page: 2, pageSize: 25, totalCount: 0, totalPages: 0 };
+    service.getItemActivity({ id: 'abc', Page: 2, PageSize: 25 }).subscribe(result => {
+      expect(result).toEqual(mockBody);
+    });
+    const req = httpTesting.expectOne(r => r.url === '/api/v1/inventory/items/abc/activity');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('Page')).toBe('2');
+    expect(req.request.params.get('PageSize')).toBe('25');
+    req.flush(mockBody);
+  });
+
   it('createItem sends POST', () => {
     const mockBody = { id: 'abc', name: 'Drill' };
     service.createItem({ body: { name: 'Drill' } }).subscribe(result => {

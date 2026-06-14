@@ -289,6 +289,8 @@ export type { DeleteItem$Params as DeleteItem$Params } from './fn/inventory/dele
 export { deleteItem as deleteItem } from './fn/inventory/delete-item';
 export type { PatchItem$Params as PatchItem$Params } from './fn/inventory/patch-item';
 export { patchItem as patchItem } from './fn/inventory/patch-item';
+export type { GetItemActivity$Params as GetItemActivity$Params } from './fn/inventory/get-item-activity';
+export { getItemActivity as getItemActivity } from './fn/inventory/get-item-activity';
 export type { GetSupplies$Params as GetSupplies$Params } from './fn/inventory/get-supplies';
 export { getSupplies as getSupplies } from './fn/inventory/get-supplies';
 export type { CreateSupply$Params as CreateSupply$Params } from './fn/inventory/create-supply';

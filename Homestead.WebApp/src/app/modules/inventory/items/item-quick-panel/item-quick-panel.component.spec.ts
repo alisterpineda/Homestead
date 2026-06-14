@@ -1,5 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { ItemQuickPanelComponent } from './item-quick-panel.component';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
@@ -70,6 +71,7 @@ describe('ItemQuickPanelComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
+        provideRouter([]),
         { provide: InventoryItemApiService, useValue: api },
         { provide: ErrorHandlerService, useValue: errorHandler },
       ],

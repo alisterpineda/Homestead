@@ -7,6 +7,7 @@ using Homestead.WebApi.Modules.Inventory.Features.Areas.PatchArea;
 using Homestead.WebApi.Modules.Inventory.Features.Items.CreateItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.DeleteItem;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
+using Homestead.WebApi.Modules.Inventory.Features.Items.GetItemActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Items.GetItems;
 using Homestead.WebApi.Modules.Inventory.Features.Items.PatchItem;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
@@ -51,6 +52,7 @@ public static class InventoryModule
         var items = v1.MapGroup("/items");
         GetItemsEndpoint.Map(items);
         GetItemEndpoint.Map(items);
+        GetItemActivityEndpoint.Map(items);
         CreateItemEndpoint.Map(items);
         PatchItemEndpoint.Map(items);
         DeleteItemEndpoint.Map(items);

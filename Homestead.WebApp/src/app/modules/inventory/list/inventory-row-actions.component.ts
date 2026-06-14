@@ -53,12 +53,10 @@ import type { InventoryRow } from './inventory-row';
               View contents
             </button>
           }
-          @if (row().kind === 'supply') {
-            <button hlmDropdownMenuItem (triggered)="viewDetails.emit(row())">
-              <ng-icon hlm name="lucideExternalLink" size="sm" />
-              View details
-            </button>
-          }
+          <button hlmDropdownMenuItem (triggered)="viewDetails.emit(row())">
+            <ng-icon hlm name="lucideExternalLink" size="sm" />
+            View details
+          </button>
           <button hlmDropdownMenuItem (triggered)="archiveRestore.emit(row())">
             <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
             {{ terminal() ? 'Restore' : 'Archive' }}

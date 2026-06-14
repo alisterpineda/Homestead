@@ -9,6 +9,7 @@ import {
   DestroyRef,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -53,6 +54,7 @@ type InlineForm = 'move' | 'lent' | null;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe,
+    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmSheetImports,
@@ -75,6 +77,15 @@ type InlineForm = 'move' | 'lent' | null;
             }
             <span class="truncate">{{ view()?.name }}</span>
           </h3>
+          @if (view()?.id; as id) {
+            <a
+              [routerLink]="['/inventory/items', id]"
+              class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Open full view
+              <ng-icon hlm name="lucideArrowRight" size="sm" />
+            </a>
+          }
         </hlm-sheet-header>
 
         @if (view(); as it) {

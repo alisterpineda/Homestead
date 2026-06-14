@@ -94,6 +94,7 @@ export type { GetDocumentVersionDto } from './models/get-document-version-dto';
 export type { GetDocumentVersionResponse } from './models/get-document-version-response';
 export type { GetDocumentVersionsResponse } from './models/get-document-versions-response';
 export type { GetInventoryOverviewResponse } from './models/get-inventory-overview-response';
+export type { GetItemActivityResponse } from './models/get-item-activity-response';
 export type { GetMyGroupsResponse } from './models/get-my-groups-response';
 export type { GetNetWorthHistoryResponse } from './models/get-net-worth-history-response';
 export type { GetPartiesByIdsQuery } from './models/get-parties-by-ids-query';
@@ -142,6 +143,7 @@ export type { PaginatedResponseOfCommodityPriceResponse } from './models/paginat
 export type { PaginatedResponseOfCommodityResponse } from './models/paginated-response-of-commodity-response';
 export type { PaginatedResponseOfGetActivityResponse } from './models/paginated-response-of-get-activity-response';
 export type { PaginatedResponseOfGetDocumentVersionsResponse } from './models/paginated-response-of-get-document-versions-response';
+export type { PaginatedResponseOfGetItemActivityResponse } from './models/paginated-response-of-get-item-activity-response';
 export type { PaginatedResponseOfGetPartiesResponse } from './models/paginated-response-of-get-parties-response';
 export type { PaginatedResponseOfGetProcessingJobsResponse } from './models/paginated-response-of-get-processing-jobs-response';
 export type { PaginatedResponseOfGetProcessingSchedulesResponse } from './models/paginated-response-of-get-processing-schedules-response';

@@ -163,10 +163,8 @@ export class InventoryBrowsePageComponent implements OnDestroy {
       const id = params.get('areaId');
       return id ? { kind: 'area', id } : null;
     }
-    if (kind === 'container') {
-      const id = params.get('itemId');
-      return id ? { kind: 'container', id } : null;
-    }
+    // Containers are no longer a browse node — they drill into their detail page — so this surface
+    // only ever resolves to an area, Unplaced, or the root grid.
     if (kind === 'unplaced') return { kind: 'unplaced' };
     return null;
   });
@@ -288,9 +286,9 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     this.supplyQuickPanelState.set('closed');
   }
 
-  /** "View contents" in the item panel drills the browser into that container. */
+  /** "View contents" in the item panel opens that container's detail page. */
   onQuickPanelViewContents(item: ItemResponse): void {
     this.onItemQuickPanelClosed();
-    void this.router.navigate(['/inventory/browse/item', item.id]);
+    void this.router.navigate(['/inventory/items', item.id]);
   }
 }

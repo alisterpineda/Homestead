@@ -51,18 +51,16 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
   supplies: [],
 };
 
-// A two-level container drill (Garage › Tool chest › Bin), for exercising the multi-segment
-// breadcrumb: ancestor links derived from each segment's kind, last segment as plain text.
-const BIN_CONTENTS: PlaceContentsResponse = {
+// A three-level nested-area drill (House › Basement › Bedroom), for exercising the multi-segment
+// breadcrumb: ancestor area links, last segment as plain text. (Containers are no longer a browse
+// node — they drill into the detail page — so the browse breadcrumb only ever holds area segments.)
+const NESTED_AREA_CONTENTS: PlaceContentsResponse = {
   path: [
-    { id: 'garage', name: 'Garage', kind: 'Area' },
-    { id: 'chest', name: 'Tool chest', kind: 'Container' },
-    { id: 'bin', name: 'Bin', kind: 'Container' },
+    { id: 'house', name: 'House', kind: 'Area' },
+    { id: 'basement', name: 'Basement', kind: 'Area' },
+    { id: 'bedroom', name: 'Bedroom', kind: 'Area' },
   ],
-  containerItem: {
-    id: 'bin', name: 'Bin', fungibility: 'NonFungible', status: 'Active',
-    isContainer: true, path: [], createdAt: '', updatedAt: '',
-  },
+  containerItem: null,
   directItemCount: 0,
   nestedItemCount: 0,
   childAreas: [],
@@ -94,6 +92,14 @@ class TitleHostComponent {
   protected header = inject(PageHeaderService);
 }
 
+/** Stand-in for the real item detail page — the redirect target for the legacy container drill. */
+@Component({
+  selector: 'test-item-detail-stub',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class ItemDetailStubComponent {}
+
 class StubPlaceApi {
   contents: PlaceContentsResponse = GARAGE_CONTENTS;
   calls: Record<string, unknown>[] = [];
@@ -118,8 +124,10 @@ describe('InventoryBrowsePageComponent', () => {
         provideRouter([
           { path: 'inventory/browse', component: InventoryBrowsePageComponent, data: { title: 'Browse' } },
           { path: 'inventory/browse/area/:areaId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'area' } },
-          { path: 'inventory/browse/item/:itemId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
+          // Containers drill into their detail page now; the legacy browse/item drill redirects there.
+          { path: 'inventory/browse/item/:itemId', redirectTo: 'inventory/items/:itemId' },
           { path: 'inventory/browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
+          { path: 'inventory/items/:id', component: ItemDetailStubComponent },
         ]),
         { provide: InventoryOverviewApiService, useValue: api },
         { provide: InventoryPlaceApiService, useValue: placeApi },
@@ -164,8 +172,6 @@ describe('InventoryBrowsePageComponent', () => {
     expect((await go(harness, '/inventory/browse')).placeRef()).toBeNull();
     expect((await go(harness, '/inventory/browse/area/garage')).placeRef())
       .toEqual({ kind: 'area', id: 'garage' });
-    expect((await go(harness, '/inventory/browse/item/chest')).placeRef())
-      .toEqual({ kind: 'container', id: 'chest' });
     expect((await go(harness, '/inventory/browse/unplaced')).placeRef())
       .toEqual({ kind: 'unplaced' });
   });
@@ -196,13 +202,15 @@ describe('InventoryBrowsePageComponent', () => {
     expect(content).toContain('Tool chest');
     expect(content).toContain('Drill');
     expect(content).toContain('Open as list');
-    // The drilled child-container card routes one level deeper.
-    expect(hrefs(harness)).toContain('/inventory/browse/item/chest');
+    // The drilled child-container card routes into that container's detail page.
+    expect(hrefs(harness)).toContain('/inventory/items/chest');
   });
 
-  it('drills into a container by id', async () => {
-    await navigate('/inventory/browse/item/chest');
-    expect(placeApi.calls).toEqual([{ ContainerItemId: 'chest' }]);
+  it('redirects the legacy container browse drill to the item detail page', async () => {
+    const router = TestBed.inject(Router);
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/inventory/browse/item/chest');
+    expect(router.url).toBe('/inventory/items/chest');
   });
 
   it('drills into Unplaced with the Unplaced flag', async () => {
@@ -226,10 +234,10 @@ describe('InventoryBrowsePageComponent', () => {
     expect(header.title()).not.toBeNull();
   });
 
-  it('renders the registered breadcrumb: ancestor links by segment kind, last as plain text', async () => {
-    placeApi.contents = BIN_CONTENTS;
+  it('renders the registered breadcrumb: ancestor area links, last as plain text', async () => {
+    placeApi.contents = NESTED_AREA_CONTENTS;
     const harness = await RouterTestingHarness.create();
-    await go(harness, '/inventory/browse/item/bin');
+    await go(harness, '/inventory/browse/area/bedroom');
 
     // The breadcrumb is registered as the header title, not rendered in the page body — outlet it.
     const host = TestBed.createComponent(TitleHostComponent);
@@ -244,15 +252,15 @@ describe('InventoryBrowsePageComponent', () => {
       ),
     );
 
-    // Root crumb + the two ancestors, each targeting the route its segment KIND maps to.
+    // Root crumb + the two area ancestors, each targeting its area drill route.
     expect(linksByText.get('All places')).toBe('/inventory/browse');
-    expect(linksByText.get('Garage')).toBe('/inventory/browse/area/garage'); // Area ancestor
-    expect(linksByText.get('Tool chest')).toBe('/inventory/browse/item/chest'); // Container ancestor
+    expect(linksByText.get('House')).toBe('/inventory/browse/area/house');
+    expect(linksByText.get('Basement')).toBe('/inventory/browse/area/basement');
 
     // The drilled node itself is the current page — plain text, not a link.
-    expect(linksByText.has('Bin')).toBe(false);
+    expect(linksByText.has('Bedroom')).toBe(false);
     const current = el.querySelector('[aria-current="page"]');
-    expect(current?.textContent?.trim()).toBe('Bin');
+    expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
   it('navigates one level deeper when the item panel asks to view contents', async () => {
@@ -265,7 +273,7 @@ describe('InventoryBrowsePageComponent', () => {
       isContainer: true, path: [], createdAt: '', updatedAt: '',
     });
 
-    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/browse/item', 'chest']);
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
   });
 
   it('refetches the drilled contents on changed', async () => {
