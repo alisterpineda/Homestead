@@ -64,7 +64,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       <nav hlmBreadcrumb class="min-w-0">
         <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
           <li hlmBreadcrumbItem>
-            <a hlmBreadcrumbLink link="/inventory/browse">All places</a>
+            <a hlmBreadcrumbLink link="/inventory/browse">Browse</a>
           </li>
           @for (seg of path(); track seg.id; let last = $last) {
             <li hlmBreadcrumbSeparator></li>
