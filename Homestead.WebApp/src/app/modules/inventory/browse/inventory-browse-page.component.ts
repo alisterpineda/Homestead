@@ -13,8 +13,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, tap, startWith } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCircleAlert } from '@ng-icons/lucide';
+import { lucideCircleAlert, lucideSearch } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
@@ -24,6 +25,7 @@ import { PageHeaderService } from '@/shared/services/page-header.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.component';
 import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
+import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
 import { ItemQuickPanelComponent } from '../items/item-quick-panel/item-quick-panel.component';
 import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
@@ -46,14 +48,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     NgIcon,
     HlmIconImports,
+    HlmInput,
     HlmSpinner,
     HlmEmptyImports,
     HlmBreadCrumbImports,
     PlaceBrowserComponent,
+    InventoryWarningPanelsComponent,
     ItemQuickPanelComponent,
     SupplyQuickPanelComponent,
   ],
-  providers: [provideIcons({ lucideCircleAlert })],
+  providers: [provideIcons({ lucideCircleAlert, lucideSearch })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerBreadcrumb>
@@ -102,6 +106,26 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         </div>
       }
 
+      <!-- Search hands the term off to the unified items list — root only (a drilled place already
+           scopes the view). The warning region is global at root, area-scoped when drilled. -->
+      @if (!placeRef()) {
+        <form class="relative mx-auto w-full max-w-xl" (submit)="onSearchSubmit($event)">
+          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            hlmInput
+            placeholder="Search items and supplies..."
+            class="h-10 w-full pl-9"
+            aria-label="Search items and supplies"
+            [value]="searchInput()"
+            (input)="searchInput.set($any($event.target).value)"
+          />
+        </form>
+      }
+
+      @if (warningScope(); as scope) {
+        <app-inventory-warning-panels [scope]="scope" />
+      }
+
       <app-place-browser
         [overview]="overview()"
         [place]="placeRef()"
@@ -144,6 +168,9 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   error = signal(false);
   drillLoading = signal(false);
   drillError = signal(false);
+
+  /** Root-only search box; hands the term to the unified items list on submit. */
+  searchInput = signal('');
 
   // Refresh-keyed: the quick panels and the create dialog mutate from this page, so the area grid
   // and place contents must refetch on `changed`.
@@ -239,6 +266,24 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** Current-node label for the breadcrumb when the path is empty (Unplaced, or still loading). */
   protected placeName = computed(() => placeDisplayName(this.placeRef(), this.placeContents()));
 
+  // The warning region's scope: global at root (reusing the overview fetch), area-scoped when
+  // drilled into an area (resolved low/lent counts from the place-contents fetch). Null — render
+  // nothing — until the backing fetch lands, and for Unplaced (no warnings there).
+  protected warningScope = computed<WarningPanelsScope | null>(() => {
+    const ref = this.placeRef();
+    if (ref === null) {
+      const ov = this.overview();
+      return ov ? { kind: 'root', overview: ov } : null;
+    }
+    if (ref.kind === 'area') {
+      const c = this.placeContents();
+      return c
+        ? { kind: 'place', areaId: ref.id, lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount }
+        : null;
+    }
+    return null;
+  });
+
   quickPanelItem = signal<ItemResponse | null>(null);
   itemQuickPanelState = signal<BrnDialogState>('closed');
   quickPanelSupply = signal<SupplyResponse | null>(null);
@@ -264,6 +309,13 @@ export class InventoryBrowsePageComponent implements OnDestroy {
 
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);
+  }
+
+  /** Hands the term off to the items list — no debounce, it's a one-shot navigation. */
+  onSearchSubmit(event: Event): void {
+    event.preventDefault();
+    const term = this.searchInput().trim();
+    void this.router.navigate(['/inventory/items'], { queryParams: { search: term || null } });
   }
 
   onOpenItem(item: ItemResponse): void {

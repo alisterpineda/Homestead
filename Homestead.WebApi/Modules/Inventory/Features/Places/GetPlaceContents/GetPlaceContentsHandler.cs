@@ -83,12 +83,37 @@ public class GetPlaceContentsHandler(
         var directCount = containers.Count + items.Count + supplies.Count + childAreas.Count;
         var nestedItemCount = Math.Max(0, ownCount - containers.Count - items.Count - supplies.Count);
 
+        // Scoped warning counts for the Browse drilled panels, resolved with the same semantics as
+        // `total` above: low-stock supplies stored here + lent items from here. Count-only — the
+        // actual items already appear in the contents list. Unplaced has neither (it's the absence
+        // of a place: holds no stock, and a lent item without a resolved area is just unplaced).
+        var scopedLowStockCount = request switch
+        {
+            { AreaId: { } areaId } => placement.AreaLowStockCounts.GetValueOrDefault(areaId),
+            { ContainerItemId: { } containerId } =>
+                placement.ContainerStats.TryGetValue(containerId, out var lowStats)
+                    ? lowStats.LowStockCount
+                    : 0,
+            _ => 0,
+        };
+        var scopedLentCount = request switch
+        {
+            { AreaId: { } areaId } => placement.AreaLentCounts.GetValueOrDefault(areaId),
+            { ContainerItemId: { } containerId } =>
+                placement.ContainerStats.TryGetValue(containerId, out var lentStats)
+                    ? lentStats.LentCount
+                    : 0,
+            _ => 0,
+        };
+
         return new PlaceContentsResponse
         {
             Path = path,
             ContainerItem = containerItem,
             DirectItemCount = directCount,
             NestedItemCount = nestedItemCount,
+            ScopedLowStockCount = scopedLowStockCount,
+            ScopedLentCount = scopedLentCount,
             ChildAreas = childAreas,
             Containers = containers,
             Items = items,

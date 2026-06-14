@@ -60,6 +60,41 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             }
         }
 
+        // Lent — the lent subset of the items walked above (Lent is a live status, so every lent
+        // item already counts toward AreaItemCounts/ContainerStats; this is the subset count, exactly
+        // like low-stock is a subset of supplies). Mirrors the item walk: directly-placed lent tally
+        // in SQL (leaf-keyed), nested lent resolved through the container chain.
+        var areaLentCounts = await db.Items.AsNoTracking()
+            .Where(i => i.Fungibility == Fungibility.NonFungible
+                && i.Status == ItemStatus.Lent
+                && i.AreaId != null)
+            .GroupBy(i => i.AreaId!.Value)
+            .Select(g => new { AreaId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.AreaId, x => x.Count, ct);
+
+        var nestedLent = await db.Items.AsNoTracking()
+            .Where(i => i.Fungibility == Fungibility.NonFungible
+                && i.Status == ItemStatus.Lent
+                && i.AreaId == null)
+            .Select(i => new { i.Id, i.ParentItemId })
+            .ToListAsync(ct);
+
+        var containerLentCounts = new Dictionary<Guid, int>();
+        foreach (var item in nestedLent)
+        {
+            var (areaId, chain) = WalkContainerChain(item.ParentItemId, containers, [item.Id]);
+            if (areaId is { } resolved)
+                areaLentCounts[resolved] = areaLentCounts.GetValueOrDefault(resolved) + 1;
+
+            // Same upward attribution as the item walk; an unresolved lent item (broken/cyclic chain)
+            // attributes to no area and no container.
+            if (chain is not null)
+            {
+                foreach (var containerId in chain)
+                    containerLentCounts[containerId] = containerLentCounts.GetValueOrDefault(containerId) + 1;
+            }
+        }
+
         // Low supplies — same predicate as the overview's low-stock tile (Active fungible with a
         // threshold whose summed on-hand is at or below it); archived supplies never count.
         var lowSupplyIds = (await db.Items.AsNoTracking()
@@ -129,6 +164,13 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
                 rolledItems[ancestor] = rolledItems.GetValueOrDefault(ancestor) + count;
 
+        // Lent items are distinct non-fungible items, so the roll-up is additive like items (no
+        // set-union dedup, which only matters for fungible supply TYPES shared across sub-areas).
+        var rolledLent = new Dictionary<Guid, int>();
+        foreach (var (areaId, count) in areaLentCounts)
+            foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
+                rolledLent[ancestor] = rolledLent.GetValueOrDefault(ancestor) + count;
+
         var rolledSupplyTypes = new Dictionary<Guid, HashSet<Guid>>();
         foreach (var (areaId, types) in areaSupplyTypes)
             foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
@@ -161,7 +203,8 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             containerStats[containerId] = new ContainerStats(
                 containerItemCounts.GetValueOrDefault(containerId)
                     + (containerSupplyTypes.TryGetValue(containerId, out var types) ? types.Count : 0),
-                containerLowTypes.TryGetValue(containerId, out var low) ? low.Count : 0);
+                containerLowTypes.TryGetValue(containerId, out var low) ? low.Count : 0,
+                containerLentCounts.GetValueOrDefault(containerId));
         }
 
         return new InventoryPlacement
@@ -170,6 +213,7 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             AreaOwnItemCounts = areaOwnCounts,
             UnplacedItems = unplaced,
             AreaLowStockCounts = rolledLowTypes.ToDictionary(kv => kv.Key, kv => kv.Value.Count),
+            AreaLentCounts = rolledLent,
             ContainerStats = containerStats,
         };
     }

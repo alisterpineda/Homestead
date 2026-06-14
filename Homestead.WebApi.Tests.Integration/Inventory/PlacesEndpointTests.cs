@@ -5,6 +5,7 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 internal record PlaceContentsResult(
     IReadOnlyList<LocationSegmentItem> Path, ItemItem? ContainerItem,
     int DirectItemCount, int NestedItemCount,
+    int ScopedLowStockCount, int ScopedLentCount,
     IReadOnlyList<PlaceContainerItem> Containers,
     IReadOnlyList<ItemItem> Items,
     IReadOnlyList<PlaceSupplyItem> Supplies);
@@ -97,6 +98,32 @@ public class PlacesEndpointTests : IntegrationTestBase
 
         Assert.Equal(3, contents.DirectItemCount); // chest + drill + tape
         Assert.Equal(2, contents.NestedItemCount); // wrench + glue
+    }
+
+    [Fact]
+    public async Task Contents_AreaScope_PopulatesScopedLowStockAndLentCounts()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+
+        // A low supply stored in the garage.
+        var glue = await CreateSupplyAsync(client, "Glue", "tubes", threshold: 5m);
+        await ReceiveAsync(client, glue.Id, garageId, 2m);
+
+        // An item lent from the garage.
+        var ladder = await CreateItemAsync(client, new { name = "Ladder", areaId = garageId });
+        var lendResp = await SendJsonPatchAsync(client, $"/api/v1/inventory/items/{ladder.Id}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Lent" },
+                new { op = "replace", path = "/lentTo", value = (object)"Dave next door" },
+            });
+        Assert.Equal(HttpStatusCode.OK, lendResp.StatusCode);
+
+        var contents = await GetContentsAsync(client, $"areaId={garageId}");
+
+        Assert.Equal(1, contents.ScopedLowStockCount);
+        Assert.Equal(1, contents.ScopedLentCount);
     }
 
     [Fact]

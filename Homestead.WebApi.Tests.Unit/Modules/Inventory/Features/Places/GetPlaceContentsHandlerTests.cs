@@ -338,6 +338,46 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Handle_AreaScope_PopulatesScopedLowStockAndLentCounts()
+    {
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        await AddItemAsync("Lent ladder", status: ItemStatus.Lent, areaId: _garage.Id);
+        await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
+        var lowGlue = await AddSupplyAsync("Glue", threshold: 5m);
+        await AddStockAsync(lowGlue.Id, 2m, areaId: _garage.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+
+        Assert.Equal(1, resp.ScopedLowStockCount);
+        Assert.Equal(2, resp.ScopedLentCount); // ladder (direct) + wrench (nested in the chest)
+    }
+
+    [Fact]
+    public async Task Handle_ContainerScope_PopulatesScopedLowStockAndLentCounts()
+    {
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
+        var lowGlue = await AddSupplyAsync("Glue", threshold: 5m);
+        await AddStockAsync(lowGlue.Id, 2m, containerItemId: chest.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
+
+        Assert.Equal(1, resp.ScopedLowStockCount);
+        Assert.Equal(1, resp.ScopedLentCount);
+    }
+
+    [Fact]
+    public async Task Handle_UnplacedScope_HasZeroScopedWarningCounts()
+    {
+        await AddItemAsync("Adrift wrench"); // resolved-unplaced
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { Unplaced = true }, Ct);
+
+        Assert.Equal(0, resp.ScopedLowStockCount);
+        Assert.Equal(0, resp.ScopedLentCount);
+    }
+
+    [Fact]
     public async Task Handle_AreaScope_OnlySubAreas_CountsCardsNotNested()
     {
         var house = await AddAreaAsync("House");

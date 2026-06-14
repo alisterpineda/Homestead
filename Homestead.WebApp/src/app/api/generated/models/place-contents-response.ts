@@ -14,5 +14,7 @@ export interface PlaceContentsResponse {
   items: Array<ItemResponse>;
   nestedItemCount: number;
   path: Array<LocationSegmentResponse>;
+  scopedLentCount: number;
+  scopedLowStockCount: number;
   supplies: Array<PlaceSupplyResponse>;
 }

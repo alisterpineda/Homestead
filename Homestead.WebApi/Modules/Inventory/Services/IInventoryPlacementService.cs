@@ -38,6 +38,13 @@ public record InventoryPlacement
     public required IReadOnlyDictionary<Guid, int> AreaLowStockCounts { get; init; }
 
     /// <summary>
+    /// areaId → live non-fungible items with status <c>Lent</c> resolving to the area (directly
+    /// placed + via container chain), rolled up the area-parent chain. A subset of
+    /// <see cref="AreaItemCounts"/> (Lent is a live status). Areas with none are absent.
+    /// </summary>
+    public required IReadOnlyDictionary<Guid, int> AreaLentCounts { get; init; }
+
+    /// <summary>
     /// containerId → resolved subtree stats, attributed upward: a nested item counts toward every
     /// container in its chain, a supply once per container its entries sit in (the holding
     /// container included). Containers with empty subtrees are absent.
@@ -50,6 +57,7 @@ public readonly record struct UnplacedItemInfo(Guid Id, string Name);
 /// <summary>
 /// Subtree stats for one container, mirroring <see cref="InventoryPlacement.AreaItemCounts"/>
 /// semantics: live non-fungible items anywhere below it + distinct live supplies with stock
-/// anywhere below it (or in it), and the low-stock subset of those supplies.
+/// anywhere below it (or in it), the low-stock subset of those supplies, and the count of lent
+/// items anywhere below it.
 /// </summary>
-public readonly record struct ContainerStats(int ResolvedContentsCount, int LowStockCount);
+public readonly record struct ContainerStats(int ResolvedContentsCount, int LowStockCount, int LentCount);

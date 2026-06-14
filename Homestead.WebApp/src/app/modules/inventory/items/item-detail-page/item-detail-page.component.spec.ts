@@ -58,6 +58,8 @@ const CHEST_CONTENTS: PlaceContentsResponse = {
   containerItem: CONTAINER_ITEM,
   directItemCount: 2,
   nestedItemCount: 0,
+  scopedLowStockCount: 0,
+  scopedLentCount: 0,
   childAreas: [],
   containers: [
     { id: 'tray', name: 'Tray', status: 'Active', itemCount: 3, lowStockCount: 0, previewNames: [] },

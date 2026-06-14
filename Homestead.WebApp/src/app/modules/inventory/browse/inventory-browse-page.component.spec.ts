@@ -40,6 +40,8 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
   containerItem: null,
   directItemCount: 2,
   nestedItemCount: 1,
+  scopedLowStockCount: 0,
+  scopedLentCount: 0,
   childAreas: [],
   containers: [
     { id: 'chest', name: 'Tool chest', status: 'Active', itemCount: 1, lowStockCount: 0, previewNames: ['Wrench'] },
@@ -63,6 +65,8 @@ const NESTED_AREA_CONTENTS: PlaceContentsResponse = {
   containerItem: null,
   directItemCount: 0,
   nestedItemCount: 0,
+  scopedLowStockCount: 0,
+  scopedLentCount: 0,
   childAreas: [],
   containers: [],
   items: [],
@@ -191,6 +195,34 @@ describe('InventoryBrowsePageComponent', () => {
     // Root fetches the overview for the grid, but never drills.
     expect(api.fetches).toBe(1);
     expect(placeApi.calls).toEqual([]);
+  });
+
+  it('surfaces the global warning region at the root', async () => {
+    // OVERVIEW has unplacedCount: 2, so the warning region renders.
+    const { harness } = await navigate('/inventory/browse');
+    expect(text(harness)).toContain('Needs attention');
+    expect(hrefs(harness)).toContain('/inventory/items?area=unplaced&kind=items');
+  });
+
+  it('hands the search term off to the items list on submit (root only)', async () => {
+    const { component } = await navigate('/inventory/browse');
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.searchInput.set('  drill ');
+    component.onSearchSubmit(new Event('submit'));
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items'], {
+      queryParams: { search: 'drill' },
+    });
+  });
+
+  it('renders the area-scoped warning panel when the drilled place has warnings', async () => {
+    placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 2, scopedLentCount: 0 };
+    const { harness } = await navigate('/inventory/browse/area/garage');
+
+    expect(text(harness)).toContain('Low supplies stored here');
+    expect(hrefs(harness)).toContain('/inventory/items?area=garage&lowStock=true');
   });
 
   it('drills into an area: fetches contents and renders the drilled view', async () => {

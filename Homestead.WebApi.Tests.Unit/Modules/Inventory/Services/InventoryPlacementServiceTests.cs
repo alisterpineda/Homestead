@@ -354,6 +354,75 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Compute_Lent_DirectlyPlaced_CountsTowardAreaAsSubsetOfItems()
+    {
+        await AddItemAsync("Lent ladder", status: ItemStatus.Lent, areaId: _garage.Id);
+        await AddItemAsync("Owned drill", areaId: _garage.Id); // Active — not lent
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaLentCounts[_garage.Id]);
+        // Lent is a subset of the area's items — both the ladder and the drill count toward the total.
+        Assert.Equal(2, placement.AreaItemCounts[_garage.Id]);
+    }
+
+    [Fact]
+    public async Task Compute_Lent_Nested_ResolvesThroughChainToAreaAndContainers()
+    {
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: bin.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        // Same resolved walk as the item count: attributes to the area + every container in the chain.
+        Assert.Equal(1, placement.AreaLentCounts[_garage.Id]);
+        Assert.Equal(1, placement.ContainerStats[bin.Id].LentCount);
+        Assert.Equal(1, placement.ContainerStats[chest.Id].LentCount);
+    }
+
+    [Fact]
+    public async Task Compute_Lent_OnlyLentStatusCounts()
+    {
+        // Only Lent counts toward the lent tally — neither other live statuses nor terminal ones do.
+        await AddItemAsync("Owned drill", areaId: _garage.Id);
+        await AddItemAsync("In-repair saw", status: ItemStatus.InRepair, areaId: _garage.Id);
+        await AddItemAsync("Sold lamp", status: ItemStatus.Sold, areaId: _garage.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.False(placement.AreaLentCounts.ContainsKey(_garage.Id));
+    }
+
+    [Fact]
+    public async Task Compute_Lent_RollsUpAreaAncestors()
+    {
+        var house = await AddAreaAsync("House");
+        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
+        await AddItemAsync("Lent book", status: ItemStatus.Lent, areaId: bedroom.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Equal(1, placement.AreaLentCounts[bedroom.Id]);
+        Assert.Equal(1, placement.AreaLentCounts[house.Id]); // rolled up to the ancestor
+    }
+
+    [Fact]
+    public async Task Compute_Lent_UnplacedRootContainer_StillCountsTowardThatContainer()
+    {
+        // A lent item in an unplaced container resolves to no AREA, but still counts toward the
+        // container itself — mirrors the item walk (Compute_UnplacedRootContainer_StillCountsItsContents),
+        // so drilling into that floating bin shows one lent thing inside.
+        var floatingBin = await AddItemAsync("Floating bin", isContainer: true);
+        await AddItemAsync("Lent torch", status: ItemStatus.Lent, parentItemId: floatingBin.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        Assert.Empty(placement.AreaLentCounts);
+        Assert.Equal(1, placement.ContainerStats[floatingBin.Id].LentCount);
+    }
+
+    [Fact]
     public async Task Compute_AreaParentCycle_DoesNotLoop()
     {
         // A manually-introduced area cycle (House ↔ Basement) must terminate, not hang.

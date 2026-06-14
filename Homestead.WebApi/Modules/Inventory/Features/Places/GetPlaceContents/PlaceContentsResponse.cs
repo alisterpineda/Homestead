@@ -34,6 +34,19 @@ public record PlaceContentsResponse
     public required int NestedItemCount { get; init; }
 
     /// <summary>
+    /// Distinct low-stock supplies resolving to this place (area/container scope; 0 for Unplaced) —
+    /// "low supplies stored here", resolved semantics (globally-low supplies that resolve here, NOT
+    /// a per-location threshold). Drives the Browse drilled low-stock warning panel (count-only).
+    /// </summary>
+    public required int ScopedLowStockCount { get; init; }
+
+    /// <summary>
+    /// Lent items resolving to this place (area/container scope; 0 for Unplaced) — "items lent from
+    /// here", resolved semantics. Drives the Browse drilled lent warning panel (count-only).
+    /// </summary>
+    public required int ScopedLentCount { get; init; }
+
+    /// <summary>
     /// Direct child areas (area scope only; always empty for container/Unplaced scopes), name-ordered.
     /// These render as drill cards alongside containers; each carries its own rolled subtree count.
     /// </summary>

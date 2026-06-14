@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { InventoryLayoutComponent } from './layout/inventory-layout.component';
-import { InventoryOverviewPageComponent } from './overview/inventory-overview-page.component';
 import { InventoryBrowsePageComponent } from './browse/inventory-browse-page.component';
 import { InventoryListPageComponent } from './list/inventory-list-page.component';
 import { AreaListPageComponent } from './areas/area-list-page.component';
@@ -12,7 +11,8 @@ export const INVENTORY_ROUTES: Routes = [
     path: '',
     component: InventoryLayoutComponent,
     children: [
-      { path: '', component: InventoryOverviewPageComponent, pathMatch: 'full', data: { title: 'Overview' } },
+      // Overview is folded into Browse (a collapsible warning region); the root now lands there.
+      { path: '', redirectTo: 'browse', pathMatch: 'full' },
       // Browse-by-place: one route per drilled node, all sharing InventoryBrowsePageComponent so
       // deeper drills into the same kind reuse the instance. The URL names only the current node;
       // the ancestor trail comes from the API's PlaceContentsResponse.path.
