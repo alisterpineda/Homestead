@@ -35,6 +35,15 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 /**
+ * Builds a drilled-place warning scope. `viewAllParams` is the place's items-list filter
+ * (`{ area }` or `{ container }`); typing it here is what lets the area/container branches drop
+ * their object-literal casts and share one definition of the `place` scope shape.
+ */
+function placeScope(lowStockCount: number, lentCount: number, viewAllParams: Record<string, string>): WarningPanelsScope {
+  return { kind: 'place', lowStockCount, lentCount, viewAllParams };
+}
+
+/**
  * Browse-by-place: the spatial-navigation surface, one route per drilled node under
  * `/inventory/browse`. The current node lives in the URL ({@link placeRef} derived from route
  * data + params); the ancestor trail comes from the API's `PlaceContentsResponse.path`, rendered
@@ -107,7 +116,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       }
 
       <!-- Search hands the term off to the unified items list — root only (a drilled place already
-           scopes the view). The warning region is global at root, area-scoped when drilled. -->
+           scopes the view). The warning region is global at root, place-scoped when drilled. -->
       @if (!placeRef()) {
         <form class="relative mx-auto w-full max-w-xl" (submit)="onSearchSubmit($event)">
           <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -133,7 +142,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         [error]="drillError()"
         (openItem)="onOpenItem($event)"
         (openSupply)="onOpenSupply($event)"
-        (containerDetails)="onOpenItem($event)"
+        (containerDetails)="onContainerDetails($event)"
         (changed)="onChanged()"
       />
     </div>
@@ -143,7 +152,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       [state]="itemQuickPanelState()"
       (changed)="onChanged()"
       (closed)="onItemQuickPanelClosed()"
-      (viewContents)="onQuickPanelViewContents($event)"
     />
 
     <app-supply-quick-panel
@@ -190,8 +198,10 @@ export class InventoryBrowsePageComponent implements OnDestroy {
       const id = params.get('areaId');
       return id ? { kind: 'area', id } : null;
     }
-    // Containers are no longer a browse node — they drill into their detail page — so this surface
-    // only ever resolves to an area, Unplaced, or the root grid.
+    if (kind === 'container') {
+      const id = params.get('containerId');
+      return id ? { kind: 'container', id } : null;
+    }
     if (kind === 'unplaced') return { kind: 'unplaced' };
     return null;
   });
@@ -266,9 +276,9 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** Current-node label for the breadcrumb when the path is empty (Unplaced, or still loading). */
   protected placeName = computed(() => placeDisplayName(this.placeRef(), this.placeContents()));
 
-  // The warning region's scope: global at root (reusing the overview fetch), area-scoped when
-  // drilled into an area (resolved low/lent counts from the place-contents fetch). Null — render
-  // nothing — until the backing fetch lands, and for Unplaced (no warnings there).
+  // The warning region's scope: global at root (reusing the overview fetch), place-scoped when
+  // drilled. Null — render nothing — until the backing fetch lands, and for Unplaced (no warnings).
+  // Invariant: each panel's count must equal exactly what its "View all" link shows (see branches).
   protected warningScope = computed<WarningPanelsScope | null>(() => {
     const ref = this.placeRef();
     if (ref === null) {
@@ -277,9 +287,18 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     }
     if (ref.kind === 'area') {
       const c = this.placeContents();
-      return c
-        ? { kind: 'place', areaId: ref.id, lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount }
-        : null;
+      // Area: backend resolved counts (the `?area=` filter resolves nested places).
+      return c ? placeScope(c.scopedLowStockCount, c.scopedLentCount, { area: ref.id }) : null;
+    }
+    if (ref.kind === 'container') {
+      const c = this.placeContents();
+      if (!c) return null;
+      // Container: direct counts client-side (the `?container=` drill is direct), so each count
+      // equals exactly what its "View all" link shows. Trade-off: nested sub-containers aren't counted.
+      const lowStockCount = c.supplies.filter(s => s.supply.isLow).length;
+      const lentCount = c.items.filter(i => i.status === 'Lent').length
+                      + c.containers.filter(cc => cc.status === 'Lent').length;
+      return placeScope(lowStockCount, lentCount, { container: ref.id });
     }
     return null;
   });
@@ -338,9 +357,8 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     this.supplyQuickPanelState.set('closed');
   }
 
-  /** "View contents" in the item panel opens that container's detail page. */
-  onQuickPanelViewContents(item: ItemResponse): void {
-    this.onItemQuickPanelClosed();
+  /** The drilled container's "Details" button — the deliberate Explore→Detail step into its record. */
+  onContainerDetails(item: ItemResponse): void {
     void this.router.navigate(['/inventory/items', item.id]);
   }
 }

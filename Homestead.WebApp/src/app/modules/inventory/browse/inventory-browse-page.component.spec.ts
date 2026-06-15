@@ -54,8 +54,8 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
 };
 
 // A three-level nested-area drill (House › Basement › Bedroom), for exercising the multi-segment
-// breadcrumb: ancestor area links, last segment as plain text. (Containers are no longer a browse
-// node — they drill into the detail page — so the browse breadcrumb only ever holds area segments.)
+// breadcrumb: ancestor area links, last segment as plain text. (Containers also drill within Browse,
+// so a breadcrumb can mix area and container segments; this fixture keeps it all-area for focus.)
 const NESTED_AREA_CONTENTS: PlaceContentsResponse = {
   path: [
     { id: 'house', name: 'House', kind: 'Area' },
@@ -96,7 +96,7 @@ class TitleHostComponent {
   protected header = inject(PageHeaderService);
 }
 
-/** Stand-in for the real item detail page — the redirect target for the legacy container drill. */
+/** Stand-in for the real item detail page — the target of a container's opt-in "Details" button. */
 @Component({
   selector: 'test-item-detail-stub',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -128,8 +128,8 @@ describe('InventoryBrowsePageComponent', () => {
         provideRouter([
           { path: 'inventory/browse', component: InventoryBrowsePageComponent, data: { title: 'Browse' } },
           { path: 'inventory/browse/area/:areaId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'area' } },
-          // Containers drill into their detail page now; the legacy browse/item drill redirects there.
-          { path: 'inventory/browse/item/:itemId', redirectTo: 'inventory/items/:itemId' },
+          // Containers drill within Browse (Explore); the opt-in "Details" button routes to the detail page.
+          { path: 'inventory/browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
           { path: 'inventory/browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
           { path: 'inventory/items/:id', component: ItemDetailStubComponent },
         ]),
@@ -176,6 +176,8 @@ describe('InventoryBrowsePageComponent', () => {
     expect((await go(harness, '/inventory/browse')).placeRef()).toBeNull();
     expect((await go(harness, '/inventory/browse/area/garage')).placeRef())
       .toEqual({ kind: 'area', id: 'garage' });
+    expect((await go(harness, '/inventory/browse/container/chest')).placeRef())
+      .toEqual({ kind: 'container', id: 'chest' });
     expect((await go(harness, '/inventory/browse/unplaced')).placeRef())
       .toEqual({ kind: 'unplaced' });
   });
@@ -234,15 +236,40 @@ describe('InventoryBrowsePageComponent', () => {
     expect(content).toContain('Tool chest');
     expect(content).toContain('Drill');
     expect(content).toContain('Open as list');
-    // The drilled child-container card routes into that container's detail page.
-    expect(hrefs(harness)).toContain('/inventory/items/chest');
+    // The drilled child-container card continues spatial drilling within Browse (Explore).
+    expect(hrefs(harness)).toContain('/inventory/browse/container/chest');
   });
 
-  it('redirects the legacy container browse drill to the item detail page', async () => {
+  it('drills into a container: fetches its contents by ContainerItemId', async () => {
+    placeApi.contents = {
+      ...GARAGE_CONTENTS,
+      path: [
+        { id: 'garage', name: 'Garage', kind: 'Area' },
+        { id: 'chest', name: 'Tool chest', kind: 'Container' },
+      ],
+      containerItem: {
+        id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
+        isContainer: true, path: [], createdAt: '', updatedAt: '',
+      },
+    };
+    const { harness } = await navigate('/inventory/browse/container/chest');
+
+    expect(placeApi.calls).toEqual([{ ContainerItemId: 'chest' }]);
+    // Still on the Browse surface — the container renders as a drilled place, with its Details button.
+    expect(text(harness)).toContain('Tool chest');
+  });
+
+  it('steps into the container record via onContainerDetails (the opt-in Explore→Detail step)', async () => {
+    const { component } = await navigate('/inventory/browse/container/chest');
     const router = TestBed.inject(Router);
-    const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/inventory/browse/item/chest');
-    expect(router.url).toBe('/inventory/items/chest');
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.onContainerDetails({
+      id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
+      isContainer: true, path: [], createdAt: '', updatedAt: '',
+    });
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
   });
 
   it('drills into Unplaced with the Unplaced flag', async () => {
@@ -285,7 +312,7 @@ describe('InventoryBrowsePageComponent', () => {
     );
 
     // Root crumb + the two area ancestors, each targeting its area drill route.
-    expect(linksByText.get('All places')).toBe('/inventory/browse');
+    expect(linksByText.get('Browse')).toBe('/inventory/browse');
     expect(linksByText.get('House')).toBe('/inventory/browse/area/house');
     expect(linksByText.get('Basement')).toBe('/inventory/browse/area/basement');
 
@@ -295,17 +322,33 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('navigates one level deeper when the item panel asks to view contents', async () => {
-    const { component } = await navigate('/inventory/browse/area/garage');
-    const router = TestBed.inject(Router);
-    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+  it('renders a container-scoped warning panel from direct low/lent counts', async () => {
+    // Direct children: one low supply + one lent item → both panels, container-filtered View-all links.
+    placeApi.contents = {
+      ...GARAGE_CONTENTS,
+      path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
+      containerItem: {
+        id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
+        isContainer: true, path: [], createdAt: '', updatedAt: '',
+      },
+      items: [{
+        id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent',
+        isContainer: false, path: [], createdAt: '', updatedAt: '',
+      }],
+      supplies: [{
+        supply: {
+          id: 'screws', name: 'Wood screws', status: 'Active', unit: 'pcs',
+          totalOnHand: 4, isLow: true, createdAt: '', updatedAt: '', stockLocations: [],
+        },
+        localQuantity: 4,
+      }],
+    };
+    const { harness } = await navigate('/inventory/browse/container/chest');
 
-    component.onQuickPanelViewContents({
-      id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
-      isContainer: true, path: [], createdAt: '', updatedAt: '',
-    });
-
-    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
+    expect(text(harness)).toContain('Low supplies stored here');
+    expect(text(harness)).toContain('Items lent from here');
+    expect(hrefs(harness)).toContain('/inventory/items?container=chest&lowStock=true');
+    expect(hrefs(harness)).toContain('/inventory/items?container=chest&lent=true');
   });
 
   it('refetches the drilled contents on changed', async () => {

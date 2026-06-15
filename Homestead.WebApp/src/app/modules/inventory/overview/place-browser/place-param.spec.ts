@@ -20,10 +20,10 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
 
 describe('place-param', () => {
   describe('placeRefToLink', () => {
-    it('maps each ref kind to its route — containers to their detail page', () => {
+    it('maps each ref kind to its browse route — containers drill within Explore', () => {
       expect(placeRefToLink({ kind: 'area', id: 'a1' })).toEqual(['/inventory/browse/area', 'a1']);
-      // A container drills into its canonical detail page, not the browse surface.
-      expect(placeRefToLink({ kind: 'container', id: 'c1' })).toEqual(['/inventory/items', 'c1']);
+      // A container drills within the Browse (Explore) surface, not out to its detail page.
+      expect(placeRefToLink({ kind: 'container', id: 'c1' })).toEqual(['/inventory/browse/container', 'c1']);
       expect(placeRefToLink({ kind: 'unplaced' })).toEqual(['/inventory/browse/unplaced']);
     });
 

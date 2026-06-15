@@ -179,8 +179,8 @@ describe('PlaceBrowserComponent', () => {
     const content = el(fixture).textContent ?? '';
     expect(content).toContain('Tray');
     expect(content).toContain('Bits, Glue');
-    // A child-container card drills into that container's detail page, not the browse surface.
-    expect(hrefs(fixture)).toContain('/inventory/items/tray');
+    // A child-container card continues spatial drilling within Browse (Explore), not out to detail.
+    expect(hrefs(fixture)).toContain('/inventory/browse/container/tray');
     const badges = el(fixture).querySelectorAll('[aria-label$="low stock"]');
     expect(badges.length).toBe(1);
   });

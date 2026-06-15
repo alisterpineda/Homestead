@@ -2,9 +2,10 @@ import type { LocationSegmentResponse } from '@/api/generated/models/location-se
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 
 /**
- * A browse-by-place drill target. Areas and Unplaced live in `/inventory/browse/...` routes (one
- * per node); a container drills into its canonical detail page at `/inventory/items/:id`. The
- * ancestor trail comes from the API's `PlaceContentsResponse.path`. `null` is the root (area grid).
+ * A browse-by-place drill target. Areas, containers, and Unplaced all live in
+ * `/inventory/browse/...` routes (one per node) — drilling area→container→sub-container stays on the
+ * Browse (Explore) surface. The ancestor trail comes from the API's `PlaceContentsResponse.path`.
+ * `null` is the root (area grid).
  */
 export type PlaceRef =
   | { kind: 'area'; id: string }
@@ -13,9 +14,10 @@ export type PlaceRef =
   | null;
 
 /**
- * The router link array for a place. Areas/Unplaced drill within the browse surface; a container
- * routes to its detail page (`/inventory/items/:id`) — the canonical "thing + its contents" surface
- * — so every container place-card and breadcrumb segment lands there rather than the old browse drill.
+ * The router link array for a place. Areas, containers, and Unplaced all drill within the Browse
+ * (Explore) surface, so every container place-card and breadcrumb segment continues spatial drilling
+ * rather than routing out to the detail page. (The opt-in "Details" button is the only Explore→Detail
+ * step.)
  */
 export function placeRefToLink(ref: PlaceRef): unknown[] {
   if (!ref) return ['/inventory/browse'];
@@ -23,7 +25,7 @@ export function placeRefToLink(ref: PlaceRef): unknown[] {
     case 'area':
       return ['/inventory/browse/area', ref.id];
     case 'container':
-      return ['/inventory/items', ref.id];
+      return ['/inventory/browse/container', ref.id];
     case 'unplaced':
       return ['/inventory/browse/unplaced'];
   }

@@ -98,7 +98,7 @@ describe('InventoryWarningPanelsComponent', () => {
   // ----- Place mode -----
 
   it('renders area-scoped count-only panels, collapsed by default, no unplaced panel', async () => {
-    const fixture = await create({ kind: 'place', areaId: 'garage', lowStockCount: 3, lentCount: 2 });
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 3, lentCount: 2 });
 
     const content = text(fixture);
     expect(content).toContain('Low supplies stored here');
@@ -115,7 +115,7 @@ describe('InventoryWarningPanelsComponent', () => {
   });
 
   it('omits the lent panel when only low-stock is present', async () => {
-    const fixture = await create({ kind: 'place', areaId: 'garage', lowStockCount: 1, lentCount: 0 });
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 1, lentCount: 0 });
 
     const content = text(fixture);
     expect(content).toContain('Low supplies stored here');
@@ -123,8 +123,16 @@ describe('InventoryWarningPanelsComponent', () => {
     expect(links(fixture)).toEqual(['/inventory/items?area=garage&lowStock=true']);
   });
 
+  it('carries the container filter when drilled into a container', async () => {
+    const fixture = await create({ kind: 'place', viewAllParams: { container: 'chest' }, lowStockCount: 1, lentCount: 1 });
+
+    // The same panels, but View-all links compose with the items-list container filter.
+    expect(links(fixture)).toContain('/inventory/items?container=chest&lowStock=true');
+    expect(links(fixture)).toContain('/inventory/items?container=chest&lent=true');
+  });
+
   it('renders nothing in a drilled place with no warnings', async () => {
-    const fixture = await create({ kind: 'place', areaId: 'garage', lowStockCount: 0, lentCount: 0 });
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 0, lentCount: 0 });
 
     expect(trigger(fixture)).toBeNull();
     expect(text(fixture).trim()).toBe('');

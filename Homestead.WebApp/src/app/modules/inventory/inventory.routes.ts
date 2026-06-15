@@ -18,9 +18,10 @@ export const INVENTORY_ROUTES: Routes = [
       // the ancestor trail comes from the API's PlaceContentsResponse.path.
       { path: 'browse', component: InventoryBrowsePageComponent, data: { title: 'Browse' } },
       { path: 'browse/area/:areaId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'area' } },
-      // Containers now drill into their canonical detail page, not the browse surface. The old
-      // browse/item drill redirects (param-preserving) so existing bookmarks keep working.
-      { path: 'browse/item/:itemId', redirectTo: 'items/:itemId' },
+      // Containers are a first-class Browse node (Explore mode): drilling area→container→sub-container
+      // stays on this surface with a continuous breadcrumb. Stepping into the container's record is
+      // the opt-in "Details" button, which routes out to /inventory/items/:id (Detail mode).
+      { path: 'browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
       { path: 'browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
       { path: 'items', component: InventoryListPageComponent, data: { title: 'Items' } },
       { path: 'items/:id', component: ItemDetailPageComponent, data: { title: 'Item' } },
