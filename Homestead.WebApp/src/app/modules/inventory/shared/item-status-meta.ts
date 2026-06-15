@@ -7,7 +7,8 @@ export interface ItemStatusMeta {
   readonly terminal: boolean;
 }
 
-const BADGE_BASE =
+/** Shared structural base for self-contained status pills — tone tokens are appended per badge. */
+export const BADGE_BASE =
   'inline-flex h-5 w-fit shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap';
 
 export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {

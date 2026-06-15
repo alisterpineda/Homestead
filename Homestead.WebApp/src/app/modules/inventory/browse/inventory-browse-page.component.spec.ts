@@ -199,11 +199,24 @@ describe('InventoryBrowsePageComponent', () => {
     expect(placeApi.calls).toEqual([]);
   });
 
-  it('surfaces the global warning region at the root', async () => {
-    // OVERVIEW has unplacedCount: 2, so the warning region renders.
+  it('surfaces the neutral status row at the root even with no alerts', async () => {
+    // OVERVIEW has lowStockCount: 0 (no alert) but unplacedCount: 2 — the status row still shows,
+    // decoupled from the Needs-attention gate.
+    const { harness } = await navigate('/inventory/browse');
+    expect(text(harness)).not.toContain('Needs attention');
+    expect(text(harness)).toContain('Browse by status');
+    expect(hrefs(harness)).toContain('/inventory/items?area=unplaced&kind=items');
+  });
+
+  it('surfaces the low-stock alert at the root when something is running low', async () => {
+    api.response = {
+      ...OVERVIEW,
+      lowStockCount: 1,
+      lowStockSupplies: [{ id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 }],
+    };
     const { harness } = await navigate('/inventory/browse');
     expect(text(harness)).toContain('Needs attention');
-    expect(hrefs(harness)).toContain('/inventory/items?area=unplaced&kind=items');
+    expect(hrefs(harness)).toContain('/inventory/items?lowStock=true');
   });
 
   it('hands the search term off to the items list on submit (root only)', async () => {
@@ -225,6 +238,18 @@ describe('InventoryBrowsePageComponent', () => {
 
     expect(text(harness)).toContain('Low supplies stored here');
     expect(hrefs(harness)).toContain('/inventory/items?area=garage&lowStock=true');
+  });
+
+  it('surfaces a scoped Lent status chip when drilled into an area', async () => {
+    placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 0, scopedLentCount: 2 };
+    const { harness } = await navigate('/inventory/browse/area/garage');
+
+    const content = text(harness);
+    // No low stock → no alert; the neutral status row still surfaces the scoped lent count.
+    expect(content).not.toContain('Needs attention');
+    expect(content).toContain('Browse by status');
+    expect(content).toContain('Lent out');
+    expect(hrefs(harness)).toContain('/inventory/items?lent=true&area=garage');
   });
 
   it('drills into an area: fetches contents and renders the drilled view', async () => {
@@ -322,8 +347,9 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('renders a container-scoped warning panel from direct low/lent counts', async () => {
-    // Direct children: one low supply + one lent item → both panels, container-filtered View-all links.
+  it('renders a container-scoped low-stock alert and lent status chip from direct counts', async () => {
+    // Direct children: one low supply (alert panel) + one lent item (status chip), both client-side
+    // counted and container-filtered. Lent is a neutral status now, so it lands in the status row.
     placeApi.contents = {
       ...GARAGE_CONTENTS,
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
@@ -345,10 +371,14 @@ describe('InventoryBrowsePageComponent', () => {
     };
     const { harness } = await navigate('/inventory/browse/container/chest');
 
-    expect(text(harness)).toContain('Low supplies stored here');
-    expect(text(harness)).toContain('Items lent from here');
+    const content = text(harness);
+    expect(content).toContain('Low supplies stored here');
+    // Lent is no longer an alert panel — it's a status chip in the "Browse by status" row.
+    expect(content).not.toContain('Items lent from here');
+    expect(content).toContain('Browse by status');
+    expect(content).toContain('Lent out');
     expect(hrefs(harness)).toContain('/inventory/items?container=chest&lowStock=true');
-    expect(hrefs(harness)).toContain('/inventory/items?container=chest&lent=true');
+    expect(hrefs(harness)).toContain('/inventory/items?lent=true&container=chest');
   });
 
   it('refetches the drilled contents on changed', async () => {

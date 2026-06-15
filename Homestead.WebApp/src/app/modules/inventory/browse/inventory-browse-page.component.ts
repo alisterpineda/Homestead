@@ -26,6 +26,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.component';
 import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
 import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
+import { InventoryStatusChipsComponent, type StatusChipsScope } from './inventory-status-chips.component';
 import { ItemQuickPanelComponent } from '../items/item-quick-panel/item-quick-panel.component';
 import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
@@ -33,15 +34,6 @@ import type { PlaceContentsResponse } from '@/api/generated/models/place-content
 import type { ItemResponse } from '@/api/generated/models/item-response';
 import type { SupplyResponse } from '@/api/generated/models/supply-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
-
-/**
- * Builds a drilled-place warning scope. `viewAllParams` is the place's items-list filter
- * (`{ area }` or `{ container }`); typing it here is what lets the area/container branches drop
- * their object-literal casts and share one definition of the `place` scope shape.
- */
-function placeScope(lowStockCount: number, lentCount: number, viewAllParams: Record<string, string>): WarningPanelsScope {
-  return { kind: 'place', lowStockCount, lentCount, viewAllParams };
-}
 
 /**
  * Browse-by-place: the spatial-navigation surface, one route per drilled node under
@@ -63,6 +55,7 @@ function placeScope(lowStockCount: number, lentCount: number, viewAllParams: Rec
     HlmBreadCrumbImports,
     PlaceBrowserComponent,
     InventoryWarningPanelsComponent,
+    InventoryStatusChipsComponent,
     ItemQuickPanelComponent,
     SupplyQuickPanelComponent,
   ],
@@ -133,6 +126,12 @@ function placeScope(lowStockCount: number, lentCount: number, viewAllParams: Rec
 
       @if (warningScope(); as scope) {
         <app-inventory-warning-panels [scope]="scope" />
+      }
+
+      <!-- Sibling of (not nested under) the alert gate above, so the neutral status row shows even
+           when there are no alerts. -->
+      @if (statusScope(); as scope) {
+        <app-inventory-status-chips [scope]="scope" />
       }
 
       <app-place-browser
@@ -276,31 +275,55 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** Current-node label for the breadcrumb when the path is empty (Unplaced, or still loading). */
   protected placeName = computed(() => placeDisplayName(this.placeRef(), this.placeContents()));
 
-  // The warning region's scope: global at root (reusing the overview fetch), place-scoped when
-  // drilled. Null — render nothing — until the backing fetch lands, and for Unplaced (no warnings).
-  // Invariant: each panel's count must equal exactly what its "View all" link shows (see branches).
-  protected warningScope = computed<WarningPanelsScope | null>(() => {
+  // A drilled place's scoped counts + items-list filter param, resolved once so the alert/status
+  // scopes below stay thin adapters and the container counting lives in a single spot. Null at root
+  // (each scope reads the overview blob directly there — they need different slices of it), on the
+  // Unplaced drill, and until the place-contents fetch lands. The explicit return type keeps the
+  // `{ area }`/`{ container }` literals from widening out of `Record<string, string>`.
+  // Invariant: each count must equal exactly what its filter param shows in the items list.
+  private drilledScope = computed<{ lowStockCount: number; lentCount: number; param: Record<string, string> } | null>(() => {
     const ref = this.placeRef();
-    if (ref === null) {
+    if (ref === null || ref.kind === 'unplaced') return null;
+    const c = this.placeContents();
+    if (!c) return null;
+    if (ref.kind === 'area') {
+      // Area: backend-resolved counts (the `?area=` filter resolves nested places).
+      const param: Record<string, string> = { area: ref.id };
+      return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param };
+    }
+    // Container: direct counts client-side (the `?container=` drill is direct), so each equals
+    // exactly what its filter shows. Trade-off: nested sub-containers aren't counted.
+    const param: Record<string, string> = { container: ref.id };
+    return {
+      lowStockCount: c.supplies.filter(s => s.supply.isLow).length,
+      lentCount: c.items.filter(i => i.status === 'Lent').length
+               + c.containers.filter(cc => cc.status === 'Lent').length,
+      param,
+    };
+  });
+
+  // The alert region's scope: global at root (the full overview, for the low-stock previews),
+  // place-scoped when drilled. Carries low stock only — lent/unplaced are neutral statuses, surfaced
+  // by statusScope. Null — render nothing — until the backing fetch lands, and for Unplaced.
+  protected warningScope = computed<WarningPanelsScope | null>(() => {
+    if (this.placeRef() === null) {
       const ov = this.overview();
       return ov ? { kind: 'root', overview: ov } : null;
     }
-    if (ref.kind === 'area') {
-      const c = this.placeContents();
-      // Area: backend resolved counts (the `?area=` filter resolves nested places).
-      return c ? placeScope(c.scopedLowStockCount, c.scopedLentCount, { area: ref.id }) : null;
+    const d = this.drilledScope();
+    return d ? { kind: 'place', lowStockCount: d.lowStockCount, viewAllParams: d.param } : null;
+  });
+
+  // The neutral status row's scope: lent (root + place) and unplaced (root only). Decoupled from
+  // warningScope so the row shows even with no alerts. Null until the backing fetch lands, and on
+  // the Unplaced drill (nothing to surface).
+  protected statusScope = computed<StatusChipsScope | null>(() => {
+    if (this.placeRef() === null) {
+      const ov = this.overview();
+      return ov ? { kind: 'root', unplacedCount: ov.unplacedCount, lentCount: ov.lentCount } : null;
     }
-    if (ref.kind === 'container') {
-      const c = this.placeContents();
-      if (!c) return null;
-      // Container: direct counts client-side (the `?container=` drill is direct), so each count
-      // equals exactly what its "View all" link shows. Trade-off: nested sub-containers aren't counted.
-      const lowStockCount = c.supplies.filter(s => s.supply.isLow).length;
-      const lentCount = c.items.filter(i => i.status === 'Lent').length
-                      + c.containers.filter(cc => cc.status === 'Lent').length;
-      return placeScope(lowStockCount, lentCount, { container: ref.id });
-    }
-    return null;
+    const d = this.drilledScope();
+    return d ? { kind: 'place', lentCount: d.lentCount, lentParams: { lent: 'true', ...d.param } } : null;
   });
 
   quickPanelItem = signal<ItemResponse | null>(null);

@@ -20,6 +20,8 @@ const BUSY: GetInventoryOverviewResponse = {
     { id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 },
     { id: 'tape', name: 'Tape', totalOnHand: 2, unit: 'rolls', restockThreshold: 3 },
   ],
+  // Lent / unplaced are now neutral statuses (see InventoryStatusChipsComponent), not alerts —
+  // the warning panels must ignore them entirely.
   lentCount: 1,
   lentItems: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
   unplacedCount: 2,
@@ -63,33 +65,62 @@ describe('InventoryWarningPanelsComponent', () => {
     return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[hlmCollapsibleTrigger]');
   }
 
+  /** The preview row whose text contains the supply name — used to scope per-row badge assertions. */
+  function row(fixture: ComponentFixture<InventoryWarningPanelsComponent>, name: string): HTMLElement | undefined {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('li'),
+    ).find(li => li.textContent?.includes(name));
+  }
+
   // ----- Root mode -----
 
-  it('renders the three global tiles with previews and deep-links, open by default', async () => {
+  it('renders only the low-stock tile (lent/unplaced are statuses, not alerts), open by default', async () => {
     const fixture = await create({ kind: 'root', overview: BUSY });
 
     const content = text(fixture);
     expect(content).toContain('Low stock');
-    expect(content).toContain('Lent out');
-    expect(content).toContain('Unplaced');
     expect(content).toContain('Glue');
     expect(content).toContain('0 tubes / 5');
-    expect(content).toContain('Ladder');
-    expect(content).toContain('Dave next door');
-    expect(content).toContain('Adrift wrench');
+    // Lent / unplaced no longer live in the alert frame.
+    expect(content).not.toContain('Lent out');
+    expect(content).not.toContain('Unplaced');
+    expect(content).not.toContain('Ladder');
+    expect(content).not.toContain('Adrift wrench');
     // 7 low-stock total with 2 previewed → "+5 more".
     expect(content).toContain('+5 more');
 
-    expect(links(fixture)).toContain('/inventory/items?lowStock=true');
-    expect(links(fixture)).toContain('/inventory/items?lent=true');
-    expect(links(fixture)).toContain('/inventory/items?area=unplaced&kind=items');
+    // The only deep-link is the low-stock View-all — no lent/unplaced links.
+    expect(links(fixture)).toEqual(['/inventory/items?lowStock=true']);
 
     // Root opens expanded — it's the household triage landing.
     expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('renders nothing at the root when everything is quiet', async () => {
+  it('flags a zero-on-hand supply "Out" but not a merely-low one', async () => {
+    const fixture = await create({ kind: 'root', overview: BUSY });
+
+    // Glue is at 0 on hand → "Out"; Tape is at 2 → just low, no badge.
+    expect(row(fixture, 'Glue')?.textContent).toContain('Out');
+    expect(row(fixture, 'Tape')?.textContent).not.toContain('Out');
+
+    // The badge carries an accessible name (matching the module's destructive-badge convention).
+    const badge = row(fixture, 'Glue')?.querySelector('[aria-label="Out of stock"]');
+    expect(badge?.textContent?.trim()).toBe('Out');
+    expect(row(fixture, 'Tape')?.querySelector('[aria-label="Out of stock"]')).toBeNull();
+  });
+
+  it('renders nothing at the root when nothing is running low', async () => {
     const fixture = await create({ kind: 'root', overview: ALL_QUIET });
+
+    expect(trigger(fixture)).toBeNull();
+    expect(text(fixture).trim()).toBe('');
+  });
+
+  it('stays hidden at the root when only lent/unplaced are nonzero (they are not alerts)', async () => {
+    const fixture = await create({
+      kind: 'root',
+      overview: { ...ALL_QUIET, lentCount: 3, unplacedCount: 4 },
+    });
 
     expect(trigger(fixture)).toBeNull();
     expect(text(fixture).trim()).toBe('');
@@ -97,42 +128,30 @@ describe('InventoryWarningPanelsComponent', () => {
 
   // ----- Place mode -----
 
-  it('renders area-scoped count-only panels, collapsed by default, no unplaced panel', async () => {
-    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 3, lentCount: 2 });
+  it('renders the area-scoped low-stock panel, collapsed by default, no lent/unplaced panel', async () => {
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 3 });
 
     const content = text(fixture);
     expect(content).toContain('Low supplies stored here');
-    expect(content).toContain('Items lent from here');
-    // Unplaced is the absence of a place — never a drilled panel.
+    // Lent is now a status chip, not an alert panel; unplaced never applies to a place.
+    expect(content).not.toContain('Items lent from here');
     expect(content).not.toContain('Unplaced');
 
-    // View-all links carry the area filter so they compose with the items-list deep-link reader.
-    expect(links(fixture)).toContain('/inventory/items?area=garage&lowStock=true');
-    expect(links(fixture)).toContain('/inventory/items?area=garage&lent=true');
+    // The View-all link carries the area filter so it composes with the items-list deep-link reader.
+    expect(links(fixture)).toEqual(['/inventory/items?area=garage&lowStock=true']);
 
-    // Drilled re-seeds collapsed so the panels don't fight the place browser for vertical space.
+    // Drilled re-seeds collapsed so the panel doesn't fight the place browser for vertical space.
     expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('omits the lent panel when only low-stock is present', async () => {
-    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 1, lentCount: 0 });
-
-    const content = text(fixture);
-    expect(content).toContain('Low supplies stored here');
-    expect(content).not.toContain('Items lent from here');
-    expect(links(fixture)).toEqual(['/inventory/items?area=garage&lowStock=true']);
-  });
-
   it('carries the container filter when drilled into a container', async () => {
-    const fixture = await create({ kind: 'place', viewAllParams: { container: 'chest' }, lowStockCount: 1, lentCount: 1 });
+    const fixture = await create({ kind: 'place', viewAllParams: { container: 'chest' }, lowStockCount: 1 });
 
-    // The same panels, but View-all links compose with the items-list container filter.
-    expect(links(fixture)).toContain('/inventory/items?container=chest&lowStock=true');
-    expect(links(fixture)).toContain('/inventory/items?container=chest&lent=true');
+    expect(links(fixture)).toEqual(['/inventory/items?container=chest&lowStock=true']);
   });
 
-  it('renders nothing in a drilled place with no warnings', async () => {
-    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 0, lentCount: 0 });
+  it('renders nothing in a drilled place with no low stock', async () => {
+    const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 0 });
 
     expect(trigger(fixture)).toBeNull();
     expect(text(fixture).trim()).toBe('');
