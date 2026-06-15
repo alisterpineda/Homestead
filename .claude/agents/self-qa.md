@@ -137,6 +137,23 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 | `/finances/settings/price-sources` | PriceSourceListComponent |
 | `/finances/settings/price-sources/:source` | PriceSourceDetailComponent |
 
+### Inventory  (`/inventory`, InventoryLayoutComponent; index → browse)
+
+| Route | Component |
+|---|---|
+| `/inventory/browse` | InventoryBrowsePageComponent (browse-by-place area grid; header breadcrumb via PageHeaderService when drilled) |
+| `/inventory/browse/area/:areaId` | InventoryBrowsePageComponent (drilled area — same instance reused) |
+| `/inventory/browse/container/:containerId` | InventoryBrowsePageComponent (drilled container; "Details" button routes out to `/inventory/items/:id`) |
+| `/inventory/browse/unplaced` | InventoryBrowsePageComponent (unplaced items) |
+| `/inventory/items` | InventoryListPageComponent (unified items + supplies list; search/filter, container drill) |
+| `/inventory/items/:id` | ItemDetailPageComponent (header breadcrumb `Items › {name}`; containers show a Contents drill) |
+| `/inventory/areas` | AreaListPageComponent |
+| `/inventory/supplies` | redirects → `/inventory/items` (supplies merged into the list) |
+| `/inventory/supplies/:id` | SupplyDetailPageComponent (legacy deep links) |
+
+Browse drill nodes all share `InventoryBrowsePageComponent` — the URL names only the current node; the
+ancestor trail comes from the API's `PlaceContentsResponse.path`.
+
 ### Admin  (`/admin`, **adminGuard on the whole module**)
 
 | Route | Component |

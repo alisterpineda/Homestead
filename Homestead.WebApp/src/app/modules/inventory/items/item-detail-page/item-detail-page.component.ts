@@ -4,15 +4,18 @@ import {
   inject,
   signal,
   computed,
+  viewChild,
+  TemplateRef,
+  afterNextRender,
   DestroyRef,
+  OnDestroy,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, NavigationEnd } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, of, catchError } from 'rxjs';
+import { switchMap, map, of, catchError, filter } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  lucideArrowLeft,
   lucidePencil,
   lucideCircleAlert,
   lucideBox,
@@ -29,6 +32,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
+import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
@@ -44,6 +48,7 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { ItemResponse } from '@/api/generated/models/item-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { GetItemActivityResponse } from '@/api/generated/models/get-item-activity-response';
@@ -68,6 +73,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
+    HlmBreadCrumbImports,
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
@@ -75,7 +81,6 @@ import { toast } from '@spartan-ng/brain/sonner';
     ItemQuickPanelComponent,
   ],
   providers: [provideIcons({
-    lucideArrowLeft,
     lucidePencil,
     lucideCircleAlert,
     lucideBox,
@@ -90,12 +95,25 @@ import { toast } from '@spartan-ng/brain/sonner';
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
-      <a routerLink="/inventory/items" class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ng-icon hlm name="lucideArrowLeft" size="sm" />
-        All items
-      </a>
+    <ng-template #headerTitle>
+      <nav hlmBreadcrumb class="min-w-0">
+        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
+          <li hlmBreadcrumbItem>
+            <a hlmBreadcrumbLink link="/inventory/items">Items</a>
+          </li>
+          <li hlmBreadcrumbSeparator></li>
+          <li hlmBreadcrumbItem class="min-w-0">
+            <span hlmBreadcrumbPage
+                  [title]="item()?.name ?? 'Item'"
+                  class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
+              {{ item()?.name ?? 'Item' }}
+            </span>
+          </li>
+        </ol>
+      </nav>
+    </ng-template>
 
+    <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
       @if (loading() && !item()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
       } @else if (notFound()) {
@@ -330,15 +348,36 @@ import { toast } from '@spartan-ng/brain/sonner';
     </hlm-alert-dialog>
   `,
 })
-export class ItemDetailPageComponent {
+export class ItemDetailPageComponent implements OnDestroy {
   private itemApi = inject(InventoryItemApiService);
   private placeApi = inject(InventoryPlaceApiService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
+  private pageHeaderService = inject(PageHeaderService);
+
+  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   protected readonly formatQty = formatQty;
+
+  constructor() {
+    // The shell clears the registered title on every NavigationStart, so re-register after each
+    // navigation — drilling container → child reuses this component and would otherwise lose the crumb.
+    afterNextRender(() => {
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
+    });
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      takeUntilDestroyed(),
+    ).subscribe(() => {
+      this.pageHeaderService.setTitle(this.headerTitleTpl());
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.pageHeaderService.clearTitle();
+  }
 
   private itemId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), { initialValue: null });
 
