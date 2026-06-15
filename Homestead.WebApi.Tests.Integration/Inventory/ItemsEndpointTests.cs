@@ -136,6 +136,52 @@ public class ItemsEndpointTests : IntegrationTestBase
         Assert.Contains(inactiveList!.Items, i => i.Id == archived.Id);
     }
 
+    // Regression guard for the reported 500: omitting page/pageSize must bind as optional and yield
+    // the page defaults (1 / 50), not a binding failure. Pre-fix, [AsParameters] treated the
+    // non-nullable int Page/PageSize as required and threw BadHttpRequestException → 500.
+    [Fact]
+    public async Task GetItems_NoPaginationParams_Returns200WithDefaults()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreateItemAsync(client, new { name = "Drill" });
+
+        var resp = await client.GetAsync("/api/v1/inventory/items", CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<PaginatedResult<ItemItem>>(CT);
+        Assert.Equal(1, body!.Page);
+        Assert.Equal(50, body.PageSize);
+        Assert.Contains(body.Items, i => i.Name == "Drill");
+    }
+
+    // The exact report repro: a direct call to the API URL with ?lent=true and no pagination params.
+    // `lent` is an unknown query param that [AsParameters] ignores; the 500 was purely the missing
+    // page/pageSize. Must now return 200 with the defaults, independent of any lent data.
+    [Fact]
+    public async Task GetItems_LentTrueWithoutPagination_Returns200WithDefaults()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.GetAsync("/api/v1/inventory/items?lent=true", CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadFromJsonAsync<PaginatedResult<ItemItem>>(CT);
+        Assert.Equal(1, body!.Page);
+        Assert.Equal(50, body.PageSize);
+    }
+
+    // Hardening: a malformed (non-numeric) page must surface as 400, not 500. The binder throws
+    // BadHttpRequestException, which DomainExceptionHandler now maps to its 400 status.
+    [Fact]
+    public async Task GetItems_NonNumericPage_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.GetAsync("/api/v1/inventory/items?page=abc", CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
     [Fact]
     public async Task DeleteItem_CleanItem_Returns204()
     {

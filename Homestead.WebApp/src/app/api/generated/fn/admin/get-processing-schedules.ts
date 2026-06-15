@@ -13,11 +13,11 @@ import { ProcessingJobType } from '../../models/processing-job-type';
 export interface GetProcessingSchedules$Params {
   JobType?: ProcessingJobType;
   IsEnabled?: boolean;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getProcessingSchedules(http: HttpClient, rootUrl: string, params: GetProcessingSchedules$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetProcessingSchedulesResponse>> {
+export function getProcessingSchedules(http: HttpClient, rootUrl: string, params?: GetProcessingSchedules$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetProcessingSchedulesResponse>> {
   const rb = new RequestBuilder(rootUrl, getProcessingSchedules.PATH, 'get');
   if (params) {
     rb.query('JobType', params.JobType, {});

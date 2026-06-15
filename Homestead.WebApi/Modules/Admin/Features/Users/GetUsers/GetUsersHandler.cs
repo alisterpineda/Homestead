@@ -25,8 +25,8 @@ public class GetUsersHandler(AppDbContext db)
 
         var items = await query
             .OrderBy(u => u.DisplayName)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .Select(u => new UserResponse
             {
                 Id = u.Id,
@@ -41,8 +41,8 @@ public class GetUsersHandler(AppDbContext db)
         return new PaginatedResponse<UserResponse>
         {
             Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount,
         };
     }

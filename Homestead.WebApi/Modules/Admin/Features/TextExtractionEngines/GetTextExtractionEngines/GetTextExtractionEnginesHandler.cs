@@ -30,15 +30,15 @@ public class GetTextExtractionEnginesHandler(AppDbContext db)
         // Built-in always appears first
         var items = new List<TextExtractionEngineResponse>();
 
-        if (builtInMatchesSearch && request.Page == 1)
+        if (builtInMatchesSearch && request.EffectivePage == 1)
         {
             items.Add(builtIn);
         }
 
-        var dbItemsToTake = request.PageSize - items.Count;
-        var dbSkip = request.Page == 1
+        var dbItemsToTake = request.EffectivePageSize - items.Count;
+        var dbSkip = request.EffectivePage == 1
             ? 0
-            : (request.Page - 1) * request.PageSize - (builtInMatchesSearch ? 1 : 0);
+            : (request.EffectivePage - 1) * request.EffectivePageSize - (builtInMatchesSearch ? 1 : 0);
 
         if (dbSkip < 0) dbSkip = 0;
 
@@ -68,8 +68,8 @@ public class GetTextExtractionEnginesHandler(AppDbContext db)
         return new PaginatedResponse<TextExtractionEngineResponse>
         {
             Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount,
         };
     }

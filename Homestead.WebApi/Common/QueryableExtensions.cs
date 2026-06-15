@@ -12,15 +12,15 @@ public static class QueryableExtensions
         var totalCount = await orderedQuery.CountAsync(ct);
 
         var items = await orderedQuery
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .ToListAsync(ct);
 
         return new PaginatedResponse<T>
         {
             Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount
         };
     }

@@ -11,8 +11,8 @@ import { PaginatedResponseOfGetDocumentVersionsResponse } from '../../models/pag
 
 export interface GetDocumentVersions$Params {
   documentId: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
 export function getDocumentVersions(http: HttpClient, rootUrl: string, params: GetDocumentVersions$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetDocumentVersionsResponse>> {

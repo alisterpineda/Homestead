@@ -20,8 +20,8 @@ export interface GetDocuments$Params {
   SortDir?: SortDirection;
   GroupId?: string;
   Deleted?: boolean;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
 export function getDocuments(http: HttpClient, rootUrl: string, params: GetDocuments$Params, context?: HttpContext): Observable<StrictHttpResponse<GetDocumentsResult>> {

@@ -25,8 +25,8 @@ public class GetAreasHandler(AppDbContext db, IInventoryPlacementService placeme
 
         var totalCount = ordered.Count;
         var pageItems = ordered
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .ToList();
 
         var placement = await placementService.ComputeAsync(ct);
@@ -42,8 +42,8 @@ public class GetAreasHandler(AppDbContext db, IInventoryPlacementService placeme
         return new PaginatedResponse<AreaResponse>
         {
             Items = responses,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount,
         };
     }

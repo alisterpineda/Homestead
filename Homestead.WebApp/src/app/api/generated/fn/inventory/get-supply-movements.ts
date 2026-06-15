@@ -11,8 +11,8 @@ import { PaginatedResponseOfStockMovementResponse } from '../../models/paginated
 
 export interface GetSupplyMovements$Params {
   id: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
 export function getSupplyMovements(http: HttpClient, rootUrl: string, params: GetSupplyMovements$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfStockMovementResponse>> {

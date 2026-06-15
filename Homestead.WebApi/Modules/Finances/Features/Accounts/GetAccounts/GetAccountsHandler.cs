@@ -25,8 +25,8 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
 
         var totalCount = await ordered.CountAsync(ct);
         var pageItems = await ordered
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .ToListAsync(ct);
 
         var ctx = request.AsOf is { } asOf
@@ -53,8 +53,8 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
         return new PaginatedResponse<AccountResponse>
         {
             Items = responses,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount,
         };
     }

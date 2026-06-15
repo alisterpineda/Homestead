@@ -11,11 +11,11 @@ import { PaginatedResponseOfGroupResponse } from '../../models/paginated-respons
 
 export interface GetGroups$Params {
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getGroups(http: HttpClient, rootUrl: string, params: GetGroups$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGroupResponse>> {
+export function getGroups(http: HttpClient, rootUrl: string, params?: GetGroups$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGroupResponse>> {
   const rb = new RequestBuilder(rootUrl, getGroups.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});

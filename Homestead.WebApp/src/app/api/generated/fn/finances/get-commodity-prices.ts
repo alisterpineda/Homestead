@@ -20,11 +20,11 @@ export interface GetCommodityPrices$Params {
   Sources?: Array<CommodityPriceSource>;
   SortBy?: CommodityPriceSortBy;
   SortDir?: SortDirection;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getCommodityPrices(http: HttpClient, rootUrl: string, params: GetCommodityPrices$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfCommodityPriceResponse>> {
+export function getCommodityPrices(http: HttpClient, rootUrl: string, params?: GetCommodityPrices$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfCommodityPriceResponse>> {
   const rb = new RequestBuilder(rootUrl, getCommodityPrices.PATH, 'get');
   if (params) {
     rb.query('CommodityId', params.CommodityId, {});

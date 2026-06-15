@@ -25,6 +25,11 @@ public class DomainExceptionHandler : IExceptionHandler
                 ProblemDetailsFactory.ValidationErrors(e.Errors
                     .GroupBy(f => f.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).ToArray())),
+            // Minimal-API parameter binding throws this for malformed/missing query params (bad Guid,
+            // non-numeric int, etc.). Without this case it falls through to an unhandled 500; surface
+            // its intended status (400) instead. Defense-in-depth for the whole API.
+            Microsoft.AspNetCore.Http.BadHttpRequestException e =>
+                ProblemDetailsFactory.Create(e.StatusCode, "Bad Request", e.Message),
             _ => null
         };
 

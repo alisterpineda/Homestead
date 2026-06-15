@@ -14,11 +14,11 @@ export interface GetAccounts$Params {
   Kind?: AccountKind;
   IncludeArchived?: boolean;
   AsOf?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getAccounts(http: HttpClient, rootUrl: string, params: GetAccounts$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAccountResponse>> {
+export function getAccounts(http: HttpClient, rootUrl: string, params?: GetAccounts$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAccountResponse>> {
   const rb = new RequestBuilder(rootUrl, getAccounts.PATH, 'get');
   if (params) {
     rb.query('Kind', params.Kind, {});

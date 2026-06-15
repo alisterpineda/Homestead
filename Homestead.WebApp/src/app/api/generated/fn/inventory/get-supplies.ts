@@ -13,11 +13,11 @@ export interface GetSupplies$Params {
   IncludeInactive?: boolean;
   LowStockOnly?: boolean;
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getSupplies(http: HttpClient, rootUrl: string, params: GetSupplies$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfSupplyResponse>> {
+export function getSupplies(http: HttpClient, rootUrl: string, params?: GetSupplies$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfSupplyResponse>> {
   const rb = new RequestBuilder(rootUrl, getSupplies.PATH, 'get');
   if (params) {
     rb.query('IncludeInactive', params.IncludeInactive, {});

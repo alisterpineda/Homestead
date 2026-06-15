@@ -2,18 +2,19 @@ namespace Homestead.WebApi.Common;
 
 public record PaginatedRequest
 {
-    private int _page = 1;
-    private int _pageSize = 50;
+    private const int DefaultPageSize = 50;
+    private const int MaxPageSize = 1000;
 
-    public int Page
-    {
-        get => _page;
-        init => _page = value < 1 ? 1 : value;
-    }
+    // Nullable so minimal-API [AsParameters] binding treats them as OPTIONAL query params — a
+    // non-nullable value type would be bound as REQUIRED and a request omitting page/pageSize
+    // would fail binding (BadHttpRequestException → 500) before the handler runs. The default +
+    // clamp lives in the Effective* accessors, not a property initializer, because [AsParameters]
+    // binds an absent optional property to null (overwriting any initializer) and derived query
+    // records bind Page/PageSize as inherited properties regardless of any base ctor default.
+    // Read Effective* everywhere a concrete page/size is needed.
+    public int? Page { get; init; }
+    public int? PageSize { get; init; }
 
-    public int PageSize
-    {
-        get => _pageSize;
-        init => _pageSize = value < 1 ? 1 : value > 1000 ? 1000 : value;
-    }
+    public int EffectivePage => Page is { } p && p >= 1 ? p : 1;
+    public int EffectivePageSize => PageSize is { } s ? Math.Clamp(s, 1, MaxPageSize) : DefaultPageSize;
 }

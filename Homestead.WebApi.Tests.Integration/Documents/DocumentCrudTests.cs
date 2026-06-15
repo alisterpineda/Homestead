@@ -57,6 +57,23 @@ public class DocumentCrudTests : IntegrationTestBase
         Assert.Empty(body.Items);
     }
 
+    // Locks the systemic pagination fix beyond Inventory: omitting page/pageSize must bind as
+    // optional and apply the defaults (1 / 50), not fail with a 500. IncludeChildTags is still
+    // passed because it is a separate required (non-nullable) binding param — this isolates the
+    // page/pageSize fix.
+    [Fact]
+    public async Task GetDocuments_NoPaginationParams_Returns200WithDefaults()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var response = await client.GetAsync("/api/v1/documents?IncludeChildTags=false", CT);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PaginatedResult<DocumentListItem>>(CT);
+        Assert.Equal(1, body!.Page);
+        Assert.Equal(50, body.PageSize);
+    }
+
     [Fact]
     public async Task GetDocument_ValidId_ReturnsDocument()
     {

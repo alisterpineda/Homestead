@@ -11,11 +11,11 @@ import { PaginatedResponseOfTextExtractionEngineResponse } from '../../models/pa
 
 export interface GetTextExtractionEngines$Params {
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getTextExtractionEngines(http: HttpClient, rootUrl: string, params: GetTextExtractionEngines$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTextExtractionEngineResponse>> {
+export function getTextExtractionEngines(http: HttpClient, rootUrl: string, params?: GetTextExtractionEngines$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTextExtractionEngineResponse>> {
   const rb = new RequestBuilder(rootUrl, getTextExtractionEngines.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});

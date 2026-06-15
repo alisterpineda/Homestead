@@ -16,11 +16,11 @@ export interface GetProcessingJobs$Params {
   EntityType?: ProcessingEntityType;
   Status?: ProcessingJobStatus;
   ParentJobId?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getProcessingJobs(http: HttpClient, rootUrl: string, params: GetProcessingJobs$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetProcessingJobsResponse>> {
+export function getProcessingJobs(http: HttpClient, rootUrl: string, params?: GetProcessingJobs$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetProcessingJobsResponse>> {
   const rb = new RequestBuilder(rootUrl, getProcessingJobs.PATH, 'get');
   if (params) {
     rb.query('EntityId', params.EntityId, {});

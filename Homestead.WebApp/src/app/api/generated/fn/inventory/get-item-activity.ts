@@ -11,8 +11,8 @@ import { PaginatedResponseOfGetItemActivityResponse } from '../../models/paginat
 
 export interface GetItemActivity$Params {
   id: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
 export function getItemActivity(http: HttpClient, rootUrl: string, params: GetItemActivity$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetItemActivityResponse>> {

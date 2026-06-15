@@ -17,11 +17,11 @@ export interface GetTags$Params {
   Search?: string;
   SortBy?: TagSortBy;
   SortDir?: SortDirection;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getTags(http: HttpClient, rootUrl: string, params: GetTags$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetTagsResponse>> {
+export function getTags(http: HttpClient, rootUrl: string, params?: GetTags$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetTagsResponse>> {
   const rb = new RequestBuilder(rootUrl, getTags.PATH, 'get');
   if (params) {
     rb.query('ParentPath', params.ParentPath, {});

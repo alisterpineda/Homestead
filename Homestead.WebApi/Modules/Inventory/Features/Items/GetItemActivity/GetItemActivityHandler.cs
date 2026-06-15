@@ -84,15 +84,15 @@ public class GetItemActivityHandler(AppDbContext db)
             .ToList();
 
         var paged = all
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .ToList();
 
         return new PaginatedResponse<GetItemActivityResponse>
         {
             Items = paged,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = all.Count,
         };
     }

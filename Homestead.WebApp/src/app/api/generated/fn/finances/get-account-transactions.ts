@@ -14,8 +14,8 @@ export interface GetAccountTransactions$Params {
   CommodityId?: string;
   DateFrom?: string;
   DateTo?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
 export function getAccountTransactions(http: HttpClient, rootUrl: string, params: GetAccountTransactions$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTransactionResponse>> {

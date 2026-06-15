@@ -11,11 +11,11 @@ import { PaginatedResponseOfAiProviderResponse } from '../../models/paginated-re
 
 export interface GetAiProviders$Params {
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getAiProviders(http: HttpClient, rootUrl: string, params: GetAiProviders$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAiProviderResponse>> {
+export function getAiProviders(http: HttpClient, rootUrl: string, params?: GetAiProviders$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAiProviderResponse>> {
   const rb = new RequestBuilder(rootUrl, getAiProviders.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});

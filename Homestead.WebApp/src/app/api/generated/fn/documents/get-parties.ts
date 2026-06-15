@@ -15,11 +15,11 @@ export interface GetParties$Params {
   Search?: string;
   SortBy?: PartySortBy;
   SortDir?: SortDirection;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getParties(http: HttpClient, rootUrl: string, params: GetParties$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetPartiesResponse>> {
+export function getParties(http: HttpClient, rootUrl: string, params?: GetParties$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfGetPartiesResponse>> {
   const rb = new RequestBuilder(rootUrl, getParties.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});

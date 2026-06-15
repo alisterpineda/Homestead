@@ -17,11 +17,11 @@ export interface GetTransactions$Params {
   DateFrom?: string;
   DateTo?: string;
   MemoContains?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getTransactions(http: HttpClient, rootUrl: string, params: GetTransactions$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTransactionResponse>> {
+export function getTransactions(http: HttpClient, rootUrl: string, params?: GetTransactions$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfTransactionResponse>> {
   const rb = new RequestBuilder(rootUrl, getTransactions.PATH, 'get');
   if (params) {
     rb.query('AccountId', params.AccountId, {});

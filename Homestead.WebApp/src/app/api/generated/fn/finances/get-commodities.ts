@@ -13,11 +13,11 @@ import { PaginatedResponseOfCommodityResponse } from '../../models/paginated-res
 export interface GetCommodities$Params {
   Kind?: CommodityKind;
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getCommodities(http: HttpClient, rootUrl: string, params: GetCommodities$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfCommodityResponse>> {
+export function getCommodities(http: HttpClient, rootUrl: string, params?: GetCommodities$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfCommodityResponse>> {
   const rb = new RequestBuilder(rootUrl, getCommodities.PATH, 'get');
   if (params) {
     rb.query('Kind', params.Kind, {});

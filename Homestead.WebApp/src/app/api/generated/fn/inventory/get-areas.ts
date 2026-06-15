@@ -10,11 +10,11 @@ import { RequestBuilder } from '../../request-builder';
 import { PaginatedResponseOfAreaResponse } from '../../models/paginated-response-of-area-response';
 
 export interface GetAreas$Params {
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getAreas(http: HttpClient, rootUrl: string, params: GetAreas$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAreaResponse>> {
+export function getAreas(http: HttpClient, rootUrl: string, params?: GetAreas$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfAreaResponse>> {
   const rb = new RequestBuilder(rootUrl, getAreas.PATH, 'get');
   if (params) {
     rb.query('Page', params.Page, {});

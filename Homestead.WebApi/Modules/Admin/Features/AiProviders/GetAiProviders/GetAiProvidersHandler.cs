@@ -25,8 +25,8 @@ public class GetAiProvidersHandler(AppDbContext db)
         // load); masking can't translate to SQL, so it runs in the in-memory pass below.
         var rows = await query
             .OrderBy(e => e.Name)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .Skip((request.EffectivePage - 1) * request.EffectivePageSize)
+            .Take(request.EffectivePageSize)
             .Select(e => new
             {
                 e.Id,
@@ -59,8 +59,8 @@ public class GetAiProvidersHandler(AppDbContext db)
         return new PaginatedResponse<AiProviderResponse>
         {
             Items = items,
-            Page = request.Page,
-            PageSize = request.PageSize,
+            Page = request.EffectivePage,
+            PageSize = request.EffectivePageSize,
             TotalCount = totalCount,
         };
     }

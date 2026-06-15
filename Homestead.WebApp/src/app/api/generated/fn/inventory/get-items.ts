@@ -16,11 +16,11 @@ export interface GetItems$Params {
   Unplaced?: boolean;
   IncludeInactive?: boolean;
   Search?: string;
-  Page: number;
-  PageSize: number;
+  Page?: number;
+  PageSize?: number;
 }
 
-export function getItems(http: HttpClient, rootUrl: string, params: GetItems$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfItemResponse>> {
+export function getItems(http: HttpClient, rootUrl: string, params?: GetItems$Params, context?: HttpContext): Observable<StrictHttpResponse<PaginatedResponseOfItemResponse>> {
   const rb = new RequestBuilder(rootUrl, getItems.PATH, 'get');
   if (params) {
     rb.query('AreaId', params.AreaId, {});
