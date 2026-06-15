@@ -14,10 +14,13 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgIcon, HlmIconImports],
   providers: [provideIcons({ lucideTriangleAlert, lucideChevronRight })],
+  // Flex host so the anchor fills the grid cell's stretched height — cards in a row stay equal
+  // height even when only some carry a contents-preview line.
+  host: { class: 'flex' },
   template: `
     <a
       [routerLink]="link()"
-      class="flex items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:bg-accent"
+      class="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:bg-accent"
     >
       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
         <span class="flex min-w-0 items-center gap-2">

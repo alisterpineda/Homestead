@@ -122,73 +122,82 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
             </div>
           } @else {
             @if (c.childAreas.length > 0) {
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                @for (childArea of c.childAreas; track childArea.id) {
-                  <app-place-card
-                    [name]="childArea.name"
-                    icon="lucideMapPin"
-                    [count]="childArea.itemCount"
-                    [lowStockCount]="childArea.lowStockCount"
-                    [link]="placeRefToLink({ kind: 'area', id: childArea.id })"
-                    [chevron]="true"
-                  />
-                }
+              <div class="space-y-2">
+                <h3 class="text-sm font-medium text-muted-foreground">Areas</h3>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  @for (childArea of c.childAreas; track childArea.id) {
+                    <app-place-card
+                      [name]="childArea.name"
+                      icon="lucideMapPin"
+                      [count]="childArea.itemCount"
+                      [lowStockCount]="childArea.lowStockCount"
+                      [link]="placeRefToLink({ kind: 'area', id: childArea.id })"
+                      [chevron]="true"
+                    />
+                  }
+                </div>
               </div>
             }
 
             @if (c.containers.length > 0) {
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                @for (container of c.containers; track container.id) {
-                  <app-place-card
-                    [name]="container.name"
-                    icon="lucideBox"
-                    [count]="container.itemCount"
-                    [lowStockCount]="container.lowStockCount"
-                    [previewNames]="container.previewNames"
-                    [link]="placeRefToLink({ kind: 'container', id: container.id })"
-                    [chevron]="true"
-                  />
-                }
+              <div class="space-y-2">
+                <h3 class="text-sm font-medium text-muted-foreground">Containers</h3>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  @for (container of c.containers; track container.id) {
+                    <app-place-card
+                      [name]="container.name"
+                      icon="lucideBox"
+                      [count]="container.itemCount"
+                      [lowStockCount]="container.lowStockCount"
+                      [previewNames]="container.previewNames"
+                      [link]="placeRefToLink({ kind: 'container', id: container.id })"
+                      [chevron]="true"
+                    />
+                  }
+                </div>
               </div>
             }
 
             @if (c.items.length > 0 || c.supplies.length > 0) {
-              <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
-                @for (item of c.items; track item.id) {
-                  <li>
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                      (click)="openItem.emit(item)"
-                    >
-                      <span class="truncate">{{ item.name }}</span>
-                      <app-item-status-badge [status]="item.status" />
-                    </button>
-                  </li>
-                }
-                @for (row of c.supplies; track row.supply.id) {
-                  <li>
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                      (click)="openSupply.emit(row.supply)"
-                    >
-                      <span class="flex min-w-0 items-center gap-2">
-                        <span class="truncate">{{ row.supply.name }}</span>
-                        @if (row.supply.isLow) {
-                          <span class="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-                            <ng-icon hlm name="lucideTriangleAlert" size="xs" />
-                            Low
-                          </span>
-                        }
-                      </span>
-                      <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {{ formatQty(row.localQuantity) }} {{ row.supply.unit }}@if (row.localQuantity !== row.supply.totalOnHand) {<span> · of {{ formatQty(row.supply.totalOnHand) }} total</span>}
-                      </span>
-                    </button>
-                  </li>
-                }
-              </ul>
+              <div class="space-y-2">
+                <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel() }}</h3>
+                <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
+                  @for (item of c.items; track item.id) {
+                    <li>
+                      <button
+                        type="button"
+                        class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+                        (click)="openItem.emit(item)"
+                      >
+                        <span class="truncate">{{ item.name }}</span>
+                        <app-item-status-badge [status]="item.status" />
+                      </button>
+                    </li>
+                  }
+                  @for (row of c.supplies; track row.supply.id) {
+                    <li>
+                      <button
+                        type="button"
+                        class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+                        (click)="openSupply.emit(row.supply)"
+                      >
+                        <span class="flex min-w-0 items-center gap-2">
+                          <span class="truncate">{{ row.supply.name }}</span>
+                          @if (row.supply.isLow) {
+                            <span class="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                              <ng-icon hlm name="lucideTriangleAlert" size="xs" />
+                              Low
+                            </span>
+                          }
+                        </span>
+                        <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          {{ formatQty(row.localQuantity) }} {{ row.supply.unit }}@if (row.localQuantity !== row.supply.totalOnHand) {<span> · of {{ formatQty(row.supply.totalOnHand) }} total</span>}
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
             }
           }
         }
@@ -254,6 +263,15 @@ export class PlaceBrowserComponent {
     (this.overview()?.areas ?? []).filter(a => a.parentAreaId == null));
 
   protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
+
+  /** Heading for the loose-contents list — names exactly what it holds (items, supplies, or both). */
+  protected contentsLabel = computed(() => {
+    const c = this.contents();
+    const hasItems = (c?.items.length ?? 0) > 0;
+    const hasSupplies = (c?.supplies.length ?? 0) > 0;
+    if (hasItems && hasSupplies) return 'Items & supplies';
+    return hasSupplies ? 'Supplies' : 'Items';
+  });
 
   protected placeIcon = computed(() => {
     const ref = this.place();

@@ -185,6 +185,24 @@ describe('PlaceBrowserComponent', () => {
     expect(badges.length).toBe(1);
   });
 
+  it('labels each contents group, and names the loose list by what it holds', async () => {
+    // BIN_CONTENTS has containers + one item + one supply (no child areas).
+    let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
+    let headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
+    expect(headings).toContain('Containers');
+    expect(headings).toContain('Items & supplies');
+    expect(headings).not.toContain('Areas');
+
+    // Loose list label collapses to the single kind actually present.
+    fixture = await create(
+      { kind: 'container', id: 'bin' },
+      makeContents({ containers: [], items: [makeItem({ id: 'wrench', name: 'Wrench' })], supplies: [] }),
+    );
+    headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
+    expect(headings).toContain('Items');
+    expect(headings).not.toContain('Items & supplies');
+  });
+
   it('emits openItem / openSupply / containerDetails from their controls', async () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     const component = fixture.componentInstance;
