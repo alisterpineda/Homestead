@@ -4,6 +4,6 @@
 export interface TransactionDetailsDividendDetails {
   accountId: string;
   amount: number;
-  kind?: 'dividend';
+  kind: 'dividend';
   paymentCurrencyId: string;
 }

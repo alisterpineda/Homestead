@@ -51,13 +51,11 @@ import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './op
 import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { toDateOnly } from '../shared/date';
-import { isDetailsOfKind } from '../transactions/transaction-display';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
-import type { TransactionDetailsBalanceEntryDetails } from '@/api/generated/models/transaction-details-balance-entry-details';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
 import type { TradeSide } from '@/api/generated/models/trade-side';
@@ -546,7 +544,7 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   private openBalanceEntryEditor(tx: TransactionResponse): void {
     const details = tx.details;
-    if (!isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(details, 'balanceEntry')) return;
+    if (details?.kind !== 'balanceEntry') return;
     const existing: BalanceEntryResponse = {
       transactionId: tx.id,
       accountId: details.accountId,

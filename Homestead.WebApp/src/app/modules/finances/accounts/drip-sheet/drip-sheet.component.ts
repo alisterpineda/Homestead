@@ -24,14 +24,12 @@ import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityStep, formatCurrency } from '../../shared/format-currency';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
-import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import { OccurredAtFieldComponent } from '../../shared/occurred-at-field/occurred-at-field.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
-import type { TransactionDetailsTradeDetails } from '@/api/generated/models/transaction-details-trade-details';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export type DripSheetMode = 'create' | 'edit';
@@ -290,7 +288,8 @@ export class DripSheetComponent {
     }
     if (this.mode() === 'edit') {
       const buy = this.resolvedBuyHalf();
-      const details = isDetailsOfKind<TransactionDetailsTradeDetails>(buy?.details, 'trade') ? buy!.details : null;
+      const d = buy?.details;
+      const details = d?.kind === 'trade' ? d : null;
       if (buy && details) {
         const { date, time } = decomposeOccurredAt(buy.occurredAt);
         // amount = units × unitPrice (the cash legs net to zero by construction). toPrecision(12)

@@ -1,15 +1,5 @@
-import type { TransactionDetails } from '@/api/generated/models/transaction-details';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 import type { TransactionShape } from '@/api/generated/models/transaction-shape';
-
-// Polymorphic transaction details discriminate via the `kind` field. This guard
-// safely narrows null/unknown to a particular variant without sprinkling casts.
-export function isDetailsOfKind<T extends { kind?: string }>(
-  details: TransactionDetails | null | undefined,
-  kind: NonNullable<T['kind']>,
-): details is T {
-  return !!details && (details as { kind?: string }).kind === kind;
-}
 
 export function shapeLabel(shape: TransactionShape): string {
   switch (shape) {

@@ -5,7 +5,7 @@ export interface TransactionDetailsTransferDetails {
   destinationAccountId: string;
   destinationAmount: number;
   destinationCurrencyId: string;
-  kind?: 'transfer';
+  kind: 'transfer';
   sourceAccountId: string;
   sourceAmount: number;
   sourceCurrencyId: string;

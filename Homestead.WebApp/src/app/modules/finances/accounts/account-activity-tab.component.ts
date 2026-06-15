@@ -47,16 +47,13 @@ import { UserPreferencesService } from '@/shared/services/user-preferences.servi
 import { displaySign } from '../shared/sign';
 import { formatMaskedCurrency } from '../shared/format-currency';
 import { toDateOnly } from '../shared/date';
-import {
-  isDetailsOfKind,
-  shapeLabel,
+import {  shapeLabel,
   shapeIconName,
   signedAmountForAccount,
   transferCounterparty,
 } from '../transactions/transaction-display';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
-import type { TransactionDetailsBalanceEntryDetails } from '@/api/generated/models/transaction-details-balance-entry-details';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 
 const PAGE_SIZE = 25;
@@ -364,7 +361,7 @@ export class AccountActivityTabComponent {
         const cp = transferCounterparty(tx, accountId);
         if (cp) accountIds.add(cp.accountId);
       }
-      if (isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(tx.details, 'balanceEntry')) {
+      if (tx.details?.kind === 'balanceEntry') {
         commodityIds.add(tx.details.assertedCommodityId);
       }
     }
@@ -425,7 +422,7 @@ export class AccountActivityTabComponent {
       if (cpName) {
         typeSubtitle = signed < 0 ? `To ${cpName}` : `From ${cpName}`;
       }
-    } else if (isDetailsOfKind<TransactionDetailsBalanceEntryDetails>(tx.details, 'balanceEntry')) {
+    } else if (tx.details?.kind === 'balanceEntry') {
       const assertedCommodity = this.commodities()[tx.details.assertedCommodityId] ?? null;
       if (assertedCommodity) {
         typeSubtitle = formatMaskedCurrency(tx.details.assertedAmount, assertedCommodity, masked);

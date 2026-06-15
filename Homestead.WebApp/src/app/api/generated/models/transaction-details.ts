@@ -5,5 +5,5 @@ import { TransactionDetailsBalanceEntryDetails } from '../models/transaction-det
 import { TransactionDetailsDividendDetails } from '../models/transaction-details-dividend-details';
 import { TransactionDetailsTradeDetails } from '../models/transaction-details-trade-details';
 import { TransactionDetailsTransferDetails } from '../models/transaction-details-transfer-details';
-export interface TransactionDetails {
-}
+export type TransactionDetails = (TransactionDetailsBalanceEntryDetails | TransactionDetailsTransferDetails | TransactionDetailsTradeDetails | TransactionDetailsDividendDetails);
+

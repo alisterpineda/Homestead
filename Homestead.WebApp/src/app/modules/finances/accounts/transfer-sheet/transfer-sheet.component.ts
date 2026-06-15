@@ -21,13 +21,11 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowIso, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { commodityResource } from '../../shared/commodity-resource';
 import { AccountPickerComponent } from '../../shared/account-picker/account-picker.component';
 import { of, catchError } from 'rxjs';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
-import type { TransactionDetailsTransferDetails } from '@/api/generated/models/transaction-details-transfer-details';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export type TransferSheetMode = 'create' | 'edit';
@@ -204,9 +202,7 @@ export class TransferSheetComponent {
       return { kind: 'closed' as const };
     }
     const rawDetails = ex?.details;
-    const details = isDetailsOfKind<TransactionDetailsTransferDetails>(rawDetails, 'transfer')
-      ? rawDetails
-      : null;
+    const details = rawDetails?.kind === 'transfer' ? rawDetails : null;
     if (this.mode() === 'edit' && ex && details) {
       const isOutgoing = details.sourceAccountId === a.id;
       return {

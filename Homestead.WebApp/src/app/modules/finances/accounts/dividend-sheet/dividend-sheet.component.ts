@@ -20,14 +20,12 @@ import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityStep } from '../../shared/format-currency';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
-import { isDetailsOfKind } from '../../transactions/transaction-display';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import { OccurredAtFieldComponent } from '../../shared/occurred-at-field/occurred-at-field.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
-import type { TransactionDetailsDividendDetails } from '@/api/generated/models/transaction-details-dividend-details';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export type DividendSheetMode = 'create' | 'edit';
@@ -153,7 +151,8 @@ export class DividendSheetComponent {
     if (!a || this.state() !== 'open') {
       return { kind: 'closed' as const };
     }
-    const details = isDetailsOfKind<TransactionDetailsDividendDetails>(ex?.details, 'dividend') ? ex!.details : null;
+    const d = ex?.details;
+    const details = d?.kind === 'dividend' ? d : null;
     if (this.mode() === 'edit' && ex && details) {
       const { date, time } = decomposeOccurredAt(ex.occurredAt);
       return {

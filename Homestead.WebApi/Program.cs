@@ -271,6 +271,7 @@ builder.Services.AddOpenApi("v1", options =>
 
     options.AddOperationTransformer<ProblemDetailsResponseTransformer>();
     options.AddSchemaTransformer<NullableEnumSchemaTransformer>();
+    options.AddDocumentTransformer<PolymorphicDiscriminatorDocumentTransformer>();
 });
 
 // Runs the OIDC requirement check at host start (as a hosted service) rather than at

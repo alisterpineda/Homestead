@@ -4,7 +4,7 @@
 export interface TransactionDetailsTradeDetails {
   accountId: string;
   fundingCurrencyId: string;
-  kind?: 'trade';
+  kind: 'trade';
   quantity: number;
   securityId: string;
   unitPrice: number;
