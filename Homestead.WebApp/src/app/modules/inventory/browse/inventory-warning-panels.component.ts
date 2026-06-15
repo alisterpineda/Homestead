@@ -17,9 +17,9 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
 /**
  * The Browse "needs attention" alert region: a conditional, collapsible block surfacing true
  * alerts — currently just **low stock** (a violation of a restock threshold the user set, with a
- * clear resolution). Neutral statuses (lent / unplaced) are *not* alerts and live in the always-on
- * status-chips row instead; the generic frame stays so future alert types (expiring soon, overdue
- * loans, warranty) can slot in. Two modes:
+ * clear resolution). Neutral statuses are *not* alerts: lending lives in the always-on status-chips
+ * row, while unplaced is a location bucket surfaced as a place card; the generic frame stays so
+ * future alert types (expiring soon, overdue loans, warranty) can slot in. Two modes:
  *
  * - **root** — the global household-wide low-stock tile with a most-urgent-first preview, reusing
  *   the overview data the Browse root already fetches; the tile deep-links into the unified items

@@ -34,33 +34,19 @@ describe('InventoryStatusChipsComponent', () => {
 
   // ----- Root mode -----
 
-  it('renders Unplaced + Lent chips with counts and deep-links at root', async () => {
-    const fixture = await create({ kind: 'root', unplacedCount: 2, lentCount: 3 });
+  it('renders the Lent chip with count and deep-link at root', async () => {
+    const fixture = await create({ kind: 'root', lentCount: 3 });
 
     const content = text(fixture);
     expect(content).toContain('Browse by status');
-    expect(content).toContain('Unplaced');
     expect(content).toContain('Lent out');
-    expect(content).toContain('2');
     expect(content).toContain('3');
 
-    expect(links(fixture)).toEqual([
-      '/inventory/items?area=unplaced&kind=items',
-      '/inventory/items?lent=true',
-    ]);
-  });
-
-  it('hides zero-count chips at root', async () => {
-    const fixture = await create({ kind: 'root', unplacedCount: 0, lentCount: 4 });
-
-    const content = text(fixture);
-    expect(content).not.toContain('Unplaced');
-    expect(content).toContain('Lent out');
     expect(links(fixture)).toEqual(['/inventory/items?lent=true']);
   });
 
-  it('renders nothing at root when both counts are zero', async () => {
-    const fixture = await create({ kind: 'root', unplacedCount: 0, lentCount: 0 });
+  it('renders nothing at root when the lent count is zero', async () => {
+    const fixture = await create({ kind: 'root', lentCount: 0 });
 
     expect(text(fixture).trim()).toBe('');
     expect(links(fixture)).toEqual([]);

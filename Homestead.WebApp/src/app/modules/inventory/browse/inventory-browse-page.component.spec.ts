@@ -200,12 +200,13 @@ describe('InventoryBrowsePageComponent', () => {
   });
 
   it('surfaces the neutral status row at the root even with no alerts', async () => {
-    // OVERVIEW has lowStockCount: 0 (no alert) but unplacedCount: 2 — the status row still shows,
+    // OVERVIEW has lowStockCount: 0 (no alert); drive the row from lentCount so it shows
     // decoupled from the Needs-attention gate.
+    api.response = { ...OVERVIEW, lentCount: 2 };
     const { harness } = await navigate('/inventory/browse');
     expect(text(harness)).not.toContain('Needs attention');
     expect(text(harness)).toContain('Browse by status');
-    expect(hrefs(harness)).toContain('/inventory/items?area=unplaced&kind=items');
+    expect(hrefs(harness)).toContain('/inventory/items?lent=true');
   });
 
   it('surfaces the low-stock alert at the root when something is running low', async () => {

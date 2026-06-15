@@ -303,8 +303,9 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   });
 
   // The alert region's scope: global at root (the full overview, for the low-stock previews),
-  // place-scoped when drilled. Carries low stock only — lent/unplaced are neutral statuses, surfaced
-  // by statusScope. Null — render nothing — until the backing fetch lands, and for Unplaced.
+  // place-scoped when drilled. Carries low stock only — lent is a neutral status surfaced by
+  // statusScope, and unplaced is a location bucket surfaced as a place card. Null — render nothing —
+  // until the backing fetch lands, and for Unplaced.
   protected warningScope = computed<WarningPanelsScope | null>(() => {
     if (this.placeRef() === null) {
       const ov = this.overview();
@@ -314,13 +315,13 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     return d ? { kind: 'place', lowStockCount: d.lowStockCount, viewAllParams: d.param } : null;
   });
 
-  // The neutral status row's scope: lent (root + place) and unplaced (root only). Decoupled from
-  // warningScope so the row shows even with no alerts. Null until the backing fetch lands, and on
-  // the Unplaced drill (nothing to surface).
+  // The neutral status row's scope: lent (root + place). Decoupled from warningScope so the row
+  // shows even with no alerts. Null until the backing fetch lands, and on the Unplaced drill
+  // (nothing to surface).
   protected statusScope = computed<StatusChipsScope | null>(() => {
     if (this.placeRef() === null) {
       const ov = this.overview();
-      return ov ? { kind: 'root', unplacedCount: ov.unplacedCount, lentCount: ov.lentCount } : null;
+      return ov ? { kind: 'root', lentCount: ov.lentCount } : null;
     }
     const d = this.drilledScope();
     return d ? { kind: 'place', lentCount: d.lentCount, lentParams: { lent: 'true', ...d.param } } : null;
