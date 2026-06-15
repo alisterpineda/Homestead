@@ -43,7 +43,7 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        // The supply this movement is of: the ledger outlives everything but the item itself, and a
+        // The consumable this movement is of: the ledger outlives everything but the item itself, and a
         // fungible item with any movement history can only be archived, never deleted.
         builder.HasOne(m => m.Item)
             .WithMany()

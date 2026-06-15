@@ -72,7 +72,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_LiveItemCount_CountsDistinctSuppliesWithStockResolvingHere()
+    public async Task Handle_LiveItemCount_CountsDistinctConsumablesWithStockResolvingHere()
     {
         var garage = new Area { Id = Guid.NewGuid(), Name = "Garage" };
         _db.Areas.Add(garage);
@@ -81,15 +81,15 @@ public class GetAreasHandlerTests : IAsyncLifetime
         bin.IsContainer = true;
         _db.Items.Add(bin);
 
-        // Two entries for the same supply resolving to the garage (direct + via the bin) ⇒ one type.
-        var batteries = Supply(ItemStatus.Active);
+        // Two entries for the same consumable resolving to the garage (direct + via the bin) ⇒ one type.
+        var batteries = Consumable(ItemStatus.Active);
         _db.Items.Add(batteries);
         _db.StockEntries.AddRange(
             Stock(batteries.Id, areaId: garage.Id),
             Stock(batteries.Id, containerItemId: bin.Id));
 
-        // Archived supplies keep stock entries but are hidden from the list — excluded.
-        var archived = Supply(ItemStatus.Archived);
+        // Archived consumables keep stock entries but are hidden from the list — excluded.
+        var archived = Consumable(ItemStatus.Archived);
         _db.Items.Add(archived);
         _db.StockEntries.Add(Stock(archived.Id, areaId: garage.Id));
 
@@ -178,10 +178,10 @@ public class GetAreasHandlerTests : IAsyncLifetime
         AreaId = areaId,
     };
 
-    private static Item Supply(ItemStatus status) => new()
+    private static Item Consumable(ItemStatus status) => new()
     {
         Id = Guid.NewGuid(),
-        Name = "Supply",
+        Name = "Consumable",
         Fungibility = Fungibility.Fungible,
         Status = status,
         Unit = "units",

@@ -15,17 +15,17 @@ import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group'
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
-import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
-import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
+import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
+import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
-type EntryKind = 'item' | 'supply';
+type EntryKind = 'durable' | 'consumable';
 
 /**
- * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the item fields
- * (location, container flag) and the supply fields (unit, restock threshold). Both forms stay to the
+ * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the durable fields
+ * (location, container flag) and the consumable fields (unit, restock threshold). Both forms stay to the
  * essentials so the dialog barely changes height on toggle — the rest is set later from the Edit sheet.
  */
 @Component({
@@ -51,12 +51,12 @@ type EntryKind = 'item' | 'supply';
         class="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[560px]"
       >
         <div hlmDialogHeader>
-          <h2 hlmDialogTitle>{{ kind() === 'supply' ? 'New supply' : 'New item' }}</h2>
+          <h2 hlmDialogTitle>{{ kind() === 'consumable' ? 'New consumable' : 'New durable' }}</h2>
           <p hlmDialogDescription>
-            @if (kind() === 'supply') {
+            @if (kind() === 'consumable') {
               Define a consumable type, counted in bulk. Add stock to it afterwards.
             } @else {
-              Add a tracked item — one specific thing. Set serial, value, and more after creating.
+              Add a tracked durable — one specific thing. Set serial, value, and more after creating.
             }
           </p>
         </div>
@@ -70,8 +70,8 @@ type EntryKind = 'item' | 'supply';
             class="w-full"
             aria-label="What are you adding?"
           >
-            <button hlmToggleGroupItem value="item" class="flex-1">Item</button>
-            <button hlmToggleGroupItem value="supply" class="flex-1">Supply</button>
+            <button hlmToggleGroupItem value="durable" class="flex-1">Durable</button>
+            <button hlmToggleGroupItem value="consumable" class="flex-1">Consumable</button>
           </hlm-toggle-group>
 
           <div class="flex flex-col gap-1.5">
@@ -80,13 +80,13 @@ type EntryKind = 'item' | 'supply';
               hlmInput
               id="create-entry-name"
               maxlength="256"
-              [placeholder]="kind() === 'supply' ? 'e.g. Paper towels' : 'e.g. Cordless drill'"
+              [placeholder]="kind() === 'consumable' ? 'e.g. Paper towels' : 'e.g. Cordless drill'"
               [value]="name()"
               (input)="name.set(asValue($event))"
             />
           </div>
 
-          @if (kind() === 'item') {
+          @if (kind() === 'durable') {
             <div class="flex flex-col gap-1.5">
               <label hlmLabel>Location</label>
               <app-location-picker
@@ -101,9 +101,9 @@ type EntryKind = 'item' | 'supply';
               <hlm-checkbox
                 [checked]="isContainer()"
                 (checkedChange)="isContainer.set($event === true)"
-                [aria-label]="'This item is a container'"
+                [aria-label]="'This durable is a container'"
               />
-              <span>This item is a container</span>
+              <span>This durable is a container</span>
             </label>
           } @else {
             <div class="flex flex-col gap-1.5">
@@ -152,7 +152,7 @@ type EntryKind = 'item' | 'supply';
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" class="w-full sm:w-auto" hlmDialogClose>Cancel</button>
             <button hlmBtn type="submit" class="w-full sm:w-auto" [disabled]="!canSubmit() || creating()">
-              {{ creating() ? 'Creating...' : (kind() === 'supply' ? 'Create supply' : 'Create item') }}
+              {{ creating() ? 'Creating...' : (kind() === 'consumable' ? 'Create consumable' : 'Create durable') }}
             </button>
           </div>
         </form>
@@ -162,20 +162,20 @@ type EntryKind = 'item' | 'supply';
 })
 export class CreateEntryDialogComponent {
   triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
-  /** Pre-selected item location on open ("Add item here" from a drilled place); null = unplaced. */
+  /** Pre-selected durable location on open ("Add here" from a drilled place); null = unplaced. */
   initialLocation = input<ItemLocationValue | null>(null);
   /** Display name for the pre-selected location, shown before the picker's lazy lists load. */
   initialLocationLabel = input<string | null>(null);
   created = output();
 
-  kind = signal<EntryKind>('item');
+  kind = signal<EntryKind>('durable');
   name = signal('');
   notes = signal('');
-  // Item fields
+  // Durable fields
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
   isContainer = signal(false);
-  // Supply fields
+  // Consumable fields
   unit = signal('');
   threshold = signal('');
 
@@ -183,13 +183,13 @@ export class CreateEntryDialogComponent {
   createError = signal('');
 
   private dialog = viewChild(BrnDialog);
-  private itemApi = inject(InventoryItemApiService);
-  private supplyApi = inject(InventorySupplyApiService);
+  private durableApi = inject(InventoryDurableApiService);
+  private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
 
   canSubmit = computed(() => {
     if (this.name().trim().length === 0) return false;
-    if (this.kind() === 'item') return true;
+    if (this.kind() === 'durable') return true;
     if (!this.unit().trim()) return false;
     const t = this.threshold().trim();
     return t === '' || (Number.isFinite(Number(t)) && Number(t) >= 0);
@@ -227,12 +227,12 @@ export class CreateEntryDialogComponent {
 
   /** The toggle-group emits `unknown` (it's non-nullable, but the value type is wide) — narrow it. */
   onKindChange(value: unknown): void {
-    if (value === 'item' || value === 'supply') this.kind.set(value);
+    if (value === 'durable' || value === 'consumable') this.kind.set(value);
   }
 
   onStateChanged(state: 'open' | 'closed'): void {
     if (state === 'open') {
-      this.kind.set('item');
+      this.kind.set('durable');
       this.name.set('');
       this.notes.set('');
       this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
@@ -251,9 +251,9 @@ export class CreateEntryDialogComponent {
     this.creating.set(true);
     this.createError.set('');
 
-    if (this.kind() === 'supply') {
+    if (this.kind() === 'consumable') {
       const t = this.threshold().trim();
-      this.supplyApi.createSupply({
+      this.consumableApi.createConsumable({
         body: {
           name: this.name().trim(),
           unit: this.unit().trim(),
@@ -261,13 +261,13 @@ export class CreateEntryDialogComponent {
           notes: this.notes().trim() ? this.notes().trim() : null,
         },
       }).subscribe({
-        next: () => this.onCreated('Supply created.'),
-        error: (err: unknown) => this.onCreateError(err, 'Failed to create supply.'),
+        next: () => this.onCreated('Consumable created.'),
+        error: (err: unknown) => this.onCreateError(err, 'Failed to create consumable.'),
       });
       return;
     }
 
-    this.itemApi.createItem({
+    this.durableApi.createDurable({
       body: {
         name: this.name().trim(),
         areaId: this.areaId(),
@@ -276,8 +276,8 @@ export class CreateEntryDialogComponent {
         notes: this.notes().trim() ? this.notes().trim() : null,
       },
     }).subscribe({
-      next: () => this.onCreated('Item created.'),
-      error: (err: unknown) => this.onCreateError(err, 'Failed to create item.'),
+      next: () => this.onCreated('Durable created.'),
+      error: (err: unknown) => this.onCreateError(err, 'Failed to create durable.'),
     });
   }
 

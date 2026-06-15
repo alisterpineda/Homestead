@@ -9,6 +9,6 @@ public enum Fungibility
     /// <summary>A single, identity-tracked instance that lives in one place (or nowhere yet).</summary>
     NonFungible,
 
-    /// <summary>A type of supply measured in a unit, whose quantity spreads across stock entries.</summary>
+    /// <summary>A type of consumable measured in a unit, whose quantity spreads across stock entries.</summary>
     Fungible,
 }

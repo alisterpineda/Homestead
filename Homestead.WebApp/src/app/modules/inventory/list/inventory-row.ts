@@ -1,13 +1,13 @@
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
-import { formatQty } from '../supplies/supply-shared';
+import { formatQty } from '../consumables/consumable-shared';
 
-export type InventoryKind = 'item' | 'supply';
+export type InventoryKind = 'durable' | 'consumable';
 
 /**
- * Row view-model for the unified inventory list: a non-fungible item or a fungible supply
+ * Row view-model for the unified inventory list: a non-fungible durable or a fungible consumable
  * flattened to one shape so the table, filters, and sorting treat both kinds uniformly.
  */
 export interface InventoryRow {
@@ -16,46 +16,46 @@ export interface InventoryRow {
   readonly name: string;
   readonly status: ItemStatus;
   readonly updatedAt: string;
-  /** Display/sort text for the Location column. Supply: '—' (no stock) | label | 'N locations'. */
+  /** Display/sort text for the Location column. Consumable: '—' (no stock) | label | 'N locations'. */
   readonly locationText: string;
   /**
-   * Resolved root area per holding location; null = unplaced. An item has exactly one entry, a
-   * supply one per stock entry — so a zero-stock supply has none and matches no area filter.
+   * Resolved root area per holding location; null = unplaced. A durable has exactly one entry, a
+   * consumable one per stock entry — so a zero-stock consumable has none and matches no area filter.
    */
   readonly resolvedAreaIds: readonly (string | null)[];
-  /** Total on hand for a supply; null for an item (renders as "—"). */
+  /** Total on hand for a consumable; null for a durable (renders as "—"). */
   readonly onHand: number | null;
   readonly unit: string | null;
   readonly isLow: boolean;
-  /** Muted hint after the quantity (drilled supply rows: "of N total"). */
+  /** Muted hint after the quantity (drilled consumable rows: "of N total"). */
   readonly onHandHint?: string;
-  readonly item?: ItemResponse;
-  readonly supply?: SupplyResponse;
+  readonly durable?: DurableResponse;
+  readonly consumable?: ConsumableResponse;
 }
 
 /**
- * Flattens an item's resolved location path to display/sort text ("Garage › Cupboard › Bin"). A
- * directly-unplaced item, or one whose chain resolves to Unplaced, is prefixed with "Unplaced".
+ * Flattens a durable's resolved location path to display/sort text ("Garage › Cupboard › Bin"). A
+ * directly-unplaced durable, or one whose chain resolves to Unplaced, is prefixed with "Unplaced".
  */
-export function formatPath(item: ItemResponse): string {
-  const names = (item.path ?? []).map(s => s.name);
+export function formatPath(durable: DurableResponse): string {
+  const names = (durable.path ?? []).map(s => s.name);
   if (names.length === 0) return 'Unplaced';
-  return (item.resolvedAreaId == null ? ['Unplaced', ...names] : names).join(' › ');
+  return (durable.resolvedAreaId == null ? ['Unplaced', ...names] : names).join(' › ');
 }
 
-export function itemToRow(item: ItemResponse): InventoryRow {
+export function durableToRow(durable: DurableResponse): InventoryRow {
   return {
-    kind: 'item',
-    id: item.id,
-    name: item.name,
-    status: item.status,
-    updatedAt: item.updatedAt,
-    locationText: formatPath(item),
-    resolvedAreaIds: [item.resolvedAreaId ?? null],
+    kind: 'durable',
+    id: durable.id,
+    name: durable.name,
+    status: durable.status,
+    updatedAt: durable.updatedAt,
+    locationText: formatPath(durable),
+    resolvedAreaIds: [durable.resolvedAreaId ?? null],
     onHand: null,
     unit: null,
     isLow: false,
-    item,
+    durable,
   };
 }
 
@@ -72,42 +72,42 @@ function entryResolvedAreaId(entry: StockEntryResponse): string | null {
   return resolved;
 }
 
-function supplyLocationText(locations: readonly StockEntryResponse[]): string {
+function consumableLocationText(locations: readonly StockEntryResponse[]): string {
   if (locations.length === 0) return '—';
   if (locations.length === 1) return locations[0].locationLabel ?? 'Unplaced';
   return `${locations.length} locations`;
 }
 
-export function supplyToRow(supply: SupplyResponse): InventoryRow {
-  const locations = supply.stockLocations ?? [];
+export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
+  const locations = consumable.stockLocations ?? [];
   return {
-    kind: 'supply',
-    id: supply.id,
-    name: supply.name,
-    status: supply.status,
-    updatedAt: supply.updatedAt,
-    locationText: supplyLocationText(locations),
+    kind: 'consumable',
+    id: consumable.id,
+    name: consumable.name,
+    status: consumable.status,
+    updatedAt: consumable.updatedAt,
+    locationText: consumableLocationText(locations),
     resolvedAreaIds: locations.map(entryResolvedAreaId),
-    onHand: supply.totalOnHand,
-    unit: supply.unit,
-    isLow: supply.isLow,
-    supply,
+    onHand: consumable.totalOnHand,
+    unit: consumable.unit,
+    isLow: consumable.isLow,
+    consumable,
   };
 }
 
 /**
- * Drill-down view of a supply scoped to one container: the LOCAL quantity at that container with a
- * muted "of N total" hint when more sits elsewhere. Null when the supply has no stock there.
+ * Drill-down view of a consumable scoped to one container: the LOCAL quantity at that container with
+ * a muted "of N total" hint when more sits elsewhere. Null when the consumable has no stock there.
  */
-export function supplyToDrillRow(supply: SupplyResponse, containerItemId: string): InventoryRow | null {
-  const entry = (supply.stockLocations ?? []).find(e => e.containerItemId === containerItemId);
+export function consumableToDrillRow(consumable: ConsumableResponse, containerItemId: string): InventoryRow | null {
+  const entry = (consumable.stockLocations ?? []).find(e => e.containerItemId === containerItemId);
   if (!entry) return null;
   return {
-    ...supplyToRow(supply),
+    ...consumableToRow(consumable),
     locationText: entry.locationLabel ?? 'Unplaced',
     onHand: entry.quantity,
-    onHandHint: entry.quantity !== supply.totalOnHand
-      ? `of ${formatQty(supply.totalOnHand)} total`
+    onHandHint: entry.quantity !== consumable.totalOnHand
+      ? `of ${formatQty(consumable.totalOnHand)} total`
       : undefined,
   };
 }

@@ -4,14 +4,14 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { LocationPickerComponent, type ItemLocationValue } from './location-picker.component';
 import type { AreaResponse } from '@/api/generated/models/area-response';
-import type { ItemResponse } from '@/api/generated/models/item-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 
 function area(id: string, name: string): AreaResponse {
   return { id, name, liveItemCount: 0, createdAt: '', updatedAt: '' };
 }
 
-function container(id: string, name: string, opts: { status?: ItemStatus; parentItemId?: string | null } = {}): ItemResponse {
+function container(id: string, name: string, opts: { status?: ItemStatus; parentItemId?: string | null } = {}): DurableResponse {
   return {
     id,
     name,
@@ -40,13 +40,13 @@ describe('LocationPickerComponent', () => {
     fixture.detectChanges();
   });
 
-  async function openAndLoad(areas: AreaResponse[], containers: ItemResponse[]): Promise<void> {
+  async function openAndLoad(areas: AreaResponse[], containers: DurableResponse[]): Promise<void> {
     component['popoverState'].set('open');
     fixture.detectChanges();
     await fixture.whenStable();
     httpMock.expectOne(r => r.url.includes('/inventory/areas'))
       .flush({ items: areas, page: 1, pageSize: 200, totalCount: areas.length });
-    httpMock.expectOne(r => r.url.includes('/inventory/items'))
+    httpMock.expectOne(r => r.url.includes('/inventory/durables'))
       .flush({ items: containers, page: 1, pageSize: 200, totalCount: containers.length });
     fixture.detectChanges();
     await fixture.whenStable();

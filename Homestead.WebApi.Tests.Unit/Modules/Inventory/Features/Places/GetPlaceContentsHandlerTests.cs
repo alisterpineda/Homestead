@@ -1,6 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
-using Homestead.WebApi.Modules.Inventory.Features.Items;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 using Homestead.WebApi.Modules.Inventory.Services;
 
@@ -57,10 +57,10 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         return item;
     }
 
-    private async Task<Item> AddSupplyAsync(
+    private async Task<Item> AddConsumableAsync(
         string name, decimal? threshold = null, ItemStatus status = ItemStatus.Active)
     {
-        var supply = new Item
+        var consumable = new Item
         {
             Id = Guid.NewGuid(),
             Name = name,
@@ -69,18 +69,18 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
             Unit = "units",
             RestockThreshold = threshold,
         };
-        _db.Items.Add(supply);
+        _db.Items.Add(consumable);
         await _db.SaveChangesAsync(Ct);
-        return supply;
+        return consumable;
     }
 
     private async Task AddStockAsync(
-        Guid supplyId, decimal quantity, Guid? areaId = null, Guid? containerItemId = null)
+        Guid consumableId, decimal quantity, Guid? areaId = null, Guid? containerItemId = null)
     {
         _db.StockEntries.Add(new StockEntry
         {
             Id = Guid.NewGuid(),
-            ItemId = supplyId,
+            ItemId = consumableId,
             AreaId = areaId,
             ContainerItemId = containerItemId,
             Quantity = quantity,
@@ -163,24 +163,24 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_ContainerScope_SuppliesCarryLocalQuantityAndFullStockLocations()
+    public async Task Handle_ContainerScope_ConsumablesCarryLocalQuantityAndFullStockLocations()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var screws = await AddSupplyAsync("Screws");
+        var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
         await AddStockAsync(screws.Id, 5m, areaId: _garage.Id); // elsewhere
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
 
-        var supply = Assert.Single(resp.Supplies);
-        Assert.Equal(screws.Id, supply.Supply.Id);
-        Assert.Equal(10m, supply.LocalQuantity);
-        Assert.Equal(15m, supply.Supply.TotalOnHand);
-        // GetSupplies parity: the full per-location breakdown rides along for the quick panel.
-        Assert.Equal(2, supply.Supply.StockLocations.Count);
-        Assert.Contains(supply.Supply.StockLocations, e => e.ContainerItemId == chest.Id && e.Quantity == 10m);
-        Assert.Contains(supply.Supply.StockLocations, e => e.AreaId == _garage.Id && e.Quantity == 5m);
-        Assert.All(supply.Supply.StockLocations, e => Assert.NotNull(e.LocationLabel));
+        var consumable = Assert.Single(resp.Consumables);
+        Assert.Equal(screws.Id, consumable.Consumable.Id);
+        Assert.Equal(10m, consumable.LocalQuantity);
+        Assert.Equal(15m, consumable.Consumable.TotalOnHand);
+        // GetConsumables parity: the full per-location breakdown rides along for the quick panel.
+        Assert.Equal(2, consumable.Consumable.StockLocations.Count);
+        Assert.Contains(consumable.Consumable.StockLocations, e => e.ContainerItemId == chest.Id && e.Quantity == 10m);
+        Assert.Contains(consumable.Consumable.StockLocations, e => e.AreaId == _garage.Id && e.Quantity == 5m);
+        Assert.All(consumable.Consumable.StockLocations, e => Assert.NotNull(e.LocationLabel));
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         Assert.Null(resp.ContainerItem);
         Assert.Equal(floatingBin.Id, Assert.Single(resp.Containers).Id);
         Assert.Equal(adrift.Id, Assert.Single(resp.Items).Id);
-        Assert.Empty(resp.Supplies);
+        Assert.Empty(resp.Consumables);
         // Direct = bin + wrench; the resolved-unplaced total adds the nested item.
         Assert.Equal(2, resp.DirectItemCount);
         Assert.Equal(1, resp.NestedItemCount);
@@ -209,9 +209,9 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         await AddItemAsync("Direct drill", areaId: _garage.Id);
         await AddItemAsync("Nested wrench", parentItemId: chest.Id);
-        var screws = await AddSupplyAsync("Screws");
+        var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
-        var tape = await AddSupplyAsync("Tape");
+        var tape = await AddConsumableAsync("Tape");
         await AddStockAsync(tape.Id, 2m, areaId: _garage.Id);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
@@ -230,30 +230,30 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         await AddItemAsync("Zebra print", parentItemId: chest.Id);
         await AddItemAsync("anvil", parentItemId: chest.Id);
         await AddItemAsync("Mallet", parentItemId: chest.Id);
-        var bolts = await AddSupplyAsync("Bolts");
+        var bolts = await AddConsumableAsync("Bolts");
         await AddStockAsync(bolts.Id, 10m, containerItemId: chest.Id);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         var card = Assert.Single(resp.Containers);
-        // Case-insensitive name sort across items + supplies, capped at 3.
+        // Case-insensitive name sort across items + consumables, capped at 3.
         Assert.Equal(new[] { "anvil", "Bolts", "Mallet" }, card.PreviewNames);
     }
 
     [Fact]
-    public async Task Handle_TerminalChildrenAndArchivedSupplies_Excluded()
+    public async Task Handle_TerminalChildrenAndArchivedConsumables_Excluded()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         await AddItemAsync("Sold drill", status: ItemStatus.Sold, areaId: _garage.Id);
         await AddItemAsync("Archived nested", status: ItemStatus.Archived, parentItemId: chest.Id);
-        var archived = await AddSupplyAsync("Old glue", status: ItemStatus.Archived);
+        var archived = await AddConsumableAsync("Old glue", status: ItemStatus.Archived);
         await AddStockAsync(archived.Id, 3m, areaId: _garage.Id);
         await AddStockAsync(archived.Id, 2m, containerItemId: chest.Id);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
         Assert.Empty(resp.Items);
-        Assert.Empty(resp.Supplies);
+        Assert.Empty(resp.Consumables);
         var card = Assert.Single(resp.Containers);
         Assert.Equal(0, card.ItemCount);
         Assert.Empty(card.PreviewNames);
@@ -284,7 +284,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
         Assert.Empty(resp.Containers);
         Assert.Empty(resp.Items);
-        Assert.Empty(resp.Supplies);
+        Assert.Empty(resp.Consumables);
         Assert.Equal(0, resp.DirectItemCount);
         Assert.Equal(0, resp.NestedItemCount);
     }
@@ -310,15 +310,15 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_AreaScope_SupplyTypeSharedWithSubArea_NestedCountStaysCorrect()
+    public async Task Handle_AreaScope_ConsumableTypeSharedWithSubArea_NestedCountStaysCorrect()
     {
-        // Regression: a supply type stocked both directly in House AND in a sub-area must not be
+        // Regression: a consumable type stocked both directly in House AND in a sub-area must not be
         // double-subtracted from the nested figure (the old `total - sum(childRolled) - …` math did,
         // and Math.Max(0,…) hid it). Nested must reflect ONLY House's own container nesting.
         var house = await AddAreaAsync("House");
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
 
-        var batteries = await AddSupplyAsync("Batteries");
+        var batteries = await AddConsumableAsync("Batteries");
         await AddStockAsync(batteries.Id, 4m, areaId: house.Id);   // direct in House
         await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id); // also in the sub-area
 
@@ -328,9 +328,9 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = house.Id }, Ct);
 
-        // Direct cards: Chest (container) + Batteries (direct supply row) + Bedroom (child-area card).
+        // Direct cards: Chest (container) + Batteries (direct consumable row) + Bedroom (child-area card).
         Assert.Equal(chest.Id, Assert.Single(resp.Containers).Id);
-        Assert.Equal(batteries.Id, Assert.Single(resp.Supplies).Supply.Id);
+        Assert.Equal(batteries.Id, Assert.Single(resp.Consumables).Consumable.Id);
         Assert.Equal(bedroom.Id, Assert.Single(resp.ChildAreas).Id);
         Assert.Equal(3, resp.DirectItemCount);
         // Nested = Watch + Ring inside Chest. Pre-fix this was 1 (Batteries stolen a slot).
@@ -343,7 +343,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         await AddItemAsync("Lent ladder", status: ItemStatus.Lent, areaId: _garage.Id);
         await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
-        var lowGlue = await AddSupplyAsync("Glue", threshold: 5m);
+        var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 2m, areaId: _garage.Id);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
@@ -357,7 +357,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
-        var lowGlue = await AddSupplyAsync("Glue", threshold: 5m);
+        var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 2m, containerItemId: chest.Id);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
@@ -388,7 +388,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
         Assert.Empty(resp.Containers);
         Assert.Empty(resp.Items);
-        Assert.Empty(resp.Supplies);
+        Assert.Empty(resp.Consumables);
         var childCard = Assert.Single(resp.ChildAreas);
         Assert.Equal(1, childCard.ItemCount); // Boiler rolls up to Basement
         Assert.Equal(1, resp.DirectItemCount); // the Basement card

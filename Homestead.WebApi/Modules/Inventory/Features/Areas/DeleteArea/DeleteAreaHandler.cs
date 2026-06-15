@@ -34,7 +34,7 @@ public class DeleteAreaHandler(
             throw new BusinessRuleException("Area has items in it and cannot be deleted. Move or retire them first.");
 
         // Stock currently sitting in the area also blocks deletion (a stock entry exists only while
-        // there is quantity there) — status-agnostic, unlike the resolved count: an ARCHIVED supply's
+        // there is quantity there) — status-agnostic, unlike the resolved count: an ARCHIVED consumable's
         // stock is hidden from counts/lists but must still block, since a stock entry requires
         // exactly one of AreaId/ContainerItemId and SetNull would corrupt it. Historical movements
         // through the area survive via SET NULL.

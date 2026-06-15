@@ -1,5 +1,5 @@
 using Homestead.WebApi.Domain.Inventory;
-using Homestead.WebApi.Modules.Inventory.Features.Items;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Services;
@@ -49,7 +49,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
         return item;
     }
 
-    private static ItemResponse Response(Guid id, Guid? areaId = null, string? areaName = null, Guid? parentItemId = null) => new()
+    private static DurableResponse Response(Guid id, Guid? areaId = null, string? areaName = null, Guid? parentItemId = null) => new()
     {
         Id = id,
         Name = "Item",

@@ -1,4 +1,4 @@
-using Homestead.WebApi.Modules.Inventory.Features.Items;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,14 +12,14 @@ namespace Homestead.WebApi.Modules.Inventory.Services;
 /// </summary>
 public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
 {
-    public async Task<ItemResponse> EnrichAsync(ItemResponse item, CancellationToken ct = default)
+    public async Task<DurableResponse> EnrichAsync(DurableResponse item, CancellationToken ct = default)
     {
         var enriched = await EnrichAsync(new[] { item }, ct);
         return enriched[0];
     }
 
-    public async Task<IReadOnlyList<ItemResponse>> EnrichAsync(
-        IReadOnlyList<ItemResponse> items, CancellationToken ct = default)
+    public async Task<IReadOnlyList<DurableResponse>> EnrichAsync(
+        IReadOnlyList<DurableResponse> items, CancellationToken ct = default)
     {
         if (items.Count == 0)
             return items;
@@ -58,8 +58,8 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
 
     // Resolves a parent-less item without a container read: a directly-placed item gets the full
     // area-ancestor path for its area; an unplaced item resolves to an empty path.
-    private static ItemResponse ResolveDirect(
-        ItemResponse item, IReadOnlyDictionary<Guid, AreaNode> areaNodes) =>
+    private static DurableResponse ResolveDirect(
+        DurableResponse item, IReadOnlyDictionary<Guid, AreaNode> areaNodes) =>
         item.AreaId is { } areaId
             ? item with
             {
@@ -68,8 +68,8 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             }
             : item with { ResolvedAreaId = null, Path = [] };
 
-    private static ItemResponse Resolve(
-        ItemResponse item,
+    private static DurableResponse Resolve(
+        DurableResponse item,
         IReadOnlyDictionary<Guid, ContainerNode> containers,
         IReadOnlyDictionary<Guid, AreaNode> areaNodes)
     {

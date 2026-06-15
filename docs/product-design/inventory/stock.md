@@ -1,12 +1,12 @@
 # Stock & Movements — Reference
 
-Detailed design for the fungible side of Inventory: stock entries, the movement ledger, thresholds, the conversion operations, and how quantity changes stay consistent. Expands on the summaries in [overview.md](overview.md#stock-and-supplies). Read this before designing, implementing, or reviewing anything that reads or writes fungible quantity.
+Detailed design for the fungible side of Inventory: stock entries, the movement ledger, thresholds, the conversion operations, and how quantity changes stay consistent. Expands on the summaries in [overview.md](overview.md#stock-and-consumables). Read this before designing, implementing, or reviewing anything that reads or writes fungible quantity.
 
 Areas, containment, resolved location, and the non-fungible item lifecycle live in [locations.md](locations.md); this document treats them only where stock sits inside a container or where lifecycle gates a stock operation.
 
 ## Conceptual model
 
-A **fungible item** is a *type* of supply, not an instance. It owns no single location and no single quantity. Instead:
+A **fungible item** is a *type* of consumable, not an instance. It owns no single location and no single quantity. Instead:
 
 - its presence at each location is a **stock entry** — `(item, location, quantity)`;
 - its **total on-hand** is the sum of those entries' quantities;
@@ -44,9 +44,9 @@ When an entry's quantity reaches zero (everything at that location was used, tra
 ## Total on-hand and low stock
 
 - **Total on-hand** for a fungible item = `SUM(Quantity)` over its stock entries.
-- **Low stock**: the item is low when `total <= RestockThreshold`. `RestockThreshold` is **optional** (nullable) — not every supply has a meaningful reorder point — and is **global to the item**, compared against the total, not against any single location. (Per-location thresholds are a named future addition; see [overview.md](overview.md#future-compatibility).)
+- **Low stock**: the item is low when `total <= RestockThreshold`. `RestockThreshold` is **optional** (nullable) — not every consumable has a meaningful reorder point — and is **global to the item**, compared against the total, not against any single location. (Per-location thresholds are a named future addition; see [overview.md](overview.md#future-compatibility).)
 
-Low-stock is a derived read, surfaced as an inline badge on supply rows in the unified items list, as its own "Low stock only" filter (the de-facto reorder view), and as a tile on the `/inventory` overview landing page — an exact household-wide count with the most urgent supplies previewed first (lowest on-hand-to-threshold ratio; a zero threshold ranks most urgent, since it only matches at zero on-hand) and a deep link into that filter; nothing is stored as "is low." Supplies appear in that list alongside non-fungible items — one row per fungible type showing total on-hand and resolved locations — with an `All | Items | Supplies` kind filter standing in for the old separate supplies page. Because each stock entry resolves to an area or container, supply rows also participate in the area filter and the container drill-down, where they show the local quantity with an "of N total" hint.
+Low-stock is a derived read, surfaced as an inline badge on consumable rows in the unified items list, as its own "Low stock only" filter (the de-facto reorder view), and as a tile on the `/inventory` overview landing page — an exact household-wide count with the most urgent consumables previewed first (lowest on-hand-to-threshold ratio; a zero threshold ranks most urgent, since it only matches at zero on-hand) and a deep link into that filter; nothing is stored as "is low." Consumables appear in that list alongside non-fungible items — one row per fungible type showing total on-hand and resolved locations — with an `All | Durables | Consumables` kind filter standing in for the old separate consumables page. Because each stock entry resolves to an area or container, consumable rows also participate in the area filter and the container drill-down, where they show the local quantity with an "of N total" hint.
 
 ## The movement ledger
 
@@ -100,7 +100,7 @@ Kind = 'Flow' AND source is set AND destination is null
 
 ### One movement per gesture, not per click
 
-The supplies quick panel changes stock primarily through per-location **− / + steppers**. Taps are debounced, and each burst commits as **one `Flow` movement of the net delta** — tapping + three times records a single inflow of 3, not three inflows of 1; a − then a + in the same burst nets to zero and **writes nothing at all**. A net-positive burst lands as one receive (inflow), a net-negative burst as one consume (outflow); "Correct" remains a distinct action and still writes an `Adjustment`.
+The consumables quick panel changes stock primarily through per-location **− / + steppers**. Taps are debounced, and each burst commits as **one `Flow` movement of the net delta** — tapping + three times records a single inflow of 3, not three inflows of 1; a − then a + in the same burst nets to zero and **writes nothing at all**. A net-positive burst lands as one receive (inflow), a net-negative burst as one consume (outflow); "Correct" remains a distinct action and still writes an `Adjustment`.
 
 This is deliberate ledger-granularity policy, not a UI accident: a ledger row should record a household event at the granularity of user *intent* ("used 3 rolls"), so rapid clicking never fragments history into click-sized rows or inflates the movement count that burn-rate analytics read. The coalescing happens before the write — the single-service funnel below still receives ordinary receive/consume commands and is unaware of it.
 
@@ -109,7 +109,7 @@ The movement ledger is **distinct from the system audit log**, and both are kept
 - The **audit log** (shared `auditing` infrastructure) records field-level "who changed what" across every module — a rename, a threshold edit, a unit change — as un-aggregated diffs. Inventory contributes snapshots for its entities like every other module.
 - The **movement ledger** is typed domain data, queried and summed for on-hand reconstruction and consumption. It is not a duplicate of the audit log and is not derived from it.
 
-A metadata edit (renaming a supply) writes the audit log only; a quantity change writes the ledger *and* (via the stock-entry mutation) the audit log. They answer different questions.
+A metadata edit (renaming a consumable) writes the audit log only; a quantity change writes the ledger *and* (via the stock-entry mutation) the audit log. They answer different questions.
 
 ## All quantity changes go through one service
 
@@ -138,7 +138,7 @@ Moving stock between two locations is a single operation that decrements the sou
 
 ## Fungible status
 
-Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**. `Lent`, `InRepair`, `Sold`, and `Discarded` are meaningless for a count of a supply (you do not lend "screws" as an identity). Archiving a supply removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted.
+Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**. `Lent`, `InRepair`, `Sold`, and `Discarded` are meaningless for a count of a consumable (you do not lend "screws" as an identity). Archiving a consumable removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted.
 
 ## Track this one individually
 

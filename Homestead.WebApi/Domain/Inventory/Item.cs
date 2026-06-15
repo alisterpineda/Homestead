@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Domain.Inventory;
 /// <summary>
 /// Anything the household owns. A single table holds both kinds, discriminated by
 /// <see cref="Fungibility"/>; the kind-specific columns are null on the other kind, enforced by
-/// check constraints. v1 surfaces non-fungible items only; the fungible columns exist so the
+/// check constraints. v1 surfaces non-fungible durables only; the fungible columns exist so the
 /// stock model can land later without re-migrating this table.
 /// </summary>
 public class Item
@@ -53,7 +53,7 @@ public class Item
     public string? LentTo { get; set; }
 
     // Fungible
-    /// <summary>Unit of measure for a supply ("screws", "rolls", "gal").</summary>
+    /// <summary>Unit of measure for a consumable ("screws", "rolls", "gal").</summary>
     public string? Unit { get; set; }
 
     /// <summary>Optional global low-stock trigger compared against total on-hand.</summary>

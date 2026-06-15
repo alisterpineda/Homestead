@@ -1,6 +1,6 @@
 using Homestead.WebApi.Domain.Inventory;
-using Homestead.WebApi.Modules.Inventory.Features.Items;
-using Homestead.WebApi.Modules.Inventory.Features.Supplies;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
+using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 
@@ -19,11 +19,11 @@ public record PlaceContentsResponse
     /// The drilled container itself, enriched like a list row (drives the header's "details"
     /// quick-panel button); null for area and Unplaced scopes.
     /// </summary>
-    public ItemResponse? ContainerItem { get; init; }
+    public DurableResponse? ContainerItem { get; init; }
 
     /// <summary>
     /// Live things directly at this place: child containers + non-container items + distinct
-    /// supplies with a direct stock entry here.
+    /// consumables with a direct stock entry here.
     /// </summary>
     public required int DirectItemCount { get; init; }
 
@@ -34,8 +34,8 @@ public record PlaceContentsResponse
     public required int NestedItemCount { get; init; }
 
     /// <summary>
-    /// Distinct low-stock supplies resolving to this place (area/container scope; 0 for Unplaced) —
-    /// "low supplies stored here", resolved semantics (globally-low supplies that resolve here, NOT
+    /// Distinct low-stock consumables resolving to this place (area/container scope; 0 for Unplaced) —
+    /// "low consumables stored here", resolved semantics (globally-low consumables that resolve here, NOT
     /// a per-location threshold). Drives the Browse drilled low-stock warning panel (count-only).
     /// </summary>
     public required int ScopedLowStockCount { get; init; }
@@ -56,14 +56,14 @@ public record PlaceContentsResponse
     public required IReadOnlyList<PlaceContainerSummary> Containers { get; init; }
 
     /// <summary>Direct live non-container items, name-ordered and enriched.</summary>
-    public required IReadOnlyList<ItemResponse> Items { get; init; }
+    public required IReadOnlyList<DurableResponse> Items { get; init; }
 
     /// <summary>
-    /// Live supplies with a direct stock entry at this place, name-ordered. Always empty for the
+    /// Live consumables with a direct stock entry at this place, name-ordered. Always empty for the
     /// Unplaced scope by construction — a stock entry always has a location (an area or a
-    /// container), so no supply can sit directly nowhere.
+    /// container), so no consumable can sit directly nowhere.
     /// </summary>
-    public required IReadOnlyList<PlaceSupplyResponse> Supplies { get; init; }
+    public required IReadOnlyList<PlaceConsumableResponse> Consumables { get; init; }
 }
 
 /// <summary>A drillable child-area card: the area's rolled subtree counts (same semantics as the overview cards).</summary>
@@ -75,7 +75,7 @@ public record PlaceChildAreaSummary
     /// <summary>Rolled resolved count for the child area (its own contents plus its descendants').</summary>
     public required int ItemCount { get; init; }
 
-    /// <summary>Distinct low-stock supplies resolving anywhere inside the child area's subtree.</summary>
+    /// <summary>Distinct low-stock consumables resolving anywhere inside the child area's subtree.</summary>
     public required int LowStockCount { get; init; }
 }
 
@@ -89,18 +89,18 @@ public record PlaceContainerSummary
     /// <summary>Resolved subtree count (everything inside, however deep) — matches the area cards' semantics.</summary>
     public required int ItemCount { get; init; }
 
-    /// <summary>Distinct low-stock supplies with stock anywhere inside.</summary>
+    /// <summary>Distinct low-stock consumables with stock anywhere inside.</summary>
     public required int LowStockCount { get; init; }
 
-    /// <summary>Up to 3 name-sorted direct contents (child items + supplies stocked in it).</summary>
+    /// <summary>Up to 3 name-sorted direct contents (child items + consumables stocked in it).</summary>
     public required IReadOnlyList<string> PreviewNames { get; init; }
 }
 
-/// <summary>One supply row in a drilled place: the supply plus how much of it sits right here.</summary>
-public record PlaceSupplyResponse
+/// <summary>One consumable row in a drilled place: the consumable plus how much of it sits right here.</summary>
+public record PlaceConsumableResponse
 {
-    /// <summary>The supply with its full <see cref="SupplyResponse.StockLocations"/> breakdown (GetSupplies parity).</summary>
-    public required SupplyResponse Supply { get; init; }
+    /// <summary>The consumable with its full <see cref="ConsumableResponse.StockLocations"/> breakdown (GetConsumables parity).</summary>
+    public required ConsumableResponse Consumable { get; init; }
 
     /// <summary>Quantity of the stock entry at this place (one entry per location by construction).</summary>
     public required decimal LocalQuantity { get; init; }

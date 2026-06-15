@@ -62,7 +62,7 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
 
         // Lent — the lent subset of the items walked above (Lent is a live status, so every lent
         // item already counts toward AreaItemCounts/ContainerStats; this is the subset count, exactly
-        // like low-stock is a subset of supplies). Mirrors the item walk: directly-placed lent tally
+        // like low-stock is a subset of consumables). Mirrors the item walk: directly-placed lent tally
         // in SQL (leaf-keyed), nested lent resolved through the container chain.
         var areaLentCounts = await db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.NonFungible
@@ -95,9 +95,9 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             }
         }
 
-        // Low supplies — same predicate as the overview's low-stock tile (Active fungible with a
-        // threshold whose summed on-hand is at or below it); archived supplies never count.
-        var lowSupplyIds = (await db.Items.AsNoTracking()
+        // Low consumables — same predicate as the overview's low-stock tile (Active fungible with a
+        // threshold whose summed on-hand is at or below it); archived consumables never count.
+        var lowConsumableIds = (await db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.Fungible
                 && i.Status == ItemStatus.Active
                 && i.RestockThreshold != null
@@ -106,9 +106,9 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             .ToListAsync(ct)).ToHashSet();
 
         // Fungible types count once per area any stock entry resolves to. The status filter is
-        // load-bearing: archived supplies can retain stock entries, and the list hides them.
+        // load-bearing: archived consumables can retain stock entries, and the list hides them.
         // Entries resolving to no area are ignored — Unplaced is items-only.
-        // A CURRENT entry's holder is always a container — PatchItem's role-off gate blocks
+        // A CURRENT entry's holder is always a container — PatchDurable's role-off gate blocks
         // turning the role off while stock sits inside — so the IsContainer-only dictionary
         // suffices here; ItemLocationResolver.ResolveHoldingLocationsAsync's by-id tolerance for
         // de-containered holders exists for HISTORICAL ledger locations only.
@@ -117,9 +117,9 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             .Select(e => new { e.ItemId, e.AreaId, e.ContainerItemId })
             .ToListAsync(ct);
 
-        var areaSupplyTypes = new Dictionary<Guid, HashSet<Guid>>();
+        var areaConsumableTypes = new Dictionary<Guid, HashSet<Guid>>();
         var areaLowTypes = new Dictionary<Guid, HashSet<Guid>>();
-        var containerSupplyTypes = new Dictionary<Guid, HashSet<Guid>>();
+        var containerConsumableTypes = new Dictionary<Guid, HashSet<Guid>>();
         var containerLowTypes = new Dictionary<Guid, HashSet<Guid>>();
         foreach (var entry in stockEntries)
         {
@@ -130,10 +130,10 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
                 ? (directAreaId, (IReadOnlyList<Guid>)[])
                 : WalkContainerChain(entry.ContainerItemId, containers, []);
 
-            var isLow = lowSupplyIds.Contains(entry.ItemId);
+            var isLow = lowConsumableIds.Contains(entry.ItemId);
             if (areaId is { } resolved)
             {
-                AddType(areaSupplyTypes, resolved, entry.ItemId);
+                AddType(areaConsumableTypes, resolved, entry.ItemId);
                 if (isLow)
                     AddType(areaLowTypes, resolved, entry.ItemId);
             }
@@ -142,17 +142,17 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
                 continue;
             foreach (var containerId in chain)
             {
-                // Per-key distinct sets: a supply with stock in two sub-bins counts once for the
+                // Per-key distinct sets: a consumable with stock in two sub-bins counts once for the
                 // chest (and once per area), matching the list's one-row-per-type rendering.
-                AddType(containerSupplyTypes, containerId, entry.ItemId);
+                AddType(containerConsumableTypes, containerId, entry.ItemId);
                 if (isLow)
                     AddType(containerLowTypes, containerId, entry.ItemId);
             }
         }
 
         // Roll leaf-keyed tallies up the area-parent chain: contents of Bedroom also count toward
-        // Basement and House. Items are additive; supply/low TYPE sets are union'd so the same
-        // supply type stocked in two sub-areas counts once for a shared ancestor (the dedup is
+        // Basement and House. Items are additive; consumable/low TYPE sets are union'd so the same
+        // consumable type stocked in two sub-areas counts once for a shared ancestor (the dedup is
         // load-bearing — it keeps the rolled card count equal to what the area-filtered list shows).
         // Mirrors the container subtree attribution above, applied to the area's own ancestors.
         var areaParents = await db.Areas.AsNoTracking()
@@ -165,16 +165,16 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
                 rolledItems[ancestor] = rolledItems.GetValueOrDefault(ancestor) + count;
 
         // Lent items are distinct non-fungible items, so the roll-up is additive like items (no
-        // set-union dedup, which only matters for fungible supply TYPES shared across sub-areas).
+        // set-union dedup, which only matters for fungible consumable TYPES shared across sub-areas).
         var rolledLent = new Dictionary<Guid, int>();
         foreach (var (areaId, count) in areaLentCounts)
             foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
                 rolledLent[ancestor] = rolledLent.GetValueOrDefault(ancestor) + count;
 
-        var rolledSupplyTypes = new Dictionary<Guid, HashSet<Guid>>();
-        foreach (var (areaId, types) in areaSupplyTypes)
+        var rolledConsumableTypes = new Dictionary<Guid, HashSet<Guid>>();
+        foreach (var (areaId, types) in areaConsumableTypes)
             foreach (var ancestor in AncestorsInclusive(areaId, areaParents))
-                UnionTypes(rolledSupplyTypes, ancestor, types);
+                UnionTypes(rolledConsumableTypes, ancestor, types);
 
         var rolledLowTypes = new Dictionary<Guid, HashSet<Guid>>();
         foreach (var (areaId, types) in areaLowTypes)
@@ -182,27 +182,27 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
                 UnionTypes(rolledLowTypes, ancestor, types);
 
         var areaCounts = new Dictionary<Guid, int>();
-        foreach (var areaId in rolledItems.Keys.Union(rolledSupplyTypes.Keys))
+        foreach (var areaId in rolledItems.Keys.Union(rolledConsumableTypes.Keys))
             areaCounts[areaId] = rolledItems.GetValueOrDefault(areaId)
-                + (rolledSupplyTypes.TryGetValue(areaId, out var supplyTypes) ? supplyTypes.Count : 0);
+                + (rolledConsumableTypes.TryGetValue(areaId, out var consumableTypes) ? consumableTypes.Count : 0);
 
         // The same count for the area's OWN contents only (no roll-up) — the deduped leaf tally.
         // GetPlaceContents subtracts the direct-card counts from this to get the container-nested
-        // figure; using the leaf count (not a sum of rolled child counts) keeps the supply-type
+        // figure; using the leaf count (not a sum of rolled child counts) keeps the consumable-type
         // dedup intact, so a type shared between an area and its sub-areas isn't subtracted twice.
         var areaOwnCounts = new Dictionary<Guid, int>();
-        foreach (var areaId in areaItemCounts.Keys.Union(areaSupplyTypes.Keys))
+        foreach (var areaId in areaItemCounts.Keys.Union(areaConsumableTypes.Keys))
             areaOwnCounts[areaId] = areaItemCounts.GetValueOrDefault(areaId)
-                + (areaSupplyTypes.TryGetValue(areaId, out var ownSupplyTypes) ? ownSupplyTypes.Count : 0);
+                + (areaConsumableTypes.TryGetValue(areaId, out var ownConsumableTypes) ? ownConsumableTypes.Count : 0);
 
         var containerIds = new HashSet<Guid>(containerItemCounts.Keys);
-        containerIds.UnionWith(containerSupplyTypes.Keys);
+        containerIds.UnionWith(containerConsumableTypes.Keys);
         var containerStats = new Dictionary<Guid, ContainerStats>(containerIds.Count);
         foreach (var containerId in containerIds)
         {
             containerStats[containerId] = new ContainerStats(
                 containerItemCounts.GetValueOrDefault(containerId)
-                    + (containerSupplyTypes.TryGetValue(containerId, out var types) ? types.Count : 0),
+                    + (containerConsumableTypes.TryGetValue(containerId, out var types) ? types.Count : 0),
                 containerLowTypes.TryGetValue(containerId, out var low) ? low.Count : 0,
                 containerLentCounts.GetValueOrDefault(containerId));
         }

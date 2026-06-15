@@ -14,8 +14,8 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
     public async Task<GetInventoryOverviewResponse> Handle(
         GetInventoryOverviewQuery request, CancellationToken ct)
     {
-        // Low stock — same predicate as GetSuppliesHandler's LowStockOnly filter over live
-        // supplies. The on-hand sum is projected once so SQL evaluates the correlated aggregate
+        // Low stock — same predicate as GetConsumablesHandler's LowStockOnly filter over live
+        // consumables. The on-hand sum is projected once so SQL evaluates the correlated aggregate
         // a single time, not per clause.
         var lowStock = db.Items.AsNoTracking()
             .Where(i => i.Fungibility == Fungibility.Fungible
@@ -35,11 +35,11 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
         // Most urgent first = lowest on-hand/threshold ratio. A zero threshold only matches when
         // on-hand is 0 (quantity sums are >= the threshold floor of 0), i.e. fully out — rank it
         // most urgent without dividing.
-        var lowStockSupplies = await lowStock
+        var lowStockConsumables = await lowStock
             .OrderBy(s => s.Threshold == 0 ? 0 : s.OnHand / s.Threshold)
             .ThenBy(s => s.Name)
             .Take(PreviewCount)
-            .Select(s => new LowStockSupplyPreview
+            .Select(s => new LowStockConsumablePreview
             {
                 Id = s.Id,
                 Name = s.Name,
@@ -58,7 +58,7 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
             .OrderBy(i => i.Name)
             .ThenBy(i => i.Id)
             .Take(PreviewCount)
-            .Select(i => new LentItemPreview { Id = i.Id, Name = i.Name, LentTo = i.LentTo })
+            .Select(i => new LentDurablePreview { Id = i.Id, Name = i.Name, LentTo = i.LentTo })
             .ToListAsync(ct);
 
         var placement = await placementService.ComputeAsync(ct);
@@ -84,17 +84,17 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
         var unplacedItems = placement.UnplacedItems
             .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
             .Take(PreviewCount)
-            .Select(i => new UnplacedItemPreview { Id = i.Id, Name = i.Name })
+            .Select(i => new UnplacedDurablePreview { Id = i.Id, Name = i.Name })
             .ToList();
 
         return new GetInventoryOverviewResponse
         {
             LowStockCount = lowStockCount,
-            LowStockSupplies = lowStockSupplies,
+            LowStockConsumables = lowStockConsumables,
             LentCount = lentCount,
-            LentItems = lentItems,
+            LentDurables = lentItems,
             UnplacedCount = placement.UnplacedItems.Count,
-            UnplacedItems = unplacedItems,
+            UnplacedDurables = unplacedItems,
             Areas = areaSummaries,
         };
     }

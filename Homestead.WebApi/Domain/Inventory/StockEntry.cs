@@ -3,7 +3,7 @@ using Homestead.WebApi.Domain.Identity;
 namespace Homestead.WebApi.Domain.Inventory;
 
 /// <summary>
-/// How much of one fungible <see cref="Item"/> sits at one location. A supply owns no single
+/// How much of one fungible <see cref="Item"/> sits at one location. A consumable owns no single
 /// location or quantity — its presence is the set of its stock entries, and its total on-hand is
 /// their sum. Exactly one of <see cref="AreaId"/> / <see cref="ContainerItemId"/> is set; an entry
 /// exists <i>because</i> there is quantity there, so a zero-quantity entry is deleted, never kept.

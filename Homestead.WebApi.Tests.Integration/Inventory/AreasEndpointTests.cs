@@ -12,7 +12,7 @@ internal record AreaItem(
 internal record ChildAreaItem(Guid Id, string Name, int ItemCount, int LowStockCount);
 internal record PlaceContentsLite(
     IReadOnlyList<LocationSegmentItem> Path, IReadOnlyList<ChildAreaItem> ChildAreas);
-internal record ItemItem(
+internal record DurableItem(
     Guid Id, string Name, string Fungibility, string Status,
     Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool IsContainer,
     Guid? ParentItemId, string? Compartment, Guid? ResolvedAreaId,
@@ -32,11 +32,11 @@ public class AreasEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<AreaItem>(CT))!;
     }
 
-    private static async Task<ItemItem> CreateItemAsync(HttpClient client, string name, Guid? areaId)
+    private static async Task<DurableItem> CreateDurableAsync(HttpClient client, string name, Guid? areaId)
     {
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items", new { name, areaId }, CT);
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables", new { name, areaId }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        return (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        return (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
     }
 
     [Fact]
@@ -68,8 +68,8 @@ public class AreasEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var area = await CreateAreaAsync(client, "Pantry");
-        await CreateItemAsync(client, "Flour bin", area.Id);
-        await CreateItemAsync(client, "Sugar bin", area.Id);
+        await CreateDurableAsync(client, "Flour bin", area.Id);
+        await CreateDurableAsync(client, "Sugar bin", area.Id);
 
         var list = await (await client.GetAsync("/api/v1/inventory/areas?page=1&pageSize=100", CT))
             .Content.ReadFromJsonAsync<PaginatedResult<AreaItem>>(CT);
@@ -83,7 +83,7 @@ public class AreasEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var area = await CreateAreaAsync(client, "Garage");
-        await CreateItemAsync(client, "Drill", area.Id);
+        await CreateDurableAsync(client, "Drill", area.Id);
 
         var deleteResp = await client.DeleteAsync($"/api/v1/inventory/areas/{area.Id}", CT);
 
@@ -95,11 +95,11 @@ public class AreasEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var area = await CreateAreaAsync(client, "Garage");
-        var item = await CreateItemAsync(client, "Old drill", area.Id);
+        var item = await CreateDurableAsync(client, "Old drill", area.Id);
 
         // Archiving (terminal) removes it from the live-item block.
         var archiveResp = await SendJsonPatchAsync(client,
-            $"/api/v1/inventory/items/{item.Id}",
+            $"/api/v1/inventory/durables/{item.Id}",
             new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
         Assert.Equal(HttpStatusCode.OK, archiveResp.StatusCode);
 
@@ -201,7 +201,7 @@ public class AreasEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var house = await CreateAreaAsync(client, "House");
         var basement = await CreateAreaAsync(client, "Basement", house.Id);
-        await CreateItemAsync(client, "Boiler", basement.Id);
+        await CreateDurableAsync(client, "Boiler", basement.Id);
 
         var list = await (await client.GetAsync("/api/v1/inventory/areas?page=1&pageSize=100", CT))
             .Content.ReadFromJsonAsync<PaginatedResult<AreaItem>>(CT);
@@ -217,7 +217,7 @@ public class AreasEndpointTests : IntegrationTestBase
         var house = await CreateAreaAsync(client, "House");
         var basement = await CreateAreaAsync(client, "Basement", house.Id);
         var bedroom = await CreateAreaAsync(client, "Bedroom", basement.Id);
-        await CreateItemAsync(client, "Lamp", bedroom.Id);
+        await CreateDurableAsync(client, "Lamp", bedroom.Id);
 
         // Drilling Basement: breadcrumb shows the full ancestor path, Bedroom is a child-area card
         // carrying its rolled count (the lamp).

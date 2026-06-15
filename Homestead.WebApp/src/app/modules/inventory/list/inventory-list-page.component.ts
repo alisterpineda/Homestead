@@ -43,23 +43,23 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
-import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
+import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { InventoryTableComponent, type InventorySortId, type InventorySortState } from './inventory-table.component';
 import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-dialog.component';
-import { EditItemSheetComponent } from '../items/edit-item-sheet/edit-item-sheet.component';
-import { ItemQuickPanelComponent } from '../items/item-quick-panel/item-quick-panel.component';
-import { EditSupplySheetComponent } from '../supplies/edit-supply-sheet/edit-supply-sheet.component';
-import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
+import { EditDurableSheetComponent } from '../durables/edit-durable-sheet/edit-durable-sheet.component';
+import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
+import { EditConsumableSheetComponent } from '../consumables/edit-consumable-sheet/edit-consumable-sheet.component';
+import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import { itemStatusLabel, isTerminalStatus } from '../shared/item-status-meta';
-import { itemToRow, supplyToRow, supplyToDrillRow, type InventoryRow } from './inventory-row';
+import { durableToRow, consumableToRow, consumableToDrillRow, type InventoryRow } from './inventory-row';
 import { orderAreaTree, buildDescendantMap, type AreaTreeNode } from '../shared/area-tree';
 import { replace } from '@/shared/json-patch';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { LocationSegmentKind } from '@/api/generated/models/location-segment-kind';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -74,9 +74,9 @@ interface InventorySortFieldOption {
 /** 'all' | 'unplaced' | an area id. */
 type AreaFilter = string;
 
-/** One-tap presets over the row kind: everything, only items, or only supplies. */
-type KindFilter = 'all' | 'items' | 'supplies';
-const isKindFilter = (v: unknown): v is KindFilter => v === 'all' || v === 'items' || v === 'supplies';
+/** One-tap presets over the row kind: everything, only durables, or only consumables. */
+type KindFilter = 'all' | 'durables' | 'consumables';
+const isKindFilter = (v: unknown): v is KindFilter => v === 'all' || v === 'durables' || v === 'consumables';
 const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilter(v) ? v : 'all');
 
 /**
@@ -105,16 +105,16 @@ function seedDeepLinkParams(
 
 /** Both lists fetched together; null until the first load resolves. */
 interface ListData {
-  items: ItemResponse[];
-  supplies: SupplyResponse[];
+  durables: DurableResponse[];
+  consumables: ConsumableResponse[];
   /** The search term this payload was fetched with — lets consumers detect stale data mid-search. */
   term: string;
 }
 
 /** Server-fetched payload for a container drill-down: the container itself plus its direct children. */
 interface DrillData {
-  container: ItemResponse | null;
-  children: ItemResponse[];
+  container: DurableResponse | null;
+  children: DurableResponse[];
 }
 
 const EMPTY_DRILL: DrillData = { container: null, children: [] };
@@ -145,10 +145,10 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
     HlmDropdownMenuImports,
     InventoryTableComponent,
     CreateEntryDialogComponent,
-    EditItemSheetComponent,
-    ItemQuickPanelComponent,
-    EditSupplySheetComponent,
-    SupplyQuickPanelComponent,
+    EditDurableSheetComponent,
+    DurableQuickPanelComponent,
+    EditConsumableSheetComponent,
+    ConsumableQuickPanelComponent,
   ],
   providers: [provideIcons({
     lucidePlus,
@@ -184,14 +184,14 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
       }
 
       @if (data() !== null) {
-        @if (allItems().length === 0 && allSupplies().length === 0 && !searchTerm()) {
+        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm()) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
                 <ng-icon name="lucidePackage" />
               </div>
               <div hlmEmptyTitle>No items yet</div>
-              <div hlmEmptyDescription>Add your first item or supply to start tracking what you own, where it lives, and how much is left.</div>
+              <div hlmEmptyDescription>Add your first durable or consumable to start tracking what you own, where it lives, and how much is left.</div>
             </div>
             <div hlmEmptyContent>
               <app-create-entry-dialog (created)="onChanged()">
@@ -209,7 +209,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                   hlmInput
                   placeholder="Search items..."
                   class="h-8 w-full min-w-0 pl-8"
-                  aria-label="Search items and supplies"
+                  aria-label="Search items"
                   [value]="searchInput()"
                   (input)="searchInput.set($any($event.target).value)"
                 />
@@ -223,8 +223,8 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 (valueChange)="onKindFilterChange($event)"
               >
                 <button hlmToggleGroupItem value="all">All</button>
-                <button hlmToggleGroupItem value="items">Items</button>
-                <button hlmToggleGroupItem value="supplies">Supplies</button>
+                <button hlmToggleGroupItem value="durables">Durables</button>
+                <button hlmToggleGroupItem value="consumables">Consumables</button>
               </hlm-toggle-group>
 
               <div hlmPopover>
@@ -385,7 +385,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                   <ng-icon name="lucidePackage" />
                 </div>
                 <div hlmEmptyTitle>Nothing matches</div>
-                <div hlmEmptyDescription>No items or supplies match the current filters.</div>
+                <div hlmEmptyDescription>No items match the current filters.</div>
               </div>
             </div>
           } @else {
@@ -405,33 +405,33 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
       }
     </div>
 
-    <app-item-quick-panel
-      [item]="quickPanelItem()"
-      [state]="itemQuickPanelState()"
+    <app-durable-quick-panel
+      [durable]="quickPanelDurable()"
+      [state]="durableQuickPanelState()"
       (changed)="onChanged()"
-      (closed)="onItemQuickPanelClosed()"
+      (closed)="onDurableQuickPanelClosed()"
       (viewContents)="onQuickPanelViewContents($event)"
     />
 
-    <app-supply-quick-panel
-      [supply]="quickPanelSupply()"
-      [state]="supplyQuickPanelState()"
+    <app-consumable-quick-panel
+      [consumable]="quickPanelConsumable()"
+      [state]="consumableQuickPanelState()"
       (changed)="onChanged()"
-      (closed)="onSupplyQuickPanelClosed()"
+      (closed)="onConsumableQuickPanelClosed()"
     />
 
-    <app-edit-item-sheet
-      [item]="selectedItem()"
-      [state]="itemSheetState()"
-      (saved)="onItemSheetSaved()"
-      (closed)="onItemSheetClosed()"
+    <app-edit-durable-sheet
+      [durable]="selectedDurable()"
+      [state]="durableSheetState()"
+      (saved)="onDurableSheetSaved()"
+      (closed)="onDurableSheetClosed()"
     />
 
-    <app-edit-supply-sheet
-      [supply]="selectedSupply()"
-      [state]="supplySheetState()"
-      (saved)="onSupplySheetSaved()"
-      (closed)="onSupplySheetClosed()"
+    <app-edit-consumable-sheet
+      [consumable]="selectedConsumable()"
+      [state]="consumableSheetState()"
+      (saved)="onConsumableSheetSaved()"
+      (closed)="onConsumableSheetClosed()"
     />
 
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
@@ -439,10 +439,10 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
         <div hlmAlertDialogHeader>
           <h2 hlmAlertDialogTitle>Delete {{ pendingDelete()?.name ?? 'entry' }}?</h2>
           <p hlmAlertDialogDescription>
-            @if (pendingDelete()?.kind === 'supply') {
-              This permanently removes the supply. Supplies with stock history cannot be deleted — archive them instead.
+            @if (pendingDelete()?.kind === 'consumable') {
+              This permanently removes the consumable. Consumables with stock history cannot be deleted — archive them instead.
             } @else {
-              This permanently removes the item. Items with contents cannot be deleted — archive them instead.
+              This permanently removes the durable. Durables with contents cannot be deleted — archive them instead.
             }
           </p>
         </div>
@@ -465,8 +465,8 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
   `,
 })
 export class InventoryListPageComponent {
-  private itemApi = inject(InventoryItemApiService);
-  private supplyApi = inject(InventorySupplyApiService);
+  private durableApi = inject(InventoryDurableApiService);
+  private consumableApi = inject(InventoryConsumableApiService);
   private areaApi = inject(InventoryAreaApiService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
@@ -510,15 +510,15 @@ export class InventoryListPageComponent {
 
   sortState = signal<InventorySortState>({ id: 'name', desc: false });
 
-  selectedItem = signal<ItemResponse | null>(null);
-  itemSheetState = signal<BrnDialogState>('closed');
-  selectedSupply = signal<SupplyResponse | null>(null);
-  supplySheetState = signal<BrnDialogState>('closed');
+  selectedDurable = signal<DurableResponse | null>(null);
+  durableSheetState = signal<BrnDialogState>('closed');
+  selectedConsumable = signal<ConsumableResponse | null>(null);
+  consumableSheetState = signal<BrnDialogState>('closed');
 
-  quickPanelItem = signal<ItemResponse | null>(null);
-  itemQuickPanelState = signal<BrnDialogState>('closed');
-  quickPanelSupply = signal<SupplyResponse | null>(null);
-  supplyQuickPanelState = signal<BrnDialogState>('closed');
+  quickPanelDurable = signal<DurableResponse | null>(null);
+  durableQuickPanelState = signal<BrnDialogState>('closed');
+  quickPanelConsumable = signal<ConsumableResponse | null>(null);
+  consumableQuickPanelState = signal<BrnDialogState>('closed');
 
   pendingDelete = signal<InventoryRow | null>(null);
   deleteState = signal<BrnDialogState>('closed');
@@ -535,12 +535,12 @@ export class InventoryListPageComponent {
         this.loading.set(true);
         this.error.set(false);
         return forkJoin({
-          items: this.itemApi
-            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
-            .pipe(map(r => (r.items ?? []) as ItemResponse[])),
-          supplies: this.supplyApi
-            .getSupplies({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
-            .pipe(map(r => (r.items ?? []) as SupplyResponse[])),
+          durables: this.durableApi
+            .getDurables({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
+            .pipe(map(r => (r.items ?? []) as DurableResponse[])),
+          consumables: this.consumableApi
+            .getConsumables({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
+            .pipe(map(r => (r.items ?? []) as ConsumableResponse[])),
         }).pipe(
           map(d => {
             this.loading.set(false);
@@ -570,12 +570,12 @@ export class InventoryListPageComponent {
   /** Each area id → its descendant set (inclusive), so the area filter matches nested areas too. */
   private areaDescendants = computed(() => buildDescendantMap(this.areas()));
 
-  allItems = computed(() => this.data()?.items ?? []);
-  allSupplies = computed(() => this.data()?.supplies ?? []);
+  allDurables = computed(() => this.data()?.durables ?? []);
+  allConsumables = computed(() => this.data()?.consumables ?? []);
 
   // Drill-down is fetched server-side (the container by id + its direct children via the
   // ParentItemId filter), so contents are complete rather than reconstructed from the capped
-  // all-items page. Re-runs on refresh and whenever the drilled container changes.
+  // all-durables page. Re-runs on refresh and whenever the drilled container changes.
   private drillKey = computed(() => ({ id: this.containerFilter(), tick: this.refreshTrigger() }));
 
   private drillData = toSignal(
@@ -587,10 +587,10 @@ export class InventoryListPageComponent {
         }
         this.drillLoading.set(true);
         return forkJoin({
-          container: this.itemApi.getItem({ id }).pipe(catchError(() => of<ItemResponse | null>(null))),
-          children: this.itemApi
-            .getItems({ Page: 1, PageSize: 200, IncludeInactive: true, ParentItemId: id })
-            .pipe(map(r => (r.items ?? []) as ItemResponse[]), catchError(() => of<ItemResponse[]>([]))),
+          container: this.durableApi.getDurable({ id }).pipe(catchError(() => of<DurableResponse | null>(null))),
+          children: this.durableApi
+            .getDurables({ Page: 1, PageSize: 200, IncludeInactive: true, ParentItemId: id })
+            .pipe(map(r => (r.items ?? []) as DurableResponse[]), catchError(() => of<DurableResponse[]>([]))),
         }).pipe(
           map(result => {
             this.drillLoading.set(false);
@@ -611,28 +611,28 @@ export class InventoryListPageComponent {
 
   /** Rows in the current scope (drill-down or area filter), before the kind/inactive/low filters. */
   private scopedRows = computed<InventoryRow[]>(() => {
-    // Drill-down wins: the container's direct item children (server-fetched, not capped by the
-    // all-items page) plus supplies holding stock in it (client-side from the full supplies fetch).
+    // Drill-down wins: the container's direct durable children (server-fetched, not capped by the
+    // all-durables page) plus consumables holding stock in it (client-side from the full consumables fetch).
     const drillId = this.containerFilter();
     if (drillId) {
-      // Supplies come from the all-list fetch; right after leaving a search, that fetch is still
-      // term-filtered, so suppress supplies until the unfiltered payload lands rather than show
+      // Consumables come from the all-list fetch; right after leaving a search, that fetch is still
+      // term-filtered, so suppress consumables until the unfiltered payload lands rather than show
       // an incomplete set.
-      const suppliesStale = (this.data()?.term ?? '') !== '';
+      const consumablesStale = (this.data()?.term ?? '') !== '';
       return [
-        ...this.drillData().children.map(itemToRow),
-        ...(suppliesStale
+        ...this.drillData().children.map(durableToRow),
+        ...(consumablesStale
           ? []
-          : this.allSupplies()
-              .map(s => supplyToDrillRow(s, drillId))
+          : this.allConsumables()
+              .map(c => consumableToDrillRow(c, drillId))
               .filter((r): r is InventoryRow => r !== null)),
       ];
     }
 
-    // Area filter uses RESOLVED areas, so a nested item — or supply stock inside a nested
-    // container — shows under the area it walks up to. Zero-stock supplies only appear under
+    // Area filter uses RESOLVED areas, so a nested durable — or consumable stock inside a nested
+    // container — shows under the area it walks up to. Zero-stock consumables only appear under
     // "All areas".
-    let rows = [...this.allItems().map(itemToRow), ...this.allSupplies().map(supplyToRow)];
+    let rows = [...this.allDurables().map(durableToRow), ...this.allConsumables().map(consumableToRow)];
     // While a freshly committed term's fetch is in flight, the cached rows were fetched with a
     // different term; mirror the server's name filter client-side so the unfiltered set never
     // flashes between commit and response.
@@ -653,12 +653,12 @@ export class InventoryListPageComponent {
   private kindRows = computed(() => {
     const kf = this.kindFilter();
     if (kf === 'all') return this.scopedRows();
-    const kind = kf === 'items' ? 'item' : 'supply';
+    const kind = kf === 'durables' ? 'durable' : 'consumable';
     return this.scopedRows().filter(r => r.kind === kind);
   });
 
   inactiveCount = computed(() => this.kindRows().filter(r => isTerminalStatus(r.status)).length);
-  // Counts what the low-stock filter would actually show: archived low supplies count only while
+  // Counts what the low-stock filter would actually show: archived low consumables count only while
   // "Show inactive" reveals them.
   lowCount = computed(() => this.kindRows()
     .filter(r => r.isLow && (this.showInactive() || !isTerminalStatus(r.status))).length);
@@ -668,7 +668,7 @@ export class InventoryListPageComponent {
   visibleRows = computed(() => {
     let rows = this.kindRows();
     if (!this.showInactive()) rows = rows.filter(r => !isTerminalStatus(r.status));
-    // Only supplies carry a low flag, so this doubles as the reorder view.
+    // Only consumables carry a low flag, so this doubles as the reorder view.
     if (this.lowStockOnly()) rows = rows.filter(r => r.isLow);
     if (this.lentOnly()) rows = rows.filter(r => r.status === 'Lent');
     return rows;
@@ -695,7 +695,7 @@ export class InventoryListPageComponent {
         case 'location':
           return a.locationText.localeCompare(b.locationText) * dir;
         case 'onHand':
-          // Items have no quantity and always sort last, whatever the direction.
+          // Durables have no quantity and always sort last, whatever the direction.
           return compareNullable(a.onHand, b.onHand, dir, (x, y) => x - y);
         case 'updatedAt':
           return compareNullable(a.updatedAt ?? null, b.updatedAt ?? null, dir, (x, y) => (x < y ? -1 : 1));
@@ -818,38 +818,38 @@ export class InventoryListPageComponent {
   }
 
   onOpen(row: InventoryRow): void {
-    if (row.kind === 'supply' && row.supply) {
-      this.quickPanelSupply.set(row.supply);
-      this.supplyQuickPanelState.set('open');
-    } else if (row.item) {
-      this.quickPanelItem.set(row.item);
-      this.itemQuickPanelState.set('open');
+    if (row.kind === 'consumable' && row.consumable) {
+      this.quickPanelConsumable.set(row.consumable);
+      this.consumableQuickPanelState.set('open');
+    } else if (row.durable) {
+      this.quickPanelDurable.set(row.durable);
+      this.durableQuickPanelState.set('open');
     }
   }
 
-  onItemQuickPanelClosed(): void {
-    this.itemQuickPanelState.set('closed');
+  onDurableQuickPanelClosed(): void {
+    this.durableQuickPanelState.set('closed');
   }
 
-  // Keeps quickPanelSupply set: a close-triggered stepper flush may still be committing, and the
-  // panel needs the supply id until it settles. Reopening reseeds the panel via its open-keyed state.
-  onSupplyQuickPanelClosed(): void {
-    this.supplyQuickPanelState.set('closed');
+  // Keeps quickPanelConsumable set: a close-triggered stepper flush may still be committing, and the
+  // panel needs the consumable id until it settles. Reopening reseeds the panel via its open-keyed state.
+  onConsumableQuickPanelClosed(): void {
+    this.consumableQuickPanelState.set('closed');
   }
 
-  onQuickPanelViewContents(item: ItemResponse): void {
-    this.onItemQuickPanelClosed();
+  onQuickPanelViewContents(durable: DurableResponse): void {
+    this.onDurableQuickPanelClosed();
     this.clearSearch();
-    this.containerFilter.set(item.id);
+    this.containerFilter.set(durable.id);
   }
 
   onEdit(row: InventoryRow): void {
-    if (row.kind === 'supply' && row.supply) {
-      this.selectedSupply.set(row.supply);
-      this.supplySheetState.set('open');
-    } else if (row.item) {
-      this.selectedItem.set(row.item);
-      this.itemSheetState.set('open');
+    if (row.kind === 'consumable' && row.consumable) {
+      this.selectedConsumable.set(row.consumable);
+      this.consumableSheetState.set('open');
+    } else if (row.durable) {
+      this.selectedDurable.set(row.durable);
+      this.durableSheetState.set('open');
     }
   }
 
@@ -859,39 +859,39 @@ export class InventoryListPageComponent {
   }
 
   onViewDetails(row: InventoryRow): void {
-    const base = row.kind === 'supply' ? '/inventory/supplies' : '/inventory/items';
+    const base = row.kind === 'consumable' ? '/inventory/consumables' : '/inventory/durables';
     void this.router.navigate([base, row.id]);
   }
 
-  onItemSheetSaved(): void {
-    this.itemSheetState.set('closed');
+  onDurableSheetSaved(): void {
+    this.durableSheetState.set('closed');
     this.onChanged();
   }
 
-  onItemSheetClosed(): void {
-    this.itemSheetState.set('closed');
-    this.selectedItem.set(null);
+  onDurableSheetClosed(): void {
+    this.durableSheetState.set('closed');
+    this.selectedDurable.set(null);
   }
 
-  onSupplySheetSaved(): void {
-    this.supplySheetState.set('closed');
+  onConsumableSheetSaved(): void {
+    this.consumableSheetState.set('closed');
     this.onChanged();
   }
 
-  onSupplySheetClosed(): void {
-    this.supplySheetState.set('closed');
-    this.selectedSupply.set(null);
+  onConsumableSheetClosed(): void {
+    this.consumableSheetState.set('closed');
+    this.selectedConsumable.set(null);
   }
 
   onArchiveRestore(row: InventoryRow): void {
     const terminal = isTerminalStatus(row.status);
     const newStatus = terminal ? 'Active' : 'Archived';
-    const isSupply = row.kind === 'supply';
-    const noun = isSupply ? 'Supply' : 'Item';
+    const isConsumable = row.kind === 'consumable';
+    const noun = isConsumable ? 'Consumable' : 'Durable';
     this.archiving.set(true);
-    const request$: Observable<unknown> = isSupply
-      ? this.supplyApi.patchSupply({ id: row.id, body: [replace('/status', newStatus)] })
-      : this.itemApi.patchItem({ id: row.id, body: [replace('/status', newStatus)] });
+    const request$: Observable<unknown> = isConsumable
+      ? this.consumableApi.patchConsumable({ id: row.id, body: [replace('/status', newStatus)] })
+      : this.durableApi.patchDurable({ id: row.id, body: [replace('/status', newStatus)] });
     request$.pipe(
       handleMutationError(this.errorHandler, this.archiving, `Failed to update ${noun.toLowerCase()}.`),
     ).subscribe(() => {
@@ -910,26 +910,26 @@ export class InventoryListPageComponent {
   confirmDelete(ctx: { close: () => void }): void {
     const row = this.pendingDelete();
     if (!row) return;
-    const isSupply = row.kind === 'supply';
+    const isConsumable = row.kind === 'consumable';
     this.deleting.set(true);
     this.deleteError.set('');
-    const request$ = isSupply
-      ? this.supplyApi.deleteSupply({ id: row.id })
-      : this.itemApi.deleteItem({ id: row.id });
+    const request$ = isConsumable
+      ? this.consumableApi.deleteConsumable({ id: row.id })
+      : this.durableApi.deleteDurable({ id: row.id });
     request$.subscribe({
       next: () => {
         this.deleting.set(false);
         ctx.close();
         this.pendingDelete.set(null);
         this.onChanged();
-        toast.success(isSupply ? 'Supply deleted.' : 'Item deleted.');
+        toast.success(isConsumable ? 'Consumable deleted.' : 'Durable deleted.');
       },
       // Inline, not a toast: the open dialog overlay would obscure a toast, and the rejection
       // reason ("has stock history — archive instead") is what the user needs to read here.
       error: (err: unknown) => {
         this.deleting.set(false);
         this.deleteError.set(
-          this.errorHandler.getErrorMessage(err, `Failed to delete ${isSupply ? 'supply' : 'item'}.`));
+          this.errorHandler.getErrorMessage(err, `Failed to delete ${isConsumable ? 'consumable' : 'durable'}.`));
       },
     });
   }

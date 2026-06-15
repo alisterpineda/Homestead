@@ -19,16 +19,16 @@ import { placeRefToLink, placeDisplayName, type PlaceRef } from './place-param';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
-import { formatQty } from '../../supplies/supply-shared';
+import { formatQty } from '../../consumables/consumable-shared';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 
 /**
  * The browse-by-place surface: at root, a card grid of areas (+ Unplaced); drilled in
  * (`place` set), drillable child-container cards and an inline list of the place's direct
- * items/supplies. Presentational — the page owns the route state and the data fetches; the
+ * durables/consumables. Presentational — the page owns the route state and the data fetches; the
  * ancestor breadcrumb lives in the page header, and row clicks bubble up so the page can open
  * its quick panels in place.
  */
@@ -100,14 +100,14 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
             </div>
           </div>
 
-          @if (c.childAreas.length === 0 && c.containers.length === 0 && c.items.length === 0 && c.supplies.length === 0) {
+          @if (c.childAreas.length === 0 && c.containers.length === 0 && c.items.length === 0 && c.consumables.length === 0) {
             <div hlmEmpty>
               <div hlmEmptyHeader>
                 <div hlmEmptyMedia variant="icon">
                   <ng-icon name="lucidePackage" />
                 </div>
                 <div hlmEmptyTitle>Nothing here yet</div>
-                <div hlmEmptyDescription>This place has no sub-areas, items, or supplies in it.</div>
+                <div hlmEmptyDescription>This place has no sub-areas, durables, or consumables in it.</div>
               </div>
               <div hlmEmptyContent>
                 <app-create-entry-dialog
@@ -158,7 +158,7 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
               </div>
             }
 
-            @if (c.items.length > 0 || c.supplies.length > 0) {
+            @if (c.items.length > 0 || c.consumables.length > 0) {
               <div class="space-y-2">
                 <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel() }}</h3>
                 <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
@@ -167,23 +167,23 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
                       <button
                         type="button"
                         class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                        (click)="openItem.emit(item)"
+                        (click)="openDurable.emit(item)"
                       >
                         <span class="truncate">{{ item.name }}</span>
                         <app-item-status-badge [status]="item.status" />
                       </button>
                     </li>
                   }
-                  @for (row of c.supplies; track row.supply.id) {
+                  @for (row of c.consumables; track row.consumable.id) {
                     <li>
                       <button
                         type="button"
                         class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                        (click)="openSupply.emit(row.supply)"
+                        (click)="openConsumable.emit(row.consumable)"
                       >
                         <span class="flex min-w-0 items-center gap-2">
-                          <span class="truncate">{{ row.supply.name }}</span>
-                          @if (row.supply.isLow) {
+                          <span class="truncate">{{ row.consumable.name }}</span>
+                          @if (row.consumable.isLow) {
                             <span class="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
                               <ng-icon hlm name="lucideTriangleAlert" size="xs" />
                               Low
@@ -191,7 +191,7 @@ import type { SupplyResponse } from '@/api/generated/models/supply-response';
                           }
                         </span>
                         <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(row.localQuantity) }} {{ row.supply.unit }}@if (row.localQuantity !== row.supply.totalOnHand) {<span> · of {{ formatQty(row.supply.totalOnHand) }} total</span>}
+                          {{ formatQty(row.localQuantity) }} {{ row.consumable.unit }}@if (row.localQuantity !== row.consumable.totalOnHand) {<span> · of {{ formatQty(row.consumable.totalOnHand) }} total</span>}
                         </span>
                       </button>
                     </li>
@@ -248,10 +248,10 @@ export class PlaceBrowserComponent {
   contents = input<PlaceContentsResponse | null>(null);
   error = input(false);
 
-  openItem = output<ItemResponse>();
-  openSupply = output<SupplyResponse>();
+  openDurable = output<DurableResponse>();
+  openConsumable = output<ConsumableResponse>();
   /** The drilled container's own quick panel (header "Details" button). */
-  containerDetails = output<ItemResponse>();
+  containerDetails = output<DurableResponse>();
   /** Something was created/mutated — the page refetches overview + contents. */
   changed = output<void>();
 
@@ -264,13 +264,13 @@ export class PlaceBrowserComponent {
 
   protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
 
-  /** Heading for the loose-contents list — names exactly what it holds (items, supplies, or both). */
+  /** Heading for the loose-contents list — names exactly what it holds (durables, consumables, or both). */
   protected contentsLabel = computed(() => {
     const c = this.contents();
     const hasItems = (c?.items.length ?? 0) > 0;
-    const hasSupplies = (c?.supplies.length ?? 0) > 0;
-    if (hasItems && hasSupplies) return 'Items & supplies';
-    return hasSupplies ? 'Supplies' : 'Items';
+    const hasConsumables = (c?.consumables.length ?? 0) > 0;
+    if (hasItems && hasConsumables) return 'Durables & consumables';
+    return hasConsumables ? 'Consumables' : 'Durables';
   });
 
   protected placeIcon = computed(() => {
@@ -293,6 +293,6 @@ export class PlaceBrowserComponent {
     const ref = this.place();
     if (ref?.kind === 'area') return { area: ref.id } as Record<string, string>;
     if (ref?.kind === 'container') return { container: ref.id } as Record<string, string>;
-    return { area: 'unplaced', kind: 'items' };
+    return { area: 'unplaced', kind: 'durables' };
   });
 }

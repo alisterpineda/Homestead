@@ -16,11 +16,11 @@ import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { isTerminalStatus } from '../item-status-meta';
 import { orderAreaTree, type AreaTreeNode } from '../area-tree';
 import type { AreaResponse } from '@/api/generated/models/area-response';
-import type { ItemResponse } from '@/api/generated/models/item-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 /** A picked location: nowhere, an area, or a container item. */
@@ -31,7 +31,7 @@ export type ItemLocationValue =
 
 interface LoadedOptions {
   areas: AreaResponse[];
-  containers: ItemResponse[];
+  containers: DurableResponse[];
 }
 
 const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
@@ -156,7 +156,7 @@ export class LocationPickerComponent {
   valueChange = output<ItemLocationValue>();
 
   private areaApi = inject(InventoryAreaApiService);
-  private itemApi = inject(InventoryItemApiService);
+  private durableApi = inject(InventoryDurableApiService);
 
   protected popoverState = signal<BrnDialogState>('closed');
   protected searchTerm = signal('');
@@ -176,11 +176,11 @@ export class LocationPickerComponent {
             map(r => r.items ?? []),
             catchError(() => of<AreaResponse[]>([])),
           ),
-          containers: this.itemApi
-            .getItems({ Page: 1, PageSize: 200, IsContainer: true, IncludeInactive: true })
+          containers: this.durableApi
+            .getDurables({ Page: 1, PageSize: 200, IsContainer: true, IncludeInactive: true })
             .pipe(
-              map(r => (r.items ?? []) as ItemResponse[]),
-              catchError(() => of<ItemResponse[]>([])),
+              map(r => (r.items ?? []) as DurableResponse[]),
+              catchError(() => of<DurableResponse[]>([])),
             ),
         }).pipe(
           map(result => {
@@ -259,7 +259,7 @@ export class LocationPickerComponent {
     return this.allContainers().find(c => c.id === v.id)?.name ?? this.selectedLabel() ?? '';
   });
 
-  protected containerSubtitle(container: ItemResponse): string {
+  protected containerSubtitle(container: DurableResponse): string {
     const names = (container.path ?? []).map(s => s.name);
     if (names.length === 0) return '';
     return (container.resolvedAreaId == null ? ['Unplaced', ...names] : names).join(' › ');
@@ -287,7 +287,7 @@ export class LocationPickerComponent {
     this.emit({ kind: 'area', id: area.id }, area.name);
   }
 
-  protected onSelectContainer(container: ItemResponse): void {
+  protected onSelectContainer(container: DurableResponse): void {
     this.emit({ kind: 'container', id: container.id }, container.name);
   }
 

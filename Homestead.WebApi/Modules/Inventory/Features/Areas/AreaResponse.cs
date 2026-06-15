@@ -16,7 +16,7 @@ public record AreaResponse
 
     /// <summary>
     /// Resolved count of live rows the area-filtered items list shows: items resolving here
-    /// (directly placed + nested in containers) plus distinct supplies with stock here.
+    /// (directly placed + nested in containers) plus distinct consumables with stock here.
     /// </summary>
     public required int LiveItemCount { get; init; }
 }

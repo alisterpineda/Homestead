@@ -10,7 +10,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { InventoryOverviewTileComponent } from './inventory-overview-tile.component';
-import { formatQty } from '../supplies/supply-shared';
+import { formatQty } from '../consumables/consumable-shared';
 import { BADGE_BASE } from '../shared/item-status-meta';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 
@@ -23,10 +23,10 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  *
  * - **root** — the global household-wide low-stock tile with a most-urgent-first preview, reusing
  *   the overview data the Browse root already fetches; the tile deep-links into the unified items
- *   list pre-filtered to low stock. A zero-on-hand supply is flagged "Out" to distinguish it from
+ *   list pre-filtered to low stock. A zero-on-hand consumable is flagged "Out" to distinguish it from
  *   merely-low.
  * - **place** — a count-only low-stock panel scoped to the drilled place, area or container ("low
- *   supplies stored here"). Its "View all" link carries the place filter (`viewAllParams`) so it
+ *   consumables stored here"). Its "View all" link carries the place filter (`viewAllParams`) so it
  *   composes with the items-list deep-link reader — `{ area: id }` for an area, `{ container: id }`
  *   for a container.
  *
@@ -87,19 +87,19 @@ export type WarningPanelsScope =
                   icon="lucideTriangleAlert"
                   title="Low stock"
                   [count]="ov.lowStockCount"
-                  [previewCount]="ov.lowStockSupplies.length"
+                  [previewCount]="ov.lowStockConsumables.length"
                   emptyText="Nothing running low"
                   [viewAllParams]="{ lowStock: 'true' }"
                 >
-                  @for (supply of ov.lowStockSupplies; track supply.id) {
+                  @for (consumable of ov.lowStockConsumables; track consumable.id) {
                     <li class="flex items-center justify-between gap-2 text-sm">
-                      <span class="truncate">{{ supply.name }}</span>
+                      <span class="truncate">{{ consumable.name }}</span>
                       <span class="flex shrink-0 items-center gap-1.5">
-                        @if (supply.totalOnHand === 0) {
+                        @if (consumable.totalOnHand === 0) {
                           <span [class]="outBadgeClass" aria-label="Out of stock">Out</span>
                         }
                         <span class="text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(supply.totalOnHand) }} {{ supply.unit }} / {{ formatQty(supply.restockThreshold) }}
+                          {{ formatQty(consumable.totalOnHand) }} {{ consumable.unit }} / {{ formatQty(consumable.restockThreshold) }}
                         </span>
                       </span>
                     </li>
@@ -133,7 +133,7 @@ export class InventoryWarningPanelsComponent {
 
   protected readonly formatQty = formatQty;
 
-  /** The "Out" badge: the shared pill base + a destructive tone, for a zero-on-hand supply. */
+  /** The "Out" badge: the shared pill base + a destructive tone, for a zero-on-hand consumable. */
   protected readonly outBadgeClass = `${BADGE_BASE} bg-destructive/10 text-destructive dark:bg-destructive/20`;
 
   /** Narrowed views so the template gets type-safe access to each mode's data. */
@@ -151,7 +151,7 @@ export class InventoryWarningPanelsComponent {
     if (s.kind !== 'place') return [];
     const panels: { icon: string; label: string; count: number; params: Record<string, string> }[] = [];
     if (s.lowStockCount > 0)
-      panels.push({ icon: 'lucideTriangleAlert', label: 'Low supplies stored here', count: s.lowStockCount, params: { ...s.viewAllParams, lowStock: 'true' } });
+      panels.push({ icon: 'lucideTriangleAlert', label: 'Low consumables stored here', count: s.lowStockCount, params: { ...s.viewAllParams, lowStock: 'true' } });
     return panels;
   });
 

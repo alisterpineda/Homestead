@@ -64,11 +64,12 @@ export class InventorySidebarComponent {
   private readonly navPaths = ['/inventory/browse', '/inventory/items', '/inventory/areas'];
 
   isActive(path: string): boolean {
-    // The supply detail route outlived the Items/Supplies list merge; it belongs to Items
-    // (its back-link targets /inventory/items), so highlight that entry there.
-    const url = this.urlPath().startsWith('/inventory/supplies')
+    // The durable and consumable detail routes belong to Items (their breadcrumb/back-link target
+    // /inventory/items), so highlight that entry there.
+    const current = this.urlPath();
+    const url = current.startsWith('/inventory/durables') || current.startsWith('/inventory/consumables')
       ? '/inventory/items'
-      : this.urlPath();
+      : current;
     return isNavItemActive(url, path, this.navPaths);
   }
 }

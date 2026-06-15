@@ -7,8 +7,8 @@ import { PlaceBrowserComponent } from './place-browser.component';
 import type { PlaceRef } from './place-param';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 
 // The embedded create dialog hosts pickers that use ResizeObserver.
 if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -19,7 +19,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   } as unknown as typeof ResizeObserver;
 }
 
-function makeItem(over: Partial<ItemResponse>): ItemResponse {
+function makeItem(over: Partial<DurableResponse>): DurableResponse {
   return {
     id: 'x',
     name: 'Item',
@@ -33,10 +33,10 @@ function makeItem(over: Partial<ItemResponse>): ItemResponse {
   };
 }
 
-function makeSupply(over: Partial<SupplyResponse>): SupplyResponse {
+function makeConsumable(over: Partial<ConsumableResponse>): ConsumableResponse {
   return {
     id: 's',
-    name: 'Supply',
+    name: 'Consumable',
     status: 'Active',
     unit: 'pcs',
     totalOnHand: 0,
@@ -59,18 +59,18 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
     childAreas: [],
     containers: [],
     items: [],
-    supplies: [],
+    consumables: [],
     ...over,
   };
 }
 
 const OVERVIEW: GetInventoryOverviewResponse = {
   lowStockCount: 0,
-  lowStockSupplies: [],
+  lowStockConsumables: [],
   lentCount: 0,
-  lentItems: [],
+  lentDurables: [],
   unplacedCount: 2,
-  unplacedItems: [],
+  unplacedDurables: [],
   areas: [
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },
     { id: 'office', name: 'Office', itemCount: 0, lowStockCount: 0 },
@@ -90,8 +90,8 @@ const BIN_CONTENTS = makeContents({
     { id: 'tray', name: 'Tray', status: 'Active', itemCount: 2, lowStockCount: 1, previewNames: ['Bits', 'Glue'] },
   ],
   items: [makeItem({ id: 'wrench', name: 'Wrench' })],
-  supplies: [
-    { supply: makeSupply({ id: 'screws', name: 'Wood screws', totalOnHand: 10, isLow: true }), localQuantity: 4 },
+  consumables: [
+    { consumable: makeConsumable({ id: 'screws', name: 'Wood screws', totalOnHand: 10, isLow: true }), localQuantity: 4 },
   ],
 });
 
@@ -186,46 +186,46 @@ describe('PlaceBrowserComponent', () => {
   });
 
   it('labels each contents group, and names the loose list by what it holds', async () => {
-    // BIN_CONTENTS has containers + one item + one supply (no child areas).
+    // BIN_CONTENTS has containers + one durable + one consumable (no child areas).
     let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     let headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
     expect(headings).toContain('Containers');
-    expect(headings).toContain('Items & supplies');
+    expect(headings).toContain('Durables & consumables');
     expect(headings).not.toContain('Areas');
 
     // Loose list label collapses to the single kind actually present.
     fixture = await create(
       { kind: 'container', id: 'bin' },
-      makeContents({ containers: [], items: [makeItem({ id: 'wrench', name: 'Wrench' })], supplies: [] }),
+      makeContents({ containers: [], items: [makeItem({ id: 'wrench', name: 'Wrench' })], consumables: [] }),
     );
     headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
-    expect(headings).toContain('Items');
-    expect(headings).not.toContain('Items & supplies');
+    expect(headings).toContain('Durables');
+    expect(headings).not.toContain('Durables & consumables');
   });
 
-  it('emits openItem / openSupply / containerDetails from their controls', async () => {
+  it('emits openDurable / openConsumable / containerDetails from their controls', async () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     const component = fixture.componentInstance;
-    const openItem = vi.fn();
-    const openSupply = vi.fn();
+    const openDurable = vi.fn();
+    const openConsumable = vi.fn();
     const details = vi.fn();
-    component.openItem.subscribe(openItem);
-    component.openSupply.subscribe(openSupply);
+    component.openDurable.subscribe(openDurable);
+    component.openConsumable.subscribe(openConsumable);
     component.containerDetails.subscribe(details);
 
     const buttons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'));
     buttons.find(b => b.textContent?.includes('Wrench'))!.click();
-    expect(openItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'wrench' }));
+    expect(openDurable).toHaveBeenCalledWith(expect.objectContaining({ id: 'wrench' }));
 
     buttons.find(b => b.textContent?.includes('Wood screws'))!.click();
-    // Emits the inner SupplyResponse, not the PlaceSupplyResponse wrapper.
-    expect(openSupply).toHaveBeenCalledWith(expect.objectContaining({ id: 'screws', unit: 'pcs' }));
+    // Emits the inner ConsumableResponse, not the PlaceConsumableResponse wrapper.
+    expect(openConsumable).toHaveBeenCalledWith(expect.objectContaining({ id: 'screws', unit: 'pcs' }));
 
     buttons.find(b => b.textContent?.trim() === 'Details')!.click();
     expect(details).toHaveBeenCalledWith(expect.objectContaining({ id: 'bin' }));
   });
 
-  it('shows local supply quantity with an of-total hint and a low badge', async () => {
+  it('shows local consumable quantity with an of-total hint and a low badge', async () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
 
     const content = el(fixture).textContent ?? '';
@@ -237,7 +237,7 @@ describe('PlaceBrowserComponent', () => {
   it('shows the empty state with an Add-item-here CTA for an empty place', async () => {
     const fixture = await create(
       { kind: 'container', id: 'bin' },
-      makeContents({ ...BIN_CONTENTS, containers: [], items: [], supplies: [], directItemCount: 0, nestedItemCount: 0 }),
+      makeContents({ ...BIN_CONTENTS, containers: [], items: [], consumables: [], directItemCount: 0, nestedItemCount: 0 }),
     );
 
     const content = el(fixture).textContent ?? '';
@@ -259,7 +259,7 @@ describe('PlaceBrowserComponent', () => {
     expect(hrefs(fixture)).toContain('/inventory/items?area=garage');
 
     fixture = await create({ kind: 'unplaced' }, makeContents({}));
-    expect(hrefs(fixture)).toContain('/inventory/items?area=unplaced&kind=items');
+    expect(hrefs(fixture)).toContain('/inventory/items?area=unplaced&kind=durables');
   });
 
   it('shows the Details button only when a container is drilled', async () => {

@@ -35,7 +35,7 @@ import type { InventoryRow } from './inventory-row';
       size="icon-sm"
       type="button"
       [hlmDropdownMenuTrigger]="menu"
-      [aria-label]="row().kind === 'supply' ? 'Supply actions' : 'Item actions'"
+      [aria-label]="row().kind === 'consumable' ? 'Consumable actions' : 'Durable actions'"
       (click)="onTriggerClick($event)"
     >
       <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
@@ -47,7 +47,7 @@ import type { InventoryRow } from './inventory-row';
             <ng-icon hlm name="lucidePencil" size="sm" />
             Edit
           </button>
-          @if (row().item?.isContainer) {
+          @if (row().durable?.isContainer) {
             <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
               <ng-icon hlm name="lucidePackageOpen" size="sm" />
               View contents

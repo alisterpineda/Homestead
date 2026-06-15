@@ -3,8 +3,8 @@ import { InventoryLayoutComponent } from './layout/inventory-layout.component';
 import { InventoryBrowsePageComponent } from './browse/inventory-browse-page.component';
 import { InventoryListPageComponent } from './list/inventory-list-page.component';
 import { AreaListPageComponent } from './areas/area-list-page.component';
-import { ItemDetailPageComponent } from './items/item-detail-page/item-detail-page.component';
-import { SupplyDetailPageComponent } from './supplies/supply-detail-page.component';
+import { DurableDetailPageComponent } from './durables/durable-detail-page/durable-detail-page.component';
+import { ConsumableDetailPageComponent } from './consumables/consumable-detail-page.component';
 
 export const INVENTORY_ROUTES: Routes = [
   {
@@ -20,15 +20,15 @@ export const INVENTORY_ROUTES: Routes = [
       { path: 'browse/area/:areaId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'area' } },
       // Containers are a first-class Browse node (Explore mode): drilling area→container→sub-container
       // stays on this surface with a continuous breadcrumb. Stepping into the container's record is
-      // the opt-in "Details" button, which routes out to /inventory/items/:id (Detail mode).
+      // the opt-in "Details" button, which routes out to /inventory/durables/:id (Detail mode).
       { path: 'browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
       { path: 'browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
       { path: 'items', component: InventoryListPageComponent, data: { title: 'Items' } },
-      { path: 'items/:id', component: ItemDetailPageComponent, data: { title: 'Item' } },
+      { path: 'durables/:id', component: DurableDetailPageComponent, data: { title: 'Durable' } },
       { path: 'areas', component: AreaListPageComponent, data: { title: 'Areas' } },
-      // Supplies merged into the unified Items list; deep links keep working.
-      { path: 'supplies', redirectTo: 'items', pathMatch: 'full' },
-      { path: 'supplies/:id', component: SupplyDetailPageComponent, data: { title: 'Supply' } },
+      // Consumables merged into the unified Items list; deep links keep working.
+      { path: 'consumables', redirectTo: 'items', pathMatch: 'full' },
+      { path: 'consumables/:id', component: ConsumableDetailPageComponent, data: { title: 'Consumable' } },
     ],
   },
 ];

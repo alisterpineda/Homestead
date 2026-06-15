@@ -7,15 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { ConsumableDetailResponse } from '../../models/consumable-detail-response';
 import { ReceiveStockRequest } from '../../models/receive-stock-request';
-import { SupplyDetailResponse } from '../../models/supply-detail-response';
 
 export interface ReceiveStock$Params {
   id: string;
       body: ReceiveStockRequest
 }
 
-export function receiveStock(http: HttpClient, rootUrl: string, params: ReceiveStock$Params, context?: HttpContext): Observable<StrictHttpResponse<SupplyDetailResponse>> {
+export function receiveStock(http: HttpClient, rootUrl: string, params: ReceiveStock$Params, context?: HttpContext): Observable<StrictHttpResponse<ConsumableDetailResponse>> {
   const rb = new RequestBuilder(rootUrl, receiveStock.PATH, 'post');
   if (params) {
     rb.path('id', params.id, {});
@@ -27,9 +27,9 @@ export function receiveStock(http: HttpClient, rootUrl: string, params: ReceiveS
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<SupplyDetailResponse>;
+      return r as StrictHttpResponse<ConsumableDetailResponse>;
     })
   );
 }
 
-receiveStock.PATH = '/api/v1/inventory/supplies/{id}/receive';
+receiveStock.PATH = '/api/v1/inventory/consumables/{id}/receive';

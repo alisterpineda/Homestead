@@ -8,14 +8,14 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 import { AdjustStockRequest } from '../../models/adjust-stock-request';
-import { SupplyDetailResponse } from '../../models/supply-detail-response';
+import { ConsumableDetailResponse } from '../../models/consumable-detail-response';
 
 export interface AdjustStock$Params {
   id: string;
       body: AdjustStockRequest
 }
 
-export function adjustStock(http: HttpClient, rootUrl: string, params: AdjustStock$Params, context?: HttpContext): Observable<StrictHttpResponse<SupplyDetailResponse>> {
+export function adjustStock(http: HttpClient, rootUrl: string, params: AdjustStock$Params, context?: HttpContext): Observable<StrictHttpResponse<ConsumableDetailResponse>> {
   const rb = new RequestBuilder(rootUrl, adjustStock.PATH, 'post');
   if (params) {
     rb.path('id', params.id, {});
@@ -27,9 +27,9 @@ export function adjustStock(http: HttpClient, rootUrl: string, params: AdjustSto
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<SupplyDetailResponse>;
+      return r as StrictHttpResponse<ConsumableDetailResponse>;
     })
   );
 }
 
-adjustStock.PATH = '/api/v1/inventory/supplies/{id}/adjust';
+adjustStock.PATH = '/api/v1/inventory/consumables/{id}/adjust';

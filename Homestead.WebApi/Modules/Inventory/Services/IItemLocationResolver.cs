@@ -1,25 +1,25 @@
-using Homestead.WebApi.Modules.Inventory.Features.Items;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
 
 namespace Homestead.WebApi.Modules.Inventory.Services;
 
 /// <summary>
-/// Fills the derived <see cref="ItemResponse.Path"/> / <see cref="ItemResponse.ResolvedAreaId"/> on
+/// Fills the derived <see cref="DurableResponse.Path"/> / <see cref="DurableResponse.ResolvedAreaId"/> on
 /// already-projected item responses by walking the container chain. Resolved location is never
 /// stored (see <c>locations.md</c>) — it is computed here at read time.
 /// </summary>
 public interface IItemLocationResolver
 {
     /// <summary>Enriches a batch of responses, fetching containers and area names once for the whole set.</summary>
-    Task<IReadOnlyList<ItemResponse>> EnrichAsync(IReadOnlyList<ItemResponse> items, CancellationToken ct = default);
+    Task<IReadOnlyList<DurableResponse>> EnrichAsync(IReadOnlyList<DurableResponse> items, CancellationToken ct = default);
 
     /// <summary>Enriches a single response.</summary>
-    Task<ItemResponse> EnrichAsync(ItemResponse item, CancellationToken ct = default);
+    Task<DurableResponse> EnrichAsync(DurableResponse item, CancellationToken ct = default);
 
     /// <summary>
     /// Resolves a set of stock holding locations (an area, or a container) into display paths,
     /// root→holding-location with the holding area/container as the last segment. The keys are the
     /// distinct non-empty locations of the input; a fully-null (deleted) location is skipped and a
-    /// broken chain yields the path resolved so far. Used by the supplies breakdown and the ledger.
+    /// broken chain yields the path resolved so far. Used by the consumables breakdown and the ledger.
     /// </summary>
     Task<IReadOnlyDictionary<HoldingLocation, LocationPath>> ResolveHoldingLocationsAsync(
         IReadOnlyCollection<HoldingLocation> locations, CancellationToken ct = default);

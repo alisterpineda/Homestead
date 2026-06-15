@@ -6,26 +6,26 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
 
 const ALL_QUIET: GetInventoryOverviewResponse = {
   lowStockCount: 0,
-  lowStockSupplies: [],
+  lowStockConsumables: [],
   lentCount: 0,
-  lentItems: [],
+  lentDurables: [],
   unplacedCount: 0,
-  unplacedItems: [],
+  unplacedDurables: [],
   areas: [],
 };
 
 const BUSY: GetInventoryOverviewResponse = {
   lowStockCount: 7,
-  lowStockSupplies: [
+  lowStockConsumables: [
     { id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 },
     { id: 'tape', name: 'Tape', totalOnHand: 2, unit: 'rolls', restockThreshold: 3 },
   ],
   // Lent / unplaced are now neutral statuses (see InventoryStatusChipsComponent), not alerts —
   // the warning panels must ignore them entirely.
   lentCount: 1,
-  lentItems: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
+  lentDurables: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
   unplacedCount: 2,
-  unplacedItems: [
+  unplacedDurables: [
     { id: 'wrench', name: 'Adrift wrench' },
     { id: 'bin', name: 'Floating bin' },
   ],
@@ -65,7 +65,7 @@ describe('InventoryWarningPanelsComponent', () => {
     return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button[hlmCollapsibleTrigger]');
   }
 
-  /** The preview row whose text contains the supply name — used to scope per-row badge assertions. */
+  /** The preview row whose text contains the consumable name — used to scope per-row badge assertions. */
   function row(fixture: ComponentFixture<InventoryWarningPanelsComponent>, name: string): HTMLElement | undefined {
     return Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('li'),
@@ -96,7 +96,7 @@ describe('InventoryWarningPanelsComponent', () => {
     expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('flags a zero-on-hand supply "Out" but not a merely-low one', async () => {
+  it('flags a zero-on-hand consumable "Out" but not a merely-low one', async () => {
     const fixture = await create({ kind: 'root', overview: BUSY });
 
     // Glue is at 0 on hand → "Out"; Tape is at 2 → just low, no badge.
@@ -132,7 +132,7 @@ describe('InventoryWarningPanelsComponent', () => {
     const fixture = await create({ kind: 'place', viewAllParams: { area: 'garage' }, lowStockCount: 3 });
 
     const content = text(fixture);
-    expect(content).toContain('Low supplies stored here');
+    expect(content).toContain('Low consumables stored here');
     // Lent is now a status chip, not an alert panel; unplaced never applies to a place.
     expect(content).not.toContain('Items lent from here');
     expect(content).not.toContain('Unplaced');

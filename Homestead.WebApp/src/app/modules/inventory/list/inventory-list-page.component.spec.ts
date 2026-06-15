@@ -5,13 +5,13 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { InventoryListPageComponent } from './inventory-list-page.component';
-import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
-import { InventorySupplyApiService } from '@/api/services/inventory-supply-api.service';
+import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import type { InventoryRow } from './inventory-row';
-import { itemToRow, supplyToRow } from './inventory-row';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import { durableToRow, consumableToRow } from './inventory-row';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 
@@ -24,7 +24,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   } as unknown as typeof ResizeObserver;
 }
 
-function makeItem(over: Partial<ItemResponse>): ItemResponse {
+function makeItem(over: Partial<DurableResponse>): DurableResponse {
   return {
     id: 'x',
     name: 'Item',
@@ -38,10 +38,10 @@ function makeItem(over: Partial<ItemResponse>): ItemResponse {
   };
 }
 
-function makeSupply(over: Partial<SupplyResponse>): SupplyResponse {
+function makeConsumable(over: Partial<ConsumableResponse>): ConsumableResponse {
   return {
     id: 's',
-    name: 'Supply',
+    name: 'Consumable',
     status: 'Active',
     unit: 'pcs',
     totalOnHand: 0,
@@ -72,14 +72,14 @@ const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemSt
 
 // tape: stocked in the garage area ; screws: split chest(4) + garage(6), low ;
 // glue: zero stock ; loose: stocked in an unplaced container (no area root)
-const TAPE = makeSupply({
+const TAPE = makeConsumable({
   id: 'tape', name: 'Tape', totalOnHand: 5,
   stockLocations: [{
     id: 'e-tape', quantity: 5, areaId: GARAGE,
     path: [{ id: GARAGE, name: 'Garage', kind: 'Area' }], locationLabel: 'Garage',
   }],
 });
-const SCREWS = makeSupply({
+const SCREWS = makeConsumable({
   id: 'screws', name: 'Wood screws', totalOnHand: 10, isLow: true,
   stockLocations: [
     {
@@ -96,8 +96,8 @@ const SCREWS = makeSupply({
     },
   ],
 });
-const GLUE = makeSupply({ id: 'glue', name: 'Glue', totalOnHand: 0 });
-const LOOSE = makeSupply({
+const GLUE = makeConsumable({ id: 'glue', name: 'Glue', totalOnHand: 0 });
+const LOOSE = makeConsumable({
   id: 'loose', name: 'Loose washers', totalOnHand: 3,
   stockLocations: [{
     id: 'e-loose', quantity: 3, containerItemId: 'floatbin',
@@ -105,36 +105,36 @@ const LOOSE = makeSupply({
   }],
 });
 
-class StubItemApi {
+class StubDurableApi {
   // Honors the server-side filters the page uses: ParentItemId (drill-down) and Search.
-  getItems = (p: { ParentItemId?: string; Search?: string }) => {
+  getDurables = (p: { ParentItemId?: string; Search?: string }) => {
     let items = p?.ParentItemId ? ITEMS.filter(i => i.parentItemId === p.ParentItemId) : ITEMS;
     if (p?.Search) items = items.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase()));
     return of({ items, page: 1, pageSize: 200, totalCount: items.length });
   };
-  getItem = (p: { id: string }) => {
+  getDurable = (p: { id: string }) => {
     const found = ITEMS.find(i => i.id === p.id);
     return found ? of(found) : throwError(() => new Error('404'));
   };
-  patchItem = () => of(makeItem({}));
-  deleteItem = () => of(undefined);
+  patchDurable = () => of(makeItem({}));
+  deleteDurable = () => of(undefined);
 }
-class StubSupplyApi {
-  getSupplies = (p?: { Search?: string }) => {
+class StubConsumableApi {
+  getConsumables = (p?: { Search?: string }) => {
     const items = p?.Search
-      ? SUPPLIES.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()))
-      : SUPPLIES;
+      ? CONSUMABLES.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()))
+      : CONSUMABLES;
     return of({ items, page: 1, pageSize: 200, totalCount: items.length });
   };
-  patchSupply = () => of(makeSupply({}));
-  deleteSupply = () => of(undefined);
+  patchConsumable = () => of(makeConsumable({}));
+  deleteConsumable = () => of(undefined);
 }
 class StubAreaApi {
   getAreas = () => of({ items: AREAS, page: 1, pageSize: 200, totalCount: AREAS.length });
 }
 
-const ITEMS: ItemResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING, LADDER];
-const SUPPLIES: SupplyResponse[] = [TAPE, SCREWS, GLUE, LOOSE];
+const ITEMS: DurableResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING, LADDER];
+const CONSUMABLES: ConsumableResponse[] = [TAPE, SCREWS, GLUE, LOOSE];
 const AREAS: AreaResponse[] = [{ id: GARAGE, name: 'Garage', liveItemCount: 0, createdAt: '', updatedAt: '' }];
 
 describe('InventoryListPageComponent', () => {
@@ -148,8 +148,8 @@ describe('InventoryListPageComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: InventoryItemApiService, useValue: new StubItemApi() },
-        { provide: InventorySupplyApiService, useValue: new StubSupplyApi() },
+        { provide: InventoryDurableApiService, useValue: new StubDurableApi() },
+        { provide: InventoryConsumableApiService, useValue: new StubConsumableApi() },
         { provide: InventoryAreaApiService, useValue: new StubAreaApi() },
       ],
     });
@@ -168,35 +168,35 @@ describe('InventoryListPageComponent', () => {
     return component['scopedRows']();
   }
 
-  // Let the drill-down's server fetch (getItem + getItems(ParentItemId)) resolve.
+  // Let the drill-down's server fetch (getDurable + getDurables(ParentItemId)) resolve.
   async function settle(): Promise<void> {
     fixture.detectChanges();
     await fixture.whenStable();
   }
 
-  it('loads both items and supplies into one row set', () => {
-    expect(component.allItems().length).toBe(ITEMS.length);
-    expect(component.allSupplies().length).toBe(SUPPLIES.length);
-    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+  it('loads both items and consumables into one row set', () => {
+    expect(component.allDurables().length).toBe(ITEMS.length);
+    expect(component.allConsumables().length).toBe(CONSUMABLES.length);
+    expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
-  it('kind filter narrows to items or supplies', () => {
-    component.kindFilter.set('items');
+  it('kind filter narrows to items or consumables', () => {
+    component.kindFilter.set('durables');
     expect(ids(component['kindRows']())).toEqual(['archived', 'bin', 'chest', 'floating', 'ladder', 'screw', 'wrench']);
 
-    component.kindFilter.set('supplies');
+    component.kindFilter.set('consumables');
     expect(ids(component['kindRows']())).toEqual(['glue', 'loose', 'screws', 'tape']);
 
     component.kindFilter.set('all');
-    expect(component['kindRows']().length).toBe(ITEMS.length + SUPPLIES.length);
+    expect(component['kindRows']().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
-  it('resolved-area filter matches nested items and supplies stocked there', () => {
+  it('resolved-area filter matches nested items and consumables stocked there', () => {
     component.areaFilter.set(GARAGE);
-    // Items that walk up to Garage plus supplies with stock resolving to Garage —
+    // Items that walk up to Garage plus consumables with stock resolving to Garage —
     // including screws, whose second entry sits inside the chest container.
     expect(ids(scopedRows())).toEqual(['archived', 'bin', 'chest', 'ladder', 'screw', 'screws', 'tape', 'wrench']);
-    // The zero-stock supply only appears under "All areas".
+    // The zero-stock consumable only appears under "All areas".
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
   });
 
@@ -207,8 +207,8 @@ describe('InventoryListPageComponent', () => {
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
   });
 
-  it('drill-down scopes to direct item children plus supplies stocked in the container', async () => {
-    component.onViewContents(itemToRow(CHEST));
+  it('drill-down scopes to direct item children plus consumables stocked in the container', async () => {
+    component.onViewContents(durableToRow(CHEST));
     await settle();
     expect(ids(scopedRows())).toEqual(['archived', 'bin', 'screws', 'wrench']);
     // Show-inactive off by default hides the archived direct child.
@@ -217,7 +217,7 @@ describe('InventoryListPageComponent', () => {
     expect(scopedRows().some(r => r.id === 'screw')).toBe(false);
   });
 
-  it('drilled supply rows show the local quantity with an of-total hint', async () => {
+  it('drilled consumable rows show the local quantity with an of-total hint', async () => {
     component.containerFilter.set('chest');
     await settle();
     const screws = scopedRows().find(r => r.id === 'screws')!;
@@ -226,7 +226,7 @@ describe('InventoryListPageComponent', () => {
     expect(screws.locationText).toBe('Garage › Tool chest');
   });
 
-  it('low-stock filter keeps only low supplies (the reorder view)', () => {
+  it('low-stock filter keeps only low consumables (the reorder view)', () => {
     component.lowStockOnly.set(true);
     expect(ids(component.visibleRows())).toEqual(['screws']);
     expect(component.lowCount()).toBe(1);
@@ -253,7 +253,7 @@ describe('InventoryListPageComponent', () => {
   });
 
   it('builds a breadcrumb from the container path plus its own name', async () => {
-    component.onViewContents(itemToRow(BIN));
+    component.onViewContents(durableToRow(BIN));
     await settle();
     const crumb = component.breadcrumb();
     expect(crumb.map(s => s.name)).toEqual(['Garage', 'Tool chest', 'Bin']);
@@ -272,24 +272,24 @@ describe('InventoryListPageComponent', () => {
   });
 
   it('shows the rejection reason inline and keeps the dialog open when a delete is blocked', () => {
-    const supplyApi = TestBed.inject(InventorySupplyApiService) as unknown as StubSupplyApi;
-    supplyApi.deleteSupply = () => throwError(() => new HttpErrorResponse({
+    const consumableApi = TestBed.inject(InventoryConsumableApiService) as unknown as StubConsumableApi;
+    consumableApi.deleteConsumable = () => throwError(() => new HttpErrorResponse({
       status: 400,
-      error: { detail: 'This supply has stock history — archive it instead.' },
+      error: { detail: 'This consumable has stock history — archive it instead.' },
     }));
 
-    component.onDeleteRequest(supplyToRow(SCREWS));
+    component.onDeleteRequest(consumableToRow(SCREWS));
     expect(component.deleteError()).toBe('');
     let closed = false;
     component.confirmDelete({ close: () => { closed = true; } });
 
     expect(closed).toBe(false);
-    expect(component.deleteError()).toBe('This supply has stock history — archive it instead.');
+    expect(component.deleteError()).toBe('This consumable has stock history — archive it instead.');
     expect(component.pendingDelete()?.id).toBe('screws');
     expect(component.deleting()).toBe(false);
 
     // Re-requesting a delete starts with a clean slate.
-    component.onDeleteRequest(supplyToRow(TAPE));
+    component.onDeleteRequest(consumableToRow(TAPE));
     expect(component.deleteError()).toBe('');
   });
 
@@ -307,8 +307,8 @@ describe('InventoryListPageComponent', () => {
 
   it('passes the committed search term to both server fetches', async () => {
     await navigateSearch('screw');
-    expect(ids(component.allItems().map(itemToRow))).toEqual(['screw']);
-    expect(ids(component.allSupplies().map(supplyToRow))).toEqual(['screws']);
+    expect(ids(component.allDurables().map(durableToRow))).toEqual(['screw']);
+    expect(ids(component.allConsumables().map(consumableToRow))).toEqual(['screws']);
     expect(ids(scopedRows())).toEqual(['screw', 'screws']);
   });
 
@@ -337,7 +337,7 @@ describe('InventoryListPageComponent', () => {
     await navigateSearch('screw');
     component.searchInput.set('screw');
 
-    component.onViewContents(itemToRow(CHEST));
+    component.onViewContents(durableToRow(CHEST));
     await settle();
     expect(component.searchInput()).toBe('');
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
@@ -350,7 +350,7 @@ describe('InventoryListPageComponent', () => {
 
   it('re-committing the same term immediately after a programmatic clear still searches', async () => {
     await navigateSearch('screw');
-    component.onViewContents(itemToRow(CHEST)); // clears search, enters drill
+    component.onViewContents(durableToRow(CHEST)); // clears search, enters drill
     await settle();
     expect(component.searchInput()).toBe('');
 
@@ -369,14 +369,14 @@ describe('InventoryListPageComponent', () => {
     // e.g. a sidebar link or history traversal removing the param while the component is reused.
     await navigateSearch(null);
     expect(component.searchInput()).toBe('');
-    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+    expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
   it('never commits whitespace-only or untrimmed terms to the URL', async () => {
     component.searchInput.set('   ');
     await flushDebounce();
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
-    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+    expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
 
     component.searchInput.set('screw ');
     await flushDebounce();
@@ -392,7 +392,7 @@ describe('InventoryListPageComponent', () => {
     expect(component.searchInput()).toBe('');
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
     expect(component.lowStockOnly()).toBe(false);
-    expect(scopedRows().length).toBe(ITEMS.length + SUPPLIES.length);
+    expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
   it('lent-only filter keeps only Lent rows', () => {
@@ -434,9 +434,9 @@ describe('InventoryListPageComponent', () => {
     });
 
     it('?area and ?kind seed their filters together (the unplaced tile link)', async () => {
-      const c = await createWithParams({ area: 'unplaced', kind: 'items' });
+      const c = await createWithParams({ area: 'unplaced', kind: 'durables' });
       expect(c.areaFilter()).toBe('unplaced');
-      expect(c.kindFilter()).toBe('items');
+      expect(c.kindFilter()).toBe('durables');
       expect(ids(c.visibleRows())).toEqual(['floating']);
       const stripped = TestBed.inject(Router).routerState.snapshot.root.queryParams;
       expect(stripped['area']).toBeUndefined();
@@ -465,22 +465,22 @@ describe('InventoryListPageComponent', () => {
   });
 
   it('dispatches open and edit by row kind', () => {
-    component.onOpen(itemToRow(CHEST));
-    expect(component.quickPanelItem()).toBe(CHEST);
-    expect(component.itemQuickPanelState()).toBe('open');
-    expect(component.supplyQuickPanelState()).toBe('closed');
+    component.onOpen(durableToRow(CHEST));
+    expect(component.quickPanelDurable()).toBe(CHEST);
+    expect(component.durableQuickPanelState()).toBe('open');
+    expect(component.consumableQuickPanelState()).toBe('closed');
 
-    component.onOpen(supplyToRow(TAPE));
-    expect(component.quickPanelSupply()).toBe(TAPE);
-    expect(component.supplyQuickPanelState()).toBe('open');
+    component.onOpen(consumableToRow(TAPE));
+    expect(component.quickPanelConsumable()).toBe(TAPE);
+    expect(component.consumableQuickPanelState()).toBe('open');
 
-    component.onEdit(itemToRow(WRENCH));
-    expect(component.selectedItem()).toBe(WRENCH);
-    expect(component.itemSheetState()).toBe('open');
-    expect(component.supplySheetState()).toBe('closed');
+    component.onEdit(durableToRow(WRENCH));
+    expect(component.selectedDurable()).toBe(WRENCH);
+    expect(component.durableSheetState()).toBe('open');
+    expect(component.consumableSheetState()).toBe('closed');
 
-    component.onEdit(supplyToRow(GLUE));
-    expect(component.selectedSupply()).toBe(GLUE);
-    expect(component.supplySheetState()).toBe('open');
+    component.onEdit(consumableToRow(GLUE));
+    expect(component.selectedConsumable()).toBe(GLUE);
+    expect(component.consumableSheetState()).toBe('open');
   });
 });

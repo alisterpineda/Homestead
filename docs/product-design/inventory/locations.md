@@ -29,7 +29,7 @@ Areas form a **hierarchy** via the optional `ParentAreaId` (`House › Basement 
 
 **Placement is any-level**: an area can hold sub-areas *and* its own direct items/containers at the same time — there is no leaf-only restriction (an area behaves like a container in this respect). **Nesting depth is unbounded** (mirroring "containers nest to any depth"); the only structural guard is cycle prevention.
 
-**Resolution & roll-up.** `ResolvedAreaId` stays the **leaf** area an item/stock directly sits in (e.g. Bedroom) — unchanged by nesting. What changes is that the displayed **path** gains the full area-ancestor chain above the leaf (`House › Basement › Bedroom › Chest › Bin`), and **counts roll up**: every ancestor area's count includes its descendant areas' contents (a drill in Bedroom counts toward Bedroom, Basement, *and* House). A supply type stocked in two sub-areas counts **once** for a shared ancestor (set-union dedup), so the rolled card count still equals what the area-filtered list shows. This is computed at read time by two walks that must stay in lock-step — `ItemLocationResolver` (per-item path) and `InventoryPlacementService` (aggregate counts).
+**Resolution & roll-up.** `ResolvedAreaId` stays the **leaf** area an item/stock directly sits in (e.g. Bedroom) — unchanged by nesting. What changes is that the displayed **path** gains the full area-ancestor chain above the leaf (`House › Basement › Bedroom › Chest › Bin`), and **counts roll up**: every ancestor area's count includes its descendant areas' contents (a drill in Bedroom counts toward Bedroom, Basement, *and* House). A consumable type stocked in two sub-areas counts **once** for a shared ancestor (set-union dedup), so the rolled card count still equals what the area-filtered list shows. This is computed at read time by two walks that must stay in lock-step — `ItemLocationResolver` (per-item path) and `InventoryPlacementService` (aggregate counts).
 
 **Creating** an area needs a name and an optional parent. **Editing** changes the name and/or re-parents the area (including promoting it to a root by clearing the parent); re-parenting moves the whole subtree with it automatically, since resolution is derived and nothing cascades. **Deleting** is governed by what currently points at it — see *Area lifecycle* below.
 
@@ -82,9 +82,9 @@ A **container** is a non-fungible item whose `IsContainer` role is on. Its conte
 
 **Typing invariants** (application-enforced — they span rows and cannot be plain check constraints):
 
-- A `ParentItemId` must reference a **non-fungible** item with `IsContainer = true`. A fungible supply can never be a parent, and a non-container item can never hold contents.
+- A `ParentItemId` must reference a **non-fungible** item with `IsContainer = true`. A fungible consumable can never be a parent, and a non-container item can never hold contents.
 - A `StockEntry.ContainerItemId` must likewise reference a non-fungible `IsContainer = true` item.
-- `IsContainer` may be **on only for non-fungible items** — never for a fungible supply.
+- `IsContainer` may be **on only for non-fungible items** — never for a fungible consumable.
 - `IsContainer` **cannot be switched off** while the item still has any child item or any stock entry pointing at it. Empty it first.
 
 **Nesting and cycles.** Containers nest to any depth (bin in cupboard in garage). Because containment is a parent chain, a move must not create a cycle: an item cannot be placed inside itself or inside any of its own descendants. Moving a container therefore validates that the proposed new parent is not the item itself or anywhere in its subtree, by walking up from the target. This is the one structural guard on moves.
@@ -116,11 +116,11 @@ Concretely, the supported moves are:
 - **Into a container** — set `ParentItemId` (to a valid container, cycle-checked), clear `AreaId`. An optional `Compartment` free-text note ("top drawer") can record sub-position within the parent; it is descriptive only and anchors nothing.
 - **Out to Unplaced** — clear both.
 
-A fungible supply is never "moved" as a unit — its stock is transferred between locations entry-by-entry; see [stock.md](stock.md#transfers).
+A fungible consumable is never "moved" as a unit — its stock is transferred between locations entry-by-entry; see [stock.md](stock.md#transfers).
 
 ## Non-fungible item lifecycle
 
-An item's `Status` records the state of the physical object. Non-fungible items use the full set; fungible supplies are restricted to `Active`/`Archived` (see [stock.md](stock.md#fungible-status)).
+An item's `Status` records the state of the physical object. Non-fungible items use the full set; fungible consumables are restricted to `Active`/`Archived` (see [stock.md](stock.md#fungible-status)).
 
 | Status | Meaning | In default views? | Terminal? |
 |---|---|---|---|
@@ -164,7 +164,7 @@ This mirrors `accounts.md`'s rule that Delete is present but disabled once an ac
 Deleting an area is governed by what references it:
 
 - **Blocked while it has sub-areas** — a parent can't be removed out from under its children. The handler raises a friendly "Area has sub-areas and cannot be deleted. Move or delete them first." ahead of the FK (`ParentAreaId` is `Restrict`, the same backstop the container chain uses). Checked first — it's the cheapest guard. Re-parent or delete the children first.
-- **Blocked while anything live resolves to it** — the same resolved count the areas table and the overview's place cards show (live items resolving there directly or via container chains, plus distinct supplies with live stock resolving there), so the UI's delete gating and the backend rule can't disagree. Additionally blocked by **any stock entry directly in the area regardless of supply status** — an archived supply's stock is hidden from counts and lists but still sits there (a stock entry requires exactly one location), so it must be moved or used up first. Move or retire the rest first.
+- **Blocked while anything live resolves to it** — the same resolved count the areas table and the overview's place cards show (live items resolving there directly or via container chains, plus distinct consumables with live stock resolving there), so the UI's delete gating and the backend rule can't disagree. Additionally blocked by **any stock entry directly in the area regardless of consumable status** — an archived consumable's stock is hidden from counts and lists but still sits there (a stock entry requires exactly one location), so it must be moved or used up first. Move or retire the rest first.
 - **Historical movement references survive a deletion.** The movement ledger records the area an inflow/outflow/transfer happened at; those references are cleared (set null) rather than blocking the delete, so the quantity history and what happened to it persist even though the now-deleted area's label is gone.
 
 **Re-parenting** is a metadata edit (PATCH `/parentAreaId`), not a move of contents: because an item's area is *derived* by walking up, moving an area to a new parent automatically takes its whole subtree with it — nothing cascades. The only rule is a **cycle guard**: an area cannot be set as its own parent, nor moved underneath any of its own descendants. The walk climbs from the proposed parent up its `ParentAreaId` chain and rejects (`BusinessRuleException`) if it reaches the area being moved — exactly mirroring the container cycle check on `ParentItemId`. Setting the parent to `null` promotes the area to a root.

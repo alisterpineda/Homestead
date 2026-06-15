@@ -24,11 +24,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 
 const OVERVIEW: GetInventoryOverviewResponse = {
   lowStockCount: 0,
-  lowStockSupplies: [],
+  lowStockConsumables: [],
   lentCount: 0,
-  lentItems: [],
+  lentDurables: [],
   unplacedCount: 2,
-  unplacedItems: [],
+  unplacedDurables: [],
   areas: [
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },
     { id: 'office', name: 'Office', itemCount: 0, lowStockCount: 0 },
@@ -50,7 +50,7 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
     id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active',
     isContainer: false, path: [], createdAt: '', updatedAt: '',
   }],
-  supplies: [],
+  consumables: [],
 };
 
 // A three-level nested-area drill (House › Basement › Bedroom), for exercising the multi-segment
@@ -70,7 +70,7 @@ const NESTED_AREA_CONTENTS: PlaceContentsResponse = {
   childAreas: [],
   containers: [],
   items: [],
-  supplies: [],
+  consumables: [],
 };
 
 class StubOverviewApi {
@@ -96,7 +96,7 @@ class TitleHostComponent {
   protected header = inject(PageHeaderService);
 }
 
-/** Stand-in for the real item detail page — the target of a container's opt-in "Details" button. */
+/** Stand-in for the real durable detail page — the target of a container's opt-in "Details" button. */
 @Component({
   selector: 'test-item-detail-stub',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,7 +131,7 @@ describe('InventoryBrowsePageComponent', () => {
           // Containers drill within Browse (Explore); the opt-in "Details" button routes to the detail page.
           { path: 'inventory/browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
           { path: 'inventory/browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
-          { path: 'inventory/items/:id', component: ItemDetailStubComponent },
+          { path: 'inventory/durables/:id', component: ItemDetailStubComponent },
         ]),
         { provide: InventoryOverviewApiService, useValue: api },
         { provide: InventoryPlaceApiService, useValue: placeApi },
@@ -213,7 +213,7 @@ describe('InventoryBrowsePageComponent', () => {
     api.response = {
       ...OVERVIEW,
       lowStockCount: 1,
-      lowStockSupplies: [{ id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 }],
+      lowStockConsumables: [{ id: 'glue', name: 'Glue', totalOnHand: 0, unit: 'tubes', restockThreshold: 5 }],
     };
     const { harness } = await navigate('/inventory/browse');
     expect(text(harness)).toContain('Needs attention');
@@ -237,7 +237,7 @@ describe('InventoryBrowsePageComponent', () => {
     placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 2, scopedLentCount: 0 };
     const { harness } = await navigate('/inventory/browse/area/garage');
 
-    expect(text(harness)).toContain('Low supplies stored here');
+    expect(text(harness)).toContain('Low consumables stored here');
     expect(hrefs(harness)).toContain('/inventory/items?area=garage&lowStock=true');
   });
 
@@ -295,7 +295,7 @@ describe('InventoryBrowsePageComponent', () => {
       isContainer: true, path: [], createdAt: '', updatedAt: '',
     });
 
-    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/durables', 'chest']);
   });
 
   it('drills into Unplaced with the Unplaced flag', async () => {
@@ -349,7 +349,7 @@ describe('InventoryBrowsePageComponent', () => {
   });
 
   it('renders a container-scoped low-stock alert and lent status chip from direct counts', async () => {
-    // Direct children: one low supply (alert panel) + one lent item (status chip), both client-side
+    // Direct children: one low consumable (alert panel) + one lent durable (status chip), both client-side
     // counted and container-filtered. Lent is a neutral status now, so it lands in the status row.
     placeApi.contents = {
       ...GARAGE_CONTENTS,
@@ -362,8 +362,8 @@ describe('InventoryBrowsePageComponent', () => {
         id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent',
         isContainer: false, path: [], createdAt: '', updatedAt: '',
       }],
-      supplies: [{
-        supply: {
+      consumables: [{
+        consumable: {
           id: 'screws', name: 'Wood screws', status: 'Active', unit: 'pcs',
           totalOnHand: 4, isLow: true, createdAt: '', updatedAt: '', stockLocations: [],
         },
@@ -373,7 +373,7 @@ describe('InventoryBrowsePageComponent', () => {
     const { harness } = await navigate('/inventory/browse/container/chest');
 
     const content = text(harness);
-    expect(content).toContain('Low supplies stored here');
+    expect(content).toContain('Low consumables stored here');
     // Lent is no longer an alert panel — it's a status chip in the "Browse by status" row.
     expect(content).not.toContain('Items lent from here');
     expect(content).toContain('Browse by status');

@@ -33,7 +33,7 @@ public class PatchAreaHandler(
             throw new BusinessRuleException("Name must be 128 characters or fewer.");
 
         // Re-parenting (move-with-contents is automatic — resolution is derived, nothing cascades).
-        // A null parent promotes to root. The cycle guard mirrors PatchItemHandler's container check.
+        // A null parent promotes to root. The cycle guard mirrors PatchDurableHandler's container check.
         if (model.ParentAreaId != area.ParentAreaId)
         {
             if (model.ParentAreaId is { } newParentId)

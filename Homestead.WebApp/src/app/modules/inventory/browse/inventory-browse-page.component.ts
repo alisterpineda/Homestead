@@ -27,12 +27,12 @@ import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.c
 import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
 import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
 import { InventoryStatusChipsComponent, type StatusChipsScope } from './inventory-status-chips.component';
-import { ItemQuickPanelComponent } from '../items/item-quick-panel/item-quick-panel.component';
-import { SupplyQuickPanelComponent } from '../supplies/supply-quick-panel/supply-quick-panel.component';
+import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
+import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 /**
@@ -56,8 +56,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     PlaceBrowserComponent,
     InventoryWarningPanelsComponent,
     InventoryStatusChipsComponent,
-    ItemQuickPanelComponent,
-    SupplyQuickPanelComponent,
+    DurableQuickPanelComponent,
+    ConsumableQuickPanelComponent,
   ],
   providers: [provideIcons({ lucideCircleAlert, lucideSearch })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -115,9 +115,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             hlmInput
-            placeholder="Search items and supplies..."
+            placeholder="Search items..."
             class="h-10 w-full pl-9"
-            aria-label="Search items and supplies"
+            aria-label="Search items"
             [value]="searchInput()"
             (input)="searchInput.set($any($event.target).value)"
           />
@@ -139,25 +139,25 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         [place]="placeRef()"
         [contents]="placeContents()"
         [error]="drillError()"
-        (openItem)="onOpenItem($event)"
-        (openSupply)="onOpenSupply($event)"
+        (openDurable)="onOpenDurable($event)"
+        (openConsumable)="onOpenConsumable($event)"
         (containerDetails)="onContainerDetails($event)"
         (changed)="onChanged()"
       />
     </div>
 
-    <app-item-quick-panel
-      [item]="quickPanelItem()"
-      [state]="itemQuickPanelState()"
+    <app-durable-quick-panel
+      [durable]="quickPanelDurable()"
+      [state]="durableQuickPanelState()"
       (changed)="onChanged()"
-      (closed)="onItemQuickPanelClosed()"
+      (closed)="onDurableQuickPanelClosed()"
     />
 
-    <app-supply-quick-panel
-      [supply]="quickPanelSupply()"
-      [state]="supplyQuickPanelState()"
+    <app-consumable-quick-panel
+      [consumable]="quickPanelConsumable()"
+      [state]="consumableQuickPanelState()"
       (changed)="onChanged()"
-      (closed)="onSupplyQuickPanelClosed()"
+      (closed)="onConsumableQuickPanelClosed()"
     />
   `,
 })
@@ -295,7 +295,7 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     // exactly what its filter shows. Trade-off: nested sub-containers aren't counted.
     const param: Record<string, string> = { container: ref.id };
     return {
-      lowStockCount: c.supplies.filter(s => s.supply.isLow).length,
+      lowStockCount: c.consumables.filter(s => s.consumable.isLow).length,
       lentCount: c.items.filter(i => i.status === 'Lent').length
                + c.containers.filter(cc => cc.status === 'Lent').length,
       param,
@@ -327,10 +327,10 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     return d ? { kind: 'place', lentCount: d.lentCount, lentParams: { lent: 'true', ...d.param } } : null;
   });
 
-  quickPanelItem = signal<ItemResponse | null>(null);
-  itemQuickPanelState = signal<BrnDialogState>('closed');
-  quickPanelSupply = signal<SupplyResponse | null>(null);
-  supplyQuickPanelState = signal<BrnDialogState>('closed');
+  quickPanelDurable = signal<DurableResponse | null>(null);
+  durableQuickPanelState = signal<BrnDialogState>('closed');
+  quickPanelConsumable = signal<ConsumableResponse | null>(null);
+  consumableQuickPanelState = signal<BrnDialogState>('closed');
 
   constructor() {
     // Register the header breadcrumb while drilled, clear it at root (the route title "Browse"
@@ -361,28 +361,28 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     void this.router.navigate(['/inventory/items'], { queryParams: { search: term || null } });
   }
 
-  onOpenItem(item: ItemResponse): void {
-    this.quickPanelItem.set(item);
-    this.itemQuickPanelState.set('open');
+  onOpenDurable(durable: DurableResponse): void {
+    this.quickPanelDurable.set(durable);
+    this.durableQuickPanelState.set('open');
   }
 
-  onOpenSupply(supply: SupplyResponse): void {
-    this.quickPanelSupply.set(supply);
-    this.supplyQuickPanelState.set('open');
+  onOpenConsumable(consumable: ConsumableResponse): void {
+    this.quickPanelConsumable.set(consumable);
+    this.consumableQuickPanelState.set('open');
   }
 
-  onItemQuickPanelClosed(): void {
-    this.itemQuickPanelState.set('closed');
+  onDurableQuickPanelClosed(): void {
+    this.durableQuickPanelState.set('closed');
   }
 
-  // Keeps quickPanelSupply set: a close-triggered stepper flush may still be committing, and the
-  // panel needs the supply id until it settles. Reopening reseeds the panel via its open-keyed state.
-  onSupplyQuickPanelClosed(): void {
-    this.supplyQuickPanelState.set('closed');
+  // Keeps quickPanelConsumable set: a close-triggered stepper flush may still be committing, and the
+  // panel needs the consumable id until it settles. Reopening reseeds the panel via its open-keyed state.
+  onConsumableQuickPanelClosed(): void {
+    this.consumableQuickPanelState.set('closed');
   }
 
   /** The drilled container's "Details" button — the deliberate Explore→Detail step into its record. */
-  onContainerDetails(item: ItemResponse): void {
-    void this.router.navigate(['/inventory/items', item.id]);
+  onContainerDetails(durable: DurableResponse): void {
+    void this.router.navigate(['/inventory/durables', durable.id]);
   }
 }

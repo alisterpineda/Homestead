@@ -30,7 +30,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
     private const string LentToRequiresLentSql =
         "\"LentTo\" IS NULL OR \"Status\" = 'Lent'";
 
-    // Fungible supplies use the reduced Active/Archived lifecycle only.
+    // Fungible consumables use the reduced Active/Archived lifecycle only.
     private const string FungibleStatusSql =
         "\"Fungibility\" = 'NonFungible' OR \"Status\" IN ('Active', 'Archived')";
 

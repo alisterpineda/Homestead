@@ -53,10 +53,10 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
         return item;
     }
 
-    private async Task<Item> AddSupplyAsync(
+    private async Task<Item> AddConsumableAsync(
         string name, decimal? threshold = null, ItemStatus status = ItemStatus.Active)
     {
-        var supply = new Item
+        var consumable = new Item
         {
             Id = Guid.NewGuid(),
             Name = name,
@@ -65,18 +65,18 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
             Unit = "units",
             RestockThreshold = threshold,
         };
-        _db.Items.Add(supply);
+        _db.Items.Add(consumable);
         await _db.SaveChangesAsync(Ct);
-        return supply;
+        return consumable;
     }
 
     private async Task AddStockAsync(
-        Guid supplyId, decimal quantity, Guid? areaId = null, Guid? containerItemId = null)
+        Guid consumableId, decimal quantity, Guid? areaId = null, Guid? containerItemId = null)
     {
         _db.StockEntries.Add(new StockEntry
         {
             Id = Guid.NewGuid(),
-            ItemId = supplyId,
+            ItemId = consumableId,
             AreaId = areaId,
             ContainerItemId = containerItemId,
             Quantity = quantity,
@@ -102,12 +102,12 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Compute_SupplyInTwoSubBins_CountsOncePerAncestorAndArea()
+    public async Task Compute_ConsumableInTwoSubBins_CountsOncePerAncestorAndArea()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         var binA = await AddItemAsync("Bin A", parentItemId: chest.Id, isContainer: true);
         var binB = await AddItemAsync("Bin B", parentItemId: chest.Id, isContainer: true);
-        var screws = await AddSupplyAsync("Screws");
+        var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: binA.Id);
         await AddStockAsync(screws.Id, 5m, containerItemId: binB.Id);
 
@@ -124,7 +124,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     public async Task Compute_StockEntryChain_IncludesHoldingContainer()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var screws = await AddSupplyAsync("Screws");
+        var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -139,9 +139,9 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
-        var lowGlue = await AddSupplyAsync("Glue", threshold: 5m);
+        var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 3m, containerItemId: bin.Id);
-        var ampleTape = await AddSupplyAsync("Tape", threshold: 5m);
+        var ampleTape = await AddConsumableAsync("Tape", threshold: 5m);
         await AddStockAsync(ampleTape.Id, 50m, containerItemId: bin.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -158,7 +158,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
         var pantry = new Area { Id = Guid.NewGuid(), Name = "Pantry" };
         _db.Areas.Add(pantry);
         await _db.SaveChangesAsync(Ct);
-        var rice = await AddSupplyAsync("Rice", threshold: 5m);
+        var rice = await AddConsumableAsync("Rice", threshold: 5m);
         await AddStockAsync(rice.Id, 3m, areaId: _garage.Id);
         await AddStockAsync(rice.Id, 4m, areaId: pantry.Id);
 
@@ -168,17 +168,17 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Compute_LowStock_ExcludesArchivedSupplies()
+    public async Task Compute_LowStock_ExcludesArchivedConsumables()
     {
-        var archived = await AddSupplyAsync("Old glue", threshold: 5m, status: ItemStatus.Archived);
+        var archived = await AddConsumableAsync("Old glue", threshold: 5m, status: ItemStatus.Archived);
         await AddStockAsync(archived.Id, 1m, areaId: _garage.Id);
-        var live = await AddSupplyAsync("Glue", threshold: 5m);
+        var live = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(live.Id, 1m, areaId: _garage.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
 
         Assert.Equal(1, placement.AreaLowStockCounts[_garage.Id]);
-        // The archived supply's stock entry doesn't count it toward the area total either.
+        // The archived consumable's stock entry doesn't count it toward the area total either.
         Assert.Equal(1, placement.AreaItemCounts[_garage.Id]);
     }
 
@@ -232,13 +232,13 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_DirectPlusNested_EqualsAreaItemCount()
     {
-        // Mixed area: direct item, chest with nested item + supply, direct-area supply stock.
+        // Mixed area: direct item, chest with nested item + consumable, direct-area consumable stock.
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
         await AddItemAsync("Direct drill", areaId: _garage.Id);
         await AddItemAsync("Nested wrench", parentItemId: chest.Id);
-        var screws = await AddSupplyAsync("Screws");
+        var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
-        var tape = await AddSupplyAsync("Tape");
+        var tape = await AddConsumableAsync("Tape");
         await AddStockAsync(tape.Id, 2m, areaId: _garage.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -271,14 +271,14 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Compute_NestedAreas_SameSupplyTypeInTwoSubAreas_CountsOnceForAncestor()
+    public async Task Compute_NestedAreas_SameConsumableTypeInTwoSubAreas_CountsOnceForAncestor()
     {
-        // The dedup across sub-areas is load-bearing: one supply type in two children of House
+        // The dedup across sub-areas is load-bearing: one consumable type in two children of House
         // must count once toward House, matching what the House-filtered list shows.
         var house = await AddAreaAsync("House");
         var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        var batteries = await AddSupplyAsync("Batteries");
+        var batteries = await AddConsumableAsync("Batteries");
         await AddStockAsync(batteries.Id, 4m, areaId: basement.Id);
         await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id);
 
@@ -294,7 +294,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     {
         var house = await AddAreaAsync("House");
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        var glue = await AddSupplyAsync("Glue", threshold: 5m);
+        var glue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(glue.Id, 1m, areaId: bedroom.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -336,13 +336,13 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Compute_AreaOwnItemCounts_DedupSupplyTypeWithinOwnScopeOnly()
+    public async Task Compute_AreaOwnItemCounts_DedupConsumableTypeWithinOwnScopeOnly()
     {
-        // Same supply type stocked directly in House and in a sub-area: House's OWN count includes it
+        // Same consumable type stocked directly in House and in a sub-area: House's OWN count includes it
         // once (its own direct entry); the sub-area's entry is NOT folded into House's own count.
         var house = await AddAreaAsync("House");
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        var batteries = await AddSupplyAsync("Batteries");
+        var batteries = await AddConsumableAsync("Batteries");
         await AddStockAsync(batteries.Id, 4m, areaId: house.Id);
         await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id);
 

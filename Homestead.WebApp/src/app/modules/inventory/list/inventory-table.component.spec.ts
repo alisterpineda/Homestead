@@ -1,10 +1,10 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { InventoryTableComponent, type InventorySortState } from './inventory-table.component';
-import { itemToRow, supplyToRow, supplyToDrillRow, formatPath, type InventoryRow } from './inventory-row';
-import type { ItemResponse } from '@/api/generated/models/item-response';
-import type { SupplyResponse } from '@/api/generated/models/supply-response';
+import { durableToRow, consumableToRow, consumableToDrillRow, formatPath, type InventoryRow } from './inventory-row';
+import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 
-function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
+function makeItem(overrides: Partial<DurableResponse> = {}): DurableResponse {
   return {
     id: 'item-1',
     name: 'Cordless drill',
@@ -18,9 +18,9 @@ function makeItem(overrides: Partial<ItemResponse> = {}): ItemResponse {
   };
 }
 
-function makeSupply(overrides: Partial<SupplyResponse> = {}): SupplyResponse {
+function makeConsumable(overrides: Partial<ConsumableResponse> = {}): ConsumableResponse {
   return {
-    id: 'supply-1',
+    id: 'consumable-1',
     name: 'Paper towels',
     status: 'Active',
     unit: 'rolls',
@@ -62,7 +62,7 @@ describe('InventoryTableComponent', () => {
     const col = () => component['_columns']().find(c => c.id === 'location')!;
 
     it('renders an item resolved path joined with ›', () => {
-      const row = itemToRow(makeItem({
+      const row = durableToRow(makeItem({
         resolvedAreaId: 'garage',
         path: [
           { id: 'garage', name: 'Garage', kind: 'Area' },
@@ -76,7 +76,7 @@ describe('InventoryTableComponent', () => {
     });
 
     it('prepends an italic Unplaced for an item chain that resolves to Unplaced', () => {
-      const row = itemToRow(makeItem({
+      const row = durableToRow(makeItem({
         resolvedAreaId: null,
         path: [
           { id: 'cupboard', name: 'Cupboard', kind: 'Container' },
@@ -90,19 +90,19 @@ describe('InventoryTableComponent', () => {
     });
 
     it('renders an italic Unplaced label when the item is directly unplaced', () => {
-      const html = renderCell(col().cell, itemToRow(makeItem({ path: [] })));
+      const html = renderCell(col().cell, durableToRow(makeItem({ path: [] })));
       expect(html).toContain('Unplaced');
       expect(html).toContain('italic');
     });
 
-    it('renders a muted dash for a supply with no stock', () => {
-      const html = renderCell(col().cell, supplyToRow(makeSupply({ totalOnHand: 0 })));
+    it('renders a muted dash for a consumable with no stock', () => {
+      const html = renderCell(col().cell, consumableToRow(makeConsumable({ totalOnHand: 0 })));
       expect(html).toContain('—');
       expect(html).toContain('italic');
     });
 
-    it('renders the single location label for a supply stocked in one place', () => {
-      const row = supplyToRow(makeSupply({
+    it('renders the single location label for a consumable stocked in one place', () => {
+      const row = consumableToRow(makeConsumable({
         stockLocations: [{
           id: 'e1', quantity: 12, areaId: 'garage',
           path: [{ id: 'garage', name: 'Garage', kind: 'Area' }], locationLabel: 'Garage',
@@ -111,8 +111,8 @@ describe('InventoryTableComponent', () => {
       expect(renderCell(col().cell, row)).toContain('Garage');
     });
 
-    it('summarizes a supply spread across locations as a count', () => {
-      const row = supplyToRow(makeSupply({
+    it('summarizes a consumable spread across locations as a count', () => {
+      const row = consumableToRow(makeConsumable({
         stockLocations: [
           {
             id: 'e1', quantity: 8, areaId: 'garage',
@@ -142,7 +142,7 @@ describe('InventoryTableComponent', () => {
 
   describe('name cell (DOM render)', () => {
     it('renders the name, serial subtitle, and a container icon for container rows', () => {
-      fixture.componentRef.setInput('rows', [itemToRow(makeItem({ name: 'Camera', serial: 'SN-9', isContainer: true }))]);
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ name: 'Camera', serial: 'SN-9', isContainer: true }))]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.textContent).toContain('Camera');
@@ -151,25 +151,25 @@ describe('InventoryTableComponent', () => {
     });
 
     it('omits the icon for plain (non-container) item rows', () => {
-      fixture.componentRef.setInput('rows', [itemToRow(makeItem({ isContainer: false }))]);
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ isContainer: false }))]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.querySelector('app-inventory-name-cell ng-icon')).toBeNull();
     });
 
-    it('renders a supply icon for supply rows', () => {
-      fixture.componentRef.setInput('rows', [supplyToRow(makeSupply())]);
+    it('renders a consumable icon for consumable rows', () => {
+      fixture.componentRef.setInput('rows', [consumableToRow(makeConsumable())]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       const icon = host.querySelector('app-inventory-name-cell ng-icon');
       expect(icon).toBeTruthy();
-      expect(icon!.getAttribute('aria-label')).toBe('Supply');
+      expect(icon!.getAttribute('aria-label')).toBe('Consumable');
     });
   });
 
   describe('on hand cell (DOM render)', () => {
-    it('renders quantity, unit, and a Low badge for a low supply', () => {
-      fixture.componentRef.setInput('rows', [supplyToRow(makeSupply({ totalOnHand: 2.5, isLow: true }))]);
+    it('renders quantity, unit, and a Low badge for a low consumable', () => {
+      fixture.componentRef.setInput('rows', [consumableToRow(makeConsumable({ totalOnHand: 2.5, isLow: true }))]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.textContent).toContain('2.5');
@@ -178,15 +178,15 @@ describe('InventoryTableComponent', () => {
     });
 
     it('renders a dash for item rows', () => {
-      fixture.componentRef.setInput('rows', [itemToRow(makeItem())]);
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem())]);
       fixture.detectChanges();
       const cell = fixture.nativeElement.querySelector('app-inventory-onhand-cell') as HTMLElement;
       expect(cell.textContent).toContain('—');
       expect(cell.textContent).not.toContain('Low');
     });
 
-    it('renders the local quantity with the of-total hint for a drilled supply row', () => {
-      const supply = makeSupply({
+    it('renders the local quantity with the of-total hint for a drilled consumable row', () => {
+      const consumable = makeConsumable({
         totalOnHand: 10,
         stockLocations: [
           {
@@ -203,7 +203,7 @@ describe('InventoryTableComponent', () => {
           },
         ],
       });
-      fixture.componentRef.setInput('rows', [supplyToDrillRow(supply, 'chest')!]);
+      fixture.componentRef.setInput('rows', [consumableToDrillRow(consumable, 'chest')!]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.textContent).toContain('4');
@@ -212,11 +212,11 @@ describe('InventoryTableComponent', () => {
   });
 
   it('marks terminal-status rows as muted/italic and all rows as clickable', () => {
-    const sold = itemToRow(makeItem({ status: 'Sold' }));
-    const archivedSupply = supplyToRow(makeSupply({ status: 'Archived' }));
-    const active = itemToRow(makeItem({ status: 'Active' }));
+    const sold = durableToRow(makeItem({ status: 'Sold' }));
+    const archivedConsumable = consumableToRow(makeConsumable({ status: 'Archived' }));
+    const active = durableToRow(makeItem({ status: 'Active' }));
     expect(component['getRowClass'](sold)).toContain('italic');
-    expect(component['getRowClass'](archivedSupply)).toContain('italic');
+    expect(component['getRowClass'](archivedConsumable)).toContain('italic');
     expect(component['getRowClass'](active)).not.toContain('italic');
     expect(component['getRowClass'](active)).toContain('cursor-pointer');
     expect(component['getRowClass'](sold)).toContain('cursor-pointer');
@@ -224,7 +224,7 @@ describe('InventoryTableComponent', () => {
 
   describe('row click', () => {
     it('emits open with the row when a body row is clicked', () => {
-      const row = itemToRow(makeItem({ id: 'clicked', name: 'Camera' }));
+      const row = durableToRow(makeItem({ id: 'clicked', name: 'Camera' }));
       fixture.componentRef.setInput('rows', [row]);
       fixture.detectChanges();
 
@@ -238,7 +238,7 @@ describe('InventoryTableComponent', () => {
     });
 
     it('emits open via keyboard (Enter and Space) on a focused row', () => {
-      const row = supplyToRow(makeSupply({ id: 'kbd' }));
+      const row = consumableToRow(makeConsumable({ id: 'kbd' }));
       fixture.componentRef.setInput('rows', [row]);
       fixture.detectChanges();
 
@@ -254,7 +254,7 @@ describe('InventoryTableComponent', () => {
     });
 
     it('does not emit open when the row-actions trigger is clicked', async () => {
-      const row = itemToRow(makeItem({ id: 'clicked' }));
+      const row = durableToRow(makeItem({ id: 'clicked' }));
       fixture.componentRef.setInput('rows', [row]);
       fixture.detectChanges();
 
@@ -285,7 +285,7 @@ describe('InventoryTableComponent', () => {
   });
 
   it('emits row-action outputs through the table meta', () => {
-    const row = supplyToRow(makeSupply());
+    const row = consumableToRow(makeConsumable());
     let edited: InventoryRow | undefined;
     let viewedContents: InventoryRow | undefined;
     let viewedDetails: InventoryRow | undefined;

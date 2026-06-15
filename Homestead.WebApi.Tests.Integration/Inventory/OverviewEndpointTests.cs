@@ -3,9 +3,9 @@ using Homestead.WebApi.Tests.Integration.Infrastructure;
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 internal record OverviewResult(
-    int LowStockCount, IReadOnlyList<LowStockPreviewItem> LowStockSupplies,
-    int LentCount, IReadOnlyList<LentPreviewItem> LentItems,
-    int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedItems,
+    int LowStockCount, IReadOnlyList<LowStockPreviewItem> LowStockConsumables,
+    int LentCount, IReadOnlyList<LentPreviewItem> LentDurables,
+    int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedDurables,
     IReadOnlyList<AreaSummaryItem> Areas);
 
 internal record LowStockPreviewItem(
@@ -31,16 +31,16 @@ public class OverviewEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<OverviewResult>(CT))!;
     }
 
-    private static async Task<ItemItem> CreateItemAsync(HttpClient client, object body)
+    private static async Task<DurableItem> CreateDurableAsync(HttpClient client, object body)
     {
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/items", body, CT);
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables", body, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        return (await resp.Content.ReadFromJsonAsync<ItemItem>(CT))!;
+        return (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
     }
 
-    private static Task<ItemItem> CreateContainerAsync(
+    private static Task<DurableItem> CreateContainerAsync(
         HttpClient client, string name, Guid? areaId = null, Guid? parentItemId = null) =>
-        CreateItemAsync(client, new { name, areaId, parentItemId, isContainer = true });
+        CreateDurableAsync(client, new { name, areaId, parentItemId, isContainer = true });
 
     private static async Task<Guid> CreateAreaAsync(HttpClient client, string name)
     {
@@ -49,19 +49,19 @@ public class OverviewEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<AreaItem>(CT))!.Id;
     }
 
-    private static async Task<SupplyItem> CreateSupplyAsync(
+    private static async Task<ConsumableItem> CreateConsumableAsync(
         HttpClient client, string name, string unit = "units", decimal? threshold = null)
     {
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/supplies",
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
             new { name, unit, restockThreshold = threshold }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
-        return (await resp.Content.ReadFromJsonAsync<SupplyItem>(CT))!;
+        return (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
     }
 
     private static async Task ReceiveAsync(
-        HttpClient client, Guid supplyId, Guid? areaId, decimal quantity, Guid? containerItemId = null)
+        HttpClient client, Guid consumableId, Guid? areaId, decimal quantity, Guid? containerItemId = null)
     {
-        var resp = await client.PostAsJsonAsync($"/api/v1/inventory/supplies/{supplyId}/receive",
+        var resp = await client.PostAsJsonAsync($"/api/v1/inventory/consumables/{consumableId}/receive",
             new { areaId, containerItemId, quantity }, CT);
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
@@ -72,13 +72,13 @@ public class OverviewEndpointTests : IntegrationTestBase
         var ops = new List<object> { new { op = "replace", path = "/status", value = (object)status } };
         if (lentTo is not null)
             ops.Add(new { op = "replace", path = "/lentTo", value = (object)lentTo });
-        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/items/{itemId}", ops.ToArray());
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{itemId}", ops.ToArray());
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
-    private static async Task PatchSupplyStatusAsync(HttpClient client, Guid supplyId, string status)
+    private static async Task PatchConsumableStatusAsync(HttpClient client, Guid consumableId, string status)
     {
-        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/supplies/{supplyId}",
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/consumables/{consumableId}",
             new[] { new { op = "replace", path = "/status", value = (object)status } });
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
@@ -93,11 +93,11 @@ public class OverviewEndpointTests : IntegrationTestBase
         var overview = await GetOverviewAsync(client);
 
         Assert.Equal(0, overview.LowStockCount);
-        Assert.Empty(overview.LowStockSupplies);
+        Assert.Empty(overview.LowStockConsumables);
         Assert.Equal(0, overview.LentCount);
-        Assert.Empty(overview.LentItems);
+        Assert.Empty(overview.LentDurables);
         Assert.Equal(0, overview.UnplacedCount);
-        Assert.Empty(overview.UnplacedItems);
+        Assert.Empty(overview.UnplacedDurables);
         Assert.Empty(overview.Areas);
     }
 
@@ -107,38 +107,38 @@ public class OverviewEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var areaId = await CreateAreaAsync(client, "Pantry");
 
-        var ample = await CreateSupplyAsync(client, "Ample batteries", "cells", threshold: 5m);
+        var ample = await CreateConsumableAsync(client, "Ample batteries", "cells", threshold: 5m);
         await ReceiveAsync(client, ample.Id, areaId, 20m);
 
-        var atThreshold = await CreateSupplyAsync(client, "Barely-low tape", "rolls", threshold: 5m);
+        var atThreshold = await CreateConsumableAsync(client, "Barely-low tape", "rolls", threshold: 5m);
         await ReceiveAsync(client, atThreshold.Id, areaId, 5m);
 
         // Never received — fully out of stock, the most urgent.
-        var outOfStock = await CreateSupplyAsync(client, "Out-of-stock glue", "tubes", threshold: 5m);
+        var outOfStock = await CreateConsumableAsync(client, "Out-of-stock glue", "tubes", threshold: 5m);
 
-        var noThreshold = await CreateSupplyAsync(client, "Untracked string", "spools");
+        var noThreshold = await CreateConsumableAsync(client, "Untracked string", "spools");
 
-        var archived = await CreateSupplyAsync(client, "Archived screws", "boxes", threshold: 5m);
-        await PatchSupplyStatusAsync(client, archived.Id, "Archived");
+        var archived = await CreateConsumableAsync(client, "Archived screws", "boxes", threshold: 5m);
+        await PatchConsumableStatusAsync(client, archived.Id, "Archived");
 
         var overview = await GetOverviewAsync(client);
 
         Assert.Equal(2, overview.LowStockCount);
-        Assert.Equal(2, overview.LowStockSupplies.Count);
-        Assert.DoesNotContain(overview.LowStockSupplies, s => s.Id == ample.Id);
-        Assert.DoesNotContain(overview.LowStockSupplies, s => s.Id == noThreshold.Id);
-        Assert.DoesNotContain(overview.LowStockSupplies, s => s.Id == archived.Id);
+        Assert.Equal(2, overview.LowStockConsumables.Count);
+        Assert.DoesNotContain(overview.LowStockConsumables, s => s.Id == ample.Id);
+        Assert.DoesNotContain(overview.LowStockConsumables, s => s.Id == noThreshold.Id);
+        Assert.DoesNotContain(overview.LowStockConsumables, s => s.Id == archived.Id);
 
         // Most urgent first: out-of-stock (ratio 0) before at-threshold (ratio 1).
-        Assert.Equal(outOfStock.Id, overview.LowStockSupplies[0].Id);
-        Assert.Equal(0m, overview.LowStockSupplies[0].TotalOnHand);
-        Assert.Equal("tubes", overview.LowStockSupplies[0].Unit);
-        Assert.Equal(5m, overview.LowStockSupplies[0].RestockThreshold);
+        Assert.Equal(outOfStock.Id, overview.LowStockConsumables[0].Id);
+        Assert.Equal(0m, overview.LowStockConsumables[0].TotalOnHand);
+        Assert.Equal("tubes", overview.LowStockConsumables[0].Unit);
+        Assert.Equal(5m, overview.LowStockConsumables[0].RestockThreshold);
 
-        Assert.Equal(atThreshold.Id, overview.LowStockSupplies[1].Id);
-        Assert.Equal(5m, overview.LowStockSupplies[1].TotalOnHand);
-        Assert.Equal("rolls", overview.LowStockSupplies[1].Unit);
-        Assert.Equal(5m, overview.LowStockSupplies[1].RestockThreshold);
+        Assert.Equal(atThreshold.Id, overview.LowStockConsumables[1].Id);
+        Assert.Equal(5m, overview.LowStockConsumables[1].TotalOnHand);
+        Assert.Equal("rolls", overview.LowStockConsumables[1].Unit);
+        Assert.Equal(5m, overview.LowStockConsumables[1].RestockThreshold);
     }
 
     [Fact]
@@ -146,24 +146,24 @@ public class OverviewEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var ladder = await CreateItemAsync(client, new { name = "Ladder" });
+        var ladder = await CreateDurableAsync(client, new { name = "Ladder" });
         await PatchStatusAsync(client, ladder.Id, "Lent", lentTo: "Dave next door");
 
-        var drill = await CreateItemAsync(client, new { name = "Drill" });
+        var drill = await CreateDurableAsync(client, new { name = "Drill" });
         await PatchStatusAsync(client, drill.Id, "Lent", lentTo: "Sam");
         await PatchStatusAsync(client, drill.Id, "Active"); // returned
 
-        var sold = await CreateItemAsync(client, new { name = "Sold bike" });
+        var sold = await CreateDurableAsync(client, new { name = "Sold bike" });
         await PatchStatusAsync(client, sold.Id, "Sold");
-        var discarded = await CreateItemAsync(client, new { name = "Discarded chair" });
+        var discarded = await CreateDurableAsync(client, new { name = "Discarded chair" });
         await PatchStatusAsync(client, discarded.Id, "Discarded");
-        var archived = await CreateItemAsync(client, new { name = "Archived lamp" });
+        var archived = await CreateDurableAsync(client, new { name = "Archived lamp" });
         await PatchStatusAsync(client, archived.Id, "Archived");
 
         var overview = await GetOverviewAsync(client);
 
         Assert.Equal(1, overview.LentCount);
-        var preview = Assert.Single(overview.LentItems);
+        var preview = Assert.Single(overview.LentDurables);
         Assert.Equal(ladder.Id, preview.Id);
         Assert.Equal("Ladder", preview.Name);
         Assert.Equal("Dave next door", preview.LentTo);
@@ -175,25 +175,25 @@ public class OverviewEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var noLocation = await CreateItemAsync(client, new { name = "Adrift wrench" });
-        await CreateItemAsync(client, new { name = "Placed drill", areaId = garageId });
+        var noLocation = await CreateDurableAsync(client, new { name = "Adrift wrench" });
+        await CreateDurableAsync(client, new { name = "Placed drill", areaId = garageId });
 
         // An item inside an unplaced container is resolved-unplaced — this distinguishes the
-        // overview from GetItemsQuery.Unplaced's direct-placement semantics.
+        // overview from GetDurablesQuery.Unplaced's direct-placement semantics.
         var floatingBin = await CreateContainerAsync(client, "Floating bin");
-        var nested = await CreateItemAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
+        var nested = await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
 
         var placedBin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
-        await CreateItemAsync(client, new { name = "Binned tape measure", parentItemId = placedBin.Id });
+        await CreateDurableAsync(client, new { name = "Binned tape measure", parentItemId = placedBin.Id });
 
-        var archivedAdrift = await CreateItemAsync(client, new { name = "Archived adrift" });
+        var archivedAdrift = await CreateDurableAsync(client, new { name = "Archived adrift" });
         await PatchStatusAsync(client, archivedAdrift.Id, "Archived");
 
         var overview = await GetOverviewAsync(client);
 
         // The unplaced container itself counts too: noLocation + floatingBin + nested.
         Assert.Equal(3, overview.UnplacedCount);
-        var ids = overview.UnplacedItems.Select(i => i.Id).ToList();
+        var ids = overview.UnplacedDurables.Select(i => i.Id).ToList();
         Assert.Contains(noLocation.Id, ids);
         Assert.Contains(floatingBin.Id, ids);
         Assert.Contains(nested.Id, ids);
@@ -206,19 +206,19 @@ public class OverviewEndpointTests : IntegrationTestBase
         var garageId = await CreateAreaAsync(client, "Garage");
 
         // Direct item + placed container + item nested in it ⇒ 3 resolved to the garage.
-        await CreateItemAsync(client, new { name = "Direct drill", areaId = garageId });
+        await CreateDurableAsync(client, new { name = "Direct drill", areaId = garageId });
         var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
-        await CreateItemAsync(client, new { name = "Nested pliers", parentItemId = bin.Id });
+        await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = bin.Id });
 
         // Lent is live and counts; Sold is terminal and doesn't.
-        var lent = await CreateItemAsync(client, new { name = "Lent ladder", areaId = garageId });
+        var lent = await CreateDurableAsync(client, new { name = "Lent ladder", areaId = garageId });
         await PatchStatusAsync(client, lent.Id, "Lent", lentTo: "Dave");
-        var sold = await CreateItemAsync(client, new { name = "Sold bike", areaId = garageId });
+        var sold = await CreateDurableAsync(client, new { name = "Sold bike", areaId = garageId });
         await PatchStatusAsync(client, sold.Id, "Sold");
 
         // An item in an unplaced container counts toward no area but is still unplaced.
         var floatingBin = await CreateContainerAsync(client, "Floating bin");
-        await CreateItemAsync(client, new { name = "Adrift wrench", parentItemId = floatingBin.Id });
+        await CreateDurableAsync(client, new { name = "Adrift wrench", parentItemId = floatingBin.Id });
 
         var overview = await GetOverviewAsync(client);
 
@@ -229,7 +229,7 @@ public class OverviewEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Overview_Areas_CountsDistinctSuppliesViaResolvedStock()
+    public async Task Overview_Areas_CountsDistinctConsumablesViaResolvedStock()
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
@@ -239,15 +239,15 @@ public class OverviewEndpointTests : IntegrationTestBase
 
         // Stock both directly in the garage and in a container resolving there ⇒ one type, counted
         // once for the garage; stock in the pantry counts the same type there too.
-        var batteries = await CreateSupplyAsync(client, "Batteries", "cells");
+        var batteries = await CreateConsumableAsync(client, "Batteries", "cells");
         await ReceiveAsync(client, batteries.Id, garageId, 4m);
         await ReceiveAsync(client, batteries.Id, areaId: null, 6m, containerItemId: bin.Id);
         await ReceiveAsync(client, batteries.Id, pantryId, 2m);
 
-        // Archived supplies keep their stock entries but are hidden from the list — excluded.
-        var archived = await CreateSupplyAsync(client, "Archived screws", "boxes");
+        // Archived consumables keep their stock entries but are hidden from the list — excluded.
+        var archived = await CreateConsumableAsync(client, "Archived screws", "boxes");
         await ReceiveAsync(client, archived.Id, garageId, 10m);
-        await PatchSupplyStatusAsync(client, archived.Id, "Archived");
+        await PatchConsumableStatusAsync(client, archived.Id, "Archived");
 
         var overview = await GetOverviewAsync(client);
 
@@ -268,15 +268,15 @@ public class OverviewEndpointTests : IntegrationTestBase
         var bin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
 
         // Low stock inside a container resolves to the container's area.
-        var lowGlue = await CreateSupplyAsync(client, "Glue", "tubes", threshold: 5m);
+        var lowGlue = await CreateConsumableAsync(client, "Glue", "tubes", threshold: 5m);
         await ReceiveAsync(client, lowGlue.Id, areaId: null, 2m, containerItemId: bin.Id);
 
         // Ample stock and archived-low stock count toward no area's low badge.
-        var ampleTape = await CreateSupplyAsync(client, "Tape", "rolls", threshold: 5m);
+        var ampleTape = await CreateConsumableAsync(client, "Tape", "rolls", threshold: 5m);
         await ReceiveAsync(client, ampleTape.Id, pantryId, 50m);
-        var archived = await CreateSupplyAsync(client, "Archived screws", "boxes", threshold: 5m);
+        var archived = await CreateConsumableAsync(client, "Archived screws", "boxes", threshold: 5m);
         await ReceiveAsync(client, archived.Id, pantryId, 1m);
-        await PatchSupplyStatusAsync(client, archived.Id, "Archived");
+        await PatchConsumableStatusAsync(client, archived.Id, "Archived");
 
         var overview = await GetOverviewAsync(client);
 
@@ -292,7 +292,7 @@ public class OverviewEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var officeId = await CreateAreaAsync(client, "Office");
         var atticId = await CreateAreaAsync(client, "Attic");
-        await CreateItemAsync(client, new { name = "Stapler", areaId = officeId });
+        await CreateDurableAsync(client, new { name = "Stapler", areaId = officeId });
 
         var overview = await GetOverviewAsync(client);
 
@@ -310,14 +310,14 @@ public class OverviewEndpointTests : IntegrationTestBase
 
         for (var i = 1; i <= 7; i++)
         {
-            var item = await CreateItemAsync(client, new { name = $"Lent thing {i}" });
+            var item = await CreateDurableAsync(client, new { name = $"Lent thing {i}" });
             await PatchStatusAsync(client, item.Id, "Lent", lentTo: $"Friend {i}");
         }
 
         var overview = await GetOverviewAsync(client);
 
         Assert.Equal(7, overview.LentCount);
-        Assert.Equal(5, overview.LentItems.Count);
+        Assert.Equal(5, overview.LentDurables.Count);
     }
 
     [Fact]

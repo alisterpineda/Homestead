@@ -7,7 +7,7 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { SupplyDetailResponse } from '../../models/supply-detail-response';
+import { ConsumableDetailResponse } from '../../models/consumable-detail-response';
 import { TransferStockRequest } from '../../models/transfer-stock-request';
 
 export interface TransferStock$Params {
@@ -15,7 +15,7 @@ export interface TransferStock$Params {
       body: TransferStockRequest
 }
 
-export function transferStock(http: HttpClient, rootUrl: string, params: TransferStock$Params, context?: HttpContext): Observable<StrictHttpResponse<SupplyDetailResponse>> {
+export function transferStock(http: HttpClient, rootUrl: string, params: TransferStock$Params, context?: HttpContext): Observable<StrictHttpResponse<ConsumableDetailResponse>> {
   const rb = new RequestBuilder(rootUrl, transferStock.PATH, 'post');
   if (params) {
     rb.path('id', params.id, {});
@@ -27,9 +27,9 @@ export function transferStock(http: HttpClient, rootUrl: string, params: Transfe
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<SupplyDetailResponse>;
+      return r as StrictHttpResponse<ConsumableDetailResponse>;
     })
   );
 }
 
-transferStock.PATH = '/api/v1/inventory/supplies/{id}/transfer';
+transferStock.PATH = '/api/v1/inventory/consumables/{id}/transfer';

@@ -269,20 +269,20 @@ public class StockService(
     private async Task<Item> LoadFungibleItemAsync(Guid itemId, CancellationToken ct)
     {
         var item = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == itemId, ct)
-            ?? throw new EntityNotFoundException("Supply not found.");
+            ?? throw new EntityNotFoundException("Consumable not found.");
         if (item.Fungibility != Fungibility.Fungible)
-            throw new BusinessRuleException("Stock operations apply only to fungible supplies.");
+            throw new BusinessRuleException("Stock operations apply only to fungible consumables.");
         return item;
     }
 
-    // Conversions additionally require the supply to be Active — unlike receive/consume/transfer/
-    // adjust, converting an Archived supply has no meaning (you can't carve from or refill a retired
+    // Conversions additionally require the consumable to be Active — unlike receive/consume/transfer/
+    // adjust, converting an Archived consumable has no meaning (you can't carve from or refill a retired
     // record). The other ops don't yet share this gate (see the plan's accepted tradeoff).
     private async Task<Item> LoadConvertibleItemAsync(Guid itemId, CancellationToken ct)
     {
         var item = await LoadFungibleItemAsync(itemId, ct);
         if (item.Status != ItemStatus.Active)
-            throw new BusinessRuleException("Conversions require an Active supply.");
+            throw new BusinessRuleException("Conversions require an Active consumable.");
         return item;
     }
 

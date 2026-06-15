@@ -13,7 +13,7 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
     childAreas: [],
     containers: [],
     items: [],
-    supplies: [],
+    consumables: [],
     ...over,
   };
 }

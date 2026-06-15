@@ -2,7 +2,7 @@ namespace Homestead.WebApi.Domain.Inventory;
 
 /// <summary>
 /// The real-world state of the physical thing an <see cref="Item"/> represents — domain lifecycle,
-/// not soft-delete. Fungible supplies use only <see cref="Active"/> / <see cref="Archived"/>.
+/// not soft-delete. Fungible consumables use only <see cref="Active"/> / <see cref="Archived"/>.
 /// </summary>
 public enum ItemStatus
 {

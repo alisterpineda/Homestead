@@ -25,7 +25,7 @@ import { SortHeaderButton } from '../../documents/list/document-table/sort-heade
 import { InventoryRowActionsComponent } from './inventory-row-actions.component';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
 import { isTerminalStatus } from '../shared/item-status-meta';
-import { formatQty } from '../supplies/supply-shared';
+import { formatQty } from '../consumables/consumable-shared';
 import { escapeHtml } from '@/shared/utils';
 import type { InventoryRow } from './inventory-row';
 import { formatPath } from './inventory-row';
@@ -51,15 +51,15 @@ interface InventoryTableMeta {
   providers: [provideIcons({ lucideBox, lucideBoxes })],
   template: `
     <div class="flex min-w-0 items-center gap-2">
-      @if (row.item?.isContainer) {
+      @if (row.durable?.isContainer) {
         <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
-      } @else if (row.kind === 'supply') {
-        <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" aria-label="Supply" />
+      } @else if (row.kind === 'consumable') {
+        <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" aria-label="Consumable" />
       }
       <div class="min-w-0">
         <span class="block truncate text-sm font-medium">{{ row.name }}</span>
-        @if (row.item?.serial) {
-          <span class="block truncate text-xs text-muted-foreground">{{ row.item?.serial }}</span>
+        @if (row.durable?.serial) {
+          <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
         }
       </div>
     </div>
@@ -77,10 +77,10 @@ export class InventoryNameCell {
   template: `
     <div class="flex min-w-0 items-center gap-2">
       <app-item-status-badge [status]="row.status" />
-      @if (row.item?.lentTo) {
+      @if (row.durable?.lentTo) {
         <!-- Explicit cap: in the auto-layout table the cell grows to fit nowrap content, so
              truncate only engages against a fixed max-width. -->
-        <span class="max-w-48 truncate text-xs text-muted-foreground">{{ row.item?.lentTo }}</span>
+        <span class="max-w-48 truncate text-xs text-muted-foreground">{{ row.durable?.lentTo }}</span>
       }
     </div>
   `,
@@ -96,7 +96,7 @@ export class InventoryStatusCell {
   imports: [NgIcon, HlmIconImports],
   providers: [provideIcons({ lucideTriangleAlert })],
   template: `
-    @if (row.kind === 'supply') {
+    @if (row.kind === 'consumable') {
       <div class="flex items-center gap-2">
         <span class="text-sm tabular-nums">{{ qty }}</span>
         <span class="text-xs text-muted-foreground">{{ row.unit }}</span>
@@ -247,18 +247,18 @@ export class InventoryTableComponent {
       header: () => flexRenderComponent(SortHeaderButton, { inputs: { header: 'Location' } }),
       cell: (info) => {
         const row = info.row.original;
-        const item = row.item;
-        if (item) {
-          const path = item.path ?? [];
+        const durable = row.durable;
+        if (durable) {
+          const path = durable.path ?? [];
           if (path.length === 0) {
             return '<span class="text-sm italic text-muted-foreground">Unplaced</span>';
           }
           const names = path.map(s => escapeHtml(s.name)).join(' › ');
           // A chain rooted at an unplaced container has no area segment — flag that visually.
-          const prefix = item.resolvedAreaId == null
+          const prefix = durable.resolvedAreaId == null
             ? '<span class="italic text-muted-foreground">Unplaced</span> › '
             : '';
-          const title = escapeHtml(formatPath(item));
+          const title = escapeHtml(formatPath(durable));
           return `<span class="block truncate text-sm" title="${title}">${prefix}${names}</span>`;
         }
         const text = row.locationText;

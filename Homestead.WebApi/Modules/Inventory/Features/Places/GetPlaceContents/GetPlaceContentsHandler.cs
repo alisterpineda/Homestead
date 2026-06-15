@@ -1,7 +1,7 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Inventory;
-using Homestead.WebApi.Modules.Inventory.Features.Items;
-using Homestead.WebApi.Modules.Inventory.Features.Supplies;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
+using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -41,14 +41,14 @@ public class GetPlaceContentsHandler(
         };
         var children = await childQuery
             .OrderBy(i => i.Name)
-            .Select(ItemResponseMapper.Projection)
+            .Select(DurableResponseMapper.Projection)
             .ToListAsync(ct);
 
         var childContainers = children.Where(c => c.IsContainer).ToList();
         var items = await locationResolver.EnrichAsync(
             children.Where(c => !c.IsContainer).ToList(), ct);
 
-        var supplies = await LoadSuppliesAsync(request, ct);
+        var consumables = await LoadConsumablesAsync(request, ct);
 
         var placement = await placementService.ComputeAsync(ct);
 
@@ -75,16 +75,16 @@ public class GetPlaceContentsHandler(
         // inside THIS place's OWN containers, so it's derived from the place's own (non-rolled) count
         // minus the direct leaf cards. For an area that's AreaOwnItemCounts (descendant areas
         // excluded, set-deduped — NOT a sum of rolled child counts, which would double-subtract any
-        // supply type shared between this area and a sub-area); for a container/Unplaced scope there
+        // consumable type shared between this area and a sub-area); for a container/Unplaced scope there
         // are no child areas, so the own count is just the rolled total.
         var ownCount = request.AreaId is { } scopeAreaId
             ? placement.AreaOwnItemCounts.GetValueOrDefault(scopeAreaId)
             : total;
-        var directCount = containers.Count + items.Count + supplies.Count + childAreas.Count;
-        var nestedItemCount = Math.Max(0, ownCount - containers.Count - items.Count - supplies.Count);
+        var directCount = containers.Count + items.Count + consumables.Count + childAreas.Count;
+        var nestedItemCount = Math.Max(0, ownCount - containers.Count - items.Count - consumables.Count);
 
         // Scoped warning counts for the Browse drilled panels, resolved with the same semantics as
-        // `total` above: low-stock supplies stored here + lent items from here. Count-only — the
+        // `total` above: low-stock consumables stored here + lent items from here. Count-only — the
         // actual items already appear in the contents list. Unplaced has neither (it's the absence
         // of a place: holds no stock, and a lent item without a resolved area is just unplaced).
         var scopedLowStockCount = request switch
@@ -117,7 +117,7 @@ public class GetPlaceContentsHandler(
             ChildAreas = childAreas,
             Containers = containers,
             Items = items,
-            Supplies = supplies,
+            Consumables = consumables,
         };
     }
 
@@ -145,7 +145,7 @@ public class GetPlaceContentsHandler(
     }
 
     /// <summary>Validates the scoped place exists and resolves its breadcrumb path.</summary>
-    private async Task<(IReadOnlyList<LocationSegmentResponse> Path, ItemResponse? ContainerItem)>
+    private async Task<(IReadOnlyList<LocationSegmentResponse> Path, DurableResponse? ContainerItem)>
         ResolveScopeAsync(GetPlaceContentsQuery request, CancellationToken ct)
     {
         if (request.AreaId is { } areaId)
@@ -163,7 +163,7 @@ public class GetPlaceContentsHandler(
         {
             var container = await db.Items.AsNoTracking()
                 .Where(i => i.Id == containerId && i.IsContainer)
-                .Select(ItemResponseMapper.Projection)
+                .Select(DurableResponseMapper.Projection)
                 .FirstOrDefaultAsync(ct)
                 ?? throw new EntityNotFoundException("Container not found.");
 
@@ -179,7 +179,7 @@ public class GetPlaceContentsHandler(
         return ([], null);
     }
 
-    private async Task<List<PlaceSupplyResponse>> LoadSuppliesAsync(
+    private async Task<List<PlaceConsumableResponse>> LoadConsumablesAsync(
         GetPlaceContentsQuery request, CancellationToken ct)
     {
         // Unplaced holds no stock by construction (an entry always has a location).
@@ -197,32 +197,32 @@ public class GetPlaceContentsHandler(
         if (localEntries.Count == 0)
             return [];
 
-        var supplyIds = localEntries.Select(e => e.ItemId).ToList();
-        var supplyResponses = await db.Items.AsNoTracking()
-            .Where(i => supplyIds.Contains(i.Id))
+        var consumableIds = localEntries.Select(e => e.ItemId).ToList();
+        var consumableResponses = await db.Items.AsNoTracking()
+            .Where(i => consumableIds.Contains(i.Id))
             .OrderBy(i => i.Name)
-            .Select(SupplyResponseMapper.Projection)
+            .Select(ConsumableResponseMapper.Projection)
             .ToListAsync(ct);
 
-        // Full per-location breakdown, shared with GetSuppliesHandler, so the quick panel opened
+        // Full per-location breakdown, shared with GetConsumablesHandler, so the quick panel opened
         // from a place row behaves identically to one opened from the list.
-        var enriched = await SupplyStockLocationLoader.AttachStockLocationsAsync(
-            db, locationResolver, supplyResponses, ct);
+        var enriched = await ConsumableStockLocationLoader.AttachStockLocationsAsync(
+            db, locationResolver, consumableResponses, ct);
 
-        // Unique-per-(item, location) guarantees one local entry per supply.
+        // Unique-per-(item, location) guarantees one local entry per consumable.
         var localQuantities = localEntries.ToDictionary(e => e.ItemId, e => e.Quantity);
 
         return enriched
-            .Select(s => new PlaceSupplyResponse
+            .Select(s => new PlaceConsumableResponse
             {
-                Supply = s,
+                Consumable = s,
                 LocalQuantity = localQuantities[s.Id],
             })
             .ToList();
     }
 
     private async Task<List<PlaceContainerSummary>> BuildContainerSummariesAsync(
-        IReadOnlyList<ItemResponse> childContainers,
+        IReadOnlyList<DurableResponse> childContainers,
         InventoryPlacement placement,
         CancellationToken ct)
     {
@@ -236,12 +236,12 @@ public class GetPlaceContentsHandler(
                 && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
             .Select(i => new { ParentId = i.ParentItemId!.Value, i.Name })
             .ToListAsync(ct);
-        var supplyNames = await db.StockEntries.AsNoTracking()
+        var consumableNames = await db.StockEntries.AsNoTracking()
             .Where(e => e.ContainerItemId != null && childIds.Contains(e.ContainerItemId.Value)
                 && ItemStatusExtensions.LiveStatuses.Contains(e.Item.Status))
             .Select(e => new { ParentId = e.ContainerItemId!.Value, e.Item.Name })
             .ToListAsync(ct);
-        var namesByContainer = childItemNames.Concat(supplyNames).ToLookup(n => n.ParentId, n => n.Name);
+        var namesByContainer = childItemNames.Concat(consumableNames).ToLookup(n => n.ParentId, n => n.Name);
 
         return childContainers
             .Select(c =>
