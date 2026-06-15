@@ -383,6 +383,6 @@ export class InventoryBrowsePageComponent implements OnDestroy {
 
   /** The drilled container's "Details" button — the deliberate Explore→Detail step into its record. */
   onContainerDetails(durable: DurableResponse): void {
-    void this.router.navigate(['/inventory/durables', durable.id]);
+    void this.router.navigate(['/inventory/items', durable.id]);
   }
 }

@@ -79,7 +79,7 @@ type InlineForm = 'move' | 'lent' | null;
           </h3>
           @if (view()?.id; as id) {
             <a
-              [routerLink]="['/inventory/durables', id]"
+              [routerLink]="['/inventory/items', id]"
               class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               Open full view

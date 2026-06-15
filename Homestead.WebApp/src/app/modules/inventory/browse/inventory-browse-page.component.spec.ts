@@ -131,7 +131,7 @@ describe('InventoryBrowsePageComponent', () => {
           // Containers drill within Browse (Explore); the opt-in "Details" button routes to the detail page.
           { path: 'inventory/browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
           { path: 'inventory/browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
-          { path: 'inventory/durables/:id', component: ItemDetailStubComponent },
+          { path: 'inventory/items/:id', component: ItemDetailStubComponent },
         ]),
         { provide: InventoryOverviewApiService, useValue: api },
         { provide: InventoryPlaceApiService, useValue: placeApi },
@@ -295,7 +295,7 @@ describe('InventoryBrowsePageComponent', () => {
       isContainer: true, path: [], createdAt: '', updatedAt: '',
     });
 
-    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/durables', 'chest']);
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
   });
 
   it('drills into Unplaced with the Unplaced flag', async () => {

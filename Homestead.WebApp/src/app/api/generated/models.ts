@@ -120,6 +120,7 @@ export type { GroupResponse } from './models/group-response';
 export type { HttpValidationProblemDetails } from './models/http-validation-problem-details';
 export type { IFormFile } from './models/i-form-file';
 export type { InitialBalanceInput } from './models/initial-balance-input';
+export type { ItemDetailResponse } from './models/item-detail-response';
 export type { ItemStatus } from './models/item-status';
 export type { JsonPatchDocument } from './models/json-patch-document';
 export type { LentDurablePreview } from './models/lent-durable-preview';

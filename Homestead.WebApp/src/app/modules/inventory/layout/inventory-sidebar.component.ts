@@ -64,12 +64,8 @@ export class InventorySidebarComponent {
   private readonly navPaths = ['/inventory/browse', '/inventory/items', '/inventory/areas'];
 
   isActive(path: string): boolean {
-    // The durable and consumable detail routes belong to Items (their breadcrumb/back-link target
-    // /inventory/items), so highlight that entry there.
-    const current = this.urlPath();
-    const url = current.startsWith('/inventory/durables') || current.startsWith('/inventory/consumables')
-      ? '/inventory/items'
-      : current;
-    return isNavItemActive(url, path, this.navPaths);
+    // The unified item detail route (/inventory/items/:id) sits under Items, so it highlights that
+    // entry naturally — no special-casing needed.
+    return isNavItemActive(this.urlPath(), path, this.navPaths);
   }
 }

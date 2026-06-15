@@ -2,8 +2,10 @@ import {
   Component,
   ChangeDetectionStrategy,
   inject,
+  input,
   signal,
   computed,
+  untracked,
   viewChild,
   TemplateRef,
   afterNextRender,
@@ -56,9 +58,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
 /**
- * The canonical surface for a non-fungible durable at `/inventory/durables/:id`: full record (value,
- * serial, status, location, notes) with full editing via the shared edit sheet, and — when the
- * durable is a container — its direct contents. Durable↔consumable parity with
+ * The canonical surface for a non-fungible durable, rendered by the `/inventory/items/:id` dispatcher:
+ * full record (value, serial, status, location, notes) with full editing via the shared edit sheet,
+ * and — when the durable is a container — its direct contents. Durable↔consumable parity with
  * {@link ConsumableDetailPageComponent}; containers are drilled *into* here rather than acted *on*, so
  * every container place-card and breadcrumb segment routes to this page (see `placeRefToLink`).
  */
@@ -217,7 +219,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <li>
                     <a
                       class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                      [routerLink]="['/inventory/durables', container.id]"
+                      [routerLink]="['/inventory/items', container.id]"
                     >
                       <span class="flex min-w-0 items-center gap-2">
                         <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" />
@@ -246,7 +248,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   <li>
                     <a
                       class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                      [routerLink]="['/inventory/consumables', row.consumable.id]"
+                      [routerLink]="['/inventory/items', row.consumable.id]"
                     >
                       <span class="flex min-w-0 items-center gap-2">
                         <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" />
@@ -379,6 +381,10 @@ export class DurableDetailPageComponent implements OnDestroy {
     this.pageHeaderService.clearTitle();
   }
 
+  // Optional payload from the `/inventory/items/:id` dispatcher, which already fetched the record. When
+  // present we render from it and skip the initial GET; absent (direct/standalone use) we fetch by id.
+  preloaded = input<DurableResponse | null>(null);
+
   private durableId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), { initialValue: null });
 
   refreshTrigger = signal(0);
@@ -389,10 +395,13 @@ export class DurableDetailPageComponent implements OnDestroy {
 
   private detailKey = computed(() => ({ id: this.durableId(), tick: this.refreshTrigger() }));
 
-  durable = toSignal<DurableResponse | null>(
+  private fetchedDurable = toSignal<DurableResponse | null>(
     toObservable(this.detailKey).pipe(
-      switchMap(({ id }) => {
+      switchMap(({ id, tick }) => {
         if (!id) return of(null);
+        // Initial render of a dispatcher-preloaded item: reuse the preload, skip the duplicate GET.
+        // A refresh (tick > 0) or a missing preload always hits the API.
+        if (tick === 0 && untracked(() => this.preloaded())?.id === id) return of(null);
         this.loading.set(true);
         this.notFound.set(false);
         return this.durableApi.getDurable({ id }).pipe(
@@ -410,6 +419,15 @@ export class DurableDetailPageComponent implements OnDestroy {
     ),
     { initialValue: null },
   );
+
+  // Prefer freshly-fetched data once it matches the routed id; otherwise fall back to the preload.
+  durable = computed<DurableResponse | null>(() => {
+    const id = this.durableId();
+    const fetched = this.fetchedDurable();
+    if (fetched && fetched.id === id) return fetched;
+    const pre = this.preloaded();
+    return pre && pre.id === id ? pre : null;
+  });
 
   protected isContainer = computed(() => this.durable()?.isContainer ?? false);
   protected terminal = computed(() => {
@@ -541,7 +559,7 @@ export class DurableDetailPageComponent implements OnDestroy {
   /** "View contents" in a hosted leaf panel drills into that container's own detail page. */
   onQuickPanelViewContents(durable: DurableResponse): void {
     this.durableQuickPanelState.set('closed');
-    void this.router.navigate(['/inventory/durables', durable.id]);
+    void this.router.navigate(['/inventory/items', durable.id]);
   }
 
   onArchiveRestore(durable: DurableResponse): void {

@@ -859,8 +859,7 @@ export class InventoryListPageComponent {
   }
 
   onViewDetails(row: InventoryRow): void {
-    const base = row.kind === 'consumable' ? '/inventory/consumables' : '/inventory/durables';
-    void this.router.navigate([base, row.id]);
+    void this.router.navigate(['/inventory/items', row.id]);
   }
 
   onDurableSheetSaved(): void {

@@ -10,6 +10,7 @@ using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurableActivity;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
+using Homestead.WebApi.Modules.Inventory.Features.Items.GetItem;
 using Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 using Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.AdjustStock;
@@ -39,6 +40,9 @@ public static class InventoryModule
             .RequireAuthorization(AuthPolicies.ActiveUser);
 
         GetInventoryOverviewEndpoint.Map(v1);
+
+        var items = v1.MapGroup("/items");
+        GetItemEndpoint.Map(items);
 
         var places = v1.MapGroup("/places");
         GetPlaceContentsEndpoint.Map(places);

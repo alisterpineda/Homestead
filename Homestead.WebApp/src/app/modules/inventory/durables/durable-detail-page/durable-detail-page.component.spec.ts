@@ -122,7 +122,7 @@ describe('DurableDetailPageComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([
-          { path: 'inventory/durables/:id', component: DurableDetailPageComponent, data: { title: 'Durable' } },
+          { path: 'inventory/items/:id', component: DurableDetailPageComponent, data: { title: 'Durable' } },
         ]),
         { provide: InventoryDurableApiService, useValue: durableApi },
         { provide: InventoryPlaceApiService, useValue: placeApi },
@@ -157,7 +157,7 @@ describe('DurableDetailPageComponent', () => {
   }
 
   it('renders the header with name, status, location, value, and serial', async () => {
-    const { harness } = await navigate('/inventory/durables/item1');
+    const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
     expect(content).toContain('Cordless Drill');
@@ -175,14 +175,14 @@ describe('DurableDetailPageComponent', () => {
 
   it('shows the not-found state when the item is missing', async () => {
     durableApi.getDurableError = true;
-    const { harness, component } = await navigate('/inventory/durables/missing');
+    const { harness, component } = await navigate('/inventory/items/missing');
 
     expect(component.notFound()).toBe(true);
     expect(text(harness)).toContain('Durable not found');
   });
 
   it('opens the edit sheet on Edit and refreshes the detail on save', async () => {
-    const { harness, component } = await navigate('/inventory/durables/item1');
+    const { harness, component } = await navigate('/inventory/items/item1');
     expect(durableApi.getDurableCalls).toBe(1);
 
     buttons(harness).find(b => b.textContent?.trim() === 'Edit')!.click();
@@ -201,14 +201,14 @@ describe('DurableDetailPageComponent', () => {
   it('renders the contents list for a container, drilling child containers into their detail page', async () => {
     durableApi.item = CONTAINER_ITEM;
     placeApi.contents = CHEST_CONTENTS;
-    const { harness } = await navigate('/inventory/durables/box1');
+    const { harness } = await navigate('/inventory/items/box1');
 
     expect(placeApi.calls).toEqual([{ ContainerItemId: 'box1' }]);
     const content = text(harness);
     expect(content).toContain('Contents');
     expect(content).toContain('Tray'); // child container
     expect(content).toContain('Wrench'); // leaf item
-    expect(hrefs(harness)).toContain('/inventory/durables/tray');
+    expect(hrefs(harness)).toContain('/inventory/items/tray');
   });
 
   it('renders the activity history feed with each summary', async () => {
@@ -219,7 +219,7 @@ describe('DurableDetailPageComponent', () => {
       ],
       page: 1, pageSize: 20, totalCount: 2, totalPages: 1,
     });
-    const { harness } = await navigate('/inventory/durables/item1');
+    const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
     expect(content).toContain('History');
@@ -232,7 +232,7 @@ describe('DurableDetailPageComponent', () => {
     durableApi.item = CONTAINER_ITEM;
     placeApi.contents = CHEST_CONTENTS;
     const harness = await RouterTestingHarness.create();
-    const component = await harness.navigateByUrl('/inventory/durables/box1', DurableDetailPageComponent);
+    const component = await harness.navigateByUrl('/inventory/items/box1', DurableDetailPageComponent);
     harness.detectChanges();
     await harness.fixture.whenStable();
 
@@ -246,7 +246,7 @@ describe('DurableDetailPageComponent', () => {
 
     // Navigate to a different item via the same route (Angular reuses the component instance).
     durableApi.item = LEAF_ITEM;
-    const component2 = await harness.navigateByUrl('/inventory/durables/item1', DurableDetailPageComponent);
+    const component2 = await harness.navigateByUrl('/inventory/items/item1', DurableDetailPageComponent);
     harness.detectChanges();
     await harness.fixture.whenStable();
 
@@ -261,7 +261,7 @@ describe('DurableDetailPageComponent', () => {
 
   it('shows an error state (not a false empty) when the activity fetch fails', async () => {
     durableApi.getDurableActivity = () => throwError(() => new Error('boom'));
-    const { harness } = await navigate('/inventory/durables/item1');
+    const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
     expect(content).toContain("Couldn't load history");
@@ -271,7 +271,7 @@ describe('DurableDetailPageComponent', () => {
   it('shows an error state (not an infinite spinner) when a container contents fetch fails', async () => {
     durableApi.item = CONTAINER_ITEM;
     placeApi.getPlaceContents = () => throwError(() => new Error('boom'));
-    const { harness } = await navigate('/inventory/durables/box1');
+    const { harness } = await navigate('/inventory/items/box1');
 
     expect(text(harness)).toContain("Couldn't load contents");
   });
@@ -279,7 +279,7 @@ describe('DurableDetailPageComponent', () => {
   it('opens the quick panel for a leaf item in the contents list', async () => {
     durableApi.item = CONTAINER_ITEM;
     placeApi.contents = CHEST_CONTENTS;
-    const { harness, component } = await navigate('/inventory/durables/box1');
+    const { harness, component } = await navigate('/inventory/items/box1');
 
     buttons(harness).find(b => b.textContent?.includes('Wrench'))!.click();
     harness.detectChanges();

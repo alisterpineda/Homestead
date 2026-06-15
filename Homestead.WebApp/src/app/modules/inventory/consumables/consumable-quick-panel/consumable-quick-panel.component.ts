@@ -665,6 +665,6 @@ export class ConsumableQuickPanelComponent {
     this.navigating.set(false);
     if (this.destroyed) return;
     this.closed.emit();
-    if (id) this.router.navigate(['/inventory/consumables', id]);
+    if (id) this.router.navigate(['/inventory/items', id]);
   }
 }

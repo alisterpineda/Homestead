@@ -2,8 +2,10 @@ import {
   Component,
   ChangeDetectionStrategy,
   inject,
+  input,
   signal,
   computed,
+  untracked,
   LOCALE_ID,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -39,6 +41,7 @@ import {
 import { TrackDurableSheetComponent } from './track-durable-sheet/track-durable-sheet.component';
 import { CollapseDurablesDialogComponent } from './collapse-durables-dialog/collapse-durables-dialog.component';
 import { formatQty, movementDirection, isWholeCount } from './consumable-shared';
+import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { ConsumableDetailResponse } from '@/api/generated/models/consumable-detail-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
@@ -300,19 +303,29 @@ export class ConsumableDetailPageComponent {
   protected readonly formatQty = formatQty;
   protected readonly isWholeCount = isWholeCount;
 
+  // Optional payload from the `/inventory/items/:id` dispatcher, which already fetched the record. When
+  // present we render from it and skip the initial GET; absent (direct/standalone use) we fetch by id.
+  preloaded = input<ConsumableDetailResponse | null>(null);
+
   private consumableId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), { initialValue: null });
 
   refreshTrigger = signal(0);
   loading = signal(false);
   notFound = signal(false);
-  page = signal(1);
+  // Reset to page 1 when the routed consumable changes, so a same-component reuse (standalone, or a
+  // future change that keeps this child mounted across :id) can't carry a stale page into the new
+  // consumable's movements query. Mirrors the durable page's activity-page handling.
+  page = seededLinkedSignal(this.consumableId, () => 1);
 
   private detailKey = computed(() => ({ id: this.consumableId(), tick: this.refreshTrigger() }));
 
-  detail = toSignal<ConsumableDetailResponse | null>(
+  private fetchedDetail = toSignal<ConsumableDetailResponse | null>(
     toObservable(this.detailKey).pipe(
-      switchMap(({ id }) => {
+      switchMap(({ id, tick }) => {
         if (!id) return of(null);
+        // Initial render of a dispatcher-preloaded item: reuse the preload, skip the duplicate GET.
+        // A refresh (tick > 0) or a missing preload always hits the API.
+        if (tick === 0 && untracked(() => this.preloaded())?.consumable?.id === id) return of(null);
         this.loading.set(true);
         this.notFound.set(false);
         return this.consumableApi.getConsumable({ id }).pipe(
@@ -330,6 +343,15 @@ export class ConsumableDetailPageComponent {
     ),
     { initialValue: null },
   );
+
+  // Prefer freshly-fetched data once it matches the routed id; otherwise fall back to the preload.
+  detail = computed<ConsumableDetailResponse | null>(() => {
+    const id = this.consumableId();
+    const fetched = this.fetchedDetail();
+    if (fetched && fetched.consumable?.id === id) return fetched;
+    const pre = this.preloaded();
+    return pre && pre.consumable?.id === id ? pre : null;
+  });
 
   consumable = computed<ConsumableResponse | null>(() => this.detail()?.consumable ?? null);
   locations = computed<StockEntryResponse[]>(() => this.detail()?.locations ?? []);
