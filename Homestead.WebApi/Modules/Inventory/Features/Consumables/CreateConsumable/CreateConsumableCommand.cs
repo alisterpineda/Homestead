@@ -12,8 +12,9 @@ public record CreateConsumableCommand : ICommand<ConsumableResponse>
 {
     public required string Name { get; init; }
 
-    /// <summary>Unit of measure ("screws", "rolls", "gal"). Required for a consumable.</summary>
-    public required string Unit { get; init; }
+    /// <summary>Unit of measure ("screws", "rolls", "gal"). Optional — when omitted, the consumable
+    /// has no unit and the frontend renders a generic fallback word at display time.</summary>
+    public string? Unit { get; init; }
 
     /// <summary>Optional global low-stock trigger, compared against total on-hand.</summary>
     public decimal? RestockThreshold { get; init; }

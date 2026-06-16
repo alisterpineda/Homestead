@@ -11,8 +11,8 @@ public class CreateConsumableCommandValidator : AbstractValidator<CreateConsumab
             .MaximumLength(256).WithMessage("Name must be 256 characters or fewer.");
 
         RuleFor(x => x.Unit)
-            .Must(u => !string.IsNullOrWhiteSpace(u)).WithMessage("Unit is required.")
-            .MaximumLength(32).WithMessage("Unit must be 32 characters or fewer.");
+            .MaximumLength(32).WithMessage("Unit must be 32 characters or fewer.")
+            .When(x => !string.IsNullOrWhiteSpace(x.Unit));
 
         RuleFor(x => x.RestockThreshold)
             .GreaterThanOrEqualTo(0m).WithMessage("Restock threshold must be zero or positive.")

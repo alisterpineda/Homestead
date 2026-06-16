@@ -15,7 +15,7 @@ internal static class ConsumableResponseMapper
         Name = i.Name,
         Status = i.Status,
         Notes = i.Notes,
-        Unit = i.Unit!,
+        Unit = i.Unit,
         RestockThreshold = i.RestockThreshold,
         TotalOnHand = i.StockEntries.Sum(e => e.Quantity),
         IsLow = i.RestockThreshold != null && i.StockEntries.Sum(e => e.Quantity) <= i.RestockThreshold,

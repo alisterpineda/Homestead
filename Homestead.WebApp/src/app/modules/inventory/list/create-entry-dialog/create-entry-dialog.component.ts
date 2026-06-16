@@ -128,7 +128,7 @@ type EntryKind = 'durable' | 'consumable';
                   hlmInput
                   id="create-entry-unit"
                   maxlength="32"
-                  placeholder="e.g. rolls"
+                  placeholder="e.g. rolls (optional)"
                   [value]="unit()"
                   (input)="unit.set(asValue($event))"
                 />
@@ -207,7 +207,6 @@ export class CreateEntryDialogComponent {
   canSubmit = computed(() => {
     if (this.name().trim().length === 0) return false;
     if (this.kind() === 'durable') return true;
-    if (!this.unit().trim()) return false;
     const t = this.threshold().trim();
     return t === '' || (Number.isFinite(Number(t)) && Number(t) >= 0);
   });
@@ -273,7 +272,7 @@ export class CreateEntryDialogComponent {
       this.consumableApi.createConsumable({
         body: {
           name: this.name().trim(),
-          unit: this.unit().trim(),
+          unit: this.unit().trim() || undefined,
           restockThreshold: t === '' ? null : Number(t),
           notes: this.notes().trim() ? this.notes().trim() : null,
         },

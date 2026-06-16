@@ -13,6 +13,6 @@ export interface ConsumableResponse {
   status: ItemStatus;
   stockLocations?: Array<StockEntryResponse>;
   totalOnHand: number;
-  unit: string;
+  unit?: (string | null);
   updatedAt: string;
 }

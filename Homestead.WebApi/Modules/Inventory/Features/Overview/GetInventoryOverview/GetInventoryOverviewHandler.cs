@@ -44,7 +44,7 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
                 Id = s.Id,
                 Name = s.Name,
                 TotalOnHand = s.OnHand,
-                Unit = s.Unit!,
+                Unit = s.Unit,
                 RestockThreshold = s.Threshold,
             })
             .ToListAsync(ct);

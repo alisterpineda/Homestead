@@ -89,7 +89,7 @@ export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
     locationText: consumableLocationText(locations),
     resolvedAreaIds: locations.map(entryResolvedAreaId),
     onHand: consumable.totalOnHand,
-    unit: consumable.unit,
+    unit: consumable.unit ?? null,
     isLow: consumable.isLow,
     consumable,
   };

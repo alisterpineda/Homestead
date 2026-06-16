@@ -32,7 +32,7 @@ public class PatchConsumableHandler(
         var model = new PatchConsumableModel
         {
             Name = item.Name,
-            Unit = item.Unit ?? string.Empty,
+            Unit = item.Unit,
             RestockThreshold = item.RestockThreshold,
             Notes = item.Notes,
             Status = item.Status,
@@ -44,9 +44,7 @@ public class PatchConsumableHandler(
             throw new BusinessRuleException("Name is required.");
         if (model.Name.Length > 256)
             throw new BusinessRuleException("Name must be 256 characters or fewer.");
-        if (string.IsNullOrWhiteSpace(model.Unit))
-            throw new BusinessRuleException("Unit is required.");
-        if (model.Unit.Length > 32)
+        if (model.Unit?.Length > 32)
             throw new BusinessRuleException("Unit must be 32 characters or fewer.");
         if (model.RestockThreshold is < 0m)
             throw new BusinessRuleException("Restock threshold must be zero or positive.");
@@ -54,7 +52,7 @@ public class PatchConsumableHandler(
             throw new BusinessRuleException("A consumable can only be Active or Archived.");
 
         item.Name = model.Name.Trim();
-        item.Unit = model.Unit.Trim();
+        item.Unit = Normalize(model.Unit);
         item.RestockThreshold = model.RestockThreshold;
         item.Notes = Normalize(model.Notes);
         item.Status = model.Status;

@@ -23,7 +23,7 @@ public class CreateConsumableHandler(
             Name = request.Name.Trim(),
             Fungibility = Fungibility.Fungible,
             Status = ItemStatus.Active,
-            Unit = request.Unit.Trim(),
+            Unit = Normalize(request.Unit),
             RestockThreshold = request.RestockThreshold,
             Notes = Normalize(request.Notes),
             CreatedAt = DateTimeOffset.UtcNow,

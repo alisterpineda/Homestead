@@ -34,7 +34,7 @@ public record LowStockConsumablePreview
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required decimal TotalOnHand { get; init; }
-    public required string Unit { get; init; }
+    public string? Unit { get; init; }
     public required decimal RestockThreshold { get; init; }
 }
 

@@ -31,6 +31,7 @@ import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.compone
 import { isTerminalStatus } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatQty } from '../consumable-shared';
+import { UnitPipe } from '../unit.pipe';
 import { StockStepperEngine, stockLocationKey } from './stock-stepper.engine';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
@@ -83,6 +84,7 @@ interface StepperPayload {
     HlmSpinner,
     LocationPickerComponent,
     ItemStatusBadgeComponent,
+    UnitPipe,
   ],
   providers: [provideIcons({ lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight })],
   template: `
@@ -105,7 +107,7 @@ interface StepperPayload {
                 <span class="text-sm text-muted-foreground">Total on hand</span>
                 <p class="text-2xl font-bold tabular-nums">
                   {{ formatQty(displayedTotal()) }}
-                  <span class="text-sm font-normal text-muted-foreground">{{ s.unit }}</span>
+                  <span class="text-sm font-normal text-muted-foreground">{{ s.unit | unit }}</span>
                 </p>
                 @if (entries().length > 0) {
                   <p class="text-xs text-muted-foreground">
@@ -120,7 +122,7 @@ interface StepperPayload {
                 @if (isLowNow()) {
                   <p class="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                     <ng-icon hlm name="lucideTriangleAlert" size="xs" />
-                    Low — restock at or below {{ formatQty(s.restockThreshold!) }} {{ s.unit }}
+                    Low — restock at or below {{ formatQty(s.restockThreshold!) }} {{ s.unit | unit }}
                   </p>
                 }
               </div>
@@ -163,7 +165,7 @@ interface StepperPayload {
                       [value]="assignQty()"
                       (input)="assignQty.set(asValue($event))"
                     />
-                    <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit }}</span>
+                    <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit | unit }}</span>
                   </div>
                 </div>
                 @if (formError(); as err) {
@@ -189,7 +191,7 @@ interface StepperPayload {
                     </div>
                     @if (archived()) {
                       <p class="text-sm tabular-nums text-muted-foreground">
-                        {{ formatQty(entry.quantity) }} {{ s.unit }}
+                        {{ formatQty(entry.quantity) }} {{ s.unit | unit }}
                       </p>
                     }
                   </div>
@@ -202,20 +204,20 @@ interface StepperPayload {
                           size="icon-sm"
                           class="max-md:size-11"
                           [disabled]="displayedQty(entry) < 1"
-                          [attr.aria-label]="'Use one ' + s.unit"
+                          [attr.aria-label]="'Use one ' + (s.unit | unit)"
                           (click)="onTap(entry, -1)"
                         >
                           <ng-icon hlm name="lucideMinus" size="sm" />
                         </button>
                         <span hlmButtonGroupText class="min-w-16 justify-center px-2 text-sm tabular-nums max-md:h-11">
-                          {{ formatQty(displayedQty(entry)) }} {{ s.unit }}
+                          {{ formatQty(displayedQty(entry)) }} {{ s.unit | unit }}
                         </span>
                         <button
                           hlmBtn
                           variant="outline"
                           size="icon-sm"
                           class="max-md:size-11"
-                          [attr.aria-label]="'Receive one ' + s.unit"
+                          [attr.aria-label]="'Receive one ' + (s.unit | unit)"
                           (click)="onTap(entry, 1)"
                         >
                           <ng-icon hlm name="lucidePlus" size="sm" />
@@ -255,7 +257,7 @@ interface StepperPayload {
                               [value]="moveQty()"
                               (input)="moveQty.set(asValue($event))"
                             />
-                            <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit }}</span>
+                            <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit | unit }}</span>
                           </div>
                         </div>
                       } @else {
@@ -273,7 +275,7 @@ interface StepperPayload {
                               [value]="correctQty()"
                               (input)="correctQty.set(asValue($event))"
                             />
-                            <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit }}</span>
+                            <span class="shrink-0 text-sm text-muted-foreground">{{ s.unit | unit }}</span>
                           </div>
                         </div>
                       }

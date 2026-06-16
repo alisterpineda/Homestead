@@ -11,9 +11,16 @@ export function formatQty(value: number): string {
   return value.toFixed(3).replace(/\.?0+$/, '');
 }
 
-/** "12 rolls" — a quantity with its unit. */
-export function formatQtyWithUnit(value: number, unit: string): string {
-  return `${formatQty(value)} ${unit}`.trim();
+/** Generic fallback word rendered when a consumable has no unit of its own. */
+export const DEFAULT_UNIT = 'units';
+
+/**
+ * Resolves a stored unit for display: the user's unit when set, otherwise the generic
+ * {@link DEFAULT_UNIT} fallback. Storage stays NULL when no unit was chosen — the fallback is a
+ * display-time concern only.
+ */
+export function resolveUnit(unit: string | null | undefined): string {
+  return unit?.trim() || DEFAULT_UNIT;
 }
 
 /**

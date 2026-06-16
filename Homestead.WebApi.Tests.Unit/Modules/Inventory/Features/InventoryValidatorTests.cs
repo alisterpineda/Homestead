@@ -1,6 +1,7 @@
 using Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.CollapseDurables;
+using Homestead.WebApi.Modules.Inventory.Features.Consumables.CreateConsumable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Inventory.Features;
@@ -145,6 +146,41 @@ public class CreateDurableCommandValidatorTests
     {
         var result = await _sut.ValidateAsync(
             new CreateDurableCommand { Name = "Tool chest", IsContainer = true }, Ct);
+        Assert.True(result.IsValid);
+    }
+}
+
+public class CreateConsumableCommandValidatorTests
+{
+    private readonly CreateConsumableCommandValidator _sut = new();
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task BlankUnit_IsValid(string? unit)
+    {
+        // Unit is optional — a blank one is stored as NULL and the frontend supplies the fallback.
+        var result = await _sut.ValidateAsync(new CreateConsumableCommand { Name = "Batteries", Unit = unit }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task UnitOver32_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", Unit = new string('a', 33) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Unit");
+    }
+
+    [Fact]
+    public async Task NameWithUnit_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Paper towels", Unit = "rolls" }, Ct);
         Assert.True(result.IsValid);
     }
 }

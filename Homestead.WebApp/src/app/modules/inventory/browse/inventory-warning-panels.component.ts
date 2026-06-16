@@ -11,6 +11,7 @@ import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { InventoryOverviewTileComponent } from './inventory-overview-tile.component';
 import { formatQty } from '../consumables/consumable-shared';
+import { UnitPipe } from '../consumables/unit.pipe';
 import { BADGE_BASE } from '../shared/item-status-meta';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 
@@ -47,6 +48,7 @@ export type WarningPanelsScope =
     HlmIconImports,
     HlmCollapsibleImports,
     InventoryOverviewTileComponent,
+    UnitPipe,
   ],
   providers: [provideIcons({
     lucideTriangleAlert,
@@ -99,7 +101,7 @@ export type WarningPanelsScope =
                           <span [class]="outBadgeClass" aria-label="Out of stock">Out</span>
                         }
                         <span class="text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(consumable.totalOnHand) }} {{ consumable.unit }} / {{ formatQty(consumable.restockThreshold) }}
+                          {{ formatQty(consumable.totalOnHand) }} {{ consumable.unit | unit }} / {{ formatQty(consumable.restockThreshold) }}
                         </span>
                       </span>
                     </li>

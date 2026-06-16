@@ -48,6 +48,7 @@ import {
 import { TrackDurableSheetComponent } from './track-durable-sheet/track-durable-sheet.component';
 import { CollapseDurablesDialogComponent } from './collapse-durables-dialog/collapse-durables-dialog.component';
 import { formatQty, movementDirection, isWholeCount } from './consumable-shared';
+import { UnitPipe } from './unit.pipe';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
@@ -77,6 +78,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     StockOpSheetComponent,
     TrackDurableSheetComponent,
     CollapseDurablesDialogComponent,
+    UnitPipe,
   ],
   providers: [provideIcons({
     lucidePencil,
@@ -122,11 +124,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             </div>
             <p class="text-3xl font-bold tabular-nums">
               {{ formatQty(s.totalOnHand) }}
-              <span class="text-base font-normal text-muted-foreground">{{ s.unit }} on hand</span>
+              <span class="text-base font-normal text-muted-foreground">{{ s.unit | unit }} on hand</span>
             </p>
             <p class="text-xs text-muted-foreground">
               @if (s.restockThreshold != null) {
-                Restock at or below {{ formatQty(s.restockThreshold) }} {{ s.unit }} &middot;
+                Restock at or below {{ formatQty(s.restockThreshold) }} {{ s.unit | unit }} &middot;
               }
               Updated {{ updatedRelative() }}
             </p>
@@ -191,7 +193,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                   @for (entry of locations(); track entry.id) {
                     <tr hlmTr>
                       <td hlmTd>{{ entry.locationLabel ?? '(unknown)' }}</td>
-                      <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit }}</td>
+                      <td hlmTd class="text-right tabular-nums">{{ formatQty(entry.quantity) }} {{ s.unit | unit }}</td>
                       <td hlmTd class="whitespace-nowrap text-right">
                         <button hlmBtn variant="ghost" size="sm" (click)="openConsume(entry)">Use</button>
                         <button hlmBtn variant="ghost" size="sm" (click)="openTransfer(entry)">Move</button>
@@ -258,10 +260,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                         }
                       </td>
                       <td hlmTd class="whitespace-nowrap text-right tabular-nums" [class]="amountClass(m)">
-                        {{ amountPrefix(m) }}{{ formatQty(m.quantity) }} {{ s.unit }}
+                        {{ amountPrefix(m) }}{{ formatQty(m.quantity) }} {{ s.unit | unit }}
                         @if (m.unitCost != null) {
                           <span class="block text-xs font-normal text-muted-foreground">
-                            {{ formatQty(m.unitCost) }}{{ m.unitCostCurrencySymbol ? ' ' + m.unitCostCurrencySymbol : '' }}/{{ s.unit }}
+                            {{ formatQty(m.unitCost) }}{{ m.unitCostCurrencySymbol ? ' ' + m.unitCostCurrencySymbol : '' }}/{{ s.unit | unit }}
                           </span>
                         }
                       </td>
@@ -291,7 +293,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     @if (consumable(); as s) {
       <app-stock-op-sheet
         [consumableId]="s.id"
-        [unit]="s.unit"
+        [unit]="s.unit | unit"
         [mode]="stockOpMode()"
         [fromLocation]="stockOpLocation()"
         [state]="stockOpState()"
@@ -302,7 +304,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       <app-track-durable-sheet
         [consumableId]="s.id"
         [consumableName]="s.name"
-        [unit]="s.unit"
+        [unit]="s.unit | unit"
         [fromLocation]="trackLocation()"
         [state]="trackState()"
         (created)="onTracked()"
@@ -312,7 +314,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       <app-collapse-durables-dialog
         [consumableId]="s.id"
         [consumableName]="s.name"
-        [unit]="s.unit"
+        [unit]="s.unit | unit"
         [state]="collapseState()"
         (collapsed)="onCollapsed()"
         (closed)="collapseState.set('closed')"

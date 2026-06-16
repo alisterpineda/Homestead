@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 internal record ConsumableItem(
-    Guid Id, string Name, string Status, string Unit, decimal? RestockThreshold,
+    Guid Id, string Name, string Status, string? Unit, decimal? RestockThreshold,
     decimal TotalOnHand, bool IsLow, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     IReadOnlyList<StockEntryItem>? StockLocations);
 
@@ -33,7 +33,7 @@ public class ConsumablesEndpointTests : IntegrationTestBase
     // ----- Helpers -----
 
     private static async Task<ConsumableItem> CreateConsumableAsync(
-        HttpClient client, string name = "Screws", string unit = "screws", decimal? threshold = null)
+        HttpClient client, string name = "Screws", string? unit = null, decimal? threshold = null)
     {
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
             new { name, unit, restockThreshold = threshold }, CT);
@@ -116,14 +116,19 @@ public class ConsumablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateConsumable_MissingUnit_Returns400()
+    public async Task CreateConsumable_WithoutUnit_Succeeds()
     {
         var client = await CreateAdminClientAsync();
 
+        // Omit the unit entirely — this is what the create dialog sends when the field is left blank.
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
-            new { name = "Nameless", unit = "" }, CT);
+            new { name = "Batteries" }, CT);
 
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var created = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Equal("Batteries", created.Name);
+        // A missing unit is stored as NULL — the frontend supplies the display fallback.
+        Assert.Null(created.Unit);
     }
 
     [Fact]
@@ -145,6 +150,22 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         Assert.Equal("Wood screws", patched.Name);
         Assert.Equal("boxes", patched.Unit);
         Assert.Equal(10m, patched.RestockThreshold);
+    }
+
+    [Fact]
+    public async Task PatchConsumable_ClearingUnit_StoresNull()
+    {
+        var client = await CreateAdminClientAsync();
+        var consumable = await CreateConsumableAsync(client, "Tape", "rolls");
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/consumables/{consumable.Id}",
+            new[] { new { op = "replace", path = "/unit", value = (object)"" } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        // A blank unit clears to NULL rather than persisting an empty string.
+        Assert.Null(patched.Unit);
     }
 
     [Fact]

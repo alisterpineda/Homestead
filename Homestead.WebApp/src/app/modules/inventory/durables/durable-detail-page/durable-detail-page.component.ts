@@ -41,6 +41,7 @@ import { EditDurableSheetComponent } from '../edit-durable-sheet/edit-durable-sh
 import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick-panel.component';
 import { formatPath } from '../../list/inventory-row';
 import { formatQty } from '../../consumables/consumable-shared';
+import { UnitPipe } from '../../consumables/unit.pipe';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { replace } from '@/shared/json-patch';
@@ -75,6 +76,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     ItemStatusBadgeComponent,
     EditDurableSheetComponent,
     DurableQuickPanelComponent,
+    UnitPipe,
   ],
   providers: [provideIcons({
     lucidePencil,
@@ -238,7 +240,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                         <span class="truncate">{{ row.consumable.name }}</span>
                       </span>
                       <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {{ formatQty(row.localQuantity) }} {{ row.consumable.unit }}
+                        {{ formatQty(row.localQuantity) }} {{ row.consumable.unit | unit }}
                       </span>
                     </a>
                   </li>

@@ -12,7 +12,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumabl
 public class PatchConsumableModel
 {
     public string Name { get; set; } = string.Empty;
-    public string Unit { get; set; } = string.Empty;
+    public string? Unit { get; set; }
     public decimal? RestockThreshold { get; set; }
     public string? Notes { get; set; }
     public ItemStatus Status { get; set; }

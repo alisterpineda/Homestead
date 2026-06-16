@@ -15,8 +15,9 @@ public record ConsumableResponse
     public required ItemStatus Status { get; init; }
     public string? Notes { get; init; }
 
-    /// <summary>Unit of measure ("screws", "rolls", "gal").</summary>
-    public required string Unit { get; init; }
+    /// <summary>Unit of measure ("screws", "rolls", "gal"). Null when the consumable has no unit;
+    /// the frontend renders a generic fallback word at display time.</summary>
+    public string? Unit { get; init; }
 
     /// <summary>Optional global low-stock trigger, compared against <see cref="TotalOnHand"/>.</summary>
     public decimal? RestockThreshold { get; init; }

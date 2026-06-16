@@ -20,6 +20,7 @@ import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.compone
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatQty } from '../../consumables/consumable-shared';
+import { UnitPipe } from '../../consumables/unit.pipe';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -45,6 +46,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
     PlaceCardComponent,
     ItemStatusBadgeComponent,
     CreateEntryDialogComponent,
+    UnitPipe,
   ],
   providers: [provideIcons({
     lucideMapPin,
@@ -191,7 +193,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                           }
                         </span>
                         <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(row.localQuantity) }} {{ row.consumable.unit }}@if (row.localQuantity !== row.consumable.totalOnHand) {<span> · of {{ formatQty(row.consumable.totalOnHand) }} total</span>}
+                          {{ formatQty(row.localQuantity) }} {{ row.consumable.unit | unit }}@if (row.localQuantity !== row.consumable.totalOnHand) {<span> · of {{ formatQty(row.consumable.totalOnHand) }} total</span>}
                         </span>
                       </button>
                     </li>

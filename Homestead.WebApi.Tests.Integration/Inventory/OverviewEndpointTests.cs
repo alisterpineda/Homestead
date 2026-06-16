@@ -9,7 +9,7 @@ internal record OverviewResult(
     IReadOnlyList<AreaSummaryItem> Areas);
 
 internal record LowStockPreviewItem(
-    Guid Id, string Name, decimal TotalOnHand, string Unit, decimal RestockThreshold);
+    Guid Id, string Name, decimal TotalOnHand, string? Unit, decimal RestockThreshold);
 
 internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
 

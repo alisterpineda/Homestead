@@ -60,6 +60,7 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
                 id="consumable-unit"
                 class="w-full"
                 maxlength="32"
+                placeholder="e.g. rolls (optional)"
                 [value]="editUnit()"
                 (input)="editUnit.set(asValue($event))"
               />
@@ -162,7 +163,6 @@ export class EditConsumableSheetComponent {
 
   validationError = computed<string | null>(() => {
     if (!this.editName().trim()) return 'Name is required.';
-    if (!this.editUnit().trim()) return 'Unit is required.';
     const t = this.normalizedThreshold();
     if (t !== null && Number.isNaN(t)) return 'Restock threshold must be a number.';
     if (t !== null && (t as number) < 0) return 'Restock threshold must be zero or positive.';
@@ -186,8 +186,10 @@ export class EditConsumableSheetComponent {
     const name = this.editName().trim();
     if (name !== s.name) ops.push(replace('/name', name));
 
+    // A cleared unit sends "" — the backend normalizes it to NULL. Compare against the stored value
+    // as null-or-string so a blank field over a null unit doesn't emit a spurious no-op patch.
     const unit = this.editUnit().trim();
-    if (unit !== s.unit) ops.push(replace('/unit', unit));
+    if ((unit || null) !== (s.unit ?? null)) ops.push(replace('/unit', unit));
 
     const threshold = this.normalizedThreshold();
     if (!Number.isNaN(threshold) && threshold !== (s.restockThreshold ?? null)) {

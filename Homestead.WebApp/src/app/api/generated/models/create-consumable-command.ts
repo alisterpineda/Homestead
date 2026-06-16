@@ -5,5 +5,5 @@ export interface CreateConsumableCommand {
   name: string;
   notes?: (string | null);
   restockThreshold?: (number | null);
-  unit: string;
+  unit?: (string | null);
 }

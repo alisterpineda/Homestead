@@ -26,6 +26,7 @@ import { InventoryRowActionsComponent } from './inventory-row-actions.component'
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
 import { isTerminalStatus } from '../shared/item-status-meta';
 import { formatQty } from '../consumables/consumable-shared';
+import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
 import type { InventoryRow } from './inventory-row';
 import { formatPath } from './inventory-row';
@@ -84,13 +85,13 @@ export class InventoryStatusCell {
 @Component({
   selector: 'app-inventory-onhand-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports],
+  imports: [NgIcon, HlmIconImports, UnitPipe],
   providers: [provideIcons({ lucideTriangleAlert })],
   template: `
     @if (row.kind === 'consumable') {
       <div class="flex items-center gap-2">
         <span class="text-sm tabular-nums">{{ qty }}</span>
-        <span class="text-xs text-muted-foreground">{{ row.unit }}</span>
+        <span class="text-xs text-muted-foreground">{{ row.unit | unit }}</span>
         @if (row.onHandHint) {
           <span class="text-xs text-muted-foreground">{{ row.onHandHint }}</span>
         }

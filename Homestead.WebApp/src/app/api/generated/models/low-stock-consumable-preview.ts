@@ -6,5 +6,5 @@ export interface LowStockConsumablePreview {
   name: string;
   restockThreshold: number;
   totalOnHand: number;
-  unit: string;
+  unit?: (string | null);
 }
