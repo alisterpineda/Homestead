@@ -71,21 +71,15 @@ type InlineForm = 'move' | 'lent' | null;
     <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
-          <h3 hlmSheetTitle class="flex items-center gap-2">
+          <div class="flex items-center gap-2">
             @if (view()?.isContainer) {
               <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
             }
-            <span class="truncate">{{ view()?.name }}</span>
-          </h3>
-          @if (view()?.id; as id) {
-            <a
-              [routerLink]="['/inventory/items', id]"
-              class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              Open full view
-              <ng-icon hlm name="lucideArrowRight" size="sm" />
-            </a>
-          }
+            <h3 hlmSheetTitle class="min-w-0 truncate">{{ view()?.name }}</h3>
+            @if (view()?.status; as status) {
+              <app-item-status-badge [status]="status" />
+            }
+          </div>
         </hlm-sheet-header>
 
         @if (view(); as it) {
@@ -128,56 +122,87 @@ type InlineForm = 'move' | 'lent' | null;
               }
             </div>
 
-            <!-- Details -->
+            <!-- Status — mirrors the Location card: live value on the left, its control on the right,
+                 with the inline "Lent to" form expanding in place (like Move under Location). -->
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">
-                <dl class="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2 text-sm">
-                  <dt class="text-muted-foreground">Status</dt>
-                  <dd><app-item-status-badge [status]="it.status" /></dd>
-                  @if (it.serial) {
-                    <dt class="text-muted-foreground">Serial</dt>
-                    <dd class="truncate">{{ it.serial }}</dd>
-                  }
-                  @if (it.value != null) {
-                    <dt class="text-muted-foreground">Value</dt>
-                    <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
-                  }
-                  @if (it.acquiredOn) {
-                    <dt class="text-muted-foreground">Acquired on</dt>
-                    <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
-                  }
-                  @if (it.status === 'Lent' && it.lentTo) {
-                    <dt class="text-muted-foreground">Lent to</dt>
-                    <dd class="truncate">{{ it.lentTo }}</dd>
-                  }
-                </dl>
-                @if (it.notes) {
-                  <p class="whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
-                }
-                <p class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</p>
+                <span class="text-sm text-muted-foreground">Status</span>
+                <app-item-status-badge [status]="it.status" />
               </div>
-            </div>
-
-            <!-- Inline lent form (opened by picking Lent in the status menu) -->
-            @if (inlineForm() === 'lent') {
-              <div class="space-y-3 rounded-md border border-dashed p-3">
-                <div class="space-y-2">
-                  <label hlmLabel for="panel-lent-to">Lent to</label>
-                  <input
-                    hlmInput
-                    id="panel-lent-to"
-                    class="w-full"
-                    maxlength="256"
-                    placeholder="e.g. Dave next door"
-                    [value]="lentToDraft()"
-                    (input)="lentToDraft.set(asValue($event))"
-                  />
-                </div>
-                <div class="flex justify-end gap-2">
-                  <button hlmBtn variant="ghost" size="sm" (click)="closeForm()">Cancel</button>
-                  <button hlmBtn size="sm" (click)="confirmLent()" [disabled]="!lentToDraft().trim() || saving()">
-                    {{ saving() ? 'Saving...' : 'Mark as lent' }}
+              @if (inlineForm() !== 'lent') {
+                <div hlmItemActions>
+                  <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" [hlmDropdownMenuTrigger]="statusMenu">
+                    Change
                   </button>
+                </div>
+              }
+
+              @if (inlineForm() === 'lent') {
+                <div class="w-full basis-full space-y-3 rounded-md border border-dashed p-3">
+                  <div class="space-y-2">
+                    <label hlmLabel for="panel-lent-to">Lent to</label>
+                    <input
+                      hlmInput
+                      id="panel-lent-to"
+                      class="w-full"
+                      maxlength="256"
+                      placeholder="e.g. Dave next door"
+                      [value]="lentToDraft()"
+                      (input)="lentToDraft.set(asValue($event))"
+                    />
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button hlmBtn variant="ghost" size="sm" (click)="closeForm()">Cancel</button>
+                    <button hlmBtn size="sm" (click)="confirmLent()" [disabled]="!lentToDraft().trim() || saving()">
+                      {{ saving() ? 'Saving...' : 'Mark as lent' }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+            <ng-template #statusMenu>
+              <hlm-dropdown-menu class="w-44">
+                <hlm-dropdown-menu-group>
+                  @for (s of statuses; track s) {
+                    <button
+                      hlmDropdownMenuRadio
+                      [checked]="it.status === s"
+                      (triggered)="onStatusPick(s)"
+                    >
+                      <hlm-dropdown-menu-radio-indicator />
+                      {{ statusLabel(s) }}
+                    </button>
+                  }
+                </hlm-dropdown-menu-group>
+              </hlm-dropdown-menu>
+            </ng-template>
+
+            <!-- Details — hidden when serial/value/acquired/lent/notes are all empty (status now lives
+                 in the header and Updated in the footer, so nothing keeps this card permanently filled). -->
+            @if (hasDetails()) {
+              <div hlmItem variant="outline">
+                <div hlmItemContent class="min-w-0">
+                  <dl class="grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2 text-sm">
+                    @if (it.serial) {
+                      <dt class="text-muted-foreground">Serial</dt>
+                      <dd class="truncate">{{ it.serial }}</dd>
+                    }
+                    @if (it.value != null) {
+                      <dt class="text-muted-foreground">Value</dt>
+                      <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
+                    }
+                    @if (it.acquiredOn) {
+                      <dt class="text-muted-foreground">Acquired on</dt>
+                      <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
+                    }
+                    @if (it.status === 'Lent' && it.lentTo) {
+                      <dt class="text-muted-foreground">Lent to</dt>
+                      <dd class="truncate">{{ it.lentTo }}</dd>
+                    }
+                  </dl>
+                  @if (it.notes) {
+                    <p class="whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
+                  }
                 </div>
               </div>
             }
@@ -201,26 +226,15 @@ type InlineForm = 'move' | 'lent' | null;
             }
           </div>
 
-          <hlm-sheet-footer>
-            <button hlmBtn variant="outline" class="w-full" [hlmDropdownMenuTrigger]="statusMenu">
-              Change status
-            </button>
-            <ng-template #statusMenu>
-              <hlm-dropdown-menu class="w-44">
-                <hlm-dropdown-menu-group>
-                  @for (s of statuses; track s) {
-                    <button
-                      hlmDropdownMenuRadio
-                      [checked]="it.status === s"
-                      (triggered)="onStatusPick(s)"
-                    >
-                      <hlm-dropdown-menu-radio-indicator />
-                      {{ statusLabel(s) }}
-                    </button>
-                  }
-                </hlm-dropdown-menu-group>
-              </hlm-dropdown-menu>
-            </ng-template>
+          <hlm-sheet-footer class="flex-row items-center justify-between gap-2">
+            <span class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</span>
+            <a
+              [routerLink]="['/inventory/items', it.id]"
+              class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
+              Open full view
+              <ng-icon hlm name="lucideArrowRight" size="sm" />
+            </a>
           </hlm-sheet-footer>
         }
       </hlm-sheet-content>
@@ -254,6 +268,17 @@ export class DurableQuickPanelComponent {
   protected locationText = computed(() => {
     const it = this.view();
     return it ? formatPath(it) : '';
+  });
+
+  // Drives whether the Details card renders at all — when serial/value/acquired/lent/notes are all
+  // empty it would be an empty box (status moved to the header, Updated to the footer). Mirrors
+  // `hasDetails` on durable-detail-page, plus notes (which live inside this card, not the header here).
+  protected hasDetails = computed(() => {
+    const it = this.view();
+    return (
+      !!it &&
+      (it.value != null || !!it.serial || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo) || !!it.notes)
+    );
   });
 
   protected updatedRelative = computed(() => {

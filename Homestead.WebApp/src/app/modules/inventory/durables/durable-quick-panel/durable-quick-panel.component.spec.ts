@@ -282,6 +282,31 @@ describe('DurableQuickPanelComponent', () => {
     });
   });
 
+  describe('hasDetails', () => {
+    it('is false when serial/value/acquired/lentTo/notes are all empty', async () => {
+      await open(makeItem());
+      expect(component['hasDetails']()).toBe(false);
+    });
+
+    it('is true when any of serial/value/acquired/lentTo/notes is present', async () => {
+      // Distinct ids so the seeded `current` signal reseeds from each new input.
+      await open(makeItem({ id: 'd-serial', serial: 'SN-1' }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-value', value: 100 }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-acq', acquiredOn: '2026-01-01' }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-lent', status: 'Lent', lentTo: 'Dave' }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-notes', notes: 'Keep dry' }));
+      expect(component['hasDetails']()).toBe(true);
+    });
+  });
+
   describe('outputs', () => {
     it('emits viewContents with the current item', async () => {
       const item = makeItem({ isContainer: true });

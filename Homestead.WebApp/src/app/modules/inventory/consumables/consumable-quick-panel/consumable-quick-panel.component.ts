@@ -89,7 +89,12 @@ interface StepperPayload {
     <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
-          <h3 hlmSheetTitle>{{ consumableView()?.name }}</h3>
+          <div class="flex items-center gap-2">
+            <h3 hlmSheetTitle class="min-w-0 truncate">{{ consumableView()?.name }}</h3>
+            @if (archived() && consumableView(); as s) {
+              <app-item-status-badge [status]="s.status" />
+            }
+          </div>
         </hlm-sheet-header>
 
         @if (consumableView(); as s) {
@@ -97,12 +102,7 @@ interface StepperPayload {
             <!-- On-hand summary -->
             <div hlmItem variant="outline">
               <div hlmItemContent>
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-sm text-muted-foreground">Total on hand</span>
-                  @if (archived()) {
-                    <app-item-status-badge [status]="s.status" />
-                  }
-                </div>
+                <span class="text-sm text-muted-foreground">Total on hand</span>
                 <p class="text-2xl font-bold tabular-nums">
                   {{ formatQty(displayedTotal()) }}
                   <span class="text-sm font-normal text-muted-foreground">{{ s.unit }}</span>
@@ -305,8 +305,15 @@ interface StepperPayload {
 
           <hlm-sheet-footer class="flex-row items-center justify-between gap-2">
             <span class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</span>
-            <button hlmBtn variant="ghost" size="sm" (click)="viewFullHistory()" [disabled]="navigating()">
-              {{ navigating() ? 'Saving changes...' : 'View full history' }}
+            <!-- Styled to match the durable panel's plain link exactly; stays a <button> only so it can
+                 flush pending optimistic stepper taps before navigating (durable patches are synchronous). -->
+            <button
+              type="button"
+              (click)="viewFullHistory()"
+              [disabled]="navigating()"
+              class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+            >
+              {{ navigating() ? 'Saving changes...' : 'Open full view' }}
               <ng-icon hlm name="lucideArrowRight" size="sm" />
             </button>
           </hlm-sheet-footer>
