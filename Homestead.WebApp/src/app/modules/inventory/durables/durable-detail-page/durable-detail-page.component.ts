@@ -6,22 +6,19 @@ import {
   signal,
   computed,
   untracked,
-  viewChild,
-  TemplateRef,
-  afterNextRender,
   DestroyRef,
-  OnDestroy,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink, NavigationEnd } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, of, catchError, filter } from 'rxjs';
+import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePencil,
   lucideCircleAlert,
   lucideBox,
   lucideBoxes,
+  lucideMapPin,
   lucideChevronLeft,
   lucideChevronRight,
   lucideEllipsisVertical,
@@ -34,7 +31,6 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
@@ -50,7 +46,6 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { GetDurableActivityResponse } from '@/api/generated/models/get-durable-activity-response';
@@ -75,7 +70,6 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
-    HlmBreadCrumbImports,
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
@@ -87,6 +81,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     lucideCircleAlert,
     lucideBox,
     lucideBoxes,
+    lucideMapPin,
     lucideChevronLeft,
     lucideChevronRight,
     lucideEllipsisVertical,
@@ -97,24 +92,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
-    <ng-template #headerTitle>
-      <nav hlmBreadcrumb class="min-w-0">
-        <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
-          <li hlmBreadcrumbItem>
-            <a hlmBreadcrumbLink link="/inventory/items">Items</a>
-          </li>
-          <li hlmBreadcrumbSeparator></li>
-          <li hlmBreadcrumbItem class="min-w-0">
-            <span hlmBreadcrumbPage
-                  [title]="durable()?.name ?? 'Durable'"
-                  class="truncate max-w-[150px] sm:max-w-[250px] md:max-w-[350px]">
-              {{ durable()?.name ?? 'Durable' }}
-            </span>
-          </li>
-        </ol>
-      </nav>
-    </ng-template>
-
     <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
       @if (loading() && !durable()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
@@ -137,7 +114,20 @@ import { toast } from '@spartan-ng/brain/sonner';
               <h1 class="text-2xl font-semibold">{{ it.name }}</h1>
               <app-item-status-badge [status]="it.status" />
             </div>
+            <!-- Headline answer: where the durable lives. The consumable's parallel is its on-hand
+                 metric; a place name isn't a single scannable number, so it's sized down deliberately. -->
+            <p class="flex items-center gap-1.5 text-lg font-medium"
+               [class.text-muted-foreground]="locationText() === 'Unplaced'">
+              <ng-icon hlm name="lucideMapPin" size="sm" class="shrink-0 text-muted-foreground" />
+              <span class="break-words">{{ locationText() }}</span>
+              @if (it.compartment) {
+                <span class="text-muted-foreground">&middot; {{ it.compartment }}</span>
+              }
+            </p>
             <p class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</p>
+            @if (it.notes) {
+              <p class="max-w-prose whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
+            }
           </div>
           <div class="flex items-center gap-2">
             <button hlmBtn variant="outline" size="sm" (click)="openEdit(it)">
@@ -165,38 +155,31 @@ import { toast } from '@spartan-ng/brain/sonner';
           </div>
         </div>
 
-        <!-- Details -->
-        <section class="space-y-2">
-          <h2 class="text-sm font-medium text-muted-foreground">Details</h2>
-          <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border p-4 text-sm sm:max-w-lg">
-            <dt class="text-muted-foreground">Location</dt>
-            <dd class="min-w-0">
-              <span class="break-words">{{ locationText() }}</span>
-              @if (it.compartment) {
-                <span class="text-muted-foreground"> · {{ it.compartment }}</span>
+        <!-- Details — hidden entirely when the durable carries no value/serial/acquired/lent fields
+             (the common case in current data); location now leads as the headline above. -->
+        @if (hasDetails()) {
+          <section class="space-y-2">
+            <h2 class="text-sm font-medium text-muted-foreground">Details</h2>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border p-4 text-sm sm:max-w-lg">
+              @if (it.value != null) {
+                <dt class="text-muted-foreground">Value</dt>
+                <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
               }
-            </dd>
-            @if (it.value != null) {
-              <dt class="text-muted-foreground">Value</dt>
-              <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
-            }
-            @if (it.serial) {
-              <dt class="text-muted-foreground">Serial</dt>
-              <dd class="break-words">{{ it.serial }}</dd>
-            }
-            @if (it.acquiredOn) {
-              <dt class="text-muted-foreground">Acquired on</dt>
-              <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
-            }
-            @if (it.status === 'Lent' && it.lentTo) {
-              <dt class="text-muted-foreground">Lent to</dt>
-              <dd class="break-words">{{ it.lentTo }}</dd>
-            }
-          </dl>
-          @if (it.notes) {
-            <p class="max-w-prose whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
-          }
-        </section>
+              @if (it.serial) {
+                <dt class="text-muted-foreground">Serial</dt>
+                <dd class="break-words">{{ it.serial }}</dd>
+              }
+              @if (it.acquiredOn) {
+                <dt class="text-muted-foreground">Acquired on</dt>
+                <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
+              }
+              @if (it.status === 'Lent' && it.lentTo) {
+                <dt class="text-muted-foreground">Lent to</dt>
+                <dd class="break-words">{{ it.lentTo }}</dd>
+              }
+            </dl>
+          </section>
+        }
 
         <!-- Contents (containers only) -->
         @if (it.isContainer) {
@@ -350,36 +333,15 @@ import { toast } from '@spartan-ng/brain/sonner';
     </hlm-alert-dialog>
   `,
 })
-export class DurableDetailPageComponent implements OnDestroy {
+export class DurableDetailPageComponent {
   private durableApi = inject(InventoryDurableApiService);
   private placeApi = inject(InventoryPlaceApiService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
-  private pageHeaderService = inject(PageHeaderService);
-
-  private headerTitleTpl = viewChild.required<TemplateRef<unknown>>('headerTitle');
 
   protected readonly formatQty = formatQty;
-
-  constructor() {
-    // The shell clears the registered title on every NavigationStart, so re-register after each
-    // navigation — drilling container → child reuses this component and would otherwise lose the crumb.
-    afterNextRender(() => {
-      this.pageHeaderService.setTitle(this.headerTitleTpl());
-    });
-    this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
-      takeUntilDestroyed(),
-    ).subscribe(() => {
-      this.pageHeaderService.setTitle(this.headerTitleTpl());
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.pageHeaderService.clearTitle();
-  }
 
   // Optional payload from the `/inventory/items/:id` dispatcher, which already fetched the record. When
   // present we render from it and skip the initial GET; absent (direct/standalone use) we fetch by id.
@@ -438,6 +400,13 @@ export class DurableDetailPageComponent implements OnDestroy {
   protected locationText = computed(() => {
     const it = this.durable();
     return it ? formatPath(it) : '';
+  });
+
+  // Drives whether the Details box renders at all — when value/serial/acquired/lent are all empty it
+  // would be an empty card, so it's hidden (location now leads as the headline, not a Details row).
+  protected hasDetails = computed(() => {
+    const it = this.durable();
+    return !!it && (it.value != null || !!it.serial || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo));
   });
 
   protected updatedRelative = computed(() => {
@@ -586,7 +555,7 @@ export class DurableDetailPageComponent implements OnDestroy {
     if (!it) return;
     this.deleting.set(true);
     this.deleteError.set('');
-    this.durableApi.deleteDurable({ id: it.id }).subscribe({
+    this.durableApi.deleteDurable({ id: it.id }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleting.set(false);
         ctx.close();

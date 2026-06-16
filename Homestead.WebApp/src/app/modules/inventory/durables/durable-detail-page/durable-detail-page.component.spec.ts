@@ -8,7 +8,6 @@ import { of, throwError } from 'rxjs';
 import { DurableDetailPageComponent } from './durable-detail-page.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
-import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { GetDurableActivityResponse } from '@/api/generated/models/get-durable-activity-response';
@@ -156,21 +155,45 @@ describe('DurableDetailPageComponent', () => {
     return Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
   }
 
-  it('renders the header with name, status, location, value, and serial', async () => {
+  it('renders the header with name, status, headline location, value, and serial', async () => {
     const { harness } = await navigate('/inventory/items/item1');
 
     const content = text(harness);
     expect(content).toContain('Cordless Drill');
     expect(content).toContain('Active'); // status badge label
-    expect(content).toContain('Garage'); // resolved location
-    expect(content).toContain('120'); // value
+    expect(content).toContain('Garage'); // resolved location, now the headline answer
+    expect(content).toContain('120'); // value (Details box — present because value is set)
     expect(content).toContain('SN-123'); // serial
-    // Back-navigation to the umbrella list is the header breadcrumb (registered via PageHeaderService),
-    // which is portaled to the shell header rather than rendered in the routed component's body.
-    expect(TestBed.inject(PageHeaderService).title()).not.toBeNull();
+    // The Details box renders here because value/serial are set; back-navigation is the shared
+    // `Items › name` breadcrumb, which lives on the dispatcher (covered by its spec), not this child.
+    expect(content).toContain('Details');
     // A leaf durable shows no Contents section and never fetches place contents.
     expect(content).not.toContain('Contents');
     expect(placeApi.calls).toEqual([]);
+  });
+
+  it('leads with the location headline and hides the Details box when no detail fields are set', async () => {
+    // A bare leaf durable: placed, but no value/serial/acquired/lent. The common shape in current data.
+    durableApi.item = {
+      id: 'bare', name: 'Some Container', fungibility: 'NonFungible', status: 'Active',
+      isContainer: false, path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+      resolvedAreaId: 'garage', createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+    };
+    const { harness } = await navigate('/inventory/items/bare');
+
+    const content = text(harness);
+    expect(content).toContain('Garage'); // location still leads as the headline
+    expect(content).not.toContain('Details'); // empty Details box is hidden entirely
+  });
+
+  it('shows Unplaced as the location headline for an unplaced durable', async () => {
+    durableApi.item = {
+      id: 'floating', name: 'Floating Thing', fungibility: 'NonFungible', status: 'Active',
+      isContainer: false, path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+    };
+    const { harness } = await navigate('/inventory/items/floating');
+
+    expect(text(harness)).toContain('Unplaced');
   });
 
   it('shows the not-found state when the item is missing', async () => {

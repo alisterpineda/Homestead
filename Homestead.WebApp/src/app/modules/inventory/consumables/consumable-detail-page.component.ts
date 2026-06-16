@@ -6,15 +6,15 @@ import {
   signal,
   computed,
   untracked,
+  DestroyRef,
   LOCALE_ID,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { formatDate } from '@angular/common';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  lucideArrowLeft,
   lucidePencil,
   lucidePlus,
   lucideCircleAlert,
@@ -24,14 +24,21 @@ import {
   lucideChevronLeft,
   lucideChevronRight,
   lucideBoxes,
+  lucideEllipsisVertical,
+  lucideArchive,
+  lucideArchiveRestore,
+  lucideTrash2,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
+import { isTerminalStatus } from '../shared/item-status-meta';
 import { EditConsumableSheetComponent } from './edit-consumable-sheet/edit-consumable-sheet.component';
 import {
   StockOpSheetComponent,
@@ -42,6 +49,11 @@ import { TrackDurableSheetComponent } from './track-durable-sheet/track-durable-
 import { CollapseDurablesDialogComponent } from './collapse-durables-dialog/collapse-durables-dialog.component';
 import { formatQty, movementDirection, isWholeCount } from './consumable-shared';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { formatRelativeAge } from '@/shared/utils/relative-age';
+import { replace } from '@/shared/json-patch';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { toast } from '@spartan-ng/brain/sonner';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { ConsumableDetailResponse } from '@/api/generated/models/consumable-detail-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
@@ -52,13 +64,14 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   selector: 'app-consumable-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
     HlmTableImports,
+    HlmAlertDialogImports,
+    HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
     EditConsumableSheetComponent,
     StockOpSheetComponent,
@@ -66,7 +79,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     CollapseDurablesDialogComponent,
   ],
   providers: [provideIcons({
-    lucideArrowLeft,
     lucidePencil,
     lucidePlus,
     lucideCircleAlert,
@@ -76,15 +88,14 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     lucideChevronLeft,
     lucideChevronRight,
     lucideBoxes,
+    lucideEllipsisVertical,
+    lucideArchive,
+    lucideArchiveRestore,
+    lucideTrash2,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
-      <a routerLink="/inventory/items" class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ng-icon hlm name="lucideArrowLeft" size="sm" />
-        All items
-      </a>
-
       @if (loading() && !detail()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
       } @else if (notFound()) {
@@ -113,9 +124,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               {{ formatQty(s.totalOnHand) }}
               <span class="text-base font-normal text-muted-foreground">{{ s.unit }} on hand</span>
             </p>
-            @if (s.restockThreshold != null) {
-              <p class="text-xs text-muted-foreground">Restock at or below {{ formatQty(s.restockThreshold) }} {{ s.unit }}</p>
-            }
+            <p class="text-xs text-muted-foreground">
+              @if (s.restockThreshold != null) {
+                Restock at or below {{ formatQty(s.restockThreshold) }} {{ s.unit }} &middot;
+              }
+              Updated {{ updatedRelative() }}
+            </p>
             @if (s.notes) {
               <p class="max-w-prose text-sm text-muted-foreground">{{ s.notes }}</p>
             }
@@ -135,6 +149,24 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <ng-icon hlm name="lucidePlus" size="sm" />
               Receive
             </button>
+            <button hlmBtn variant="outline" size="icon-sm" [hlmDropdownMenuTrigger]="actionsMenu" aria-label="Consumable actions">
+              <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+            </button>
+            <ng-template #actionsMenu>
+              <hlm-dropdown-menu class="w-44">
+                <hlm-dropdown-menu-group>
+                  <button hlmDropdownMenuItem (triggered)="onArchiveRestore(s)" [disabled]="archiving()">
+                    <ng-icon hlm [name]="terminal() ? 'lucideArchiveRestore' : 'lucideArchive'" size="sm" />
+                    {{ terminal() ? 'Restore' : 'Archive' }}
+                  </button>
+                  <hlm-dropdown-menu-separator />
+                  <button hlmDropdownMenuItem variant="destructive" (triggered)="onDeleteRequest()">
+                    <ng-icon hlm name="lucideTrash2" size="sm" />
+                    Delete
+                  </button>
+                </hlm-dropdown-menu-group>
+              </hlm-dropdown-menu>
+            </ng-template>
           </div>
         </div>
 
@@ -293,11 +325,39 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (saved)="onEditSaved()"
       (closed)="editState.set('closed')"
     />
+
+    <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Delete {{ consumable()?.name ?? 'consumable' }}?</h2>
+          <p hlmAlertDialogDescription>
+            This permanently removes the consumable. Consumables with stock history cannot be deleted — archive them instead.
+          </p>
+        </div>
+        @if (deleteError()) {
+          <p class="text-sm text-destructive">{{ deleteError() }}</p>
+        }
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+          <button
+            hlmAlertDialogAction
+            variant="destructive"
+            (click)="confirmDelete(ctx)"
+            [disabled]="deleting()"
+          >
+            {{ deleting() ? 'Deleting...' : 'Delete' }}
+          </button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
   `,
 })
 export class ConsumableDetailPageComponent {
   private consumableApi = inject(InventoryConsumableApiService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
   private locale = inject(LOCALE_ID);
 
   protected readonly formatQty = formatQty;
@@ -356,6 +416,16 @@ export class ConsumableDetailPageComponent {
   consumable = computed<ConsumableResponse | null>(() => this.detail()?.consumable ?? null);
   locations = computed<StockEntryResponse[]>(() => this.detail()?.locations ?? []);
 
+  protected terminal = computed(() => {
+    const s = this.consumable();
+    return s ? isTerminalStatus(s.status) : false;
+  });
+
+  protected updatedRelative = computed(() => {
+    const updatedAt = this.consumable()?.updatedAt;
+    return updatedAt ? formatRelativeAge(updatedAt) : '';
+  });
+
   private movementsKey = computed(() => ({
     id: this.consumableId(),
     page: this.page(),
@@ -392,6 +462,12 @@ export class ConsumableDetailPageComponent {
   // Edit sheet state.
   editConsumable = signal<ConsumableResponse | null>(null);
   editState = signal<BrnDialogState>('closed');
+
+  // Lifecycle (archive/restore + delete) overflow-menu state.
+  deleteState = signal<BrnDialogState>('closed');
+  deleting = signal(false);
+  deleteError = signal('');
+  archiving = signal(false);
 
   private toOpLocation(entry: StockEntryResponse): StockOpLocation {
     return {
@@ -459,6 +535,46 @@ export class ConsumableDetailPageComponent {
   onEditSaved(): void {
     this.editState.set('closed');
     this.refreshTrigger.update((v) => v + 1);
+  }
+
+  onArchiveRestore(consumable: ConsumableResponse): void {
+    const terminal = isTerminalStatus(consumable.status);
+    const newStatus = terminal ? 'Active' : 'Archived';
+    this.archiving.set(true);
+    this.consumableApi.patchConsumable({ id: consumable.id, body: [replace('/status', newStatus)] }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.archiving, 'Failed to update consumable.'),
+    ).subscribe(() => {
+      this.archiving.set(false);
+      toast.success(terminal ? 'Consumable restored.' : 'Consumable archived.');
+      this.refreshTrigger.update((v) => v + 1);
+    });
+  }
+
+  onDeleteRequest(): void {
+    this.deleteError.set('');
+    this.deleteState.set('open');
+  }
+
+  confirmDelete(ctx: { close: () => void }): void {
+    const s = this.consumable();
+    if (!s) return;
+    this.deleting.set(true);
+    this.deleteError.set('');
+    this.consumableApi.deleteConsumable({ id: s.id }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        ctx.close();
+        toast.success('Consumable deleted.');
+        void this.router.navigate(['/inventory/items']);
+      },
+      // Inline, not a toast: the open dialog overlay would obscure a toast, and the rejection reason
+      // ("has stock history — archive instead") is what the user needs to read here.
+      error: (err: unknown) => {
+        this.deleting.set(false);
+        this.deleteError.set(this.errorHandler.getErrorMessage(err, 'Failed to delete consumable.'));
+      },
+    });
   }
 
   prevPage(): void {

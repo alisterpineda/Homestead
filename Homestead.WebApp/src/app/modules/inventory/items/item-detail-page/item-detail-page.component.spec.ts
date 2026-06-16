@@ -1,5 +1,6 @@
-import { Component, input, provideZonelessChangeDetection } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { NgTemplateOutlet } from '@angular/common';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -9,6 +10,7 @@ import { ItemDetailPageComponent } from './item-detail-page.component';
 import { DurableDetailPageComponent } from '../../durables/durable-detail-page/durable-detail-page.component';
 import { ConsumableDetailPageComponent } from '../../consumables/consumable-detail-page.component';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import { PageHeaderService } from '@/shared/services/page-header.service';
 import type { ItemDetailResponse } from '@/api/generated/models/item-detail-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableDetailResponse } from '@/api/generated/models/consumable-detail-response';
@@ -30,6 +32,21 @@ class StubDurableDetailPageComponent {
 })
 class StubConsumableDetailPageComponent {
   preloaded = input<ConsumableDetailResponse | null>(null);
+}
+
+/**
+ * Renders whatever template the dispatcher registered as the header title — the shared `Items › name`
+ * breadcrumb lives in the shell header (via PageHeaderService), not in the dispatcher's own DOM, so
+ * this stands in for the shell.
+ */
+@Component({
+  selector: 'test-title-host',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgTemplateOutlet],
+  template: `<ng-container [ngTemplateOutlet]="header.title()" />`,
+})
+class TitleHostComponent {
+  protected header = inject(PageHeaderService);
 }
 
 const DURABLE_ITEM: ItemDetailResponse = {
@@ -131,5 +148,40 @@ describe('ItemDetailPageComponent', () => {
     const content = text(harness);
     expect(content).toContain('consumable child: Wood Screws');
     expect(content).not.toContain('durable child');
+  });
+
+  // The breadcrumb lives on the dispatcher (not the kind-specific children) so it stays flicker-free
+  // across :id navigations. It's registered as the header title and outlet'd by the shell, not the body.
+  async function renderTitle(): Promise<HTMLElement> {
+    const host = TestBed.createComponent(TitleHostComponent);
+    host.detectChanges();
+    await host.whenStable();
+    host.detectChanges();
+    return host.nativeElement as HTMLElement;
+  }
+
+  it('registers the header breadcrumb via PageHeaderService once the item resolves', async () => {
+    itemApi.result = of(DURABLE_ITEM);
+    await navigate('/inventory/items/d1');
+
+    expect(TestBed.inject(PageHeaderService).title()).not.toBeNull();
+  });
+
+  it('renders the registered breadcrumb with the durable name and an Items back-link', async () => {
+    itemApi.result = of(DURABLE_ITEM);
+    await navigate('/inventory/items/d1');
+
+    const el = await renderTitle();
+    expect(el.querySelector('a[href]')?.textContent?.trim()).toBe('Items');
+    expect(el.querySelector('a[href]')?.getAttribute('href')).toBe('/inventory/items');
+    expect(el.textContent).toContain('Cordless Drill'); // leaf crumb = durable name
+  });
+
+  it('renders the registered breadcrumb resolving the name from the consumable kind', async () => {
+    itemApi.result = of(CONSUMABLE_ITEM);
+    await navigate('/inventory/items/c1');
+
+    const el = await renderTitle();
+    expect(el.textContent).toContain('Wood Screws'); // leaf crumb resolved from the consumable payload
   });
 });

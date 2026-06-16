@@ -138,7 +138,7 @@ Moving stock between two locations is a single operation that decrements the sou
 
 ## Fungible status
 
-Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**. `Lent`, `InRepair`, `Sold`, and `Discarded` are meaningless for a count of a consumable (you do not lend "screws" as an identity). Archiving a consumable removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted.
+Fungible items use a reduced lifecycle — only **`Active`** and **`Archived`**. `Lent`, `InRepair`, `Sold`, and `Discarded` are meaningless for a count of a consumable (you do not lend "screws" as an identity). Archiving a consumable removes it from the default unified items list behind the same "Show inactive" reveal used elsewhere; per the delete-vs-archive rule in [locations.md](locations.md#delete-vs-archive), a fungible item with any movement history can only be archived, not hard-deleted. The consumable detail page exposes **Archive** (and **Restore** once archived), plus **Delete** when there is no ledger history, through its `⋮` overflow menu — the same lifecycle actions the unified list's row actions offer.
 
 ## Track this one individually
 

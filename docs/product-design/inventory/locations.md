@@ -157,6 +157,8 @@ Inventory keeps the Finances delete-vs-archive split:
 - **Archive** (`Status = Archived`) is the keep-the-record path — the item leaves the active picture but its row, history, and any attachments survive. This is the normal way to retire something you no longer want listed.
 - **Delete** is the mistake-eraser, and is **disabled once the item carries history worth keeping**: a non-fungible item that is or was a container with contents, or a fungible item with movement-ledger rows, cannot be hard-deleted — it can only be archived. A freshly mis-created item with no history can be deleted outright.
 
+Both **Archive/Restore** and **Delete** are surfaced on the item detail page's `⋮` overflow menu for **both** kinds (durable and consumable alike), alongside the unified list's row actions; Delete stays gated exactly as described above (the blocked reason — "has contents / stock history — archive instead" — is shown inline in the confirm dialog).
+
 This mirrors `accounts.md`'s rule that Delete is present but disabled once an account has transactions, and the "Show archived (N)" reveal in the same module.
 
 ## Area lifecycle
