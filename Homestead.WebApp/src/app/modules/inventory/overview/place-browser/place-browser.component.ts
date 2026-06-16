@@ -17,6 +17,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { PlaceCardComponent } from './place-card.component';
 import { placeRefToLink, placeDisplayName, type PlaceRef } from './place-param';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
+import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatQty } from '../../consumables/consumable-shared';
@@ -186,7 +187,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                         <span class="flex min-w-0 items-center gap-2">
                           <span class="truncate">{{ row.consumable.name }}</span>
                           @if (row.consumable.isLow) {
-                            <span class="flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                            <span [class]="lowStockBadgeClass">
                               <ng-icon hlm name="lucideTriangleAlert" size="xs" />
                               Low
                             </span>
@@ -259,6 +260,7 @@ export class PlaceBrowserComponent {
 
   protected readonly formatQty = formatQty;
   protected readonly placeRefToLink = placeRefToLink;
+  protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
 
   /** Top-level areas only; nested areas surface by drilling into their parent. */
   protected rootAreas = computed(() =>

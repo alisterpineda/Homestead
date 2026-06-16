@@ -24,7 +24,7 @@ import {
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
 import { InventoryRowActionsComponent } from './inventory-row-actions.component';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
-import { isTerminalStatus } from '../shared/item-status-meta';
+import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
@@ -96,9 +96,7 @@ export class InventoryStatusCell {
           <span class="text-xs text-muted-foreground">{{ row.onHandHint }}</span>
         }
         @if (row.isLow) {
-          <span
-            class="inline-flex h-5 w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-          >
+          <span [class]="lowStockBadgeClass">
             <ng-icon hlm name="lucideTriangleAlert" size="xs" />
             Low
           </span>
@@ -111,6 +109,7 @@ export class InventoryStatusCell {
 })
 export class InventoryOnHandCell {
   private readonly ctx = injectFlexRenderContext<CellContext<InventoryRow, unknown>>();
+  protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
   protected get row(): InventoryRow { return this.ctx.row.original; }
   protected get qty(): string { return formatQty(this.row.onHand ?? 0); }
 }

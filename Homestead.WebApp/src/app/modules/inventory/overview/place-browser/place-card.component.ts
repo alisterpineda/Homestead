@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideTriangleAlert, lucideChevronRight } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
 
 /**
  * One drillable place card: root areas, the Unplaced pseudo-place, and child containers in a
@@ -34,7 +35,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
       <span class="flex shrink-0 items-center gap-2">
         @if (lowStockCount() > 0) {
           <span
-            class="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive tabular-nums"
+            [class]="lowStockBadgeClass"
             [attr.aria-label]="lowStockCount() + ' low stock'"
           >
             <ng-icon hlm name="lucideTriangleAlert" size="xs" />
@@ -50,6 +51,8 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
   `,
 })
 export class PlaceCardComponent {
+  /** Count badge needs tabular figures so multi-digit counts don't jitter. */
+  protected readonly lowStockBadgeClass = `${LOW_STOCK_BADGE_CLASS} tabular-nums`;
   name = input.required<string>();
   icon = input.required<string>();
   count = input.required<number>();

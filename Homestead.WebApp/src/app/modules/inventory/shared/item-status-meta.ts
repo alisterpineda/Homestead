@@ -11,6 +11,15 @@ export interface ItemStatusMeta {
 export const BADGE_BASE =
   'inline-flex h-5 w-fit shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap';
 
+/**
+ * Stock-signal badge classes — self-contained pills for a fungible item's stock level, built on the
+ * shared {@link BADGE_BASE}. Amber (warning) means low; destructive (empty) means out. Defining the two
+ * tones together, distinct from each other, is what stops "low" and "out" reading as the same alert.
+ * The low-stock pill carries an icon, so it adds `gap-1`; the "out" pill is text-only.
+ */
+export const LOW_STOCK_BADGE_CLASS = `${BADGE_BASE} gap-1 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300`;
+export const OUT_OF_STOCK_BADGE_CLASS = `${BADGE_BASE} bg-destructive/10 text-destructive dark:bg-destructive/20`;
+
 export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {
   Active: {
     label: 'Active',

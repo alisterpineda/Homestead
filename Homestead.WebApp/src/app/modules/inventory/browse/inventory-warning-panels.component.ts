@@ -12,7 +12,7 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { InventoryOverviewTileComponent } from './inventory-overview-tile.component';
 import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
-import { BADGE_BASE } from '../shared/item-status-meta';
+import { OUT_OF_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 
 /**
@@ -135,8 +135,8 @@ export class InventoryWarningPanelsComponent {
 
   protected readonly formatQty = formatQty;
 
-  /** The "Out" badge: the shared pill base + a destructive tone, for a zero-on-hand consumable. */
-  protected readonly outBadgeClass = `${BADGE_BASE} bg-destructive/10 text-destructive dark:bg-destructive/20`;
+  /** The "Out" badge for a zero-on-hand consumable (destructive tone). */
+  protected readonly outBadgeClass = OUT_OF_STOCK_BADGE_CLASS;
 
   /** Narrowed views so the template gets type-safe access to each mode's data. */
   protected rootOverview = computed(() => {

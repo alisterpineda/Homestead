@@ -38,7 +38,7 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
-import { isTerminalStatus } from '../shared/item-status-meta';
+import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import { EditConsumableSheetComponent } from './edit-consumable-sheet/edit-consumable-sheet.component';
 import {
   StockOpSheetComponent,
@@ -116,7 +116,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               <h1 class="text-2xl font-semibold">{{ s.name }}</h1>
               <app-item-status-badge [status]="s.status" />
               @if (s.isLow) {
-                <span class="inline-flex h-5 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                <span [class]="lowStockBadgeClass">
                   <ng-icon hlm name="lucideTriangleAlert" size="xs" />
                   Low
                 </span>
@@ -364,6 +364,7 @@ export class ConsumableDetailPageComponent {
 
   protected readonly formatQty = formatQty;
   protected readonly isWholeCount = isWholeCount;
+  protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
 
   // Optional payload from the `/inventory/items/:id` dispatcher, which already fetched the record. When
   // present we render from it and skip the initial GET; absent (direct/standalone use) we fetch by id.
