@@ -25,8 +25,10 @@ type EntryKind = 'durable' | 'consumable';
 
 /**
  * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the durable fields
- * (location, container flag) and the consumable fields (unit, restock threshold). Both forms stay to the
- * essentials so the dialog barely changes height on toggle — the rest is set later from the Edit sheet.
+ * (location, container flag) and the consumable fields (unit, restock threshold). The two field sets and
+ * the two descriptions are grid-stacked into a shared cell, so the dialog reserves max(durable, consumable)
+ * height and never reflows on toggle; the inactive variant is `invisible` + `inert`. Title and submit stay
+ * kind-neutral — the toggle group is the kind selector. The rest is set later from the Edit sheet.
  */
 @Component({
   selector: 'app-create-entry-dialog',
@@ -51,13 +53,14 @@ type EntryKind = 'durable' | 'consumable';
         class="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[560px]"
       >
         <div hlmDialogHeader>
-          <h2 hlmDialogTitle>{{ kind() === 'consumable' ? 'New consumable' : 'New durable' }}</h2>
-          <p hlmDialogDescription>
-            @if (kind() === 'consumable') {
-              Define a consumable type, counted in bulk. Add stock to it afterwards.
-            } @else {
+          <h2 hlmDialogTitle>New item</h2>
+          <p hlmDialogDescription class="grid grid-cols-1">
+            <span class="col-start-1 row-start-1" [class.invisible]="kind() !== 'durable'">
               Add a tracked durable — one specific thing. Set serial, value, and more after creating.
-            }
+            </span>
+            <span class="col-start-1 row-start-1" [class.invisible]="kind() !== 'consumable'">
+              Define a consumable type, counted in bulk. Add stock to it afterwards.
+            </span>
           </p>
         </div>
 
@@ -86,52 +89,66 @@ type EntryKind = 'durable' | 'consumable';
             />
           </div>
 
-          @if (kind() === 'durable') {
-            <div class="flex flex-col gap-1.5">
-              <label hlmLabel>Location</label>
-              <app-location-picker
-                [value]="locationValue()"
-                (valueChange)="onLocationChange($event)"
-                [selectedLabel]="initialLocationLabel()"
-                ariaLabel="Location"
-              />
+          <!-- Both field sets share one grid cell so the dialog reserves max height and never reflows
+               on toggle; the inactive variant is hidden (still occupies space) and made inert. -->
+          <div class="grid grid-cols-1">
+            <div
+              class="col-start-1 row-start-1 flex flex-col gap-4"
+              [class.invisible]="kind() !== 'durable'"
+              [attr.inert]="kind() === 'durable' ? null : ''"
+            >
+              <div class="flex flex-col gap-1.5">
+                <label hlmLabel>Location</label>
+                <app-location-picker
+                  [value]="locationValue()"
+                  (valueChange)="onLocationChange($event)"
+                  [selectedLabel]="initialLocationLabel()"
+                  ariaLabel="Location"
+                />
+              </div>
+
+              <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
+                <hlm-checkbox
+                  [checked]="isContainer()"
+                  (checkedChange)="isContainer.set($event === true)"
+                  [aria-label]="'This durable is a container'"
+                />
+                <span>This durable is a container</span>
+              </label>
             </div>
 
-            <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
-              <hlm-checkbox
-                [checked]="isContainer()"
-                (checkedChange)="isContainer.set($event === true)"
-                [aria-label]="'This durable is a container'"
-              />
-              <span>This durable is a container</span>
-            </label>
-          } @else {
-            <div class="flex flex-col gap-1.5">
-              <label hlmLabel for="create-entry-unit">Unit</label>
-              <input
-                hlmInput
-                id="create-entry-unit"
-                maxlength="32"
-                placeholder="e.g. rolls"
-                [value]="unit()"
-                (input)="unit.set(asValue($event))"
-              />
-            </div>
+            <div
+              class="col-start-1 row-start-1 flex flex-col gap-4"
+              [class.invisible]="kind() !== 'consumable'"
+              [attr.inert]="kind() === 'consumable' ? null : ''"
+            >
+              <div class="flex flex-col gap-1.5">
+                <label hlmLabel for="create-entry-unit">Unit</label>
+                <input
+                  hlmInput
+                  id="create-entry-unit"
+                  maxlength="32"
+                  placeholder="e.g. rolls"
+                  [value]="unit()"
+                  (input)="unit.set(asValue($event))"
+                />
+              </div>
 
-            <div class="flex flex-col gap-1.5">
-              <label hlmLabel for="create-entry-threshold">Restock threshold (optional)</label>
-              <input
-                hlmInput
-                id="create-entry-threshold"
-                type="number"
-                step="0.001"
-                min="0"
-                placeholder="Flag as low at or below this total"
-                [value]="threshold()"
-                (input)="threshold.set(asValue($event))"
-              />
+              <div class="flex flex-col gap-1.5">
+                <label hlmLabel for="create-entry-threshold">Restock threshold (optional)</label>
+                <input
+                  hlmInput
+                  id="create-entry-threshold"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  placeholder="Flag as low at or below this total"
+                  [value]="threshold()"
+                  (input)="threshold.set(asValue($event))"
+                />
+              </div>
             </div>
-          }
+          </div>
 
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="create-entry-notes">Notes (optional)</label>
@@ -152,7 +169,7 @@ type EntryKind = 'durable' | 'consumable';
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" class="w-full sm:w-auto" hlmDialogClose>Cancel</button>
             <button hlmBtn type="submit" class="w-full sm:w-auto" [disabled]="!canSubmit() || creating()">
-              {{ creating() ? 'Creating...' : (kind() === 'consumable' ? 'Create consumable' : 'Create durable') }}
+              {{ creating() ? 'Creating...' : 'Create' }}
             </button>
           </div>
         </form>
