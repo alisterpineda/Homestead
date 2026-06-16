@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { formatDate } from '@angular/common';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideBox, lucideBoxes, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideTriangleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
@@ -47,21 +47,12 @@ interface InventoryTableMeta {
 @Component({
   selector: 'app-inventory-name-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports],
-  providers: [provideIcons({ lucideBox, lucideBoxes })],
   template: `
-    <div class="flex min-w-0 items-center gap-2">
-      @if (row.durable?.isContainer) {
-        <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
-      } @else if (row.kind === 'consumable') {
-        <ng-icon hlm name="lucideBoxes" size="sm" class="shrink-0 text-muted-foreground" aria-label="Consumable" />
+    <div class="min-w-0">
+      <span class="block truncate text-sm font-medium">{{ row.name }}</span>
+      @if (row.durable?.serial) {
+        <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
       }
-      <div class="min-w-0">
-        <span class="block truncate text-sm font-medium">{{ row.name }}</span>
-        @if (row.durable?.serial) {
-          <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
-        }
-      </div>
     </div>
   `,
 })
