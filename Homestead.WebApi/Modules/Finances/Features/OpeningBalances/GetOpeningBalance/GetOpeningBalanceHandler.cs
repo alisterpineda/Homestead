@@ -12,6 +12,8 @@ public class GetOpeningBalanceHandler(
 {
     public async Task<OpeningBalanceResponse?> Handle(GetOpeningBalanceQuery request, CancellationToken ct)
     {
+        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+
         var transaction = await db.OpeningBalancesFor(request.AccountId, request.CommodityId)
             .AsNoTracking()
             .Include(t => t.Splits)

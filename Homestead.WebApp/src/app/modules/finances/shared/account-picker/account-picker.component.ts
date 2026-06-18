@@ -107,7 +107,6 @@ export class AccountPickerComponent {
     const exclude = this.excludeAccountId();
     const term = this.searchTerm().trim().toLowerCase();
     return this.allAccounts().filter(a => {
-      if (a.isSystem) return false;
       if (exclude && a.id === exclude) return false;
       if (!term) return true;
       const haystack = `${a.name} ${a.institution ?? ''}`.toLowerCase();

@@ -556,6 +556,60 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.NoContent, delResp.StatusCode);
     }
 
+    private async Task<Guid> GetOpeningBalancesSystemIdAsync()
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Accounts
+            .Where(a => a.IsSystem && a.Name == SystemAccountSeeder.OpeningBalancesName)
+            .Select(a => a.Id)
+            .SingleAsync(CT);
+    }
+
+    [Fact]
+    public async Task GetList_SystemOpeningBalancesAccount_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        // Seed a real user opening balance — its counterpart leg is the system Opening-Balances
+        // account. Without the guard, listing by the system id over-returns *this user's* balance
+        // (the leak this endpoint previously had); the guard makes it a consistent 404.
+        var accountId = await CreateInvestmentAccountAsync(client, usdId);
+        await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new { commodityId = usdId, quantity = 5000m, asOfDate = "2026-04-23" }, CT);
+
+        var openingBalancesId = await GetOpeningBalancesSystemIdAsync();
+
+        var listResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{openingBalancesId}/opening-balances", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, listResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSingle_SystemOpeningBalancesAccount_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        // Seed a real user opening balance for USD. Its counterpart leg sits on the system
+        // Opening-Balances account in the same commodity, so without the guard a by-(account,
+        // commodity) lookup keyed on the system id surfaces *this user's* row. The guard 404s it.
+        var accountId = await CreateInvestmentAccountAsync(client, usdId);
+        await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{accountId}/opening-balances",
+            new { commodityId = usdId, quantity = 5000m, asOfDate = "2026-04-23" }, CT);
+
+        var openingBalancesId = await GetOpeningBalancesSystemIdAsync();
+
+        var getResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{openingBalancesId}/opening-balances/{usdId}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, getResp.StatusCode);
+    }
+
     private record OpeningBalanceItem(
         Guid TransactionId, Guid AccountId, Guid CommodityId, string Memo,
         decimal Quantity, decimal? ValuePerUnit, DateOnly AsOfDate);

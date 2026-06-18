@@ -26,16 +26,51 @@ public class AccountsEndpointTests : IntegrationTestBase
     };
 
     [Fact]
-    public async Task GetAccounts_ListsSystemAccounts()
+    public async Task GetAccounts_ExcludesSystemAccounts()
     {
         var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
 
+        // One user account so the list (and totalCount) has a known non-system baseline.
+        await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Visible-Cash",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = CashInitialBalance(0m),
+        }, CT);
+
+        // includeArchived=true proves the system-account exclusion is unconditional.
         var response = await client.GetAsync("/api/v1/finances/accounts?page=1&pageSize=100&includeArchived=true", CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<PaginatedResult<FinanceAccountItem>>(CT);
-        Assert.Contains(body!.Items, a => a.Name == SystemAccountSeeder.OpeningBalancesName && a.IsSystem);
-        Assert.Contains(body.Items, a => a.Name == SystemAccountSeeder.AdjustmentsName && a.IsSystem);
+        Assert.DoesNotContain(body!.Items, a => a.Name == SystemAccountSeeder.OpeningBalancesName);
+        Assert.DoesNotContain(body.Items, a => a.Name == SystemAccountSeeder.AdjustmentsName);
+        Assert.DoesNotContain(body.Items, a => a.Name == SystemAccountSeeder.IncomeName);
+        Assert.DoesNotContain(body.Items, a => a.Name == SystemAccountSeeder.ExpenseName);
+        Assert.DoesNotContain(body.Items, a => a.IsSystem);
+
+        // totalCount is counted from the same filtered query — only the user account remains.
+        Assert.Equal(1, body.TotalCount);
+        Assert.Single(body.Items);
+    }
+
+    [Fact]
+    public async Task GetAccount_SystemAccount_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var systemAccountId = await db.Accounts
+            .Where(a => a.IsSystem)
+            .Select(a => a.Id)
+            .FirstAsync(CT);
+
+        var response = await client.GetAsync($"/api/v1/finances/accounts/{systemAccountId}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

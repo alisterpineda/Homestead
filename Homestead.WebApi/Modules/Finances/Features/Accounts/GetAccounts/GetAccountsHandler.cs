@@ -13,7 +13,7 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
     public async Task<PaginatedResponse<AccountResponse>> Handle(
         GetAccountsQuery request, CancellationToken ct)
     {
-        var query = db.Accounts.AsNoTracking();
+        var query = db.Accounts.AsNoTracking().Where(a => !a.IsSystem);
 
         if (request.IncludeArchived != true)
             query = query.Where(a => !a.IsArchived);

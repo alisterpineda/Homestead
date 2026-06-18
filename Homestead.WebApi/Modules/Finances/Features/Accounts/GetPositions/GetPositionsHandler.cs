@@ -17,7 +17,7 @@ public class GetPositionsHandler(AppDbContext db, IValuationService valuations)
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == request.AccountId, ct);
 
-        if (account is null || account.Kind != AccountKind.Investment)
+        if (account is null || account.IsSystem || account.Kind != AccountKind.Investment)
             throw new EntityNotFoundException("Account not found.");
 
         var ctx = await valuations.LoadContextAsync(ct);

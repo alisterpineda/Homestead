@@ -134,4 +134,24 @@ public class GetAccountHandlerTests : IAsyncLifetime
         var resp = await _sut.Handle(new GetAccountQuery { Id = Guid.NewGuid() }, Ct);
         Assert.Null(resp);
     }
+
+    [Fact]
+    public async Task SystemAccountId_ReturnsNull()
+    {
+        var systemAccount = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "Equity:Opening Balances",
+            AccountType = AccountType.Equity,
+            Kind = null,
+            ReportingCurrencyId = _cad.Id,
+            IsSystem = true,
+            IsArchived = false,
+        };
+        _db.Accounts.Add(systemAccount);
+        await _db.SaveChangesAsync(Ct);
+
+        var resp = await _sut.Handle(new GetAccountQuery { Id = systemAccount.Id }, Ct);
+        Assert.Null(resp);
+    }
 }

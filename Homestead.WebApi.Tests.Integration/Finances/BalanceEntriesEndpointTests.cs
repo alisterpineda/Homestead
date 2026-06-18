@@ -211,6 +211,52 @@ public class BalanceEntriesEndpointTests : IntegrationTestBase
         Assert.Equal(2, items!.Count);
     }
 
+    [Fact]
+    public async Task GetList_SystemAccount_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var systemAccountId = await db.Accounts
+            .Where(a => a.IsSystem)
+            .Select(a => a.Id)
+            .FirstAsync(CT);
+
+        var listResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{systemAccountId}/balance-entries", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, listResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSingle_SystemAccount_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var cash = await CreateCashAccountAsync(client, cad, "Cash-BE-Single-Sys");
+
+        // A real user balance entry; its transaction id is valid and belongs to a user account.
+        var createResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash}/balance-entries",
+            new { commodityId = cad, assertedAmount = 100m, date = "2026-04-25" }, CT);
+        var created = await createResp.Content.ReadFromJsonAsync<BalanceEntryItem>(CT);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var systemAccountId = await db.Accounts
+            .Where(a => a.IsSystem)
+            .Select(a => a.Id)
+            .FirstAsync(CT);
+
+        // Without the visibility guard this 400s ("does not belong to this account"); the guard
+        // makes a system account id a consistent 404, matching the list route and the other reads.
+        var getResp = await client.GetAsync(
+            $"/api/v1/finances/accounts/{systemAccountId}/balance-entries/{created!.TransactionId}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, getResp.StatusCode);
+    }
+
     private record BalanceEntryItem(
         Guid TransactionId, Guid AccountId, Guid CommodityId,
         decimal AssertedAmount, DateOnly Date, string Memo);

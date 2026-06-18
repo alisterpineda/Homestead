@@ -1,5 +1,5 @@
-using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +12,7 @@ public class GetBalanceEntriesHandler(AppDbContext db)
     public async Task<IReadOnlyList<BalanceEntryResponse>> Handle(
         GetBalanceEntriesQuery request, CancellationToken ct)
     {
-        var accountExists = await db.Accounts
-            .AsNoTracking()
-            .AnyAsync(a => a.Id == request.AccountId, ct);
-
-        if (!accountExists)
-            throw new EntityNotFoundException("Account not found.");
+        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
 
         var entries = await db.AccountTransactions
             .OfType<BalanceEntryTransaction>()

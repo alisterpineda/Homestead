@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,10 @@ public class GetTransactionsHandler(AppDbContext db)
             .AsQueryable();
 
         if (request.AccountId is Guid accountId)
+        {
+            await AccountVisibility.EnsureUserVisibleAsync(db, accountId, ct);
             query = query.Where(t => t.Splits.Any(s => s.AccountId == accountId));
+        }
 
         if (request.CommodityId is Guid commodityId)
             query = query.Where(t => t.Splits.Any(s => s.CommodityId == commodityId

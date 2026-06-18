@@ -12,7 +12,7 @@ public class GetAccountHandler(AppDbContext db, IValuationService valuations)
     {
         var account = await db.Accounts
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == request.Id, ct);
+            .FirstOrDefaultAsync(a => a.Id == request.Id && !a.IsSystem, ct);
 
         if (account is null) return null;
 

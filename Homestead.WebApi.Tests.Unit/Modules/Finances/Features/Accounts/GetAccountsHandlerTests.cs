@@ -63,6 +63,23 @@ public class GetAccountsHandlerTests : IAsyncLifetime
         return account;
     }
 
+    private async Task<Account> AddSystemAccountAsync(string name = "Equity:Opening Balances")
+    {
+        var account = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            AccountType = AccountType.Equity,
+            Kind = null,
+            ReportingCurrencyId = _cad.Id,
+            IsSystem = true,
+            IsArchived = false,
+        };
+        _db.Accounts.Add(account);
+        await _db.SaveChangesAsync();
+        return account;
+    }
+
     private async Task AddSplitAsync(Guid accountId, decimal quantity, DateTimeOffset occurredAt)
     {
         var txn = new NormalTransaction
@@ -84,6 +101,19 @@ public class GetAccountsHandlerTests : IAsyncLifetime
             UpdatedAt = DateTimeOffset.UtcNow,
         });
         await _db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task SystemAccounts_AreExcludedFromListAndCount()
+    {
+        var userAccount = await AddCashAccountAsync();
+        await AddSystemAccountAsync();
+
+        var resp = await _sut.Handle(new GetAccountsQuery { Page = 1, PageSize = 10 }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal(userAccount.Id, resp.Items[0].Id);
+        Assert.Equal(1, resp.TotalCount);
     }
 
     [Fact]

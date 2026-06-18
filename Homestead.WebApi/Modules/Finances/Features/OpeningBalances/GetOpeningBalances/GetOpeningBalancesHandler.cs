@@ -14,6 +14,8 @@ public class GetOpeningBalancesHandler(
     public async Task<IReadOnlyList<OpeningBalanceResponse>> Handle(
         GetOpeningBalancesQuery request, CancellationToken ct)
     {
+        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
 
         var transactions = await db.AccountTransactions

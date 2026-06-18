@@ -399,7 +399,7 @@ export class AccountListPageComponent {
     { initialValue: null },
   );
 
-  userAccounts = computed(() => (this.data() ?? []).filter(a => !a.isSystem));
+  userAccounts = computed(() => this.data() ?? []);
   archivedCount = computed(() => this.userAccounts().filter(a => a.isArchived).length);
   visibleAccounts = computed(() => {
     const all = this.userAccounts();

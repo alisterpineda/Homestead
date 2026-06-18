@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,8 @@ public class GetBalanceEntryHandler(AppDbContext db)
 {
     public async Task<BalanceEntryResponse> Handle(GetBalanceEntryQuery request, CancellationToken ct)
     {
+        await AccountVisibility.EnsureUserVisibleAsync(db, request.AccountId, ct);
+
         var entry = await db.AccountTransactions
             .OfType<BalanceEntryTransaction>()
             .AsNoTracking()
