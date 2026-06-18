@@ -212,12 +212,15 @@ public class JobProcessorService(
 
             if (handler is IParentJobHandler)
             {
-                // Parent stays InProgress until UpdateParentProgressAsync transitions it
-                // when the last child completes.
                 await db.SaveChangesAsync(ct);
                 logger.LogInformation(
                     "Parent job {JobId} ({JobType}) spawned {ChildCount} children",
                     job.Id, job.Type, job.TotalChildCount);
+
+                // A parent that spawned zero children has nothing to trigger finalization later,
+                // so terminate it now (Completed) — see overview.md.
+                if (job.TotalChildCount == 0)
+                    await UpdateParentProgressAsync(db, job.Id, scope.ServiceProvider, ct);
             }
             else
             {
@@ -288,7 +291,10 @@ public class JobProcessorService(
             })
             .FirstOrDefaultAsync(ct);
 
-        if (stats is null) return;
+        // Zero children => no child rows => grouped query returns null. Treat as 0/0 so the
+        // terminal check below (0 finished >= 0 total, failed == 0) finalizes as Completed.
+        var completed = stats?.Completed ?? 0;
+        var failed = stats?.Failed ?? 0;
 
         // Read parent fields needed for notification and terminal check
         var parent = await db.ProcessingJobs
@@ -304,15 +310,15 @@ public class JobProcessorService(
             .FirstAsync(ct);
 
         var notifier = sp.GetRequiredService<IProcessingNotifier>();
-        var finishedCount = stats.Completed + stats.Failed;
+        var finishedCount = completed + failed;
 
         ProcessingJobStatus? notifyStatus = null;
 
         if (finishedCount >= parent.TotalChildCount)
         {
-            var terminalStatus = stats.Failed == 0
+            var terminalStatus = failed == 0
                 ? ProcessingJobStatus.Completed
-                : stats.Completed == 0
+                : completed == 0
                     ? ProcessingJobStatus.Failed
                     : ProcessingJobStatus.PartiallyCompleted;
 
@@ -323,8 +329,8 @@ public class JobProcessorService(
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(j => j.Status, terminalStatus)
                     .SetProperty(j => j.CompletedAt, DateTimeOffset.UtcNow)
-                    .SetProperty(j => j.CompletedChildCount, stats.Completed)
-                    .SetProperty(j => j.FailedChildCount, stats.Failed), ct);
+                    .SetProperty(j => j.CompletedChildCount, completed)
+                    .SetProperty(j => j.FailedChildCount, failed), ct);
 
             if (transitioned > 0)
                 notifyStatus = terminalStatus;
@@ -336,8 +342,8 @@ public class JobProcessorService(
             var updated = await db.ProcessingJobs
                 .Where(j => j.Id == parentJobId && j.Status == ProcessingJobStatus.InProgress)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(j => j.CompletedChildCount, stats.Completed)
-                    .SetProperty(j => j.FailedChildCount, stats.Failed), ct);
+                    .SetProperty(j => j.CompletedChildCount, completed)
+                    .SetProperty(j => j.FailedChildCount, failed), ct);
 
             if (updated > 0)
                 notifyStatus = ProcessingJobStatus.InProgress;
@@ -351,8 +357,8 @@ public class JobProcessorService(
                 documentName: null, error: null,
                 parent.CreatedByUserId, ct,
                 totalChildCount: parent.TotalChildCount,
-                completedChildCount: stats.Completed,
-                failedChildCount: stats.Failed);
+                completedChildCount: completed,
+                failedChildCount: failed);
         }
     }
 

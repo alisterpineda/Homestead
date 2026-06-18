@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -96,5 +98,45 @@ public class ProcessingPipelineTests : IntegrationTestBase
         var elapsed = job.CompletedAt!.Value - before;
         Assert.True(elapsed.TotalSeconds < 15,
             $"Job took {elapsed.TotalSeconds}s — should complete quickly via signal, not wait for poll interval");
+    }
+
+    [Fact]
+    public async Task ParentJob_WithZeroChildren_FinalizesAsCompleted()
+    {
+        // A bulk-classify parent whose target IDs resolve to no documents spawns zero children.
+        // Using random, never-existent IDs deterministically reproduces the production-reachable
+        // state (documents trashed/deleted between enqueue and processing) without timing games.
+        // With nothing to trigger finalization later, the parent must terminate itself as
+        // Completed immediately; without the fix it hangs InProgress forever and this
+        // WaitForJobCompletionAsync times out.
+        var payload = JsonSerializer.Serialize(
+            new BulkClassifyPayload(new List<Guid> { Guid.NewGuid(), Guid.NewGuid() }));
+
+        Guid jobId;
+        using (var scope = CreateScope())
+        {
+            var queue = scope.ServiceProvider.GetRequiredService<IJobQueue>();
+            jobId = await queue.EnqueueAsync(
+                ProcessingJobType.BulkClassifyDocuments,
+                opts =>
+                {
+                    opts.Payload = payload;
+                    opts.CreatedByUserId = Guid.NewGuid();
+                },
+                CT);
+        }
+
+        await WaitForJobCompletionAsync(jobId);
+
+        using var assertScope = CreateScope();
+        var db = assertScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var parent = await db.ProcessingJobs.AsNoTracking()
+            .FirstAsync(j => j.Id == jobId, CT);
+
+        Assert.Equal(ProcessingJobStatus.Completed, parent.Status);
+        Assert.NotNull(parent.CompletedAt);
+        Assert.Equal(0, parent.TotalChildCount);
+        Assert.Equal(0, parent.CompletedChildCount);
+        Assert.Equal(0, parent.FailedChildCount);
     }
 }
