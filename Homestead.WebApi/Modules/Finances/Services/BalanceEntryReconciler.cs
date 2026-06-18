@@ -83,12 +83,21 @@ public class BalanceEntryReconciler(
     {
         var entrySplitIds = entry.Splits.Select(s => s.Id).ToHashSet();
 
+        // "Prior" must match the chain ordering ReconcileAsync uses — (OccurredAt, CreatedAt, Id) —
+        // so a same-instant transaction created (or tie-broken) before this entry is counted in its
+        // running balance. A strict OccurredAt comparison would wrongly drop same-instant prior
+        // activity (e.g. an end-of-day balance entry sharing 23:59:59 with an earlier-created txn).
+        // The entry's own splits are already excluded via entrySplitIds.
         var splits = await db.AccountTransactionSplits
             .AsNoTracking()
             .Where(s => s.AccountId == entry.AccountId
                      && s.CommodityId == entry.AssertedCommodityId
                      && !entrySplitIds.Contains(s.Id)
-                     && s.Transaction.OccurredAt < entry.OccurredAt)
+                     && (s.Transaction.OccurredAt < entry.OccurredAt
+                         || (s.Transaction.OccurredAt == entry.OccurredAt
+                             && (s.Transaction.CreatedAt < entry.CreatedAt
+                                 || (s.Transaction.CreatedAt == entry.CreatedAt
+                                     && s.Transaction.Id < entry.Id)))))
             .Select(s => new { s.Id, s.Quantity })
             .ToListAsync(ct);
 

@@ -180,6 +180,84 @@ public class TransferServiceTests : IAsyncLifetime
                 TestContext.Current.CancellationToken));
     }
 
+    // These ratios leave a residue when the source is multiplied back through the rate (verified:
+    // sourceAmount * (dest/source) != dest in decimal), which is exactly what tripped the old code.
+    [Theory]
+    [InlineData(3, 1)]  // rate 1/3   → 3 * (1/3)  = 0.999…9 ≠ 1
+    [InlineData(3, 2)]  // rate 2/3   → 3 * (2/3)  = 2.000…1 ≠ 2
+    [InlineData(6, 7)]  // rate 7/6   → 6 * (7/6)  = 7.000…2 ≠ 7
+    public async Task Create_CrossCurrencyTransfer_NonTerminatingRate_BothLegsBalanceExactly(
+        int sourceAmountInt, int destinationAmountInt)
+    {
+        // A non-terminating FX ratio used to leave a ~1e-28 residue: the source leg was annotated with
+        // rate = dest/source while the destination leg stored the raw typed amount, so the validator's
+        // recomputed source weight (Quantity * rate) didn't recover the destination exactly and the
+        // zero-tolerance balance check threw 400. Deriving the destination from sourceAmount * rate
+        // makes both legs cancel exactly. Mirrors DripServiceTests' non-terminating-price test.
+        var usd = await AddAccount(AccountKind.Cash, _usd.Id, "USD");
+        var cad = await AddAccount(AccountKind.Cash, _cad.Id, "CAD");
+
+        decimal sourceAmount = sourceAmountInt;
+        decimal destinationAmount = destinationAmountInt;
+        var rate = destinationAmount / sourceAmount;
+        Assert.NotEqual(destinationAmount, sourceAmount * rate);  // guard: this case is non-terminating
+
+        // CreateAsync runs the validator internally — not throwing here is the regression assertion.
+        var result = await _sut.CreateAsync(
+            new CreateTransferRequest(usd.Id, cad.Id, sourceAmount, destinationAmount,
+                new DateOnly(2026, 4, 23), null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var sourceSplit = result.Transaction!.Splits.Single(s => s.AccountId == usd.Id);
+        var destSplit = result.Transaction!.Splits.Single(s => s.AccountId == cad.Id);
+
+        Assert.Equal(-sourceAmount, sourceSplit.Quantity);
+        Assert.Equal(rate, sourceSplit.UnitPriceRate);
+        Assert.Equal(_cad.Id, sourceSplit.UnitPriceCommodityId);
+
+        // Destination quantity is derived from the same product as the source weight.
+        Assert.Equal(sourceAmount * rate, destSplit.Quantity);
+        Assert.Null(destSplit.UnitPriceRate);
+
+        // The two legs cancel to exactly zero in the destination (annotation) commodity.
+        Assert.Equal(0m, sourceSplit.Quantity * sourceSplit.UnitPriceRate!.Value + destSplit.Quantity);
+    }
+
+    [Fact]
+    public async Task Update_ToCrossCurrencyNonTerminatingRate_BothLegsBalanceExactly()
+    {
+        var usd = await AddAccount(AccountKind.Cash, _usd.Id, "USD");
+        var cad = await AddAccount(AccountKind.Cash, _cad.Id, "CAD");
+
+        // Start from a terminating-rate transfer, then edit it to a non-terminating ratio so the edit
+        // path exercises the same bridge arithmetic as create (and can't drift from it).
+        var created = await _sut.CreateAsync(
+            new CreateTransferRequest(usd.Id, cad.Id, 100m, 135m, new DateOnly(2026, 4, 23), null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var sourceAmount = 3m;
+        var destinationAmount = 10m;
+        var rate = destinationAmount / sourceAmount;
+
+        var result = await _sut.UpdateAsync(created.Transaction!.Id,
+            new UpdateTransferRequest(usd.Id, cad.Id, sourceAmount, destinationAmount,
+                new DateOnly(2026, 4, 24), null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var sourceSplit = result.Transaction!.Splits.Single(s => s.AccountId == usd.Id);
+        var destSplit = result.Transaction!.Splits.Single(s => s.AccountId == cad.Id);
+
+        Assert.Equal(-sourceAmount, sourceSplit.Quantity);
+        Assert.Equal(rate, sourceSplit.UnitPriceRate);
+        Assert.Equal(_cad.Id, sourceSplit.UnitPriceCommodityId);
+        Assert.Equal(sourceAmount * rate, destSplit.Quantity);
+        Assert.Null(destSplit.UnitPriceRate);
+        Assert.Equal(0m, sourceSplit.Quantity * sourceSplit.UnitPriceRate!.Value + destSplit.Quantity);
+    }
+
     [Fact]
     public async Task Update_OnNonTransferNormal_Throws_ShapeIsImmutable()
     {

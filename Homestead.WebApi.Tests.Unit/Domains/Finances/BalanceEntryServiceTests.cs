@@ -277,4 +277,105 @@ public class BalanceEntryServiceTests : IAsyncLifetime
         // BE2 prior is now $100 (50 + 50), asserted = 250, delta = 150. Same as before.
         Assert.Equal(150m, be2Account.Quantity);
     }
+
+    [Theory]
+    [InlineData(true, 150)]   // normal txn created before the BE → sorts earlier, counted in prior (250 - 100)
+    [InlineData(false, 250)]  // normal txn created after the BE → sorts later, excluded from prior (250 - 0)
+    public async Task Reconciler_SameInstantPriorTxn_IncludedOnlyWhenItSortsEarlier(
+        bool normalCreatedEarlier, int expectedAccountDelta)
+    {
+        // A balance entry pinned to 23:59:59 UTC can share its exact OccurredAt with an ordinary
+        // transaction. The documented chain order is (OccurredAt, CreatedAt, Id), so the same-instant
+        // txn belongs in the BE's prior iff it sorts earlier. A strict OccurredAt-only predicate would
+        // always drop it, mis-booking the delta. EF-InMemory ignores the CURRENT_TIMESTAMP default, so
+        // CreatedAt is set explicitly here for deterministic ordering.
+        var cash = await AddAccountAsync(AccountKind.Cash);
+
+        var instant = new DateTimeOffset(2026, 4, 30, 23, 59, 59, TimeSpan.Zero);
+        var beCreatedAt = new DateTimeOffset(2026, 4, 30, 12, 0, 0, TimeSpan.Zero);
+        var normalCreatedAt = normalCreatedEarlier ? beCreatedAt.AddHours(-1) : beCreatedAt.AddHours(1);
+
+        var normal = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = instant,
+            CreatedAt = normalCreatedAt,
+            Memo = "Transfer",
+            Type = TransactionType.Normal,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = cash.Id, CommodityId = _cad.Id, Quantity = 100m },
+                new() { Id = Guid.NewGuid(), AccountId = _adjustments.Id, CommodityId = _cad.Id, Quantity = -100m },
+            ],
+        };
+        var be = new BalanceEntryTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = instant,
+            CreatedAt = beCreatedAt,
+            Memo = "BE",
+            Type = TransactionType.BalanceEntry,
+            AccountId = cash.Id,
+            AssertedCommodityId = _cad.Id,
+            AssertedQuantity = 250m,
+            // Deliberately stale split quantities; the reconciler recomputes them.
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = cash.Id, CommodityId = _cad.Id, Quantity = 0m },
+                new() { Id = Guid.NewGuid(), AccountId = _adjustments.Id, CommodityId = _cad.Id, Quantity = 0m },
+            ],
+        };
+        _db.AccountTransactions.AddRange(normal, be);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await _reconciler.ReconcileAsync(
+            new[] { new TouchedPair(cash.Id, _cad.Id, instant) },
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var beReloaded = await _db.AccountTransactions
+            .OfType<BalanceEntryTransaction>()
+            .Include(e => e.Splits)
+            .SingleAsync(e => e.Id == be.Id, TestContext.Current.CancellationToken);
+        var accountSplit = beReloaded.Splits.Single(s => s.AccountId == cash.Id);
+        var adjSplit = beReloaded.Splits.Single(s => s.AccountId == _adjustments.Id);
+
+        Assert.Equal((decimal)expectedAccountDelta, accountSplit.Quantity);
+        Assert.Equal(-(decimal)expectedAccountDelta, adjSplit.Quantity);
+    }
+
+    [Fact]
+    public async Task Create_SameInstantPriorTxn_IncludedInPrior()
+    {
+        // The new balance entry lands at end-of-day UTC; an existing transaction at that exact instant
+        // is genuine prior activity (the create-only path includes same-instant via <=, since the new
+        // entry's DB-assigned CreatedAt sorts it last among ties). A strict < would drop it.
+        var cash = await AddAccountAsync(AccountKind.Cash);
+
+        var instant = new DateTimeOffset(2026, 4, 30, 23, 59, 59, TimeSpan.Zero);
+        var normal = new NormalTransaction
+        {
+            Id = Guid.NewGuid(),
+            OccurredAt = instant,
+            Memo = "Transfer",
+            Type = TransactionType.Normal,
+            Splits =
+            [
+                new() { Id = Guid.NewGuid(), AccountId = cash.Id, CommodityId = _cad.Id, Quantity = 100m },
+                new() { Id = Guid.NewGuid(), AccountId = _adjustments.Id, CommodityId = _cad.Id, Quantity = -100m },
+            ],
+        };
+        _db.AccountTransactions.Add(normal);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var result = await _sut.CreateAsync(
+            new CreateBalanceEntryRequest(cash.Id, _cad.Id, 250m, new DateOnly(2026, 4, 30), null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var accountSplit = result.Entry!.Splits.Single(s => s.AccountId == cash.Id);
+
+        // prior = 100 (same-instant txn included), delta = 250 - 100 = 150.
+        Assert.Equal(150m, accountSplit.Quantity);
+    }
 }

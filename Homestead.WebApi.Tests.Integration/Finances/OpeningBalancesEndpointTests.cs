@@ -296,6 +296,147 @@ public class OpeningBalancesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateOpeningBalance_BeforeExistingBalanceEntry_ReconcilesDownstreamDelta()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        // Cash account starting at 0 (amount = 0 ⇒ no auto opening balance is created).
+        var cashResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Cash-CreateOB-Reconcile",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = new { amount = 0m, asOfDate = "2026-01-01" },
+        }, CT);
+        Assert.Equal(HttpStatusCode.Created, cashResp.StatusCode);
+        var cash = (await cashResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+
+        // Balance entry asserts $1500 with no prior activity ⇒ delta = 1500.
+        var beResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/balance-entries",
+            new { commodityId = usdId, assertedAmount = 1500m, date = "2026-02-15" }, CT);
+        Assert.Equal(HttpStatusCode.Created, beResp.StatusCode);
+
+        // Insert an opening balance dated EARLIER than the balance entry. The BE's prior shifts from
+        // $0 to $1000, so its delta must be recomputed to $500 and Equity:Adjustments must absorb the
+        // change — otherwise (pre-fix) the account balance double-counts to $2500.
+        var obResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/opening-balances",
+            new { commodityId = usdId, quantity = 1000m, asOfDate = "2026-01-01" }, CT);
+        Assert.Equal(HttpStatusCode.Created, obResp.StatusCode);
+
+        var afterGet = await client.GetAsync($"/api/v1/finances/accounts/{cash.Id}", CT);
+        var after = (await afterGet.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+        Assert.Equal(1500m, after.NativeBalance);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Downstream balance entry's delta recomputed to 1500 - 1000 = 500.
+        var beAccountSplit = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == cash.Id && s.CommodityId == usdId
+                     && s.Transaction is BalanceEntryTransaction)
+            .Select(s => s.Quantity)
+            .SingleAsync(CT);
+        Assert.Equal(500m, beAccountSplit);
+
+        var adjustments = await db.Accounts.SingleAsync(
+            a => a.IsSystem && a.Name == SystemAccountSeeder.AdjustmentsName, CT);
+        var adjustmentsBalance = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == adjustments.Id && s.CommodityId == usdId)
+            .SumAsync(s => s.Quantity, CT);
+        Assert.Equal(-500m, adjustmentsBalance);
+    }
+
+    [Fact]
+    public async Task PatchOpeningBalance_ChangesQuantity_ReconcilesDownstreamDelta()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        // Cash account with an auto opening balance of $1000 at 2026-01-01.
+        var cashResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Cash-PatchOB-Reconcile",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = new { amount = 1000m, asOfDate = "2026-01-01" },
+        }, CT);
+        Assert.Equal(HttpStatusCode.Created, cashResp.StatusCode);
+        var cash = (await cashResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+
+        // BE asserts $1500: prior = $1000 ⇒ delta = $500.
+        var beResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/balance-entries",
+            new { commodityId = usdId, assertedAmount = 1500m, date = "2026-02-15" }, CT);
+        Assert.Equal(HttpStatusCode.Created, beResp.StatusCode);
+
+        // Raise the opening balance to $1200. The BE's prior becomes $1200 ⇒ delta = $300; the
+        // account assertion of $1500 must hold. Pre-fix the edit skipped reconciliation, leaving the
+        // BE delta at $500 and the balance at $1700.
+        var patchResp = await client.PatchAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/opening-balances/{usdId}",
+            new { quantity = 1200m, asOfDate = "2026-01-01" }, CT);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+
+        var afterGet = await client.GetAsync($"/api/v1/finances/accounts/{cash.Id}", CT);
+        var after = (await afterGet.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+        Assert.Equal(1500m, after.NativeBalance);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var beAccountSplit = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == cash.Id && s.CommodityId == usdId
+                     && s.Transaction is BalanceEntryTransaction)
+            .Select(s => s.Quantity)
+            .SingleAsync(CT);
+        Assert.Equal(300m, beAccountSplit);
+    }
+
+    [Fact]
+    public async Task PatchOpeningBalance_ChangesQuantityAndDate_ReconcilesDownstreamDelta()
+    {
+        var client = await CreateAdminClientAsync();
+        var usdId = await GetUsdIdAsync();
+
+        var cashResp = await client.PostAsJsonAsync("/api/v1/finances/accounts", new
+        {
+            name = "Cash-PatchOBDate-Reconcile",
+            kind = "Cash",
+            reportingCurrencyId = usdId,
+            initialBalance = new { amount = 1000m, asOfDate = "2026-01-01" },
+        }, CT);
+        Assert.Equal(HttpStatusCode.Created, cashResp.StatusCode);
+        var cash = (await cashResp.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+
+        var beResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/balance-entries",
+            new { commodityId = usdId, assertedAmount = 1500m, date = "2026-02-15" }, CT);
+        Assert.Equal(HttpStatusCode.Created, beResp.StatusCode);
+
+        // Move the OB to a different (still earliest) date AND change its quantity. This exercises the
+        // touched-pairs-covering-both-instants path in UpdateAsync; the downstream BE must re-reconcile.
+        var patchResp = await client.PatchAsJsonAsync(
+            $"/api/v1/finances/accounts/{cash.Id}/opening-balances/{usdId}",
+            new { quantity = 1200m, asOfDate = "2026-01-10" }, CT);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+
+        var afterGet = await client.GetAsync($"/api/v1/finances/accounts/{cash.Id}", CT);
+        var after = (await afterGet.Content.ReadFromJsonAsync<FinanceAccountItem>(CT))!;
+        Assert.Equal(1500m, after.NativeBalance);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var beAccountSplit = await db.AccountTransactionSplits
+            .Where(s => s.AccountId == cash.Id && s.CommodityId == usdId
+                     && s.Transaction is BalanceEntryTransaction)
+            .Select(s => s.Quantity)
+            .SingleAsync(CT);
+        Assert.Equal(300m, beAccountSplit);
+    }
+
+    [Fact]
     public async Task Create_WithMemo_RoundTripsThroughResponse()
     {
         var client = await CreateAdminClientAsync();

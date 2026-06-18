@@ -191,11 +191,16 @@ public class BalanceEntryService(
     private async Task<decimal> ComputePriorRunningAsync(Guid accountId, Guid commodityId,
         DateTimeOffset occurredAt, CancellationToken ct)
     {
+        // Include same-instant activity (<=, not <). This method is create-only: the new entry is
+        // not yet persisted and, with its DB-assigned CreatedAt = now, sorts last among any
+        // same-instant ties per the (OccurredAt, CreatedAt, Id) chain order the reconciler uses. So
+        // every existing same-instant transaction is genuinely "prior" to it. The post-save
+        // reconciler pass (which compares CreatedAt/Id explicitly) remains authoritative.
         return await db.AccountTransactionSplits
             .AsNoTracking()
             .Where(s => s.AccountId == accountId
                      && s.CommodityId == commodityId
-                     && s.Transaction.OccurredAt < occurredAt)
+                     && s.Transaction.OccurredAt <= occurredAt)
             .SumAsync(s => (decimal?)s.Quantity, ct) ?? 0m;
     }
 

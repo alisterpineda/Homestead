@@ -15,7 +15,7 @@ public class OpeningBalanceService(
     ILinkedPriceManager linkedPrices,
     IAuditContext audit) : IOpeningBalanceService
 {
-    public async Task<AccountTransaction> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct)
+    public async Task<OpeningBalanceMutationResult> CreateAsync(CreateOpeningBalanceRequest request, CancellationToken ct)
     {
         var account = await FindAccountAsync(request.AccountId, ct);
         AccountWritability.EnsureUserWritable(account);
@@ -63,10 +63,14 @@ public class OpeningBalanceService(
 
         await linkedPrices.SyncForTransactionAsync(transaction, ct);
 
-        return transaction;
+        // The OB is the earliest transaction on this (account, commodity); inserting it shifts the
+        // prior-running of any pre-existing downstream balance entries, so hand the pair to the
+        // reconciler. TouchedFor yields one pair per split at the txn instant (same call
+        // TransferService.CreateAsync makes); the equity pair is a harmless no-op for the reconciler.
+        return new OpeningBalanceMutationResult(transaction, TouchedFor(transaction).ToArray());
     }
 
-    public async Task<AccountTransaction> UpdateAsync(Guid transactionId, UpdateOpeningBalanceRequest request,
+    public async Task<OpeningBalanceMutationResult> UpdateAsync(Guid transactionId, UpdateOpeningBalanceRequest request,
         CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
@@ -90,6 +94,11 @@ public class OpeningBalanceService(
         var commodity = await db.Commodities.FindAsync([accountSplit.CommodityId], ct)
             ?? throw new BusinessRuleException("Commodity not found.");
 
+        // Capture touched pairs at the OLD instant before mutating OccurredAt; concatenating the new
+        // instant below covers both ends of a date move (the reconciler collapses each pair to its
+        // earliest affected instant). Mirrors TransferService.UpdateAsync.
+        var touchedBefore = TouchedFor(transaction).ToList();
+
         audit.Track<AccountTransactionSnapshot, AccountTransaction>(
             transaction, "AccountTransaction", transaction.Id);
 
@@ -104,10 +113,11 @@ public class OpeningBalanceService(
 
         await linkedPrices.SyncForTransactionAsync(transaction, ct);
 
-        return transaction;
+        return new OpeningBalanceMutationResult(
+            transaction, touchedBefore.Concat(TouchedFor(transaction)).ToArray());
     }
 
-    public async Task<IReadOnlyCollection<TouchedPair>> DeleteAsync(Guid transactionId, CancellationToken ct)
+    public async Task<OpeningBalanceMutationResult> DeleteAsync(Guid transactionId, CancellationToken ct)
     {
         var transaction = await db.AccountTransactions
             .OfType<OpeningBalanceTransaction>()
@@ -115,16 +125,14 @@ public class OpeningBalanceService(
             .FirstOrDefaultAsync(t => t.Id == transactionId, ct)
             ?? throw new EntityNotFoundException("Opening-balance transaction not found.");
 
-        var touched = transaction.Splits
-            .Select(s => new TouchedPair(s.AccountId, s.CommodityId, transaction.OccurredAt))
-            .ToArray();
+        var touched = TouchedFor(transaction).ToArray();
 
         await linkedPrices.AuditCascadeDeletesAsync(transactionId, ct);
 
         db.AccountTransactions.Remove(transaction);
         audit.Deleted("AccountTransaction", transaction.Id, transaction.Memo);
 
-        return touched;
+        return new OpeningBalanceMutationResult(null, touched);
     }
 
     private async Task<Account> FindAccountAsync(Guid accountId, CancellationToken ct)

@@ -88,10 +88,8 @@ public class TransferService(
 
         if (!AreSameCurrency(sourceCurrency, destinationCurrency))
         {
-            sourceSlot.UnitPriceRate = DeriveRate(request.SourceAmount, request.DestinationAmount!.Value);
-            sourceSlot.UnitPriceCommodityId = destinationCurrency.Id;
-            destSlot.UnitPriceRate = null;
-            destSlot.UnitPriceCommodityId = null;
+            ApplyCrossCurrencyBridge(sourceSlot, destSlot, request.SourceAmount,
+                request.DestinationAmount!.Value, destinationCurrency.Id);
         }
         else
         {
@@ -224,12 +222,29 @@ public class TransferService(
         };
 
         if (!AreSameCurrency(sourceCurrency, destinationCurrency))
-        {
-            sourceSplit.UnitPriceRate = DeriveRate(sourceAmount, destinationAmount!.Value);
-            sourceSplit.UnitPriceCommodityId = destinationCurrency.Id;
-        }
+            ApplyCrossCurrencyBridge(sourceSplit, destSplit, sourceAmount, destinationAmount!.Value,
+                destinationCurrency.Id);
 
         return (sourceSplit, destSplit);
+    }
+
+    // Bridges a cross-currency transfer's two legs. The source leg carries the price annotation
+    // (rate quoted in the destination currency); the destination leg's quantity is derived from the
+    // SAME product the validator recomputes for the source weight (Quantity * rate). Storing the raw
+    // typed destinationAmount instead would leave a ~1e-28 residue for non-terminating rates,
+    // tripping the zero-tolerance per-commodity balance check (400). Mirrors TradeService/DripService;
+    // the stored destination quantity is off the typed amount only far below any currency's display
+    // precision. Do NOT pre-round the rate — that would push the destination further from the amount.
+    private static void ApplyCrossCurrencyBridge(
+        AccountTransactionSplit sourceSplit, AccountTransactionSplit destSplit,
+        decimal sourceAmount, decimal destinationAmount, Guid destinationCurrencyId)
+    {
+        var rate = DeriveRate(sourceAmount, destinationAmount);
+        sourceSplit.UnitPriceRate = rate;
+        sourceSplit.UnitPriceCommodityId = destinationCurrencyId;
+        destSplit.Quantity = sourceAmount * rate;
+        destSplit.UnitPriceRate = null;
+        destSplit.UnitPriceCommodityId = null;
     }
 
     private static void PopulateSplit(AccountTransactionSplit split, Guid accountId, Guid commodityId,

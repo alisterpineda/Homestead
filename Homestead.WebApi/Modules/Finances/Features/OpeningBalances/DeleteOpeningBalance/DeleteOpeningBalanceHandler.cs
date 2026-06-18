@@ -21,10 +21,10 @@ public class DeleteOpeningBalanceHandler(
 
         if (txnId is null) return false;
 
-        var touched = await openingBalances.DeleteAsync(txnId.Value, ct);
+        var result = await openingBalances.DeleteAsync(txnId.Value, ct);
         await unitOfWork.SaveChangesAsync(ct);
 
-        await reconciler.ReconcileAsync(touched, ct);
+        await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 
         return true;
     }

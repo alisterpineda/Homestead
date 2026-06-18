@@ -6,13 +6,14 @@ namespace Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeni
 
 public class CreateOpeningBalanceHandler(
     IOpeningBalanceService openingBalances,
+    IBalanceEntryReconciler reconciler,
     ISystemAccountProvider systemAccounts,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CreateOpeningBalanceCommand, OpeningBalanceResponse>
 {
     public async Task<OpeningBalanceResponse> Handle(CreateOpeningBalanceCommand request, CancellationToken ct)
     {
-        var transaction = await openingBalances.CreateAsync(
+        var result = await openingBalances.CreateAsync(
             new CreateOpeningBalanceRequest(
                 request.AccountId, request.CommodityId, request.Quantity,
                 request.ValuePerUnit, request.AsOfDate, request.Memo),
@@ -20,6 +21,11 @@ public class CreateOpeningBalanceHandler(
 
         await unitOfWork.SaveChangesAsync(ct);
 
+        // An opening balance is the earliest transaction on its chain; re-reconcile any pre-existing
+        // downstream balance entries whose prior-running it shifts.
+        await reconciler.ReconcileAsync(result.TouchedPairs, ct);
+
+        var transaction = result.Transaction!;
         var openingBalancesAccount = await systemAccounts.GetOpeningBalancesAsync(ct);
         var accountSplit = OpeningBalanceMapping.AccountSideSplit(transaction, openingBalancesAccount.Id);
 
