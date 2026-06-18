@@ -26,24 +26,30 @@ public class GetActivityHandler(AppDbContext db)
     public async Task<PaginatedResponse<GetActivityResponse>> Handle(
         GetActivityQuery request, CancellationToken ct)
     {
+        // LEFT join Users (GroupJoin + SelectMany + DefaultIfEmpty), NOT an inner Join: an audit row
+        // whose actor is null (a system/background action) or a since-deleted user must still surface.
+        // An inner join silently drops those rows — the bug called out in the Documents audit doc §3.1.
         var auditRows = await db.AuditLogs
             .AsNoTracking()
             .Where(a =>
                 (a.EntityType == "Document" && a.EntityId == request.DocumentId) ||
                 (a.EntityType == "DocumentVersion" && a.ParentEntityId == request.DocumentId))
-            .Join(
+            .GroupJoin(
                 db.Users.AsNoTracking(),
                 a => a.UserId,
                 u => u.Id,
-                (a, u) => new
+                (a, users) => new { Audit = a, Users = users })
+            .SelectMany(
+                x => x.Users.DefaultIfEmpty(),
+                (x, u) => new
                 {
-                    a.Id,
-                    a.EntityType,
-                    a.Action,
-                    a.Changes,
-                    a.Timestamp,
-                    u.DisplayName,
-                    u.Email
+                    x.Audit.Id,
+                    x.Audit.EntityType,
+                    x.Audit.Action,
+                    x.Audit.Changes,
+                    x.Audit.Timestamp,
+                    DisplayName = u != null ? u.DisplayName : null,
+                    Email = u != null ? u.Email : null,
                 })
             .ToListAsync(ct);
 
@@ -82,9 +88,13 @@ public class GetActivityHandler(AppDbContext db)
                 })
             .ToListAsync(ct);
 
+        // Two distinct ID spaces (audit + comments) merge via Concat and paginate in memory, so Id is the
+        // tiebreaker: equal-timestamp rows — likely on coarse-resolution clocks — get a stable order and
+        // can't drift across page boundaries.
         var allItems = auditItems
             .Concat(commentItems)
             .OrderByDescending(x => x.Timestamp)
+            .ThenByDescending(x => x.Id)
             .ToList();
 
         var totalCount = allItems.Count;
