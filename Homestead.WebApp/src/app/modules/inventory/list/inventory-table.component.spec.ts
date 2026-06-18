@@ -141,29 +141,34 @@ describe('InventoryTableComponent', () => {
   });
 
   describe('name cell (DOM render)', () => {
-    it('renders the name, serial subtitle, and a container icon for container rows', () => {
-      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ name: 'Camera', serial: 'SN-9', isContainer: true }))]);
+    it('renders the name and a serial subtitle when the durable has a serial', () => {
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ name: 'Camera', serial: 'SN-9' }))]);
       fixture.detectChanges();
-      const host = fixture.nativeElement as HTMLElement;
-      expect(host.textContent).toContain('Camera');
-      expect(host.textContent).toContain('SN-9');
-      expect(host.querySelector('app-inventory-name-cell ng-icon')).toBeTruthy();
+      const spans = fixture.nativeElement.querySelectorAll('app-inventory-name-cell span');
+      expect(spans.length).toBe(2);
+      expect(spans[0].textContent).toContain('Camera');
+      expect(spans[1].textContent).toContain('SN-9');
     });
 
-    it('omits the icon for plain (non-container) item rows', () => {
-      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ isContainer: false }))]);
+    it('omits the serial subtitle when the durable has no serial', () => {
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ name: 'Camera' }))]);
+      fixture.detectChanges();
+      const spans = fixture.nativeElement.querySelectorAll('app-inventory-name-cell span');
+      expect(spans.length).toBe(1);
+      expect(spans[0].textContent).toContain('Camera');
+    });
+
+    // Per-row kind icons were intentionally dropped (commit 8e9cece0): a box for containers, boxes
+    // for consumables, nothing for plain durables conflated two axes into low-signal noise. Kind now
+    // reads from the On-hand column and the All/Durables/Consumables filter. Guard the removal.
+    it('renders no kind icon in the name cell for any row kind', () => {
+      fixture.componentRef.setInput('rows', [
+        durableToRow(makeItem({ isContainer: true })),
+        consumableToRow(makeConsumable()),
+      ]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.querySelector('app-inventory-name-cell ng-icon')).toBeNull();
-    });
-
-    it('renders a consumable icon for consumable rows', () => {
-      fixture.componentRef.setInput('rows', [consumableToRow(makeConsumable())]);
-      fixture.detectChanges();
-      const host = fixture.nativeElement as HTMLElement;
-      const icon = host.querySelector('app-inventory-name-cell ng-icon');
-      expect(icon).toBeTruthy();
-      expect(icon!.getAttribute('aria-label')).toBe('Consumable');
     });
   });
 
