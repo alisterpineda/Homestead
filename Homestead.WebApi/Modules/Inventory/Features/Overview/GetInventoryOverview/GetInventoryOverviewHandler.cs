@@ -1,4 +1,6 @@
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Features.Consumables;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -6,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 
-public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementService placementService)
+public class GetInventoryOverviewHandler(
+    AppDbContext db, IInventoryPlacementService placementService, IItemLocationResolver locationResolver)
     : IRequestHandler<GetInventoryOverviewQuery, GetInventoryOverviewResponse>
 {
     private const int PreviewCount = 5;
+    private const int RecentCount = 6;
 
     public async Task<GetInventoryOverviewResponse> Handle(
         GetInventoryOverviewQuery request, CancellationToken ct)
@@ -87,6 +91,8 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
             .Select(i => new UnplacedDurablePreview { Id = i.Id, Name = i.Name })
             .ToList();
 
+        var recentlyUpdated = await BuildRecentlyUpdatedAsync(ct);
+
         return new GetInventoryOverviewResponse
         {
             LowStockCount = lowStockCount,
@@ -96,6 +102,100 @@ public class GetInventoryOverviewHandler(AppDbContext db, IInventoryPlacementSer
             UnplacedCount = placement.UnplacedItems.Count,
             UnplacedDurables = unplacedItems,
             Areas = areaSummaries,
+            RecentlyUpdated = recentlyUpdated,
         };
+    }
+
+    /// <summary>
+    /// The browse-root "Recently updated" strip: the <see cref="RecentCount"/> most-recently-touched
+    /// live items, newest first. Recency is the effective last-activity time — the later of
+    /// <c>Item.UpdatedAt</c> and (for a consumable) its latest <c>StockEntry.UpdatedAt</c>, so a
+    /// restock/move/consume bumps a consumable even though it only touches its stock rows.
+    /// </summary>
+    /// <remarks>
+    /// Materialize-then-merge in memory rather than gamble on EF translating a CASE-over-correlated-MAX
+    /// in <c>ORDER BY</c>; the lightweight tuple scan is consistent with the placement service's item
+    /// scan. The winners are then re-projected by id through the shared mappers — durables enriched with
+    /// their resolved location (the durable quick panel reads <c>Path</c> with no re-fetch); consumables
+    /// left bare (their panel re-fetches stock locations by id on open).
+    /// </remarks>
+    private async Task<IReadOnlyList<RecentlyUpdatedItem>> BuildRecentlyUpdatedAsync(CancellationToken ct)
+    {
+        // Consumables are only ever Active among the live statuses; durables span Active/Lent/InRepair.
+        var recency = await db.Items.AsNoTracking()
+            .Where(i => ItemStatusExtensions.LiveStatuses.Contains(i.Status))
+            .Select(i => new
+            {
+                i.Id,
+                i.Fungibility,
+                i.UpdatedAt,
+                LastStockAt = i.Fungibility == Fungibility.Fungible
+                    ? i.StockEntries.Max(e => (DateTimeOffset?)e.UpdatedAt) // null when no stock entries
+                    : null,
+            })
+            .ToListAsync(ct);
+
+        var winners = recency
+            .Select(r => new
+            {
+                r.Id,
+                r.Fungibility,
+                Effective = r.LastStockAt > r.UpdatedAt ? r.LastStockAt.Value : r.UpdatedAt,
+            })
+            .OrderByDescending(r => r.Effective)
+            .ThenBy(r => r.Id)
+            .Take(RecentCount)
+            .ToList();
+
+        if (winners.Count == 0)
+            return [];
+
+        var durableIds = winners.Where(w => w.Fungibility == Fungibility.NonFungible).Select(w => w.Id).ToList();
+        var consumableIds = winners.Where(w => w.Fungibility == Fungibility.Fungible).Select(w => w.Id).ToList();
+
+        // Re-apply the live-status filter on the re-projection — not just an id match. The winners are
+        // live as of the scan, but this is a separate query with no transaction, so a concurrent flip
+        // to a terminal status (or a delete) between the scan and here must drop the row rather than
+        // surface an item the rest of the inventory now hides. A dropped row is then skipped below.
+        IReadOnlyList<DurableResponse> durables = [];
+        if (durableIds.Count > 0)
+        {
+            var projected = await db.Items.AsNoTracking()
+                .Where(i => durableIds.Contains(i.Id) && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
+                .Select(DurableResponseMapper.Projection)
+                .ToListAsync(ct);
+            durables = await locationResolver.EnrichAsync(projected, ct);
+        }
+
+        List<ConsumableResponse> consumables = [];
+        if (consumableIds.Count > 0)
+        {
+            consumables = await db.Items.AsNoTracking()
+                .Where(i => consumableIds.Contains(i.Id) && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
+                .Select(ConsumableResponseMapper.Projection)
+                .ToListAsync(ct);
+        }
+
+        var durableById = durables.ToDictionary(d => d.Id);
+        var consumableById = consumables.ToDictionary(c => c.Id);
+
+        // Reassemble in the step-2 display order, wrapping each full DTO with its effective time. A
+        // winner whose row vanished from the re-projection (concurrent delete/terminalize) is skipped
+        // via TryGetValue rather than indexed — a lost row degrades the strip gracefully, never 500s.
+        var result = new List<RecentlyUpdatedItem>(winners.Count);
+        foreach (var w in winners)
+        {
+            if (w.Fungibility == Fungibility.NonFungible)
+            {
+                if (durableById.TryGetValue(w.Id, out var durable))
+                    result.Add(new RecentlyUpdatedItem { LastActivityAt = w.Effective, Durable = durable });
+            }
+            else if (consumableById.TryGetValue(w.Id, out var consumable))
+            {
+                result.Add(new RecentlyUpdatedItem { LastActivityAt = w.Effective, Consumable = consumable });
+            }
+        }
+
+        return result;
     }
 }

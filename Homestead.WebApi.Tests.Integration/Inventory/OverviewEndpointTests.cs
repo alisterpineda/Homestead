@@ -6,7 +6,8 @@ internal record OverviewResult(
     int LowStockCount, IReadOnlyList<LowStockPreviewItem> LowStockConsumables,
     int LentCount, IReadOnlyList<LentPreviewItem> LentDurables,
     int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedDurables,
-    IReadOnlyList<AreaSummaryItem> Areas);
+    IReadOnlyList<AreaSummaryItem> Areas,
+    IReadOnlyList<RecentlyUpdatedPreview> RecentlyUpdated);
 
 internal record LowStockPreviewItem(
     Guid Id, string Name, decimal TotalOnHand, string? Unit, decimal RestockThreshold);
@@ -16,6 +17,10 @@ internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
 internal record UnplacedPreviewItem(Guid Id, string Name);
 
 internal record AreaSummaryItem(Guid Id, string Name, int ItemCount, int LowStockCount);
+
+// Exactly one of Durable / Consumable is populated per entry (the other deserializes to null).
+internal record RecentlyUpdatedPreview(
+    DateTimeOffset LastActivityAt, DurableItem? Durable, ConsumableItem? Consumable);
 
 [Collection("Integration")]
 public class OverviewEndpointTests : IntegrationTestBase
@@ -318,6 +323,53 @@ public class OverviewEndpointTests : IntegrationTestBase
 
         Assert.Equal(7, overview.LentCount);
         Assert.Equal(5, overview.LentDurables.Count);
+    }
+
+    [Fact]
+    public async Task Overview_RecentlyUpdated_StockActivitySurfacesConsumableOrderedAndCappedAtSix()
+    {
+        var client = await CreateAdminClientAsync();
+        var areaId = await CreateAreaAsync(client, "Garage");
+
+        // Create the consumable FIRST so its metadata (Item.UpdatedAt) is the oldest activity in the
+        // household. If recency keyed off Item.UpdatedAt it would rank last and the cap would drop it.
+        var screws = await CreateConsumableAsync(client, "Wood screws", "pcs");
+
+        // Then eight durables, each newer than the consumable's metadata. The newest is placed in the
+        // garage so we can prove the API enriches a durable's resolved location for the quick panel.
+        var durables = new List<Guid>();
+        for (var i = 1; i <= 7; i++)
+            durables.Add((await CreateDurableAsync(client, new { name = $"Durable {i}" })).Id);
+        var placed = await CreateDurableAsync(client, new { name = "Placed drill", areaId });
+        durables.Add(placed.Id);
+
+        // Finally restock the consumable — its stock-entry timestamp is now the most recent activity
+        // household-wide, so effective-recency must float it to the front of the strip.
+        await ReceiveAsync(client, screws.Id, areaId, 25m);
+
+        var overview = await GetOverviewAsync(client);
+
+        // Capped at six (one consumable + eight durables = nine live items).
+        Assert.Equal(6, overview.RecentlyUpdated.Count);
+        Assert.All(overview.RecentlyUpdated, r => Assert.True((r.Durable is null) ^ (r.Consumable is null)));
+
+        // Stock activity wins: the restocked consumable leads, ahead of every more-recently-created durable.
+        var first = overview.RecentlyUpdated[0];
+        Assert.NotNull(first.Consumable);
+        Assert.Equal(screws.Id, first.Consumable!.Id);
+
+        // The most-recently-touched durable comes next, location-enriched (no re-fetch for the panel).
+        var second = overview.RecentlyUpdated[1];
+        Assert.NotNull(second.Durable);
+        Assert.Equal(placed.Id, second.Durable!.Id);
+        Assert.Equal(areaId, second.Durable!.ResolvedAreaId);
+        Assert.NotNull(second.Durable!.Path);
+        Assert.NotEmpty(second.Durable!.Path!);
+
+        // The two oldest durables fall outside the six-item cap.
+        var ids = overview.RecentlyUpdated.Select(r => r.Durable?.Id).ToList();
+        Assert.DoesNotContain(durables[0], ids);
+        Assert.DoesNotContain(durables[1], ids);
     }
 
     [Fact]

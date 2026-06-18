@@ -12,6 +12,7 @@ const ALL_QUIET: GetInventoryOverviewResponse = {
   unplacedCount: 0,
   unplacedDurables: [],
   areas: [],
+  recentlyUpdated: [],
 };
 
 const BUSY: GetInventoryOverviewResponse = {
@@ -30,6 +31,7 @@ const BUSY: GetInventoryOverviewResponse = {
     { id: 'bin', name: 'Floating bin' },
   ],
   areas: [],
+  recentlyUpdated: [],
 };
 
 describe('InventoryWarningPanelsComponent', () => {

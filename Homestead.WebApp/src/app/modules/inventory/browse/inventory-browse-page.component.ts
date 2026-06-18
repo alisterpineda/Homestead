@@ -27,9 +27,11 @@ import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.c
 import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
 import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
 import { InventoryStatusChipsComponent, type StatusChipsScope } from './inventory-status-chips.component';
+import { InventoryRecentlyUpdatedComponent } from './inventory-recently-updated.component';
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
+import type { RecentlyUpdatedItem } from '@/api/generated/models/recently-updated-item';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
@@ -56,6 +58,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     PlaceBrowserComponent,
     InventoryWarningPanelsComponent,
     InventoryStatusChipsComponent,
+    InventoryRecentlyUpdatedComponent,
     DurableQuickPanelComponent,
     ConsumableQuickPanelComponent,
   ],
@@ -126,6 +129,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
       @if (warningScope(); as scope) {
         <app-inventory-warning-panels [scope]="scope" />
+      }
+
+      <!-- The recency axis (root only): actionable alerts stay first, then this leads the neutral
+           nav rows. Carries full DTOs so a chip click opens the quick panel with no re-fetch. -->
+      @if (recentlyUpdated(); as items) {
+        <app-inventory-recently-updated
+          [items]="items"
+          (openDurable)="onOpenDurable($event)"
+          (openConsumable)="onOpenConsumable($event)"
+        />
       }
 
       <!-- Sibling of (not nested under) the alert gate above, so the neutral status row shows even
@@ -325,6 +338,14 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     }
     const d = this.drilledScope();
     return d ? { kind: 'place', lentCount: d.lentCount, lentParams: { lent: 'true', ...d.param } } : null;
+  });
+
+  // The recency strip — root only (a drilled place is already spatially scoped). Null hides it: at a
+  // drilled node, before the overview lands, and when nothing has been touched yet.
+  protected recentlyUpdated = computed<RecentlyUpdatedItem[] | null>(() => {
+    if (this.placeRef() !== null) return null;
+    const ov = this.overview();
+    return ov && ov.recentlyUpdated.length ? ov.recentlyUpdated : null;
   });
 
   quickPanelDurable = signal<DurableResponse | null>(null);

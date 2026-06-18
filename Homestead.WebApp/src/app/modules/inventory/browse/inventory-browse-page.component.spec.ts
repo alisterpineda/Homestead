@@ -33,6 +33,7 @@ const OVERVIEW: GetInventoryOverviewResponse = {
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },
     { id: 'office', name: 'Office', itemCount: 0, lowStockCount: 0 },
   ],
+  recentlyUpdated: [],
 };
 
 const GARAGE_CONTENTS: PlaceContentsResponse = {

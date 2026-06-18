@@ -1,3 +1,6 @@
+using Homestead.WebApi.Modules.Inventory.Features.Consumables;
+using Homestead.WebApi.Modules.Inventory.Features.Durables;
+
 namespace Homestead.WebApi.Modules.Inventory.Features.Overview.GetInventoryOverview;
 
 public record GetInventoryOverviewResponse
@@ -9,6 +12,25 @@ public record GetInventoryOverviewResponse
     public required int UnplacedCount { get; init; }
     public required IReadOnlyList<UnplacedDurablePreview> UnplacedDurables { get; init; }
     public required IReadOnlyList<AreaSummary> Areas { get; init; }
+
+    /// <summary>
+    /// The most-recently-touched live items (durables + consumables, mixed), newest first, for the
+    /// browse-root "Recently updated" strip. Recency is the effective last-activity time — the later
+    /// of <c>Item.UpdatedAt</c> and, for a consumable, its latest stock entry's <c>UpdatedAt</c>.
+    /// </summary>
+    public required IReadOnlyList<RecentlyUpdatedItem> RecentlyUpdated { get; init; }
+}
+
+/// <summary>
+/// One entry in the "Recently updated" strip: a full, location-enriched durable or consumable DTO
+/// (so a chip click can open the quick panel with no re-fetch) tagged with its effective
+/// last-activity time. Exactly one of <see cref="Durable"/> / <see cref="Consumable"/> is set.
+/// </summary>
+public record RecentlyUpdatedItem
+{
+    public required DateTimeOffset LastActivityAt { get; init; }
+    public DurableResponse? Durable { get; init; }
+    public ConsumableResponse? Consumable { get; init; }
 }
 
 public record AreaSummary

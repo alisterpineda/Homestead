@@ -190,6 +190,7 @@ export type { ProcessingEntityType } from './models/processing-entity-type';
 export type { ProcessingJobStatus } from './models/processing-job-status';
 export type { ProcessingJobType } from './models/processing-job-type';
 export type { ReceiveStockRequest } from './models/receive-stock-request';
+export type { RecentlyUpdatedItem } from './models/recently-updated-item';
 export type { ReprocessDocumentVersionBody } from './models/reprocess-document-version-body';
 export type { ReprocessDocumentVersionResponse } from './models/reprocess-document-version-response';
 export type { ResolvedLogLevel } from './models/resolved-log-level';
