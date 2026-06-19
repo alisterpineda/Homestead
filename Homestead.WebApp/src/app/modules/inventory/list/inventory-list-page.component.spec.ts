@@ -4,7 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { InventoryListPageComponent } from './inventory-list-page.component';
 import { InventoryItemsViewComponent } from './inventory-items-view.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
@@ -108,15 +108,10 @@ const LOOSE = makeConsumable({
 });
 
 class StubDurableApi {
-  // Honors the server-side filters the page uses: ParentItemId (drill-down) and Search.
-  getDurables = (p: { ParentItemId?: string; Search?: string }) => {
-    let items = p?.ParentItemId ? ITEMS.filter(i => i.parentItemId === p.ParentItemId) : ITEMS;
-    if (p?.Search) items = items.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase()));
+  // The list page fetches the full set with an optional Search; container scoping moved to Browse.
+  getDurables = (p: { Search?: string }) => {
+    const items = p?.Search ? ITEMS.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase())) : ITEMS;
     return of({ items, page: 1, pageSize: 200, totalCount: items.length });
-  };
-  getDurable = (p: { id: string }) => {
-    const found = ITEMS.find(i => i.id === p.id);
-    return found ? of(found) : throwError(() => new Error('404'));
   };
   patchDurable = () => of(makeItem({}));
   deleteDurable = () => of(undefined);
@@ -175,7 +170,7 @@ describe('InventoryListPageComponent', () => {
     return f.debugElement.query(By.directive(InventoryItemsViewComponent)).componentInstance;
   }
 
-  // Let the drill-down's server fetch (getDurable + getDurables(ParentItemId)) resolve.
+  // Flush the async list/area fetches.
   async function settle(): Promise<void> {
     fixture.detectChanges();
     await fixture.whenStable();
@@ -204,64 +199,23 @@ describe('InventoryListPageComponent', () => {
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
   });
 
-  it('drill-down scopes to direct item children plus consumables stocked in the container', async () => {
+  it('routes a container "View contents" to the Browse container drill (list no longer drills)', () => {
+    const navSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
     component.onViewContents(durableToRow(CHEST));
-    await settle();
-    expect(ids(scopedRows())).toEqual(['archived', 'bin', 'screws', 'wrench']);
-    // The grandchild (screw, under bin) is never in chest's direct-children scope.
-    expect(scopedRows().some(r => r.id === 'screw')).toBe(false);
-    // The items-view hides the archived child by default (show-inactive off).
-    expect(ids(itemsView().visibleRows())).toEqual(['bin', 'screws', 'wrench']);
+    expect(navSpy).toHaveBeenCalledWith(['/inventory/browse/container', 'chest']);
+
+    navSpy.mockClear();
+    component.onQuickPanelViewContents(CHEST);
+    expect(navSpy).toHaveBeenCalledWith(['/inventory/browse/container', 'chest']);
   });
 
-  it('drilled consumable rows show the local quantity with an of-total hint', async () => {
-    component.containerFilter.set('chest');
-    await settle();
-    const screws = scopedRows().find(r => r.id === 'screws')!;
-    expect(screws.onHand).toBe(4);
-    expect(screws.onHandHint).toBe('of 10 total');
-    expect(screws.locationText).toBe('Garage › Tool chest');
-  });
-
-  it('clears container scope when an area filter is picked or the scope is reset', () => {
-    component.containerFilter.set('chest');
-    component.selectAreaFilter(GARAGE);
-    expect(component.containerFilter()).toBeNull();
-    expect(component.areaFilter()).toBe(GARAGE);
-
-    component.containerFilter.set('chest');
-    component.onReset();
-    expect(component.containerFilter()).toBeNull();
-    expect(component.areaFilter()).toBe('all');
-  });
-
-  it('builds a breadcrumb from the container path plus its own name', async () => {
-    component.onViewContents(durableToRow(BIN));
-    await settle();
-    const crumb = component.breadcrumb();
-    expect(crumb.map(s => s.name)).toEqual(['Garage', 'Tool chest', 'Bin']);
-    expect(crumb[crumb.length - 1].id).toBe('bin');
-  });
-
-  it('keeps the breadcrumb exit reachable when the drilled container metadata is missing', async () => {
-    // Container fetch fails / returns nothing → containerItem is null, but the scope (and its exit)
-    // must remain: the breadcrumb block is gated on containerFilter, not on the loaded metadata.
-    component.containerFilter.set('does-not-exist');
-    await settle();
-    expect(component.containerItem()).toBeNull();
-    expect(component.containerFilter()).toBe('does-not-exist');
-    component.clearContainerFilter();
-    expect(component.containerFilter()).toBeNull();
-  });
-
-  it('exposes the container/area scope as the items-view trigger label', () => {
+  it('exposes the area scope as the items-view trigger label', () => {
     expect(component['scopeLabel']()).toBeNull();
     component.areaFilter.set(GARAGE);
     expect(component['scopeLabel']()).toBe('Filter: Garage');
     component.areaFilter.set('unplaced');
     expect(component['scopeLabel']()).toBe('Filter: Unplaced');
-    component.containerFilter.set('chest');
-    expect(component['scopeLabel']()).toContain('In:');
   });
 
   // Drive the committed term the way the app does — through the URL.
@@ -292,36 +246,19 @@ describe('InventoryListPageComponent', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('input[hlmInput]')).not.toBeNull();
   });
 
-  it('committing a typed search drops drill-down and area scope and syncs the URL', async () => {
-    component.containerFilter.set('chest');
+  it('committing a typed search drops the area scope and syncs the URL', async () => {
     component.areaFilter.set(GARAGE);
     component.searchInput.set('screw');
     await flushDebounce();
 
-    expect(component.containerFilter()).toBeNull();
     expect(component.areaFilter()).toBe('all');
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
     expect(ids(scopedRows())).toEqual(['screw', 'screws']);
   });
 
-  it('entering a drill-down clears an active search', async () => {
-    await navigateSearch('screw');
-    component.searchInput.set('screw');
-
-    component.onViewContents(durableToRow(CHEST));
-    await settle();
-    expect(component.searchInput()).toBe('');
-    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBeUndefined();
-    expect(ids(scopedRows())).toEqual(['archived', 'bin', 'screws', 'wrench']);
-
-    // The debounced '' emission must not re-trigger anything after the immediate clear.
-    await flushDebounce();
-    expect(component.containerFilter()).toBe('chest');
-  });
-
   it('re-committing the same term immediately after a programmatic clear still searches', async () => {
     await navigateSearch('screw');
-    component.onViewContents(durableToRow(CHEST)); // clears search, enters drill
+    component.selectAreaFilter(GARAGE); // clears search, scopes to an area
     await settle();
     expect(component.searchInput()).toBe('');
 
@@ -329,7 +266,8 @@ describe('InventoryListPageComponent', () => {
     component.searchInput.set('screw');
     await flushDebounce();
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
-    expect(component.containerFilter()).toBeNull();
+    // Committing search is a global scope, so it drops the area filter.
+    expect(component.areaFilter()).toBe('all');
     expect(ids(scopedRows())).toEqual(['screw', 'screws']);
   });
 
@@ -354,7 +292,7 @@ describe('InventoryListPageComponent', () => {
     expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['search']).toBe('screw');
   });
 
-  it('onReset clears the committed search along with the scope', async () => {
+  it('onReset clears the committed search along with the area scope', async () => {
     await navigateSearch('screw');
     component.areaFilter.set(GARAGE);
 
@@ -366,8 +304,9 @@ describe('InventoryListPageComponent', () => {
     expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
-  // Deep links from the overview tiles: params seed the items-view (kind/low/lent) and the page's own
-  // scope (area/container) once at construction, and are then stripped from the URL.
+  // Deep links from the overview tiles and place cards: params seed the items-view (kind/low/lent)
+  // and the page's own area scope once at construction, and are then stripped from the URL. Container
+  // navigation lives on Browse, so ?container= is no longer a list deep link.
   describe('deep-link param seeding', () => {
     async function createWithParams(params: Record<string, string>): Promise<ComponentFixture<InventoryListPageComponent>> {
       await TestBed.inject(Router).navigate([], { queryParams: params });
@@ -405,13 +344,6 @@ describe('InventoryListPageComponent', () => {
     it('an unknown ?kind value falls back to all kinds', async () => {
       const f = await createWithParams({ kind: 'bogus' });
       expect(itemsView(f).kind()).toBe('all');
-    });
-
-    it('?container seeds the drill-down scope and strips the param', async () => {
-      const f = await createWithParams({ container: 'chest' });
-      expect(f.componentInstance.containerFilter()).toBe('chest');
-      expect(ids(itemsView(f).visibleRows())).toEqual(['bin', 'screws', 'wrench']);
-      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['container']).toBeUndefined();
     });
 
     it('param stripping preserves an accompanying ?search', async () => {

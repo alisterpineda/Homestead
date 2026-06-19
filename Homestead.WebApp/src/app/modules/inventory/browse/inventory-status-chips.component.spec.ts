@@ -66,10 +66,16 @@ describe('InventoryStatusChipsComponent', () => {
     expect(links(fixture)).toEqual(['/inventory/items?lent=true&area=garage']);
   });
 
-  it('carries the container filter when drilled into a container', async () => {
-    const fixture = await create({ kind: 'place', lentCount: 1, lentParams: { lent: 'true', container: 'chest' } });
+  it('renders a count-only Lent chip (no link) when drilled into a container', async () => {
+    // A container drill carries null params — the list can't scope to a container, so the chip is
+    // count-only (the matching items already render in the contents table below).
+    const fixture = await create({ kind: 'place', lentCount: 1, lentParams: null });
 
-    expect(links(fixture)).toEqual(['/inventory/items?lent=true&container=chest']);
+    const content = text(fixture);
+    expect(content).toContain('Browse by status');
+    expect(content).toContain('Lent out');
+    expect(content).toContain('1');
+    expect(links(fixture)).toEqual([]);
   });
 
   it('renders nothing in a drilled place with nothing lent', async () => {

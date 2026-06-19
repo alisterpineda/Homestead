@@ -27,10 +27,10 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  *   the overview data the Browse root already fetches; the section deep-links into the unified items
  *   list pre-filtered to low stock. A zero-on-hand consumable is flagged "Out" to distinguish it from
  *   merely-low.
- * - **place** — a count-only low-stock section scoped to the drilled place, area or container ("low
- *   consumables stored here"). Its "View all" link carries the place filter (`viewAllParams`) so it
- *   composes with the items-list deep-link reader — `{ area: id }` for an area, `{ container: id }`
- *   for a container.
+ * - **place** — a count-only low-stock section scoped to the drilled place ("low consumables stored
+ *   here"). An **area** drill carries a `{ area: id }` filter, so its "View all" links into the
+ *   pre-filtered items list; a **container** drill carries `null` (the list no longer scopes to a
+ *   container — Browse owns containment), so the section renders count-only with no link.
  *
  * Renders nothing when the scope has no alerts, so a household with nothing running low sees a clean
  * Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling area→area keeps the
@@ -38,7 +38,7 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  */
 export type WarningPanelsScope =
   | { kind: 'root'; overview: GetInventoryOverviewResponse }
-  | { kind: 'place'; lowStockCount: number; viewAllParams: Record<string, string> };
+  | { kind: 'place'; lowStockCount: number; viewAllParams: Record<string, string> | null };
 
 @Component({
   selector: 'app-inventory-warning-panels',
@@ -145,12 +145,18 @@ export class InventoryWarningPanelsComponent {
    * The nonzero count-only panels for a drilled place (area or container) — low stock only. Kept as
    * a list (rather than a single conditional row) so future alert types slot in alongside it.
    */
-  protected placePanels = computed<{ icon: string; label: string; count: number; params: Record<string, string> }[]>(() => {
+  protected placePanels = computed<{ icon: string; label: string; count: number; params: Record<string, string> | null }[]>(() => {
     const s = this.scope();
     if (s.kind !== 'place') return [];
-    const panels: { icon: string; label: string; count: number; params: Record<string, string> }[] = [];
+    const panels: { icon: string; label: string; count: number; params: Record<string, string> | null }[] = [];
     if (s.lowStockCount > 0)
-      panels.push({ icon: 'lucideTriangleAlert', label: 'Low consumables stored here', count: s.lowStockCount, params: { ...s.viewAllParams, lowStock: 'true' } });
+      panels.push({
+        icon: 'lucideTriangleAlert',
+        label: 'Low consumables stored here',
+        count: s.lowStockCount,
+        // Area drill → linkable (`?area=…&lowStock=true`); container drill (null) → count-only.
+        params: s.viewAllParams ? { ...s.viewAllParams, lowStock: 'true' } : null,
+      });
     return panels;
   });
 

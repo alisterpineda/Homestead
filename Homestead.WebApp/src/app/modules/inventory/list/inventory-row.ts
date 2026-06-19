@@ -105,28 +105,10 @@ export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
 }
 
 /**
- * Drill-down view of a consumable scoped to one container: the LOCAL quantity at that container with
- * a muted "of N total" hint when more sits elsewhere. Null when the consumable has no stock there.
- */
-export function consumableToDrillRow(consumable: ConsumableResponse, containerItemId: string): InventoryRow | null {
-  const entry = (consumable.stockLocations ?? []).find(e => e.containerItemId === containerItemId);
-  if (!entry) return null;
-  return {
-    ...consumableToRow(consumable),
-    locationText: entry.locationLabel ?? 'Unplaced',
-    onHand: entry.quantity,
-    onHandHint: entry.quantity !== consumable.totalOnHand
-      ? `of ${formatQty(consumable.totalOnHand)} total`
-      : undefined,
-  };
-}
-
-/**
- * Place-scoped view of a consumable (Browse drill-down): the LOCAL quantity at the drilled place,
- * carried by `PlaceConsumableResponse.localQuantity`, with a muted "of N total" hint when more sits
- * elsewhere. Unlike {@link consumableToDrillRow}, the local quantity is supplied directly by the
- * place-contents payload rather than reconstructed from a stock entry, and the (Browse-hidden)
- * Location column keeps the base consumable's text.
+ * Place-scoped view of a consumable (Browse place contents): the LOCAL quantity at the drilled
+ * place, carried by `PlaceConsumableResponse.localQuantity`, with a muted "of N total" hint when
+ * more sits elsewhere. The local quantity is supplied directly by the place-contents payload, and
+ * the (Browse-hidden) Location column keeps the base consumable's text.
  */
 export function placeConsumableToRow(pc: PlaceConsumableResponse): InventoryRow {
   const total = pc.consumable.totalOnHand;

@@ -1,6 +1,6 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { InventoryTableComponent, type InventorySortState } from './inventory-table.component';
-import { durableToRow, consumableToRow, consumableToDrillRow, formatPath, type InventoryRow } from './inventory-row';
+import { durableToRow, consumableToRow, placeConsumableToRow, formatPath, type InventoryRow } from './inventory-row';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 
@@ -211,25 +211,9 @@ describe('InventoryTableComponent', () => {
       expect(cell.textContent).not.toContain('Low');
     });
 
-    it('renders the local quantity with the of-total hint for a drilled consumable row', () => {
-      const consumable = makeConsumable({
-        totalOnHand: 10,
-        stockLocations: [
-          {
-            id: 'e1', quantity: 4, containerItemId: 'chest',
-            path: [
-              { id: 'garage', name: 'Garage', kind: 'Area' },
-              { id: 'chest', name: 'Tool chest', kind: 'Container' },
-            ],
-            locationLabel: 'Garage › Tool chest',
-          },
-          {
-            id: 'e2', quantity: 6, areaId: 'garage',
-            path: [{ id: 'garage', name: 'Garage', kind: 'Area' }], locationLabel: 'Garage',
-          },
-        ],
-      });
-      fixture.componentRef.setInput('rows', [consumableToDrillRow(consumable, 'chest')!]);
+    it('renders the local quantity with the of-total hint for a place-scoped consumable row', () => {
+      const consumable = makeConsumable({ totalOnHand: 10 });
+      fixture.componentRef.setInput('rows', [placeConsumableToRow({ consumable, localQuantity: 4 })]);
       fixture.detectChanges();
       const host = fixture.nativeElement as HTMLElement;
       expect(host.textContent).toContain('4');

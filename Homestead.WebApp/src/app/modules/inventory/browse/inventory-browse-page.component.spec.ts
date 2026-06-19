@@ -359,9 +359,10 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('renders a container-scoped low-stock alert and lent status chip from direct counts', async () => {
-    // Direct children: one low consumable (alert panel) + one lent durable (status chip), both client-side
-    // counted and container-filtered. Lent is a neutral status now, so it lands in the status row.
+  it('renders a container-scoped low-stock alert and lent status chip as count-only (no link)', async () => {
+    // Direct children: one low consumable (alert panel) + one lent durable (status chip), both
+    // client-side counted. The items list can't scope to a container (Browse owns containment), so
+    // both render count-only — the matching items already appear in the contents table below.
     placeApi.contents = {
       ...GARAGE_CONTENTS,
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
@@ -385,12 +386,12 @@ describe('InventoryBrowsePageComponent', () => {
 
     const content = text(harness);
     expect(content).toContain('Low consumables stored here');
-    // Lent is no longer an alert panel — it's a status chip in the "Browse by status" row.
+    // Lent is a status chip in the "Browse by status" row, not an alert panel.
     expect(content).not.toContain('Items lent from here');
     expect(content).toContain('Browse by status');
     expect(content).toContain('Lent out');
-    expect(hrefs(harness)).toContain('/inventory/items?container=chest&lowStock=true');
-    expect(hrefs(harness)).toContain('/inventory/items?lent=true&container=chest');
+    // No list deep-link into a container — the alert and chip are count-only here.
+    expect(hrefs(harness).some(h => h.includes('container=chest'))).toBe(false);
   });
 
   it('refetches the drilled contents on changed', async () => {

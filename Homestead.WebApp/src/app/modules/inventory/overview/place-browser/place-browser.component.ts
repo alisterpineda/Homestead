@@ -86,7 +86,9 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
               @if (c.containerItem; as containerItem) {
                 <button hlmBtn variant="ghost" size="sm" (click)="containerDetails.emit(containerItem)">Details</button>
               }
-              <a hlmBtn variant="outline" size="sm" routerLink="/inventory/items" [queryParams]="openAsListParams()">Open as list</a>
+              @if (showOpenAsList()) {
+                <a hlmBtn variant="outline" size="sm" routerLink="/inventory/items" [queryParams]="openAsListParams()">Open as list</a>
+              }
               <app-create-entry-dialog
                 triggerSize="sm"
                 [initialLocation]="addLocation()"
@@ -269,11 +271,17 @@ export class PlaceBrowserComponent {
     return { kind: 'unplaced' };
   });
 
-  /** Escape hatch into the full items list, scoped to this place. */
+  /**
+   * "Open as list" shows only for area / unplaced drills — a container's contents already render in
+   * the full interactive table on this surface, so there's no separate list to escape to (and the
+   * items list no longer scopes to a container).
+   */
+  protected readonly showOpenAsList = computed(() => this.place()?.kind !== 'container');
+
+  /** Escape hatch into the full items list, scoped to this place (area / unplaced only). */
   protected openAsListParams = computed<Record<string, string>>(() => {
     const ref = this.place();
     if (ref?.kind === 'area') return { area: ref.id } as Record<string, string>;
-    if (ref?.kind === 'container') return { container: ref.id } as Record<string, string>;
     return { area: 'unplaced', kind: 'durables' };
   });
 }

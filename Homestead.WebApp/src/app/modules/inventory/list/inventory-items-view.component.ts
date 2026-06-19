@@ -201,8 +201,6 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
       <ng-content select="[toolbarEnd]" />
     </div>
 
-    <ng-content select="[beforeTable]" />
-
     @if (loading() && sortedVisibleRows().length === 0) {
       <div class="flex justify-center py-16">
         <hlm-spinner />

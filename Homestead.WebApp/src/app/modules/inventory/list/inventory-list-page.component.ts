@@ -23,12 +23,9 @@ import {
   lucidePackage,
   lucideCircleAlert,
   lucideCheck,
-  lucideChevronRight,
   lucideSearch,
-  lucideX,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
@@ -40,12 +37,11 @@ import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-d
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import { InventoryItemsViewComponent, kindFilterFromParam, type KindFilter } from './inventory-items-view.component';
-import { durableToRow, consumableToRow, consumableToDrillRow, type InventoryRow } from './inventory-row';
+import { durableToRow, consumableToRow, type InventoryRow } from './inventory-row';
 import { orderAreaTree, buildDescendantMap, type AreaTreeNode } from '../shared/area-tree';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
-import type { LocationSegmentKind } from '@/api/generated/models/location-segment-kind';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
@@ -84,21 +80,12 @@ interface ListData {
   term: string;
 }
 
-/** Server-fetched payload for a container drill-down: the container itself plus its direct children. */
-interface DrillData {
-  container: DurableResponse | null;
-  children: DurableResponse[];
-}
-
-const EMPTY_DRILL: DrillData = { container: null, children: [] };
-
 @Component({
   selector: 'app-inventory-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgIcon,
     HlmIconImports,
-    HlmButton,
     HlmInput,
     HlmSpinner,
     HlmEmptyImports,
@@ -113,9 +100,7 @@ const EMPTY_DRILL: DrillData = { container: null, children: [] };
     lucidePackage,
     lucideCircleAlert,
     lucideCheck,
-    lucideChevronRight,
     lucideSearch,
-    lucideX,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -163,7 +148,6 @@ const EMPTY_DRILL: DrillData = { container: null, children: [] };
             [initialLentOnly]="initialLentOnly"
             [extraFiltersActive]="extraFiltersActive()"
             [scopeLabel]="scopeLabel()"
-            [loading]="drillLoading()"
             (changed)="onChanged()"
             (openDurable)="onOpenDurable($event)"
             (openConsumable)="onOpenConsumable($event)"
@@ -197,7 +181,7 @@ const EMPTY_DRILL: DrillData = { container: null, children: [] };
                   (click)="selectAreaFilter('all')"
                 >
                   <span>All areas</span>
-                  @if (areaFilter() === 'all' && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  @if (areaFilter() === 'all') { <ng-icon hlm name="lucideCheck" size="sm" /> }
                 </button>
                 <button
                   type="button"
@@ -205,7 +189,7 @@ const EMPTY_DRILL: DrillData = { container: null, children: [] };
                   (click)="selectAreaFilter('unplaced')"
                 >
                   <span class="italic text-muted-foreground">Unplaced</span>
-                  @if (areaFilter() === 'unplaced' && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  @if (areaFilter() === 'unplaced') { <ng-icon hlm name="lucideCheck" size="sm" /> }
                 </button>
                 @for (node of areaTree(); track node.area.id) {
                   <button
@@ -214,40 +198,11 @@ const EMPTY_DRILL: DrillData = { container: null, children: [] };
                     (click)="selectAreaFilter(node.area.id)"
                   >
                     <span class="truncate" [style.marginInlineStart.px]="node.depth * 14">{{ node.area.name }}</span>
-                    @if (areaFilter() === node.area.id && !containerFilter()) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                    @if (areaFilter() === node.area.id) { <ng-icon hlm name="lucideCheck" size="sm" /> }
                   </button>
                 }
               </div>
             </div>
-
-            @if (containerFilter()) {
-              <div beforeTable class="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                @for (seg of breadcrumb(); track seg.id; let last = $last) {
-                  @if (last) {
-                    <span class="font-medium text-foreground">{{ seg.name }}</span>
-                  } @else {
-                    <button
-                      type="button"
-                      class="hover:text-foreground hover:underline"
-                      (click)="onBreadcrumbSegment(seg)"
-                    >{{ seg.name }}</button>
-                    <ng-icon hlm name="lucideChevronRight" size="xs" class="shrink-0" />
-                  }
-                } @empty {
-                  <span class="italic">Container contents</span>
-                }
-                <button
-                  hlmBtn
-                  variant="ghost"
-                  size="icon-sm"
-                  class="ml-1 size-6"
-                  aria-label="Exit container view"
-                  (click)="clearContainerFilter()"
-                >
-                  <ng-icon hlm name="lucideX" size="sm" />
-                </button>
-              </div>
-            }
           </app-inventory-items-view>
         }
       }
@@ -280,12 +235,11 @@ export class InventoryListPageComponent {
   refreshTrigger = signal(0);
   loading = signal(false);
   error = signal(false);
-  drillLoading = signal(false);
-  // Deep-link params from the overview tiles and place browser, seeded once into the filter
-  // signals below and stripped from the URL (read-once, not two-way synced — that's the lenses
-  // feature). When both ?area= and ?container= arrive, the container drill wins via scopedRows'
-  // existing precedence — no extra handling needed here.
-  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area', 'container']);
+  // Deep-link params from the overview tiles and place browser, seeded once into the filter signals
+  // below and stripped from the URL (read-once, not two-way synced — that's the lenses feature).
+  // Container-level navigation lives on Browse, so the list seeds only the area scope and the
+  // non-place lenses; a container's "View contents" routes to /inventory/browse/container/:id.
+  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area']);
 
   // The non-place refinements live in the items-view; pass the deep-link values as its one-shot seeds.
   protected readonly initialKind: KindFilter = kindFilterFromParam(this.deepLink['kind']);
@@ -293,8 +247,6 @@ export class InventoryListPageComponent {
   protected readonly initialLentOnly = this.deepLink['lent'] === 'true';
 
   areaFilter = signal<AreaFilter>(this.deepLink['area'] ?? 'all');
-  /** When set, the list is scoped to the direct contents of this container (drill-down). */
-  containerFilter = signal<string | null>(this.deepLink['container'] ?? null);
 
   /** What the user is typing (immediate); synced to the URL after a 300ms debounce. */
   searchInput = signal((this.route.snapshot.queryParamMap.get('search') ?? '').trim());
@@ -356,62 +308,8 @@ export class InventoryListPageComponent {
   allDurables = computed(() => this.data()?.durables ?? []);
   allConsumables = computed(() => this.data()?.consumables ?? []);
 
-  // Drill-down is fetched server-side (the container by id + its direct children via the
-  // ParentItemId filter), so contents are complete rather than reconstructed from the capped
-  // all-durables page. Re-runs on refresh and whenever the drilled container changes.
-  private drillKey = computed(() => ({ id: this.containerFilter(), tick: this.refreshTrigger() }));
-
-  private drillData = toSignal(
-    toObservable(this.drillKey).pipe(
-      switchMap(({ id }) => {
-        if (!id) {
-          this.drillLoading.set(false);
-          return of(EMPTY_DRILL);
-        }
-        this.drillLoading.set(true);
-        return forkJoin({
-          container: this.durableApi.getDurable({ id }).pipe(catchError(() => of<DurableResponse | null>(null))),
-          children: this.durableApi
-            .getDurables({ Page: 1, PageSize: 200, IncludeInactive: true, ParentItemId: id })
-            .pipe(map(r => (r.items ?? []) as DurableResponse[]), catchError(() => of<DurableResponse[]>([]))),
-        }).pipe(
-          map(result => {
-            this.drillLoading.set(false);
-            return result;
-          }),
-          catchError(() => {
-            this.drillLoading.set(false);
-            return of(EMPTY_DRILL);
-          }),
-        );
-      }),
-    ),
-    { initialValue: EMPTY_DRILL },
-  );
-
-  /** The container the list is drilled into (server-fetched), or null when not drilled in. */
-  containerItem = computed(() => (this.containerFilter() ? this.drillData().container : null));
-
-  /** Rows in the current scope (drill-down or area filter), before the kind/inactive/low filters. */
+  /** Rows in the current scope (area filter), before the kind/inactive/low filters. */
   protected scopedRows = computed<InventoryRow[]>(() => {
-    // Drill-down wins: the container's direct durable children (server-fetched, not capped by the
-    // all-durables page) plus consumables holding stock in it (client-side from the full consumables fetch).
-    const drillId = this.containerFilter();
-    if (drillId) {
-      // Consumables come from the all-list fetch; right after leaving a search, that fetch is still
-      // term-filtered, so suppress consumables until the unfiltered payload lands rather than show
-      // an incomplete set.
-      const consumablesStale = (this.data()?.term ?? '') !== '';
-      return [
-        ...this.drillData().children.map(durableToRow),
-        ...(consumablesStale
-          ? []
-          : this.allConsumables()
-              .map(c => consumableToDrillRow(c, drillId))
-              .filter((r): r is InventoryRow => r !== null)),
-      ];
-    }
-
     // Area filter uses RESOLVED areas, so a nested durable — or consumable stock inside a nested
     // container — shows under the area it walks up to. Zero-stock consumables only appear under
     // "All areas".
@@ -433,19 +331,9 @@ export class InventoryListPageComponent {
     return rows.filter(r => r.resolvedAreaIds.some(id => id != null && descendants.has(id)));
   });
 
-  /** Breadcrumb to the drilled-in container: its resolved path plus its own (current) name. */
-  breadcrumb = computed<{ id: string; name: string; kind: LocationSegmentKind }[]>(() => {
-    const container = this.containerItem();
-    if (!container) return [];
-    const path = (container.path ?? []).map(s => ({ id: s.id, name: s.name, kind: s.kind }));
-    return [...path, { id: container.id, name: container.name, kind: 'Container' as LocationSegmentKind }];
-  });
-
-  // Higher-precedence trigger label for the refine popover: the drilled container or selected area
-  // (the items-view falls back to its own low/lent/inactive label when this is null). Mirrors the
-  // old filterLabel's container > area precedence exactly.
+  // Higher-precedence trigger label for the refine popover: the selected area (the items-view falls
+  // back to its own low/lent/inactive label when this is null).
   protected scopeLabel = computed<string | null>(() => {
-    if (this.containerFilter()) return `In: ${this.containerItem()?.name ?? 'container'}`;
     const af = this.areaFilter();
     if (af === 'unplaced') return 'Filter: Unplaced';
     if (af !== 'all') {
@@ -455,10 +343,10 @@ export class InventoryListPageComponent {
     return null;
   });
 
-  // Drives the items-view Reset button: the popover's own filters OR any parent scope (area/
-  // container/search) being active.
+  // Drives the items-view Reset button: the popover's own filters OR any parent scope (area/search)
+  // being active.
   protected extraFiltersActive = computed(() =>
-    this.areaFilter() !== 'all' || this.containerFilter() !== null || this.searchTerm() !== '');
+    this.areaFilter() !== 'all' || this.searchTerm() !== '');
 
   constructor() {
     // Debounced URL sync for the search box: commit the trimmed term once typing pauses. No
@@ -472,14 +360,11 @@ export class InventoryListPageComponent {
     ).subscribe(term => this.syncSearchParam(term || null));
 
     // Commit-point enforcement: however a term lands in the URL (typing, history traversal,
-    // external navigation), search is a global scope — drop any drill/area scope and keep the
-    // input box in step. Living here rather than in the debounce subscriber, it also covers
-    // commits that never went through the box (e.g. popstate restoring ?search=).
+    // external navigation), search is a global scope — drop any area scope and keep the input box
+    // in step. Living here rather than in the debounce subscriber, it also covers commits that
+    // never went through the box (e.g. popstate restoring ?search=).
     toObservable(this.searchTerm).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(term => {
-      if (term) {
-        this.containerFilter.set(null);
-        this.areaFilter.set('all');
-      }
+      if (term) this.areaFilter.set('all');
       if (term !== this.searchInput().trim()) this.searchInput.set(term);
     });
   }
@@ -504,36 +389,16 @@ export class InventoryListPageComponent {
     });
   }
 
-  /** Picking an area drops any container drill-down and search (mutually exclusive scopes). */
+  /** Picking an area drops any active search (mutually exclusive scopes). */
   selectAreaFilter(af: AreaFilter): void {
     if (af !== 'all') this.clearSearch();
-    this.containerFilter.set(null);
     this.areaFilter.set(af);
   }
 
-  clearContainerFilter(): void {
-    // A committed search can't coexist with the drill, but a pending debounced one can — drop it
-    // so a keystroke from <300ms ago doesn't override this click.
-    this.clearSearch();
-    this.containerFilter.set(null);
-    this.areaFilter.set('all');
-  }
-
-  onBreadcrumbSegment(seg: { id: string; kind: LocationSegmentKind }): void {
-    this.clearSearch();
-    if (seg.kind === 'Area') {
-      this.containerFilter.set(null);
-      this.areaFilter.set(seg.id);
-    } else {
-      this.containerFilter.set(seg.id);
-    }
-  }
-
-  /** The items-view Reset clears its own refinements; the page clears its scope (search/area/container). */
+  /** The items-view Reset clears its own refinements; the page clears its scope (search/area). */
   onReset(): void {
     this.clearSearch();
     this.areaFilter.set('all');
-    this.containerFilter.set(null);
   }
 
   onChanged(): void {
@@ -560,14 +425,19 @@ export class InventoryListPageComponent {
     this.consumableQuickPanelState.set('closed');
   }
 
+  /** A container's "View contents" in the quick panel — Browse owns containment navigation. */
   onQuickPanelViewContents(durable: DurableResponse): void {
     this.onDurableQuickPanelClosed();
-    this.clearSearch();
-    this.containerFilter.set(durable.id);
+    this.viewContainerInBrowse(durable.id);
   }
 
+  /** A container row's "View contents" — drill into it on Browse, not in the list. */
   onViewContents(row: InventoryRow): void {
-    this.clearSearch();
-    this.containerFilter.set(row.id);
+    this.viewContainerInBrowse(row.id);
+  }
+
+  /** Both "View contents" entry points route to the container's Browse drill (the list never drills). */
+  private viewContainerInBrowse(id: string): void {
+    void this.router.navigate(['/inventory/browse/container', id]);
   }
 }

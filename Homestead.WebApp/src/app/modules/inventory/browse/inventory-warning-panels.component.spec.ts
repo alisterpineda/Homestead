@@ -76,7 +76,7 @@ describe('InventoryWarningPanelsComponent', () => {
 
   // ----- Root mode -----
 
-  it('renders only the low-stock tile (lent/unplaced are statuses, not alerts), open by default', async () => {
+  it('renders only the low-stock tile (lent/unplaced are statuses, not alerts), collapsed by default', async () => {
     const fixture = await create({ kind: 'root', overview: BUSY });
 
     const content = text(fixture);
@@ -94,8 +94,8 @@ describe('InventoryWarningPanelsComponent', () => {
     // The only deep-link is the low-stock View-all — no lent/unplaced links.
     expect(links(fixture)).toEqual(['/inventory/items?lowStock=true']);
 
-    // Root opens expanded — it's the household triage landing.
-    expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('true');
+    // Collapsed by default in every scope — incl. the root — so the panels don't fight the page.
+    expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('flags a zero-on-hand consumable "Out" but not a merely-low one', async () => {
@@ -146,10 +146,13 @@ describe('InventoryWarningPanelsComponent', () => {
     expect(trigger(fixture)?.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('carries the container filter when drilled into a container', async () => {
-    const fixture = await create({ kind: 'place', viewAllParams: { container: 'chest' }, lowStockCount: 1 });
+  it('renders a count-only low-stock panel (no link) when drilled into a container', async () => {
+    // A container drill carries null params — the list can't scope to a container, so the panel is
+    // count-only (the matching items already render in the contents table below).
+    const fixture = await create({ kind: 'place', viewAllParams: null, lowStockCount: 1 });
 
-    expect(links(fixture)).toEqual(['/inventory/items?container=chest&lowStock=true']);
+    expect(text(fixture)).toContain('Low consumables stored here');
+    expect(links(fixture)).toEqual([]);
   });
 
   it('renders nothing in a drilled place with no low stock', async () => {

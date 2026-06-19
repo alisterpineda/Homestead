@@ -272,9 +272,11 @@ describe('PlaceBrowserComponent', () => {
     expect(addButtons.length).toBe(2);
   });
 
-  it('targets Open-as-list per scope', async () => {
+  it('shows Open-as-list for area / unplaced drills but not for containers', async () => {
+    // A container drill shows the full interactive table in place, so there's no escape hatch into
+    // the list (which no longer scopes to a container).
     let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
-    expect(hrefs(fixture)).toContain('/inventory/items?container=bin');
+    expect(el(fixture).textContent).not.toContain('Open as list');
 
     fixture = await create(
       { kind: 'area', id: 'garage' },

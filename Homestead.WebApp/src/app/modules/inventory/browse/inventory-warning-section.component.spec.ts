@@ -25,7 +25,7 @@ class CountOnlyHost {
   label = 'Low consumables stored here';
   count = 3;
   previewCount = 0;
-  viewAllParams: Record<string, string> = { area: 'garage', lowStock: 'true' };
+  viewAllParams: Record<string, string> | null = { area: 'garage', lowStock: 'true' };
 }
 
 /**
@@ -144,5 +144,20 @@ describe('InventoryWarningSectionComponent', () => {
 
     // The single deep-link carries the place filter.
     expect(links(fixture)).toEqual(['/inventory/items?area=garage&lowStock=true']);
+  });
+
+  it('renders a plain, non-link header when viewAllParams is null (a container drill)', async () => {
+    const fixture = TestBed.createComponent(CountOnlyHost);
+    fixture.componentInstance.viewAllParams = null;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const content = text(fixture);
+    expect(content).toContain('Low consumables stored here');
+    expect(content).toContain('3');
+    // No link and no "View all" affordance — the items list can't scope to a container.
+    expect(links(fixture)).toEqual([]);
+    expect(content).not.toContain('View all');
   });
 });

@@ -295,24 +295,25 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   // Unplaced drill, and until the place-contents fetch lands. The explicit return type keeps the
   // `{ area }`/`{ container }` literals from widening out of `Record<string, string>`.
   // Invariant: each count must equal exactly what its filter param shows in the items list.
-  private drilledScope = computed<{ lowStockCount: number; lentCount: number; param: Record<string, string> } | null>(() => {
+  private drilledScope = computed<{ lowStockCount: number; lentCount: number; param: Record<string, string> | null } | null>(() => {
     const ref = this.placeRef();
     if (ref === null || ref.kind === 'unplaced') return null;
     const c = this.placeContents();
     if (!c) return null;
     if (ref.kind === 'area') {
-      // Area: backend-resolved counts (the `?area=` filter resolves nested places).
+      // Area: backend-resolved counts, linkable into the items list via the `?area=` filter (which
+      // resolves nested places) — so each count still equals exactly what its "View all" link opens.
       const param: Record<string, string> = { area: ref.id };
       return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param };
     }
-    // Container: direct counts client-side (the `?container=` drill is direct), so each equals
-    // exactly what its filter shows. Trade-off: nested sub-containers aren't counted.
-    const param: Record<string, string> = { container: ref.id };
+    // Container: direct counts client-side. The items list no longer scopes to a container (Browse
+    // owns containment), so these panels are count-only (param null) — the matching items already
+    // render in the contents table below. Trade-off: nested sub-containers aren't counted.
     return {
       lowStockCount: c.consumables.filter(s => s.consumable.isLow).length,
       lentCount: c.items.filter(i => i.status === 'Lent').length
                + c.containers.filter(cc => cc.status === 'Lent').length,
-      param,
+      param: null,
     };
   });
 
@@ -331,14 +332,14 @@ export class InventoryBrowsePageComponent implements OnDestroy {
 
   // The neutral status row's scope: lent (root + place). Decoupled from warningScope so the row
   // shows even with no alerts. Null until the backing fetch lands, and on the Unplaced drill
-  // (nothing to surface).
+  // (nothing to surface). A container drill carries no param (d.param null) → count-only, no link.
   protected statusScope = computed<StatusChipsScope | null>(() => {
     if (this.placeRef() === null) {
       const ov = this.overview();
       return ov ? { kind: 'root', lentCount: ov.lentCount } : null;
     }
     const d = this.drilledScope();
-    return d ? { kind: 'place', lentCount: d.lentCount, lentParams: { lent: 'true', ...d.param } } : null;
+    return d ? { kind: 'place', lentCount: d.lentCount, lentParams: d.param ? { lent: 'true', ...d.param } : null } : null;
   });
 
   // The recency strip — root only (a drilled place is already spatially scoped). Null hides it: at a
