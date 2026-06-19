@@ -33,8 +33,8 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  *   for a container.
  *
  * Renders nothing when the scope has no alerts, so a household with nothing running low sees a clean
- * Browse. Defaults open at root, collapsed when drilled — seeded on scope kind, so drilling
- * area→area keeps the user's toggle while root↔place re-seeds the default.
+ * Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling area→area keeps the
+ * user's toggle while root↔place re-seeds the collapsed default.
  */
 export type WarningPanelsScope =
   | { kind: 'root'; overview: GetInventoryOverviewResponse }
@@ -169,11 +169,11 @@ export class InventoryWarningPanelsComponent {
     return parts;
   });
 
-  // Open by default at the root (the household triage view), collapsed when drilled so the panels
-  // don't fight the place browser for vertical space. Seeded on the scope KIND, so drilling
-  // area→area preserves a user's manual toggle while root↔place re-seeds the default.
+  // Collapsed by default in every scope so the panels don't fight the page for vertical space; the
+  // user opens it on demand. Seeded on the scope KIND, so drilling area→area preserves a user's
+  // manual toggle while root↔place re-seeds the collapsed default.
   protected expanded = seededLinkedSignal(
     computed(() => this.scope().kind),
-    () => this.scope().kind === 'root',
+    () => false,
   );
 }
