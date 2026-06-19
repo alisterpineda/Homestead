@@ -3,7 +3,7 @@
 #
 # Runs ONLY at Stop (there is intentionally no per-edit PostToolUse hook). Fast signals only:
 #   backend changed  -> dotnet build Homestead.WebApi + unit tests (EF InMemory, deterministic)
-#   frontend changed -> ng build (catches template + type errors)
+#   frontend changed -> ng build (template + type errors) + ng test (Vitest unit tests, single-run)
 # Slow signals (integration tests, E2E, Aspire cold start) are NEVER run here.
 #
 # Contract: exit 0 = allow stop; exit 2 = block stop and feed stderr back to the model.
@@ -46,9 +46,13 @@ if [ -n "$BACKEND" ] && command -v dotnet >/dev/null 2>&1; then
 fi
 
 if [ -z "$FAIL" ] && [ -n "$FRONTEND" ] && command -v npm >/dev/null 2>&1; then
-  echo "## Frontend gate: ng build" >>"$LOG"
+  echo "## Frontend gate: ng build + unit tests" >>"$LOG"
+  # --watch=false is the default outside a TTY (as here), but we pass it explicitly so the
+  # gate can never hang in watch mode. No --coverage: the gate wants a fast pass/fail, not a report.
   if ! ( cd Homestead.WebApp && npm run build >>"$LOG" 2>&1 ); then
     FAIL="frontend build (npm run build)"
+  elif ! ( cd Homestead.WebApp && npm test -- --watch=false >>"$LOG" 2>&1 ); then
+    FAIL="frontend unit tests (npm test)"
   fi
 fi
 
