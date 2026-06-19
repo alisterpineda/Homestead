@@ -186,22 +186,21 @@ describe('PlaceBrowserComponent', () => {
     expect(badges.length).toBe(1);
   });
 
-  it('labels each contents group, and names the loose list by what it holds', async () => {
+  it('labels each contents group, and names the loose list generically', async () => {
     // BIN_CONTENTS has containers + one durable + one consumable (no child areas).
     let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     let headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
     expect(headings).toContain('Containers');
-    expect(headings).toContain('Durables & consumables');
+    expect(headings).toContain('Items');
     expect(headings).not.toContain('Areas');
 
-    // Loose list label collapses to the single kind actually present.
+    // Loose list keeps the generic label regardless of which kinds it holds.
     fixture = await create(
       { kind: 'container', id: 'bin' },
       makeContents({ containers: [], items: [makeItem({ id: 'wrench', name: 'Wrench' })], consumables: [] }),
     );
     headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
-    expect(headings).toContain('Durables');
-    expect(headings).not.toContain('Durables & consumables');
+    expect(headings).toContain('Items');
   });
 
   it('emits openDurable / openConsumable / containerDetails from their controls', async () => {

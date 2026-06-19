@@ -163,7 +163,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
 
             @if (c.items.length > 0 || c.consumables.length > 0) {
               <div class="space-y-2">
-                <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel() }}</h3>
+                <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel }}</h3>
                 <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
                   @for (item of c.items; track item.id) {
                     <li>
@@ -268,14 +268,8 @@ export class PlaceBrowserComponent {
 
   protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
 
-  /** Heading for the loose-contents list — names exactly what it holds (durables, consumables, or both). */
-  protected contentsLabel = computed(() => {
-    const c = this.contents();
-    const hasItems = (c?.items.length ?? 0) > 0;
-    const hasConsumables = (c?.consumables.length ?? 0) > 0;
-    if (hasItems && hasConsumables) return 'Durables & consumables';
-    return hasConsumables ? 'Consumables' : 'Durables';
-  });
+  /** Heading for the loose-contents list — kept generic rather than exposing the durable/consumable taxonomy. */
+  protected readonly contentsLabel = 'Items';
 
   protected placeIcon = computed(() => {
     const ref = this.place();
