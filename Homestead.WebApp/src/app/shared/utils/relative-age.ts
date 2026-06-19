@@ -7,6 +7,9 @@ const SKEW_TOLERANCE_MS = 60_000;
 export function formatRelativeAge(timestamp: string): string {
   const now = Date.now();
   const then = new Date(timestamp).getTime();
+  // An unparseable timestamp yields NaN, and every comparison below would be false, falling through
+  // to a nonsensical "NaNy ago". Guard it: render nothing rather than a broken string.
+  if (Number.isNaN(then)) return '';
   const diffMs = now - then;
   if (diffMs < -SKEW_TOLERANCE_MS) return new Date(timestamp).toLocaleDateString();
   const diffSec = Math.floor(diffMs / 1000);

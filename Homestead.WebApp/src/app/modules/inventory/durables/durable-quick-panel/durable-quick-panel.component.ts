@@ -127,7 +127,9 @@ type InlineForm = 'move' | 'lent' | null;
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">
                 <span class="text-sm text-muted-foreground">Status</span>
-                <app-item-status-badge [status]="it.status" />
+                <!-- This badge IS the field value (not a header adornment), so show Active too —
+                     otherwise the most common state renders a blank value under the label. -->
+                <app-item-status-badge [status]="it.status" [showDefault]="true" />
               </div>
               @if (inlineForm() !== 'lent') {
                 <div hlmItemActions>

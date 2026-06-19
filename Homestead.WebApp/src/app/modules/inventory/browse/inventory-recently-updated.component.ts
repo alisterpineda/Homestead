@@ -34,7 +34,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
       <section>
         <h2 class="mb-3 text-sm font-medium text-muted-foreground">Recently updated</h2>
         <div class="flex flex-wrap gap-2">
-          @for (entry of items(); track entry.durable?.id ?? entry.consumable?.id) {
+          @for (entry of items(); track entry.durable?.id ?? entry.consumable?.id ?? $index) {
             @if (entry.durable; as d) {
               <button
                 type="button"
