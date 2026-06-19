@@ -68,7 +68,8 @@ export class InventoryNameCell {
   imports: [ItemStatusBadgeComponent],
   template: `
     <div class="flex min-w-0 items-center gap-2">
-      <app-item-status-badge [status]="row.status" />
+      <!-- Dense list: keep a status chip on every row, including Active (quiet secondary tone). -->
+      <app-item-status-badge [status]="row.status" [showDefault]="true" />
       @if (row.durable?.lentTo) {
         <!-- Explicit cap: in the auto-layout table the cell grows to fit nowrap content, so
              truncate only engages against a fixed max-width. -->

@@ -160,7 +160,9 @@ describe('DurableDetailPageComponent', () => {
 
     const content = text(harness);
     expect(content).toContain('Cordless Drill');
-    expect(content).toContain('Active'); // status badge label
+    // Active is the resting default state — it renders no status badge anywhere (see
+    // ItemStatusBadgeComponent). A non-default status still shows its chip (asserted below).
+    expect(content).not.toContain('Active');
     expect(content).toContain('Garage'); // resolved location, now the headline answer
     expect(content).toContain('120'); // value (Details box — present because value is set)
     expect(content).toContain('SN-123'); // serial
@@ -170,6 +172,14 @@ describe('DurableDetailPageComponent', () => {
     // A leaf durable shows no Contents section and never fetches place contents.
     expect(content).not.toContain('Contents');
     expect(placeApi.calls).toEqual([]);
+  });
+
+  it('renders the status chip in the header for a non-default status', async () => {
+    durableApi.item = { ...LEAF_ITEM, status: 'Lent' };
+    const { harness } = await navigate('/inventory/items/item1');
+
+    // Non-default statuses are exactly the ones worth surfacing — the chip renders with its label.
+    expect(text(harness)).toContain('Lent');
   });
 
   it('leads with the location headline and hides the Details box when no detail fields are set', async () => {

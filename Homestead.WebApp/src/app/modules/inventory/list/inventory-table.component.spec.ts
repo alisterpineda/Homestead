@@ -172,6 +172,27 @@ describe('InventoryTableComponent', () => {
     });
   });
 
+  describe('status cell (DOM render)', () => {
+    // The dense list opts into showing the default Active state (quiet secondary tone) so the status
+    // column stays consistent on every row — unlike single-item surfaces, which suppress it.
+    it('renders a quiet Active chip for a default-status row', () => {
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ status: 'Active' }))]);
+      fixture.detectChanges();
+      const cell = fixture.nativeElement.querySelector('app-inventory-status-cell') as HTMLElement;
+      const span = cell.querySelector('span');
+      expect(span?.textContent?.trim()).toBe('Active');
+      expect(span?.className).toContain('bg-secondary');
+    });
+
+    it('renders the colored chip and lent-to text for a Lent row', () => {
+      fixture.componentRef.setInput('rows', [durableToRow(makeItem({ status: 'Lent', lentTo: 'Neighbor' }))]);
+      fixture.detectChanges();
+      const cell = fixture.nativeElement.querySelector('app-inventory-status-cell') as HTMLElement;
+      expect(cell.textContent).toContain('Lent');
+      expect(cell.textContent).toContain('Neighbor');
+    });
+  });
+
   describe('on hand cell (DOM render)', () => {
     it('renders quantity, unit, and a Low badge for a low consumable', () => {
       fixture.componentRef.setInput('rows', [consumableToRow(makeConsumable({ totalOnHand: 2.5, isLow: true }))]);

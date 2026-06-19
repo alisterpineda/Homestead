@@ -5,6 +5,8 @@ export interface ItemStatusMeta {
   /** Full Tailwind class string for the status pill (self-contained — not an hlmBadge variant). */
   readonly badgeClass: string;
   readonly terminal: boolean;
+  /** The resting default state; rendered as no badge (see {@link ItemStatusBadgeComponent}). */
+  readonly isDefault?: boolean;
 }
 
 /** Shared structural base for self-contained status pills — tone tokens are appended per badge. */
@@ -23,8 +25,13 @@ export const OUT_OF_STOCK_BADGE_CLASS = `${BADGE_BASE} bg-destructive/10 text-de
 export const ITEM_STATUS_META: Record<ItemStatus, ItemStatusMeta> = {
   Active: {
     label: 'Active',
-    badgeClass: `${BADGE_BASE} bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300`,
+    // The resting default state — suppressed everywhere except the dense list/table, which opts in
+    // via `[showDefault]` (see ItemStatusBadgeComponent). Styled as the quiet Spartan `secondary`
+    // tone (not the old loud green): same neutral fill as the muted terminal pills, but readable
+    // secondary-foreground text, so a present "Active" stays distinct from greyed-out Sold/Archived.
+    badgeClass: `${BADGE_BASE} bg-secondary text-secondary-foreground`,
     terminal: false,
+    isDefault: true,
   },
   Lent: {
     label: 'Lent',
