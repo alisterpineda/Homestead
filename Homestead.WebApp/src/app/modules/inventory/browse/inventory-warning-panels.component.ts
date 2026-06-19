@@ -1,15 +1,13 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideTriangleAlert,
-  lucideCircleCheck,
   lucideChevronRight,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
-import { InventoryOverviewTileComponent } from './inventory-overview-tile.component';
+import { InventoryWarningSectionComponent } from './inventory-warning-section.component';
 import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
 import { OUT_OF_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
@@ -20,13 +18,16 @@ import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-in
  * alerts — currently just **low stock** (a violation of a restock threshold the user set, with a
  * clear resolution). Neutral statuses are *not* alerts: lending lives in the always-on status-chips
  * row, while unplaced is a location bucket surfaced as a place card; the generic frame stays so
- * future alert types (expiring soon, overdue loans, warranty) can slot in. Two modes:
+ * future alert types (expiring soon, overdue loans, warranty) can slot in. The single light card
+ * holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out in a content-aware
+ * `auto-fit` grid — one section fills the row (matching the page's full-width rhythm), two-plus flow
+ * into equal side-by-side columns, mobile collapses to one. Two modes:
  *
- * - **root** — the global household-wide low-stock tile with a most-urgent-first preview, reusing
- *   the overview data the Browse root already fetches; the tile deep-links into the unified items
+ * - **root** — the global household-wide low-stock section with a most-urgent-first preview, reusing
+ *   the overview data the Browse root already fetches; the section deep-links into the unified items
  *   list pre-filtered to low stock. A zero-on-hand consumable is flagged "Out" to distinguish it from
  *   merely-low.
- * - **place** — a count-only low-stock panel scoped to the drilled place, area or container ("low
+ * - **place** — a count-only low-stock section scoped to the drilled place, area or container ("low
  *   consumables stored here"). Its "View all" link carries the place filter (`viewAllParams`) so it
  *   composes with the items-list deep-link reader — `{ area: id }` for an area, `{ container: id }`
  *   for a container.
@@ -43,16 +44,14 @@ export type WarningPanelsScope =
   selector: 'app-inventory-warning-panels',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmCollapsibleImports,
-    InventoryOverviewTileComponent,
+    InventoryWarningSectionComponent,
     UnitPipe,
   ],
   providers: [provideIcons({
     lucideTriangleAlert,
-    lucideCircleCheck,
     lucideChevronRight,
   })],
   template: `
@@ -64,7 +63,10 @@ export type WarningPanelsScope =
         >
           <ng-icon hlm name="lucideTriangleAlert" size="sm" class="shrink-0 text-muted-foreground" />
           <span class="font-medium">Needs attention</span>
-          <span class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+          <span
+            class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground tabular-nums"
+            [class.hidden]="expanded()"
+          >
             @for (part of summaryParts(); track part.label) {
               <span class="flex items-center gap-1">
                 <ng-icon hlm [name]="part.icon" size="xs" />
@@ -83,14 +85,15 @@ export type WarningPanelsScope =
 
         <div hlmCollapsibleContent>
           <div class="border-t border-border p-4">
-            @if (rootOverview(); as ov) {
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <app-inventory-overview-tile
+            <div
+              class="grid gap-x-8 gap-y-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))]"
+            >
+              @if (rootOverview(); as ov) {
+                <app-inventory-warning-section
                   icon="lucideTriangleAlert"
-                  title="Low stock"
+                  label="Low stock"
                   [count]="ov.lowStockCount"
                   [previewCount]="ov.lowStockConsumables.length"
-                  emptyText="Nothing running low"
                   [viewAllParams]="{ lowStock: 'true' }"
                 >
                   @for (consumable of ov.lowStockConsumables; track consumable.id) {
@@ -106,24 +109,18 @@ export type WarningPanelsScope =
                       </span>
                     </li>
                   }
-                </app-inventory-overview-tile>
-              </div>
-            } @else {
-              <div class="flex flex-col gap-2">
+                </app-inventory-warning-section>
+              } @else {
                 @for (panel of placePanels(); track panel.label) {
-                  <a
-                    class="flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-accent"
-                    routerLink="/inventory/items"
-                    [queryParams]="panel.params"
-                  >
-                    <ng-icon hlm [name]="panel.icon" size="sm" class="shrink-0 text-muted-foreground" />
-                    <span class="font-medium">{{ panel.label }}</span>
-                    <span class="text-muted-foreground tabular-nums">{{ panel.count }}</span>
-                    <ng-icon hlm name="lucideChevronRight" size="sm" class="ml-auto shrink-0 text-muted-foreground" />
-                  </a>
+                  <app-inventory-warning-section
+                    [icon]="panel.icon"
+                    [label]="panel.label"
+                    [count]="panel.count"
+                    [viewAllParams]="panel.params"
+                  />
                 }
-              </div>
-            }
+              }
+            </div>
           </div>
         </div>
       </div>
