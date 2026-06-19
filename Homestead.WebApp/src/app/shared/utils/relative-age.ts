@@ -13,6 +13,9 @@ export function formatRelativeAge(timestamp: string): string {
   if (diffDay < 30) return `${diffDay}d ago`;
   const diffMo = Math.floor(diffDay / 30);
   if (diffMo < 12) return `${diffMo}mo ago`;
-  const diffYr = Math.floor(diffDay / 365);
+  // Derive years from the same 30-day month unit, not /365: mixing the two left a gap at
+  // diffDay 360–364 (diffMo == 12 so the months branch is skipped, yet diffDay/365 == 0),
+  // which rendered a nonsensical "0y ago".
+  const diffYr = Math.floor(diffMo / 12);
   return `${diffYr}y ago`;
 }
