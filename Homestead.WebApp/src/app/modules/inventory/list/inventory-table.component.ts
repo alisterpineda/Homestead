@@ -2,9 +2,11 @@ import {
   Component,
   ChangeDetectionStrategy,
   computed,
+  effect,
   inject,
   input,
   output,
+  signal,
   LOCALE_ID,
 } from '@angular/core';
 import { formatDate } from '@angular/common';
@@ -15,6 +17,7 @@ import { HlmTableImports } from '@/shared/components/spartan/table';
 import {
   type CellContext,
   type ColumnDef,
+  type VisibilityState,
   createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
@@ -28,14 +31,10 @@ import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-m
 import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
-import type { InventoryRow } from './inventory-row';
+import type { InventoryRow, InventorySortId, InventorySortState } from './inventory-row';
 import { formatPath } from './inventory-row';
 
-export type InventorySortId = 'name' | 'status' | 'location' | 'onHand' | 'updatedAt';
-export interface InventorySortState {
-  readonly id: InventorySortId;
-  readonly desc: boolean;
-}
+export type { InventorySortId, InventorySortState } from './inventory-row';
 
 interface InventoryTableMeta {
   onEdit: (row: InventoryRow) => void;
@@ -203,6 +202,8 @@ export class InventoryActionsCell {
 export class InventoryTableComponent {
   rows = input.required<InventoryRow[]>();
   sortState = input<InventorySortState>({ id: 'name', desc: false });
+  /** Per-column visibility (TanStack {@link VisibilityState}); default `{}` keeps every column shown. */
+  columnVisibility = input<VisibilityState>({});
 
   open = output<InventoryRow>();
   edit = output<InventoryRow>();
@@ -219,6 +220,15 @@ export class InventoryTableComponent {
     onArchiveRestore: (r) => this.archiveRestore.emit(r),
     onDelete: (r) => this.delete.emit(r),
   };
+
+  // Mirror the columnVisibility input into TanStack's controlled state. Input → signal via an effect
+  // (not read directly in the table options) so a parent change re-applies; onColumnVisibilityChange
+  // keeps internal toggles (none today) from desyncing.
+  private readonly _columnVisibility = signal<VisibilityState>({});
+
+  constructor() {
+    effect(() => this._columnVisibility.set(this.columnVisibility()));
+  }
 
   private readonly _columns = computed<ColumnDef<InventoryRow>[]>(() => [
     {
@@ -298,8 +308,13 @@ export class InventoryTableComponent {
       if (prev.id === first.id && prev.desc === first.desc) return;
       this.sortChange.emit({ id: first.id as InventorySortId, desc: first.desc });
     },
+    onColumnVisibilityChange: (updater) => {
+      const next = updater instanceof Function ? updater(this._columnVisibility()) : updater;
+      this._columnVisibility.set(next);
+    },
     state: {
       sorting: [this.sortState()],
+      columnVisibility: this._columnVisibility(),
     },
     meta: this._meta,
   }));

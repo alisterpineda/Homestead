@@ -299,6 +299,16 @@ describe('InventoryBrowsePageComponent', () => {
     expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
   });
 
+  it('keeps drilling within Browse when a loose container row asks to view contents', async () => {
+    const { component } = await navigate('/inventory/browse/container/chest');
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.onViewContainer('tray');
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/browse/container', 'tray']);
+  });
+
   it('drills into Unplaced with the Unplaced flag', async () => {
     await navigate('/inventory/browse/unplaced');
     expect(placeApi.calls).toEqual([{ Unplaced: true }]);

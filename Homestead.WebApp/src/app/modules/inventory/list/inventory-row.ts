@@ -1,10 +1,19 @@
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
+import type { PlaceConsumableResponse } from '@/api/generated/models/place-consumable-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import { formatQty } from '../consumables/consumable-shared';
+import { itemStatusLabel } from '../shared/item-status-meta';
 
 export type InventoryKind = 'durable' | 'consumable';
+
+/** The sortable columns of the unified inventory list, and a column+direction pair. */
+export type InventorySortId = 'name' | 'status' | 'location' | 'onHand' | 'updatedAt';
+export interface InventorySortState {
+  readonly id: InventorySortId;
+  readonly desc: boolean;
+}
 
 /**
  * Row view-model for the unified inventory list: a non-fungible durable or a fungible consumable
@@ -110,4 +119,56 @@ export function consumableToDrillRow(consumable: ConsumableResponse, containerIt
       ? `of ${formatQty(consumable.totalOnHand)} total`
       : undefined,
   };
+}
+
+/**
+ * Place-scoped view of a consumable (Browse drill-down): the LOCAL quantity at the drilled place,
+ * carried by `PlaceConsumableResponse.localQuantity`, with a muted "of N total" hint when more sits
+ * elsewhere. Unlike {@link consumableToDrillRow}, the local quantity is supplied directly by the
+ * place-contents payload rather than reconstructed from a stock entry, and the (Browse-hidden)
+ * Location column keeps the base consumable's text.
+ */
+export function placeConsumableToRow(pc: PlaceConsumableResponse): InventoryRow {
+  const total = pc.consumable.totalOnHand;
+  return {
+    ...consumableToRow(pc.consumable),
+    onHand: pc.localQuantity,
+    onHandHint: pc.localQuantity !== total ? `of ${formatQty(total)} total` : undefined,
+  };
+}
+
+function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, b: T) => number): number {
+  if (av === bv) return 0;
+  if (av === null) return 1;
+  if (bv === null) return -1;
+  return lt(av, bv) * dir;
+}
+
+/**
+ * Pure comparator-sort over inventory rows by the chosen column/direction. Returns a new array.
+ * Durables (no quantity, null `onHand`/`updatedAt`) always sort last regardless of direction — see
+ * {@link compareNullable}. Shared by the items-view component and tests so a single ordering rule
+ * backs every surface.
+ */
+export function sortRows(rows: readonly InventoryRow[], sortState: InventorySortState): InventoryRow[] {
+  const result = [...rows];
+  const { id, desc } = sortState;
+  const dir: 1 | -1 = desc ? -1 : 1;
+  result.sort((a, b) => {
+    switch (id) {
+      case 'name':
+        return a.name.localeCompare(b.name) * dir;
+      case 'status':
+        return itemStatusLabel(a.status).localeCompare(itemStatusLabel(b.status)) * dir;
+      case 'location':
+        return a.locationText.localeCompare(b.locationText) * dir;
+      case 'onHand':
+        return compareNullable(a.onHand, b.onHand, dir, (x, y) => x - y);
+      case 'updatedAt':
+        return compareNullable(a.updatedAt ?? null, b.updatedAt ?? null, dir, (x, y) => (x < y ? -1 : 1));
+      default:
+        return 0;
+    }
+  });
+  return result;
 }

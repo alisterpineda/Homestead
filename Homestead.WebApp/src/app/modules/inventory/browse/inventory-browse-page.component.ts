@@ -155,6 +155,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         (openDurable)="onOpenDurable($event)"
         (openConsumable)="onOpenConsumable($event)"
         (containerDetails)="onContainerDetails($event)"
+        (viewContainer)="onViewContainer($event)"
         (changed)="onChanged()"
       />
     </div>
@@ -405,5 +406,10 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** The drilled container's "Details" button — the deliberate Explore→Detail step into its record. */
   onContainerDetails(durable: DurableResponse): void {
     void this.router.navigate(['/inventory/items', durable.id]);
+  }
+
+  /** A loose container row's "View contents" — keep drilling within Browse (Explore), not out to detail. */
+  onViewContainer(containerId: string): void {
+    void this.router.navigate(['/inventory/browse/container', containerId]);
   }
 }

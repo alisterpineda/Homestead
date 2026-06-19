@@ -3,7 +3,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { PlaceBrowserComponent } from './place-browser.component';
+import { InventoryItemsViewComponent } from '../../list/inventory-items-view.component';
 import type { PlaceRef } from './place-param';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
@@ -203,7 +205,13 @@ describe('PlaceBrowserComponent', () => {
     expect(headings).toContain('Items');
   });
 
-  it('emits openDurable / openConsumable / containerDetails from their controls', async () => {
+  /** A loose-contents table row by the visible name (durables + consumables render as table rows now). */
+  function row(fixture: ComponentFixture<PlaceBrowserComponent>, name: string): HTMLTableRowElement {
+    return Array.from(el(fixture).querySelectorAll<HTMLTableRowElement>('app-inventory-items-view tbody tr'))
+      .find(tr => tr.textContent?.includes(name))!;
+  }
+
+  it('emits openDurable / openConsumable from the table rows and containerDetails from the header', async () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     const component = fixture.componentInstance;
     const openDurable = vi.fn();
@@ -213,25 +221,41 @@ describe('PlaceBrowserComponent', () => {
     component.openConsumable.subscribe(openConsumable);
     component.containerDetails.subscribe(details);
 
-    const buttons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'));
-    buttons.find(b => b.textContent?.includes('Wrench'))!.click();
+    row(fixture, 'Wrench').click();
     expect(openDurable).toHaveBeenCalledWith(expect.objectContaining({ id: 'wrench' }));
 
-    buttons.find(b => b.textContent?.includes('Wood screws'))!.click();
+    row(fixture, 'Wood screws').click();
     // Emits the inner ConsumableResponse, not the PlaceConsumableResponse wrapper.
     expect(openConsumable).toHaveBeenCalledWith(expect.objectContaining({ id: 'screws', unit: 'pcs' }));
 
-    buttons.find(b => b.textContent?.trim() === 'Details')!.click();
+    Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.trim() === 'Details')!.click();
     expect(details).toHaveBeenCalledWith(expect.objectContaining({ id: 'bin' }));
+  });
+
+  it('renders the loose contents as the scoped items-view: no place filter, Location hidden, Show inactive off', async () => {
+    const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
+    const view = fixture.debugElement.query(By.directive(InventoryItemsViewComponent))
+      .componentInstance as InventoryItemsViewComponent;
+
+    // The place is the route, not a filter; the drilled place has only live statuses; every loose
+    // item resolves to this same place, so the Location column is redundant.
+    expect(view.showInactiveFilter()).toBe(false);
+    expect(view.columnVisibility()).toEqual({ location: false });
+    expect(view.rows().map(r => r.id).sort()).toEqual(['screws', 'wrench']);
+
+    const headerText = el(fixture).querySelector('app-inventory-items-view thead')?.textContent ?? '';
+    expect(headerText).not.toContain('Location');
   });
 
   it('shows local consumable quantity with an of-total hint and a low badge', async () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
 
-    const content = el(fixture).textContent ?? '';
-    expect(content).toContain('4 pcs');
-    expect(content).toContain('of 10 total');
-    expect(content).toContain('Low');
+    const onHand = row(fixture, 'Wood screws').querySelector('app-inventory-onhand-cell')!.textContent ?? '';
+    expect(onHand).toContain('4');
+    expect(onHand).toContain('pcs');
+    expect(onHand).toContain('of 10 total');
+    expect(onHand).toContain('Low');
   });
 
   it('shows the empty state with an Add-item-here CTA for an empty place', async () => {

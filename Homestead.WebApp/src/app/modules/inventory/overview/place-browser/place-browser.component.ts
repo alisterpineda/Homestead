@@ -5,7 +5,6 @@ import {
   lucideMapPin,
   lucideMapPinOff,
   lucideBox,
-  lucideTriangleAlert,
   lucideCircleAlert,
   lucidePackage,
   lucidePlus,
@@ -16,12 +15,11 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { PlaceCardComponent } from './place-card.component';
 import { placeRefToLink, placeDisplayName, type PlaceRef } from './place-param';
-import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
-import { LOW_STOCK_BADGE_CLASS } from '../../shared/item-status-meta';
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
+import { InventoryItemsViewComponent } from '../../list/inventory-items-view.component';
+import { durableToRow, placeConsumableToRow, type InventoryRow } from '../../list/inventory-row';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
-import { formatQty } from '../../consumables/consumable-shared';
-import { UnitPipe } from '../../consumables/unit.pipe';
+import type { VisibilityState } from '@tanstack/angular-table';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -45,15 +43,13 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
     HlmSpinner,
     HlmEmptyImports,
     PlaceCardComponent,
-    ItemStatusBadgeComponent,
     CreateEntryDialogComponent,
-    UnitPipe,
+    InventoryItemsViewComponent,
   ],
   providers: [provideIcons({
     lucideMapPin,
     lucideMapPinOff,
     lucideBox,
-    lucideTriangleAlert,
     lucideCircleAlert,
     lucidePackage,
     lucidePlus,
@@ -161,45 +157,21 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
               </div>
             }
 
-            @if (c.items.length > 0 || c.consumables.length > 0) {
+            @if (contentRows().length > 0) {
               <div class="space-y-2">
                 <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel }}</h3>
-                <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
-                  @for (item of c.items; track item.id) {
-                    <li>
-                      <button
-                        type="button"
-                        class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                        (click)="openDurable.emit(item)"
-                      >
-                        <span class="truncate">{{ item.name }}</span>
-                        <app-item-status-badge [status]="item.status" />
-                      </button>
-                    </li>
-                  }
-                  @for (row of c.consumables; track row.consumable.id) {
-                    <li>
-                      <button
-                        type="button"
-                        class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                        (click)="openConsumable.emit(row.consumable)"
-                      >
-                        <span class="flex min-w-0 items-center gap-2">
-                          <span class="truncate">{{ row.consumable.name }}</span>
-                          @if (row.consumable.isLow) {
-                            <span [class]="lowStockBadgeClass">
-                              <ng-icon hlm name="lucideTriangleAlert" size="xs" />
-                              Low
-                            </span>
-                          }
-                        </span>
-                        <span class="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(row.localQuantity) }} {{ row.consumable.unit | unit }}@if (row.localQuantity !== row.consumable.totalOnHand) {<span> · of {{ formatQty(row.consumable.totalOnHand) }} total</span>}
-                        </span>
-                      </button>
-                    </li>
-                  }
-                </ul>
+                <!-- Same interactive table as the Items list, scoped to this place's loose contents.
+                     No place/area filter (the place is the route, not a filter); Show inactive is hidden
+                     (place contents carry only live statuses); the Location column is constant here. -->
+                <app-inventory-items-view
+                  [rows]="contentRows()"
+                  [showInactiveFilter]="false"
+                  [columnVisibility]="hideLocationColumn"
+                  (changed)="changed.emit()"
+                  (openDurable)="openDurable.emit($event)"
+                  (openConsumable)="openConsumable.emit($event)"
+                  (viewContents)="viewContainer.emit($event.id)"
+                />
               </div>
             }
           }
@@ -255,18 +227,29 @@ export class PlaceBrowserComponent {
   openConsumable = output<ConsumableResponse>();
   /** The drilled container's own quick panel (header "Details" button). */
   containerDetails = output<DurableResponse>();
+  /** A loose container row's "View contents" — the page drills to its Browse route (presentational). */
+  viewContainer = output<string>();
   /** Something was created/mutated — the page refetches overview + contents. */
   changed = output<void>();
 
-  protected readonly formatQty = formatQty;
   protected readonly placeRefToLink = placeRefToLink;
-  protected readonly lowStockBadgeClass = LOW_STOCK_BADGE_CLASS;
+
+  /** Hides the redundant Location column in the loose-contents table (every row resolves to this place). */
+  protected readonly hideLocationColumn: VisibilityState = { location: false };
 
   /** Top-level areas only; nested areas surface by drilling into their parent. */
   protected rootAreas = computed(() =>
     (this.overview()?.areas ?? []).filter(a => a.parentAreaId == null));
 
   protected placeName = computed(() => placeDisplayName(this.place(), this.contents()));
+
+  // The drilled place's loose contents as unified table rows: durables plus consumables carrying
+  // their place-local quantity. Empty at root / while loading — the @if guard hides the table then.
+  protected readonly contentRows = computed<InventoryRow[]>(() => {
+    const c = this.contents();
+    if (!c) return [];
+    return [...c.items.map(durableToRow), ...c.consumables.map(placeConsumableToRow)];
+  });
 
   /** Heading for the loose-contents list — kept generic rather than exposing the durable/consumable taxonomy. */
   protected readonly contentsLabel = 'Items';

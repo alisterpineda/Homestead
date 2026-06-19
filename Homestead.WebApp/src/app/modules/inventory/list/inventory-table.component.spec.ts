@@ -299,6 +299,29 @@ describe('InventoryTableComponent', () => {
     });
   });
 
+  describe('column visibility', () => {
+    it('shows every column by default ({}), and hides one marked false', () => {
+      fixture.componentRef.setInput('rows', [
+        durableToRow(makeItem({
+          resolvedAreaId: 'garage',
+          path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+        })),
+      ]);
+      fixture.detectChanges();
+      // Default: name, status, location, onHand, updatedAt, actions.
+      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(6);
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Location');
+
+      fixture.componentRef.setInput('columnVisibility', { location: false });
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('thead th').length).toBe(5);
+      expect(fixture.nativeElement.querySelector('tbody tr')!.querySelectorAll('td').length).toBe(5);
+      expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Location');
+    });
+  });
+
   it('emits sortChange when sorting changes via the table', () => {
     fixture.detectChanges();
     let emitted: InventorySortState | undefined;
