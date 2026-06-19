@@ -1,8 +1,14 @@
+// A timestamp a little ahead of the client clock is almost always client/server skew on a
+// just-touched item, not a real future date — render it "just now" (it falls through to the
+// seconds branch below) rather than a jarring full date. Only timestamps well beyond the skew
+// window are treated as genuinely future and shown as a locale date.
+const SKEW_TOLERANCE_MS = 60_000;
+
 export function formatRelativeAge(timestamp: string): string {
   const now = Date.now();
   const then = new Date(timestamp).getTime();
   const diffMs = now - then;
-  if (diffMs < 0) return new Date(timestamp).toLocaleDateString();
+  if (diffMs < -SKEW_TOLERANCE_MS) return new Date(timestamp).toLocaleDateString();
   const diffSec = Math.floor(diffMs / 1000);
   if (diffSec < 60) return 'just now';
   const diffMin = Math.floor(diffSec / 60);

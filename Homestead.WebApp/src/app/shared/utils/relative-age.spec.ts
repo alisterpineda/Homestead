@@ -30,4 +30,11 @@ describe('formatRelativeAge', () => {
     const future = new Date(now + 24 * 60 * 60 * 1000).toISOString();
     expect(formatRelativeAge(future)).toBe(new Date(future).toLocaleDateString());
   });
+
+  // A just-touched item whose server timestamp is a few seconds ahead of the client clock should
+  // read "just now", not a jarring full date (clock skew, not a real future date).
+  it('treats sub-minute future skew as "just now"', () => {
+    expect(formatRelativeAge(new Date(now + 5 * 1000).toISOString())).toBe('just now');
+    expect(formatRelativeAge(new Date(now + 30 * 1000).toISOString())).toBe('just now');
+  });
 });
