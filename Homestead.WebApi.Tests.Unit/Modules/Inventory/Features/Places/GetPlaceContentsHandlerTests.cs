@@ -198,16 +198,13 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         Assert.Equal(floatingBin.Id, Assert.Single(resp.Containers).Id);
         Assert.Equal(adrift.Id, Assert.Single(resp.Items).Id);
         Assert.Empty(resp.Consumables);
-        // Direct = bin + wrench; the resolved-unplaced total adds the nested item.
-        Assert.Equal(2, resp.DirectItemCount);
-        Assert.Equal(1, resp.NestedItemCount);
     }
 
     [Fact]
-    public async Task Handle_AreaScope_NestedCountMath()
+    public async Task Handle_AreaScope_SplitsDirectContentsAndCardCarriesRolledSubtreeCount()
     {
         var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        await AddItemAsync("Direct drill", areaId: _garage.Id);
+        var drill = await AddItemAsync("Direct drill", areaId: _garage.Id);
         await AddItemAsync("Nested wrench", parentItemId: chest.Id);
         var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
@@ -216,10 +213,12 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
 
-        // Direct: chest + drill + tape. Nested: wrench + screws (inside the chest).
-        Assert.Equal(3, resp.DirectItemCount);
-        Assert.Equal(2, resp.NestedItemCount);
+        // The area's direct contents split into their cards/rows: chest (container), drill (item), tape (consumable).
         var chestCard = Assert.Single(resp.Containers);
+        Assert.Equal(chest.Id, chestCard.Id);
+        Assert.Equal(drill.Id, Assert.Single(resp.Items).Id);
+        Assert.Equal(tape.Id, Assert.Single(resp.Consumables).Consumable.Id);
+        // The container card carries its rolled subtree count: wrench + screws inside the chest.
         Assert.Equal(2, chestCard.ItemCount);
     }
 
@@ -257,8 +256,6 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var card = Assert.Single(resp.Containers);
         Assert.Equal(0, card.ItemCount);
         Assert.Empty(card.PreviewNames);
-        Assert.Equal(1, resp.DirectItemCount); // the chest itself
-        Assert.Equal(0, resp.NestedItemCount);
     }
 
     [Fact]
@@ -285,8 +282,6 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         Assert.Empty(resp.Containers);
         Assert.Empty(resp.Items);
         Assert.Empty(resp.Consumables);
-        Assert.Equal(0, resp.DirectItemCount);
-        Assert.Equal(0, resp.NestedItemCount);
     }
 
     [Fact]
@@ -304,37 +299,10 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
         var childCard = Assert.Single(resp.ChildAreas);
         Assert.Equal(bedroom.Id, childCard.Id);
         Assert.Equal(1, childCard.ItemCount);
-        // The child-area card counts as a direct card; nothing is nested in Basement's own containers.
-        Assert.Equal(1, resp.DirectItemCount);
-        Assert.Equal(0, resp.NestedItemCount);
-    }
-
-    [Fact]
-    public async Task Handle_AreaScope_ConsumableTypeSharedWithSubArea_NestedCountStaysCorrect()
-    {
-        // Regression: a consumable type stocked both directly in House AND in a sub-area must not be
-        // double-subtracted from the nested figure (the old `total - sum(childRolled) - …` math did,
-        // and Math.Max(0,…) hid it). Nested must reflect ONLY House's own container nesting.
-        var house = await AddAreaAsync("House");
-        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-
-        var batteries = await AddConsumableAsync("Batteries");
-        await AddStockAsync(batteries.Id, 4m, areaId: house.Id);   // direct in House
-        await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id); // also in the sub-area
-
-        var chest = await AddItemAsync("Chest", areaId: house.Id, isContainer: true);
-        await AddItemAsync("Watch", parentItemId: chest.Id);
-        await AddItemAsync("Ring", parentItemId: chest.Id);
-
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = house.Id }, Ct);
-
-        // Direct cards: Chest (container) + Batteries (direct consumable row) + Bedroom (child-area card).
-        Assert.Equal(chest.Id, Assert.Single(resp.Containers).Id);
-        Assert.Equal(batteries.Id, Assert.Single(resp.Consumables).Consumable.Id);
-        Assert.Equal(bedroom.Id, Assert.Single(resp.ChildAreas).Id);
-        Assert.Equal(3, resp.DirectItemCount);
-        // Nested = Watch + Ring inside Chest. Pre-fix this was 1 (Batteries stolen a slot).
-        Assert.Equal(2, resp.NestedItemCount);
+        // An area whose only contents are sub-areas has empty direct lists — the lamp lives in Bedroom.
+        Assert.Empty(resp.Containers);
+        Assert.Empty(resp.Items);
+        Assert.Empty(resp.Consumables);
     }
 
     [Fact]
@@ -375,23 +343,5 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
         Assert.Equal(0, resp.ScopedLowStockCount);
         Assert.Equal(0, resp.ScopedLentCount);
-    }
-
-    [Fact]
-    public async Task Handle_AreaScope_OnlySubAreas_CountsCardsNotNested()
-    {
-        var house = await AddAreaAsync("House");
-        var basement = await AddAreaAsync("Basement", parentAreaId: house.Id);
-        await AddItemAsync("Boiler", areaId: basement.Id);
-
-        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = house.Id }, Ct);
-
-        Assert.Empty(resp.Containers);
-        Assert.Empty(resp.Items);
-        Assert.Empty(resp.Consumables);
-        var childCard = Assert.Single(resp.ChildAreas);
-        Assert.Equal(1, childCard.ItemCount); // Boiler rolls up to Basement
-        Assert.Equal(1, resp.DirectItemCount); // the Basement card
-        Assert.Equal(0, resp.NestedItemCount); // House has no containers of its own
     }
 }

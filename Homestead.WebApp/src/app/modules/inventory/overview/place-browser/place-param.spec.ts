@@ -6,8 +6,6 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
   return {
     path: [],
     containerItem: null,
-    directItemCount: 0,
-    nestedItemCount: 0,
     scopedLowStockCount: 0,
     scopedLentCount: 0,
     childAreas: [],

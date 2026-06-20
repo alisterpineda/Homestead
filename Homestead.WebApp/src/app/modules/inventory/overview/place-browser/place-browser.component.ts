@@ -78,9 +78,6 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                 <ng-icon hlm [name]="placeIcon()" size="sm" class="shrink-0 text-muted-foreground" />
                 <span class="truncate">{{ placeName() }}</span>
               </h2>
-              <p class="text-sm text-muted-foreground tabular-nums">
-                {{ c.directItemCount }} here@if (c.nestedItemCount > 0) {<span> · {{ c.nestedItemCount }} more inside containers</span>}
-              </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               @if (c.containerItem; as containerItem) {

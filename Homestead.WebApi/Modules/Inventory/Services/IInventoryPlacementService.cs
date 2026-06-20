@@ -20,14 +20,6 @@ public record InventoryPlacement
     /// </summary>
     public required IReadOnlyDictionary<Guid, int> AreaItemCounts { get; init; }
 
-    /// <summary>
-    /// areaId → the same count as <see cref="AreaItemCounts"/> but for the area's OWN contents only
-    /// (leaf-keyed; descendant-area contents excluded). Computed with set-union dedup, so it can be
-    /// subtracted from the direct-card counts to get "deeper inside this area's own containers"
-    /// without the double-count a naive subtraction of rolled child sums would introduce.
-    /// </summary>
-    public required IReadOnlyDictionary<Guid, int> AreaOwnItemCounts { get; init; }
-
     /// <summary>Live non-fungible items whose container chain reaches no area (resolved-unplaced).</summary>
     public required IReadOnlyList<UnplacedItemInfo> UnplacedItems { get; init; }
 

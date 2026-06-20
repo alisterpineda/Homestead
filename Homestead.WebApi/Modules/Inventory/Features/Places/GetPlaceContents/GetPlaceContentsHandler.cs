@@ -58,33 +58,8 @@ public class GetPlaceContentsHandler(
         // carrying its own rolled subtree count.
         var childAreas = await LoadChildAreasAsync(request, placement, ct);
 
-        // The scope's resolved total uses the exact semantics that drive the overview cards, so
-        // direct + nested always reconciles with the count the user clicked.
-        var total = request switch
-        {
-            { AreaId: { } areaId } => placement.AreaItemCounts.GetValueOrDefault(areaId),
-            { ContainerItemId: { } containerId } =>
-                placement.ContainerStats.TryGetValue(containerId, out var stats)
-                    ? stats.ResolvedContentsCount
-                    : 0,
-            _ => placement.UnplacedItems.Count,
-        };
-
-        // Child-area cards count as direct cards (like containers): each is one drillable thing shown
-        // here, carrying its own rolled subtree count. The "+N nested" badge means only things deeper
-        // inside THIS place's OWN containers, so it's derived from the place's own (non-rolled) count
-        // minus the direct leaf cards. For an area that's AreaOwnItemCounts (descendant areas
-        // excluded, set-deduped — NOT a sum of rolled child counts, which would double-subtract any
-        // consumable type shared between this area and a sub-area); for a container/Unplaced scope there
-        // are no child areas, so the own count is just the rolled total.
-        var ownCount = request.AreaId is { } scopeAreaId
-            ? placement.AreaOwnItemCounts.GetValueOrDefault(scopeAreaId)
-            : total;
-        var directCount = containers.Count + items.Count + consumables.Count + childAreas.Count;
-        var nestedItemCount = Math.Max(0, ownCount - containers.Count - items.Count - consumables.Count);
-
-        // Scoped warning counts for the Browse drilled panels, resolved with the same semantics as
-        // `total` above: low-stock consumables stored here + lent items from here. Count-only — the
+        // Scoped warning counts for the Browse drilled panels, resolved with the overview-card
+        // semantics: low-stock consumables stored here + lent items from here. Count-only — the
         // actual items already appear in the contents list. Unplaced has neither (it's the absence
         // of a place: holds no stock, and a lent item without a resolved area is just unplaced).
         var scopedLowStockCount = request switch
@@ -110,8 +85,6 @@ public class GetPlaceContentsHandler(
         {
             Path = path,
             ContainerItem = containerItem,
-            DirectItemCount = directCount,
-            NestedItemCount = nestedItemCount,
             ScopedLowStockCount = scopedLowStockCount,
             ScopedLentCount = scopedLentCount,
             ChildAreas = childAreas,

@@ -54,8 +54,6 @@ function makeContents(over: Partial<PlaceContentsResponse>): PlaceContentsRespon
   return {
     path: [],
     containerItem: null,
-    directItemCount: 0,
-    nestedItemCount: 0,
     scopedLowStockCount: 0,
     scopedLentCount: 0,
     childAreas: [],
@@ -86,8 +84,6 @@ const BIN_CONTENTS = makeContents({
     { id: 'bin', name: 'Bin', kind: 'Container' },
   ],
   containerItem: makeItem({ id: 'bin', name: 'Bin', isContainer: true }),
-  directItemCount: 3,
-  nestedItemCount: 2,
   containers: [
     { id: 'tray', name: 'Tray', status: 'Active', itemCount: 2, lowStockCount: 1, previewNames: ['Bits', 'Glue'] },
   ],
@@ -160,19 +156,6 @@ describe('PlaceBrowserComponent', () => {
     fixture = await create(null, null, { ...OVERVIEW, areas: [], unplacedCount: 0 });
     expect(el(fixture).textContent).toContain('No areas yet');
     expect(hrefs(fixture)).toContain('/inventory/areas');
-  });
-
-  it('shows the counts line with the nested part hidden at zero', async () => {
-    let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
-    expect(el(fixture).textContent).toContain('3 here · 2 more inside containers');
-
-    fixture = await create(
-      { kind: 'container', id: 'bin' },
-      makeContents({ ...BIN_CONTENTS, nestedItemCount: 0 }),
-    );
-    const content = el(fixture).textContent ?? '';
-    expect(content).toContain('3 here');
-    expect(content).not.toContain('more inside containers');
   });
 
   it('renders child-container cards with subtree counts, previews, and drill links', async () => {
@@ -260,7 +243,7 @@ describe('PlaceBrowserComponent', () => {
   it('shows the empty state with a New-item CTA for an empty place', async () => {
     const fixture = await create(
       { kind: 'container', id: 'bin' },
-      makeContents({ ...BIN_CONTENTS, containers: [], items: [], consumables: [], directItemCount: 0, nestedItemCount: 0 }),
+      makeContents({ ...BIN_CONTENTS, containers: [], items: [], consumables: [] }),
     );
 
     const content = el(fixture).textContent ?? '';
@@ -329,10 +312,9 @@ describe('PlaceBrowserComponent', () => {
   });
 
   it('labels an Unplaced drill from its place ref', async () => {
-    const fixture = await create({ kind: 'unplaced' }, makeContents({ directItemCount: 1 }));
+    const fixture = await create({ kind: 'unplaced' }, makeContents({}));
 
     const content = el(fixture).textContent ?? '';
     expect(content).toContain('Unplaced');
-    expect(content).toContain('1 here');
   });
 });

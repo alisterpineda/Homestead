@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Places.GetPlaceContents;
 
 /// <summary>
 /// The direct contents of one place (an area, a container, or Unplaced) for the overview's
-/// in-place drill-down browser, plus the breadcrumb path and the direct/nested count split.
+/// in-place drill-down browser, plus the breadcrumb path.
 /// </summary>
 public record PlaceContentsResponse
 {
@@ -20,18 +20,6 @@ public record PlaceContentsResponse
     /// quick-panel button); null for area and Unplaced scopes.
     /// </summary>
     public DurableResponse? ContainerItem { get; init; }
-
-    /// <summary>
-    /// Live things directly at this place: child containers + non-container items + distinct
-    /// consumables with a direct stock entry here.
-    /// </summary>
-    public required int DirectItemCount { get; init; }
-
-    /// <summary>
-    /// Things deeper inside this place's containers: the resolved subtree total (same semantics
-    /// as the overview cards' counts) minus <see cref="DirectItemCount"/>, floored at zero.
-    /// </summary>
-    public required int NestedItemCount { get; init; }
 
     /// <summary>
     /// Distinct low-stock consumables resolving to this place (area/container scope; 0 for Unplaced) —

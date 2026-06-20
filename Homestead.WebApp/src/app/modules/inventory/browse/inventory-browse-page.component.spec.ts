@@ -40,8 +40,6 @@ const OVERVIEW: GetInventoryOverviewResponse = {
 const GARAGE_CONTENTS: PlaceContentsResponse = {
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   containerItem: null,
-  directItemCount: 2,
-  nestedItemCount: 1,
   scopedLowStockCount: 0,
   scopedLentCount: 0,
   childAreas: [],
@@ -65,8 +63,6 @@ const NESTED_AREA_CONTENTS: PlaceContentsResponse = {
     { id: 'bedroom', name: 'Bedroom', kind: 'Area' },
   ],
   containerItem: null,
-  directItemCount: 0,
-  nestedItemCount: 0,
   scopedLowStockCount: 0,
   scopedLentCount: 0,
   childAreas: [],
@@ -262,7 +258,6 @@ describe('InventoryBrowsePageComponent', () => {
 
     expect(placeApi.calls).toEqual([{ AreaId: 'garage' }]);
     const content = text(harness);
-    expect(content).toContain('2 here · 1 more inside containers');
     expect(content).toContain('Tool chest');
     expect(content).toContain('Drill');
     // The drilled child-container card continues spatial drilling within Browse (Explore).

@@ -320,40 +320,6 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Compute_AreaOwnItemCounts_ExcludeDescendantsButRollUpForAreaItemCounts()
-    {
-        // House (1 direct item) › Bedroom (1 direct item). Own counts are leaf-only; AreaItemCounts roll up.
-        var house = await AddAreaAsync("House");
-        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        await AddItemAsync("Painting", areaId: house.Id);
-        await AddItemAsync("Lamp", areaId: bedroom.Id);
-
-        var placement = await _sut.ComputeAsync(Ct);
-
-        Assert.Equal(1, placement.AreaOwnItemCounts[house.Id]);    // Painting only — excludes Bedroom
-        Assert.Equal(1, placement.AreaOwnItemCounts[bedroom.Id]);  // Lamp
-        Assert.Equal(2, placement.AreaItemCounts[house.Id]);       // rolled: Painting + Lamp
-    }
-
-    [Fact]
-    public async Task Compute_AreaOwnItemCounts_DedupConsumableTypeWithinOwnScopeOnly()
-    {
-        // Same consumable type stocked directly in House and in a sub-area: House's OWN count includes it
-        // once (its own direct entry); the sub-area's entry is NOT folded into House's own count.
-        var house = await AddAreaAsync("House");
-        var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        var batteries = await AddConsumableAsync("Batteries");
-        await AddStockAsync(batteries.Id, 4m, areaId: house.Id);
-        await AddStockAsync(batteries.Id, 6m, areaId: bedroom.Id);
-
-        var placement = await _sut.ComputeAsync(Ct);
-
-        Assert.Equal(1, placement.AreaOwnItemCounts[house.Id]);   // Batteries once (House's own entry)
-        Assert.Equal(1, placement.AreaOwnItemCounts[bedroom.Id]); // Batteries once
-        Assert.Equal(1, placement.AreaItemCounts[house.Id]);      // rolled, still deduped to once
-    }
-
-    [Fact]
     public async Task Compute_Lent_DirectlyPlaced_CountsTowardAreaAsSubsetOfItems()
     {
         await AddItemAsync("Lent ladder", status: ItemStatus.Lent, areaId: _garage.Id);

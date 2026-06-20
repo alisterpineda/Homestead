@@ -56,8 +56,6 @@ const CHEST_CONTENTS: PlaceContentsResponse = {
     { id: 'box1', name: 'Tool Chest', kind: 'Container' },
   ],
   containerItem: CONTAINER_ITEM,
-  directItemCount: 2,
-  nestedItemCount: 0,
   scopedLowStockCount: 0,
   scopedLentCount: 0,
   childAreas: [],

@@ -11,9 +11,7 @@ export interface PlaceContentsResponse {
   consumables: Array<PlaceConsumableResponse>;
   containerItem?: (null | DurableResponse);
   containers: Array<PlaceContainerSummary>;
-  directItemCount: number;
   items: Array<DurableResponse>;
-  nestedItemCount: number;
   path: Array<LocationSegmentResponse>;
   scopedLentCount: number;
   scopedLowStockCount: number;

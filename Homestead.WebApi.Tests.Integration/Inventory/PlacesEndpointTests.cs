@@ -4,7 +4,6 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 internal record PlaceContentsResult(
     IReadOnlyList<LocationSegmentItem> Path, DurableItem? ContainerItem,
-    int DirectItemCount, int NestedItemCount,
     int ScopedLowStockCount, int ScopedLentCount,
     IReadOnlyList<PlaceContainerItem> Containers,
     IReadOnlyList<DurableItem> Items,
@@ -64,7 +63,7 @@ public class PlacesEndpointTests : IntegrationTestBase
     // ----- Tests -----
 
     [Fact]
-    public async Task Contents_AreaScope_ReturnsDirectContentsAndCounts()
+    public async Task Contents_AreaScope_ReturnsDirectContents()
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
@@ -95,9 +94,6 @@ public class PlacesEndpointTests : IntegrationTestBase
         var consumableRow = Assert.Single(contents.Consumables);
         Assert.Equal(tape.Id, consumableRow.Consumable.Id);
         Assert.Equal(3m, consumableRow.LocalQuantity);
-
-        Assert.Equal(3, contents.DirectItemCount); // chest + drill + tape
-        Assert.Equal(2, contents.NestedItemCount); // wrench + glue
     }
 
     [Fact]
@@ -169,8 +165,6 @@ public class PlacesEndpointTests : IntegrationTestBase
         Assert.Equal(floatingBin.Id, Assert.Single(contents.Containers).Id);
         Assert.Equal(adrift.Id, Assert.Single(contents.Items).Id);
         Assert.Empty(contents.Consumables);
-        Assert.Equal(2, contents.DirectItemCount);
-        Assert.Equal(1, contents.NestedItemCount); // the nested pliers
     }
 
     [Fact]

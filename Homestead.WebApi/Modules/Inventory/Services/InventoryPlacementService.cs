@@ -186,15 +186,6 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
             areaCounts[areaId] = rolledItems.GetValueOrDefault(areaId)
                 + (rolledConsumableTypes.TryGetValue(areaId, out var consumableTypes) ? consumableTypes.Count : 0);
 
-        // The same count for the area's OWN contents only (no roll-up) — the deduped leaf tally.
-        // GetPlaceContents subtracts the direct-card counts from this to get the container-nested
-        // figure; using the leaf count (not a sum of rolled child counts) keeps the consumable-type
-        // dedup intact, so a type shared between an area and its sub-areas isn't subtracted twice.
-        var areaOwnCounts = new Dictionary<Guid, int>();
-        foreach (var areaId in areaItemCounts.Keys.Union(areaConsumableTypes.Keys))
-            areaOwnCounts[areaId] = areaItemCounts.GetValueOrDefault(areaId)
-                + (areaConsumableTypes.TryGetValue(areaId, out var ownConsumableTypes) ? ownConsumableTypes.Count : 0);
-
         var containerIds = new HashSet<Guid>(containerItemCounts.Keys);
         containerIds.UnionWith(containerConsumableTypes.Keys);
         var containerStats = new Dictionary<Guid, ContainerStats>(containerIds.Count);
@@ -210,7 +201,6 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
         return new InventoryPlacement
         {
             AreaItemCounts = areaCounts,
-            AreaOwnItemCounts = areaOwnCounts,
             UnplacedItems = unplaced,
             AreaLowStockCounts = rolledLowTypes.ToDictionary(kv => kv.Key, kv => kv.Value.Count),
             AreaLentCounts = rolledLent,
