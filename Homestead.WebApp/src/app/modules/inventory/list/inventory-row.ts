@@ -8,11 +8,30 @@ import { itemStatusLabel } from '../shared/item-status-meta';
 
 export type InventoryKind = 'durable' | 'consumable';
 
-/** The sortable columns of the unified inventory list, and a column+direction pair. */
-export type InventorySortId = 'name' | 'status' | 'location' | 'onHand' | 'updatedAt';
+/** The sortable columns of the unified inventory list — the single source of truth for the set. */
+export const INVENTORY_SORT_IDS = ['name', 'status', 'location', 'onHand', 'updatedAt'] as const;
+/** A sortable column id, derived from {@link INVENTORY_SORT_IDS} so the two never drift. */
+export type InventorySortId = (typeof INVENTORY_SORT_IDS)[number];
+/** A column + direction pair. */
 export interface InventorySortState {
   readonly id: InventorySortId;
   readonly desc: boolean;
+}
+
+const SORT_IDS: ReadonlySet<string> = new Set(INVENTORY_SORT_IDS);
+
+/**
+ * The items-list initial sort from the `?sort`/`?dir` deep link (the Browse "View all →" recency
+ * bridge). An absent or unknown `sort` id falls back to name-ascending, so ordinary navigation is
+ * unaffected; `dir=desc` flips to descending, anything else (including absent) stays ascending.
+ * Colocated with {@link InventorySortId} (mirroring `kindFilterFromParam`) so the validator can't
+ * drift from the id set it validates against.
+ */
+export function sortStateFromParams(sort: string | null, dir: string | null): InventorySortState {
+  if (sort && SORT_IDS.has(sort)) {
+    return { id: sort as InventorySortId, desc: dir === 'desc' };
+  }
+  return { id: 'name', desc: false };
 }
 
 /**
@@ -81,7 +100,7 @@ function entryResolvedAreaId(entry: StockEntryResponse): string | null {
   return resolved;
 }
 
-function consumableLocationText(locations: readonly StockEntryResponse[]): string {
+export function consumableLocationText(locations: readonly StockEntryResponse[]): string {
   if (locations.length === 0) return '—';
   if (locations.length === 1) return locations[0].locationLabel ?? 'Unplaced';
   return `${locations.length} locations`;

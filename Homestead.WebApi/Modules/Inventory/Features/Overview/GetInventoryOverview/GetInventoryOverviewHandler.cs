@@ -13,7 +13,7 @@ public class GetInventoryOverviewHandler(
     : IRequestHandler<GetInventoryOverviewQuery, GetInventoryOverviewResponse>
 {
     private const int PreviewCount = 5;
-    private const int RecentCount = 6;
+    private const int RecentCount = 10;
 
     public async Task<GetInventoryOverviewResponse> Handle(
         GetInventoryOverviewQuery request, CancellationToken ct)
@@ -108,9 +108,11 @@ public class GetInventoryOverviewHandler(
     /// <remarks>
     /// Materialize-then-merge in memory rather than gamble on EF translating a CASE-over-correlated-MAX
     /// in <c>ORDER BY</c>; the lightweight tuple scan is consistent with the placement service's item
-    /// scan. The winners are then re-projected by id through the shared mappers — durables enriched with
-    /// their resolved location (the durable quick panel reads <c>Path</c> with no re-fetch); consumables
-    /// left bare (their panel re-fetches stock locations by id on open).
+    /// scan. The winners are then re-projected by id through the shared mappers and both kinds arrive
+    /// location-enriched: durables via <see cref="IItemLocationResolver"/>, consumables via
+    /// <see cref="ConsumableStockLocationLoader"/>, so each recency row renders its location with no
+    /// re-fetch (the consumable quick panel still re-fetches its full breakdown on open — the row only
+    /// needs display text).
     /// </remarks>
     private async Task<IReadOnlyList<RecentlyUpdatedItem>> BuildRecentlyUpdatedAsync(CancellationToken ct)
     {
@@ -167,6 +169,7 @@ public class GetInventoryOverviewHandler(
                 .Where(i => consumableIds.Contains(i.Id) && ItemStatusExtensions.LiveStatuses.Contains(i.Status))
                 .Select(ConsumableResponseMapper.Projection)
                 .ToListAsync(ct);
+            consumables = await ConsumableStockLocationLoader.AttachStockLocationsAsync(db, locationResolver, consumables, ct);
         }
 
         var durableById = durables.ToDictionary(d => d.Id);

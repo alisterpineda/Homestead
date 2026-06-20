@@ -319,7 +319,7 @@ public class OverviewEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Overview_RecentlyUpdated_StockActivitySurfacesConsumableOrderedAndCappedAtSix()
+    public async Task Overview_RecentlyUpdated_StockActivitySurfacesConsumableOrderedAndCappedAtTen()
     {
         var client = await CreateAdminClientAsync();
         var areaId = await CreateAreaAsync(client, "Garage");
@@ -328,10 +328,10 @@ public class OverviewEndpointTests : IntegrationTestBase
         // household. If recency keyed off Item.UpdatedAt it would rank last and the cap would drop it.
         var screws = await CreateConsumableAsync(client, "Wood screws", "pcs");
 
-        // Then eight durables, each newer than the consumable's metadata. The newest is placed in the
+        // Then eleven durables, each newer than the consumable's metadata. The newest is placed in the
         // garage so we can prove the API enriches a durable's resolved location for the quick panel.
         var durables = new List<Guid>();
-        for (var i = 1; i <= 7; i++)
+        for (var i = 1; i <= 10; i++)
             durables.Add((await CreateDurableAsync(client, new { name = $"Durable {i}" })).Id);
         var placed = await CreateDurableAsync(client, new { name = "Placed drill", areaId });
         durables.Add(placed.Id);
@@ -342,14 +342,19 @@ public class OverviewEndpointTests : IntegrationTestBase
 
         var overview = await GetOverviewAsync(client);
 
-        // Capped at six (one consumable + eight durables = nine live items).
-        Assert.Equal(6, overview.RecentlyUpdated.Count);
+        // Capped at ten (one consumable + eleven durables = twelve live items).
+        Assert.Equal(10, overview.RecentlyUpdated.Count);
         Assert.All(overview.RecentlyUpdated, r => Assert.True((r.Durable is null) ^ (r.Consumable is null)));
 
         // Stock activity wins: the restocked consumable leads, ahead of every more-recently-created durable.
         var first = overview.RecentlyUpdated[0];
         Assert.NotNull(first.Consumable);
         Assert.Equal(screws.Id, first.Consumable!.Id);
+        // The leading consumable arrives location-enriched too, resolving to the restock area — so the
+        // recency row renders its location with no re-fetch (decision 1: location on every row).
+        Assert.NotNull(first.Consumable!.StockLocations);
+        var location = Assert.Single(first.Consumable!.StockLocations!);
+        Assert.Equal(areaId, location.AreaId);
 
         // The most-recently-touched durable comes next, location-enriched (no re-fetch for the panel).
         var second = overview.RecentlyUpdated[1];
@@ -359,7 +364,7 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.NotNull(second.Durable!.Path);
         Assert.NotEmpty(second.Durable!.Path!);
 
-        // The two oldest durables fall outside the six-item cap.
+        // The two oldest durables fall outside the ten-item cap.
         var ids = overview.RecentlyUpdated.Select(r => r.Durable?.Id).ToList();
         Assert.DoesNotContain(durables[0], ids);
         Assert.DoesNotContain(durables[1], ids);

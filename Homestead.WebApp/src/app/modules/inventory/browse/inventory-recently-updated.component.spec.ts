@@ -137,4 +137,49 @@ describe('InventoryRecentlyUpdatedComponent', () => {
 
     expect(emitted).toEqual(consumable);
   });
+
+  it('renders a durable row with its resolved location', async () => {
+    const fixture = await create([
+      {
+        lastActivityAt: TWO_HOURS_AGO,
+        durable: makeDurable({
+          name: 'Cordless drill',
+          resolvedAreaId: 'garage',
+          path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+        }),
+      },
+    ]);
+
+    // The location (hidden on narrow viewports) is still in the jsdom textContent.
+    expect(buttons(fixture)[0].textContent).toContain('Garage');
+  });
+
+  it('renders a consumable row with its stock location', async () => {
+    const fixture = await create([
+      {
+        lastActivityAt: TWO_HOURS_AGO,
+        consumable: makeConsumable({
+          name: 'Wood screws',
+          stockLocations: [{
+            id: 'e1', quantity: 12, areaId: 'pantry',
+            path: [{ id: 'pantry', name: 'Pantry', kind: 'Area' }], locationLabel: 'Pantry',
+          }],
+        }),
+      },
+    ]);
+
+    expect(buttons(fixture)[0].textContent).toContain('Pantry');
+  });
+
+  it('links "View all" to the items list sorted by Updated-descending', async () => {
+    const fixture = await create([
+      { lastActivityAt: TWO_HOURS_AGO, durable: makeDurable() },
+    ]);
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a');
+    const href = link?.getAttribute('href') ?? '';
+    expect(href).toContain('/inventory/items');
+    expect(href).toContain('sort=updatedAt');
+    expect(href).toContain('dir=desc');
+  });
 });

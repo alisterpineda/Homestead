@@ -124,19 +124,19 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RecentlyUpdated_CapsAtSix()
+    public async Task RecentlyUpdated_CapsAtTen()
     {
-        // Eight live durables, ascending recency; only the six most recent survive the cap.
+        // Twelve live durables, ascending recency; only the ten most recent survive the cap.
         var ids = new List<Guid>();
-        for (var i = 1; i <= 8; i++)
+        for (var i = 1; i <= 12; i++)
             ids.Add((await AddDurableAsync($"Item {i}", T0.AddHours(i))).Id);
 
         var resp = await HandleAsync();
 
-        Assert.Equal(6, resp.RecentlyUpdated.Count);
+        Assert.Equal(10, resp.RecentlyUpdated.Count);
         var returned = resp.RecentlyUpdated.Select(r => r.Durable!.Id).ToList();
-        // The six newest (hours 8..3), newest first; the two oldest (hours 1, 2) are dropped.
-        Assert.Equal(ids.AsEnumerable().Reverse().Take(6), returned);
+        // The ten newest (hours 12..3), newest first; the two oldest (hours 1, 2) are dropped.
+        Assert.Equal(ids.AsEnumerable().Reverse().Take(10), returned);
         Assert.DoesNotContain(ids[0], returned);
         Assert.DoesNotContain(ids[1], returned);
     }
@@ -151,29 +151,33 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
         // A consumable touched only by a restock (metadata stale): effective = stock time (T0+7h).
         var restocked = await AddConsumableAsync(
             "Restocked consumable", itemUpdatedAt: T0.AddHours(1), quantity: 3m, stockUpdatedAt: T0.AddHours(7));
-        // Durables spanning the ranking, including two that must fall outside the six-item cap.
+        // Ten durables spanning the ranking, including two that must fall outside the ten-item cap.
+        var d11 = await AddDurableAsync("Durable h11", T0.AddHours(11));
         var d10 = await AddDurableAsync("Durable h10", T0.AddHours(10));
         var d8 = await AddDurableAsync("Durable h8", T0.AddHours(8));
         var d6 = await AddDurableAsync("Durable h6", T0.AddHours(6));
         var d5 = await AddDurableAsync("Durable h5", T0.AddHours(5));
+        var d4 = await AddDurableAsync("Durable h4", T0.AddHours(4));
         var d3 = await AddDurableAsync("Durable h3", T0.AddHours(3));
+        var d2 = await AddDurableAsync("Durable h2", T0.AddHours(2));
+        var d1 = await AddDurableAsync("Durable h1", T0.AddHours(1));
         var d0 = await AddDurableAsync("Durable h0", T0);
 
         var resp = await HandleAsync();
 
-        // Effective order interleaves both types: d10(10), editedConsumable(9), d8(8), restocked(7),
-        // d6(6), d5(5) | dropped: d3(3), d0(0).
-        Assert.Equal(6, resp.RecentlyUpdated.Count);
+        // Effective order interleaves both types: d11(11), d10(10), editedConsumable(9), d8(8),
+        // restocked(7), d6(6), d5(5), d4(4), d3(3), d2(2) | dropped: d1(1), d0(0).
+        Assert.Equal(10, resp.RecentlyUpdated.Count);
         var orderedIds = resp.RecentlyUpdated.Select(r => r.Durable?.Id ?? r.Consumable!.Id).ToList();
         Assert.Equal(
-            new[] { d10.Id, editedConsumable.Id, d8.Id, restocked.Id, d6.Id, d5.Id },
+            new[] { d11.Id, d10.Id, editedConsumable.Id, d8.Id, restocked.Id, d6.Id, d5.Id, d4.Id, d3.Id, d2.Id },
             orderedIds);
         // The two oldest durables fall outside the cap even though one outranks no consumable.
-        Assert.DoesNotContain(d3.Id, orderedIds);
+        Assert.DoesNotContain(d1.Id, orderedIds);
         Assert.DoesNotContain(d0.Id, orderedIds);
         // The edited consumable ranks by its metadata time, not its stale stock time.
-        Assert.Equal(editedConsumable.Id, resp.RecentlyUpdated[1].Consumable!.Id);
-        Assert.Equal(T0.AddHours(9), resp.RecentlyUpdated[1].LastActivityAt);
+        Assert.Equal(editedConsumable.Id, resp.RecentlyUpdated[2].Consumable!.Id);
+        Assert.Equal(T0.AddHours(9), resp.RecentlyUpdated[2].LastActivityAt);
     }
 
     [Fact]
@@ -205,6 +209,24 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
         Assert.Equal(_garage.Id, durable.ResolvedAreaId);
         Assert.NotEmpty(durable.Path);
         Assert.Equal("Garage", durable.Path[^1].Name);
+    }
+
+    [Fact]
+    public async Task RecentlyUpdated_ConsumablesArriveLocationEnriched()
+    {
+        // AddConsumableAsync places the stock in _garage, so the recency row must arrive with its
+        // resolved stock location attached — the row renders its location text with no re-fetch.
+        await AddConsumableAsync("Placed screws", T0.AddHours(1), quantity: 10m);
+
+        var resp = await HandleAsync();
+
+        var consumable = Assert.Single(resp.RecentlyUpdated).Consumable;
+        Assert.NotNull(consumable);
+        // ConsumableStockLocationLoader filled the per-location breakdown, resolved to the garage.
+        var location = Assert.Single(consumable.StockLocations);
+        Assert.Equal(_garage.Id, location.AreaId);
+        Assert.NotEmpty(location.Path);
+        Assert.Equal("Garage", location.Path[^1].Name);
     }
 
     [Fact]

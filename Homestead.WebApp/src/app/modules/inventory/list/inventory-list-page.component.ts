@@ -37,7 +37,7 @@ import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-d
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import { InventoryItemsViewComponent, kindFilterFromParam, type KindFilter } from './inventory-items-view.component';
-import { durableToRow, consumableToRow, type InventoryRow } from './inventory-row';
+import { durableToRow, consumableToRow, sortStateFromParams, type InventoryRow, type InventorySortState } from './inventory-row';
 import { orderAreaTree, buildDescendantMap, type AreaTreeNode } from '../shared/area-tree';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -146,6 +146,7 @@ interface ListData {
             [initialKind]="initialKind"
             [initialLowStockOnly]="initialLowStockOnly"
             [initialLentOnly]="initialLentOnly"
+            [initialSort]="initialSort"
             [extraFiltersActive]="extraFiltersActive()"
             [scopeLabel]="scopeLabel()"
             (changed)="onChanged()"
@@ -239,12 +240,15 @@ export class InventoryListPageComponent {
   // below and stripped from the URL (read-once, not two-way synced — that's the lenses feature).
   // Container-level navigation lives on Browse, so the list seeds only the area scope and the
   // non-place lenses; a container's "View contents" routes to /inventory/browse/container/:id.
-  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area']);
+  private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area', 'sort', 'dir']);
 
   // The non-place refinements live in the items-view; pass the deep-link values as its one-shot seeds.
   protected readonly initialKind: KindFilter = kindFilterFromParam(this.deepLink['kind']);
   protected readonly initialLowStockOnly = this.deepLink['lowStock'] === 'true';
   protected readonly initialLentOnly = this.deepLink['lent'] === 'true';
+  // The "View all →" recency bridge lands here sorted by Updated-descending; absent/invalid → name-asc.
+  protected readonly initialSort: InventorySortState =
+    sortStateFromParams(this.deepLink['sort'], this.deepLink['dir']);
 
   areaFilter = signal<AreaFilter>(this.deepLink['area'] ?? 'all');
 

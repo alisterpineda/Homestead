@@ -353,6 +353,24 @@ describe('InventoryListPageComponent', () => {
       expect(params['lowStock']).toBeUndefined();
       expect(params['search']).toBe('screw');
     });
+
+    it('?sort=updatedAt&dir=desc seeds the items-view sort and strips the params', async () => {
+      const f = await createWithParams({ sort: 'updatedAt', dir: 'desc' });
+      expect(itemsView(f).sort()).toEqual({ id: 'updatedAt', desc: true });
+      const stripped = TestBed.inject(Router).routerState.snapshot.root.queryParams;
+      expect(stripped['sort']).toBeUndefined();
+      expect(stripped['dir']).toBeUndefined();
+    });
+
+    it('an unknown ?sort value falls back to name-ascending', async () => {
+      const f = await createWithParams({ sort: 'bogus', dir: 'desc' });
+      expect(itemsView(f).sort()).toEqual({ id: 'name', desc: false });
+    });
+
+    it('?sort without ?dir defaults to ascending', async () => {
+      const f = await createWithParams({ sort: 'updatedAt' });
+      expect(itemsView(f).sort()).toEqual({ id: 'updatedAt', desc: false });
+    });
   });
 
   it('opens the matching quick panel when the items-view dispatches a row open', () => {
