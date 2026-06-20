@@ -132,6 +132,106 @@ public class ConsumablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task CreateConsumable_NoStockFields_StartsEmpty()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // Regression: a bare create (no starting location/quantity) still produces a placeless,
+        // zero-stock consumable — the deliberate "register the type, stock it later" path.
+        var created = await CreateConsumableAsync(client, "Bolts", "boxes");
+
+        var detail = await GetConsumableAsync(client, created.Id);
+        Assert.Equal(0m, detail.Consumable.TotalOnHand);
+        Assert.Empty(detail.Locations);
+        Assert.Empty(await GetMovementsAsync(client, created.Id));
+    }
+
+    [Fact]
+    public async Task CreateConsumable_WithStartingQuantityInArea_SeedsStockAndInflow()
+    {
+        var client = await CreateAdminClientAsync();
+        var pantryId = await CreateAreaAsync(client, "Pantry");
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Batteries", unit = "cells", initialQuantity = 12m, initialAreaId = pantryId }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var created = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        // The create response already reflects the seeded stock (it sums the new stock entry).
+        Assert.Equal(12m, created.TotalOnHand);
+
+        var detail = await GetConsumableAsync(client, created.Id);
+        Assert.Equal(12m, detail.Consumable.TotalOnHand);
+        var entry = Assert.Single(detail.Locations);
+        Assert.Equal(12m, entry.Quantity);
+        Assert.Equal(pantryId, entry.AreaId);
+
+        var movement = Assert.Single(await GetMovementsAsync(client, created.Id));
+        Assert.Equal("Flow", movement.Kind);
+        Assert.Equal(12m, movement.Quantity);
+        Assert.Null(movement.FromAreaId);
+        Assert.Equal(pantryId, movement.ToAreaId);
+    }
+
+    [Fact]
+    public async Task CreateConsumable_WithStartingQuantityInContainer_SeedsStockInContainer()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Parts bin", areaId: garageId);
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Screws", initialQuantity = 25m, initialContainerItemId = bin.Id }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var created = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+
+        var detail = await GetConsumableAsync(client, created.Id);
+        Assert.Equal(25m, detail.Consumable.TotalOnHand);
+        var entry = Assert.Single(detail.Locations);
+        Assert.Equal(25m, entry.Quantity);
+        Assert.Equal(bin.Id, entry.ContainerItemId);
+        Assert.Null(entry.AreaId);
+
+        var movement = Assert.Single(await GetMovementsAsync(client, created.Id));
+        Assert.Equal("Flow", movement.Kind);
+        Assert.Equal(bin.Id, movement.ToContainerItemId);
+    }
+
+    [Fact]
+    public async Task CreateConsumable_WithNonexistentStartingArea_RollsBackEntireCommand()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Ghost stock", initialQuantity = 5m, initialAreaId = Guid.NewGuid() }, CT);
+
+        // The seed receive fails on the missing area, rolling back the whole command — no orphan.
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+
+        var list = await (await client.GetAsync("/api/v1/inventory/consumables?page=1&pageSize=200", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<ConsumableItem>>(CT);
+        Assert.DoesNotContain(list!.Items, s => s.Name == "Ghost stock");
+    }
+
+    [Fact]
+    public async Task CreateConsumable_WithNonContainerStartingLocation_RollsBackEntireCommand()
+    {
+        var client = await CreateAdminClientAsync();
+        // A plain (non-container) durable is not a valid stock location.
+        var plainResp = await client.PostAsJsonAsync("/api/v1/inventory/durables", new { name = "Hammer" }, CT);
+        var plain = (await plainResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Misplaced stock", initialQuantity = 5m, initialContainerItemId = plain.Id }, CT);
+
+        // The seed receive rejects the non-container location, rolling back the whole command.
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+
+        var list = await (await client.GetAsync("/api/v1/inventory/consumables?page=1&pageSize=200", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<ConsumableItem>>(CT);
+        Assert.DoesNotContain(list!.Items, s => s.Name == "Misplaced stock");
+    }
+
+    [Fact]
     public async Task PatchConsumable_EditsMetadata()
     {
         var client = await CreateAdminClientAsync();

@@ -183,6 +183,81 @@ public class CreateConsumableCommandValidatorTests
             new CreateConsumableCommand { Name = "Paper towels", Unit = "rolls" }, Ct);
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public async Task NoStockFields_IsValid()
+    {
+        var result = await _sut.ValidateAsync(new CreateConsumableCommand { Name = "Batteries" }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task QuantityWithArea_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialQuantity = 12m, InitialAreaId = Guid.NewGuid() }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task QuantityWithContainer_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialQuantity = 12m, InitialContainerItemId = Guid.NewGuid() }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task QuantityWithoutLocation_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialQuantity = 12m }, Ct);
+        Assert.False(result.IsValid);
+        // Bind to the coherence rule so an unrelated future failure can't keep this test green.
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("starting location requires"));
+    }
+
+    [Fact]
+    public async Task LocationWithoutQuantity_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialAreaId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("starting location requires"));
+    }
+
+    [Fact]
+    public async Task ZeroQuantity_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialQuantity = 0m, InitialAreaId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "InitialQuantity");
+    }
+
+    [Fact]
+    public async Task NegativeQuantity_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand { Name = "Batteries", InitialQuantity = -5m, InitialAreaId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "InitialQuantity");
+    }
+
+    [Fact]
+    public async Task BothAreaAndContainer_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateConsumableCommand
+            {
+                Name = "Batteries",
+                InitialQuantity = 12m,
+                InitialAreaId = Guid.NewGuid(),
+                InitialContainerItemId = Guid.NewGuid(),
+            }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("exactly one of an area or a container"));
+    }
 }
 
 public class TrackDurableCommandValidatorTests

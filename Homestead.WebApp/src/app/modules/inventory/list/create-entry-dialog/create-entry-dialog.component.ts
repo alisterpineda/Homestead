@@ -59,7 +59,12 @@ type EntryKind = 'durable' | 'consumable';
               Add a tracked durable — one specific thing. Set serial, value, and more after creating.
             </span>
             <span class="col-start-1 row-start-1" [class.invisible]="kind() !== 'consumable'">
-              Define a consumable type, counted in bulk. Add stock to it afterwards.
+              @if (placedInitialLocation()) {
+                Define a consumable type, counted in bulk. Optionally give it a starting quantity, or
+                add stock later.
+              } @else {
+                Define a consumable type, counted in bulk. Add stock to it afterwards.
+              }
             </span>
           </p>
         </div>
@@ -147,6 +152,25 @@ type EntryKind = 'durable' | 'consumable';
                   (input)="threshold.set(asValue($event))"
                 />
               </div>
+
+              @if (placedInitialLocation()) {
+                <div class="flex flex-col gap-1.5">
+                  <label hlmLabel for="create-entry-initial-quantity">Starting quantity (optional)</label>
+                  <input
+                    hlmInput
+                    id="create-entry-initial-quantity"
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    placeholder="0"
+                    [value]="initialQuantity()"
+                    (input)="initialQuantity.set(asValue($event))"
+                  />
+                  <p class="text-sm text-muted-foreground">
+                    at {{ initialLocationLabel() ?? 'this location' }}. Leave blank to add stock later.
+                  </p>
+                </div>
+              }
             </div>
           </div>
 
@@ -195,6 +219,8 @@ export class CreateEntryDialogComponent {
   // Consumable fields
   unit = signal('');
   threshold = signal('');
+  /** Optional starting quantity to seed at the drilled place; only shown for a real pre-filled place. */
+  initialQuantity = signal('');
 
   creating = signal(false);
   createError = signal('');
@@ -204,11 +230,22 @@ export class CreateEntryDialogComponent {
   private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
 
+  /**
+   * The drilled location only when it's a real place (area or container). A bare consumable can't be
+   * given starting stock from the Items page / Browse root / Unplaced, so the quantity field hides there.
+   */
+  placedInitialLocation = computed(() => {
+    const loc = this.initialLocation();
+    return loc && loc.kind !== 'unplaced' ? loc : null;
+  });
+
   canSubmit = computed(() => {
     if (this.name().trim().length === 0) return false;
     if (this.kind() === 'durable') return true;
     const t = this.threshold().trim();
-    return t === '' || (Number.isFinite(Number(t)) && Number(t) >= 0);
+    if (t !== '' && !(Number.isFinite(Number(t)) && Number(t) >= 0)) return false;
+    const q = this.initialQuantity().trim();
+    return q === '' || (Number.isFinite(Number(q)) && Number(q) >= 0);
   });
 
   /** The location pair as a single discriminated value for the picker. */
@@ -255,6 +292,7 @@ export class CreateEntryDialogComponent {
       this.isContainer.set(false);
       this.unit.set('');
       this.threshold.set('');
+      this.initialQuantity.set('');
       this.creating.set(false);
       this.createError.set('');
     }
@@ -269,15 +307,27 @@ export class CreateEntryDialogComponent {
 
     if (this.kind() === 'consumable') {
       const t = this.threshold().trim();
+      // Only seed stock when opened from a real place AND a positive quantity was entered; otherwise
+      // create a bare consumable (empty/0 quantity is a deliberate "stock it later" choice).
+      const loc = this.placedInitialLocation();
+      const q = this.initialQuantity().trim();
+      const qty = q === '' ? null : Number(q);
+      const placeStock = loc !== null && qty !== null && qty > 0;
+      const successMessage = placeStock
+        ? `Consumable created with ${qty} at ${this.initialLocationLabel() ?? 'this location'}.`
+        : 'Consumable created.';
       this.consumableApi.createConsumable({
         body: {
           name: this.name().trim(),
           unit: this.unit().trim() || undefined,
           restockThreshold: t === '' ? null : Number(t),
           notes: this.notes().trim() ? this.notes().trim() : null,
+          initialQuantity: placeStock ? qty : null,
+          initialAreaId: placeStock && loc!.kind === 'area' ? loc!.id : null,
+          initialContainerItemId: placeStock && loc!.kind === 'container' ? loc!.id : null,
         },
       }).subscribe({
-        next: () => this.onCreated('Consumable created.'),
+        next: () => this.onCreated(successMessage),
         error: (err: unknown) => this.onCreateError(err, 'Failed to create consumable.'),
       });
       return;
