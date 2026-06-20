@@ -5,7 +5,6 @@ import { AreaSummary } from '../models/area-summary';
 import { LentDurablePreview } from '../models/lent-durable-preview';
 import { LowStockConsumablePreview } from '../models/low-stock-consumable-preview';
 import { RecentlyUpdatedItem } from '../models/recently-updated-item';
-import { UnplacedDurablePreview } from '../models/unplaced-durable-preview';
 export interface GetInventoryOverviewResponse {
   areas: Array<AreaSummary>;
   lentCount: number;
@@ -14,5 +13,4 @@ export interface GetInventoryOverviewResponse {
   lowStockCount: number;
   recentlyUpdated: Array<RecentlyUpdatedItem>;
   unplacedCount: number;
-  unplacedDurables: Array<UnplacedDurablePreview>;
 }

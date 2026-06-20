@@ -3,6 +3,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideTriangleAlert,
   lucideChevronRight,
+  lucideUserRound,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
@@ -14,31 +15,36 @@ import { OUT_OF_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import type { GetInventoryOverviewResponse } from '@/api/generated/models/get-inventory-overview-response';
 
 /**
- * The Browse "needs attention" alert region: a conditional, collapsible block surfacing true
- * alerts — currently just **low stock** (a violation of a restock threshold the user set, with a
- * clear resolution). Neutral statuses are *not* alerts: lending lives in the always-on status-chips
- * row, while unplaced is a location bucket surfaced as a place card; the generic frame stays so
- * future alert types (expiring soon, overdue loans, warranty) can slot in. The single light card
- * holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out in a content-aware
- * `auto-fit` grid — one section fills the row (matching the page's full-width rhythm), two-plus flow
- * into equal side-by-side columns, mobile collapses to one. Two modes:
+ * The Browse "needs attention" alert region: a conditional, collapsible block surfacing the things
+ * that want the user's eye — **low stock** (a violation of a restock threshold the user set, with a
+ * clear resolution) and **lent out** (durables currently out on loan). Lent is folded in here as an
+ * alert tile rather than left as a standalone neutral status row, so the panel now renders whenever
+ * something is lent even if nothing is low. (Unplaced is deliberately **not** a tile here — it stays
+ * a location bucket surfaced as a place card; that diverges from the product-design doc, which lists
+ * unplaced as a third needs-attention tile.) The
+ * generic frame stays so future alert types (expiring soon, overdue loans, warranty) can slot in. The
+ * single light card holds stacked, flat alert sections (`InventoryWarningSectionComponent`) laid out
+ * in a content-aware `auto-fit` grid — one section fills the row (matching the page's full-width
+ * rhythm), two-plus flow into equal side-by-side columns, mobile collapses to one. Two modes:
  *
- * - **root** — the global household-wide low-stock section with a most-urgent-first preview, reusing
- *   the overview data the Browse root already fetches; the section deep-links into the unified items
- *   list pre-filtered to low stock. A zero-on-hand consumable is flagged "Out" to distinguish it from
- *   merely-low.
- * - **place** — a count-only low-stock section scoped to the drilled place ("low consumables stored
- *   here"). An **area** drill carries a `{ area: id }` filter, so its "View all" links into the
- *   pre-filtered items list; a **container** drill carries `null` (the list no longer scopes to a
- *   container — Browse owns containment), so the section renders count-only with no link.
+ * - **root** — the global household-wide low-stock section with a most-urgent-first preview plus a
+ *   lent-out section listing who has what, reusing the overview data the Browse root already fetches;
+ *   each section deep-links into the unified items list pre-filtered to that slice (`?lowStock=true` /
+ *   `?lent=true`). A zero-on-hand consumable is flagged "Out" to distinguish it from merely-low.
+ * - **place** — count-only sections scoped to the drilled place ("low consumables stored here" /
+ *   "items lent from here"). An **area** drill carries a `{ area: id }` filter, so its low-stock
+ *   "View all" links into the pre-filtered items list; lent is always count-only (Browse already
+ *   scopes spatially, and the lent items show in the contents table). A **container** drill carries
+ *   `null` for low stock too (the list no longer scopes to a container — Browse owns containment), so
+ *   that section renders count-only with no link.
  *
- * Renders nothing when the scope has no alerts, so a household with nothing running low sees a clean
- * Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling area→area keeps the
- * user's toggle while root↔place re-seeds the collapsed default.
+ * Renders nothing when the scope has no alerts, so a household with nothing running low and nothing
+ * lent sees a clean Browse. Defaults collapsed in every scope — seeded on scope kind, so drilling
+ * area→area keeps the user's toggle while root↔place re-seeds the collapsed default.
  */
 export type WarningPanelsScope =
   | { kind: 'root'; overview: GetInventoryOverviewResponse }
-  | { kind: 'place'; lowStockCount: number; viewAllParams: Record<string, string> | null };
+  | { kind: 'place'; lowStockCount: number; lentCount: number; viewAllParams: Record<string, string> | null };
 
 @Component({
   selector: 'app-inventory-warning-panels',
@@ -53,6 +59,7 @@ export type WarningPanelsScope =
   providers: [provideIcons({
     lucideTriangleAlert,
     lucideChevronRight,
+    lucideUserRound,
   })],
   template: `
     @if (hasWarnings()) {
@@ -89,27 +96,47 @@ export type WarningPanelsScope =
               class="grid gap-x-8 gap-y-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr))]"
             >
               @if (rootOverview(); as ov) {
-                <app-inventory-warning-section
-                  icon="lucideTriangleAlert"
-                  label="Low stock"
-                  [count]="ov.lowStockCount"
-                  [previewCount]="ov.lowStockConsumables.length"
-                  [viewAllParams]="{ lowStock: 'true' }"
-                >
-                  @for (consumable of ov.lowStockConsumables; track consumable.id) {
-                    <li class="flex items-center justify-between gap-2 text-sm">
-                      <span class="truncate">{{ consumable.name }}</span>
-                      <span class="flex shrink-0 items-center gap-1.5">
-                        @if (consumable.totalOnHand === 0) {
-                          <span [class]="outBadgeClass" aria-label="Out of stock">Out</span>
-                        }
-                        <span class="text-xs text-muted-foreground tabular-nums">
-                          {{ formatQty(consumable.totalOnHand) }} {{ consumable.unit | unit }} / {{ formatQty(consumable.restockThreshold) }}
+                @if (ov.lowStockCount > 0) {
+                  <app-inventory-warning-section
+                    icon="lucideTriangleAlert"
+                    label="Low stock"
+                    [count]="ov.lowStockCount"
+                    [previewCount]="ov.lowStockConsumables.length"
+                    [viewAllParams]="{ lowStock: 'true' }"
+                  >
+                    @for (consumable of ov.lowStockConsumables; track consumable.id) {
+                      <li class="flex items-center justify-between gap-2 text-sm">
+                        <span class="truncate">{{ consumable.name }}</span>
+                        <span class="flex shrink-0 items-center gap-1.5">
+                          @if (consumable.totalOnHand === 0) {
+                            <span [class]="outBadgeClass" aria-label="Out of stock">Out</span>
+                          }
+                          <span class="text-xs text-muted-foreground tabular-nums">
+                            {{ formatQty(consumable.totalOnHand) }} {{ consumable.unit | unit }} / {{ formatQty(consumable.restockThreshold) }}
+                          </span>
                         </span>
-                      </span>
-                    </li>
-                  }
-                </app-inventory-warning-section>
+                      </li>
+                    }
+                  </app-inventory-warning-section>
+                }
+                @if (ov.lentCount > 0) {
+                  <app-inventory-warning-section
+                    icon="lucideUserRound"
+                    label="Lent out"
+                    [count]="ov.lentCount"
+                    [previewCount]="ov.lentDurables.length"
+                    [viewAllParams]="{ lent: 'true' }"
+                  >
+                    @for (durable of ov.lentDurables; track durable.id) {
+                      <li class="flex items-center justify-between gap-2 text-sm">
+                        <span class="truncate">{{ durable.name }}</span>
+                        @if (durable.lentTo) {
+                          <span class="shrink-0 truncate text-xs text-muted-foreground">to {{ durable.lentTo }}</span>
+                        }
+                      </li>
+                    }
+                  </app-inventory-warning-section>
+                }
               } @else {
                 @for (panel of placePanels(); track panel.label) {
                   <app-inventory-warning-section
@@ -142,7 +169,7 @@ export class InventoryWarningPanelsComponent {
   });
 
   /**
-   * The nonzero count-only panels for a drilled place (area or container) — low stock only. Kept as
+   * The nonzero count-only panels for a drilled place (area or container) — low stock + lent. Kept as
    * a list (rather than a single conditional row) so future alert types slot in alongside it.
    */
   protected placePanels = computed<{ icon: string; label: string; count: number; params: Record<string, string> | null }[]>(() => {
@@ -157,21 +184,34 @@ export class InventoryWarningPanelsComponent {
         // Area drill → linkable (`?area=…&lowStock=true`); container drill (null) → count-only.
         params: s.viewAllParams ? { ...s.viewAllParams, lowStock: 'true' } : null,
       });
+    // Lent is count-only here: Browse already scopes spatially, and the lent items show in the
+    // contents table below — no items-list deep-link needed.
+    if (s.lentCount > 0)
+      panels.push({ icon: 'lucideUserRound', label: 'Items lent from here', count: s.lentCount, params: null });
     return panels;
   });
 
-  /** Hidden entirely when nothing needs attention — i.e. no low stock. */
-  protected hasWarnings = computed(() => {
+  /** The scope's alert counts, narrowed once from whichever mode is active — the single source for
+   *  the hidden-when-empty gate and the collapsed summary line. */
+  private counts = computed(() => {
     const s = this.scope();
-    return (s.kind === 'root' ? s.overview.lowStockCount : s.lowStockCount) > 0;
+    return s.kind === 'root'
+      ? { low: s.overview.lowStockCount, lent: s.overview.lentCount }
+      : { low: s.lowStockCount, lent: s.lentCount };
   });
 
-  /** One chip per nonzero alert for the collapsed summary line (low stock today). */
+  /** Hidden entirely when nothing needs attention — i.e. no low stock and nothing lent. */
+  protected hasWarnings = computed(() => {
+    const { low, lent } = this.counts();
+    return low > 0 || lent > 0;
+  });
+
+  /** One chip per nonzero alert for the collapsed summary line (e.g. "3 low · 1 lent"). */
   protected summaryParts = computed<{ icon: string; label: string; count: number }[]>(() => {
-    const s = this.scope();
-    const low = s.kind === 'root' ? s.overview.lowStockCount : s.lowStockCount;
+    const { low, lent } = this.counts();
     const parts: { icon: string; label: string; count: number }[] = [];
     if (low > 0) parts.push({ icon: 'lucideTriangleAlert', label: 'low', count: low });
+    if (lent > 0) parts.push({ icon: 'lucideUserRound', label: 'lent', count: lent });
     return parts;
   });
 

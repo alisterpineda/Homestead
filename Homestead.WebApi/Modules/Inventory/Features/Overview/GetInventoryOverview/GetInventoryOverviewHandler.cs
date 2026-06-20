@@ -85,12 +85,6 @@ public class GetInventoryOverviewHandler(
             })
             .ToList();
 
-        var unplacedItems = placement.UnplacedItems
-            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(PreviewCount)
-            .Select(i => new UnplacedDurablePreview { Id = i.Id, Name = i.Name })
-            .ToList();
-
         var recentlyUpdated = await BuildRecentlyUpdatedAsync(ct);
 
         return new GetInventoryOverviewResponse
@@ -100,7 +94,6 @@ public class GetInventoryOverviewHandler(
             LentCount = lentCount,
             LentDurables = lentItems,
             UnplacedCount = placement.UnplacedItems.Count,
-            UnplacedDurables = unplacedItems,
             Areas = areaSummaries,
             RecentlyUpdated = recentlyUpdated,
         };

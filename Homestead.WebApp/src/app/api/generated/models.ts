@@ -223,7 +223,6 @@ export type { TransactionResponse } from './models/transaction-response';
 export type { TransactionShape } from './models/transaction-shape';
 export type { TransactionSplitResponse } from './models/transaction-split-response';
 export type { TransferStockRequest } from './models/transfer-stock-request';
-export type { UnplacedDurablePreview } from './models/unplaced-durable-preview';
 export type { UpdateAiProviderRequest } from './models/update-ai-provider-request';
 export type { UpdateGroupMemberRequest } from './models/update-group-member-request';
 export type { UpdateGroupRequest } from './models/update-group-request';

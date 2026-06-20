@@ -26,7 +26,6 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { PlaceBrowserComponent } from '../overview/place-browser/place-browser.component';
 import { placeRefToLink, segmentToRef, placeKey, placeDisplayName, type PlaceRef } from '../overview/place-browser/place-param';
 import { InventoryWarningPanelsComponent, type WarningPanelsScope } from './inventory-warning-panels.component';
-import { InventoryStatusChipsComponent, type StatusChipsScope } from './inventory-status-chips.component';
 import { InventoryRecentlyUpdatedComponent } from './inventory-recently-updated.component';
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
@@ -57,7 +56,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmBreadCrumbImports,
     PlaceBrowserComponent,
     InventoryWarningPanelsComponent,
-    InventoryStatusChipsComponent,
     InventoryRecentlyUpdatedComponent,
     DurableQuickPanelComponent,
     ConsumableQuickPanelComponent,
@@ -131,22 +129,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         <app-inventory-warning-panels [scope]="scope" />
       }
 
-      <!-- The recency axis (root only): actionable alerts stay first, then this leads the neutral
-           nav rows. Carries full DTOs so a chip click opens the quick panel with no re-fetch. -->
-      @if (recentlyUpdated(); as items) {
-        <app-inventory-recently-updated
-          [items]="items"
-          (openDurable)="onOpenDurable($event)"
-          (openConsumable)="onOpenConsumable($event)"
-        />
-      }
-
-      <!-- Sibling of (not nested under) the alert gate above, so the neutral status row shows even
-           when there are no alerts. -->
-      @if (statusScope(); as scope) {
-        <app-inventory-status-chips [scope]="scope" />
-      }
-
       <app-place-browser
         [overview]="overview()"
         [place]="placeRef()"
@@ -158,6 +140,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         (viewContainer)="onViewContainer($event)"
         (changed)="onChanged()"
       />
+
+      <!-- The recency axis (root only): demoted below the place grid so Browse leads with its point —
+           the places. Carries full DTOs so a chip click opens the quick panel with no re-fetch. -->
+      @if (recentlyUpdated(); as items) {
+        <app-inventory-recently-updated
+          [items]="items"
+          (openDurable)="onOpenDurable($event)"
+          (openConsumable)="onOpenConsumable($event)"
+        />
+      }
     </div>
 
     <app-durable-quick-panel
@@ -289,52 +281,49 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** Current-node label for the breadcrumb when the path is empty (Unplaced, or still loading). */
   protected placeName = computed(() => placeDisplayName(this.placeRef(), this.placeContents()));
 
-  // A drilled place's scoped low-stock count + items-list filter param, resolved once so the alert
-  // scope below stays a thin adapter and the container counting lives in a single spot. Null at root
-  // (warningScope reads the overview blob directly there), on the Unplaced drill, and until the
-  // place-contents fetch lands. The explicit return type keeps the `{ area }` literal from widening
-  // out of `Record<string, string>`.
-  // Invariant: the count must equal exactly what its filter param shows in the items list.
-  private drilledScope = computed<{ lowStockCount: number; param: Record<string, string> | null } | null>(() => {
+  // A drilled place's scoped low-stock + lent counts and the items-list filter param, resolved once
+  // so the alert scope below stays a thin adapter and the container counting lives in a single spot.
+  // Null at root (warningScope reads the overview blob directly there), on the Unplaced drill, and
+  // until the place-contents fetch lands. The explicit return type keeps the `{ area }` literal from
+  // widening out of `Record<string, string>`.
+  // Invariant: the low-stock count must equal exactly what its filter param shows in the items list.
+  private drilledScope = computed<{ lowStockCount: number; lentCount: number; param: Record<string, string> | null } | null>(() => {
     const ref = this.placeRef();
     if (ref === null || ref.kind === 'unplaced') return null;
     const c = this.placeContents();
     if (!c) return null;
     if (ref.kind === 'area') {
-      // Area: backend-resolved count, linkable into the items list via the `?area=` filter (which
-      // resolves nested places) — so the count still equals exactly what its "View all" link opens.
+      // Area: backend-resolved (rolled subtree) counts, low stock linkable into the items list via the
+      // `?area=` filter (which resolves nested places) — so the count still equals exactly what its
+      // "View all" opens. Lent is the same backend-resolved scoped count, shown count-only (no link).
       const param: Record<string, string> = { area: ref.id };
-      return { lowStockCount: c.scopedLowStockCount, param };
+      return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param };
     }
-    // Container: direct count client-side. The items list no longer scopes to a container (Browse
-    // owns containment), so this panel is count-only (param null) — the matching items already
-    // render in the contents table below. Trade-off: nested sub-containers aren't counted.
+    // Container: both counts are DIRECT — the container's own contents — per the product-design doc
+    // ("a drilled container scopes its panels by its direct contents"). Low stock is counted from the
+    // direct consumable rows, lent from the direct durable rows (status Lent). We deliberately do NOT
+    // use the backend `scopedLowStockCount`/`scopedLentCount` here: those are rolled subtree totals
+    // (right for an area, wrong for a container). The items list can't scope to a container (Browse
+    // owns containment), so the panel is count-only (param null) — the matching items already render
+    // in the contents table below. Trade-off: nested sub-containers aren't counted.
     return {
       lowStockCount: c.consumables.filter(s => s.consumable.isLow).length,
+      lentCount: c.items.filter(i => i.status === 'Lent').length,
       param: null,
     };
   });
 
-  // The alert region's scope: global at root (the full overview, for the low-stock previews),
-  // place-scoped when drilled. Carries low stock only — lent is a neutral status surfaced by
-  // statusScope, and unplaced is a location bucket surfaced as a place card. Null — render nothing —
-  // until the backing fetch lands, and for Unplaced.
+  // The alert region's scope: global at root (the full overview, for the low-stock + lent previews),
+  // place-scoped when drilled. Carries both low stock and lent — lent is folded into needs-attention
+  // as a tile. Unplaced is a location bucket surfaced as a place card, not an alert. Null — render
+  // nothing — until the backing fetch lands, and for Unplaced.
   protected warningScope = computed<WarningPanelsScope | null>(() => {
     if (this.placeRef() === null) {
       const ov = this.overview();
       return ov ? { kind: 'root', overview: ov } : null;
     }
     const d = this.drilledScope();
-    return d ? { kind: 'place', lowStockCount: d.lowStockCount, viewAllParams: d.param } : null;
-  });
-
-  // The neutral status row's scope — root only (a drilled place is already spatially scoped, so its
-  // lent items show in the contents table below). Decoupled from warningScope so the row shows even
-  // with no alerts. Null hides it: while drilled, and before the overview fetch lands.
-  protected statusScope = computed<StatusChipsScope | null>(() => {
-    if (this.placeRef() !== null) return null;
-    const ov = this.overview();
-    return ov ? { lentCount: ov.lentCount } : null;
+    return d ? { kind: 'place', lowStockCount: d.lowStockCount, lentCount: d.lentCount, viewAllParams: d.param } : null;
   });
 
   // The recency strip — root only (a drilled place is already spatially scoped). Null hides it: at a

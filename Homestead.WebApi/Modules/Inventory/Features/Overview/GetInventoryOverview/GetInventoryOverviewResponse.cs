@@ -10,7 +10,6 @@ public record GetInventoryOverviewResponse
     public required int LentCount { get; init; }
     public required IReadOnlyList<LentDurablePreview> LentDurables { get; init; }
     public required int UnplacedCount { get; init; }
-    public required IReadOnlyList<UnplacedDurablePreview> UnplacedDurables { get; init; }
     public required IReadOnlyList<AreaSummary> Areas { get; init; }
 
     /// <summary>
@@ -65,10 +64,4 @@ public record LentDurablePreview
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public string? LentTo { get; init; }
-}
-
-public record UnplacedDurablePreview
-{
-    public required Guid Id { get; init; }
-    public required string Name { get; init; }
 }

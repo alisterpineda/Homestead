@@ -22,7 +22,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
  * component does no client-side sort. Each chip is a *button* (not a router link): a click opens the
  * existing durable/consumable quick panel in place, so the user stays on the page. The full,
  * location-enriched DTO rides on each entry, so the durable panel renders its location with no
- * re-fetch. Built in the image of {@link InventoryStatusChipsComponent}.
+ * re-fetch.
  */
 @Component({
   selector: 'app-inventory-recently-updated',

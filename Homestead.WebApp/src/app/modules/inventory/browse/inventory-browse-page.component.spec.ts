@@ -25,10 +25,11 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 const OVERVIEW: GetInventoryOverviewResponse = {
   lowStockCount: 0,
   lowStockConsumables: [],
-  lentCount: 0,
-  lentDurables: [],
+  // Lent is folded into the needs-attention panel, so a household-wide lent item opens it at root
+  // even with nothing low.
+  lentCount: 1,
+  lentDurables: [{ id: 'ladder', name: 'Ladder', lentTo: 'Dave next door' }],
   unplacedCount: 2,
-  unplacedDurables: [],
   areas: [
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },
     { id: 'office', name: 'Office', itemCount: 0, lowStockCount: 0 },
@@ -200,13 +201,14 @@ describe('InventoryBrowsePageComponent', () => {
     expect(placeApi.calls).toEqual([]);
   });
 
-  it('surfaces the neutral status row at the root even with no alerts', async () => {
-    // OVERVIEW has lowStockCount: 0 (no alert); drive the row from lentCount so it shows
-    // decoupled from the Needs-attention gate.
-    api.response = { ...OVERVIEW, lentCount: 2 };
+  it('surfaces lent inside the needs-attention panel at the root, even with nothing low', async () => {
+    // OVERVIEW has lowStockCount: 0 but lentCount: 1 — lent is folded into needs-attention, so the
+    // panel opens on lent alone with a "Lent out" tile deep-linking into the items list.
     const { harness } = await navigate('/inventory/browse');
-    expect(text(harness)).not.toContain('Needs attention');
-    expect(text(harness)).toContain('Browse by status');
+    const content = text(harness);
+    expect(content).toContain('Needs attention');
+    expect(content).toContain('Lent out');
+    expect(content).toContain('Ladder');
     expect(hrefs(harness)).toContain('/inventory/items?lent=true');
   });
 
@@ -242,15 +244,16 @@ describe('InventoryBrowsePageComponent', () => {
     expect(hrefs(harness)).toContain('/inventory/items?area=garage&lowStock=true');
   });
 
-  it('hides the Browse by status row when drilled into an area', async () => {
+  it('renders a count-only lent panel when drilled into an area with lent items', async () => {
     placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 0, scopedLentCount: 2 };
     const { harness } = await navigate('/inventory/browse/area/garage');
 
     const content = text(harness);
-    // The status row is root-only: a drilled place is already spatially scoped (its lent items show
-    // in the contents table below), so the row is hidden even with a nonzero scoped lent count.
-    expect(content).not.toContain('Needs attention');
-    expect(content).not.toContain('Browse by status');
+    // Lent folds into needs-attention; while drilled it's count-only (no items-list deep-link) — the
+    // lent items already show in the contents table below.
+    expect(content).toContain('Needs attention');
+    expect(content).toContain('Items lent from here');
+    expect(hrefs(harness)).not.toContain('/inventory/items?lent=true');
     expect(hrefs(harness)).not.toContain('/inventory/items?lent=true&area=garage');
   });
 
@@ -358,11 +361,13 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('renders a container-scoped low-stock alert count-only (no link), with the status row hidden', async () => {
-    // Direct children: one low consumable (alert panel) + one lent durable. The low-stock alert is
-    // client-side counted and count-only — the items list can't scope to a container (Browse owns
-    // containment), so the matching items already appear in the contents table below. The "Browse by
-    // status" row is root-only, so the lent durable surfaces only in that contents table here.
+  it('renders container-scoped low-stock and lent alerts count-only (no links) using DIRECT counts', async () => {
+    // Direct children: one low consumable + two lent durables (one Active durable is not counted). Both
+    // alerts fold into needs-attention and both render count-only — the items list can't scope to a
+    // container (Browse owns containment), so the matching items already appear in the contents table
+    // below. Per the product-design doc a container scopes its panels by its DIRECT contents, so lent
+    // is counted from the direct durable rows — NOT from the backend's rolled `scopedLentCount` (set
+    // here to a deliberately-wrong subtree total that must be ignored).
     placeApi.contents = {
       ...GARAGE_CONTENTS,
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
@@ -370,10 +375,12 @@ describe('InventoryBrowsePageComponent', () => {
         id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
         isContainer: true, path: [], createdAt: '', updatedAt: '',
       },
-      items: [{
-        id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent',
-        isContainer: false, path: [], createdAt: '', updatedAt: '',
-      }],
+      scopedLentCount: 99,
+      items: [
+        { id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+        { id: 'saw', name: 'Saw', fungibility: 'NonFungible', status: 'Lent', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+        { id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+      ],
       consumables: [{
         consumable: {
           id: 'screws', name: 'Wood screws', status: 'Active', unit: 'pcs',
@@ -386,11 +393,13 @@ describe('InventoryBrowsePageComponent', () => {
 
     const content = text(harness);
     expect(content).toContain('Low consumables stored here');
-    // Lent is neither an alert panel nor a status chip while drilled — the row is root-only.
-    expect(content).not.toContain('Items lent from here');
-    expect(content).not.toContain('Browse by status');
-    // No list deep-link into a container — the alert is count-only here.
+    expect(content).toContain('Items lent from here');
+    // The collapsed summary uses the DIRECT lent count (2), never the rolled subtree total (99).
+    expect(content).toContain('2 lent');
+    expect(content).not.toContain('99');
+    // No list deep-links from a container drill — both alerts are count-only here.
     expect(hrefs(harness).some(h => h.includes('container=chest'))).toBe(false);
+    expect(hrefs(harness)).not.toContain('/inventory/items?lent=true');
   });
 
   it('refetches the drilled contents on changed', async () => {

@@ -72,7 +72,6 @@ const OVERVIEW: GetInventoryOverviewResponse = {
   lentCount: 0,
   lentDurables: [],
   unplacedCount: 2,
-  unplacedDurables: [],
   areas: [
     { id: 'garage', name: 'Garage', itemCount: 12, lowStockCount: 3 },
     { id: 'office', name: 'Office', itemCount: 0, lowStockCount: 0 },

@@ -5,7 +5,7 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 internal record OverviewResult(
     int LowStockCount, IReadOnlyList<LowStockPreviewItem> LowStockConsumables,
     int LentCount, IReadOnlyList<LentPreviewItem> LentDurables,
-    int UnplacedCount, IReadOnlyList<UnplacedPreviewItem> UnplacedDurables,
+    int UnplacedCount,
     IReadOnlyList<AreaSummaryItem> Areas,
     IReadOnlyList<RecentlyUpdatedPreview> RecentlyUpdated);
 
@@ -13,8 +13,6 @@ internal record LowStockPreviewItem(
     Guid Id, string Name, decimal TotalOnHand, string? Unit, decimal RestockThreshold);
 
 internal record LentPreviewItem(Guid Id, string Name, string? LentTo);
-
-internal record UnplacedPreviewItem(Guid Id, string Name);
 
 internal record AreaSummaryItem(Guid Id, string Name, int ItemCount, int LowStockCount);
 
@@ -102,7 +100,6 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.Equal(0, overview.LentCount);
         Assert.Empty(overview.LentDurables);
         Assert.Equal(0, overview.UnplacedCount);
-        Assert.Empty(overview.UnplacedDurables);
         Assert.Empty(overview.Areas);
     }
 
@@ -180,13 +177,13 @@ public class OverviewEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var noLocation = await CreateDurableAsync(client, new { name = "Adrift wrench" });
+        await CreateDurableAsync(client, new { name = "Adrift wrench" });
         await CreateDurableAsync(client, new { name = "Placed drill", areaId = garageId });
 
         // An item inside an unplaced container is resolved-unplaced — this distinguishes the
         // overview from GetDurablesQuery.Unplaced's direct-placement semantics.
         var floatingBin = await CreateContainerAsync(client, "Floating bin");
-        var nested = await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
+        await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
 
         var placedBin = await CreateContainerAsync(client, "Garage bin", areaId: garageId);
         await CreateDurableAsync(client, new { name = "Binned tape measure", parentItemId = placedBin.Id });
@@ -196,12 +193,8 @@ public class OverviewEndpointTests : IntegrationTestBase
 
         var overview = await GetOverviewAsync(client);
 
-        // The unplaced container itself counts too: noLocation + floatingBin + nested.
+        // The unplaced container itself counts too: adrift wrench + floating bin + nested pliers.
         Assert.Equal(3, overview.UnplacedCount);
-        var ids = overview.UnplacedDurables.Select(i => i.Id).ToList();
-        Assert.Contains(noLocation.Id, ids);
-        Assert.Contains(floatingBin.Id, ids);
-        Assert.Contains(nested.Id, ids);
     }
 
     [Fact]
