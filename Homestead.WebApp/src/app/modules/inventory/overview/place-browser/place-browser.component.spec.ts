@@ -268,8 +268,50 @@ describe('PlaceBrowserComponent', () => {
     expect(content).toContain('Nothing here yet');
     const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
       .filter(b => b.textContent?.includes('Add item here'));
-    // Header CTA + empty-state CTA.
-    expect(addButtons.length).toBe(2);
+    // Only the empty-state CTA — the header no longer duplicates it.
+    expect(addButtons.length).toBe(1);
+    // The lone CTA is the centered empty-state one, not a table toolbar button.
+    expect(el(fixture).querySelector('app-inventory-items-view')).toBeNull();
+  });
+
+  it('renders the Add CTA in the items-view toolbar (not the header) when the place has loose items', async () => {
+    const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
+
+    const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .filter(b => b.textContent?.includes('Add item here'));
+    expect(addButtons.length).toBe(1);
+
+    // The single Add button is projected into the items-view toolbar, not the place header.
+    const view = el(fixture).querySelector('app-inventory-items-view')!;
+    expect(view.contains(addButtons[0])).toBe(true);
+
+    // The drilled container still shows its Details button in the header.
+    const detailsBtn = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.trim() === 'Details');
+    expect(detailsBtn).toBeTruthy();
+  });
+
+  it('keeps the Add CTA in the header when the place holds only sub-places/containers', async () => {
+    const fixture = await create(
+      { kind: 'container', id: 'bin' },
+      makeContents({
+        containerItem: makeItem({ id: 'bin', name: 'Bin', isContainer: true }),
+        containers: [
+          { id: 'tray', name: 'Tray', status: 'Active', itemCount: 2, lowStockCount: 0, previewNames: [] },
+        ],
+        items: [],
+        consumables: [],
+      }),
+    );
+
+    const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .filter(b => b.textContent?.includes('Add item here'));
+    expect(addButtons.length).toBe(1);
+
+    // No loose items means no table — the Add button stays in the header.
+    expect(el(fixture).querySelector('app-inventory-items-view')).toBeNull();
+    const headings = Array.from(el(fixture).querySelectorAll('h3')).map(h => h.textContent?.trim());
+    expect(headings).not.toContain('Items');
   });
 
   it('shows the Details button only when a container is drilled', async () => {

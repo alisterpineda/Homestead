@@ -86,19 +86,21 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
               @if (c.containerItem; as containerItem) {
                 <button hlmBtn variant="ghost" size="sm" (click)="containerDetails.emit(containerItem)">Details</button>
               }
-              <app-create-entry-dialog
-                triggerSize="sm"
-                [initialLocation]="addLocation()"
-                [initialLocationLabel]="placeName()"
-                (created)="changed.emit()"
-              >
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                Add item here
-              </app-create-entry-dialog>
+              @if (!hasLooseContent() && !isPlaceEmpty()) {
+                <app-create-entry-dialog
+                  triggerSize="sm"
+                  [initialLocation]="addLocation()"
+                  [initialLocationLabel]="placeName()"
+                  (created)="changed.emit()"
+                >
+                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  Add item here
+                </app-create-entry-dialog>
+              }
             </div>
           </div>
 
-          @if (c.childAreas.length === 0 && c.containers.length === 0 && c.items.length === 0 && c.consumables.length === 0) {
+          @if (isPlaceEmpty()) {
             <div hlmEmpty>
               <div hlmEmptyHeader>
                 <div hlmEmptyMedia variant="icon">
@@ -156,7 +158,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
               </div>
             }
 
-            @if (contentRows().length > 0) {
+            @if (hasLooseContent()) {
               <div class="space-y-2">
                 <h3 class="text-sm font-medium text-muted-foreground">{{ contentsLabel }}</h3>
                 <!-- Same interactive table as the Items list, scoped to this place's loose contents.
@@ -170,7 +172,18 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                   (openDurable)="openDurable.emit($event)"
                   (openConsumable)="openConsumable.emit($event)"
                   (viewContents)="viewContainer.emit($event.id)"
-                />
+                >
+                  <app-create-entry-dialog
+                    toolbarEnd
+                    triggerSize="sm"
+                    [initialLocation]="addLocation()"
+                    [initialLocationLabel]="placeName()"
+                    (created)="changed.emit()"
+                  >
+                    <ng-icon hlm name="lucidePlus" size="sm" />
+                    Add item here
+                  </app-create-entry-dialog>
+                </app-inventory-items-view>
               </div>
             }
           }
@@ -248,6 +261,17 @@ export class PlaceBrowserComponent {
     const c = this.contents();
     if (!c) return [];
     return [...c.items.map(durableToRow), ...c.consumables.map(placeConsumableToRow)];
+  });
+
+  /** True when the drilled place has loose durables/consumables to show in the items table. */
+  protected readonly hasLooseContent = computed(() => this.contentRows().length > 0);
+
+  /** True when the drilled place holds nothing at all — drives the "Nothing here yet" CTA. */
+  protected readonly isPlaceEmpty = computed(() => {
+    const c = this.contents();
+    if (!c) return false;
+    return c.childAreas.length === 0 && c.containers.length === 0
+      && c.items.length === 0 && c.consumables.length === 0;
   });
 
   /** Heading for the loose-contents list — kept generic rather than exposing the durable/consumable taxonomy. */
