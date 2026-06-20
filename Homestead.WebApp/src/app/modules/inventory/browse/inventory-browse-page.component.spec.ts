@@ -242,16 +242,16 @@ describe('InventoryBrowsePageComponent', () => {
     expect(hrefs(harness)).toContain('/inventory/items?area=garage&lowStock=true');
   });
 
-  it('surfaces a scoped Lent status chip when drilled into an area', async () => {
+  it('hides the Browse by status row when drilled into an area', async () => {
     placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 0, scopedLentCount: 2 };
     const { harness } = await navigate('/inventory/browse/area/garage');
 
     const content = text(harness);
-    // No low stock → no alert; the neutral status row still surfaces the scoped lent count.
+    // The status row is root-only: a drilled place is already spatially scoped (its lent items show
+    // in the contents table below), so the row is hidden even with a nonzero scoped lent count.
     expect(content).not.toContain('Needs attention');
-    expect(content).toContain('Browse by status');
-    expect(content).toContain('Lent out');
-    expect(hrefs(harness)).toContain('/inventory/items?lent=true&area=garage');
+    expect(content).not.toContain('Browse by status');
+    expect(hrefs(harness)).not.toContain('/inventory/items?lent=true&area=garage');
   });
 
   it('drills into an area: fetches contents and renders the drilled view', async () => {
@@ -358,10 +358,11 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('renders a container-scoped low-stock alert and lent status chip as count-only (no link)', async () => {
-    // Direct children: one low consumable (alert panel) + one lent durable (status chip), both
-    // client-side counted. The items list can't scope to a container (Browse owns containment), so
-    // both render count-only — the matching items already appear in the contents table below.
+  it('renders a container-scoped low-stock alert count-only (no link), with the status row hidden', async () => {
+    // Direct children: one low consumable (alert panel) + one lent durable. The low-stock alert is
+    // client-side counted and count-only — the items list can't scope to a container (Browse owns
+    // containment), so the matching items already appear in the contents table below. The "Browse by
+    // status" row is root-only, so the lent durable surfaces only in that contents table here.
     placeApi.contents = {
       ...GARAGE_CONTENTS,
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
@@ -385,11 +386,10 @@ describe('InventoryBrowsePageComponent', () => {
 
     const content = text(harness);
     expect(content).toContain('Low consumables stored here');
-    // Lent is a status chip in the "Browse by status" row, not an alert panel.
+    // Lent is neither an alert panel nor a status chip while drilled — the row is root-only.
     expect(content).not.toContain('Items lent from here');
-    expect(content).toContain('Browse by status');
-    expect(content).toContain('Lent out');
-    // No list deep-link into a container — the alert and chip are count-only here.
+    expect(content).not.toContain('Browse by status');
+    // No list deep-link into a container — the alert is count-only here.
     expect(hrefs(harness).some(h => h.includes('container=chest'))).toBe(false);
   });
 

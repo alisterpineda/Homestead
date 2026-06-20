@@ -289,30 +289,28 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   /** Current-node label for the breadcrumb when the path is empty (Unplaced, or still loading). */
   protected placeName = computed(() => placeDisplayName(this.placeRef(), this.placeContents()));
 
-  // A drilled place's scoped counts + items-list filter param, resolved once so the alert/status
-  // scopes below stay thin adapters and the container counting lives in a single spot. Null at root
-  // (each scope reads the overview blob directly there — they need different slices of it), on the
-  // Unplaced drill, and until the place-contents fetch lands. The explicit return type keeps the
-  // `{ area }`/`{ container }` literals from widening out of `Record<string, string>`.
-  // Invariant: each count must equal exactly what its filter param shows in the items list.
-  private drilledScope = computed<{ lowStockCount: number; lentCount: number; param: Record<string, string> | null } | null>(() => {
+  // A drilled place's scoped low-stock count + items-list filter param, resolved once so the alert
+  // scope below stays a thin adapter and the container counting lives in a single spot. Null at root
+  // (warningScope reads the overview blob directly there), on the Unplaced drill, and until the
+  // place-contents fetch lands. The explicit return type keeps the `{ area }` literal from widening
+  // out of `Record<string, string>`.
+  // Invariant: the count must equal exactly what its filter param shows in the items list.
+  private drilledScope = computed<{ lowStockCount: number; param: Record<string, string> | null } | null>(() => {
     const ref = this.placeRef();
     if (ref === null || ref.kind === 'unplaced') return null;
     const c = this.placeContents();
     if (!c) return null;
     if (ref.kind === 'area') {
-      // Area: backend-resolved counts, linkable into the items list via the `?area=` filter (which
-      // resolves nested places) — so each count still equals exactly what its "View all" link opens.
+      // Area: backend-resolved count, linkable into the items list via the `?area=` filter (which
+      // resolves nested places) — so the count still equals exactly what its "View all" link opens.
       const param: Record<string, string> = { area: ref.id };
-      return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param };
+      return { lowStockCount: c.scopedLowStockCount, param };
     }
-    // Container: direct counts client-side. The items list no longer scopes to a container (Browse
-    // owns containment), so these panels are count-only (param null) — the matching items already
+    // Container: direct count client-side. The items list no longer scopes to a container (Browse
+    // owns containment), so this panel is count-only (param null) — the matching items already
     // render in the contents table below. Trade-off: nested sub-containers aren't counted.
     return {
       lowStockCount: c.consumables.filter(s => s.consumable.isLow).length,
-      lentCount: c.items.filter(i => i.status === 'Lent').length
-               + c.containers.filter(cc => cc.status === 'Lent').length,
       param: null,
     };
   });
@@ -330,16 +328,13 @@ export class InventoryBrowsePageComponent implements OnDestroy {
     return d ? { kind: 'place', lowStockCount: d.lowStockCount, viewAllParams: d.param } : null;
   });
 
-  // The neutral status row's scope: lent (root + place). Decoupled from warningScope so the row
-  // shows even with no alerts. Null until the backing fetch lands, and on the Unplaced drill
-  // (nothing to surface). A container drill carries no param (d.param null) → count-only, no link.
+  // The neutral status row's scope — root only (a drilled place is already spatially scoped, so its
+  // lent items show in the contents table below). Decoupled from warningScope so the row shows even
+  // with no alerts. Null hides it: while drilled, and before the overview fetch lands.
   protected statusScope = computed<StatusChipsScope | null>(() => {
-    if (this.placeRef() === null) {
-      const ov = this.overview();
-      return ov ? { kind: 'root', lentCount: ov.lentCount } : null;
-    }
-    const d = this.drilledScope();
-    return d ? { kind: 'place', lentCount: d.lentCount, lentParams: d.param ? { lent: 'true', ...d.param } : null } : null;
+    if (this.placeRef() !== null) return null;
+    const ov = this.overview();
+    return ov ? { lentCount: ov.lentCount } : null;
   });
 
   // The recency strip — root only (a drilled place is already spatially scoped). Null hides it: at a

@@ -11,15 +11,13 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
  * simply renders one chip per status whose count is `> 0`; if none apply, the row doesn't appear
  * (it's navigation to non-empty slices, not a gate).
  *
- * - **root** — household-wide Lent chip.
- * - **place** — Lent scoped to the drilled place. An **area** drill carries a `?area=` filter
- *   (`lentParams`) so the chip links into the pre-filtered list; a **container** drill carries
- *   `null` (the list can't scope to a container — Browse owns containment), so the chip is
- *   count-only with no link.
+ * Root-only: a household-wide Lent chip linking into `/inventory/items?lent=true`. A drilled place
+ * is already spatially scoped (its lent items show in the contents table), so Browse hides the row
+ * there rather than passing a place scope.
  */
-export type StatusChipsScope =
-  | { kind: 'root'; lentCount: number }
-  | { kind: 'place'; lentCount: number; lentParams: Record<string, string> | null };
+export interface StatusChipsScope {
+  lentCount: number;
+}
 
 @Component({
   selector: 'app-inventory-status-chips',
@@ -32,24 +30,16 @@ export type StatusChipsScope =
         <h2 class="mb-3 text-sm font-medium text-muted-foreground">Browse by status</h2>
         <div class="flex flex-wrap gap-2">
           @for (chip of chips(); track chip.label) {
-            @if (chip.params; as params) {
-              <a
-                class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent"
-                routerLink="/inventory/items"
-                [queryParams]="params"
-              >
-                <ng-icon hlm [name]="chip.icon" size="sm" class="shrink-0 text-muted-foreground" />
-                <span class="font-medium">{{ chip.label }}</span>
-                <span class="text-muted-foreground tabular-nums">{{ chip.count }}</span>
-                <ng-icon hlm name="lucideChevronRight" size="sm" class="shrink-0 text-muted-foreground" />
-              </a>
-            } @else {
-              <div class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm">
-                <ng-icon hlm [name]="chip.icon" size="sm" class="shrink-0 text-muted-foreground" />
-                <span class="font-medium">{{ chip.label }}</span>
-                <span class="text-muted-foreground tabular-nums">{{ chip.count }}</span>
-              </div>
-            }
+            <a
+              class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent"
+              routerLink="/inventory/items"
+              [queryParams]="chip.params"
+            >
+              <ng-icon hlm [name]="chip.icon" size="sm" class="shrink-0 text-muted-foreground" />
+              <span class="font-medium">{{ chip.label }}</span>
+              <span class="text-muted-foreground tabular-nums">{{ chip.count }}</span>
+              <ng-icon hlm name="lucideChevronRight" size="sm" class="shrink-0 text-muted-foreground" />
+            </a>
           }
         </div>
       </section>
@@ -59,13 +49,12 @@ export type StatusChipsScope =
 export class InventoryStatusChipsComponent {
   scope = input.required<StatusChipsScope>();
 
-  /** One chip per nonzero status — Lent — reusing today's deep-links (null params → count-only). */
-  protected chips = computed<{ icon: string; label: string; count: number; params: Record<string, string> | null }[]>(() => {
+  /** One chip per nonzero status — currently just Lent — linking into its items-list slice. */
+  protected chips = computed<{ icon: string; label: string; count: number; params: Record<string, string> }[]>(() => {
     const s = this.scope();
-    const chips: { icon: string; label: string; count: number; params: Record<string, string> | null }[] = [];
-    const lentParams = s.kind === 'root' ? { lent: 'true' } : s.lentParams;
+    const chips: { icon: string; label: string; count: number; params: Record<string, string> }[] = [];
     if (s.lentCount > 0)
-      chips.push({ icon: 'lucideUserRound', label: 'Lent out', count: s.lentCount, params: lentParams });
+      chips.push({ icon: 'lucideUserRound', label: 'Lent out', count: s.lentCount, params: { lent: 'true' } });
     return chips;
   });
 }
