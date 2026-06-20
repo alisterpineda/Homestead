@@ -451,7 +451,7 @@ export class DurableDetailPageComponent {
   // --- Activity history (every durable, leaf or container) ---
   protected readonly relativeAge = formatRelativeAge;
   // Resets to page 1 when the routed durable changes — Angular reuses this component on a :id-only
-  // navigation (a contents-list drill or the quick panel's "Open full view"), so a plain signal
+  // navigation (a contents-list drill or the quick panel's "View details"), so a plain signal
   // would carry the prior durable's page number into the new durable's activity query.
   page = seededLinkedSignal(this.durableId, () => 1);
 
@@ -486,7 +486,7 @@ export class DurableDetailPageComponent {
   // Hosted leaf-durable quick panel (opened from the contents list). This panel, the edit sheet, and
   // the delete dialog all reset to 'closed' when the routed durable changes: the component is reused on
   // a :id-only navigation, so without the reset an overlay opened for the previous durable would linger
-  // over the newly-loaded one (e.g. the leaf panel's own "Open full view" routes to this component).
+  // over the newly-loaded one (e.g. the leaf panel's own "View details" routes to this component).
   quickPanelDurable = signal<DurableResponse | null>(null);
   durableQuickPanelState = seededLinkedSignal<string | null, BrnDialogState>(this.durableId, () => 'closed');
 

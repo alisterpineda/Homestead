@@ -315,7 +315,7 @@ interface StepperPayload {
               [disabled]="navigating()"
               class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
             >
-              {{ navigating() ? 'Saving changes...' : 'Open full view' }}
+              {{ navigating() ? 'Saving changes...' : 'View details' }}
               <ng-icon hlm name="lucideArrowRight" size="sm" />
             </button>
           </hlm-sheet-footer>

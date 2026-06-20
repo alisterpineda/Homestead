@@ -97,7 +97,7 @@ class TitleHostComponent {
   protected header = inject(PageHeaderService);
 }
 
-/** Stand-in for the real durable detail page — the target of a container's opt-in "Details" button. */
+/** Stand-in for the real durable detail page — the target of a container's opt-in "View details" button. */
 @Component({
   selector: 'test-item-detail-stub',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -129,7 +129,7 @@ describe('InventoryBrowsePageComponent', () => {
         provideRouter([
           { path: 'inventory/browse', component: InventoryBrowsePageComponent, data: { title: 'Browse' } },
           { path: 'inventory/browse/area/:areaId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'area' } },
-          // Containers drill within Browse (Explore); the opt-in "Details" button routes to the detail page.
+          // Containers drill within Browse (Explore); the opt-in "View details" button routes to the detail page.
           { path: 'inventory/browse/container/:containerId', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'container' } },
           { path: 'inventory/browse/unplaced', component: InventoryBrowsePageComponent, data: { title: 'Browse', placeKind: 'unplaced' } },
           { path: 'inventory/items/:id', component: ItemDetailStubComponent },
@@ -281,7 +281,7 @@ describe('InventoryBrowsePageComponent', () => {
     const { harness } = await navigate('/inventory/browse/container/chest');
 
     expect(placeApi.calls).toEqual([{ ContainerItemId: 'chest' }]);
-    // Still on the Browse surface — the container renders as a drilled place, with its Details button.
+    // Still on the Browse surface — the container renders as a drilled place, with its View-details button.
     expect(text(harness)).toContain('Tool chest');
   });
 

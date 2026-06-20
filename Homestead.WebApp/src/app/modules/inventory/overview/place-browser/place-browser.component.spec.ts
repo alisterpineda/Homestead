@@ -229,7 +229,7 @@ describe('PlaceBrowserComponent', () => {
     expect(openConsumable).toHaveBeenCalledWith(expect.objectContaining({ id: 'screws', unit: 'pcs' }));
 
     Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .find(b => b.textContent?.trim() === 'Details')!.click();
+      .find(b => b.textContent?.trim() === 'View details')!.click();
     expect(details).toHaveBeenCalledWith(expect.objectContaining({ id: 'bin' }));
   });
 
@@ -258,7 +258,7 @@ describe('PlaceBrowserComponent', () => {
     expect(onHand).toContain('Low');
   });
 
-  it('shows the empty state with an Add-item-here CTA for an empty place', async () => {
+  it('shows the empty state with a New-item CTA for an empty place', async () => {
     const fixture = await create(
       { kind: 'container', id: 'bin' },
       makeContents({ ...BIN_CONTENTS, containers: [], items: [], consumables: [], directItemCount: 0, nestedItemCount: 0 }),
@@ -267,7 +267,7 @@ describe('PlaceBrowserComponent', () => {
     const content = el(fixture).textContent ?? '';
     expect(content).toContain('Nothing here yet');
     const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .filter(b => b.textContent?.includes('Add item here'));
+      .filter(b => b.textContent?.includes('New item'));
     // Only the empty-state CTA — the header no longer duplicates it.
     expect(addButtons.length).toBe(1);
     // The lone CTA is the centered empty-state one, not a table toolbar button.
@@ -278,16 +278,16 @@ describe('PlaceBrowserComponent', () => {
     const fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
 
     const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .filter(b => b.textContent?.includes('Add item here'));
+      .filter(b => b.textContent?.includes('New item'));
     expect(addButtons.length).toBe(1);
 
     // The single Add button is projected into the items-view toolbar, not the place header.
     const view = el(fixture).querySelector('app-inventory-items-view')!;
     expect(view.contains(addButtons[0])).toBe(true);
 
-    // The drilled container still shows its Details button in the header.
+    // The drilled container still shows its View-details button in the header.
     const detailsBtn = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .find(b => b.textContent?.trim() === 'Details');
+      .find(b => b.textContent?.trim() === 'View details');
     expect(detailsBtn).toBeTruthy();
   });
 
@@ -305,7 +305,7 @@ describe('PlaceBrowserComponent', () => {
     );
 
     const addButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .filter(b => b.textContent?.includes('Add item here'));
+      .filter(b => b.textContent?.includes('New item'));
     expect(addButtons.length).toBe(1);
 
     // No loose items means no table — the Add button stays in the header.
@@ -314,10 +314,10 @@ describe('PlaceBrowserComponent', () => {
     expect(headings).not.toContain('Items');
   });
 
-  it('shows the Details button only when a container is drilled', async () => {
+  it('shows the View-details button only when a container is drilled', async () => {
     let fixture = await create({ kind: 'container', id: 'bin' }, BIN_CONTENTS);
     let detailsBtn = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .find(b => b.textContent?.trim() === 'Details');
+      .find(b => b.textContent?.trim() === 'View details');
     expect(detailsBtn).toBeTruthy();
 
     fixture = await create(
@@ -325,7 +325,7 @@ describe('PlaceBrowserComponent', () => {
       makeContents({ path: [{ id: 'garage', name: 'Garage', kind: 'Area' }] }),
     );
     detailsBtn = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
-      .find(b => b.textContent?.trim() === 'Details');
+      .find(b => b.textContent?.trim() === 'View details');
     expect(detailsBtn).toBeUndefined();
   });
 

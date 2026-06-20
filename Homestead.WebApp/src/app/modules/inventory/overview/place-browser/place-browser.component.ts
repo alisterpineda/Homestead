@@ -84,7 +84,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
             </div>
             <div class="flex flex-wrap items-center gap-2">
               @if (c.containerItem; as containerItem) {
-                <button hlmBtn variant="ghost" size="sm" (click)="containerDetails.emit(containerItem)">Details</button>
+                <button hlmBtn variant="ghost" size="sm" (click)="containerDetails.emit(containerItem)">View details</button>
               }
               @if (!hasLooseContent() && !isPlaceEmpty()) {
                 <app-create-entry-dialog
@@ -94,7 +94,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                   (created)="changed.emit()"
                 >
                   <ng-icon hlm name="lucidePlus" size="sm" />
-                  Add item here
+                  New item
                 </app-create-entry-dialog>
               }
             </div>
@@ -116,7 +116,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                   (created)="changed.emit()"
                 >
                   <ng-icon hlm name="lucidePlus" size="sm" />
-                  Add item here
+                  New item
                 </app-create-entry-dialog>
               </div>
             </div>
@@ -181,7 +181,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                     (created)="changed.emit()"
                   >
                     <ng-icon hlm name="lucidePlus" size="sm" />
-                    Add item here
+                    New item
                   </app-create-entry-dialog>
                 </app-inventory-items-view>
               </div>
@@ -284,7 +284,7 @@ export class PlaceBrowserComponent {
     return 'lucideMapPin';
   });
 
-  /** Pre-filled location for "Add item here" — the drilled place itself. */
+  /** Pre-filled location for "New item" — the drilled place itself. */
   protected addLocation = computed<ItemLocationValue>(() => {
     const ref = this.place();
     if (ref?.kind === 'area') return { kind: 'area', id: ref.id };

@@ -64,7 +64,7 @@ import { AreaParentPickerComponent } from '../../shared/area-parent-picker/area-
           <div hlmDialogFooter>
             <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
             <button hlmBtn type="submit" [disabled]="!canSubmit() || creating()">
-              {{ creating() ? 'Creating...' : 'Create area' }}
+              {{ creating() ? 'Creating...' : 'Create' }}
             </button>
           </div>
         </form>

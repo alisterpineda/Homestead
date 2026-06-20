@@ -136,7 +136,7 @@ interface ListData {
             <div hlmEmptyContent>
               <app-create-entry-dialog (created)="onChanged()">
                 <ng-icon hlm name="lucidePlus" size="sm" />
-                New
+                New item
               </app-create-entry-dialog>
             </div>
           </div>
@@ -168,7 +168,7 @@ interface ListData {
 
             <app-create-entry-dialog toolbarEnd triggerSize="sm" (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
-              New
+              New item
             </app-create-entry-dialog>
 
             <div refineExtra>

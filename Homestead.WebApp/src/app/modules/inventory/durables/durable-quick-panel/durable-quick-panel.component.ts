@@ -234,7 +234,7 @@ type InlineForm = 'move' | 'lent' | null;
               [routerLink]="['/inventory/items', it.id]"
               class="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
-              Open full view
+              View details
               <ng-icon hlm name="lucideArrowRight" size="sm" />
             </a>
           </hlm-sheet-footer>
