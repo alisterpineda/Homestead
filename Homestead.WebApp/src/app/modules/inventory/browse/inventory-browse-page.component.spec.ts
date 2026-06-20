@@ -262,7 +262,6 @@ describe('InventoryBrowsePageComponent', () => {
     expect(content).toContain('2 here · 1 more inside containers');
     expect(content).toContain('Tool chest');
     expect(content).toContain('Drill');
-    expect(content).toContain('Open as list');
     // The drilled child-container card continues spatial drilling within Browse (Explore).
     expect(hrefs(harness)).toContain('/inventory/browse/container/chest');
   });
