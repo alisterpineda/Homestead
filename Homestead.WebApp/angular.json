@@ -71,6 +71,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
+            "runnerConfig": true,
             "coverage": false,
             "coverageReporters": ["text", "cobertura"],
             "coverageExclude": [
