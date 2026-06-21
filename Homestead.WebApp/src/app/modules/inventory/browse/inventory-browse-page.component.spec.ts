@@ -219,19 +219,6 @@ describe('InventoryBrowsePageComponent', () => {
     expect(hrefs(harness)).toContain('/inventory/items?lowStock=true');
   });
 
-  it('hands the search term off to the items list on submit (root only)', async () => {
-    const { component } = await navigate('/inventory/browse');
-    const router = TestBed.inject(Router);
-    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    component.searchInput.set('  drill ');
-    component.onSearchSubmit(new Event('submit'));
-
-    expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items'], {
-      queryParams: { search: 'drill' },
-    });
-  });
-
   it('renders the area-scoped warning panel when the drilled place has warnings', async () => {
     placeApi.contents = { ...GARAGE_CONTENTS, scopedLowStockCount: 2, scopedLentCount: 0 };
     const { harness } = await navigate('/inventory/browse/area/garage');

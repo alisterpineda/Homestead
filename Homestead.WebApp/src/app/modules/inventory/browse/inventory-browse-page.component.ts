@@ -13,9 +13,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, tap, startWith } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideCircleAlert, lucideSearch } from '@ng-icons/lucide';
+import { lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
@@ -50,7 +49,6 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     NgIcon,
     HlmIconImports,
-    HlmInput,
     HlmSpinner,
     HlmEmptyImports,
     HlmBreadCrumbImports,
@@ -60,7 +58,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     DurableQuickPanelComponent,
     ConsumableQuickPanelComponent,
   ],
-  providers: [provideIcons({ lucideCircleAlert, lucideSearch })],
+  providers: [provideIcons({ lucideCircleAlert })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerBreadcrumb>
@@ -109,22 +107,8 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         </div>
       }
 
-      <!-- Search hands the term off to the unified items list — root only (a drilled place already
-           scopes the view). The warning region is global at root, place-scoped when drilled. -->
-      @if (!placeRef()) {
-        <form class="relative mx-auto w-full max-w-xl" (submit)="onSearchSubmit($event)">
-          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            hlmInput
-            placeholder="Search items..."
-            class="h-10 w-full pl-9"
-            aria-label="Search items"
-            [value]="searchInput()"
-            (input)="searchInput.set($any($event.target).value)"
-          />
-        </form>
-      }
-
+      <!-- The warning region is global at root, place-scoped when drilled. (Item search lives in the
+           shell-wide command palette / ⌘K, so there is no per-page search box here.) -->
       @if (warningScope(); as scope) {
         <app-inventory-warning-panels [scope]="scope" />
       }
@@ -181,9 +165,6 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   error = signal(false);
   drillLoading = signal(false);
   drillError = signal(false);
-
-  /** Root-only search box; hands the term to the unified items list on submit. */
-  searchInput = signal('');
 
   // Refresh-keyed: the quick panels and the create dialog mutate from this page, so the area grid
   // and place contents must refetch on `changed`.
@@ -359,13 +340,6 @@ export class InventoryBrowsePageComponent implements OnDestroy {
 
   onChanged(): void {
     this.refreshTrigger.update(v => v + 1);
-  }
-
-  /** Hands the term off to the items list — no debounce, it's a one-shot navigation. */
-  onSearchSubmit(event: Event): void {
-    event.preventDefault();
-    const term = this.searchInput().trim();
-    void this.router.navigate(['/inventory/items'], { queryParams: { search: term || null } });
   }
 
   onOpenDurable(durable: DurableResponse): void {
