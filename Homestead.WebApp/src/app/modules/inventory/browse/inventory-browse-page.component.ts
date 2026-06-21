@@ -141,6 +141,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       [state]="durableQuickPanelState()"
       (changed)="onChanged()"
       (closed)="onDurableQuickPanelClosed()"
+      (viewContents)="onQuickPanelViewContents($event)"
     />
 
     <app-consumable-quick-panel
@@ -365,6 +366,19 @@ export class InventoryBrowsePageComponent implements OnDestroy {
 
   onDurableQuickPanelClosed(): void {
     this.durableQuickPanelState.set('closed');
+  }
+
+  /**
+   * A holder's "View contents/components" from the quick panel. An assembly is not a Browse place, so
+   * it routes out to its detail page (where its components live); a container keeps drilling in Browse.
+   */
+  onQuickPanelViewContents(durable: DurableResponse): void {
+    this.onDurableQuickPanelClosed();
+    void this.router.navigate(
+      durable.durableKind === 'Assembly'
+        ? ['/inventory/items', durable.id]
+        : ['/inventory/browse/container', durable.id],
+    );
   }
 
   // Keeps quickPanelConsumable set: a close-triggered stepper flush may still be committing, and the
