@@ -4,8 +4,15 @@ import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound, lucideSunMoon } from '@ng-icons/lucide';
+import {
+  lucideLogOut,
+  lucideEllipsisVertical,
+  lucideCircleUserRound,
+  lucideSunMoon,
+  lucideSearch,
+} from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
+import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmSeparator } from '@/shared/components/spartan/separator';
 import { HlmAlertDialog, HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -13,6 +20,8 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { ProfileDialogComponent } from '../../profile/profile.component';
 import { ThemeDialogComponent } from '../../theme/theme-dialog/theme-dialog.component';
 import { AppSwitcherComponent } from '../app-switcher/app-switcher.component';
+import { CommandPaletteComponent } from '@/shared/components/search/command-palette.component';
+import { GlobalSearchService } from '@/shared/services/global-search.service';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -28,6 +37,7 @@ import { getModuleByPath } from '@/modules/registry';
     NgTemplateOutlet,
     NgIcon,
     HlmIconImports,
+    HlmButton,
     HlmSidebarImports,
     HlmSeparator,
     HlmAlertDialogImports,
@@ -35,8 +45,11 @@ import { getModuleByPath } from '@/modules/registry';
     ProfileDialogComponent,
     ThemeDialogComponent,
     AppSwitcherComponent,
+    CommandPaletteComponent,
   ],
-  providers: [provideIcons({ lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound, lucideSunMoon })],
+  providers: [
+    provideIcons({ lucideLogOut, lucideEllipsisVertical, lucideCircleUserRound, lucideSunMoon, lucideSearch }),
+  ],
   template: `
     <div hlmSidebarWrapper class="max-h-svh">
       <hlm-sidebar variant="inset">
@@ -139,6 +152,37 @@ import { getModuleByPath } from '@/modules/registry';
           } @else {
             <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
           }
+
+          <!-- Global search trigger: faux-input on desktop, icon button on mobile. ⌘K opens it too.
+               min-w-0 lets this zone yield space so a wide page title/breadcrumb keeps priority. -->
+          <div class="flex min-w-0 flex-1 justify-center px-2">
+            <button
+              type="button"
+              (click)="globalSearch.openPalette()"
+              class="hidden h-8 w-full max-w-sm items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/50 md:flex"
+              aria-label="Search"
+            >
+              <ng-icon hlm name="lucideSearch" size="sm" />
+              <span>Search…</span>
+              <kbd
+                class="ml-auto hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground lg:inline-flex"
+                aria-hidden="true"
+              >⌘K</kbd>
+            </button>
+
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon"
+              type="button"
+              (click)="globalSearch.openPalette()"
+              class="flex md:hidden"
+              aria-label="Search"
+            >
+              <ng-icon hlm name="lucideSearch" size="sm" />
+            </button>
+          </div>
+
           <div class="ml-auto flex items-center gap-2">
             @if (headerSecondaryActions()) {
               <ng-container *ngTemplateOutlet="headerSecondaryActions()!" />
@@ -149,6 +193,9 @@ import { getModuleByPath } from '@/modules/registry';
           </div>
         </header>
 
+        <!-- Global command palette, mounted once for the whole shell. -->
+        <app-command-palette />
+
         <div class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4">
           <router-outlet />
         </div>
@@ -158,6 +205,7 @@ import { getModuleByPath } from '@/modules/registry';
 })
 export class AppShellComponent {
   protected auth = inject(AuthService);
+  protected globalSearch = inject(GlobalSearchService);
   private router = inject(Router);
   private activatedRoute = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);

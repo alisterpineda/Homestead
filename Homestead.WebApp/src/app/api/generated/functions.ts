@@ -317,3 +317,5 @@ export type { TrackDurableIndividually$Params as TrackDurableIndividually$Params
 export { trackDurableIndividually as trackDurableIndividually } from './fn/inventory/track-durable-individually';
 export type { CollapseDurables$Params as CollapseDurables$Params } from './fn/inventory/collapse-durables';
 export { collapseDurables as collapseDurables } from './fn/inventory/collapse-durables';
+export type { UniversalSearch$Params as UniversalSearch$Params } from './fn/search/universal-search';
+export { universalSearch as universalSearch } from './fn/search/universal-search';

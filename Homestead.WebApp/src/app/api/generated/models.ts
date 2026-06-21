@@ -198,6 +198,9 @@ export type { RestoreDocumentsCommand } from './models/restore-documents-command
 export type { RestoreDocumentsResponse } from './models/restore-documents-response';
 export type { RunNowBody } from './models/run-now-body';
 export type { RunPriceSourceImportNowResponse } from './models/run-price-source-import-now-response';
+export type { SearchGroup } from './models/search-group';
+export type { SearchHit } from './models/search-hit';
+export type { SearchResponse } from './models/search-response';
 export type { SortDirection } from './models/sort-direction';
 export type { StockEntryResponse } from './models/stock-entry-response';
 export type { StockMovementResponse } from './models/stock-movement-response';

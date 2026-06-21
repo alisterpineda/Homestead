@@ -25,6 +25,7 @@ CLAUDE.md files (`/CLAUDE.md`, `Homestead.WebApi/CLAUDE.md`,
 ## Cross-cutting
 
 - [shared/table-ux.md](shared/table-ux.md) — product/UX rules for every data-table screen (toolbars, the unified-popover filter pattern, selection state, responsive behaviour). Applies across modules.
+- [shared/universal-search.md](shared/universal-search.md) — the global command palette (⌘K): search-only, grouped per-source (no global ranking), and the `ISearchSource` / presenter seam that makes new modules additive. v1 ships Inventory items.
 
 ## Maintenance
 

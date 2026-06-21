@@ -15,7 +15,10 @@ using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Modules.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
+using Homestead.WebApi.Modules.Inventory.Features.Search;
 using Homestead.WebApi.Modules.Processing;
+using Homestead.WebApi.Modules.Search;
+using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Modules.Status;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Processing.Hubs;
@@ -169,6 +172,9 @@ builder.Services.AddScoped<ITagPathResolver, TagPathResolver>();
 builder.Services.AddScoped<IItemLocationResolver, ItemLocationResolver>();
 builder.Services.AddScoped<IInventoryPlacementService, InventoryPlacementService>();
 builder.Services.AddScoped<IStockService, StockService>();
+// Universal-search source for inventory items. Registered against the IEnumerable<ISearchSource>
+// seam (multi-impl precedent: IThumbnailGenerator / IJobHandler) — other modules add their own.
+builder.Services.AddScoped<ISearchSource, InventorySearchSource>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
@@ -337,6 +343,7 @@ versionedApi.MapProcessingEndpoints();
 versionedApi.MapAdminEndpoints();
 versionedApi.MapFinancesEndpoints();
 versionedApi.MapInventoryEndpoints();
+versionedApi.MapSearchEndpoints();
 
 if (!string.IsNullOrEmpty(app.Configuration.GetConnectionString("postgresdb")))
 {

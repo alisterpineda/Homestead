@@ -133,6 +133,9 @@
       ],
       "@/shared/components/spartan/toggle": [
         "./src/app/shared/components/spartan/toggle/src/index.ts"
+      ],
+      "@/shared/components/spartan/command": [
+        "./src/app/shared/components/spartan/command/src/index.ts"
       ]
     }
   },
