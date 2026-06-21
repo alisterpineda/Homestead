@@ -148,18 +148,19 @@ import { getModuleByPath } from '@/modules/registry';
           <button hlmSidebarTrigger></button>
           <hlm-separator orientation="vertical" class="mr-2 !h-4" />
           @if (headerTitle()) {
-            <ng-container *ngTemplateOutlet="headerTitle()!" />
+            <div class="min-w-0">
+              <ng-container *ngTemplateOutlet="headerTitle()!" />
+            </div>
           } @else {
-            <h1 class="text-sm font-medium">{{ pageTitle() }}</h1>
+            <h1 class="min-w-0 truncate text-sm font-medium">{{ pageTitle() }}</h1>
           }
 
-          <!-- Global search trigger: faux-input on desktop, icon button on mobile. ⌘K opens it too.
-               min-w-0 lets this zone yield space so a wide page title/breadcrumb keeps priority. -->
-          <div class="flex min-w-0 flex-1 justify-center px-2">
+          <div class="ml-auto flex shrink-0 items-center gap-2">
+            <!-- Global search trigger: faux-input on desktop, icon button on mobile. ⌘K opens it too. -->
             <button
               type="button"
               (click)="globalSearch.openPalette()"
-              class="hidden h-8 w-full max-w-sm items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/50 md:flex"
+              class="hidden h-8 w-64 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent/50 md:flex"
               aria-label="Search"
             >
               <ng-icon hlm name="lucideSearch" size="sm" />
@@ -181,9 +182,7 @@ import { getModuleByPath } from '@/modules/registry';
             >
               <ng-icon hlm name="lucideSearch" size="sm" />
             </button>
-          </div>
 
-          <div class="ml-auto flex items-center gap-2">
             @if (headerSecondaryActions()) {
               <ng-container *ngTemplateOutlet="headerSecondaryActions()!" />
             }

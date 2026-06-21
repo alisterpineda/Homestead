@@ -76,7 +76,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
         </div>
         <div class="max-h-[320px] overflow-y-auto p-1">
           @if (loading()) {
-            <div class="flex justify-center py-4"><hlm-spinner class="size-4" /></div>
+            <div class="flex justify-center py-4"><hlm-spinner /></div>
           } @else {
             @if (allowUnplaced()) {
               <button

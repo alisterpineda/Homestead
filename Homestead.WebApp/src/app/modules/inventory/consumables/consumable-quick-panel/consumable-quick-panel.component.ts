@@ -181,7 +181,7 @@ interface StepperPayload {
             }
 
             @if (loading() && entries().length === 0 && !detail()) {
-              <div class="flex justify-center py-8"><hlm-spinner class="size-5" /></div>
+              <div class="flex justify-center py-8"><hlm-spinner class="text-xl" /></div>
             } @else {
               @for (entry of entries(); track stockLocationKey(entry)) {
                 <div hlmItem variant="outline" size="sm">

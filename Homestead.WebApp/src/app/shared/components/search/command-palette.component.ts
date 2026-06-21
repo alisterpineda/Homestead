@@ -60,7 +60,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
             }
             @case ('loading') {
               <div class="flex items-center justify-center py-6">
-                <hlm-spinner class="size-5" />
+                <hlm-spinner class="text-xl" />
               </div>
             }
             @case ('error') {

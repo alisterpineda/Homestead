@@ -102,7 +102,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
             </div>
             <div class="max-h-[240px] overflow-y-auto rounded-md border">
               @if (searching()) {
-                <div class="flex justify-center py-6"><hlm-spinner class="size-4" /></div>
+                <div class="flex justify-center py-6"><hlm-spinner /></div>
               } @else if (candidates().length === 0) {
                 <p class="px-3 py-6 text-center text-sm text-muted-foreground">
                   No individually-tracked durables found.

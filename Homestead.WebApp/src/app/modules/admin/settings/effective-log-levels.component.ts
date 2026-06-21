@@ -89,7 +89,7 @@ type BadgeVariant = 'default' | 'secondary' | 'outline';
               <button hlmBtn variant="secondary" type="button" (click)="resolve()"
                 [disabled]="resolving() || !query().trim()">
                 @if (resolving()) {
-                  <hlm-spinner class="size-4" />
+                  <hlm-spinner />
                 } @else {
                   <ng-icon hlm name="lucideSearch" size="sm" class="mr-1" />
                   Check
