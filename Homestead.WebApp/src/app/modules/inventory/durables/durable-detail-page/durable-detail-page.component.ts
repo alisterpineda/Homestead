@@ -18,6 +18,8 @@ import {
   lucideCircleAlert,
   lucideBox,
   lucideBoxes,
+  lucideCpu,
+  lucidePlus,
   lucideMapPin,
   lucideChevronLeft,
   lucideChevronRight,
@@ -39,6 +41,8 @@ import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.compone
 import { isTerminalStatus } from '../../shared/item-status-meta';
 import { EditDurableSheetComponent } from '../edit-durable-sheet/edit-durable-sheet.component';
 import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick-panel.component';
+import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
+import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatPath } from '../../list/inventory-row';
 import { formatQty } from '../../consumables/consumable-shared';
 import { UnitPipe } from '../../consumables/unit.pipe';
@@ -56,7 +60,8 @@ import { toast } from '@spartan-ng/brain/sonner';
 /**
  * The canonical surface for a non-fungible durable, rendered by the `/inventory/items/:id` dispatcher:
  * full record (value, serial, status, location, notes) with full editing via the shared edit sheet,
- * and — when the durable is a container — its direct contents. Durable↔consumable parity with
+ * and — when the durable is a container — its direct contents, or — when an assembly — its
+ * components. Durable↔consumable parity with
  * {@link ConsumableDetailPageComponent}; containers are drilled *into* here rather than acted *on*, so
  * every container place-card and breadcrumb segment routes to this page (see `placeRefToLink`).
  */
@@ -76,6 +81,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     ItemStatusBadgeComponent,
     EditDurableSheetComponent,
     DurableQuickPanelComponent,
+    CreateEntryDialogComponent,
     UnitPipe,
   ],
   providers: [provideIcons({
@@ -83,6 +89,8 @@ import { toast } from '@spartan-ng/brain/sonner';
     lucideCircleAlert,
     lucideBox,
     lucideBoxes,
+    lucideCpu,
+    lucidePlus,
     lucideMapPin,
     lucideChevronLeft,
     lucideChevronRight,
@@ -110,8 +118,10 @@ import { toast } from '@spartan-ng/brain/sonner';
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-1">
             <div class="flex flex-wrap items-center gap-3">
-              @if (it.isContainer) {
+              @if (it.durableKind === 'Container') {
                 <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+              } @else if (it.durableKind === 'Assembly') {
+                <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
               }
               <h1 class="text-2xl font-semibold">{{ it.name }}</h1>
               <app-item-status-badge [status]="it.status" />
@@ -183,8 +193,58 @@ import { toast } from '@spartan-ng/brain/sonner';
           </section>
         }
 
+        <!-- Components (assemblies) -->
+        @if (it.durableKind === 'Assembly') {
+          <section class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-sm font-medium text-muted-foreground">Components</h2>
+              <app-create-entry-dialog
+                triggerSize="sm"
+                [initialLocation]="addComponentLocation()"
+                [initialLocationLabel]="it.name"
+                (created)="onChanged()"
+              >
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Add component
+              </app-create-entry-dialog>
+            </div>
+            @if (contentsError()) {
+              <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Couldn't load components.
+                <button type="button" class="underline underline-offset-4 hover:text-foreground" (click)="onChanged()">Retry</button>
+              </div>
+            } @else if (!contents()) {
+              <div class="flex justify-center py-8"><hlm-spinner /></div>
+            } @else if (contentItems().length === 0) {
+              <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No components yet.
+              </div>
+            } @else {
+              <ul class="divide-y divide-border rounded-lg border border-border bg-card text-card-foreground">
+                @for (child of contentItems(); track child.id) {
+                  <li>
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors hover:bg-accent"
+                      (click)="onOpenDurable(child)"
+                    >
+                      <span class="flex min-w-0 items-center gap-2">
+                        <span class="truncate">{{ child.name }}</span>
+                        @if (child.compartment) {
+                          <span class="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{{ child.compartment }}</span>
+                        }
+                      </span>
+                      <app-item-status-badge [status]="child.status" />
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        }
+
         <!-- Contents (containers only) -->
-        @if (it.isContainer) {
+        @if (it.durableKind === 'Container') {
           <section class="space-y-2">
             <h2 class="text-sm font-medium text-muted-foreground">Contents</h2>
             @if (contentsError()) {
@@ -393,7 +453,17 @@ export class DurableDetailPageComponent {
     return pre && pre.id === id ? pre : null;
   });
 
-  protected isContainer = computed(() => this.durable()?.isContainer ?? false);
+  protected durableKind = computed(() => this.durable()?.durableKind ?? null);
+  protected isContainer = computed(() => this.durableKind() === 'Container');
+  protected isAssembly = computed(() => this.durableKind() === 'Assembly');
+  // Both a Container and an Assembly hold children, so both fetch contents (the assembly's are
+  // its components).
+  protected isHolder = computed(() => this.isContainer() || this.isAssembly());
+  // "Add component" pre-parents the create dialog under this assembly.
+  protected addComponentLocation = computed<ItemLocationValue | null>(() => {
+    const it = this.durable();
+    return it ? { kind: 'container', id: it.id } : null;
+  });
   protected terminal = computed(() => {
     const it = this.durable();
     return it ? isTerminalStatus(it.status) : false;
@@ -420,7 +490,7 @@ export class DurableDetailPageComponent {
   // `.containers`/`.consumables` lists. Skipped (and left null) for a leaf durable. Keyed on the refresh
   // tick so an in-place edit/quick-panel change re-reads the contents.
   private contentsKey = computed(() => ({
-    id: this.isContainer() ? this.durableId() : null,
+    id: this.isHolder() ? this.durableId() : null,
     tick: this.refreshTrigger(),
   }));
 

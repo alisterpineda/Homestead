@@ -43,7 +43,7 @@ public class PatchDurableHandler(
             LentTo = item.LentTo,
             AreaId = item.AreaId,
             ParentItemId = item.ParentItemId,
-            IsContainer = item.IsContainer,
+            DurableKind = item.DurableKind,
             Compartment = item.Compartment,
         };
 
@@ -111,20 +111,22 @@ public class PatchDurableHandler(
 
         if (targetParentId is { } newParentId && newParentId != item.ParentItemId)
         {
-            // Typing: a parent must be a non-fungible container.
+            // Typing: a parent must be a non-fungible holder (container or assembly).
             var parent = await db.Items.AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == newParentId, ct);
             if (parent is null)
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
-            if (parent.Fungibility != Fungibility.NonFungible || !parent.IsContainer)
-                throw new BusinessRuleException("ParentItemId must reference a container item.");
+            if (parent.Fungibility != Fungibility.NonFungible || !parent.DurableKind.IsHolder())
+                throw new BusinessRuleException("ParentItemId must reference a container or assembly item.");
 
             // Cycle: an item cannot be placed inside itself or inside any of its own descendants.
             if (newParentId == item.Id)
                 throw new BusinessRuleException("An item cannot be placed inside itself.");
 
-            var containerLinks = await db.Items.AsNoTracking()
-                .Where(i => i.IsContainer)
+            // A cycle can form through either edge kind (stored-in or component), so the link set
+            // spans all holders, not just containers.
+            var holderLinks = await db.Items.AsNoTracking()
+                .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly)
                 .Select(i => new { i.Id, i.ParentItemId })
                 .ToDictionaryAsync(i => i.Id, i => i.ParentItemId, ct);
 
@@ -134,16 +136,22 @@ public class PatchDurableHandler(
             {
                 if (ancestorId == item.Id)
                     throw new BusinessRuleException("An item cannot be placed inside one of its own descendants.");
-                if (!visited.Add(ancestorId) || !containerLinks.TryGetValue(ancestorId, out var next))
+                if (!visited.Add(ancestorId) || !holderLinks.TryGetValue(ancestorId, out var next))
                     break;
                 cursor = next;
             }
         }
 
+        // A non-fungible item always names a holder-role; a patch may switch it but never clear it.
+        if (model.DurableKind is not { } targetKind)
+            throw new BusinessRuleException("DurableKind is required.");
+
         // Children gates — one query, only when a relevant change is requested.
-        var roleOff = item.IsContainer && !model.IsContainer;
-        var sealingContainer = transitioningToTerminal && item.IsContainer;
-        if (roleOff || sealingContainer)
+        var kindChange = targetKind != item.DurableKind;
+        // Only a Container seals against its contents; an Assembly's components ride along (their
+        // effective state is derived at read time, like a lent container), so it never blocks.
+        var sealingContainer = transitioningToTerminal && item.DurableKind == DurableKind.Container;
+        if (kindChange || sealingContainer)
         {
             var childStatuses = await db.Items.AsNoTracking()
                 .Where(i => i.ParentItemId == item.Id)
@@ -154,14 +162,15 @@ public class PatchDurableHandler(
             // stock entry exists only while there is quantity there, so its mere presence blocks.
             var hasStock = await db.StockEntries.AnyAsync(e => e.ContainerItemId == item.Id, ct);
 
-            // Role-off (Rule B): blocked while ANY child references the item — live or terminal — or
-            // any stock sits in it.
-            if (roleOff && (childStatuses.Count > 0 || hasStock))
+            // Kind-change gate: changing the holder-role is blocked while the item still references
+            // ANY child — live or terminal — or any stock sits in it. Empty it first. (A Plain item
+            // holds nothing, so Plain → Container/Assembly is always free.) Generalises the old role-off rule.
+            if (kindChange && (childStatuses.Count > 0 || hasStock))
                 throw new BusinessRuleException(
-                    "Cannot turn off the container role while the item still has contents (including inactive records). Empty it first.");
+                    "Cannot change the type while the item still has contents (including inactive records). Empty it first.");
 
             // Taking a container terminal: only LIVE children block; terminal leftovers don't, so
-            // the flag stays on and the parent-is-container invariant is preserved. Live stock blocks too.
+            // the kind stays Container and the parent-is-holder invariant is preserved. Live stock blocks too.
             if (sealingContainer && (childStatuses.Any(s => !s.IsTerminal()) || hasStock))
                 throw new BusinessRuleException(
                     "Cannot mark a container Sold/Discarded/Archived while it has active contents.");
@@ -180,7 +189,7 @@ public class PatchDurableHandler(
         item.LentTo = lentTo;
         item.AreaId = targetAreaId;
         item.ParentItemId = targetParentId;
-        item.IsContainer = model.IsContainer;
+        item.DurableKind = targetKind;
         item.Compartment = targetCompartment;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByUserId = currentUser.UserId;

@@ -26,7 +26,7 @@ const LEAF_ITEM: DurableResponse = {
   name: 'Cordless Drill',
   fungibility: 'NonFungible',
   status: 'Active',
-  isContainer: false,
+  durableKind: 'Plain',
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   resolvedAreaId: 'garage',
   areaId: 'garage',
@@ -43,7 +43,7 @@ const CONTAINER_ITEM: DurableResponse = {
   name: 'Tool Chest',
   fungibility: 'NonFungible',
   status: 'Active',
-  isContainer: true,
+  durableKind: 'Container',
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   resolvedAreaId: 'garage',
   createdAt: '2025-01-01T00:00:00Z',
@@ -64,7 +64,39 @@ const CHEST_CONTENTS: PlaceContentsResponse = {
   ],
   items: [{
     id: 'wrench', name: 'Wrench', fungibility: 'NonFungible', status: 'Active',
-    isContainer: false, path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
+    durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
+  }],
+  consumables: [],
+};
+
+const ASSEMBLY_ITEM: DurableResponse = {
+  id: 'pc1',
+  name: 'Gaming PC',
+  fungibility: 'NonFungible',
+  status: 'Active',
+  durableKind: 'Assembly',
+  path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+  resolvedAreaId: 'garage',
+  areaId: 'garage',
+  areaName: 'Garage',
+  createdAt: '2025-01-01T00:00:00Z',
+  updatedAt: '2025-06-01T00:00:00Z',
+};
+
+const PC_CONTENTS: PlaceContentsResponse = {
+  path: [
+    { id: 'garage', name: 'Garage', kind: 'Area' },
+    { id: 'pc1', name: 'Gaming PC', kind: 'Container' },
+  ],
+  containerItem: ASSEMBLY_ITEM,
+  scopedLowStockCount: 0,
+  scopedLentCount: 0,
+  childAreas: [],
+  containers: [],
+  items: [{
+    id: 'cpu', name: 'Ryzen 9', fungibility: 'NonFungible', status: 'Active',
+    durableKind: 'Plain', parentItemId: 'pc1', parentDurableKind: 'Assembly', compartment: 'CPU',
+    path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
   }],
   consumables: [],
 };
@@ -184,7 +216,7 @@ describe('DurableDetailPageComponent', () => {
     // A bare leaf durable: placed, but no value/serial/acquired/lent. The common shape in current data.
     durableApi.item = {
       id: 'bare', name: 'Some Container', fungibility: 'NonFungible', status: 'Active',
-      isContainer: false, path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+      durableKind: 'Plain', path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
       resolvedAreaId: 'garage', createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
     };
     const { harness } = await navigate('/inventory/items/bare');
@@ -197,7 +229,7 @@ describe('DurableDetailPageComponent', () => {
   it('shows Unplaced as the location headline for an unplaced durable', async () => {
     durableApi.item = {
       id: 'floating', name: 'Floating Thing', fungibility: 'NonFungible', status: 'Active',
-      isContainer: false, path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+      durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
     };
     const { harness } = await navigate('/inventory/items/floating');
 
@@ -240,6 +272,28 @@ describe('DurableDetailPageComponent', () => {
     expect(content).toContain('Tray'); // child container
     expect(content).toContain('Wrench'); // leaf item
     expect(hrefs(harness)).toContain('/inventory/items/tray');
+  });
+
+  it('renders a Components section (with slot label) for an assembly, not a Contents section', async () => {
+    durableApi.item = ASSEMBLY_ITEM;
+    placeApi.contents = PC_CONTENTS;
+    const { harness } = await navigate('/inventory/items/pc1');
+
+    expect(placeApi.calls).toEqual([{ ContainerItemId: 'pc1' }]);
+    const content = text(harness);
+    expect(content).toContain('Components');
+    expect(content).not.toContain('Contents');
+    expect(content).toContain('Ryzen 9'); // the component
+    expect(content).toContain('CPU'); // its compartment / slot label
+    expect(content).toContain('Add component');
+  });
+
+  it('pre-parents the create dialog under the assembly for "Add component"', async () => {
+    durableApi.item = ASSEMBLY_ITEM;
+    placeApi.contents = PC_CONTENTS;
+    const { component } = await navigate('/inventory/items/pc1');
+
+    expect(component['addComponentLocation']()).toEqual({ kind: 'container', id: 'pc1' });
   });
 
   it('renders the activity history feed with each summary', async () => {

@@ -36,7 +36,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
 
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
-        Guid? parentItemId = null, bool isContainer = false)
+        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain)
     {
         var item = new Item
         {
@@ -46,7 +46,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
             Status = status,
             AreaId = areaId,
             ParentItemId = parentItemId,
-            IsContainer = isContainer,
+            DurableKind = durableKind,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(Ct);
@@ -87,8 +87,8 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_NestedItem_CountsTowardEveryAncestorContainer()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, durableKind: DurableKind.Container);
         var wrench = await AddItemAsync("Wrench", parentItemId: bin.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -102,11 +102,28 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Compute_ComponentOfAssembly_CountsTowardAssemblyArea()
+    {
+        // A component resolves to its assembly's area and counts toward that area (card count ==
+        // area-filtered list), even though the assembly is not a place.
+        var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        var cpu = await AddItemAsync("CPU", parentItemId: pc.Id);
+
+        var placement = await _sut.ComputeAsync(Ct);
+
+        // PC + CPU both resolve to the garage.
+        Assert.Equal(2, placement.AreaItemCounts[_garage.Id]);
+        // The component is attributed to its assembly's subtree like a container's contents.
+        Assert.Equal(1, placement.ContainerStats[pc.Id].ResolvedContentsCount);
+        _ = cpu;
+    }
+
+    [Fact]
     public async Task Compute_ConsumableInTwoSubBins_CountsOncePerAncestorAndArea()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var binA = await AddItemAsync("Bin A", parentItemId: chest.Id, isContainer: true);
-        var binB = await AddItemAsync("Bin B", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var binA = await AddItemAsync("Bin A", parentItemId: chest.Id, durableKind: DurableKind.Container);
+        var binB = await AddItemAsync("Bin B", parentItemId: chest.Id, durableKind: DurableKind.Container);
         var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: binA.Id);
         await AddStockAsync(screws.Id, 5m, containerItemId: binB.Id);
@@ -123,7 +140,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_StockEntryChain_IncludesHoldingContainer()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
 
@@ -137,8 +154,8 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_LowStock_ResolvesThroughChainToAreaAndContainers()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, durableKind: DurableKind.Container);
         var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 3m, containerItemId: bin.Id);
         var ampleTape = await AddConsumableAsync("Tape", threshold: 5m);
@@ -185,8 +202,8 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_CyclicChain_AttributesToNothing()
     {
-        var binA = await AddItemAsync("Bin A", isContainer: true);
-        var binB = await AddItemAsync("Bin B", parentItemId: binA.Id, isContainer: true);
+        var binA = await AddItemAsync("Bin A", durableKind: DurableKind.Container);
+        var binB = await AddItemAsync("Bin B", parentItemId: binA.Id, durableKind: DurableKind.Container);
         binA.ParentItemId = binB.Id; // cycle
         await _db.SaveChangesAsync(Ct);
         var wrench = await AddItemAsync("Wrench", parentItemId: binA.Id);
@@ -204,7 +221,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_UnplacedRootContainer_StillCountsItsContents()
     {
-        var floatingBin = await AddItemAsync("Floating bin", isContainer: true);
+        var floatingBin = await AddItemAsync("Floating bin", durableKind: DurableKind.Container);
         var nested = await AddItemAsync("Pliers", parentItemId: floatingBin.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -219,7 +236,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_TerminalItems_ExcludedFromContainerStats()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Sold drill", status: ItemStatus.Sold, parentItemId: chest.Id);
         await AddItemAsync("Archived lamp", status: ItemStatus.Archived, parentItemId: chest.Id);
 
@@ -233,7 +250,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     public async Task Compute_DirectPlusNested_EqualsAreaItemCount()
     {
         // Mixed area: direct item, chest with nested item + consumable, direct-area consumable stock.
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Direct drill", areaId: _garage.Id);
         await AddItemAsync("Nested wrench", parentItemId: chest.Id);
         var screws = await AddConsumableAsync("Screws");
@@ -310,7 +327,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
         // Bedroom, then up the area chain to House.
         var house = await AddAreaAsync("House");
         var bedroom = await AddAreaAsync("Bedroom", parentAreaId: house.Id);
-        var chest = await AddItemAsync("Chest", areaId: bedroom.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: bedroom.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Watch", parentItemId: chest.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -335,8 +352,8 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
     [Fact]
     public async Task Compute_Lent_Nested_ResolvesThroughChainToAreaAndContainers()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: bin.Id);
 
         var placement = await _sut.ComputeAsync(Ct);
@@ -379,7 +396,7 @@ public class InventoryPlacementServiceTests : IAsyncLifetime
         // A lent item in an unplaced container resolves to no AREA, but still counts toward the
         // container itself — mirrors the item walk (Compute_UnplacedRootContainer_StillCountsItsContents),
         // so drilling into that floating bin shows one lent thing inside.
-        var floatingBin = await AddItemAsync("Floating bin", isContainer: true);
+        var floatingBin = await AddItemAsync("Floating bin", durableKind: DurableKind.Container);
         await AddItemAsync("Lent torch", status: ItemStatus.Lent, parentItemId: floatingBin.Id);
 
         var placement = await _sut.ComputeAsync(Ct);

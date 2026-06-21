@@ -40,7 +40,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
 
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
-        Guid? parentItemId = null, bool isContainer = false)
+        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain)
     {
         var item = new Item
         {
@@ -50,7 +50,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
             Status = status,
             AreaId = areaId,
             ParentItemId = parentItemId,
-            IsContainer = isContainer,
+            DurableKind = durableKind,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(Ct);
@@ -125,7 +125,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_AreaScope_SplitsContainersFromItemsWithSingleSegmentPath()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         var drill = await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Elsewhere", parentItemId: chest.Id); // not direct in the area
 
@@ -141,10 +141,58 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Handle_AreaScope_AssemblyIsAnItemNotADrillCard_ComponentsAbsent()
+    {
+        // An Assembly is not a place: it renders as a plain item row in its area, NOT a drill card,
+        // and its components never appear in the area's drill-in (their parent is the assembly).
+        var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        await AddItemAsync("CPU", parentItemId: pc.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { AreaId = _garage.Id }, Ct);
+
+        Assert.Empty(resp.Containers);
+        Assert.Equal(pc.Id, Assert.Single(resp.Items).Id);
+        Assert.DoesNotContain(resp.Items, i => i.Name == "CPU");
+    }
+
+    [Fact]
+    public async Task Handle_AssemblyScope_ReturnsComponentsAsItemsNoConsumables()
+    {
+        // The same endpoint, called with the assembly id, returns its components as items — reused by
+        // the detail page's Components section.
+        var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        var cpu = await AddItemAsync("CPU", parentItemId: pc.Id);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
+
+        Assert.NotNull(resp.ContainerItem);
+        Assert.Equal(pc.Id, resp.ContainerItem.Id);
+        Assert.Equal(DurableKind.Assembly, resp.ContainerItem.DurableKind);
+        Assert.Equal(cpu.Id, Assert.Single(resp.Items).Id);
+        Assert.Empty(resp.Containers);
+        Assert.Empty(resp.Consumables);
+    }
+
+    [Fact]
+    public async Task Handle_AssemblyScope_ContainerComponentRendersAsItemNotDrillCard()
+    {
+        // A component can itself be a Container; under an assembly scope it must still appear as a
+        // component (items), never split into a drillable place-card — an assembly is not a place.
+        var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        var driveCage = await AddItemAsync(
+            "Drive cage", parentItemId: pc.Id, durableKind: DurableKind.Container);
+
+        var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = pc.Id }, Ct);
+
+        Assert.Empty(resp.Containers);
+        Assert.Equal(driveCage.Id, Assert.Single(resp.Items).Id);
+    }
+
+    [Fact]
     public async Task Handle_ContainerScope_BreadcrumbIncludesSelfAndEnrichesContainer()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
-        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, durableKind: DurableKind.Container);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = bin.Id }, Ct);
 
@@ -165,7 +213,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_ContainerScope_ConsumablesCarryLocalQuantityAndFullStockLocations()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         var screws = await AddConsumableAsync("Screws");
         await AddStockAsync(screws.Id, 10m, containerItemId: chest.Id);
         await AddStockAsync(screws.Id, 5m, areaId: _garage.Id); // elsewhere
@@ -186,7 +234,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_UnplacedScope_ItemsOnlyWithEmptyPath()
     {
-        var floatingBin = await AddItemAsync("Floating bin", isContainer: true);
+        var floatingBin = await AddItemAsync("Floating bin", durableKind: DurableKind.Container);
         var adrift = await AddItemAsync("Adrift wrench");
         await AddItemAsync("Placed drill", areaId: _garage.Id);
         await AddItemAsync("Nested", parentItemId: floatingBin.Id); // resolved-unplaced, not direct
@@ -203,7 +251,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_AreaScope_SplitsDirectContentsAndCardCarriesRolledSubtreeCount()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         var drill = await AddItemAsync("Direct drill", areaId: _garage.Id);
         await AddItemAsync("Nested wrench", parentItemId: chest.Id);
         var screws = await AddConsumableAsync("Screws");
@@ -225,7 +273,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_PreviewNames_CappedAtThreeAndNameSorted()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Zebra print", parentItemId: chest.Id);
         await AddItemAsync("anvil", parentItemId: chest.Id);
         await AddItemAsync("Mallet", parentItemId: chest.Id);
@@ -242,7 +290,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_TerminalChildrenAndArchivedConsumables_Excluded()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Sold drill", status: ItemStatus.Sold, areaId: _garage.Id);
         await AddItemAsync("Archived nested", status: ItemStatus.Archived, parentItemId: chest.Id);
         var archived = await AddConsumableAsync("Old glue", status: ItemStatus.Archived);
@@ -262,7 +310,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     public async Task Handle_TerminalContainerScope_AllowedAndRendersLiveContents()
     {
         var archivedChest = await AddItemAsync(
-            "Archived chest", status: ItemStatus.Archived, areaId: _garage.Id, isContainer: true);
+            "Archived chest", status: ItemStatus.Archived, areaId: _garage.Id, durableKind: DurableKind.Container);
         var wrench = await AddItemAsync("Wrench", parentItemId: archivedChest.Id);
 
         var resp = await _sut.Handle(
@@ -275,7 +323,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_EmptyContainer_ReturnsEmptyLists()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
 
         var resp = await _sut.Handle(new GetPlaceContentsQuery { ContainerItemId = chest.Id }, Ct);
 
@@ -308,7 +356,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_AreaScope_PopulatesScopedLowStockAndLentCounts()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Lent ladder", status: ItemStatus.Lent, areaId: _garage.Id);
         await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
         var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
@@ -323,7 +371,7 @@ public class GetPlaceContentsHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_ContainerScope_PopulatesScopedLowStockAndLentCounts()
     {
-        var chest = await AddItemAsync("Chest", areaId: _garage.Id, isContainer: true);
+        var chest = await AddItemAsync("Chest", areaId: _garage.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Lent wrench", status: ItemStatus.Lent, parentItemId: chest.Id);
         var lowGlue = await AddConsumableAsync("Glue", threshold: 5m);
         await AddStockAsync(lowGlue.Id, 2m, containerItemId: chest.Id);

@@ -30,7 +30,7 @@ public class ConversionsEndpointTests : IntegrationTestBase
     private static async Task<DurableItem> CreateContainerAsync(HttpClient client, string name, Guid? areaId = null)
     {
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
-            new { name, areaId, isContainer = true }, CT);
+            new { name, areaId, durableKind = "Container" }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
     }
@@ -121,7 +121,7 @@ public class ConversionsEndpointTests : IntegrationTestBase
         Assert.Equal("Active", result.Item.Status);
         Assert.Equal(areaId, result.Item.AreaId);
         Assert.Null(result.Item.ParentItemId);
-        Assert.False(result.Item.IsContainer);
+        Assert.Equal("Plain", result.Item.DurableKind);
 
         // The conversion outflow carries the new item's id for two-way traceability.
         var conversions = (await GetMovementsAsync(client, consumable.Id)).Where(m => m.Kind == "Conversion").ToList();

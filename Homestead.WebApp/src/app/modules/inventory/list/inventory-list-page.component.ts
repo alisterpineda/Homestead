@@ -429,19 +429,24 @@ export class InventoryListPageComponent {
     this.consumableQuickPanelState.set('closed');
   }
 
-  /** A container's "View contents" in the quick panel — Browse owns containment navigation. */
+  /** A holder's "View contents/components" in the quick panel — Browse owns containment navigation. */
   onQuickPanelViewContents(durable: DurableResponse): void {
     this.onDurableQuickPanelClosed();
-    this.viewContainerInBrowse(durable.id);
+    this.viewHolder(durable.id, durable.durableKind);
   }
 
-  /** A container row's "View contents" — drill into it on Browse, not in the list. */
+  /** A holder row's "View contents/components" — drill into it (the list never drills inline). */
   onViewContents(row: InventoryRow): void {
-    this.viewContainerInBrowse(row.id);
+    this.viewHolder(row.id, row.durable?.durableKind);
   }
 
-  /** Both "View contents" entry points route to the container's Browse drill (the list never drills). */
-  private viewContainerInBrowse(id: string): void {
-    void this.router.navigate(['/inventory/browse/container', id]);
+  /**
+   * A Container drills into its Browse place (the list never drills); an Assembly is not a place, so
+   * its components live on its detail page's Components section instead.
+   */
+  private viewHolder(id: string, kind: DurableResponse['durableKind']): void {
+    void this.router.navigate(
+      kind === 'Assembly' ? ['/inventory/items', id] : ['/inventory/browse/container', id],
+    );
   }
 }

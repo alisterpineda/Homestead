@@ -93,7 +93,7 @@ public class DeleteAreaHandlerTests : IDisposable
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Sold,
             AreaId = area.Id,
-            IsContainer = true,
+            DurableKind = DurableKind.Container,
         };
         _db.Items.AddRange(bin, new Item
         {

@@ -7,12 +7,13 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
+import { DurableKind } from '../../models/durable-kind';
 import { PaginatedResponseOfDurableResponse } from '../../models/paginated-response-of-durable-response';
 
 export interface GetDurables$Params {
   AreaId?: string;
   ParentItemId?: string;
-  IsContainer?: boolean;
+  DurableKinds?: Array<DurableKind>;
   Unplaced?: boolean;
   IncludeInactive?: boolean;
   Search?: string;
@@ -25,7 +26,7 @@ export function getDurables(http: HttpClient, rootUrl: string, params?: GetDurab
   if (params) {
     rb.query('AreaId', params.AreaId, {});
     rb.query('ParentItemId', params.ParentItemId, {});
-    rb.query('IsContainer', params.IsContainer, {});
+    rb.query('DurableKinds', params.DurableKinds, {});
     rb.query('Unplaced', params.Unplaced, {});
     rb.query('IncludeInactive', params.IncludeInactive, {});
     rb.query('Search', params.Search, {});

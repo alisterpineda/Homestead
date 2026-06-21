@@ -302,7 +302,8 @@ public class StockService(
         var container = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == containerId, ct);
         if (container is null)
             throw new BusinessRuleException("ContainerItemId must reference an existing item.");
-        if (container.Fungibility != Fungibility.NonFungible || !container.IsContainer)
+        // Loose stock can only sit in a Container — an Assembly holds components, not a place that takes stock.
+        if (container.Fungibility != Fungibility.NonFungible || container.DurableKind != DurableKind.Container)
             throw new BusinessRuleException("ContainerItemId must reference a container item.");
     }
 

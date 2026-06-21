@@ -27,16 +27,16 @@ public class CreateDurableHandler(
                 throw new BusinessRuleException("AreaId must reference an existing area.");
         }
 
-        // A parent must be a non-fungible container. No cycle is possible on create — the new row
-        // has no descendants yet.
+        // A parent must be a non-fungible holder (container or assembly). No cycle is possible on
+        // create — the new row has no descendants yet.
         if (request.ParentItemId is { } parentId)
         {
             var parent = await db.Items.AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == parentId, ct);
             if (parent is null)
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
-            if (parent.Fungibility != Fungibility.NonFungible || !parent.IsContainer)
-                throw new BusinessRuleException("ParentItemId must reference a container item.");
+            if (parent.Fungibility != Fungibility.NonFungible || !parent.DurableKind.IsHolder())
+                throw new BusinessRuleException("ParentItemId must reference a container or assembly item.");
         }
 
         // Value and its currency are set together or not at all.
@@ -58,7 +58,7 @@ public class CreateDurableHandler(
             Name = request.Name.Trim(),
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            IsContainer = request.IsContainer,
+            DurableKind = request.DurableKind,
             Notes = Normalize(request.Notes),
             Serial = Normalize(request.Serial),
             AcquiredOn = request.AcquiredOn,

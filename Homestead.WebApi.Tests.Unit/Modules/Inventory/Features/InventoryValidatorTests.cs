@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.CollapseDurables;
@@ -142,10 +143,10 @@ public class CreateDurableCommandValidatorTests
     }
 
     [Fact]
-    public async Task IsContainerAlone_IsValid()
+    public async Task ContainerKindAlone_IsValid()
     {
         var result = await _sut.ValidateAsync(
-            new CreateDurableCommand { Name = "Tool chest", IsContainer = true }, Ct);
+            new CreateDurableCommand { Name = "Tool chest", DurableKind = DurableKind.Container }, Ct);
         Assert.True(result.IsValid);
     }
 }

@@ -10,7 +10,7 @@ function makeItem(overrides: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -95,6 +95,20 @@ describe('InventoryTableComponent', () => {
       expect(html).toContain('italic');
     });
 
+    it('renders "Part of {assembly}" for a component instead of the storage breadcrumb', () => {
+      const row = durableToRow(makeItem({
+        parentDurableKind: 'Assembly',
+        resolvedAreaId: 'garage',
+        path: [
+          { id: 'garage', name: 'Garage', kind: 'Area' },
+          { id: 'pc', name: 'Gaming PC', kind: 'Container' },
+        ],
+      }));
+      const html = renderCell(col().cell, row);
+      expect(html).toContain('Part of Gaming PC');
+      expect(html).not.toContain('Garage › Gaming PC');
+    });
+
     it('renders a muted dash for a consumable with no stock', () => {
       const html = renderCell(col().cell, consumableToRow(makeConsumable({ totalOnHand: 0 })));
       expect(html).toContain('—');
@@ -163,7 +177,7 @@ describe('InventoryTableComponent', () => {
     // reads from the On-hand column and the All/Durables/Consumables filter. Guard the removal.
     it('renders no kind icon in the name cell for any row kind', () => {
       fixture.componentRef.setInput('rows', [
-        durableToRow(makeItem({ isContainer: true })),
+        durableToRow(makeItem({ durableKind: 'Container' })),
         consumableToRow(makeConsumable()),
       ]);
       fixture.detectChanges();

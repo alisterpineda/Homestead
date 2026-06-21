@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -35,10 +36,11 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
         if (items.All(i => i.ParentItemId is null))
             return items.Select(i => ResolveDirect(i, areaNodes)).ToList();
 
-        // Every valid ancestor is a container. A chain legitimately passes through terminal
-        // containers, so this is deliberately NOT filtered by status.
+        // Every valid ancestor is a holder — a container (storage) or an assembly (composition); a
+        // component resolves its area by walking up through its assembly. A chain legitimately passes
+        // through terminal holders, so this is deliberately NOT filtered by status.
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.IsContainer)
+            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly)
             .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
             .ToDictionaryAsync(c => c.Id, ct);
 
@@ -172,7 +174,8 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             .ToHashSet();
 
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.IsContainer || referencedContainerIds.Contains(i.Id))
+            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly
+                || referencedContainerIds.Contains(i.Id))
             .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
             .ToDictionaryAsync(c => c.Id, ct);
 

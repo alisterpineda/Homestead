@@ -2,6 +2,7 @@ import {
   durableToRow,
   consumableToRow,
   placeConsumableToRow,
+  formatPath,
   sortRows,
   type InventoryRow,
 } from './inventory-row';
@@ -15,7 +16,7 @@ function makeItem(over: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     path: [],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
@@ -37,6 +38,35 @@ function makeConsumable(over: Partial<ConsumableResponse> = {}): ConsumableRespo
     ...over,
   };
 }
+
+describe('formatPath', () => {
+  it('renders a storage path for a stored item', () => {
+    const it = makeItem({
+      resolvedAreaId: 'garage',
+      path: [
+        { id: 'garage', name: 'Garage', kind: 'Area' },
+        { id: 'chest', name: 'Tool chest', kind: 'Container' },
+      ],
+    });
+    expect(formatPath(it)).toBe('Garage › Tool chest');
+  });
+
+  it('renders "Part of {assembly}" for a component', () => {
+    const it = makeItem({
+      parentDurableKind: 'Assembly',
+      resolvedAreaId: 'garage',
+      path: [
+        { id: 'garage', name: 'Garage', kind: 'Area' },
+        { id: 'pc', name: 'Gaming PC', kind: 'Container' },
+      ],
+    });
+    expect(formatPath(it)).toBe('Part of Gaming PC');
+  });
+
+  it('renders Unplaced for a directly-unplaced item', () => {
+    expect(formatPath(makeItem())).toBe('Unplaced');
+  });
+});
 
 describe('placeConsumableToRow', () => {
   it('carries the place-local quantity with an of-total hint when more sits elsewhere', () => {

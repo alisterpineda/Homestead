@@ -34,7 +34,7 @@ public class TrackDurableHandler(
             Name = body.Name.Trim(),
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            IsContainer = false,
+            DurableKind = DurableKind.Plain,
             AreaId = body.AreaId,
             ParentItemId = body.ContainerItemId,
             // Compartment is only meaningful inside a container.

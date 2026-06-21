@@ -11,7 +11,7 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
     public string? Notes { get; init; }
     public Guid? AreaId { get; init; }
     public Guid? ParentItemId { get; init; }
-    public required bool IsContainer { get; init; }
+    public DurableKind? DurableKind { get; init; }
     public string? Compartment { get; init; }
     public decimal? Value { get; init; }
     public Guid? ValueCurrencyId { get; init; }
@@ -28,7 +28,7 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
         Notes = source.Notes,
         AreaId = source.AreaId,
         ParentItemId = source.ParentItemId,
-        IsContainer = source.IsContainer,
+        DurableKind = source.DurableKind,
         Compartment = source.Compartment,
         Value = source.Value,
         ValueCurrencyId = source.ValueCurrencyId,
@@ -53,8 +53,8 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
             changes.Add(new ScalarFieldChange("AreaId", AreaId?.ToString(), other.AreaId?.ToString()));
         if (ParentItemId != other.ParentItemId)
             changes.Add(new ScalarFieldChange("ParentItemId", ParentItemId?.ToString(), other.ParentItemId?.ToString()));
-        if (IsContainer != other.IsContainer)
-            changes.Add(new ScalarFieldChange("IsContainer", IsContainer.ToString(), other.IsContainer.ToString()));
+        if (DurableKind != other.DurableKind)
+            changes.Add(new ScalarFieldChange("DurableKind", DurableKind?.ToString(), other.DurableKind?.ToString()));
         if (Compartment != other.Compartment)
             changes.Add(new ScalarFieldChange("Compartment", Compartment, other.Compartment));
         if (Value != other.Value)

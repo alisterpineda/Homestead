@@ -26,8 +26,8 @@ public class GetDurablesHandler(AppDbContext db, IItemLocationResolver locationR
         if (request.ParentItemId is { } parentItemId)
             query = query.Where(i => i.ParentItemId == parentItemId);
 
-        if (request.IsContainer is { } isContainer)
-            query = query.Where(i => i.IsContainer == isContainer);
+        if (request.DurableKinds is { Length: > 0 } kinds)
+            query = query.Where(i => i.DurableKind != null && kinds.Contains(i.DurableKind.Value));
 
         if (request.Unplaced == true)
             query = query.Where(i => i.AreaId == null && i.ParentItemId == null);

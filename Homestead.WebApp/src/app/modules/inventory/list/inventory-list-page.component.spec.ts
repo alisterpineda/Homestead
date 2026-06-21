@@ -32,7 +32,7 @@ function makeItem(over: Partial<DurableResponse>): DurableResponse {
     name: 'Item',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     path: [],
     createdAt: '',
     updatedAt: '',
@@ -58,10 +58,10 @@ function makeConsumable(over: Partial<ConsumableResponse>): ConsumableResponse {
 const GARAGE = 'garage';
 
 // chest(garage) ← wrench, bin(garage), archivedInChest ; bin ← screw(grandchild) ; floating(unplaced)
-const CHEST = makeItem({ id: 'chest', name: 'Tool chest', isContainer: true, areaId: GARAGE, resolvedAreaId: GARAGE });
+const CHEST = makeItem({ id: 'chest', name: 'Tool chest', durableKind: 'Container', areaId: GARAGE, resolvedAreaId: GARAGE });
 const WRENCH = makeItem({ id: 'wrench', name: 'Wrench', parentItemId: 'chest', resolvedAreaId: GARAGE });
 const BIN = makeItem({
-  id: 'bin', name: 'Bin', isContainer: true, parentItemId: 'chest', resolvedAreaId: GARAGE,
+  id: 'bin', name: 'Bin', durableKind: 'Container', parentItemId: 'chest', resolvedAreaId: GARAGE,
   path: [
     { id: GARAGE, name: 'Garage', kind: 'Area' },
     { id: 'chest', name: 'Tool chest', kind: 'Container' },

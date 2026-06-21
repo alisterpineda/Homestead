@@ -68,7 +68,7 @@ public class PlacesEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, isContainer = true });
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
         var drill = await CreateDurableAsync(client, new { name = "Drill", areaId = garageId });
         await CreateDurableAsync(client, new { name = "Nested wrench", parentItemId = chest.Id });
 
@@ -127,8 +127,8 @@ public class PlacesEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
-        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, isContainer = true });
-        var bin = await CreateDurableAsync(client, new { name = "Bin", parentItemId = chest.Id, isContainer = true });
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
+        var bin = await CreateDurableAsync(client, new { name = "Bin", parentItemId = chest.Id, durableKind = "Container" });
 
         var screws = await CreateConsumableAsync(client, "Screws", "screws");
         await ReceiveAsync(client, screws.Id, areaId: null, 10m, containerItemId: bin.Id);
@@ -153,7 +153,7 @@ public class PlacesEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var floatingBin = await CreateDurableAsync(client, new { name = "Floating bin", isContainer = true });
+        var floatingBin = await CreateDurableAsync(client, new { name = "Floating bin", durableKind = "Container" });
         var adrift = await CreateDurableAsync(client, new { name = "Adrift wrench" });
         await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
         await CreateDurableAsync(client, new { name = "Placed drill", areaId = garageId });

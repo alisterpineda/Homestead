@@ -10,16 +10,17 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
     private const string LocationNotBothSql =
         "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)";
 
-    // A fungible row carries none of the non-fungible columns and is never a container.
+    // A fungible row carries none of the non-fungible columns and has no durable kind.
     private const string NonFungibleFieldsSql =
         "\"Fungibility\" = 'NonFungible' OR ("
         + "\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL "
         + "AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL "
-        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" = FALSE)";
+        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL)";
 
-    // A non-fungible row carries none of the fungible columns.
+    // A non-fungible row carries none of the fungible columns and always names a durable kind.
     private const string FungibleFieldsSql =
-        "\"Fungibility\" = 'Fungible' OR (\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL)";
+        "\"Fungibility\" = 'Fungible' OR ("
+        + "\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL AND \"DurableKind\" IS NOT NULL)";
 
     // Estimated value and its currency are set together or not at all.
     private const string ValueCurrencyPairSql =
@@ -70,9 +71,9 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.Value).HasColumnType("numeric");
         builder.Property(i => i.RestockThreshold).HasColumnType("numeric");
 
-        builder.Property(i => i.IsContainer)
-            .IsRequired()
-            .HasDefaultValue(false);
+        builder.Property(i => i.DurableKind)
+            .HasConversion<string>()
+            .HasMaxLength(16);
 
         builder.Property(i => i.CreatedAt)
             .IsRequired()

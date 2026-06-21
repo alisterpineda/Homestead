@@ -31,7 +31,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
 
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
-        Guid? parentItemId = null, bool isContainer = false)
+        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain)
     {
         var item = new Item
         {
@@ -41,7 +41,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
             Status = status,
             AreaId = areaId,
             ParentItemId = parentItemId,
-            IsContainer = isContainer,
+            DurableKind = durableKind,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(Ct);
@@ -114,8 +114,8 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Handle_FiltersByParentItemId_ReturnsDirectChildrenOnly()
     {
-        var chest = await AddItemAsync("Tool chest", areaId: _garage.Id, isContainer: true);
-        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, isContainer: true);
+        var chest = await AddItemAsync("Tool chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        var bin = await AddItemAsync("Bin", parentItemId: chest.Id, durableKind: DurableKind.Container);
         await AddItemAsync("Wrench", parentItemId: chest.Id); // direct child
         await AddItemAsync("Screw driver", parentItemId: bin.Id); // grandchild
 
@@ -129,15 +129,47 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_FiltersByIsContainer()
+    public async Task Handle_FiltersByDurableKinds_ContainerAndAssembly()
     {
-        await AddItemAsync("Tool chest", areaId: _garage.Id, isContainer: true);
+        await AddItemAsync("Tool chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
         await AddItemAsync("Wrench", areaId: _garage.Id);
 
         var resp = await _sut.Handle(
-            new GetDurablesQuery { Page = 1, PageSize = 50, IsContainer = true }, Ct);
+            new GetDurablesQuery
+            {
+                Page = 1,
+                PageSize = 50,
+                DurableKinds = [DurableKind.Container, DurableKind.Assembly],
+            }, Ct);
+
+        Assert.Equal(2, resp.Items.Count);
+        Assert.Contains(resp.Items, i => i.Name == "Tool chest");
+        Assert.Contains(resp.Items, i => i.Name == "Gaming PC");
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByDurableKinds_SingleKind()
+    {
+        await AddItemAsync("Tool chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+
+        var resp = await _sut.Handle(
+            new GetDurablesQuery { Page = 1, PageSize = 50, DurableKinds = [DurableKind.Container] }, Ct);
 
         Assert.Single(resp.Items);
         Assert.Equal("Tool chest", resp.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task Handle_NoKindFilter_IncludesComponentsAndAll()
+    {
+        var pc = await AddItemAsync("Gaming PC", areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        await AddItemAsync("CPU", parentItemId: pc.Id); // a component is first-class in the list
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50 }, Ct);
+
+        Assert.Equal(2, resp.Items.Count);
+        Assert.Contains(resp.Items, i => i.Name == "CPU");
     }
 }

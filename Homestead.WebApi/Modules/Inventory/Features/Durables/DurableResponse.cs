@@ -13,7 +13,17 @@ public record DurableResponse
     public Guid? AreaId { get; init; }
     public string? AreaName { get; init; }
     public Guid? ParentItemId { get; init; }
-    public required bool IsContainer { get; init; }
+
+    /// <summary>Holder-role of this item; null for a fungible consumable.</summary>
+    public DurableKind? DurableKind { get; init; }
+
+    /// <summary>
+    /// The immediate parent's <see cref="Domain.Inventory.DurableKind"/>; null when the item has no
+    /// parent. Drives the client's "Part of X" vs "In X" label/icon without a second fetch — an
+    /// <see cref="Domain.Inventory.DurableKind.Assembly"/> parent means this item is a component.
+    /// </summary>
+    public DurableKind? ParentDurableKind { get; init; }
+
     public string? Compartment { get; init; }
 
     /// <summary>

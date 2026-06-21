@@ -17,12 +17,16 @@ function container(id: string, name: string, opts: { status?: ItemStatus; parent
     name,
     fungibility: 'NonFungible',
     status: opts.status ?? 'Active',
-    isContainer: true,
+    durableKind: 'Container',
     parentItemId: opts.parentItemId ?? null,
     path: [],
     createdAt: '',
     updatedAt: '',
   };
+}
+
+function assembly(id: string, name: string, opts: { status?: ItemStatus; parentItemId?: string | null } = {}): DurableResponse {
+  return { ...container(id, name, opts), durableKind: 'Assembly' };
 }
 
 describe('LocationPickerComponent', () => {
@@ -85,6 +89,33 @@ describe('LocationPickerComponent', () => {
     const ids = component['filteredContainers']().map(c => c.id);
     // 'a' is the item, 'b'/'c'/'d' are its subtree (the walk crosses terminal 'c'), 'f' is terminal.
     expect(ids).toEqual(['e']);
+  });
+
+  it('splits holders into Containers and Part-of groups by durableKind', async () => {
+    await openAndLoad([], [container('chest', 'Tool chest'), assembly('pc', 'Gaming PC')]);
+
+    expect(component['filteredContainers']().map(c => c.id)).toEqual(['chest']);
+    expect(component['filteredAssemblies']().map(c => c.id)).toEqual(['pc']);
+  });
+
+  it('requests both Container and Assembly holders', async () => {
+    component['popoverState'].set('open');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    httpMock.expectOne(r => r.url.includes('/inventory/areas')).flush({ items: [], page: 1, pageSize: 200, totalCount: 0 });
+    const req = httpMock.expectOne(r => r.url.includes('/inventory/durables'));
+    expect(req.request.params.getAll('DurableKinds')).toEqual(['Container', 'Assembly']);
+    req.flush({ items: [], page: 1, pageSize: 200, totalCount: 0 });
+  });
+
+  it('selecting an assembly emits a container-kind value (mapped to parentItemId by consumers)', async () => {
+    await openAndLoad([], [assembly('pc', 'Gaming PC')]);
+
+    const emitted: ItemLocationValue[] = [];
+    component.valueChange.subscribe(v => emitted.push(v));
+    component['onSelectContainer'](assembly('pc', 'Gaming PC'));
+
+    expect(emitted).toEqual([{ kind: 'container', id: 'pc' }]);
   });
 
   it('filters both areas and containers by the search term', async () => {

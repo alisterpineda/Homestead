@@ -27,6 +27,11 @@ public class GetPlaceContentsHandler(
 
         var (path, containerItem) = await ResolveScopeAsync(request, ct);
 
+        // An Assembly scope lists its components: every direct child is a component regardless of its
+        // own kind, so none are split off as drillable place-cards (an assembly is not a place, and a
+        // component that is itself a container/assembly must still render in the parent's list).
+        var scopeIsAssembly = containerItem?.DurableKind == DurableKind.Assembly;
+
         // Direct live children, name-ordered; containers become drillable cards, the rest the
         // inline list. Terminal containers themselves are allowed as the scope (deep links to
         // archived containers still render) — contents are live-filtered regardless.
@@ -44,9 +49,16 @@ public class GetPlaceContentsHandler(
             .Select(DurableResponseMapper.Projection)
             .ToListAsync(ct);
 
-        var childContainers = children.Where(c => c.IsContainer).ToList();
+        // Only Containers become drillable place cards, and only when the scope itself is a place. An
+        // Assembly is not a place, so it falls into the plain-items list; and under an Assembly scope
+        // ALL children are components (a Container child included), so nothing is split into cards.
+        var childContainers = scopeIsAssembly
+            ? new List<DurableResponse>()
+            : children.Where(c => c.DurableKind == DurableKind.Container).ToList();
         var items = await locationResolver.EnrichAsync(
-            children.Where(c => !c.IsContainer).ToList(), ct);
+            (scopeIsAssembly
+                ? children
+                : children.Where(c => c.DurableKind != DurableKind.Container)).ToList(), ct);
 
         var consumables = await LoadConsumablesAsync(request, ct);
 
@@ -134,14 +146,17 @@ public class GetPlaceContentsHandler(
 
         if (request.ContainerItemId is { } containerId)
         {
+            // Any holder is a valid scope: a Container (its stored-in contents) or an Assembly (its
+            // components — reused by the detail page's Components section).
             var container = await db.Items.AsNoTracking()
-                .Where(i => i.Id == containerId && i.IsContainer)
+                .Where(i => i.Id == containerId
+                    && (i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly))
                 .Select(DurableResponseMapper.Projection)
                 .FirstOrDefaultAsync(ct)
                 ?? throw new EntityNotFoundException("Container not found.");
 
             // The holding-location walk includes the holder as the last segment — exactly the
-            // breadcrumb (area › ancestors › this container).
+            // breadcrumb (area › ancestors › this holder).
             var holding = new HoldingLocation(null, containerId);
             var paths = await locationResolver.ResolveHoldingLocationsAsync([holding], ct);
             return (

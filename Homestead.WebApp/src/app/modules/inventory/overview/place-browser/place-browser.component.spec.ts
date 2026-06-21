@@ -27,7 +27,7 @@ function makeItem(over: Partial<DurableResponse>): DurableResponse {
     name: 'Item',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     path: [],
     createdAt: '',
     updatedAt: '',
@@ -83,7 +83,7 @@ const BIN_CONTENTS = makeContents({
     { id: 'chest', name: 'Tool chest', kind: 'Container' },
     { id: 'bin', name: 'Bin', kind: 'Container' },
   ],
-  containerItem: makeItem({ id: 'bin', name: 'Bin', isContainer: true }),
+  containerItem: makeItem({ id: 'bin', name: 'Bin', durableKind: 'Container' }),
   containers: [
     { id: 'tray', name: 'Tray', status: 'Active', itemCount: 2, lowStockCount: 1, previewNames: ['Bits', 'Glue'] },
   ],
@@ -277,7 +277,7 @@ describe('PlaceBrowserComponent', () => {
     const fixture = await create(
       { kind: 'container', id: 'bin' },
       makeContents({
-        containerItem: makeItem({ id: 'bin', name: 'Bin', isContainer: true }),
+        containerItem: makeItem({ id: 'bin', name: 'Bin', durableKind: 'Container' }),
         containers: [
           { id: 'tray', name: 'Tray', status: 'Active', itemCount: 2, lowStockCount: 0, previewNames: [] },
         ],

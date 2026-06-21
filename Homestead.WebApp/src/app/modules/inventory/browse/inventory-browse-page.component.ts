@@ -332,6 +332,17 @@ export class InventoryBrowsePageComponent implements OnDestroy {
         this.pageHeaderService.clearTitle();
       }
     });
+
+    // An assembly is not a Browse place. The container drill route still resolves one (a deep link,
+    // or a breadcrumb segment for an assembly an item is nested under — segments carry no Assembly
+    // kind), so when the drilled scope turns out to be an assembly, bounce to its detail page where
+    // its components live.
+    effect(() => {
+      const ref = this.placeRef();
+      if (ref?.kind === 'container' && this.placeContents()?.containerItem?.durableKind === 'Assembly') {
+        void this.router.navigate(['/inventory/items', ref.id]);
+      }
+    });
   }
 
   ngOnDestroy(): void {

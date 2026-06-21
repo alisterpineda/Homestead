@@ -32,7 +32,9 @@ public class ItemLocationResolverTests : IAsyncLifetime
         return area;
     }
 
-    private async Task<Item> AddContainerAsync(string name, Guid? areaId = null, Guid? parentItemId = null)
+    private async Task<Item> AddContainerAsync(
+        string name, Guid? areaId = null, Guid? parentItemId = null,
+        DurableKind durableKind = DurableKind.Container)
     {
         var item = new Item
         {
@@ -40,7 +42,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
             Name = name,
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            IsContainer = true,
+            DurableKind = durableKind,
             AreaId = areaId,
             ParentItemId = parentItemId,
         };
@@ -55,7 +57,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
         Name = "Item",
         Fungibility = Fungibility.NonFungible,
         Status = ItemStatus.Active,
-        IsContainer = false,
+        DurableKind = DurableKind.Plain,
         AreaId = areaId,
         AreaName = areaName,
         ParentItemId = parentItemId,
@@ -93,6 +95,20 @@ public class ItemLocationResolverTests : IAsyncLifetime
         Assert.Equal(
             [LocationSegmentKind.Area, LocationSegmentKind.Area, LocationSegmentKind.Container, LocationSegmentKind.Container],
             enriched.Path.Select(s => s.Kind));
+    }
+
+    [Fact]
+    public async Task Enrich_ComponentOfAssembly_ResolvesAreaThroughAssembly()
+    {
+        // A component (child of an Assembly) resolves its area by walking up through the assembly,
+        // even though the assembly is not a place.
+        var garage = await AddAreaAsync("Garage");
+        var pc = await AddContainerAsync("Gaming PC", areaId: garage.Id, durableKind: DurableKind.Assembly);
+
+        var enriched = await _sut.EnrichAsync(Response(Guid.NewGuid(), parentItemId: pc.Id), Ct);
+
+        Assert.Equal(garage.Id, enriched.ResolvedAreaId);
+        Assert.Equal(["Garage", "Gaming PC"], enriched.Path.Select(s => s.Name));
     }
 
     [Fact]

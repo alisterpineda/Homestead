@@ -16,7 +16,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
     private static Task<DurableItem> CreateContainerAsync(
         HttpClient client, string name, Guid? areaId = null, Guid? parentItemId = null) =>
-        CreateDurableAsync(client, new { name, areaId, parentItemId, isContainer = true });
+        CreateDurableAsync(client, new { name, areaId, parentItemId, durableKind = "Container" });
 
     private static async Task<DurableItem> GetDurableAsync(HttpClient client, Guid id)
     {
@@ -43,7 +43,7 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal("Cordless drill", item.Name);
         Assert.Equal("NonFungible", item.Fungibility);
         Assert.Equal("Active", item.Status);
-        Assert.False(item.IsContainer);
+        Assert.Equal("Plain", item.DurableKind);
         Assert.Null(item.AreaId);
     }
 
@@ -282,18 +282,21 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetDurables_IsContainerFilter_ReturnsContainersOnly()
+    public async Task GetDurables_DurableKindsFilter_ReturnsHoldersOnly()
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
         var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var pc = await CreateDurableAsync(client,
+            new { name = "Gaming PC", areaId = garageId, durableKind = "Assembly" });
         var wrench = await CreateDurableAsync(client, new { name = "Wrench", areaId = garageId });
 
         var list = await (await client.GetAsync(
-                "/api/v1/inventory/durables?page=1&pageSize=200&isContainer=true", CT))
+                "/api/v1/inventory/durables?page=1&pageSize=200&durableKinds=Container&durableKinds=Assembly", CT))
             .Content.ReadFromJsonAsync<PaginatedResult<DurableItem>>(CT);
 
         Assert.Contains(list!.Items, i => i.Id == chest.Id);
+        Assert.Contains(list.Items, i => i.Id == pc.Id);
         Assert.DoesNotContain(list.Items, i => i.Id == wrench.Id);
     }
 
@@ -464,7 +467,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
         var firstAttempt = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
         Assert.Equal(HttpStatusCode.BadRequest, firstAttempt.StatusCode);
 
         // Archiving the child does not release the role-off block (Rule B: ANY child blocks).
@@ -475,7 +478,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
         var retry = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
         Assert.Equal(HttpStatusCode.BadRequest, retry.StatusCode);
     }
 
@@ -512,7 +515,7 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, sellResp.StatusCode);
         var sold = (await sellResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
         Assert.Equal("Sold", sold.Status);
-        Assert.True(sold.IsContainer); // role stays on, preserving the invariant for leftovers.
+        Assert.Equal("Container", sold.DurableKind); // kind stays, preserving the invariant for leftovers.
     }
 
     // ----- Containment: escape hatch -----
@@ -567,9 +570,9 @@ public class DurablesEndpointTests : IntegrationTestBase
         // With the container now empty, role-off succeeds.
         var roleOffResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
+            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
         Assert.Equal(HttpStatusCode.OK, roleOffResp.StatusCode);
         var noLongerContainer = (await roleOffResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
-        Assert.False(noLongerContainer.IsContainer);
+        Assert.Equal("Plain", noLongerContainer.DurableKind);
     }
 }

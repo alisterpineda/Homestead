@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Inventory;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 
@@ -12,11 +13,11 @@ public record CreateDurableCommand : ICommand<DurableResponse>
     public required string Name { get; init; }
     public Guid? AreaId { get; init; }
 
-    /// <summary>Place the new item inside this container. At most one of this / <see cref="AreaId"/>.</summary>
+    /// <summary>Place the new item inside this holder (container or assembly). At most one of this / <see cref="AreaId"/>.</summary>
     public Guid? ParentItemId { get; init; }
 
-    /// <summary>Whether the new item is itself a container.</summary>
-    public bool IsContainer { get; init; }
+    /// <summary>Holder-role of the new item; defaults to <see cref="DurableKind.Plain"/> (holds nothing).</summary>
+    public DurableKind DurableKind { get; init; } = DurableKind.Plain;
 
     /// <summary>Free-text sub-position; only allowed when <see cref="ParentItemId"/> is set.</summary>
     public string? Compartment { get; init; }

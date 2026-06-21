@@ -10,7 +10,7 @@ import {
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideChevronDown, lucideSearch, lucideCheck, lucideBox } from '@ng-icons/lucide';
+import { lucideChevronDown, lucideSearch, lucideCheck, lucideBox, lucideCpu } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -45,7 +45,7 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
   selector: 'app-location-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmInput, HlmSpinner],
-  providers: [provideIcons({ lucideChevronDown, lucideSearch, lucideCheck, lucideBox })],
+  providers: [provideIcons({ lucideChevronDown, lucideSearch, lucideCheck, lucideBox, lucideCpu })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
       <button
@@ -68,10 +68,10 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
           <input
             hlmInput
             class="h-8 w-full pl-8"
-            placeholder="Search areas and containers..."
+            placeholder="Search areas, containers, devices…"
             [value]="searchTerm()"
             (input)="searchTerm.set(asValue($event))"
-            aria-label="Search areas and containers"
+            aria-label="Search areas, containers, devices"
           />
         </div>
         <div class="max-h-[320px] overflow-y-auto p-1">
@@ -131,7 +131,31 @@ const EMPTY_OPTIONS: LoadedOptions = { areas: [], containers: [] };
               }
             }
 
-            @if (filteredAreas().length === 0 && filteredContainers().length === 0) {
+            @if (filteredAssemblies().length > 0) {
+              <span class="block px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">Part of</span>
+              @for (assembly of filteredAssemblies(); track assembly.id) {
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  (click)="onSelectContainer(assembly)"
+                >
+                  <span class="flex min-w-0 items-center gap-2">
+                    <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" />
+                    <span class="min-w-0">
+                      <span class="block truncate">{{ assembly.name }}</span>
+                      @if (containerSubtitle(assembly); as subtitle) {
+                        <span class="block truncate text-xs text-muted-foreground">{{ subtitle }}</span>
+                      }
+                    </span>
+                  </span>
+                  @if (isSelectedContainer(assembly.id)) {
+                    <ng-icon hlm name="lucideCheck" size="sm" />
+                  }
+                </button>
+              }
+            }
+
+            @if (filteredAreas().length === 0 && filteredContainers().length === 0 && filteredAssemblies().length === 0) {
               <p class="px-2 py-4 text-center text-sm text-muted-foreground">No locations found.</p>
             }
           }
@@ -177,7 +201,12 @@ export class LocationPickerComponent {
             catchError(() => of<AreaResponse[]>([])),
           ),
           containers: this.durableApi
-            .getDurables({ Page: 1, PageSize: 200, IsContainer: true, IncludeInactive: true })
+            .getDurables({
+              Page: 1,
+              PageSize: 200,
+              DurableKinds: ['Container', 'Assembly'],
+              IncludeInactive: true,
+            })
             .pipe(
               map(r => (r.items ?? []) as DurableResponse[]),
               catchError(() => of<DurableResponse[]>([])),
@@ -238,13 +267,21 @@ export class LocationPickerComponent {
     return term ? tree.filter(n => n.area.name.toLowerCase().includes(term)) : tree;
   });
 
-  protected filteredContainers = computed(() => {
+  // Storage places (drillable containers) and assemblies (component holders) render as two distinct
+  // groups; both still emit the same { kind: 'container', id } value (the server derives the
+  // relationship from the parent's kind).
+  protected filteredContainers = computed(() => this.filteredHolders('Container'));
+  protected filteredAssemblies = computed(() => this.filteredHolders('Assembly'));
+
+  private filteredHolders(kind: DurableResponse['durableKind']): DurableResponse[] {
     const term = this.searchTerm().trim().toLowerCase();
     const excluded = this.excludedIds();
-    // Display live containers only; the exclusion walk above still crosses terminal ones.
-    const live = this.allContainers().filter(c => !excluded.has(c.id) && !isTerminalStatus(c.status));
+    // Display live holders only; the exclusion walk above still crosses terminal ones.
+    const live = this.allContainers().filter(
+      c => c.durableKind === kind && !excluded.has(c.id) && !isTerminalStatus(c.status),
+    );
     return term ? live.filter(c => c.name.toLowerCase().includes(term)) : live;
-  });
+  }
 
   protected displayLabel = computed<string | null>(() => {
     const v = this.value();

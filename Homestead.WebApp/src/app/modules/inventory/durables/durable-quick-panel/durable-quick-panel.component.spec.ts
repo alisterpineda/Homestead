@@ -14,7 +14,7 @@ function makeItem(over: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     areaId: 'garage',
     areaName: 'Garage',
     path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
@@ -268,7 +268,7 @@ describe('DurableQuickPanelComponent', () => {
 
   describe('contents count', () => {
     it('fetches a PageSize-1 children count for containers when opened', async () => {
-      await open(makeItem({ isContainer: true }));
+      await open(makeItem({ durableKind: 'Container' }));
       expect(api.getDurablesCalls).toEqual([
         { ParentItemId: 'item-1', IncludeInactive: true, Page: 1, PageSize: 1 },
       ]);
@@ -276,7 +276,7 @@ describe('DurableQuickPanelComponent', () => {
     });
 
     it('does not fetch contents for non-containers', async () => {
-      await open(makeItem({ isContainer: false }));
+      await open(makeItem({ durableKind: 'Plain' }));
       expect(api.getDurablesCalls.length).toBe(0);
       expect(component.contentsCount()).toBeNull();
     });
@@ -309,7 +309,7 @@ describe('DurableQuickPanelComponent', () => {
 
   describe('outputs', () => {
     it('emits viewContents with the current item', async () => {
-      const item = makeItem({ isContainer: true });
+      const item = makeItem({ durableKind: 'Container' });
       await open(item);
       let emitted: DurableResponse | undefined;
       component.viewContents.subscribe((v) => (emitted = v));

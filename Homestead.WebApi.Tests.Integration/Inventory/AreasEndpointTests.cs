@@ -14,8 +14,8 @@ internal record PlaceContentsLite(
     IReadOnlyList<LocationSegmentItem> Path, IReadOnlyList<ChildAreaItem> ChildAreas);
 internal record DurableItem(
     Guid Id, string Name, string Fungibility, string Status,
-    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool IsContainer,
-    Guid? ParentItemId, string? Compartment, Guid? ResolvedAreaId,
+    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, string? DurableKind,
+    Guid? ParentItemId, string? ParentDurableKind, string? Compartment, Guid? ResolvedAreaId,
     IReadOnlyList<LocationSegmentItem>? Path);
 // Enum serializes as a string server-side, so Kind is "Area" | "Container".
 internal record LocationSegmentItem(Guid Id, string Name, string Kind);

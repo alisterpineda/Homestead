@@ -35,10 +35,17 @@ public class Item
     public Guid? ParentItemId { get; set; }
     public Item? ParentItem { get; set; }
 
-    /// <summary>Container role; only a non-fungible item may be a container.</summary>
-    public bool IsContainer { get; set; }
+    /// <summary>
+    /// Holder-role; set on every non-fungible item, null on fungible items. A <see cref="DurableKind.Container"/>
+    /// stores children and stock; an <see cref="DurableKind.Assembly"/> holds components; a
+    /// <see cref="DurableKind.Plain"/> item holds nothing and cannot be a parent.
+    /// </summary>
+    public DurableKind? DurableKind { get; set; }
 
-    /// <summary>Free-text sub-position within a parent ("top drawer").</summary>
+    /// <summary>
+    /// Free-text sub-position within a parent ("top drawer"); doubles as the component role/slot
+    /// label ("CPU") for a child of an <see cref="DurableKind.Assembly"/>.
+    /// </summary>
     public string? Compartment { get; set; }
 
     /// <summary>Estimated value; paired both-or-neither with <see cref="ValueCurrencyId"/>.</summary>

@@ -21,10 +21,11 @@ public class DeleteDurableHandler(AppDbContext db, IAuditContext audit, IUnitOfW
             return false;
 
         // Delete is the mistake-eraser; an item that has held contents carries history and can only
-        // be archived. Contents are nested items or fungible stock entries pointing at this container.
+        // be archived. Contents are nested items — stored-in children of a container or components of
+        // an assembly — or fungible stock entries pointing at this container (the ParentItemId FK is Restrict).
         var hasChildren = await db.Items.AnyAsync(i => i.ParentItemId == item.Id, ct);
         if (hasChildren)
-            throw new BusinessRuleException("Item has contents and cannot be deleted. Archive it instead.");
+            throw new BusinessRuleException("Item has contents or components and cannot be deleted. Archive it instead.");
 
         var hasStock = await db.StockEntries.AnyAsync(e => e.ContainerItemId == item.Id, ct);
         if (hasStock)

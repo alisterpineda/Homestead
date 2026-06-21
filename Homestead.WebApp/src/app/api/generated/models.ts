@@ -81,6 +81,7 @@ export type { DocumentSuggestionField } from './models/document-suggestion-field
 export type { DocumentSuggestionStatus } from './models/document-suggestion-status';
 export type { DownloadDocumentsCommand } from './models/download-documents-command';
 export type { DownloadDocumentsResponse } from './models/download-documents-response';
+export type { DurableKind } from './models/durable-kind';
 export type { DurableResponse } from './models/durable-response';
 export type { EmptyTrashResponse } from './models/empty-trash-response';
 export type { FinanceSettingsResponse } from './models/finance-settings-response';

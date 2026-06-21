@@ -26,7 +26,10 @@ public class GetDurableActivityHandler(AppDbContext db)
         ["Serial"] = "serial",
         ["AcquiredOn"] = "acquired date",
         ["LentTo"] = "lent to",
-        ["IsContainer"] = "container role",
+        ["DurableKind"] = "type",
+        // Historical rows recorded the old boolean under "IsContainer"; keep mapping it so pre-migration
+        // activity still reads "type" rather than the raw field name.
+        ["IsContainer"] = "type",
         ["Notes"] = "notes",
         ["Unit"] = "unit",
         ["RestockThreshold"] = "restock threshold",

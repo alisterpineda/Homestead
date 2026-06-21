@@ -16,8 +16,8 @@ The module is not an asset-management system, a warehouse/WMS, a shopping-list a
 - **Items** — anything owned, in one of two flavours distinguished by **fungibility**:
   - **Non-fungible** items: single, identity-tracked instances that live in exactly one place (or nowhere yet).
   - **Fungible** items ("consumables"): a *type* whose quantity is spread across one or more locations, with a total on-hand that is the sum.
-- **Containment** — any non-fungible item can be a **container** that holds other items; containers nest arbitrarily deep. Moving a container carries its contents automatically.
-- **Derived location** — an item's resolved area is computed by walking up the containment chain, never stored, so move-with-contents is free and never drifts out of sync.
+- **Holding** — any non-fungible item can hold others, as a **container** (storage: a place you browse into) or an **assembly** (composition: a machine and its components); both nest arbitrarily deep, and moving one carries its contents/components automatically. A child's relationship is derived from the parent's kind (`DurableKind`).
+- **Derived location** — an item's resolved area is computed by walking up the parent chain through holders of either kind, never stored, so move-with-contents is free and never drifts out of sync.
 - **Stock tracking** — per-location quantities for fungible items, a total on-hand, and a low-stock signal against an optional per-item restock threshold.
 - **A usage/movement ledger** — an append-only history of every fungible quantity change, so consumption over time (burn rate) can be measured. Captured from day one even though v1's surfaces are mostly current-state.
 - **Lifecycle status** — items carry a status (`Active`, `Lent`, `InRepair`, `Sold`, `Discarded`, `Archived`) that records the real-world state of the thing, with terminal states hidden from default views.
@@ -58,13 +58,18 @@ The labels users see — "durables" vs "consumables" — are presentation only. 
 
 See [stock.md](stock.md) for the fungible model in full: stock entries, the movement ledger, thresholds, and the conversion operations.
 
-### Container and containment
+### Holders: containment vs composition
 
-A **container** is any non-fungible item with its container role switched on. Containers are not a separate type — being a container is a role any non-fungible item can play, so a toolbox, a drawer, a shelf, and a storage bin are all just items that happen to hold other things. A container's contents are the non-fungible items parented to it **plus** any fungible stock whose stock entry points at it (shown at the per-container quantity). Containers nest: a bin inside a cupboard inside the garage.
+Every non-fungible item carries a three-valued **`DurableKind`** that names its holder-role: **`Plain`** (holds nothing — the default), **`Container`**, or **`Assembly`**. Being a holder is a role any non-fungible item can play, not a separate type — a toolbox, a drawer, a shelf, and a storage bin are all just items with `DurableKind = Container`. The two holder kinds model two genuinely different relationships:
 
-Fungible items can never be containers — only a single, identity-tracked thing can be opened and have contents. A container's role cannot be switched off while it still holds anything.
+- A **container** is a storage *place* you browse into and file loose things under. Its contents are the non-fungible items parented to it **plus** any fungible stock whose stock entry points at it (shown at the per-container quantity). Containers nest: a bin inside a cupboard inside the garage.
+- An **assembly** is a machine that holds **components** — a CPU in a PC, installed not stored. An assembly is **not a place**: it never appears as a drillable card in spatial Browse and cannot take loose stock. Its components are still **first-class items** in the unified list (their location reads "Part of Gaming PC") and resolve to the assembly's area, but they are reached through the assembly's detail-page **Components** section, not the area's Browse drill-in.
 
-See [locations.md](locations.md) for containment typing rules, nesting, cycle prevention, and what "empty" means.
+A child's relationship is **derived from its parent's kind** — there is no per-child attachment flag. The free-text `Compartment` doubles as the component **slot label** ("CPU", "RAM slot 1"); structured/empty slots are deferred. Fungible items are never holders (only a single, identity-tracked thing can hold contents), so `DurableKind` is null for them. A holder's kind cannot be changed while it still holds anything.
+
+This replaces an earlier `IsContainer` boolean, and fixes its conflation bug: selling a PC as a unit is no longer blocked by its live components (they ride along, like the contents of a lent bag), whereas a container with live stored-in contents still blocks.
+
+See [locations.md](locations.md) for containment-vs-composition typing rules, nesting, cycle prevention, and what "empty" means.
 
 ### Resolved location
 
@@ -122,9 +127,9 @@ See [stock.md](stock.md) for both operations step by step, including the whole-n
 
 ## Design principles
 
-### Location is a tree; containers are a role, not a type
+### Location is a tree; holding is a role, not a type
 
-Areas are fixed structure; everything else owned is an item; and any non-fungible item can hold other items. Collapsing "container" into "a role an item plays" rather than a separate entity means one ID space, uniform handling of mixed contents (a bin holds both a tracked camera and a pile of screws), and no special table for "storage." It is the single decision that makes the rest of the model fall out.
+Areas are fixed structure; everything else owned is an item; and any non-fungible item can hold other items — either as a **container** (storage) or an **assembly** (composition), named by its `DurableKind`. Collapsing "holder" into "a role an item plays" rather than a separate entity means one ID space, uniform handling of mixed contents (a bin holds both a tracked camera and a pile of screws), and no special table for "storage." Splitting the role into two kinds keeps the tree honest: a place you browse into and a machine whose parts ride along are genuinely different, and conflating them (the old `IsContainer` boolean) wrongly blocked selling a machine as a unit. It is the single decision that makes the rest of the model fall out.
 
 ### Resolved location is derived, never stored
 

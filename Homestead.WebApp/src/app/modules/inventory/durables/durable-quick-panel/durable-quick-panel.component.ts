@@ -13,7 +13,7 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideBox, lucideArrowRight } from '@ng-icons/lucide';
+import { lucideBox, lucideCpu, lucideArrowRight } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -66,14 +66,16 @@ type InlineForm = 'move' | 'lent' | null;
     LocationPickerComponent,
     ItemStatusBadgeComponent,
   ],
-  providers: [provideIcons({ lucideBox, lucideArrowRight })],
+  providers: [provideIcons({ lucideBox, lucideCpu, lucideArrowRight })],
   template: `
     <hlm-sheet [side]="sheetSide()" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
           <div class="flex items-center gap-2">
-            @if (view()?.isContainer) {
+            @if (view()?.durableKind === 'Container') {
               <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
+            } @else if (view()?.durableKind === 'Assembly') {
+              <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
             }
             <h3 hlmSheetTitle class="min-w-0 truncate">{{ view()?.name }}</h3>
             @if (view()?.status; as status) {
@@ -209,18 +211,18 @@ type InlineForm = 'move' | 'lent' | null;
               </div>
             }
 
-            <!-- Contents (containers only) -->
-            @if (it.isContainer) {
+            <!-- Contents (containers) / Components (assemblies) -->
+            @if (isHolder()) {
               <div hlmItem variant="outline" size="sm">
                 <div hlmItemContent>
                   <span class="text-sm">
                     {{ contentsCount() === null ? '…' : contentsCount() }}
-                    {{ contentsCount() === 1 ? 'item' : 'items' }}
+                    {{ contentsCountNoun() }}
                   </span>
                 </div>
                 <div hlmItemActions>
                   <button hlmBtn variant="ghost" size="sm" class="max-md:h-11" (click)="onViewContents()">
-                    View contents
+                    {{ isAssembly() ? 'View components' : 'View contents' }}
                     <ng-icon hlm name="lucideArrowRight" size="sm" />
                   </button>
                 </div>
@@ -272,6 +274,18 @@ export class DurableQuickPanelComponent {
     return it ? formatPath(it) : '';
   });
 
+  protected isAssembly = computed(() => this.view()?.durableKind === 'Assembly');
+  // Both Containers and Assemblies hold children; the count card renders for either.
+  protected isHolder = computed(() => {
+    const k = this.view()?.durableKind;
+    return k === 'Container' || k === 'Assembly';
+  });
+  protected contentsCountNoun = computed(() => {
+    const n = this.contentsCount();
+    if (this.isAssembly()) return n === 1 ? 'component' : 'components';
+    return n === 1 ? 'item' : 'items';
+  });
+
   // Drives whether the Details card renders at all — when serial/value/acquired/lent/notes are all
   // empty it would be an empty box (status moved to the header, Updated to the footer). Mirrors
   // `hasDetails` on durable-detail-page, plus notes (which live inside this card, not the header here).
@@ -288,11 +302,12 @@ export class DurableQuickPanelComponent {
     return updatedAt ? formatRelativeAge(updatedAt) : '';
   });
 
-  // Lazy contents count, containers only — PageSize 1 just to read totalCount.
+  // Lazy contents count, holders only (a container's contents or an assembly's components) —
+  // PageSize 1 just to read totalCount.
   private contentsKey = computed(() => {
     const it = this.view();
     const open = this.state() === 'open';
-    return { id: open && it?.isContainer ? it.id : null };
+    return { id: open && this.isHolder() ? it!.id : null };
   });
 
   contentsCount = toSignal<number | null, number | null>(

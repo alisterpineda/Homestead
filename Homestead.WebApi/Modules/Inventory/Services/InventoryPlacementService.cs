@@ -16,10 +16,11 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
 {
     public async Task<InventoryPlacement> ComputeAsync(CancellationToken ct = default)
     {
-        // Every valid ancestor is a container; deliberately not status-filtered (a chain may pass
-        // through terminal containers), same as the resolver.
+        // Every valid ancestor is a holder — container (storage) or assembly (composition); a
+        // component resolves and counts through its (non-place) assembly. Deliberately not
+        // status-filtered (a chain may pass through terminal holders), same as the resolver.
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.IsContainer)
+            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly)
             .Select(i => new { i.Id, i.AreaId, i.ParentItemId })
             .ToDictionaryAsync(c => c.Id, c => new ContainerNode(c.AreaId, c.ParentItemId), ct);
 
@@ -108,10 +109,10 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
         // Fungible types count once per area any stock entry resolves to. The status filter is
         // load-bearing: archived consumables can retain stock entries, and the list hides them.
         // Entries resolving to no area are ignored — Unplaced is items-only.
-        // A CURRENT entry's holder is always a container — PatchDurable's role-off gate blocks
-        // turning the role off while stock sits inside — so the IsContainer-only dictionary
-        // suffices here; ItemLocationResolver.ResolveHoldingLocationsAsync's by-id tolerance for
-        // de-containered holders exists for HISTORICAL ledger locations only.
+        // A CURRENT entry's holder is always a container — PatchDurable's kind-change gate blocks
+        // changing the type while stock sits inside — so the holder dictionary (a superset of the
+        // stock-holding containers) suffices here; ItemLocationResolver.ResolveHoldingLocationsAsync's
+        // by-id tolerance for de-containered holders exists for HISTORICAL ledger locations only.
         var stockEntries = await db.StockEntries.AsNoTracking()
             .Where(e => ItemStatusExtensions.LiveStatuses.Contains(e.Item.Status))
             .Select(e => new { e.ItemId, e.AreaId, e.ContainerItemId })

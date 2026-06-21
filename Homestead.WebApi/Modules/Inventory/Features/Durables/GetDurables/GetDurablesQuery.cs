@@ -1,5 +1,7 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Domain.Inventory;
 using MediatR;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 
@@ -12,11 +14,16 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     /// </summary>
     public Guid? AreaId { get; init; }
 
-    /// <summary>Restrict to direct children of this container.</summary>
+    /// <summary>Restrict to direct children of this holder (container or assembly).</summary>
     public Guid? ParentItemId { get; init; }
 
-    /// <summary>Restrict to container / non-container items.</summary>
-    public bool? IsContainer { get; init; }
+    /// <summary>
+    /// Restrict to items whose holder-role is one of these kinds. Empty/absent ⇒ no kind filter (all
+    /// non-fungible items, components included). The placement picker passes
+    /// <c>[Container, Assembly]</c>; the list can pass a single kind.
+    /// </summary>
+    [FromQuery(Name = "DurableKinds")]
+    public DurableKind[]? DurableKinds { get; init; }
 
     /// <summary>
     /// Restrict to items with no <b>direct</b> location (neither area nor container). Like

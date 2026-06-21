@@ -14,7 +14,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
-import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { CurrencyPickerComponent } from '@/modules/finances/shared/currency-picker/currency-picker.component';
@@ -25,6 +24,7 @@ import { tomorrowIso } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { DurableKind } from '@/api/generated/models/durable-kind';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -43,7 +43,6 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
     HlmLabel,
     HlmInput,
     HlmSelectImports,
-    HlmCheckboxImports,
     CurrencyPickerComponent,
     LocationPickerComponent,
   ],
@@ -142,27 +141,37 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 
             @if (editParentItemId() !== null) {
               <div class="space-y-2">
-                <label hlmLabel for="durable-compartment">Compartment</label>
+                <label hlmLabel for="durable-compartment">Compartment / slot</label>
                 <input
                   hlmInput
                   id="durable-compartment"
                   class="w-full"
                   maxlength="256"
-                  placeholder="e.g. Top drawer"
+                  placeholder="e.g. Top drawer, CPU"
                   [value]="editCompartment()"
                   (input)="editCompartment.set(asValue($event))"
                 />
               </div>
             }
 
-            <label class="flex items-center gap-2 text-sm cursor-pointer" hlmLabel>
-              <hlm-checkbox
-                [checked]="editIsContainer()"
-                (checkedChange)="editIsContainer.set($event === true)"
-                [aria-label]="'This durable is a container'"
-              />
-              <span>This durable is a container</span>
-            </label>
+            <div class="space-y-2">
+              <label hlmLabel>Type</label>
+              <hlm-select [ngModel]="editDurableKind()" (ngModelChange)="editDurableKind.set($event)" [itemToString]="durableKindToString">
+                <hlm-select-trigger class="w-full" aria-label="Durable type">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    <hlm-select-item value="Plain">Plain item</hlm-select-item>
+                    <hlm-select-item value="Container">Container</hlm-select-item>
+                    <hlm-select-item value="Assembly">Assembly</hlm-select-item>
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+              <p class="text-xs text-muted-foreground">
+                Empty the item (move out its contents) before changing its type.
+              </p>
+            </div>
 
             <div class="space-y-2">
               <label hlmLabel>Status</label>
@@ -248,7 +257,8 @@ export class EditDurableSheetComponent {
   editParentItemId = seededLinkedSignal<string, string | null>(
     this.seedKey, () => this.openDurable()?.parentItemId ?? null);
   editCompartment = seededLinkedSignal(this.seedKey, () => this.openDurable()?.compartment ?? '');
-  editIsContainer = seededLinkedSignal(this.seedKey, () => this.openDurable()?.isContainer ?? false);
+  editDurableKind = seededLinkedSignal<string, DurableKind>(
+    this.seedKey, () => this.openDurable()?.durableKind ?? 'Plain');
   editStatus = seededLinkedSignal<string, ItemStatus>(
     this.seedKey, () => this.openDurable()?.status ?? 'Active');
   editLentTo = seededLinkedSignal(this.seedKey, () => this.openDurable()?.lentTo ?? '');
@@ -350,6 +360,9 @@ export class EditDurableSheetComponent {
 
   statusToString = (status: ItemStatus): string => itemStatusLabel(status);
 
+  durableKindToString = (kind: DurableKind): string =>
+    kind === 'Plain' ? 'Plain item' : kind;
+
   asValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
@@ -397,7 +410,9 @@ export class EditDurableSheetComponent {
     const parentItemId = this.editParentItemId();
     if (parentItemId !== (it.parentItemId ?? null)) ops.push(replace('/parentItemId', parentItemId));
 
-    if (this.editIsContainer() !== it.isContainer) ops.push(replace('/isContainer', this.editIsContainer()));
+    // Compare against the same default the field is seeded with, so an item with a null/absent kind
+    // doesn't emit a spurious /durableKind op when the user never touched the Type select.
+    if (this.editDurableKind() !== (it.durableKind ?? 'Plain')) ops.push(replace('/durableKind', this.editDurableKind()));
 
     // Compartment only travels while in a container; the server auto-clears it on unplace.
     if (parentItemId !== null) {

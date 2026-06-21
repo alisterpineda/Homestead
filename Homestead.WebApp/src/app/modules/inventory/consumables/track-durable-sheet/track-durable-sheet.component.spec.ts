@@ -10,7 +10,7 @@ import type { TrackDurableResponse } from '@/api/generated/models/track-durable-
 
 const TRACK_RESULT: TrackDurableResponse = {
   detail: { consumable: { id: 's1', name: 'Drill bits', status: 'Active', unit: 'bits', totalOnHand: 4, isLow: false, createdAt: '', updatedAt: '' }, locations: [] },
-  item: { id: 'i1', name: 'Drill bit #1', fungibility: 'NonFungible', status: 'Active', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+  item: { id: 'i1', name: 'Drill bit #1', fungibility: 'NonFungible', status: 'Active', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
 };
 
 class StubConsumableApi {

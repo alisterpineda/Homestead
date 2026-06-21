@@ -6,7 +6,9 @@ import { of } from 'rxjs';
 import { toast } from '@spartan-ng/brain/sonner';
 import { CreateEntryDialogComponent } from './create-entry-dialog.component';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
+import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import type { CreateConsumableCommand } from '@/api/generated/models/create-consumable-command';
+import type { CreateDurableCommand } from '@/api/generated/models/create-durable-command';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 
 // The embedded location picker's popover uses ResizeObserver.
@@ -20,10 +22,12 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 
 describe('CreateEntryDialogComponent', () => {
   let createConsumable: ReturnType<typeof vi.fn>;
+  let createDurable: ReturnType<typeof vi.fn>;
   let successToast: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     createConsumable = vi.fn().mockReturnValue(of({ id: 'new-consumable' }));
+    createDurable = vi.fn().mockReturnValue(of({ id: 'new-durable' }));
     successToast = vi.spyOn(toast, 'success').mockImplementation(() => undefined as never);
     TestBed.configureTestingModule({
       providers: [
@@ -31,9 +35,15 @@ describe('CreateEntryDialogComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: InventoryConsumableApiService, useValue: { createConsumable } },
+        { provide: InventoryDurableApiService, useValue: { createDurable } },
       ],
     });
   });
+
+  /** The last body passed to the mocked createDurable. */
+  function submittedDurableBody(): CreateDurableCommand {
+    return createDurable.mock.calls.at(-1)![0].body as CreateDurableCommand;
+  }
 
   function create(initialLocation: ItemLocationValue | null = null, initialLocationLabel: string | null = null):
     ComponentFixture<CreateEntryDialogComponent> {
@@ -110,6 +120,42 @@ describe('CreateEntryDialogComponent', () => {
       .toEqual({ kind: 'container', id: 'chest' });
     expect(create({ kind: 'unplaced' }).componentInstance.placedInitialLocation()).toBeNull();
     expect(create(null).componentInstance.placedInitialLocation()).toBeNull();
+  });
+
+  it('sends durableKind=Plain by default when creating a durable', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.onStateChanged('open');
+    component.name.set('Cordless drill');
+
+    component.handleSubmit(new Event('submit'));
+
+    expect(createDurable).toHaveBeenCalledTimes(1);
+    expect(submittedDurableBody().durableKind).toBe('Plain');
+  });
+
+  it('sends the chosen durableKind (Assembly) when creating a durable', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.onStateChanged('open');
+    component.name.set('Gaming PC');
+    component.durableKind.set('Assembly');
+
+    component.handleSubmit(new Event('submit'));
+
+    const body = submittedDurableBody();
+    expect(body.name).toBe('Gaming PC');
+    expect(body.durableKind).toBe('Assembly');
+  });
+
+  it('resets the durable type to Plain on open', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.durableKind.set('Container');
+
+    component.onStateChanged('open');
+
+    expect(component.durableKind()).toBe('Plain');
   });
 
   it('seeds starting stock when a quantity is entered at a drilled area', () => {

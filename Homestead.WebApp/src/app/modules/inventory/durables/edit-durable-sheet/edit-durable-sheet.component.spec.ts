@@ -20,7 +20,7 @@ function makeItem(overrides: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    isContainer: false,
+    durableKind: 'Plain',
     path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -78,14 +78,14 @@ describe('EditDurableSheetComponent', () => {
 
     it('seeds the container / parent / compartment fields from the item', () => {
       open(makeItem({
-        parentItemId: 'chest', isContainer: true, compartment: 'Top drawer',
+        parentItemId: 'chest', durableKind: 'Container', compartment: 'Top drawer',
         path: [
           { id: 'garage', name: 'Garage', kind: 'Area' },
           { id: 'chest', name: 'Tool chest', kind: 'Container' },
         ],
       }));
       expect(component.editParentItemId()).toBe('chest');
-      expect(component.editIsContainer()).toBe(true);
+      expect(component.editDurableKind()).toBe('Container');
       expect(component.editCompartment()).toBe('Top drawer');
     });
   });
@@ -127,10 +127,16 @@ describe('EditDurableSheetComponent', () => {
       expect(ops()).toEqual([]);
     });
 
-    it('emits an /isContainer op when the role toggles', () => {
-      open(makeItem({ isContainer: false }));
-      component.editIsContainer.set(true);
-      expect(ops()).toEqual([{ op: 'replace', path: '/isContainer', value: true }]);
+    it('emits a /durableKind op when the type changes', () => {
+      open(makeItem({ durableKind: 'Plain' }));
+      component.editDurableKind.set('Container');
+      expect(ops()).toEqual([{ op: 'replace', path: '/durableKind', value: 'Container' }]);
+    });
+
+    it('emits a /durableKind op of Assembly', () => {
+      open(makeItem({ durableKind: 'Plain' }));
+      component.editDurableKind.set('Assembly');
+      expect(ops()).toEqual([{ op: 'replace', path: '/durableKind', value: 'Assembly' }]);
     });
   });
 
