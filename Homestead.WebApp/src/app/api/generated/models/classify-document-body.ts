@@ -3,6 +3,5 @@
 
 import { DocumentSuggestionField } from '../models/document-suggestion-field';
 export interface ClassifyDocumentBody {
-  aiProviderId?: (string | null);
   fields?: (Array<DocumentSuggestionField> | null);
 }

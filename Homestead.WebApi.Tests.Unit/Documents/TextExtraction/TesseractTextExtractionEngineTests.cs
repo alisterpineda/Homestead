@@ -1,5 +1,7 @@
+using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
@@ -13,9 +15,12 @@ public class TesseractTextExtractionEngineTests : IDisposable
     public TesseractTextExtractionEngineTests()
     {
         _runner = Substitute.For<ITesseractRunner>();
-        _sut = new TesseractTextExtractionEngine(_runner, Substitute.For<ILogger<TesseractTextExtractionEngine>>());
+        _sut = EngineWith(new TesseractOptions());
         _tempFile = Path.GetTempFileName();
     }
+
+    private TesseractTextExtractionEngine EngineWith(TesseractOptions options) =>
+        new(_runner, Options.Create(options), Substitute.For<ILogger<TesseractTextExtractionEngine>>());
 
     public void Dispose()
     {
@@ -29,7 +34,7 @@ public class TesseractTextExtractionEngineTests : IDisposable
     [InlineData("video/mp4")]
     public async Task ExtractTextAsync_UnsupportedContentType_ReturnsNull(string contentType)
     {
-        var result = await _sut.ExtractTextAsync(_tempFile, contentType, null, CancellationToken.None);
+        var result = await _sut.ExtractTextAsync(_tempFile, contentType, CancellationToken.None);
 
         Assert.Null(result);
         await _runner.DidNotReceive().OcrAsync(
@@ -47,7 +52,7 @@ public class TesseractTextExtractionEngineTests : IDisposable
         _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("ocr text");
 
-        var result = await _sut.ExtractTextAsync(_tempFile, contentType, null, CancellationToken.None);
+        var result = await _sut.ExtractTextAsync(_tempFile, contentType, CancellationToken.None);
 
         Assert.Equal("ocr text", result);
         await _runner.Received(1).OcrAsync(
@@ -55,25 +60,26 @@ public class TesseractTextExtractionEngineTests : IDisposable
     }
 
     [Fact]
-    public async Task ExtractTextAsync_ImageWithLanguageConfig_PassesLanguageToRunner()
+    public async Task ExtractTextAsync_ImageWithConfiguredLanguages_PassesLanguageToRunner()
     {
-        var config = """{"languages":["Fra","Deu"]}""";
+        // Languages now come from TesseractOptions (static config), not a per-call config blob.
+        var engine = EngineWith(new TesseractOptions { Languages = [TesseractLanguage.Fra, TesseractLanguage.Deu] });
         _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("texte");
 
-        await _sut.ExtractTextAsync(_tempFile, "image/png", config, CancellationToken.None);
+        await engine.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
 
         await _runner.Received(1).OcrAsync(
             Arg.Any<Stream>(), "fra+deu", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExtractTextAsync_ImageWithNullConfig_UsesDefaultLanguage()
+    public async Task ExtractTextAsync_ImageWithDefaultOptions_UsesDefaultLanguage()
     {
         _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("text");
 
-        await _sut.ExtractTextAsync(_tempFile, "image/png", null, CancellationToken.None);
+        await _sut.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
 
         await _runner.Received(1).OcrAsync(
             Arg.Any<Stream>(), "eng", Arg.Any<CancellationToken>());
@@ -85,7 +91,7 @@ public class TesseractTextExtractionEngineTests : IDisposable
         _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
 
-        var result = await _sut.ExtractTextAsync(_tempFile, "image/png", null, CancellationToken.None);
+        var result = await _sut.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
 
         Assert.Null(result);
     }

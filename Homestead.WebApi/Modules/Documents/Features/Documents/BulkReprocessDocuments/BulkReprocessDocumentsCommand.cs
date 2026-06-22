@@ -4,5 +4,4 @@ using Homestead.WebApi.Common;
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocuments;
 
 public record BulkReprocessDocumentsCommand(
-    List<Guid> Ids,
-    Guid? TextExtractionEngineId = null) : ICommand<BulkReprocessDocumentsResponse>;
+    List<Guid> Ids) : ICommand<BulkReprocessDocumentsResponse>;

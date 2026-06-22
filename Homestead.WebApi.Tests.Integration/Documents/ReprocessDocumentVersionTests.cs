@@ -91,7 +91,7 @@ public class ReprocessDocumentVersionTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task ReprocessVersion_WithEngineIdBody_ReturnsAccepted()
+    public async Task ReprocessVersion_WithEmptyJsonBody_ReturnsAccepted()
     {
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client);
@@ -101,58 +101,16 @@ public class ReprocessDocumentVersionTests : IntegrationTestBase
         var versions = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
         var versionId = versions!.Items.First().Id;
 
-        // Use built-in engine ID in the body
-        var builtInId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        // The endpoint still accepts an (ignored) JSON body — guards against a 415/400 regression now that
+        // ReprocessDocumentVersionBody is an empty record.
         var response = await client.PostAsJsonAsync(
             $"/api/v1/documents/{docId}/versions/{versionId}/reprocess",
-            new { textExtractionEngineId = builtInId }, CT);
+            new { }, CT);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
         Assert.NotEqual(Guid.Empty, jobBody!.JobId);
 
         await WaitForJobCompletionAsync(jobBody.JobId);
-    }
-
-    [Fact]
-    public async Task ReprocessVersion_WithNullBody_ReturnsAccepted()
-    {
-        var client = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(client);
-
-        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
-        listResponse.EnsureSuccessStatusCode();
-        var versions = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
-        var versionId = versions!.Items.First().Id;
-
-        // Send with null engine ID in the body (uses default)
-        var response = await client.PostAsJsonAsync(
-            $"/api/v1/documents/{docId}/versions/{versionId}/reprocess",
-            new { textExtractionEngineId = (Guid?)null }, CT);
-
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        var jobBody = await response.Content.ReadFromJsonAsync<JobResponse>(CT);
-        Assert.NotEqual(Guid.Empty, jobBody!.JobId);
-
-        await WaitForJobCompletionAsync(jobBody.JobId);
-    }
-
-    [Fact]
-    public async Task ReprocessVersion_WithNonExistentEngineId_Returns400()
-    {
-        var client = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(client);
-
-        var listResponse = await client.GetAsync($"/api/v1/documents/{docId}/versions?Page=1&PageSize=10", CT);
-        listResponse.EnsureSuccessStatusCode();
-        var versions = await listResponse.Content.ReadFromJsonAsync<PaginatedResult<VersionItem>>(CT);
-        var versionId = versions!.Items.First().Id;
-
-        var fakeEngineId = Guid.NewGuid();
-        var response = await client.PostAsJsonAsync(
-            $"/api/v1/documents/{docId}/versions/{versionId}/reprocess",
-            new { textExtractionEngineId = fakeEngineId }, CT);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

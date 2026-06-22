@@ -41,7 +41,7 @@ public class UploadDocumentJobHandler(
 
             // Text extraction
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-                stagingPath, payload.ContentType, payload.TextExtractionEngineId, ct);
+                stagingPath, payload.ContentType, ct);
 
             if (!extractionResult.Succeeded)
             {
@@ -95,18 +95,14 @@ public class UploadDocumentJobHandler(
             // Auto-classify in-memory (non-fatal). Folded into creation below so the document is created
             // with AI values already applied — a single Created audit entry, no suppressed Updated.
             ClassificationResult? classification = null;
-            Guid? providerId = null;
             try
             {
                 if (await classifier.IsAutoClassifyEnabledAsync(ct))
                 {
                     var output = await classifier.ClassifyAsync(
-                        documentName, extractedText, aiProviderId: null, ClassificationScope.All, ct);
+                        documentName, extractedText, ClassificationScope.All, ct);
                     if (output is not null)
-                    {
                         classification = output.Classification;
-                        providerId = output.ProviderId;
-                    }
                 }
             }
             catch (OperationCanceledException) { throw; }
@@ -130,7 +126,6 @@ public class UploadDocumentJobHandler(
                     Label = payload.Label,
                     ExtractedText = extractedText,
                     Classification = classification,
-                    ProviderId = providerId,
                     ActorUserId = job.CreatedByUserId
                 }, ct);
             }

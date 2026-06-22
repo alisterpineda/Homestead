@@ -190,9 +190,6 @@ namespace Homestead.WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AiProviderId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -225,8 +222,6 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AiProviderId");
 
                     b.HasIndex("DocumentId", "Field");
 
@@ -1333,52 +1328,6 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("schedules", "processing");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domain.Settings.AiProvider", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Configuration")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("ProviderType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("ai_providers", "settings");
-                });
-
             modelBuilder.Entity("Homestead.WebApi.Domain.Settings.AppSetting", b =>
                 {
                     b.Property<string>("Key")
@@ -1405,47 +1354,6 @@ namespace Homestead.WebApi.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("app_settings", "settings");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domain.Settings.TextExtractionEngine", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Configuration")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EngineType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("text_extraction_engines", "settings");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
@@ -1569,18 +1477,11 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Documents.DocumentSuggestion", b =>
                 {
-                    b.HasOne("Homestead.WebApi.Domain.Settings.AiProvider", "AiProvider")
-                        .WithMany()
-                        .HasForeignKey("AiProviderId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("Homestead.WebApi.Domain.Documents.Document", "Document")
                         .WithMany("Suggestions")
                         .HasForeignKey("DocumentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("AiProvider");
 
                     b.Navigation("Document");
                 });
@@ -2034,26 +1935,6 @@ namespace Homestead.WebApi.Migrations
                         .WithMany()
                         .HasForeignKey("LastJobId")
                         .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domain.Settings.AiProvider", b =>
-                {
-                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("Homestead.WebApi.Domain.Settings.TextExtractionEngine", b =>
-                {
-                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.BalanceEntryTransaction", b =>

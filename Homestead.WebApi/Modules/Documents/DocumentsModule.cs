@@ -34,8 +34,6 @@ using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVers
 using Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.PermanentlyDeleteDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.EmptyTrash;
-using Homestead.WebApi.Modules.Documents.Features.TextExtractionEngineSummaries.GetTextExtractionEngineSummaries;
-using Homestead.WebApi.Modules.Documents.Features.AiProviderSummaries.GetAiProviderSummaries;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkSummarizeDocuments;
 using Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
@@ -79,8 +77,6 @@ public static class DocumentsModule
         PermanentlyDeleteDocumentsEndpoint.Map(v1);
         RestoreDocumentsEndpoint.Map(v1);
 
-        GetTextExtractionEngineSummariesEndpoint.Map(v1);
-        GetAiProviderSummariesEndpoint.Map(v1);
         ClassifyPreviewEndpoint.Map(v1);
         SummarizeDocumentEndpoint.Map(v1);
 

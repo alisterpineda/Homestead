@@ -22,7 +22,6 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
     {
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client, "idle-tx-test.pdf");
-        var providerId = await SeedEnabledProviderAsync();
 
         var (entered, release) = FakeAiClassificationService.ArmGate();
         // Declared outside the try so the finally can drain it on every exit path (see below).
@@ -32,7 +31,7 @@ public class IdleInTransactionTests(PostgresFixture fixture) : IntegrationTestBa
             // Fire the summarize without awaiting; it will block inside the fake AI call, which happens
             // BEFORE the handler's only flush — so the command transaction has not opened yet.
             summarizeTask = client.PostAsJsonAsync(
-                $"/api/v1/documents/{docId}/summarize", new { aiProviderId = providerId }, CT);
+                $"/api/v1/documents/{docId}/summarize", new { }, CT);
 
             await entered.WaitAsync(TimeSpan.FromSeconds(15), CT);
 

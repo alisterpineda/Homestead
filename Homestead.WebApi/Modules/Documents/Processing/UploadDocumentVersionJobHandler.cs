@@ -44,7 +44,7 @@ public class UploadDocumentVersionJobHandler(
 
             // Text extraction
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-                stagingPath, payload.ContentType, payload.TextExtractionEngineId, ct);
+                stagingPath, payload.ContentType, ct);
 
             if (!extractionResult.Succeeded)
             {

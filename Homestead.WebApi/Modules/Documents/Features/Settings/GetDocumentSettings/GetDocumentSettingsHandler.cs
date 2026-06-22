@@ -22,8 +22,6 @@ public class GetDocumentSettingsHandler(AppDbContext db)
 
         return new DocumentSettingsResponse
         {
-            DefaultTextExtractionEngineId = settings.DefaultTextExtractionEngineId,
-            DefaultAiProviderId = settings.DefaultAiProviderId,
             AutoClassifyOnUpload = settings.AutoClassifyOnUpload
         };
     }

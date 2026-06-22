@@ -94,6 +94,19 @@ if (!string.IsNullOrEmpty(oidcAuthority))
     MapCsvEnvToConfigArray("OIDC_ADDITIONAL_SCOPES", "Oidc:AdditionalScopes");
 }
 
+// When running outside Aspire (e.g. Docker), map self-hoster-friendly AI env vars into .NET config.
+// AI is optional: gated on AI_ENDPOINT being set, so leaving it unset keeps the feature a graceful no-op.
+var aiEndpoint = Environment.GetEnvironmentVariable("AI_ENDPOINT");
+if (!string.IsNullOrEmpty(aiEndpoint))
+{
+    builder.Configuration["Ai:Endpoint"] = aiEndpoint;
+    builder.Configuration["Ai:Model"] =
+        Environment.GetEnvironmentVariable("AI_MODEL") ?? "";
+    var aiApiKey = Environment.GetEnvironmentVariable("AI_API_KEY");
+    if (!string.IsNullOrEmpty(aiApiKey))
+        builder.Configuration["Ai:ApiKey"] = aiApiKey;
+}
+
 void MapCsvEnvToConfigArray(string envVar, string configPrefix)
 {
     var raw = Environment.GetEnvironmentVariable(envVar);
@@ -207,8 +220,7 @@ builder.Services.AddProcessing(builder.Configuration);
 builder.Services.AddPriceProviders(builder.Configuration);
 builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
 builder.Services.AddTextExtraction(builder.Configuration);
-builder.Services.AddAiServices();
-builder.Services.AddScoped<IAiProviderResolver, AiProviderResolver>();
+builder.Services.AddAiServices(builder.Configuration);
 builder.Services.AddScoped<IAiClassificationService, AiClassificationService>();
 builder.Services.AddThumbnails();
 

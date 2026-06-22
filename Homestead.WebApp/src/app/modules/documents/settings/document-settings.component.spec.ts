@@ -43,29 +43,13 @@ describe('DocumentSettingsComponent', () => {
     expect(component.loadError()).toBe(false);
   });
 
-  it('should initialise with empty engines', () => {
-    expect(component.engines()).toEqual([]);
-  });
-
-  it('should initialise with null selectedEngineId', () => {
-    expect(component.selectedEngineId()).toBeNull();
-  });
-
   it('should have no changes initially', () => {
     expect(component.hasChanges()).toBe(false);
   });
 
-  it('should not report stale engine when no saved engine', () => {
-    expect(component.staleEngineId()).toBe(false);
-  });
-
-  it('should set selectedEngineId to null for empty string', () => {
-    component.onEngineChange('');
-    expect(component.selectedEngineId()).toBeNull();
-  });
-
-  it('should set selectedEngineId for non-empty string', () => {
-    component.onEngineChange('some-id');
-    expect(component.selectedEngineId()).toBe('some-id');
+  it('should set selectedAutoClassify and report a change when toggled', () => {
+    component.onAutoClassifyChange(true);
+    expect(component.selectedAutoClassify()).toBe(true);
+    expect(component.hasChanges()).toBe(true);
   });
 });

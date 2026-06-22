@@ -1,16 +1,18 @@
 using System.ClientModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
-using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Services;
 
-public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiClassificationService> logger)
+public class AiClassificationService(
+    IAiClientFactory clientFactory, IOptions<AiOptions> options, ILogger<AiClassificationService> logger)
     : IAiClassificationService
 {
+    private readonly AiOptions _options = options.Value;
+
     private const int MaxPartyDescriptionLength = 200;
 
     // Head/tail split for the document-text sample. The head gets 2/3, the tail 1/3: a document's type,
@@ -38,7 +40,6 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ClassificationResult?> ClassifyAsync(
-        AiProvider provider,
         string documentName,
         string? extractedText,
         List<TagInfo> availableTags,
@@ -59,10 +60,11 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         if (!hasText && !tagsUseful && !partiesUseful)
             return null;
 
-        using var client = clientFactory.CreateClient(provider);
+        // The factory owns and reuses the client (app-lifetime, connection-pooled), so do not dispose it here.
+        var client = clientFactory.CreateClient();
 
         var systemPrompt = BuildSystemPrompt(scope);
-        var budget = ResolveBudget(provider);
+        var budget = _options.ResolveMaxInputChars();
         var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope, budget);
 
         var messages = new List<ChatMessage>
@@ -348,20 +350,12 @@ public class AiClassificationService(IAiClientFactory clientFactory, ILogger<AiC
         return JsonSerializer.SerializeToElement(schema);
     }
 
-    // Resolves the document-text character budget for this provider: the value configured in the provider's
-    // Configuration blob (when it clears the floor) or the default. ClassifyAsync already receives the
-    // AiProvider, so the knob needs no interface change. An unparseable/absent config yields the default.
-    private static int ResolveBudget(AiProvider provider) =>
-        AiProviderConfig.TryParse(provider.Configuration, out var config) && config is not null
-            ? config.ResolveMaxInputChars()
-            : AiProviderConfig.DefaultMaxInputChars;
-
     // Samples up to `budget` characters of document text for the prompt. Text within budget is returned
     // verbatim. When it exceeds the budget we keep a head and a tail window joined by an elision marker —
     // for many household documents the classifying signal (parties, totals, dates, signatures) lives at the
     // end, which a leading-only window never sees. Slice boundaries snap to whitespace for clean word edges
     // and never split a UTF-16 surrogate pair (a raw substring can orphan half a pair → U+FFFD downstream).
-    // Precondition: budget >= a few hundred chars (guaranteed by AiProviderConfig.MinInputChars upstream).
+    // Precondition: budget >= a few hundred chars (guaranteed by AiOptions.MinInputChars upstream).
     internal static string SampleText(string? extractedText, int budget)
     {
         var text = extractedText ?? string.Empty;

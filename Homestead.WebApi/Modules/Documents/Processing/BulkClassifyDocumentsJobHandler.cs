@@ -31,7 +31,7 @@ public class BulkClassifyDocumentsJobHandler(
 
         foreach (var documentId in documentIds)
         {
-            var childPayload = new ClassifyDocumentPayload(documentId, payload.AiProviderId, payload.Scope);
+            var childPayload = new ClassifyDocumentPayload(documentId, payload.Scope);
 
             db.ProcessingJobs.Add(new ProcessingJob
             {

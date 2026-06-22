@@ -20,9 +20,8 @@ public record ApplyClassificationCommand : ICommand<ApplyClassificationResult>, 
 {
     public required Guid DocumentId { get; init; }
 
-    /// <summary>The classification produced upstream in the job scope; null when no provider resolved or the model produced nothing.</summary>
+    /// <summary>The classification produced upstream in the job scope; null when AI is unconfigured or the model produced nothing.</summary>
     public ClassificationResult? Classification { get; init; }
-    public Guid? ProviderId { get; init; }
 
     public ClassificationScope Scope { get; init; } = ClassificationScope.All;
     public Guid? ActorUserId { get; init; }
@@ -43,14 +42,14 @@ public class ApplyClassificationHandler(
             .FirstOrDefaultAsync(d => d.Id == request.DocumentId, ct)
             ?? throw new InvalidOperationException($"Document {request.DocumentId} not found.");
 
-        // null = no provider / nothing produced upstream → graceful no-op (no audit, no changes).
-        if (request.Classification is not null && request.ProviderId is not null)
+        // null = AI unconfigured / nothing produced upstream → graceful no-op (no audit, no changes).
+        if (request.Classification is not null)
         {
             // Track before applying so the in-memory snapshot diff (now resolving Tag.Path from the
             // .Tag nav set in ApplyAsync) becomes the Updated audit entry at the chokepoint flush.
             audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
-            await classifier.ApplyAsync(document, request.Classification, request.ProviderId.Value, request.Scope,
+            await classifier.ApplyAsync(document, request.Classification, request.Scope,
                 request.ActorUserId, stampSummaryMetadata: true, ct);
         }
 

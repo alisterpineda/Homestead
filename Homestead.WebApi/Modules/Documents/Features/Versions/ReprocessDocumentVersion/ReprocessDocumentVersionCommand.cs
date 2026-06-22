@@ -9,7 +9,6 @@ public class ReprocessDocumentVersionCommand : ICommand<ReprocessDocumentVersion
 {
     public Guid DocumentId { get; set; }
     public Guid VersionId { get; set; }
-    public Guid? TextExtractionEngineId { get; set; }
 
     public OperationAuthorizationRequirement RequiredOperation => DocumentOperations.Write;
 }

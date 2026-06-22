@@ -78,14 +78,4 @@ describe('AdminApiService', () => {
     expect(req.request.method).toBe('GET');
     req.flush(mockBody);
   });
-
-  it('getTextExtractionEngines sends GET and unwraps body', () => {
-    const mockBody = { items: [], page: 1, pageSize: 10, totalCount: 0, totalPages: 0 };
-    service.getTextExtractionEngines({ Page: 1, PageSize: 10 }).subscribe(result => {
-      expect(result).toEqual(mockBody);
-    });
-    const req = httpTesting.expectOne(r => r.url === '/api/v1/admin/text-extraction-engines');
-    expect(req.request.method).toBe('GET');
-    req.flush(mockBody);
-  });
 });

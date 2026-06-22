@@ -8,7 +8,6 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument
 public record ClassifyPreviewQuery : IRequest<ClassifyPreviewResponse>, IRequireDocumentAuthorization
 {
     public Guid DocumentId { get; init; }
-    public Guid? AiProviderId { get; init; }
 
     /// <summary>
     /// The fields to classify. Null or empty defaults to all classify fields (Tags, Parties, Name).

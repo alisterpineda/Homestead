@@ -3,7 +3,8 @@ using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.SummarizeDocument;
 
-public record SummarizeDocumentBody(Guid? AiProviderId = null);
+// Kept as an empty record so the POST still accepts an (ignored) body without a 415/400 regression.
+public record SummarizeDocumentBody();
 
 public static class SummarizeDocumentEndpoint
 {
@@ -14,8 +15,7 @@ public static class SummarizeDocumentEndpoint
         {
             var response = await sender.Send(new SummarizeDocumentCommand
             {
-                DocumentId = documentId,
-                AiProviderId = body?.AiProviderId
+                DocumentId = documentId
             }, ct);
             return Results.Ok(response);
         })

@@ -1,5 +1,3 @@
-using Homestead.WebApi.Domain.Settings;
-
 namespace Homestead.WebApi.Domain.Documents;
 
 public class DocumentSuggestion
@@ -13,8 +11,6 @@ public class DocumentSuggestion
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? ResolvedAt { get; set; }
     public bool IsApplied { get; set; } = true;
-    public Guid? AiProviderId { get; set; }
 
     public Document Document { get; set; } = null!;
-    public AiProvider? AiProvider { get; set; }
 }

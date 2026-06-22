@@ -14,10 +14,5 @@ public sealed class TextExtractionResult
 
     public static TextExtractionResult Success(string? text) => new(text, error: null);
 
-    /// <summary>
-    /// No engine registered for the resolved engine type — not an error.
-    /// </summary>
-    public static TextExtractionResult NoEngineAvailable { get; } = new(null, error: null);
-
     public static TextExtractionResult Failure(Exception error) => new(null, error);
 }

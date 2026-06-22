@@ -1,6 +1,7 @@
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +20,9 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
-        // ApplyAsync only touches the DbContext; the resolver/service are never called on the apply path.
+        // ApplyAsync only touches the DbContext; the factory/service are never called on the apply path.
         var classifier = new DocumentClassifier(
-            _db, Substitute.For<IAiProviderResolver>(), Substitute.For<IAiClassificationService>());
+            _db, Substitute.For<IAiClientFactory>(), Substitute.For<IAiClassificationService>());
         _sut = new CreateDocumentFromUploadHandler(_db, classifier, _audit);
     }
 
@@ -48,7 +49,6 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
             FileExtension = ".pdf",
             ExtractedText = "extracted",
             Classification = new ClassificationResult([tagId], [], "AI summary", "AI Title"),
-            ProviderId = Guid.NewGuid(),
             ActorUserId = _userId
         };
 
@@ -95,7 +95,6 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
             FileExtension = ".pdf",
             ExtractedText = null,
             Classification = null,
-            ProviderId = null,
             ActorUserId = _userId
         };
 

@@ -6,5 +6,4 @@ namespace Homestead.WebApi.Modules.Documents.Features.Documents.BulkClassifyDocu
 
 public record BulkClassifyDocumentsCommand(
     List<Guid> Ids,
-    Guid? AiProviderId = null,
     List<DocumentSuggestionField>? Fields = null) : ICommand<BulkClassifyDocumentsResponse>;

@@ -1,7 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -31,12 +30,7 @@ public class BulkReprocessDocumentsHandler(
         await queryService.EnsureAllDocumentsWritableAsync(
             db.Documents.Where(d => existingIds.Contains(d.Id)).Select(d => d.Id), ct);
 
-        if (request.TextExtractionEngineId is { } engineId)
-        {
-            await TextExtractionEngineValidator.ValidateEngineExistsAsync(db, engineId, ct);
-        }
-
-        var payload = new BulkReprocessPayload(existingIds, request.TextExtractionEngineId);
+        var payload = new BulkReprocessPayload(existingIds);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.BulkReprocessDocuments, opts =>
         {

@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVersion;
 using Homestead.WebApi.Processing;
 using NSubstitute;
@@ -60,74 +59,17 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_NullEngineId_Succeeds()
+    public async Task Handle_Succeeds_EnqueuesJob()
     {
         var request = new ReprocessDocumentVersionCommand
         {
             DocumentId = _docId,
             VersionId = _versionId,
-            TextExtractionEngineId = null,
         };
 
         var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
 
         Assert.NotEqual(Guid.Empty, result.JobId);
-    }
-
-    [Fact]
-    public async Task Handle_BuiltInEngineId_Succeeds()
-    {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            TextExtractionEngineId = BuiltInTextExtractionEngines.TesseractDefaultId,
-        };
-
-        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
-
-        Assert.NotEqual(Guid.Empty, result.JobId);
-    }
-
-    [Fact]
-    public async Task Handle_ValidDbEngineId_Succeeds()
-    {
-        var engineId = Guid.NewGuid();
-        _db.TextExtractionEngines.Add(new TextExtractionEngine
-        {
-            Id = engineId,
-            Name = "Custom Engine",
-            EngineType = TextExtractionEngineType.Tesseract,
-            CreatedAt = DateTimeOffset.UtcNow,
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            TextExtractionEngineId = engineId,
-        };
-
-        var result = await _sut.Handle(request, TestContext.Current.CancellationToken);
-
-        Assert.NotEqual(Guid.Empty, result.JobId);
-    }
-
-    [Fact]
-    public async Task Handle_NonExistentEngineId_ThrowsBadRequest()
-    {
-        var request = new ReprocessDocumentVersionCommand
-        {
-            DocumentId = _docId,
-            VersionId = _versionId,
-            TextExtractionEngineId = Guid.NewGuid(),
-        };
-
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(request, TestContext.Current.CancellationToken));
-
-        Assert.Contains("does not exist", ex.Message);
     }
 
     [Fact]

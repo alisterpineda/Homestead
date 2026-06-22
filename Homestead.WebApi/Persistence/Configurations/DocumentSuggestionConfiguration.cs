@@ -34,11 +34,6 @@ public class DocumentSuggestionConfiguration : IEntityTypeConfiguration<Document
             .HasForeignKey(e => e.DocumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne(e => e.AiProvider)
-            .WithMany()
-            .HasForeignKey(e => e.AiProviderId)
-            .OnDelete(DeleteBehavior.SetNull);
-
         builder.HasIndex(e => new { e.DocumentId, e.Field });
     }
 }

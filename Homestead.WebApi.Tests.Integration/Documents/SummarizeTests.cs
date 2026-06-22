@@ -16,14 +16,14 @@ public class SummarizeTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client, "summarize-test.pdf");
-        var providerId = await SeedEnabledProviderAsync();
 
-        var response = await client.PostAsJsonAsync(
-            $"/api/v1/documents/{docId}/summarize",
-            new { aiProviderId = providerId }, CT);
+        var response = await client.PostAsync(
+            $"/api/v1/documents/{docId}/summarize", null, CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<SummarizeResult>(CT);
+        // Asserting a non-null canned summary is the false-green guard: if the fake IAiClientFactory
+        // registration goes missing, the real factory reports unconfigured, summarize no-ops, and this fails.
         Assert.Equal(FakeAiClassificationService.GeneratedSummary, result!.Summary);
 
         using var scope = CreateScope();
@@ -38,25 +38,6 @@ public class SummarizeTests : IntegrationTestBase
             .FirstOrDefaultAsync(CT);
         Assert.NotNull(auditRow);
         Assert.Contains("Summary", auditRow!.Changes);
-    }
-
-    [Fact]
-    public async Task Summarize_NoProvider_Returns200_SummaryUnchanged()
-    {
-        var client = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(client, "summarize-noprovider-test.pdf");
-
-        var response = await client.PostAsync(
-            $"/api/v1/documents/{docId}/summarize", null, CT);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<SummarizeResult>(CT);
-        Assert.Null(result!.Summary);
-
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var doc = await db.Documents.AsNoTracking().FirstAsync(d => d.Id == docId, CT);
-        Assert.Null(doc.Summary);
     }
 
     [Fact]

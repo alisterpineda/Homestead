@@ -1,14 +1,12 @@
 using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using MediatR;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
@@ -19,7 +17,6 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
-    private readonly ITextExtractionEngineResolver _engineResolver;
     private readonly ISender _sender;
     private readonly ReprocessDocumentVersionJobHandler _handler;
 
@@ -31,15 +28,10 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         _textExtractionEngine = Substitute.For<ITextExtractionEngine>();
         _textExtractionEngine.ExtractTextAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
 
         _notifier = Substitute.For<IProcessingNotifier>();
-        _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
-        _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
-            .Returns(new TextExtractionContext(
-                TextExtractionEngineType.Tesseract,
-                BuiltInTextExtractionEngines.TesseractDefaultConfiguration));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -48,11 +40,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
             })
             .Build();
 
-        var serviceProvider = new ServiceCollection()
-            .AddKeyedSingleton(TextExtractionEngineType.Tesseract, _textExtractionEngine)
-            .BuildServiceProvider();
-        var textExtractionHelper = new TextExtractionHelper(
-            serviceProvider, _engineResolver);
+        var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
 
         _sender = Substitute.For<ISender>();
         _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
@@ -110,9 +98,9 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         return (doc, version);
     }
 
-    private ProcessingJob CreateJob(Guid documentId, Guid versionId, Guid? textExtractionEngineId = null)
+    private ProcessingJob CreateJob(Guid documentId, Guid versionId)
     {
-        var payload = new ReprocessDocumentVersionPayload(documentId, versionId, textExtractionEngineId);
+        var payload = new ReprocessDocumentVersionPayload(documentId, versionId);
         return new ProcessingJob
         {
             Id = Guid.NewGuid(),
@@ -125,44 +113,13 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_CallsEngineResolverWithPayloadEngineId()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var (doc, version) = SeedDocumentWithVersion("old text");
-        var engineId = Guid.NewGuid();
-        var job = CreateJob(doc.Id, version.Id, textExtractionEngineId: engineId);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("new text");
-
-        await _handler.HandleAsync(job, ct);
-
-        await _engineResolver.Received(1).ResolveAsync(engineId, ct);
-    }
-
-    [Fact]
-    public async Task HandleAsync_CallsEngineResolverWithNull_WhenNoEngineIdInPayload()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var (doc, version) = SeedDocumentWithVersion("old text");
-        var job = CreateJob(doc.Id, version.Id, textExtractionEngineId: null);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("new text");
-
-        await _handler.HandleAsync(job, ct);
-
-        await _engineResolver.Received(1).ResolveAsync(null, ct);
-    }
-
-    [Fact]
     public async Task HandleAsync_SendsReprocessVersionTextCommand_WithCorrectFields()
     {
         var ct = TestContext.Current.CancellationToken;
         var (doc, version) = SeedDocumentWithVersion("old text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("new extracted text");
 
         await _handler.HandleAsync(job, ct);
@@ -183,7 +140,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion();
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
@@ -210,7 +167,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
         job.ParentJobId = Guid.NewGuid();
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         await _handler.HandleAsync(job, ct);
@@ -246,7 +203,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("existing text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns<string?>(x => throw new Exception("OCR failed"));
 
         await Assert.ThrowsAsync<TextExtractionFailedException>(
@@ -263,7 +220,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var (doc, version) = SeedDocumentWithVersion("existing text");
         var job = CreateJob(doc.Id, version.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns<string?>(x => throw new Exception("OCR failed"));
 
         var ex = await Assert.ThrowsAsync<TextExtractionFailedException>(

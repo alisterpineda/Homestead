@@ -1,11 +1,11 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Text.Json;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -17,20 +17,17 @@ public class AiClassificationServiceTests
     private readonly IChatClient _client = Substitute.For<IChatClient>();
     private readonly AiClassificationService _sut;
 
-    private readonly AiProvider _provider = new()
-    {
-        Id = Guid.NewGuid(),
-        Name = "Test Provider",
-        ProviderType = AiProviderType.OpenAI,
-        Configuration = "{}",
-        IsEnabled = true
-    };
-
     public AiClassificationServiceTests()
     {
-        _factory.CreateClient(Arg.Any<AiProvider>()).Returns(_client);
-        _sut = new AiClassificationService(_factory, NullLogger<AiClassificationService>.Instance);
+        _factory.IsConfigured.Returns(true);
+        _factory.CreateClient().Returns(_client);
+        _sut = SutWith(new AiOptions());
     }
+
+    // Builds a service over the shared (capturing) client with a given options budget — used by the
+    // budget tests to set AiOptions.MaxInputChars instead of the old per-provider Configuration JSON.
+    private AiClassificationService SutWith(AiOptions options) =>
+        new(_factory, Options.Create(options), NullLogger<AiClassificationService>.Instance);
 
     private List<ChatMessage>? _captured;
     private ChatOptions? _capturedOptions;
@@ -64,7 +61,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
         var parties = new List<PartyInfo> { new(Guid.NewGuid(), "ACME", null) };
 
-        await _sut.ClassifyAsync(_provider, "Doc", "some text", tags, parties, ClassificationScope.Tags, ct);
+        await _sut.ClassifyAsync("Doc", "some text", tags, parties, ClassificationScope.Tags, ct);
 
         // System prompt: tag instruction present; party/summary/title absent.
         Assert.Contains("Select applicable tags", SystemPrompt);
@@ -91,7 +88,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
         var parties = new List<PartyInfo> { new(Guid.NewGuid(), "ACME", null) };
 
-        await _sut.ClassifyAsync(_provider, "Doc", "some text", tags, parties, ClassificationScope.Summary, ct);
+        await _sut.ClassifyAsync("Doc", "some text", tags, parties, ClassificationScope.Summary, ct);
 
         Assert.DoesNotContain("Available tags:", UserMessage);
         Assert.DoesNotContain("Available parties:", UserMessage);
@@ -107,7 +104,7 @@ public class AiClassificationServiceTests
         var ct = TestContext.Current.CancellationToken;
 
         var result = await _sut.ClassifyAsync(
-            _provider, "Doc", extractedText: null, [], [], ClassificationScope.Summary, ct);
+            "Doc", extractedText: null, [], [], ClassificationScope.Summary, ct);
 
         Assert.Null(result);
         await _client.DidNotReceive().GetResponseAsync(
@@ -122,7 +119,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
 
         var result = await _sut.ClassifyAsync(
-            _provider, "Doc", "some text", tags, [], ClassificationScope.None, ct);
+            "Doc", "some text", tags, [], ClassificationScope.None, ct);
 
         Assert.Null(result);
         await _client.DidNotReceive().GetResponseAsync(
@@ -145,7 +142,7 @@ public class AiClassificationServiceTests
         var parties = new List<PartyInfo> { new(partyId, "ACME", null) };
 
         var result = await _sut.ClassifyAsync(
-            _provider, "Original Name", "some text", tags, parties, ClassificationScope.Tags, ct);
+            "Original Name", "some text", tags, parties, ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -165,7 +162,7 @@ public class AiClassificationServiceTests
         // 1 repeated, 5 (out of range), -1 (out of range), then 0.
         RespondWith("""{"tagIndexes":[1,1,5,-1,0]}""");
 
-        var result = await _sut.ClassifyAsync(_provider, "Doc", "text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "text", tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([t1, t0], result!.MatchedTagIds);  // order preserved, duplicates + out-of-range dropped
@@ -193,7 +190,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"tagIndexes":[2,0],"partyIndexes":[1]}""");
 
         var result = await _sut.ClassifyAsync(
-            _provider, "Doc", "text", tags, parties, ClassificationScope.Tags | ClassificationScope.Parties, ct);
+            "Doc", "text", tags, parties, ClassificationScope.Tags | ClassificationScope.Parties, ct);
 
         // Each emitted catalog entry's "index" equals its array position, and no GUID is leaked into the prompt.
         AssertCatalogIsPositional(UserMessage, "Available tags:", [.. tags.Select(t => t.Name)]);
@@ -234,7 +231,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"tagIndexes":[]}""");
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
 
-        await _sut.ClassifyAsync(_provider, "Doc", "text", tags, [], ClassificationScope.Tags, ct);
+        await _sut.ClassifyAsync("Doc", "text", tags, [], ClassificationScope.Tags, ct);
 
         // 1.1 — deterministic sampling.
         Assert.Equal(0f, _capturedOptions!.Temperature);
@@ -283,7 +280,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync(_provider, "Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -328,7 +325,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync(_provider, "Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -363,7 +360,7 @@ public class AiClassificationServiceTests
             .ThrowsAsync(contextLength);
 
         await Assert.ThrowsAsync<ClientResultException>(() =>
-            _sut.ClassifyAsync(_provider, "Doc", "some text", tags, [], ClassificationScope.Tags, ct));
+            _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct));
 
         // Exactly one attempt — the error was surfaced, not masked behind a degraded retry.
         await _client.Received(1).GetResponseAsync(
@@ -397,7 +394,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync(_provider, "Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -415,13 +412,9 @@ public class AiClassificationServiceTests
     {
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(), Name = "Big", ProviderType = AiProviderType.OpenAI,
-            Configuration = """{"maxInputChars":40000}""", IsEnabled = true
-        };
+        var sut = SutWith(new AiOptions { MaxInputChars = 40_000 });
 
-        await _sut.ClassifyAsync(provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        await sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
 
         // 20k-char body fits inside the 40k budget -> sent whole, no elision, both ends present.
         Assert.DoesNotContain("[...document text omitted...]", UserMessage);
@@ -435,8 +428,8 @@ public class AiClassificationServiceTests
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
 
-        // _provider has Configuration "{}" — no override, so the default budget applies and the 20k body is sampled.
-        await _sut.ClassifyAsync(_provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        // Default AiOptions — no override, so the default budget applies and the 20k body is sampled.
+        await _sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
 
         Assert.Contains("[...document text omitted...]", UserMessage);
     }
@@ -444,17 +437,13 @@ public class AiClassificationServiceTests
     [Fact]
     public async Task SubFloorMaxInputChars_FallsBackToDefaultBudget_AndSamples()
     {
-        // A degenerate value that bypassed the admin validator (e.g. a seeded row): the service floor ignores it
-        // and uses the default budget, so the long body is still sampled rather than sent at a 10-char budget.
+        // A degenerate sub-floor value: the service floor ignores it and uses the default budget, so the long
+        // body is still sampled rather than sent at a 10-char budget.
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(), Name = "Degenerate", ProviderType = AiProviderType.OpenAI,
-            Configuration = """{"maxInputChars":10}""", IsEnabled = true
-        };
+        var sut = SutWith(new AiOptions { MaxInputChars = 10 });
 
-        await _sut.ClassifyAsync(provider, "Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        await sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
 
         Assert.Contains("[...document text omitted...]", UserMessage);
         Assert.Contains("DOC_START_SENTINEL", UserMessage);   // not truncated to ~10 chars
@@ -475,7 +464,7 @@ public class AiClassificationServiceTests
             .ThrowsAsync(rateLimited);
 
         await Assert.ThrowsAsync<ClientResultException>(() =>
-            _sut.ClassifyAsync(_provider, "Doc", "some text", tags, [], ClassificationScope.Tags, ct));
+            _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct));
 
         // No JSON-mode fallback for a non-400 error — only the single strict attempt was made.
         await _client.Received(1).GetResponseAsync(

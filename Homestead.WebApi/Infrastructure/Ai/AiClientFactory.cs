@@ -1,54 +1,37 @@
-using Homestead.WebApi.Domain.Settings;
-using Homestead.WebApi.Infrastructure.Ai.Configurations;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
-public class AiClientFactory : IAiClientFactory
+public class AiClientFactory(IOptions<AiOptions> options) : IAiClientFactory
 {
-    public IChatClient CreateClient(AiProvider provider)
+    private readonly AiOptions _options = options.Value;
+    private IChatClient? _client;
+
+    public bool IsConfigured => _options.IsConfigured;
+
+    public IChatClient CreateClient()
     {
-        return provider.ProviderType switch
-        {
-            AiProviderType.AzureAIFoundry => CreateAzureAIFoundryClient(provider),
-            AiProviderType.OpenAI => CreateOpenAIClient(provider),
-            _ => throw new NotSupportedException($"AI provider type '{provider.ProviderType}' is not supported.")
-        };
+        if (!_options.IsConfigured)
+            throw new InvalidOperationException("AI is not configured (Ai:Endpoint and Ai:Model are required).");
+
+        // Built once and reused (singleton over static config): the underlying OpenAI-compatible chat client
+        // is a stateless, thread-safe HTTP wrapper. Rebuilding per call would spin up a fresh HTTP pipeline
+        // each time — a new TLS handshake per classify against a remote endpoint and no connection reuse
+        // under bulk classify. The benign init race (two concurrent first-calls) just discards a redundant,
+        // never-used build. The client is factory-owned for the app lifetime, so callers must not dispose it.
+        return _client ??= BuildClient();
     }
 
-    private static IChatClient CreateAzureAIFoundryClient(AiProvider provider)
+    private IChatClient BuildClient()
     {
-        var config = ParseConfig(provider);
+        // Reuse the OpenAI-compatible path pointed at Ollama's /v1. Ollama ignores the key, so a dummy is
+        // substituted when none is configured. normalizeForAzure: false sends the endpoint verbatim.
+        var openAiClient = OpenAIClientBuilder.Build(
+            string.IsNullOrWhiteSpace(_options.ApiKey) ? "ollama" : _options.ApiKey,
+            _options.Endpoint,
+            normalizeForAzure: false);
 
-        if (string.IsNullOrWhiteSpace(config.Endpoint))
-            throw new InvalidOperationException($"Endpoint is required for AI provider '{provider.Name}'.");
-        if (string.IsNullOrWhiteSpace(config.ApiKey))
-            throw new InvalidOperationException($"API key is required for AI provider '{provider.Name}'.");
-        if (string.IsNullOrWhiteSpace(config.Model))
-            throw new InvalidOperationException($"Model is required for AI provider '{provider.Name}'.");
-
-        var openAiClient = OpenAIClientBuilder.Build(config.ApiKey, config.Endpoint, normalizeForAzure: true);
-        return openAiClient.GetChatClient(config.Model).AsIChatClient();
-    }
-
-    private static IChatClient CreateOpenAIClient(AiProvider provider)
-    {
-        var config = ParseConfig(provider);
-
-        if (string.IsNullOrWhiteSpace(config.ApiKey))
-            throw new InvalidOperationException($"API key is required for AI provider '{provider.Name}'.");
-        if (string.IsNullOrWhiteSpace(config.Model))
-            throw new InvalidOperationException($"Model is required for AI provider '{provider.Name}'.");
-
-        // Endpoint is optional for OpenAI — the SDK default is used when none is supplied.
-        var openAiClient = OpenAIClientBuilder.Build(config.ApiKey, config.Endpoint, normalizeForAzure: false);
-        return openAiClient.GetChatClient(config.Model).AsIChatClient();
-    }
-
-    private static AiProviderConfig ParseConfig(AiProvider provider)
-    {
-        if (!AiProviderConfig.TryParse(provider.Configuration, out var config) || config is null)
-            throw new InvalidOperationException($"Invalid configuration for AI provider '{provider.Name}'.");
-        return config;
+        return openAiClient.GetChatClient(_options.Model).AsIChatClient();
     }
 }

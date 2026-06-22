@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
@@ -12,7 +11,6 @@ using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -24,7 +22,6 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
     private readonly string _mediaPath;
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
-    private readonly ITextExtractionEngineResolver _engineResolver;
     private readonly ThumbnailService _thumbnailService;
     private readonly ISender _sender;
     private readonly UploadDocumentVersionJobHandler _handler;
@@ -37,15 +34,10 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         _textExtractionEngine = Substitute.For<ITextExtractionEngine>();
         _textExtractionEngine.ExtractTextAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
 
         _notifier = Substitute.For<IProcessingNotifier>();
-        _engineResolver = Substitute.For<ITextExtractionEngineResolver>();
-        _engineResolver.ResolveAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
-            .Returns(new TextExtractionContext(
-                TextExtractionEngineType.Tesseract,
-                BuiltInTextExtractionEngines.TesseractDefaultConfiguration));
 
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -59,11 +51,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), config,
             Substitute.For<ILogger<ThumbnailService>>());
-        var serviceProvider = new ServiceCollection()
-            .AddKeyedSingleton(TextExtractionEngineType.Tesseract, _textExtractionEngine)
-            .BuildServiceProvider();
-        var textExtractionHelper = new TextExtractionHelper(
-            serviceProvider, _engineResolver);
+        var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
 
         _sender = Substitute.For<ISender>();
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
@@ -97,13 +85,12 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
     private (ProcessingJob job, string stagingPath) CreateVersionUploadJob(
         Guid documentId,
-        Guid? textExtractionEngineId = null,
         byte[]? content = null)
     {
         var uploadId = Guid.NewGuid();
         var payload = new UploadDocumentVersionPayload(
             uploadId, documentId, "version2.pdf", "v2",
-            "application/pdf", 2048, ".pdf", textExtractionEngineId);
+            "application/pdf", 2048, ".pdf");
 
         var job = new ProcessingJob
         {
@@ -125,37 +112,6 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     [Fact]
-    public async Task HandleAsync_CallsEngineResolverWithPayloadEngineId()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var engineId = Guid.NewGuid();
-        var (job, _) = CreateVersionUploadJob(doc.Id, textExtractionEngineId: engineId);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
-
-        await _handler.HandleAsync(job, ct);
-
-        await _engineResolver.Received(1).ResolveAsync(engineId, ct);
-    }
-
-    [Fact]
-    public async Task HandleAsync_CallsEngineResolverWithNull_WhenNoEngineIdInPayload()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var doc = SeedDocument();
-        var (job, _) = CreateVersionUploadJob(doc.Id, textExtractionEngineId: null);
-
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
-            .Returns("text");
-
-        await _handler.HandleAsync(job, ct);
-
-        await _engineResolver.Received(1).ResolveAsync(null, ct);
-    }
-
-    [Fact]
     public async Task HandleAsync_SendsAddDocumentVersionCommand_WithCorrectFields()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -163,7 +119,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"version-fields {Guid.NewGuid()}");
         var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("extracted text");
 
         await _handler.HandleAsync(job, ct);
@@ -185,7 +141,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var doc = SeedDocument();
         var (job, _) = CreateVersionUploadJob(doc.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
@@ -224,7 +180,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var doc = SeedDocument();
         var (job, _) = CreateVersionUploadJob(doc.Id);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns<string?>(x => throw new Exception("OCR failed"));
 
         await _handler.HandleAsync(job, ct);
@@ -241,7 +197,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"move-final-ver {Guid.NewGuid()}");
         var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         await _handler.HandleAsync(job, ct);
@@ -260,7 +216,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"compensation-ver {Guid.NewGuid()}");
         var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
@@ -281,7 +237,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var content = Encoding.UTF8.GetBytes($"dupe-ver {Guid.NewGuid()}");
         var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         SeedExistingVersion(doc, HashOf(content));
@@ -314,7 +270,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var targetDoc = SeedDocument();
         var (job, _) = CreateVersionUploadJob(targetDoc.Id, content: content);
 
-        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), ct)
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
             .Returns("text");
 
         var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(

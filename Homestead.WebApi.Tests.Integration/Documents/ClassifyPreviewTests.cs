@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Documents;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -80,23 +79,10 @@ public class ClassifyPreviewTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client, "scoped-preview-test.pdf");
 
-        Guid providerId;
         Guid suggestionId;
         using (var scope = CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var provider = new AiProvider
-            {
-                Id = Guid.NewGuid(),
-                Name = $"Test Provider {Guid.NewGuid():N}",
-                ProviderType = AiProviderType.AzureAIFoundry,
-                IsEnabled = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            db.AiProviders.Add(provider);
-            providerId = provider.Id;
-
             var suggestion = new DocumentSuggestion
             {
                 Id = Guid.NewGuid(),
@@ -105,7 +91,6 @@ public class ClassifyPreviewTests : IntegrationTestBase
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = "AI Suggested Title",
                 OriginalValue = "scoped-preview-test.pdf",
-                AiProviderId = provider.Id,
                 CreatedAt = DateTimeOffset.UtcNow
             };
             db.DocumentSuggestions.Add(suggestion);
@@ -113,11 +98,11 @@ public class ClassifyPreviewTests : IntegrationTestBase
             suggestionId = suggestion.Id;
         }
 
-        // Pass the provider id so the request resolves a provider and actually drives the (fake)
-        // classifier with a Tags-only scope — not a null-provider short-circuit.
+        // AI is configured (fake factory), so the request drives the (fake) classifier with a Tags-only
+        // scope — exercising that preview never mutates suggestions even when the classifier runs.
         var response = await client.PostAsJsonAsync(
             $"/api/v1/documents/{docId}/classify-preview",
-            new { aiProviderId = providerId, fields = new[] { "Tags" } }, CT);
+            new { fields = new[] { "Tags" } }, CT);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 

@@ -9,7 +9,7 @@ import { ClassifyOptionsDialogComponent } from '../../shared/classify-options-di
 
 /**
  * Bulk-summarize trigger: a button that opens the shared classify-options dialog with field
- * checkboxes hidden (provider only). Presentational — the parent list performs the API call.
+ * checkboxes hidden. Presentational — the parent list performs the API call.
  */
 @Component({
   selector: 'app-bulk-summarize-dialog',
@@ -34,7 +34,7 @@ import { ClassifyOptionsDialogComponent } from '../../shared/classify-options-di
 export class BulkSummarizeDialogComponent {
   documentIds = input.required<Set<string>>();
   disabled = input(false);
-  confirmed = output<{ aiProviderId: string | null; fields: DocumentSuggestionField[] }>();
+  confirmed = output<{ fields: DocumentSuggestionField[] }>();
 
   documentCount = computed(() => this.documentIds().size);
 }

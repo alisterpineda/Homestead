@@ -17,10 +17,9 @@ public class BulkSummarizeTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var docId1 = await UploadAndWaitAsync(client, "bulk-summarize-1.pdf");
         var docId2 = await UploadAndWaitAsync(client, "bulk-summarize-2.pdf");
-        var providerId = await SeedEnabledProviderAsync();
 
         var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-summarize",
-            new { ids = new[] { docId1, docId2 }, aiProviderId = providerId }, CT);
+            new { ids = new[] { docId1, docId2 } }, CT);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkClassifyResult>(CT);

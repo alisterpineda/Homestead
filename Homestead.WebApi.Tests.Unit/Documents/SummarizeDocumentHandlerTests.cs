@@ -57,8 +57,8 @@ public class SummarizeDocumentHandlerTests : IDisposable
         SeedDocument();
 
         var output = new DocumentClassificationOutput(
-            new ClassificationResult([], [], "Generated summary", "Test Doc"), [], Guid.NewGuid());
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.Summary, ct)
+            new ClassificationResult([], [], "Generated summary", "Test Doc"), []);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
             .Returns(output);
 
         var response = await _sut.Handle(
@@ -81,7 +81,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         SeedDocument(summary: "existing summary");
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.Summary, ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
             .Returns((DocumentClassificationOutput?)null);
 
         var response = await _sut.Handle(
@@ -102,8 +102,8 @@ public class SummarizeDocumentHandlerTests : IDisposable
         SeedDocument(summary: "existing summary");
 
         var output = new DocumentClassificationOutput(
-            new ClassificationResult([], [], "   ", "Test Doc"), [], Guid.NewGuid());
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, ClassificationScope.Summary, ct)
+            new ClassificationResult([], [], "   ", "Test Doc"), []);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
             .Returns(output);
 
         var response = await _sut.Handle(

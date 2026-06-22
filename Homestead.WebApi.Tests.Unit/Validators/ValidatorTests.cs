@@ -1,10 +1,8 @@
 using Homestead.WebApi.Domain.Groups;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
-using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
 using Homestead.WebApi.Modules.Documents.Features.Comments.CreateComment;
 using Homestead.WebApi.Modules.Documents.Features.Parties.CreateParty;
 using Homestead.WebApi.Modules.Documents.Features.Parties.UpdateParty;
@@ -255,33 +253,6 @@ public class UpdateGroupMemberCommandValidatorTests
             GroupId = Guid.NewGuid(),
             UserId = Guid.NewGuid(),
             Request = new UpdateGroupMemberRequest { AccessLevel = GroupAccessLevel.Viewer }
-        }, TestContext.Current.CancellationToken);
-        Assert.True(result.IsValid);
-    }
-}
-
-public class CreateTextExtractionEngineCommandValidatorTests
-{
-    private readonly CreateTextExtractionEngineCommandValidator _sut = new();
-
-    [Fact]
-    public async Task WhitespaceName_IsInvalid()
-    {
-        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineCommand
-        {
-            Name = "   ",
-            EngineType = TextExtractionEngineType.Tesseract
-        }, TestContext.Current.CancellationToken);
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public async Task ValidName_IsValid()
-    {
-        var result = await _sut.ValidateAsync(new CreateTextExtractionEngineCommand
-        {
-            Name = "My Engine",
-            EngineType = TextExtractionEngineType.Tesseract
         }, TestContext.Current.CancellationToken);
         Assert.True(result.IsValid);
     }

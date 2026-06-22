@@ -21,7 +21,7 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
         var scope = ClassificationScopeExtensions.FromFields(request.Fields);
 
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, request.AiProviderId, scope, ct);
+            request.DocumentId, document.Name, scope, ct);
 
         if (output is null)
         {

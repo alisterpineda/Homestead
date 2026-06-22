@@ -52,9 +52,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         var availableTags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
         var classification = new ClassificationResult([tagId], [], "A summary", "Better Title");
-        var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, availableTags);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);
@@ -82,7 +82,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct)
             .Returns((DocumentClassificationOutput?)null);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
@@ -119,9 +119,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
 
         var availableTags = new List<TagInfo> { new(knownTagId, "Finance", "Finance") };
         var classification = new ClassificationResult([knownTagId, unknownTagId], [], "summary", "title");
-        var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, availableTags);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);
@@ -144,9 +144,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var classification = new ClassificationResult([], [], "new summary", "Same Name");
-        var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, []);
 
-        _classifier.ClassifyAsync(_documentId, "Same Name", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Same Name", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);
@@ -171,9 +171,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var classification = new ClassificationResult([], [], "a fresh summary", "New Title");
-        var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, []);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);
@@ -195,14 +195,14 @@ public class ClassifyPreviewHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct)
             .Returns((DocumentClassificationOutput?)null);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId, Fields = null };
         await _sut.Handle(query, ct);
 
         await _classifier.Received(1).ClassifyAsync(
-            _documentId, "Test Doc", null,
+            _documentId, "Test Doc",
             ClassificationScope.Tags | ClassificationScope.Parties | ClassificationScope.Name, ct);
     }
 
@@ -219,7 +219,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         });
         await _db.SaveChangesAsync(ct);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct)
             .Returns((DocumentClassificationOutput?)null);
 
         var query = new ClassifyPreviewQuery
@@ -230,7 +230,7 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _sut.Handle(query, ct);
 
         await _classifier.Received(1).ClassifyAsync(
-            _documentId, "Test Doc", null, ClassificationScope.Tags, ct);
+            _documentId, "Test Doc", ClassificationScope.Tags, ct);
     }
 
     [Fact]
@@ -270,9 +270,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
             new(newTagId, "New", "New")
         };
         var classification = new ClassificationResult([existingTagId, newTagId], [], "summary", "title");
-        var output = new DocumentClassificationOutput(classification, availableTags, Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, availableTags);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);
@@ -312,9 +312,9 @@ public class ClassifyPreviewHandlerTests : IDisposable
         await _db.SaveChangesAsync(ct);
 
         var classification = new ClassificationResult([], [existingPartyId, newPartyId], "summary", "title");
-        var output = new DocumentClassificationOutput(classification, [], Guid.NewGuid());
+        var output = new DocumentClassificationOutput(classification, []);
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", null, Arg.Any<ClassificationScope>(), ct).Returns(output);
+        _classifier.ClassifyAsync(_documentId, "Test Doc", Arg.Any<ClassificationScope>(), ct).Returns(output);
 
         var query = new ClassifyPreviewQuery { DocumentId = _documentId };
         var response = await _sut.Handle(query, ct);

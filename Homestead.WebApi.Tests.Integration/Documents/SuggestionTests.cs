@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -21,17 +20,6 @@ public class SuggestionTests : IntegrationTestBase
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Test Provider {Guid.NewGuid():N}",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            IsEnabled = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AiProviders.Add(provider);
-
         db.DocumentSuggestions.Add(new DocumentSuggestion
         {
             Id = Guid.NewGuid(),
@@ -40,7 +28,6 @@ public class SuggestionTests : IntegrationTestBase
             Status = DocumentSuggestionStatus.Pending,
             SuggestedValue = "AI Suggested Title",
             OriginalValue = "suggestion-test.pdf",
-            AiProviderId = provider.Id,
             CreatedAt = DateTimeOffset.UtcNow
         });
 
@@ -125,17 +112,6 @@ public class SuggestionTests : IntegrationTestBase
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var provider = new AiProvider
-            {
-                Id = Guid.NewGuid(),
-                Name = $"Test Provider {Guid.NewGuid():N}",
-                ProviderType = AiProviderType.AzureAIFoundry,
-                IsEnabled = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            db.AiProviders.Add(provider);
-
             var party = new Party
             {
                 Id = Guid.NewGuid(),
@@ -155,7 +131,6 @@ public class SuggestionTests : IntegrationTestBase
                 Field = DocumentSuggestionField.Parties,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = partyId.ToString(),
-                AiProviderId = provider.Id,
                 CreatedAt = DateTimeOffset.UtcNow
             };
             db.DocumentSuggestions.Add(suggestion);
@@ -239,17 +214,6 @@ public class SuggestionTests : IntegrationTestBase
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var provider = new AiProvider
-            {
-                Id = Guid.NewGuid(),
-                Name = $"Test Provider {Guid.NewGuid():N}",
-                ProviderType = AiProviderType.AzureAIFoundry,
-                IsEnabled = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            db.AiProviders.Add(provider);
-
             var party = new Party
             {
                 Id = Guid.NewGuid(),
@@ -268,7 +232,6 @@ public class SuggestionTests : IntegrationTestBase
                 Field = DocumentSuggestionField.Parties,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = partyId.ToString(),
-                AiProviderId = provider.Id,
                 CreatedAt = DateTimeOffset.UtcNow
             });
 

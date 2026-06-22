@@ -4,7 +4,7 @@ using MediatR;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.ClassifyDocument;
 
-public record ClassifyDocumentBody(Guid? AiProviderId = null, List<DocumentSuggestionField>? Fields = null);
+public record ClassifyDocumentBody(List<DocumentSuggestionField>? Fields = null);
 
 public static class ClassifyPreviewEndpoint
 {
@@ -16,7 +16,6 @@ public static class ClassifyPreviewEndpoint
             var response = await sender.Send(new ClassifyPreviewQuery
             {
                 DocumentId = documentId,
-                AiProviderId = body?.AiProviderId,
                 Fields = body?.Fields
             }, ct);
             return Results.Ok(response);

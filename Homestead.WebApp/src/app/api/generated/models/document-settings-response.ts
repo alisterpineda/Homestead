@@ -3,6 +3,4 @@
 
 export interface DocumentSettingsResponse {
   autoClassifyOnUpload?: (boolean | null);
-  defaultAiProviderId?: (string | null);
-  defaultTextExtractionEngineId?: (string | null);
 }

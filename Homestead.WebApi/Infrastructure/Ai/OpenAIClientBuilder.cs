@@ -3,9 +3,9 @@ using OpenAI;
 
 namespace Homestead.WebApi.Infrastructure.Ai;
 
-// Builds the raw OpenAIClient used in three places: the chat-client factory, the test-connection
-// slice, and the list-models slice. Azure AI Foundry needs the endpoint normalized to the
-// versionless /openai/v1 path; OpenAI uses any override endpoint verbatim (or the SDK default).
+// Builds the raw OpenAIClient used by the chat-client factory. Azure AI Foundry needs the endpoint
+// normalized to the versionless /openai/v1 path; the OpenAI-compatible path (Ollama) uses any override
+// endpoint verbatim (or the SDK default). The normalizeForAzure branch is retained for that contingency.
 public static class OpenAIClientBuilder
 {
     public static OpenAIClient Build(string apiKey, string? endpoint, bool normalizeForAzure)

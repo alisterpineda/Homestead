@@ -27,7 +27,6 @@ public record CreateDocumentFromUploadCommand : ICommand<CreateDocumentFromUploa
 
     /// <summary>Optional AI classification produced in-memory during the job (null when auto-classify is off).</summary>
     public ClassificationResult? Classification { get; init; }
-    public Guid? ProviderId { get; init; }
 
     public Guid? ActorUserId { get; init; }
 }
@@ -71,9 +70,9 @@ public class CreateDocumentFromUploadHandler(
 
         // Fold the in-memory classification into creation: applied as part of the initial state, so no
         // modified-metadata stamp (stampSummaryMetadata: false) — the document reads as created-only.
-        if (request.Classification is not null && request.ProviderId is not null)
+        if (request.Classification is not null)
         {
-            await classifier.ApplyAsync(document, request.Classification, request.ProviderId.Value,
+            await classifier.ApplyAsync(document, request.Classification,
                 ClassificationScope.All, request.ActorUserId, stampSummaryMetadata: false, ct);
         }
 

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
@@ -101,10 +102,17 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<TimeProvider>(Clock);
 
             // Substitute the AI service so classify/summarize flows are deterministic and never make
-            // a live model call. Benign by default (only reached when a provider resolves, which no
-            // existing test triggers); summarize/classify tests seed an enabled provider to exercise it.
+            // a live model call.
             services.RemoveAll<IAiClassificationService>();
             services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
+
+            // AI is now gated by IAiClientFactory.IsConfigured (config-driven), not a seeded DB row. The
+            // test host sets no Ai:* config, so the real factory reports unconfigured and classify/summarize
+            // would silently no-op. Register a fake that reports configured so those flows actually run
+            // through FakeAiClassificationService. (Auto-classify on upload still needs its own setting on,
+            // so this doesn't classify uploads that don't ask for it.)
+            services.RemoveAll<IAiClientFactory>();
+            services.AddSingleton<IAiClientFactory, FakeAiClientFactory>();
 
             // Swap the Bank of Canada price provider for a network-free fake so the import-pipeline tests
             // exercise the real DB queries + unique-index enforcement without hitting the live Valet API.

@@ -351,29 +351,29 @@ describe('DocumentListComponent', () => {
   });
 
   describe('bulk AI actions', () => {
-    it('onBulkClassifyConfirmed sends a body with ids, provider, and selected fields', () => {
+    it('onBulkClassifyConfirmed sends a body with ids and selected fields', () => {
       const documentApi = TestBed.inject(DocumentApiService);
       const apiSpy = vi.spyOn(documentApi, 'bulkClassifyDocuments').mockReturnValue(of({ jobIds: ['job-1'] }));
       const startedSpy = vi.spyOn(component, 'onBulkClassifyStarted').mockImplementation(() => {});
       component.selectedDocumentIds.set(new Set(['doc-1', 'doc-2']));
 
-      component.onBulkClassifyConfirmed({ aiProviderId: 'provider-1', fields: ['Tags', 'Name'] });
+      component.onBulkClassifyConfirmed({ fields: ['Tags', 'Name'] });
 
       expect(apiSpy).toHaveBeenCalledWith({
-        body: { ids: ['doc-1', 'doc-2'], aiProviderId: 'provider-1', fields: ['Tags', 'Name'] },
+        body: { ids: ['doc-1', 'doc-2'], fields: ['Tags', 'Name'] },
       });
       expect(startedSpy).toHaveBeenCalledWith(['job-1']);
     });
 
-    it('onBulkSummarizeConfirmed sends a body with ids and provider but no fields', () => {
+    it('onBulkSummarizeConfirmed sends a body with ids and no fields', () => {
       const documentApi = TestBed.inject(DocumentApiService);
       const apiSpy = vi.spyOn(documentApi, 'bulkSummarizeDocuments').mockReturnValue(of({ jobIds: ['job-2'] }));
       const startedSpy = vi.spyOn(component, 'onBulkSummarizeStarted').mockImplementation(() => {});
       component.selectedDocumentIds.set(new Set(['doc-1']));
 
-      component.onBulkSummarizeConfirmed({ aiProviderId: null });
+      component.onBulkSummarizeConfirmed();
 
-      expect(apiSpy).toHaveBeenCalledWith({ body: { ids: ['doc-1'], aiProviderId: null } });
+      expect(apiSpy).toHaveBeenCalledWith({ body: { ids: ['doc-1'] } });
       expect(startedSpy).toHaveBeenCalledWith(['job-2']);
     });
 
@@ -382,8 +382,8 @@ describe('DocumentListComponent', () => {
       const classifySpy = vi.spyOn(documentApi, 'bulkClassifyDocuments');
       const summarizeSpy = vi.spyOn(documentApi, 'bulkSummarizeDocuments');
 
-      component.onBulkClassifyConfirmed({ aiProviderId: null, fields: ['Tags'] });
-      component.onBulkSummarizeConfirmed({ aiProviderId: null });
+      component.onBulkClassifyConfirmed({ fields: ['Tags'] });
+      component.onBulkSummarizeConfirmed();
 
       expect(classifySpy).not.toHaveBeenCalled();
       expect(summarizeSpy).not.toHaveBeenCalled();

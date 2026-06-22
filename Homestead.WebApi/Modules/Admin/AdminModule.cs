@@ -12,16 +12,6 @@ using Homestead.WebApi.Modules.Admin.Features.Users.GetUsers;
 using Homestead.WebApi.Modules.Admin.Features.Groups.RemoveGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroup;
 using Homestead.WebApi.Modules.Admin.Features.Groups.UpdateGroupMember;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.BulkDeleteAiProviders;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.CreateAiProvider;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.GetAiProviders;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.ListAiProviderModels;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.TestAiProviderConnection;
-using Homestead.WebApi.Modules.Admin.Features.AiProviders.UpdateAiProvider;
-using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.BulkDeleteTextExtractionEngines;
-using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.CreateTextExtractionEngine;
-using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.GetTextExtractionEngines;
-using Homestead.WebApi.Modules.Admin.Features.TextExtractionEngines.UpdateTextExtractionEngine;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.CreateProcessingSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.DeleteProcessingSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Schedules.GetProcessingSchedules;
@@ -63,30 +53,6 @@ public static class AdminModule
         AddGroupMemberEndpoint.Map(groups);
         UpdateGroupMemberEndpoint.Map(groups);
         RemoveGroupMemberEndpoint.Map(groups);
-
-        var textExtractionEngines = app.MapGroup("/api/v{version:apiVersion}/admin/text-extraction-engines")
-            .HasApiVersion(1, 0)
-            .WithGroupName("v1")
-            .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
-
-        GetTextExtractionEnginesEndpoint.Map(textExtractionEngines);
-        CreateTextExtractionEngineEndpoint.Map(textExtractionEngines);
-        UpdateTextExtractionEngineEndpoint.Map(textExtractionEngines);
-        BulkDeleteTextExtractionEnginesEndpoint.Map(textExtractionEngines);
-
-        var aiProviders = app.MapGroup("/api/v{version:apiVersion}/admin/ai-providers")
-            .HasApiVersion(1, 0)
-            .WithGroupName("v1")
-            .WithTags("Admin")
-            .RequireAuthorization(AuthPolicies.RequireAdmin);
-
-        GetAiProvidersEndpoint.Map(aiProviders);
-        CreateAiProviderEndpoint.Map(aiProviders);
-        UpdateAiProviderEndpoint.Map(aiProviders);
-        BulkDeleteAiProvidersEndpoint.Map(aiProviders);
-        TestAiProviderConnectionEndpoint.Map(aiProviders);
-        ListAiProviderModelsEndpoint.Map(aiProviders);
 
         var settings = app.MapGroup("/api/v{version:apiVersion}/admin/settings")
             .HasApiVersion(1, 0)

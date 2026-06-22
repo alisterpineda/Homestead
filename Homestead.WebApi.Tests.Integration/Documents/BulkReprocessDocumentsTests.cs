@@ -65,36 +65,6 @@ public class BulkReprocessDocumentsTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task BulkReprocess_WithEngineId_ReturnsAccepted()
-    {
-        var client = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(client);
-
-        var builtInId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-reprocess",
-            new { ids = new[] { docId }, textExtractionEngineId = builtInId }, CT);
-
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-
-        var body = await response.Content.ReadFromJsonAsync<BulkReprocessResult>(CT);
-        Assert.Single(body!.JobIds);
-
-        await WaitForJobCompletionAsync(body.JobIds[0]);
-    }
-
-    [Fact]
-    public async Task BulkReprocess_NonExistentEngineId_Returns400()
-    {
-        var client = await CreateAdminClientAsync();
-        var docId = await UploadAndWaitAsync(client);
-
-        var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-reprocess",
-            new { ids = new[] { docId }, textExtractionEngineId = Guid.NewGuid() }, CT);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
     public async Task BulkReprocess_NonExistentDocumentIds_ReturnsAccepted_WithEmptyJobIds()
     {
         var client = await CreateAdminClientAsync();

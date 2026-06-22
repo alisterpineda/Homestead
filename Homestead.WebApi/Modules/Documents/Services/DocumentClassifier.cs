@@ -3,6 +3,7 @@ using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -11,24 +12,23 @@ namespace Homestead.WebApi.Modules.Documents.Services;
 
 public record DocumentClassificationOutput(
     ClassificationResult Classification,
-    List<TagInfo> AvailableTags,
-    Guid ProviderId);
+    List<TagInfo> AvailableTags);
 
 public interface IDocumentClassifier
 {
     /// <summary>
     /// Classifies an existing document by loading its latest version's extracted text. Pure — performs
-    /// no document writes. Returns null when no AI provider is configured or the model produced nothing.
+    /// no document writes. Returns null when AI is not configured or the model produced nothing.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct);
+        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct);
 
     /// <summary>
     /// Classifies from an in-memory document name + extracted text — used during upload, before the
     /// document exists. Pure — performs no document writes.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct);
+        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct);
 
     /// <summary>
     /// Applies a classification result to a tracked (or newly-constructed) document as a net diff —
@@ -39,7 +39,7 @@ public interface IDocumentClassifier
     /// audit — the caller's command handler owns the commit (and the Created/Updated audit decision).
     /// </summary>
     Task ApplyAsync(
-        Document document, ClassificationResult classification, Guid providerId, ClassificationScope scope,
+        Document document, ClassificationResult classification, ClassificationScope scope,
         Guid? actorUserId, bool stampSummaryMetadata, CancellationToken ct);
 
     Task<bool> IsAutoClassifyEnabledAsync(CancellationToken ct);
@@ -47,16 +47,15 @@ public interface IDocumentClassifier
 
 public class DocumentClassifier(
     AppDbContext db,
-    IAiProviderResolver providerResolver,
+    IAiClientFactory clientFactory,
     IAiClassificationService classificationService) : IDocumentClassifier
 {
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct)
+        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct)
     {
-        // Resolve the provider before touching the database so a disabled/absent provider short-circuits
-        // without loading the latest version.
-        var provider = await providerResolver.ResolveAsync(aiProviderId, ct);
-        if (provider is null)
+        // Gate on configured-ness before touching the database so an unconfigured AI integration
+        // short-circuits without loading the latest version.
+        if (!clientFactory.IsConfigured)
             return null;
 
         var latestVersion = await db.DocumentVersions
@@ -64,21 +63,20 @@ public class DocumentClassifier(
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
 
-        return await ClassifyCoreAsync(provider, documentName, latestVersion?.ExtractedText, scope, ct);
+        return await ClassifyCoreAsync(documentName, latestVersion?.ExtractedText, scope, ct);
     }
 
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, Guid? aiProviderId, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct)
     {
-        var provider = await providerResolver.ResolveAsync(aiProviderId, ct);
-        if (provider is null)
+        if (!clientFactory.IsConfigured)
             return null;
 
-        return await ClassifyCoreAsync(provider, documentName, extractedText, scope, ct);
+        return await ClassifyCoreAsync(documentName, extractedText, scope, ct);
     }
 
     private async Task<DocumentClassificationOutput?> ClassifyCoreAsync(
-        AiProvider provider, string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct)
     {
         // Only load a catalog when its field is in scope — mirrors the service omitting it from the prompt.
         var allTags = scope.HasFlag(ClassificationScope.Tags)
@@ -96,24 +94,24 @@ public class DocumentClassifier(
             : [];
 
         var result = await classificationService.ClassifyAsync(
-            provider, documentName, extractedText, allTags, allParties, scope, ct);
+            documentName, extractedText, allTags, allParties, scope, ct);
 
         if (result is null)
             return null;
 
-        return new DocumentClassificationOutput(result, allTags, provider.Id);
+        return new DocumentClassificationOutput(result, allTags);
     }
 
     public async Task ApplyAsync(
-        Document document, ClassificationResult classification, Guid providerId, ClassificationScope scope,
+        Document document, ClassificationResult classification, ClassificationScope scope,
         Guid? actorUserId, bool stampSummaryMetadata, CancellationToken ct)
     {
         if (scope.HasFlag(ClassificationScope.Tags))
-            await ApplyTagsAsync(document, classification.MatchedTagIds, providerId, ct);
+            await ApplyTagsAsync(document, classification.MatchedTagIds, ct);
         if (scope.HasFlag(ClassificationScope.Parties))
-            await ApplyPartiesAsync(document, classification.MatchedPartyIds, providerId, ct);
+            await ApplyPartiesAsync(document, classification.MatchedPartyIds, ct);
         if (scope.HasFlag(ClassificationScope.Name))
-            ApplyName(document, classification.SuggestedTitle, providerId);
+            ApplyName(document, classification.SuggestedTitle);
         if (scope.HasFlag(ClassificationScope.Summary))
             ApplySummary(document, classification.Summary, actorUserId, stampSummaryMetadata);
     }
@@ -131,7 +129,7 @@ public class DocumentClassifier(
         return settings?.AutoClassifyOnUpload == true;
     }
 
-    private async Task ApplyTagsAsync(Document document, List<Guid> matchedTagIds, Guid providerId, CancellationToken ct)
+    private async Task ApplyTagsAsync(Document document, List<Guid> matchedTagIds, CancellationToken ct)
     {
         // Resolve the matched tags that actually exist — gives us tracked entities to set the .Tag nav
         // and silently drops any stale ids the model may have returned.
@@ -182,13 +180,12 @@ public class DocumentClassifier(
                 Field = DocumentSuggestionField.Tags,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = tagId.ToString(),
-                AiProviderId = providerId,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         }
     }
 
-    private async Task ApplyPartiesAsync(Document document, List<Guid> matchedPartyIds, Guid providerId, CancellationToken ct)
+    private async Task ApplyPartiesAsync(Document document, List<Guid> matchedPartyIds, CancellationToken ct)
     {
         var matched = (await db.Parties
                 .Where(p => matchedPartyIds.Contains(p.Id))
@@ -232,13 +229,12 @@ public class DocumentClassifier(
                 Field = DocumentSuggestionField.Parties,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = partyId.ToString(),
-                AiProviderId = providerId,
                 CreatedAt = DateTimeOffset.UtcNow
             });
         }
     }
 
-    private void ApplyName(Document document, string suggestedTitle, Guid providerId)
+    private void ApplyName(Document document, string suggestedTitle)
     {
         // Clear any pending name suggestion and recover the true original name (its OriginalValue).
         var oldNameSuggestions = document.Suggestions
@@ -268,7 +264,6 @@ public class DocumentClassifier(
             Status = DocumentSuggestionStatus.Pending,
             SuggestedValue = suggestedTitle,
             OriginalValue = originalName,
-            AiProviderId = providerId,
             CreatedAt = DateTimeOffset.UtcNow
         });
     }

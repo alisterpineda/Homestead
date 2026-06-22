@@ -34,14 +34,13 @@ public class ClassifyDocumentJobHandler(
             ?? throw new InvalidOperationException($"Document {payload.DocumentId} not found.");
 
         var output = await classifier.ClassifyAsync(
-            payload.DocumentId, documentName, payload.AiProviderId, payload.Scope, ct);
+            payload.DocumentId, documentName, payload.Scope, ct);
 
         // Dispatch the thinned command carrying the precomputed result — the handler only persists.
         var result = await sender.Send(new ApplyClassificationCommand
         {
             DocumentId = payload.DocumentId,
             Classification = output?.Classification,
-            ProviderId = output?.ProviderId,
             Scope = payload.Scope,
             ActorUserId = job.CreatedByUserId
         }, ct);

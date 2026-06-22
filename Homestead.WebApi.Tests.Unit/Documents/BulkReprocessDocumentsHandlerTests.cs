@@ -3,7 +3,6 @@ using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocuments;
 using Homestead.WebApi.Processing;
 using NSubstitute;
@@ -136,38 +135,15 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_NullEngineId_Succeeds()
+    public async Task Handle_Succeeds_EnqueuesJob()
     {
         var (docId, _) = SeedDocument();
 
         var result = await _sut.Handle(
-            new BulkReprocessDocumentsCommand([docId], TextExtractionEngineId: null),
+            new BulkReprocessDocumentsCommand([docId]),
             CancellationToken.None);
 
         Assert.Single(result.JobIds);
-    }
-
-    [Fact]
-    public async Task Handle_BuiltInEngineId_Succeeds()
-    {
-        var (docId, _) = SeedDocument();
-
-        var result = await _sut.Handle(
-            new BulkReprocessDocumentsCommand([docId], BuiltInTextExtractionEngines.TesseractDefaultId),
-            CancellationToken.None);
-
-        Assert.Single(result.JobIds);
-    }
-
-    [Fact]
-    public async Task Handle_NonExistentEngineId_ThrowsBusinessRuleException()
-    {
-        var (docId, _) = SeedDocument();
-
-        await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(
-                new BulkReprocessDocumentsCommand([docId], Guid.NewGuid()),
-                CancellationToken.None));
     }
 
     [Fact]

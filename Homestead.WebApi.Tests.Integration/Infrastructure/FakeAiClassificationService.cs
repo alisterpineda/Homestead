@@ -1,4 +1,3 @@
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Services;
 
 namespace Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -7,7 +6,7 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// Deterministic stand-in for the real AI service so integration tests can exercise the
 /// classify/summarize flows without a live model. Returns only a canned summary (gated by scope)
 /// and an unchanged title — no tag/party matches, keeping results FK-safe regardless of the DB.
-/// Only reached when a provider resolves (an enabled provider is seeded + its id is passed).
+/// Reached whenever classify/summarize runs, since <see cref="FakeAiClientFactory"/> reports AI configured.
 /// </summary>
 public sealed class FakeAiClassificationService : IAiClassificationService
 {
@@ -43,7 +42,6 @@ public sealed class FakeAiClassificationService : IAiClassificationService
     }
 
     public async Task<ClassificationResult?> ClassifyAsync(
-        AiProvider provider,
         string documentName,
         string? extractedText,
         List<TagInfo> availableTags,

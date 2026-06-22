@@ -33,7 +33,7 @@ public class BulkSummarizeDocumentsHandler(
             db.Documents.Where(d => existingIds.Contains(d.Id)).Select(d => d.Id), ct);
 
         // Same parent job type as bulk classify, scoped to Summary only.
-        var payload = new BulkClassifyPayload(existingIds, request.AiProviderId, ClassificationScope.Summary);
+        var payload = new BulkClassifyPayload(existingIds, ClassificationScope.Summary);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.BulkClassifyDocuments, opts =>
         {

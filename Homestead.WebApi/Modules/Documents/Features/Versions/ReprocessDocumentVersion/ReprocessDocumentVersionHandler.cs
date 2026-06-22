@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -27,14 +26,9 @@ public class ReprocessDocumentVersionHandler(
         if (!versionExists)
             throw new EntityNotFoundException("Document version not found.");
 
-        if (request.TextExtractionEngineId is { } engineId)
-        {
-            await TextExtractionEngineValidator.ValidateEngineExistsAsync(db, engineId, ct);
-        }
-
         var userId = currentUser.UserId;
 
-        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId, request.TextExtractionEngineId);
+        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.ReprocessDocumentVersion, opts =>
         {

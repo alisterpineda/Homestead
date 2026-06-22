@@ -25,7 +25,6 @@ import { approveSuggestion } from '@/api/generated/fn/documents/approve-suggesti
 import { declineSuggestion } from '@/api/generated/fn/documents/decline-suggestion';
 import { approveAllSuggestions } from '@/api/generated/fn/documents/approve-all-suggestions';
 import { declineAllSuggestions } from '@/api/generated/fn/documents/decline-all-suggestions';
-import { getAiProviderSummaries } from '@/api/generated/fn/documents/get-ai-provider-summaries';
 import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
@@ -41,7 +40,6 @@ import type { DocumentSettingsResponse } from '@/api/generated/models/document-s
 import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
 import type { BulkClassifyDocumentsResponse } from '@/api/generated/models/bulk-classify-documents-response';
 import type { SummarizeDocumentResponse } from '@/api/generated/models/summarize-document-response';
-import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
 
 export type { GetDocuments$Params } from '@/api/generated/fn/documents/get-documents';
 export type { GetDocument$Params } from '@/api/generated/fn/documents/get-document';
@@ -156,10 +154,6 @@ export class DocumentApiService {
 
   declineAllSuggestions(params: Parameters<typeof declineAllSuggestions>[2]): Observable<void> {
     return declineAllSuggestions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
-  }
-
-  getAiProviderSummaries(): Observable<Array<AiProviderSummary>> {
-    return getAiProviderSummaries(this.http, this.config.rootUrl).pipe(map(r => r.body));
   }
 
   getDocumentFile(id: string, versionId?: string | null): Observable<Blob> {

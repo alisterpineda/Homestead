@@ -8,5 +8,4 @@ public record UploadDocumentPayload(
     string ContentType,
     long FileSize,
     string FileExtension,
-    Guid? GroupId = null,
-    Guid? TextExtractionEngineId = null);
+    Guid? GroupId = null);

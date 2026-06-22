@@ -14,8 +14,7 @@ public static class ReprocessDocumentVersionEndpoint
             var request = new ReprocessDocumentVersionCommand
             {
                 DocumentId = documentId,
-                VersionId = versionId,
-                TextExtractionEngineId = body?.TextExtractionEngineId
+                VersionId = versionId
             };
             var response = await sender.Send(request, ct);
             return Results.Accepted(null, response);

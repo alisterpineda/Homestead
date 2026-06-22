@@ -22,7 +22,6 @@ public class BulkClassifyTests : IntegrationTestBase
         // independent of the suggestion rows.
         var client = await CreateAdminClientAsync();
         var docId = await UploadAndWaitAsync(client, "bulk-classify-audit.pdf");
-        var providerId = await SeedEnabledProviderAsync();
 
         Guid tagId = Guid.NewGuid();
         using (var scope = CreateScope())
@@ -44,14 +43,13 @@ public class BulkClassifyTests : IntegrationTestBase
                 Field = DocumentSuggestionField.Tags,
                 Status = DocumentSuggestionStatus.Pending,
                 SuggestedValue = tagId.ToString(),
-                AiProviderId = providerId,
                 CreatedAt = DateTimeOffset.UtcNow
             });
             await db.SaveChangesAsync(CT);
         }
 
         var response = await client.PostAsJsonAsync("/api/v1/documents/bulk-classify",
-            new { ids = new[] { docId }, aiProviderId = providerId, fields = new[] { "Tags" } }, CT);
+            new { ids = new[] { docId }, fields = new[] { "Tags" } }, CT);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BulkClassifyResult>(CT);

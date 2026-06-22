@@ -28,7 +28,7 @@ public class SummarizeDocumentHandler(
         audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, request.AiProviderId, ClassificationScope.Summary, ct);
+            request.DocumentId, document.Name, ClassificationScope.Summary, ct);
 
         // null = no provider / nothing to summarize; blank = the model produced no usable summary.
         // Either way it's a graceful no-op — never overwrite an existing summary with nothing (no undo).

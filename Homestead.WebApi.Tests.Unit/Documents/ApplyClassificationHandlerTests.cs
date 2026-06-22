@@ -35,7 +35,6 @@ public class ApplyClassificationHandlerTests : IDisposable
     public async Task Handle_AppliesPrecomputedClassification_WhenProvided()
     {
         var ct = TestContext.Current.CancellationToken;
-        var providerId = Guid.NewGuid();
         var actorId = Guid.NewGuid();
         var classification = new ClassificationResult([], [], "summary", "Doc");
 
@@ -43,7 +42,6 @@ public class ApplyClassificationHandlerTests : IDisposable
         {
             DocumentId = _documentId,
             Classification = classification,
-            ProviderId = providerId,
             Scope = ClassificationScope.All,
             ActorUserId = actorId
         }, ct);
@@ -51,10 +49,10 @@ public class ApplyClassificationHandlerTests : IDisposable
         Assert.Equal("Doc", result.DocumentName);
         // The handler does NOT re-run ClassifyAsync — only ApplyAsync with the precomputed result.
         await _classifier.DidNotReceive().ClassifyAsync(
-            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
+            Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
         await _classifier.Received(1).ApplyAsync(
             Arg.Is<Document>(d => d.Id == _documentId),
-            classification, providerId, ClassificationScope.All, actorId, true, ct);
+            classification, ClassificationScope.All, actorId, true, ct);
         Assert.True(_audit.HasEntries);   // tracked for the Updated audit entry
     }
 
@@ -67,33 +65,12 @@ public class ApplyClassificationHandlerTests : IDisposable
         {
             DocumentId = _documentId,
             Classification = null,
-            ProviderId = null,
             Scope = ClassificationScope.All
         }, ct);
 
         Assert.Equal("Doc", result.DocumentName);
         await _classifier.DidNotReceive().ApplyAsync(
-            Arg.Any<Document>(), Arg.Any<ClassificationResult>(), Arg.Any<Guid>(),
-            Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        Assert.False(_audit.HasEntries);
-    }
-
-    [Fact]
-    public async Task Handle_IsNoOp_WhenProviderIdNull_EvenWithClassification()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var classification = new ClassificationResult([], [], "summary", "Doc");
-
-        await _sut.Handle(new ApplyClassificationCommand
-        {
-            DocumentId = _documentId,
-            Classification = classification,
-            ProviderId = null,
-            Scope = ClassificationScope.All
-        }, ct);
-
-        await _classifier.DidNotReceive().ApplyAsync(
-            Arg.Any<Document>(), Arg.Any<ClassificationResult>(), Arg.Any<Guid>(),
+            Arg.Any<Document>(), Arg.Any<ClassificationResult>(),
             Arg.Any<ClassificationScope>(), Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
         Assert.False(_audit.HasEntries);
     }
@@ -106,8 +83,7 @@ public class ApplyClassificationHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.Handle(new ApplyClassificationCommand
         {
             DocumentId = Guid.NewGuid(),
-            Classification = new ClassificationResult([], [], "s", "t"),
-            ProviderId = Guid.NewGuid()
+            Classification = new ClassificationResult([], [], "s", "t")
         }, ct));
     }
 }

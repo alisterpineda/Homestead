@@ -35,7 +35,7 @@ public class ClassifyPayloadBackCompatTests
     [Fact]
     public void ClassifyDocumentPayload_ExplicitScope_RoundTrips()
     {
-        var original = new ClassifyDocumentPayload(Guid.NewGuid(), null, ClassificationScope.Summary);
+        var original = new ClassifyDocumentPayload(Guid.NewGuid(), ClassificationScope.Summary);
 
         var roundTripped = JsonSerializer.Deserialize<ClassifyDocumentPayload>(
             JsonSerializer.Serialize(original));

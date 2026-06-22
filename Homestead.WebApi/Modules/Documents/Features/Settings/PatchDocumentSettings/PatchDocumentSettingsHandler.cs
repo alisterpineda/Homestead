@@ -41,19 +41,6 @@ public class PatchDocumentSettingsHandler(
                 e.ErrorMessage
             }));
 
-        // Validate
-        if (settings.DefaultTextExtractionEngineId is { } engineId)
-        {
-            await TextExtractionEngineValidator.ValidateEngineExistsAsync(db, engineId, ct);
-        }
-
-        if (settings.DefaultAiProviderId is { } aiProviderId)
-        {
-            var aiProviderExists = await db.AiProviders.AnyAsync(p => p.Id == aiProviderId && p.IsEnabled, ct);
-            if (!aiProviderExists)
-                throw new BusinessRuleException("The specified AI provider does not exist or is disabled.");
-        }
-
         var newValue = JsonSerializer.Serialize(settings, FieldChange.JsonOptions);
 
         if (entity is null)
@@ -86,8 +73,6 @@ public class PatchDocumentSettingsHandler(
 
         return new DocumentSettingsResponse
         {
-            DefaultTextExtractionEngineId = settings.DefaultTextExtractionEngineId,
-            DefaultAiProviderId = settings.DefaultAiProviderId,
             AutoClassifyOnUpload = settings.AutoClassifyOnUpload
         };
     }

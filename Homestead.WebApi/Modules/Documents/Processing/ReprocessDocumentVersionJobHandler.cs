@@ -36,7 +36,7 @@ public class ReprocessDocumentVersionJobHandler(
 
         // Re-extract text (the failure-prone step stays in the job handler)
         var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-            filePath, version.ContentType, payload.TextExtractionEngineId, ct);
+            filePath, version.ContentType, ct);
 
         if (!extractionResult.Succeeded)
         {

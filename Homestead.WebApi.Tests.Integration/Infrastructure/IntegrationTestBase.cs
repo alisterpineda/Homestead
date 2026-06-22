@@ -1,5 +1,4 @@
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -248,24 +247,6 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         db.ProcessingSchedules.Add(schedule);
         await db.SaveChangesAsync(CT);
         return schedule.Id;
-    }
-
-    protected async Task<Guid> SeedEnabledProviderAsync()
-    {
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var provider = new AiProvider
-        {
-            Id = Guid.NewGuid(),
-            Name = $"Test Provider {Guid.NewGuid():N}",
-            ProviderType = AiProviderType.AzureAIFoundry,
-            IsEnabled = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AiProviders.Add(provider);
-        await db.SaveChangesAsync(CT);
-        return provider.Id;
     }
 
     protected async Task<Guid> GetUserIdAsync(HttpClient client)

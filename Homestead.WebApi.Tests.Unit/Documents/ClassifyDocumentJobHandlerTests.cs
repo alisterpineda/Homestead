@@ -56,17 +56,16 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         // The slow AI call runs here in the job scope (before the command transaction), keyed off the
         // document name read from the store.
         await _classifier.Received(1).ClassifyAsync(
-            _documentId, DocumentName, null, ClassificationScope.All, ct);
+            _documentId, DocumentName, ClassificationScope.All, ct);
     }
 
     [Fact]
     public async Task HandleAsync_SendsApplyClassificationCommand_WithPrecomputedResult_AndActorFromJob()
     {
         var ct = TestContext.Current.CancellationToken;
-        var providerId = Guid.NewGuid();
         var classification = new ClassificationResult([], [], "summary", DocumentName);
-        _classifier.ClassifyAsync(_documentId, DocumentName, Arg.Any<Guid?>(), Arg.Any<ClassificationScope>(), ct)
-            .Returns(new DocumentClassificationOutput(classification, [], providerId));
+        _classifier.ClassifyAsync(_documentId, DocumentName, Arg.Any<ClassificationScope>(), ct)
+            .Returns(new DocumentClassificationOutput(classification, []));
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
@@ -75,16 +74,15 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
                 && c.Classification == classification
-                && c.ProviderId == providerId
                 && c.ActorUserId == job.CreatedByUserId),
             ct);
     }
 
     [Fact]
-    public async Task HandleAsync_NoClassificationProduced_SendsCommandWithNulls()
+    public async Task HandleAsync_NoClassificationProduced_SendsCommandWithNullClassification()
     {
         var ct = TestContext.Current.CancellationToken;
-        // Default substitute returns null output (no provider / nothing produced).
+        // Default substitute returns null output (AI unconfigured / nothing produced).
         var job = CreateJob();
 
         await _sut.HandleAsync(job, ct);
@@ -92,22 +90,8 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         await _sender.Received(1).Send(
             Arg.Is<ApplyClassificationCommand>(c =>
                 c.DocumentId == _documentId
-                && c.Classification == null
-                && c.ProviderId == null),
+                && c.Classification == null),
             ct);
-    }
-
-    [Fact]
-    public async Task HandleAsync_PassesAiProviderIdFromPayload()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var aiProviderId = Guid.NewGuid();
-        var job = CreateJob(aiProviderId);
-
-        await _sut.HandleAsync(job, ct);
-
-        await _classifier.Received(1).ClassifyAsync(
-            _documentId, DocumentName, aiProviderId, ClassificationScope.All, ct);
     }
 
     [Fact]
@@ -119,7 +103,7 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         await _classifier.Received(1).ClassifyAsync(
-            _documentId, DocumentName, null, ClassificationScope.Summary, ct);
+            _documentId, DocumentName, ClassificationScope.Summary, ct);
         await _sender.Received(1).Send(
             Arg.Is<ApplyClassificationCommand>(c => c.Scope == ClassificationScope.Summary), ct);
     }
@@ -205,9 +189,9 @@ public class ClassifyDocumentJobHandlerTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
     }
 
-    private ProcessingJob CreateJob(Guid? aiProviderId = null, ClassificationScope scope = ClassificationScope.All)
+    private ProcessingJob CreateJob(ClassificationScope scope = ClassificationScope.All)
     {
-        var payload = new ClassifyDocumentPayload(_documentId, aiProviderId, scope);
+        var payload = new ClassifyDocumentPayload(_documentId, scope);
         var job = new ProcessingJob
         {
             Id = Guid.NewGuid(),

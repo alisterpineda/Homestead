@@ -3,7 +3,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Domain.Auditing;
-using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Modules.Documents.Features.Settings.PatchDocumentSettings;
 using Homestead.WebApi.Persistence;
@@ -50,22 +49,22 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     public async Task Handle_NoExistingRow_CreatesNewSetting()
     {
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
+            p.Replace(m => m.AutoClassifyOnUpload, true));
 
         var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
+        Assert.True(response.AutoClassifyOnUpload);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, TestContext.Current.CancellationToken);
         Assert.NotNull(saved);
-        Assert.Contains(BuiltInTextExtractionEngines.TesseractDefaultId.ToString(), saved.Value);
+        Assert.Contains("autoClassifyOnUpload", saved.Value);
     }
 
     [Fact]
     public async Task Handle_NoExistingRow_LogsCreated()
     {
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
+            p.Replace(m => m.AutoClassifyOnUpload, true));
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
@@ -79,16 +78,16 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+            Value = """{"autoClassifyOnUpload":true}"""
         });
         await _db.SaveChangesAsync(ct);
 
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
+            p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
         var response = await _sut.Handle(command, ct);
 
-        Assert.Null(response.DefaultTextExtractionEngineId);
+        Assert.Null(response.AutoClassifyOnUpload);
 
         var saved = await _db.AppSettings.FirstOrDefaultAsync(s => s.Key == AppSetting.DocumentsModule, ct);
         Assert.NotNull(saved);
@@ -101,12 +100,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+            Value = """{"autoClassifyOnUpload":true}"""
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
+            p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
@@ -125,7 +124,7 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
 
         var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        Assert.Null(response.DefaultTextExtractionEngineId);
+        Assert.Null(response.AutoClassifyOnUpload);
     }
 
     [Fact]
@@ -134,12 +133,12 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+            Value = """{"autoClassifyOnUpload":true}"""
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
+            p.Replace(m => m.AutoClassifyOnUpload, true));
 
         await _sut.Handle(command, TestContext.Current.CancellationToken);
 
@@ -151,62 +150,31 @@ public class PatchDocumentSettingsHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_SetDefaultEngineToBuiltIn_Succeeds()
+    public async Task Handle_SetAutoClassify_Succeeds()
     {
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, BuiltInTextExtractionEngines.TesseractDefaultId));
+            p.Replace(m => m.AutoClassifyOnUpload, true));
 
         var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        Assert.Equal(BuiltInTextExtractionEngines.TesseractDefaultId, response.DefaultTextExtractionEngineId);
+        Assert.True(response.AutoClassifyOnUpload);
     }
 
     [Fact]
-    public async Task Handle_SetDefaultEngineToNonExistent_ThrowsBadRequest()
-    {
-        var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, Guid.NewGuid()));
-
-        await Assert.ThrowsAsync<BusinessRuleException>(
-            () => _sut.Handle(command, TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public async Task Handle_SetDefaultEngineToDbEngine_Succeeds()
-    {
-        var engineId = Guid.NewGuid();
-        _db.TextExtractionEngines.Add(new TextExtractionEngine
-        {
-            Id = engineId,
-            Name = "Custom Engine",
-            EngineType = TextExtractionEngineType.Tesseract,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, engineId));
-
-        var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
-
-        Assert.Equal(engineId, response.DefaultTextExtractionEngineId);
-    }
-
-    [Fact]
-    public async Task Handle_ClearDefaultEngine_Succeeds()
+    public async Task Handle_ClearAutoClassify_Succeeds()
     {
         _db.AppSettings.Add(new AppSetting
         {
             Key = AppSetting.DocumentsModule,
-            Value = $$$"""{"defaultTextExtractionEngineId":"{{{BuiltInTextExtractionEngines.TesseractDefaultId}}}"}"""
+            Value = """{"autoClassifyOnUpload":true}"""
         });
         await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var command = CreatePatchCommand(p =>
-            p.Replace(m => m.DefaultTextExtractionEngineId, (Guid?)null));
+            p.Replace(m => m.AutoClassifyOnUpload, (bool?)null));
 
         var response = await _sut.Handle(command, TestContext.Current.CancellationToken);
 
-        Assert.Null(response.DefaultTextExtractionEngineId);
+        Assert.Null(response.AutoClassifyOnUpload);
     }
 }

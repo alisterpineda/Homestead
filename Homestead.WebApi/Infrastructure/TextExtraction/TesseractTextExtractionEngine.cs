@@ -1,11 +1,13 @@
 using System.Text;
-using Homestead.WebApi.Infrastructure.TextExtraction.Configurations;
+using Homestead.WebApi.Domain.Settings;
+using Microsoft.Extensions.Options;
 using PDFtoImage;
 using UglyToad.PdfPig;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
-public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<TesseractTextExtractionEngine> logger)
+public class TesseractTextExtractionEngine(
+    ITesseractRunner tesseract, IOptions<TesseractOptions> options, ILogger<TesseractTextExtractionEngine> logger)
     : ITextExtractionEngine
 {
     private static readonly HashSet<string> SupportedImageTypes =
@@ -17,30 +19,36 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
         "image/gif"
     ];
 
-    public async Task<string?> ExtractTextAsync(string filePath, string contentType, string? configuration, CancellationToken ct)
+    // The Tesseract language argument ("eng" or "eng+fra"), computed once from configured languages.
+    // Folds in the deleted TesseractLanguageResolver's logic; defaults to "eng" when none are configured.
+    private readonly string _language = ResolveLanguage(options.Value.Languages);
+
+    private static string ResolveLanguage(List<TesseractLanguage> languages) =>
+        languages is { Count: > 0 }
+            ? string.Join("+", languages.Select(l => l.ToString().ToLowerInvariant()))
+            : TesseractLanguage.Eng.ToString().ToLowerInvariant();
+
+    public async Task<string?> ExtractTextAsync(string filePath, string contentType, CancellationToken ct)
     {
         if (SupportedImageTypes.Contains(contentType))
-            return await ExtractFromImageAsync(filePath, configuration, ct);
+            return await ExtractFromImageAsync(filePath, ct);
 
         if (contentType is "application/pdf")
-            return await ExtractFromPdfAsync(filePath, configuration, ct);
+            return await ExtractFromPdfAsync(filePath, ct);
 
         return null;
     }
 
-    private async Task<string?> ExtractFromImageAsync(string filePath, string? configuration, CancellationToken ct)
+    private async Task<string?> ExtractFromImageAsync(string filePath, CancellationToken ct)
     {
-        var language = TesseractLanguageResolver.Resolve(configuration);
         await using var fileStream = File.OpenRead(filePath);
-        return await tesseract.OcrAsync(fileStream, language, ct);
+        return await tesseract.OcrAsync(fileStream, _language, ct);
     }
 
-    private async Task<string?> ExtractFromPdfAsync(string filePath, string? configuration, CancellationToken ct)
+    private async Task<string?> ExtractFromPdfAsync(string filePath, CancellationToken ct)
     {
         try
         {
-            var language = TesseractLanguageResolver.Resolve(configuration);
-
             using var document = PdfDocument.Open(filePath);
             var sb = new StringBuilder();
 
@@ -61,7 +69,7 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
                 }
 
                 // No embedded text on this page — render as image and OCR.
-                var ocrText = await TryOcrPageAsync(pdfStream, page.Number, language, filePath, ct);
+                var ocrText = await TryOcrPageAsync(pdfStream, page.Number, filePath, ct);
                 if (!string.IsNullOrWhiteSpace(ocrText))
                 {
                     if (sb.Length > 0)
@@ -87,7 +95,7 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
     // Per-page failure (tesseract missing, render error, etc.) must not discard
     // text already extracted from other pages.
     private async Task<string?> TryOcrPageAsync(
-        FileStream pdfStream, int pageNumber, string language, string filePath, CancellationToken ct)
+        FileStream pdfStream, int pageNumber, string filePath, CancellationToken ct)
     {
         try
         {
@@ -98,7 +106,7 @@ public class TesseractTextExtractionEngine(ITesseractRunner tesseract, ILogger<T
 #pragma warning restore CA1416
             pngStream.Position = 0;
 
-            return await tesseract.OcrAsync(pngStream, language, ct);
+            return await tesseract.OcrAsync(pngStream, _language, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

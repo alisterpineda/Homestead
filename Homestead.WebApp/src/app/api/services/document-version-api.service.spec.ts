@@ -71,14 +71,4 @@ describe('DocumentVersionApiService', () => {
     expect(req.request.method).toBe('POST');
     req.flush(mockBody);
   });
-
-  it('getTextExtractionEngineSummaries sends GET and unwraps body', () => {
-    const mockBody = [{ id: 'e1', name: 'Tesseract' }];
-    service.getTextExtractionEngineSummaries().subscribe(result => {
-      expect(result).toEqual(mockBody);
-    });
-    const req = httpTesting.expectOne('/api/v1/documents/text-extraction-engines');
-    expect(req.request.method).toBe('GET');
-    req.flush(mockBody);
-  });
 });

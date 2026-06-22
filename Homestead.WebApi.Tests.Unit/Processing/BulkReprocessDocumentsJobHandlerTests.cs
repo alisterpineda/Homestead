@@ -54,9 +54,9 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
         return docId;
     }
 
-    private ProcessingJob CreateParentJob(List<Guid> documentIds, Guid? engineId = null)
+    private ProcessingJob CreateParentJob(List<Guid> documentIds)
     {
-        var payload = new BulkReprocessPayload(documentIds, engineId);
+        var payload = new BulkReprocessPayload(documentIds);
         return new ProcessingJob
         {
             Id = Guid.NewGuid(),

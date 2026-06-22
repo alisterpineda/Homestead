@@ -3,7 +3,6 @@
 
 import { DocumentSuggestionField } from '../models/document-suggestion-field';
 export interface BulkClassifyDocumentsCommand {
-  aiProviderId?: (string | null);
   fields?: (Array<DocumentSuggestionField> | null);
   ids: Array<string>;
 }

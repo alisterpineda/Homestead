@@ -360,7 +360,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         #summarizeOptionsDialog
         mode="single"
         [showFields]="false"
-        (confirmed)="handleSummarize($event)"
+        (confirmed)="handleSummarize()"
       />
 
       <!-- Shared content templates -->
@@ -1472,7 +1472,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
-  handleClassify(options: { aiProviderId: string | null; fields: DocumentSuggestionField[] }): void {
+  handleClassify(options: { fields: DocumentSuggestionField[] }): void {
     const id = this.documentId();
     if (!id) return;
     this.classifyingPreview.set(true);
@@ -1495,7 +1495,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
     this.classifySub = this.documentApi.classifyPreview({
       documentId: id,
-      body: { aiProviderId: options.aiProviderId, fields: options.fields },
+      body: { fields: options.fields },
     }).pipe(
       handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
       finalize(() => settle.reject()),
@@ -1545,7 +1545,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
-  handleSummarize(options: { aiProviderId: string | null }): void {
+  handleSummarize(): void {
     const id = this.documentId();
     if (!id) return;
     this.summarizing.set(true);
@@ -1553,7 +1553,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const toastId = toast.loading('Summarizing document...');
     this.summarizeSub = this.documentApi.summarizeDocument({
       documentId: id,
-      body: { aiProviderId: options.aiProviderId },
+      body: {},
     }).pipe(
       handleMutationError(this.errorHandler, this.summarizing, 'Failed to summarize document.'),
       finalize(() => toast.dismiss(toastId)),

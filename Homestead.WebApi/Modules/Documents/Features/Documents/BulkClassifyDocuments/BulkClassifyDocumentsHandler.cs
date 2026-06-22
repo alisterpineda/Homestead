@@ -32,7 +32,7 @@ public class BulkClassifyDocumentsHandler(
             db.Documents.Where(d => existingIds.Contains(d.Id)).Select(d => d.Id), ct);
 
         var scope = ClassificationScopeExtensions.FromFields(request.Fields);
-        var payload = new BulkClassifyPayload(existingIds, request.AiProviderId, scope);
+        var payload = new BulkClassifyPayload(existingIds, scope);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.BulkClassifyDocuments, opts =>
         {

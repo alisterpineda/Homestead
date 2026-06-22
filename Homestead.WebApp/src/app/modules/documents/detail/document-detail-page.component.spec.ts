@@ -806,11 +806,11 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         setGuardDocumentId('doc-1');
         guardFixture.detectChanges();
 
-        guardComponent.handleClassify({ aiProviderId: 'provider-1', fields: ['Tags'] });
+        guardComponent.handleClassify({ fields: ['Tags'] });
 
         expect(guardDocumentApi.classifyPreview).toHaveBeenCalledWith({
           documentId: 'doc-1',
-          body: { aiProviderId: 'provider-1', fields: ['Tags'] },
+          body: { fields: ['Tags'] },
         });
       });
 
@@ -824,7 +824,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         (guardDocumentApi.classifyPreview as ReturnType<typeof vi.fn>).mockReturnValue(
           of({ suggestedTitle: null, summary: null, tags: [], parties: [] }));
 
-        guardComponent.handleClassify({ aiProviderId: null, fields: ['Tags', 'Parties'] });
+        guardComponent.handleClassify({ fields: ['Tags', 'Parties'] });
         guardFixture.detectChanges();
 
         expect(guardComponent.editName()).toBe('Original');
@@ -836,12 +836,12 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         guardFixture.detectChanges();
 
         const before = guardComponent.refreshTrigger();
-        guardComponent.handleSummarize({ aiProviderId: 'provider-1' });
+        guardComponent.handleSummarize();
         guardFixture.detectChanges();
 
         expect(guardDocumentApi.summarizeDocument).toHaveBeenCalledWith({
           documentId: 'doc-1',
-          body: { aiProviderId: 'provider-1' },
+          body: {},
         });
         expect(guardComponent.refreshTrigger()).toBeGreaterThan(before);
       });

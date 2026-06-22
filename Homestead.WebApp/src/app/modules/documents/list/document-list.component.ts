@@ -244,7 +244,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-bulk-edit-parties-popover [selectedIds]="selectedDocumentIds()" [documents]="data()?.items ?? []" [disabled]="!hasSelection()" (applied)="onBulkUpdateApplied()" />
               <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
               <app-bulk-classify-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkClassifyConfirmed($event)" />
-              <app-bulk-summarize-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkSummarizeConfirmed($event)" />
+              <app-bulk-summarize-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkSummarizeConfirmed()" />
               <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                 <ng-icon hlm name="lucideDownload" size="sm" />
                 Download
@@ -933,12 +933,12 @@ export class DocumentListComponent {
     });
   }
 
-  onBulkClassifyConfirmed(options: { aiProviderId: string | null; fields: DocumentSuggestionField[] }): void {
+  onBulkClassifyConfirmed(options: { fields: DocumentSuggestionField[] }): void {
     const ids = Array.from(this.selectedDocumentIds());
     if (ids.length === 0) return;
 
     this.documentApi.bulkClassifyDocuments({
-      body: { ids, aiProviderId: options.aiProviderId, fields: options.fields },
+      body: { ids, fields: options.fields },
     }).pipe(
       handleMutationError(this.errorHandler, this.bulkAiEnqueuing, 'Failed to start AI classification.'),
       takeUntilDestroyed(this.destroyRef),
@@ -947,12 +947,12 @@ export class DocumentListComponent {
     });
   }
 
-  onBulkSummarizeConfirmed(options: { aiProviderId: string | null }): void {
+  onBulkSummarizeConfirmed(): void {
     const ids = Array.from(this.selectedDocumentIds());
     if (ids.length === 0) return;
 
     this.documentApi.bulkSummarizeDocuments({
-      body: { ids, aiProviderId: options.aiProviderId },
+      body: { ids },
     }).pipe(
       handleMutationError(this.errorHandler, this.bulkAiEnqueuing, 'Failed to start AI summarization.'),
       takeUntilDestroyed(this.destroyRef),

@@ -3,5 +3,4 @@
 
 export interface BulkReprocessDocumentsCommand {
   ids: Array<string>;
-  textExtractionEngineId?: (string | null);
 }

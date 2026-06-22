@@ -1,16 +1,10 @@
-import { Component, ChangeDetectionStrategy, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, ChangeDetectionStrategy, computed, input, output, viewChild } from '@angular/core';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
-import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmSpinner } from '@/shared/components/spartan/spinner';
-import { DocumentApiService } from '@/api/services/document-api.service';
-import { AuthService } from '@/shared/services/auth.service';
-import type { AiProviderSummary } from '@/api/generated/models/ai-provider-summary';
 import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
 import { persistedSignal } from '@/shared/utils/persisted-signal';
 
@@ -30,10 +24,10 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
 }
 
 /**
- * Shared, presentational dialog for AI classify/summarize. Lets the user pick an AI provider and
- * (for classify) which fields to (re)generate. Emits `confirmed`; the consumer makes the API call.
- * Opened programmatically via `open()` — the consumer supplies its own trigger.
- * Set `showFields=false` to back Summarize (provider only, no field checkboxes).
+ * Shared, presentational dialog for AI classify/summarize. For classify it lets the user pick which
+ * fields to (re)generate. Emits `confirmed`; the consumer makes the API call. Opened programmatically
+ * via `open()` — the consumer supplies its own trigger. Set `showFields=false` to back Summarize (no
+ * field checkboxes). AI provider selection was removed — the single statically-configured model is used.
  */
 @Component({
   selector: 'app-classify-options-dialog',
@@ -42,13 +36,10 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
     HlmDialogImports,
     HlmButton,
     HlmLabel,
-    HlmSpinner,
-    HlmSelectImports,
     HlmCheckboxImports,
-    RouterLink,
   ],
   template: `
-    <hlm-dialog (stateChanged)="onStateChanged($event)">
+    <hlm-dialog>
       <button hlmBtn class="hidden" hlmDialogTrigger>Open</button>
 
       <hlm-dialog-content *hlmDialogPortal="let ctx">
@@ -58,63 +49,27 @@ function isFieldSelection(value: unknown): value is ClassifyFieldSelection {
         </div>
 
         <div class="flex flex-col gap-4 py-4">
-          @if (loadingProviders()) {
-            <div class="flex justify-center py-2">
-              <hlm-spinner />
-            </div>
-          } @else if (noProviders()) {
+          @if (showFields()) {
             <div class="flex flex-col gap-2">
-              <p class="text-sm text-muted-foreground">{{ emptyStateMessage() }}</p>
-              @if (isAdmin()) {
-                <a hlmBtn variant="link" class="self-start px-0" routerLink="/admin/ai-providers" hlmDialogClose>
-                  Go to AI Providers
-                </a>
+              <label hlmLabel>Fields to classify</label>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <hlm-checkbox [checked]="fields().tags" (checkedChange)="setField('tags', $event)" [aria-label]="'Tags'" />
+                <span>Tags</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <hlm-checkbox [checked]="fields().parties" (checkedChange)="setField('parties', $event)" [aria-label]="'Parties'" />
+                <span>Parties</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <hlm-checkbox [checked]="fields().name" (checkedChange)="setField('name', $event)" [aria-label]="'Name'" />
+                <span>Name</span>
+              </label>
+              @if (noFieldsSelected()) {
+                <p class="text-sm text-muted-foreground">Select at least one field.</p>
               }
             </div>
           } @else {
-            @if (loadError()) {
-              <p class="text-sm text-muted-foreground">
-                Could not load AI providers. You can still continue with the system default.
-              </p>
-            } @else {
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel>AI Provider</label>
-                <hlm-select [value]="selectedProviderId() ?? ''" (valueChange)="onProviderChange($any($event))" [itemToString]="providerToString">
-                  <hlm-select-trigger class="w-full">
-                    <hlm-select-value />
-                  </hlm-select-trigger>
-                  <hlm-select-content *hlmSelectPortal class="max-h-60">
-                    <hlm-select-group>
-                      <hlm-select-item value="">Default (system setting)</hlm-select-item>
-                      @for (provider of enabledProviders(); track provider.id) {
-                        <hlm-select-item [value]="provider.id">{{ provider.name }}</hlm-select-item>
-                      }
-                    </hlm-select-group>
-                  </hlm-select-content>
-                </hlm-select>
-              </div>
-            }
-
-            @if (showFields()) {
-              <div class="flex flex-col gap-2">
-                <label hlmLabel>Fields to classify</label>
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                  <hlm-checkbox [checked]="fields().tags" (checkedChange)="setField('tags', $event)" [aria-label]="'Tags'" />
-                  <span>Tags</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                  <hlm-checkbox [checked]="fields().parties" (checkedChange)="setField('parties', $event)" [aria-label]="'Parties'" />
-                  <span>Parties</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                  <hlm-checkbox [checked]="fields().name" (checkedChange)="setField('name', $event)" [aria-label]="'Name'" />
-                  <span>Name</span>
-                </label>
-                @if (noFieldsSelected()) {
-                  <p class="text-sm text-muted-foreground">Select at least one field.</p>
-                }
-              </div>
-            }
+            <p class="text-sm text-muted-foreground">{{ description() }}</p>
           }
         </div>
 
@@ -134,14 +89,7 @@ export class ClassifyOptionsDialogComponent {
   disabled = input(false);
   showFields = input(true);
 
-  confirmed = output<{ aiProviderId: string | null; fields: DocumentSuggestionField[] }>();
-
-  providers = signal<AiProviderSummary[]>([]);
-  selectedProviderId = signal<string | null>(null);
-  loadingProviders = signal(false);
-  loadError = signal(false);
-  // True only after a successful fetch, so we can distinguish "not loaded yet" from "loaded zero".
-  providersLoaded = signal(false);
+  confirmed = output<{ fields: DocumentSuggestionField[] }>();
 
   // Remembered across surfaces (single/bulk classify) and sessions.
   fields = persistedSignal<ClassifyFieldSelection>({
@@ -150,26 +98,11 @@ export class ClassifyOptionsDialogComponent {
     validate: isFieldSelection,
   });
 
-  enabledProviders = computed(() => this.providers().filter(p => p.isEnabled));
-  // Loaded successfully but nothing usable: the "system default" can't resolve to an enabled
-  // provider either, so classification/summarization would silently no-op on the backend.
-  noProviders = computed(() => this.providersLoaded() && this.enabledProviders().length === 0);
   noFieldsSelected = computed(() => {
     const f = this.fields();
     return !f.tags && !f.parties && !f.name;
   });
-  confirmDisabled = computed(() =>
-    this.loadingProviders() || this.noProviders() || (this.showFields() && this.noFieldsSelected()),
-  );
-
-  isAdmin = inject(AuthService).isAdmin;
-
-  emptyStateMessage = computed(() => {
-    const action = this.showFields() ? 'classify documents' : 'generate summaries';
-    return this.isAdmin()
-      ? `No AI providers are configured. Add and enable one to ${action}.`
-      : `No AI providers are configured. An administrator must add and enable one before you can ${action}.`;
-  });
+  confirmDisabled = computed(() => this.showFields() && this.noFieldsSelected());
 
   private readonly verb = computed(() => (this.showFields() ? 'Classify' : 'Summarize'));
 
@@ -197,28 +130,9 @@ export class ClassifyOptionsDialogComponent {
   });
 
   private dialog = viewChild(BrnDialog);
-  private documentApi = inject(DocumentApiService);
-
-  providerToString = (id: string): string => {
-    if (id === '') return 'Default (system setting)';
-    return this.providers().find(p => p.id === id)?.name ?? id;
-  };
 
   open(): void {
     this.dialog()?.open();
-  }
-
-  onStateChanged(state: 'open' | 'closed'): void {
-    if (state === 'open') {
-      this.selectedProviderId.set(null);
-      this.loadError.set(false);
-      this.providersLoaded.set(false);
-      this.loadProviders();
-    }
-  }
-
-  onProviderChange(value: string): void {
-    this.selectedProviderId.set(value === '' ? null : value);
   }
 
   setField(field: keyof ClassifyFieldSelection, checked: boolean): void {
@@ -237,23 +151,6 @@ export class ClassifyOptionsDialogComponent {
     }
 
     ctx.close();
-    this.confirmed.emit({ aiProviderId: this.selectedProviderId(), fields });
-  }
-
-  private loadProviders(): void {
-    this.loadingProviders.set(true);
-    this.loadError.set(false);
-
-    this.documentApi.getAiProviderSummaries().subscribe({
-      next: (r) => {
-        this.providers.set(r);
-        this.providersLoaded.set(true);
-        this.loadingProviders.set(false);
-      },
-      error: () => {
-        this.loadError.set(true);
-        this.loadingProviders.set(false);
-      },
-    });
+    this.confirmed.emit({ fields });
   }
 }

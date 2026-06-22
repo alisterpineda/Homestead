@@ -38,7 +38,7 @@ public class BulkReprocessDocumentsJobHandler(
         foreach (var item in latestVersions)
         {
             var childPayload = new ReprocessDocumentVersionPayload(
-                item.DocumentId, item.VersionId, payload.TextExtractionEngineId);
+                item.DocumentId, item.VersionId);
 
             db.ProcessingJobs.Add(new ProcessingJob
             {

@@ -32,20 +32,8 @@ internal record VersionItem(Guid Id, int VersionNumber, string? Label, string Co
 
 internal record ProblemDetailsResponse(string? Type, string? Title, int? Status, string? Detail, string? ErrorCode);
 
-internal record TextExtractionEngineItem(Guid Id, string Name, string EngineType, string? Configuration, bool IsBuiltIn);
-
 internal record DocumentSettingsItem(
-    Guid? DefaultTextExtractionEngineId = null,
-    Guid? DefaultAiProviderId = null,
     bool? AutoClassifyOnUpload = null);
-
-internal record AiProviderItem(Guid Id, string Name, string ProviderType, string? Configuration, bool IsEnabled);
-
-internal record AiProviderSummaryItem(Guid Id, string Name, string ProviderType, bool IsEnabled);
-
-internal record TestConnectionResult(bool Success, string? Message);
-
-internal record ListModelsResult(IReadOnlyList<string> Models);
 
 internal record BulkClassifyResult(IReadOnlyList<Guid> JobIds);
 
@@ -65,8 +53,6 @@ internal record DocumentDetailItem(
     IReadOnlyList<DocumentSuggestionItem>? Suggestions = null);
 
 internal record SystemSettingsItem();
-
-internal record TextExtractionEngineSummaryItem(Guid Id, string Name);
 
 // Finances — enum fields are serialized as strings server-side, so use string here.
 internal record FinanceCommodityItem(

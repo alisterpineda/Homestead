@@ -34,7 +34,7 @@ import { ClassifyOptionsDialogComponent } from '../../shared/classify-options-di
 export class BulkClassifyDialogComponent {
   documentIds = input.required<Set<string>>();
   disabled = input(false);
-  confirmed = output<{ aiProviderId: string | null; fields: DocumentSuggestionField[] }>();
+  confirmed = output<{ fields: DocumentSuggestionField[] }>();
 
   documentCount = computed(() => this.documentIds().size);
 }
