@@ -23,6 +23,9 @@ public class TesseractTextExtractionEngine(
     // Folds in the deleted TesseractLanguageResolver's logic; defaults to "eng" when none are configured.
     private readonly string _language = ResolveLanguage(options.Value.Languages);
 
+    // DPI used to rasterize PDF pages, and passed through to Tesseract as --dpi for those pages.
+    private readonly int _dpi = options.Value.Dpi;
+
     private static string ResolveLanguage(List<TesseractLanguage> languages) =>
         languages is { Count: > 0 }
             ? string.Join("+", languages.Select(l => l.ToString().ToLowerInvariant()))
@@ -42,7 +45,7 @@ public class TesseractTextExtractionEngine(
     private async Task<string?> ExtractFromImageAsync(string filePath, CancellationToken ct)
     {
         await using var fileStream = File.OpenRead(filePath);
-        return await tesseract.OcrAsync(fileStream, _language, ct);
+        return await tesseract.OcrAsync(fileStream, _language, dpi: null, ct);
     }
 
     private async Task<string?> ExtractFromPdfAsync(string filePath, CancellationToken ct)
@@ -102,11 +105,11 @@ public class TesseractTextExtractionEngine(
             pdfStream.Position = 0;
             using var pngStream = new MemoryStream();
 #pragma warning disable CA1416 // PDFtoImage supports all server platforms (Linux, macOS, Windows)
-            Conversion.SavePng(pngStream, pdfStream, (Index)(pageNumber - 1), leaveOpen: true);
+            Conversion.SavePng(pngStream, pdfStream, (Index)(pageNumber - 1), options: new(Dpi: _dpi), leaveOpen: true);
 #pragma warning restore CA1416
             pngStream.Position = 0;
 
-            return await tesseract.OcrAsync(pngStream, _language, ct);
+            return await tesseract.OcrAsync(pngStream, _language, dpi: _dpi, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

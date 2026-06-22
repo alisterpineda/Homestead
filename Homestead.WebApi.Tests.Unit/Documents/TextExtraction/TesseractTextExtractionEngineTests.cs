@@ -38,7 +38,7 @@ public class TesseractTextExtractionEngineTests : IDisposable
 
         Assert.Null(result);
         await _runner.DidNotReceive().OcrAsync(
-            Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -49,14 +49,14 @@ public class TesseractTextExtractionEngineTests : IDisposable
     [InlineData("image/gif")]
     public async Task ExtractTextAsync_SupportedImageType_CallsRunner(string contentType)
     {
-        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
             .Returns("ocr text");
 
         var result = await _sut.ExtractTextAsync(_tempFile, contentType, CancellationToken.None);
 
         Assert.Equal("ocr text", result);
         await _runner.Received(1).OcrAsync(
-            Arg.Any<Stream>(), "eng", Arg.Any<CancellationToken>());
+            Arg.Any<Stream>(), "eng", null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -64,31 +64,31 @@ public class TesseractTextExtractionEngineTests : IDisposable
     {
         // Languages now come from TesseractOptions (static config), not a per-call config blob.
         var engine = EngineWith(new TesseractOptions { Languages = [TesseractLanguage.Fra, TesseractLanguage.Deu] });
-        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
             .Returns("texte");
 
         await engine.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
 
         await _runner.Received(1).OcrAsync(
-            Arg.Any<Stream>(), "fra+deu", Arg.Any<CancellationToken>());
+            Arg.Any<Stream>(), "fra+deu", null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ExtractTextAsync_ImageWithDefaultOptions_UsesDefaultLanguage()
     {
-        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
             .Returns("text");
 
         await _sut.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
 
         await _runner.Received(1).OcrAsync(
-            Arg.Any<Stream>(), "eng", Arg.Any<CancellationToken>());
+            Arg.Any<Stream>(), "eng", null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ExtractTextAsync_RunnerReturnsNull_ReturnsNull()
     {
-        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _runner.OcrAsync(Arg.Any<Stream>(), Arg.Any<string>(), Arg.Any<int?>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
 
         var result = await _sut.ExtractTextAsync(_tempFile, "image/png", CancellationToken.None);
