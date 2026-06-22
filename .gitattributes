@@ -1,0 +1,8 @@
+# Shell scripts must stay LF — they run under `sh` in Docker (Alpine busybox),
+# the devcontainer, and CI. A CRLF checkout on Windows would break execution.
+*.sh text eol=lf
+
+# Tesseract provisioning source-of-truth files: the fetch script strips CR
+# defensively, but pin LF so the committed bytes are stable across platforms.
+tessdata.manifest text eol=lf
+tessdata.ref text eol=lf

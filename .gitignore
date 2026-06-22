@@ -12,6 +12,10 @@ riderModule.iml
 node_modules/
 Homestead.WebApi/wwwroot/
 
+# Tesseract models are provisioned by scripts/fetch-tessdata.sh (pinned in tessdata.ref),
+# never committed. The manifest + ref + script are tracked; the downloaded models are not.
+**/*.traineddata
+
 .local/
 
 # Claude Code

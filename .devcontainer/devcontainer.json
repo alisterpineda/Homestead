@@ -19,7 +19,8 @@
   },
   "postStartCommand": "dotnet dev-certs https --trust || true",
   "remoteEnv": {
-    "SSL_CERT_DIR": "$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs"
+    "SSL_CERT_DIR": "$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs",
+    "Ocr__Tesseract__TessDataPath": "/usr/share/tessdata"
   },
   "postCreateCommand": ".devcontainer/post-create.sh",
   "customizations": {

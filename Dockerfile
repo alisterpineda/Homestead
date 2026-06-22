@@ -22,15 +22,16 @@ WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# tzdata: required by JobSchedulerService for IANA timezone lookups — do not remove
-RUN apk add --no-cache tzdata tesseract-ocr fontconfig \
-    tesseract-ocr-data-eng tesseract-ocr-data-fra tesseract-ocr-data-deu \
-    tesseract-ocr-data-spa tesseract-ocr-data-ita tesseract-ocr-data-por \
-    tesseract-ocr-data-nld tesseract-ocr-data-rus tesseract-ocr-data-chi_sim \
-    tesseract-ocr-data-jpn tesseract-ocr-data-kor tesseract-ocr-data-ara \
-    tesseract-ocr-data-hin tesseract-ocr-data-pol tesseract-ocr-data-tur \
-    tesseract-ocr-data-vie tesseract-ocr-data-tha tesseract-ocr-data-swe \
-    tesseract-ocr-data-dan tesseract-ocr-data-nor
+# tzdata: required by JobSchedulerService for IANA timezone lookups — do not remove.
+# ca-certificates: busybox wget needs it for the HTTPS tessdata download below.
+# tessdata language packages are NOT installed here — models are pinned via fetch-tessdata.sh.
+RUN apk add --no-cache tzdata tesseract-ocr fontconfig ca-certificates
+
+# Pinned tessdata_best models (languages from tessdata.manifest, frozen to tessdata.ref).
+# Kept before the app COPYs so app-code changes don't invalidate this download layer.
+COPY scripts/fetch-tessdata.sh scripts/
+COPY Homestead.WebApi/tessdata.manifest Homestead.WebApi/tessdata.ref Homestead.WebApi/
+RUN sh scripts/fetch-tessdata.sh /usr/share/tessdata
 
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/Homestead/browser ./wwwroot/

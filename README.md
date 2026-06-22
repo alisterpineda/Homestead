@@ -142,6 +142,7 @@ dotnet user-secrets set "Ai:Model" "gemma-4-e4b"
 |---|---|---|
 | `FileStorage__MediaPath` | `/media` | Path for document storage |
 | `FileStorage__CachePath` | `/cache` | Path for generated thumbnail cache |
+| `Ocr__Tesseract__TessDataPath` | `/usr/share/tessdata` | Directory of pinned Tesseract `.traineddata` models — see [OCR Models](#ocr-models-tesseract) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
 
 ### Volumes
@@ -169,6 +170,57 @@ Admins can also pre-create users from the admin panel at `/admin` — pre-create
 - The container listens on port **8080** (HTTP). TLS termination is handled by your reverse proxy.
 - Forwarded headers are enabled by default, so `X-Forwarded-For` / `X-Forwarded-Proto` from your reverse proxy are trusted automatically.
 - Database migrations run automatically on startup.
+
+### OCR Models (Tesseract)
+
+OCR uses Tesseract (invoked as an external CLI) with models pinned to an exact
+[`tessdata_best`](https://github.com/tesseract-ocr/tessdata_best) commit, so OCR output stays
+reproducible across dev, test, and prod and over time — it does not float with whatever the OS
+packager happens to ship. Three committed files are the source of truth:
+
+| File | Purpose |
+|---|---|
+| `Homestead.WebApi/tessdata.manifest` | Languages to provision, one code per line (`eng`, `fra`) |
+| `Homestead.WebApi/tessdata.ref` | The pinned `tessdata_best` commit SHA |
+| `scripts/fetch-tessdata.sh` | Downloads each manifest language at that ref into a destination directory |
+
+The single runtime knob is the **`Ocr__Tesseract__TessDataPath`** env var, which points Tesseract at
+the provisioned directory. Every environment provisions the same way and converges on
+`/usr/share/tessdata`:
+
+- **Prod** — the Docker image runs the script at build time and sets the env var (nothing to do).
+- **Dev container** — `post-create.sh` installs the Tesseract binary and runs the script; the env
+  var is set in `devcontainer.json`'s `remoteEnv`.
+- **CI** — the `integration-test` job installs the binary, runs the script, and sets the env var.
+
+`dotnet build` / `dotnet test` never touch the network — provisioning happens only in those hooks.
+
+**Enabled vs. available languages.** The script provisions every manifest language (`eng` + `fra`),
+but only the languages listed in `Ocr:Tesseract:Languages` (default `["Eng"]`) are used at
+extraction time. The French models ship but stay dormant unless a self-hoster enables `Fra`.
+
+> ⚠️ **Every enabled language must also be in `tessdata.manifest`.** Tesseract is invoked once with
+> the combined `-l eng+fra` form, so a single missing model makes the *whole* call fail and **all**
+> OCR for that deployment silently yields no extracted text (it's logged as a warning, not surfaced
+> as an error). **Upgrade note:** the image now provisions only `eng`+`fra`; it previously bundled
+> ~20 language packs via the OS packager. If you had enabled any other language in
+> `Ocr:Tesseract:Languages`, add it to `tessdata.manifest` (and re-provision) before upgrading.
+
+**Adding a language.** Append its `tessdata_best` filename stem to `tessdata.manifest` (e.g. `deu`),
+re-run the provisioning hook, and enable it in `Ocr:Tesseract:Languages`. Optionally bump
+`tessdata.ref` to a newer commit to refresh every model at once. The manifest stem must match the
+lowercased `TesseractLanguage` enum name the engine resolves (e.g. `Fra` → `fra`). CJK is a known
+exception: the enum's `Zho` resolves to `zho`, but the actual file is `chi_sim`, so adding Chinese
+requires both a `chi_sim` manifest line **and** an explicit `Zho → "chi_sim"` mapping in
+`TesseractTextExtractionEngine.ResolveLanguage`.
+
+**Bare-metal dev** (running the WebApi natively, outside the dev container — e.g. macOS): run the
+script once into a writable directory and point the env var there:
+
+```bash
+sh scripts/fetch-tessdata.sh "$HOME/.local/share/tessdata"
+export Ocr__Tesseract__TessDataPath="$HOME/.local/share/tessdata"
+```
 
 ## Development
 

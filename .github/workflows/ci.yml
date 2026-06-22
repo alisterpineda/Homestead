@@ -49,6 +49,8 @@ jobs:
 
   integration-test:
     runs-on: ubuntu-latest
+    env:
+      Ocr__Tesseract__TessDataPath: /usr/share/tessdata
 
     steps:
       - name: Checkout
@@ -62,7 +64,10 @@ jobs:
       - name: Install Tesseract OCR
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+          sudo apt-get install -y tesseract-ocr
+
+      - name: Fetch pinned tessdata models
+        run: sudo sh scripts/fetch-tessdata.sh /usr/share/tessdata
 
       - name: Restore
         run: dotnet restore Homestead.WebApi.Tests.Integration

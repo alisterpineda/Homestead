@@ -1,6 +1,5 @@
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Infrastructure.Ai;
-using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using MediatR;
@@ -60,12 +59,10 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
         builder.UseSetting("Processing:Scheduling:Enabled", "false");
 
-        // Point Tesseract at the host's installed tessdata so PDF pages without an
-        // embedded text layer (e.g. scanned fixtures) can OCR. The default relative
-        // "tessdata" path doesn't exist next to the test bin on Linux runners.
-        var tessDataPath = ResolveTessDataPath();
-        if (tessDataPath is not null)
-            builder.UseSetting($"{TesseractOptions.SectionName}:{nameof(TesseractOptions.TessDataPath)}", tessDataPath);
+        // Tesseract's tessdata path comes from the Ocr__Tesseract__TessDataPath env var
+        // (devcontainer remoteEnv / CI job env), provisioned by scripts/fetch-tessdata.sh.
+        // The WebApi runs in-process here, so .NET's env-var config provider picks it up —
+        // no OS path-guessing needed.
 
         builder.ConfigureServices(services =>
         {
@@ -132,19 +129,6 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // DbContext pooling precisely so a scoped interceptor resolves per request, which also removed
             // the pooling/lifetime conflict this block used to work around.
         });
-    }
-
-    private static string? ResolveTessDataPath()
-    {
-        var candidates = new[]
-        {
-            "/usr/share/tesseract-ocr/5/tessdata",
-            "/usr/share/tesseract-ocr/4.00/tessdata",
-            "/usr/share/tessdata",
-            "/opt/homebrew/share/tessdata",
-            "/usr/local/share/tessdata"
-        };
-        return candidates.FirstOrDefault(p => Directory.Exists(p) && File.Exists(Path.Combine(p, "eng.traineddata")));
     }
 
     public override async ValueTask DisposeAsync()

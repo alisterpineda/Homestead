@@ -14,3 +14,8 @@ dotnet tool install -g aspire.cli
 npm install -g @anthropic-ai/claude-code
 
 npx -y skills@latest add angular/skills -g -s angular-developer -a claude-code -y --copy
+
+# OCR: Tesseract binary only — the pinned tessdata_best models (eng+fra) come from the
+# provisioning script, not apt language packs, so dev/test/prod use byte-identical models.
+sudo apt-get install -y tesseract-ocr
+sudo sh scripts/fetch-tessdata.sh /usr/share/tessdata
