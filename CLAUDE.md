@@ -25,7 +25,7 @@ This starts PostgreSQL (with pgWeb admin UI), Keycloak (with pre-imported realm)
 
 ## Aspire Orchestration
 
-`Homestead.AppHost` orchestrates all services: PostgreSQL, Keycloak, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. Keycloak runs on port 8080 with a pre-imported `homestead` realm (`KeycloakRealms/homestead-realm.json`) containing test users (`admin@test.com`/`admin123`, `user@test.com`/`user123`). The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`.
+`Homestead.AppHost` orchestrates all services: PostgreSQL, Keycloak, WebApi, and the Angular dev server. The WebApi connects to PostgreSQL via the `postgresdb` connection name. Keycloak runs on port 8080 with a pre-imported `homestead` realm (`KeycloakRealms/homestead-realm.json`) containing test users (`admin@test.com`/`admin123`, `user@test.com`/`user123`). The Angular frontend is added via `AddJavaScriptApp` (from `Aspire.Hosting.JavaScript`) with an HTTP endpoint on port 4200. The Angular dev server proxies API requests to the WebApi via `proxy.conf.js`. AI is optional and off by default — configure it via AppHost user-secrets (`Ai:Endpoint` / `Ai:Model` / `Ai:ApiKey`), which AppHost forwards to the WebApi as the `AI_*` env vars.
 
 ## Syncing Frontend with Backend API Changes
 

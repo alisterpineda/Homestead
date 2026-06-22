@@ -117,6 +117,25 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 | `OIDC_ADMIN_CLAIM_VALUES` | — | Comma-separated claim values that grant the admin role |
 | `OIDC_ADDITIONAL_SCOPES` | — | Comma-separated additional OAuth scopes |
 
+#### AI (optional)
+
+AI-assisted document classification/summarization is optional — leave these unset and the feature is a graceful no-op. The endpoint must be an OpenAI-compatible base URL (e.g. Ollama's `/v1`).
+
+| Variable | Default | Description |
+|---|---|---|
+| `AI_ENDPOINT` | — | OpenAI-compatible base URL, e.g. `http://localhost:11434/v1` (enables AI when set) |
+| `AI_MODEL` | — | Model tag, e.g. `gemma-4-e4b` |
+| `AI_API_KEY` | — | API key; optional (ignored by Ollama) |
+
+For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards them to the WebApi as the env vars above:
+
+```bash
+cd Homestead.AppHost
+dotnet user-secrets set "Ai:Endpoint" "http://localhost:11434/v1"
+dotnet user-secrets set "Ai:Model" "gemma-4-e4b"
+# optional: dotnet user-secrets set "Ai:ApiKey" "..."
+```
+
 #### Other
 
 | Variable | Default | Description |
