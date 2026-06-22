@@ -25,12 +25,11 @@ public class AiClientFactory(IOptions<AiOptions> options) : IAiClientFactory
 
     private IChatClient BuildClient()
     {
-        // Reuse the OpenAI-compatible path pointed at Ollama's /v1. Ollama ignores the key, so a dummy is
-        // substituted when none is configured. normalizeForAzure: false sends the endpoint verbatim.
+        // Reuse the OpenAI-compatible path pointed at the configured endpoint. Ollama ignores the key, so a
+        // dummy is substituted when none is configured; the endpoint is sent verbatim.
         var openAiClient = OpenAIClientBuilder.Build(
             string.IsNullOrWhiteSpace(_options.ApiKey) ? "ollama" : _options.ApiKey,
-            _options.Endpoint,
-            normalizeForAzure: false);
+            _options.Endpoint);
 
         return openAiClient.GetChatClient(_options.Model).AsIChatClient();
     }
