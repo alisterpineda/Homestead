@@ -22,6 +22,8 @@ import { deleteProcessingSchedule } from '@/api/generated/fn/admin/delete-proces
 import { getSystemSettings } from '@/api/generated/fn/admin/get-system-settings';
 import { patchSystemSettings } from '@/api/generated/fn/admin/patch-system-settings';
 import { getLogLevels } from '@/api/generated/fn/admin/get-log-levels';
+import { getAiStatus } from '@/api/generated/fn/admin/get-ai-status';
+import { testAiConnection } from '@/api/generated/fn/admin/test-ai-connection';
 import type { PaginatedResponseOfUserResponse } from '@/api/generated/models/paginated-response-of-user-response';
 import type { UserResponse } from '@/api/generated/models/user-response';
 import type { BulkDeleteUsersResponse } from '@/api/generated/models/bulk-delete-users-response';
@@ -34,6 +36,8 @@ import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/ge
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
 import type { SystemSettingsResponse } from '@/api/generated/models/system-settings-response';
 import type { LogLevelsResponse } from '@/api/generated/models/log-levels-response';
+import type { AiStatusResponse } from '@/api/generated/models/ai-status-response';
+import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-connection-response';
 
 export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
 export type { CreateUser$Params } from '@/api/generated/fn/admin/create-user';
@@ -54,6 +58,8 @@ export type { DeleteProcessingSchedule$Params } from '@/api/generated/fn/admin/d
 export type { GetSystemSettings$Params } from '@/api/generated/fn/admin/get-system-settings';
 export type { PatchSystemSettings$Params } from '@/api/generated/fn/admin/patch-system-settings';
 export type { GetLogLevels$Params } from '@/api/generated/fn/admin/get-log-levels';
+export type { GetAiStatus$Params } from '@/api/generated/fn/admin/get-ai-status';
+export type { TestAiConnection$Params } from '@/api/generated/fn/admin/test-ai-connection';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -134,5 +140,13 @@ export class AdminApiService {
 
   getLogLevels(category?: string): Observable<LogLevelsResponse> {
     return getLogLevels(this.http, this.config.rootUrl, category ? { category } : undefined).pipe(map(r => r.body));
+  }
+
+  getAiStatus(): Observable<AiStatusResponse> {
+    return getAiStatus(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  testAiConnection(): Observable<TestAiConnectionResponse> {
+    return testAiConnection(this.http, this.config.rootUrl).pipe(map(r => r.body));
   }
 }

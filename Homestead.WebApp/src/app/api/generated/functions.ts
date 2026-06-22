@@ -145,6 +145,10 @@ export type { CreateProcessingSchedule$Params as CreateProcessingSchedule$Params
 export { createProcessingSchedule as createProcessingSchedule } from './fn/admin/create-processing-schedule';
 export type { DeleteProcessingSchedule$Params as DeleteProcessingSchedule$Params } from './fn/admin/delete-processing-schedule';
 export { deleteProcessingSchedule as deleteProcessingSchedule } from './fn/admin/delete-processing-schedule';
+export type { GetAiStatus$Params as GetAiStatus$Params } from './fn/admin/get-ai-status';
+export { getAiStatus as getAiStatus } from './fn/admin/get-ai-status';
+export type { TestAiConnection$Params as TestAiConnection$Params } from './fn/admin/test-ai-connection';
+export { testAiConnection as testAiConnection } from './fn/admin/test-ai-connection';
 export type { GetAccounts$Params as GetAccounts$Params } from './fn/finances/get-accounts';
 export { getAccounts as getAccounts } from './fn/finances/get-accounts';
 export type { CreateAccount$Params as CreateAccount$Params } from './fn/finances/create-account';

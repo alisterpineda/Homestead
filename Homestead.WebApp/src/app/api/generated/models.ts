@@ -6,6 +6,7 @@ export type { AccountResponse } from './models/account-response';
 export type { AccountType } from './models/account-type';
 export type { AddGroupMemberRequest } from './models/add-group-member-request';
 export type { AdjustStockRequest } from './models/adjust-stock-request';
+export type { AiStatusResponse } from './models/ai-status-response';
 export type { AppRole } from './models/app-role';
 export type { AreaResponse } from './models/area-response';
 export type { AreaSummary } from './models/area-summary';
@@ -197,6 +198,7 @@ export type { SummarizeDocumentResponse } from './models/summarize-document-resp
 export type { SystemSettingsResponse } from './models/system-settings-response';
 export type { TagDto } from './models/tag-dto';
 export type { TagSortBy } from './models/tag-sort-by';
+export type { TestAiConnectionResponse } from './models/test-ai-connection-response';
 export type { TrackDurableRequest } from './models/track-durable-request';
 export type { TrackDurableResponse } from './models/track-durable-response';
 export type { TradeSide } from './models/trade-side';

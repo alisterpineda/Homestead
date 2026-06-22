@@ -1,5 +1,7 @@
 using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
+using Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
 using Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Users.BulkDeleteUsers;
 using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
@@ -73,6 +75,15 @@ public static class AdminModule
         GetProcessingSchedulesEndpoint.Map(schedules);
         CreateProcessingScheduleEndpoint.Map(schedules);
         DeleteProcessingScheduleEndpoint.Map(schedules);
+
+        var ai = app.MapGroup("/api/v{version:apiVersion}/admin/ai")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetAiStatusEndpoint.Map(ai);
+        TestAiConnectionEndpoint.Map(ai);
 
         return app;
     }
