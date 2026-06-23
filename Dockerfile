@@ -29,9 +29,12 @@ RUN apk add --no-cache tzdata tesseract-ocr fontconfig ca-certificates
 
 # Pinned tessdata_best models (languages from tessdata.manifest, frozen to tessdata.ref).
 # Kept before the app COPYs so app-code changes don't invalidate this download layer.
-COPY scripts/fetch-tessdata.sh scripts/
-COPY Homestead.WebApi/tessdata.manifest Homestead.WebApi/tessdata.ref Homestead.WebApi/
-RUN sh scripts/fetch-tessdata.sh /usr/share/tessdata
+# Staged under /tessdata-src (NOT /app): the script resolves the manifest at
+# <repo-root>/Homestead.WebApi/, and that dir would otherwise collide with the published
+# Homestead.WebApi apphost executable that lands in /app via the COPY below.
+COPY scripts/fetch-tessdata.sh /tessdata-src/scripts/
+COPY Homestead.WebApi/tessdata.manifest Homestead.WebApi/tessdata.ref /tessdata-src/Homestead.WebApi/
+RUN sh /tessdata-src/scripts/fetch-tessdata.sh /usr/share/tessdata && rm -rf /tessdata-src
 
 COPY --from=backend-build /app/publish .
 COPY --from=frontend-build /app/frontend/dist/Homestead/browser ./wwwroot/
