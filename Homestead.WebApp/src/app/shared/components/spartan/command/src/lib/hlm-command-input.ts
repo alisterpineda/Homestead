@@ -17,7 +17,7 @@ import { classes } from '@/shared/components/spartan/utils';
 			<input
 				brnCommandInput
 				data-slot="command-input"
-				class="w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+				class="w-full outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
 				[id]="id()"
 				[placeholder]="placeholder()"
 			/>
