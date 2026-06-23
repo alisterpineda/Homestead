@@ -144,7 +144,7 @@ import { getModuleByPath } from '@/modules/registry';
 
       <main hlmSidebarInset class="min-h-0 min-w-0">
         <!-- Inset Header -->
-        <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+        <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 select-none">
           <button hlmSidebarTrigger></button>
           <hlm-separator orientation="vertical" class="mr-2 !h-4" />
           @if (headerTitle()) {
@@ -195,7 +195,7 @@ import { getModuleByPath } from '@/modules/registry';
         <!-- Global command palette, mounted once for the whole shell. -->
         <app-command-palette />
 
-        <div class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto p-4">
+        <div class="flex flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain p-4">
           <router-outlet />
         </div>
       </main>

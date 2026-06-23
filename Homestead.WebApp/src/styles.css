@@ -94,6 +94,32 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;   /* remove the grey tap-flash on touch */
+  }
+  /* Kill vertical pull-to-refresh + document rubber-band; keep horizontal swipe-back.
+     iOS Safari 16+ honours overscroll-behavior on <html>. */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+  /* Fast taps (no double-tap zoom / tap delay), pinch-zoom preserved. Scoped to tap
+     targets — touch-action does not inherit, and the app has no slider/cdkDrag/Hammer
+     gesture components that need touch-action: none. */
+  a,
+  button,
+  [role="button"],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  /* App chrome shouldn't feel like a web page: no text selection or iOS long-press
+     callout on the sidebar. Targets the stable data attribute the Spartan sidebar
+     renders (desktop inner + mobile sheet both carry data-sidebar="sidebar"), so the
+     generated component file is NOT edited. */
+  [data-sidebar="sidebar"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   /* iOS Safari auto-zooms into focused text inputs whose font-size is < 16px.
      Bump to 16px on coarse-pointer devices to suppress the zoom while leaving
