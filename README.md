@@ -233,9 +233,10 @@ export Ocr__Tesseract__TessDataPath="$HOME/.local/share/tessdata"
    ssh-add --apple-use-keychain ~/.ssh/id_ed25519
    ```
 2. Open the repository in VS Code and click **"Reopen in Container"** when prompted.
-3. Once the container is ready, start the full stack:
+3. Once the container is ready, start the full stack (from the repo root):
    ```bash
-   cd Homestead.AppHost && dotnet run
+   aspire run   # auto-detects the AppHost
    ```
+   Backend hot reload is on by default via the committed `aspire.config.json` (`features.defaultWatchEnabled=true`) — most C# edits are hot-reloaded into the running WebApi in place, and edits watch can't patch restart just the WebApi; either way, no manual stop/re-run. The Angular dev server already live-reloads on its own. `cd Homestead.AppHost && dotnet run` starts the stack without watch.
 
 See [CLAUDE.md](CLAUDE.md) for project structure and test commands.

@@ -18,10 +18,12 @@ Homestead is a full-stack household-management application — document manageme
 ## Running the Full Stack
 
 ```bash
-cd Homestead.AppHost && dotnet run
+aspire run   # from repo root; auto-detects the AppHost
 ```
 
-This starts PostgreSQL (with pgWeb admin UI), Keycloak (with pre-imported realm), the WebApi, and the Angular dev server via Aspire. OIDC config is automatically passed to the WebApi.
+This starts PostgreSQL (with pgWeb admin UI), Keycloak (with pre-imported realm), the WebApi, and the Angular dev server via Aspire. OIDC config is automatically passed to the WebApi. Backend hot reload is on by default: the committed `aspire.config.json` sets `features.defaultWatchEnabled=true`, so `aspire run` (and `aspire start`) watch the AppHost and its referenced projects (the WebApi) — most C# edits are hot-reloaded into the running WebApi in place (no restart), and edits watch can't patch (e.g. constructor/signature changes) restart just the WebApi instead. Either way there's no manual stop/re-run, and the Postgres/Keycloak containers and their data volumes stay up. The Angular dev server already live-reloads on its own. `cd Homestead.AppHost && dotnet run` starts the stack without watch.
+
+> Watch mode is best-effort: most edits hot-reload, but some still need an explicit `aspire resource homestead-webapi restart` (or `rebuild`). Editing `AppHost.cs` restarts the whole app.
 
 ## Aspire Orchestration
 

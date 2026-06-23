@@ -1,5 +1,8 @@
 {
-    "appHost": {
-        "path": "Homestead.AppHost/Homestead.AppHost.csproj"
-    }
+  "appHost": {
+    "path": "Homestead.AppHost/Homestead.AppHost.csproj"
+  },
+  "features": {
+    "defaultWatchEnabled": "true"
+  }
 }
