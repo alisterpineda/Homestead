@@ -85,6 +85,14 @@ Document search uses PostgreSQL FTS with a stored `SearchVector` (`tsvector`) co
 - **DB-owned**: `SearchVector` is maintained entirely by database triggers (migration `AddSearchVectorTriggers`) — there is no app-side updater. A `BEFORE` trigger on `documents` recomputes the vector when `Name`/`Summary` change; an `AFTER` trigger on `document_versions` recomputes the parent document's vector when the latest version's `ExtractedText` changes or a version is added/removed. Because the vector spans two tables (latest version's text lives on `document_versions`), a `GENERATED ALWAYS AS … STORED` column is not sufficient — hence triggers.
 - Uses `WebSearchToTsQuery` for user-friendly query parsing and `ts_rank_cd` for relevance ordering
 
+## AI Integration
+
+Document AI features (classify / summarize) use **Microsoft.Extensions.AI 10.6.0** (`Microsoft.Extensions.AI.Abstractions` + `.OpenAI`) over an OpenAI-compatible chat endpoint. Provider chat clients live in `Infrastructure/Ai/`; the classification flow is `Modules/Documents/Services/AiClassificationService.cs`.
+
+- **Strict structured-output gotcha:** M.E.AI only emits OpenAI's `strict: true` — which makes the JSON schema *enforced* rather than advisory — when `ChatOptions.AdditionalProperties["strict"] = true` is set; `ChatResponseFormat.ForJsonSchema(...)` **alone leaves it unset**. Both are set together in `AiClassificationService.GetResponseWithFallbackAsync`; keep them in sync if you change the response format.
+- **Degradation ladder:** `GetResponseWithFallbackAsync` retries an HTTP 400 up to 3 attempts, dropping a custom `Temperature` and/or structured output as `DiagnoseUnsupportedOption` implicates them — so a model that rejects strict `json_schema` or a non-default temperature still succeeds with reduced options. A 400 that implicates neither is rethrown unchanged.
+- **Signal:** the `"Retrying with reduced options"` warning in `aspire logs homestead-webapi` means the model rejected the strict schema or temperature and the ladder kicked in; its absence means both were accepted on the first attempt.
+
 ## Audit Logging
 
 Field-level change tracking in `auditing.audit_logs` (JSONB). No FK constraints — survives entity deletion.

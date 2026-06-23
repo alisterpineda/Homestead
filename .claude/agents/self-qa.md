@@ -32,7 +32,7 @@ needed:
 aspire ps --format Json            # is a detached AppHost already running?
 ```
 
-- If an AppHost for this repo is listed → **reuse it**. Do NOT start a second copy.
+- If an AppHost for this repo is listed → **reuse it**. Do NOT start a second copy. Backend hot reload is on by default (the committed `aspire.config.json` enables Aspire watch), so a reused stack picks up backend C# edits live — you normally do **not** need to rebuild. If a backend change clearly isn't reflected (a watch miss or rude-edit restart race), force it with `aspire resource homestead-webapi restart && aspire wait homestead-webapi --status healthy`, then retry — don't report a "bug" against stale code.
 - If none is running → start it detached and wait for readiness:
 
 ```bash
