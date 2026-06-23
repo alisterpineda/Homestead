@@ -54,7 +54,10 @@ export class StockStepperEngine<P> {
 
   constructor(
     private readonly hooks: StepperHooks<P>,
-    private readonly debounceMs = 800,
+    // Closing the panel flushes pending bursts (flushAll), so close is the real commit point;
+    // this timer is the durability backstop for exits that never emit 'closed' (refresh, tab
+    // close, hard nav). Kept long so a normal editing session commits as one movement on close.
+    private readonly debounceMs = 3000,
   ) {}
 
   /** Net optimistic delta (pending burst + queued/running commits) for one location key. */

@@ -114,7 +114,7 @@ describe('ConsumableQuickPanelComponent', () => {
     await fixture.whenStable();
   }
 
-  // Engine taps debounce on real 800ms timers; tests commit them deterministically via flush.
+  // Engine taps debounce on a real timer; tests commit them deterministically via flush.
   function flushSteppers(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (component as any).engine.flushAll();

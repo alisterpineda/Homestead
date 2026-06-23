@@ -10,6 +10,10 @@ const DETAIL = {
 const KEY_A = 'area-1|';
 const KEY_B = '|container-1';
 
+// Representative debounce window for the mechanism tests below — decoupled from the production
+// default so the tuning constant can change without rewriting every timer advance here.
+const DEBOUNCE_MS = 800;
+
 interface CommitCall {
   payload: string;
   delta: number;
@@ -53,7 +57,7 @@ describe('StockStepperEngine', () => {
   describe('debounced taps', () => {
     it('commits the net delta of a burst as one call after the debounce window', () => {
       const { hooks, commits, committed } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_A, 1, KEY_A);
@@ -61,7 +65,7 @@ describe('StockStepperEngine', () => {
       expect(commits.length).toBe(0);
       expect(engine.deltaFor(KEY_A)).toBe(3);
 
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       expect(commits.length).toBe(1);
       expect(commits[0]).toMatchObject({ payload: KEY_A, delta: 3 });
 
@@ -74,12 +78,12 @@ describe('StockStepperEngine', () => {
 
     it('restarts the debounce timer on every tap', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(700);
+      vi.advanceTimersByTime(DEBOUNCE_MS - 100);
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(700);
+      vi.advanceTimersByTime(DEBOUNCE_MS - 100);
       expect(commits.length).toBe(0);
 
       vi.advanceTimersByTime(100);
@@ -89,13 +93,13 @@ describe('StockStepperEngine', () => {
 
     it('mixes − and + into a single net delta', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_A, -1, KEY_A);
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       expect(commits.length).toBe(1);
       expect(commits[0].delta).toBe(2);
@@ -103,43 +107,43 @@ describe('StockStepperEngine', () => {
 
     it('drops a net-zero burst without any API call', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_A, -1, KEY_A);
       expect(engine.deltaFor(KEY_A)).toBe(0);
       expect(engine.isBusy()).toBe(false);
 
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       expect(commits.length).toBe(0);
     });
 
     it('debounces each location key independently', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(DEBOUNCE_MS / 2);
       engine.tap(KEY_B, -1, KEY_B);
       expect(engine.totalDelta()).toBe(0); // +1 and −1 across keys
 
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(DEBOUNCE_MS / 2);
       expect(commits.length).toBe(1);
       expect(commits[0]).toMatchObject({ payload: KEY_A, delta: 1 });
       commits[0].response.next(DETAIL);
       commits[0].response.complete();
 
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(DEBOUNCE_MS / 2);
       expect(commits.length).toBe(2);
       expect(commits[1]).toMatchObject({ payload: KEY_B, delta: -1 });
     });
 
     it('uses the payload captured at tap time for the commit', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, 'payload-at-tap-time');
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       expect(commits[0].payload).toBe('payload-at-tap-time');
     });
@@ -148,11 +152,11 @@ describe('StockStepperEngine', () => {
   describe('single-flight serialization', () => {
     it('runs one commit at a time, in FIFO order', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_B, 1, KEY_B);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       // Both bursts flushed, but only the first commit is in flight.
       expect(commits.length).toBe(1);
@@ -166,11 +170,11 @@ describe('StockStepperEngine', () => {
 
     it('keeps a queued (not yet running) commit in the optimistic delta', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_B, 1, KEY_B);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       // A is in flight, B is queued behind it — BOTH must stay visible to the display.
       expect(commits.length).toBe(1);
@@ -190,10 +194,10 @@ describe('StockStepperEngine', () => {
 
     it('accumulates taps during a flight as a fresh burst committed afterwards', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       expect(commits.length).toBe(1);
 
       // In-flight + a new burst on the same key: optimistic delta shows both.
@@ -205,17 +209,17 @@ describe('StockStepperEngine', () => {
       commits[0].response.complete();
       expect(engine.deltaFor(KEY_A)).toBe(1); // in-flight cleared, fresh burst remains
 
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       expect(commits.length).toBe(2);
       expect(commits[1].delta).toBe(1);
     });
 
     it('serializes enqueued mutations with stepper commits', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       const work = new Subject<string>();
       let workSubscribed = false;
@@ -245,11 +249,11 @@ describe('StockStepperEngine', () => {
   describe('error handling', () => {
     it('drops in-flight and pending state for the failed key, reports it, and pumps the next job', () => {
       const { hooks, commits, errors, committed } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_B, 1, KEY_B);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
 
       // Taps on KEY_A while its commit is in flight — these must be discarded on failure too.
       engine.tap(KEY_A, 1, KEY_A);
@@ -272,15 +276,15 @@ describe('StockStepperEngine', () => {
 
     it('purges queued (not yet running) commits for the failed key', () => {
       const { hooks, commits, errors } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       // Commit 1 for A goes in flight; a second A burst and a B burst get queued behind it.
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       engine.tap(KEY_A, 1, KEY_A);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       engine.tap(KEY_B, 1, KEY_B);
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(DEBOUNCE_MS);
       expect(commits.length).toBe(1);
       expect(engine.deltaFor(KEY_A)).toBe(2); // in flight + queued
 
@@ -299,7 +303,7 @@ describe('StockStepperEngine', () => {
 
     it('routes enqueued-job errors to the job handler, not the stepper hook', () => {
       const { hooks, errors } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       const boom = new Error('400 no-op');
       let jobErr: unknown;
@@ -317,7 +321,7 @@ describe('StockStepperEngine', () => {
   describe('flush and whenIdle', () => {
     it('flushAll commits every pending burst immediately', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 2, KEY_A);
       engine.tap(KEY_B, -1, KEY_B);
@@ -338,20 +342,20 @@ describe('StockStepperEngine', () => {
 
     it('flush of a key with no pending burst is a no-op', () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
       engine.flush(KEY_A);
       expect(commits.length).toBe(0);
     });
 
     it('whenIdle resolves immediately when there is no work', async () => {
       const { hooks } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
       await expect(engine.whenIdle()).resolves.toBeUndefined();
     });
 
     it('whenIdle waits for pending, queued, and in-flight work to settle', async () => {
       const { hooks, commits } = makeControlledHooks();
-      const engine = new StockStepperEngine(hooks);
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
 
       engine.tap(KEY_A, 1, KEY_A);
       engine.tap(KEY_B, 1, KEY_B);
