@@ -149,13 +149,34 @@ describe('PlaceBrowserComponent', () => {
     expect(badges[0].getAttribute('aria-label')).toBe('3 low stock');
   });
 
-  it('hides the Unplaced card at zero and shows the no-areas hint when empty', async () => {
+  it('hides the Unplaced card at zero and shows the cold-start CTAs when empty', async () => {
     let fixture = await create(null, null, { ...OVERVIEW, unplacedCount: 0 });
     expect(hrefs(fixture)).not.toContain('/inventory/browse/unplaced');
 
+    // Cold start (no areas, no unplaced durables): an invitation to add an item, not a dead-end.
     fixture = await create(null, null, { ...OVERVIEW, areas: [], unplacedCount: 0 });
-    expect(el(fixture).textContent).toContain('No areas yet');
+    const content = el(fixture).textContent ?? '';
+    expect(content).toContain('Start your inventory');
+    expect(content).not.toContain('No areas yet');
+
+    // Primary CTA: a create-entry dialog trigger to add the first item.
+    const addButton = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .find(b => b.textContent?.includes('Add your first item'));
+    expect(addButton).toBeTruthy();
+
+    // Secondary CTA: areas reframed as optional, not the gate.
     expect(hrefs(fixture)).toContain('/inventory/areas');
+  });
+
+  it('renders exactly one root New-item button at the populated root', async () => {
+    const fixture = await create(null);
+
+    const newItemButtons = Array.from(el(fixture).querySelectorAll<HTMLButtonElement>('button'))
+      .filter(b => b.textContent?.trim() === 'New item');
+    expect(newItemButtons.length).toBe(1);
+
+    // The button coexists with the grid; full grid/drill-link coverage lives in the root-grid test above.
+    expect(hrefs(fixture)).toContain('/inventory/browse/area/garage');
   });
 
   it('renders child-container cards with subtree counts, previews, and drill links', async () => {

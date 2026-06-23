@@ -188,13 +188,35 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
       </section>
     } @else if (overview(); as ov) {
       <section>
-        <h2 class="mb-3 text-sm font-medium text-muted-foreground">Browse by place</h2>
         @if (rootAreas().length === 0 && ov.unplacedCount === 0) {
-          <p class="text-sm text-muted-foreground">
-            No areas yet — set up rooms and places on the
-            <a routerLink="/inventory/areas" class="underline underline-offset-4 hover:text-foreground">Areas page</a>.
-          </p>
+          <div hlmEmpty>
+            <div hlmEmptyHeader>
+              <div hlmEmptyMedia variant="icon">
+                <ng-icon name="lucidePackage" />
+              </div>
+              <div hlmEmptyTitle>Start your inventory</div>
+              <div hlmEmptyDescription>
+                Add an item to begin — you can place it in a room later. Setting up areas is optional.
+              </div>
+            </div>
+            <div hlmEmptyContent>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <app-create-entry-dialog (created)="changed.emit()">
+                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  Add your first item
+                </app-create-entry-dialog>
+                <a hlmBtn variant="outline" routerLink="/inventory/areas">Set up areas</a>
+              </div>
+            </div>
+          </div>
         } @else {
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <h2 class="text-sm font-medium text-muted-foreground">Browse by place</h2>
+            <app-create-entry-dialog triggerSize="sm" (created)="changed.emit()">
+              <ng-icon hlm name="lucidePlus" size="sm" />
+              New item
+            </app-create-entry-dialog>
+          </div>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             @for (area of rootAreas(); track area.id) {
               <app-place-card
