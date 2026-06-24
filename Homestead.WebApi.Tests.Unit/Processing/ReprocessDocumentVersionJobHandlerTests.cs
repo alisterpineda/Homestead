@@ -4,9 +4,10 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using MediatR;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
@@ -33,12 +34,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
         _notifier = Substitute.For<IProcessingNotifier>();
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["FileStorage:MediaPath"] = _mediaPath
-            })
-            .Build();
+        var storage = Options.Create(new FileStorageOptions { MediaPath = _mediaPath });
 
         var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
 
@@ -47,7 +43,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
             .Returns(_ => new ReprocessVersionTextResult("Test Document"));
 
         _handler = new ReprocessDocumentVersionJobHandler(
-            _db, config,
+            _db, storage,
             _notifier, textExtractionHelper, _sender);
     }
 

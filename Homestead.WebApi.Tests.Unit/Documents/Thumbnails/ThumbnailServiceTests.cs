@@ -1,6 +1,7 @@
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.Thumbnails;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.Thumbnails;
@@ -23,16 +24,11 @@ public class ThumbnailServiceTests : IDisposable
         _pdfGen = Substitute.For<IThumbnailGenerator>();
         _pdfGen.CanGenerate("application/pdf").Returns(true);
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["FileStorage:CachePath"] = _cachePath
-            })
-            .Build();
+        var storage = Options.Create(new FileStorageOptions { CachePath = _cachePath });
 
         var logger = Substitute.For<ILogger<ThumbnailService>>();
 
-        _service = new ThumbnailService(new[] { _imageGen, _pdfGen }, config, logger);
+        _service = new ThumbnailService(new[] { _imageGen, _pdfGen }, storage, logger);
     }
 
     public void Dispose()

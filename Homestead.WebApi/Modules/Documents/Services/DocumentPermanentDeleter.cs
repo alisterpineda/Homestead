@@ -1,6 +1,7 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,11 +10,10 @@ namespace Homestead.WebApi.Modules.Documents.Services;
 internal static class DocumentPermanentDeleter
 {
     public static async Task<int> ExecuteAsync(
-        List<Document> documents, AppDbContext db, IConfiguration configuration,
+        List<Document> documents, AppDbContext db, FileStorageOptions storage,
         IAuditContext audit, IUnitOfWork unitOfWork, ILogger logger, CancellationToken ct)
     {
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.MediaPath;
 
         var versions = documents.SelectMany(d => d.Versions).ToList();
         var physicalPaths = versions

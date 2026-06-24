@@ -1,13 +1,15 @@
 using MediatR;
 using Homestead.WebApi.Persistence;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentThumbnail;
 
 public class GetDocumentThumbnailHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     ThumbnailService thumbnailService)
     : IRequestHandler<GetDocumentThumbnailQuery, IResult>
 {
@@ -38,8 +40,7 @@ public class GetDocumentThumbnailHandler(
             return Results.File(thumbnailPath, "image/webp");
 
         // On-demand generation
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var sourcePath = Path.Combine(mediaPath, version.FilePath);
 

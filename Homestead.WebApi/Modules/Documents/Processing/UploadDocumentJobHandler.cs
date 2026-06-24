@@ -5,16 +5,18 @@ using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
 
 public class UploadDocumentJobHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier,
     IDocumentClassifier classifier,
@@ -29,8 +31,7 @@ public class UploadDocumentJobHandler(
         var payload = job.GetPayload<UploadDocumentPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var stagingPath = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot, $"{payload.UploadId}{payload.FileExtension}");
 

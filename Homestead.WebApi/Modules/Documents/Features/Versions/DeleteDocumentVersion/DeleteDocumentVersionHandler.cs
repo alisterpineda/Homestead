@@ -2,12 +2,14 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using MediatR;
 using Homestead.WebApi.Domain.Documents;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Versions.DeleteDocumentVersion;
 
-public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration configuration,
+public class DeleteDocumentVersionHandler(AppDbContext db, IOptions<FileStorageOptions> storage,
     IAuditContext audit, IUnitOfWork unitOfWork,
     ILogger<DeleteDocumentVersionHandler> logger)
     : IRequestHandler<DeleteDocumentVersionCommand, bool>
@@ -28,8 +30,7 @@ public class DeleteDocumentVersionHandler(AppDbContext db, IConfiguration config
         if (versionCount <= 1)
             throw new BusinessRuleException("Cannot delete the last version of a document.");
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var physicalPath = version.GetPhysicalPath(mediaPath);
 

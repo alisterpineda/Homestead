@@ -152,6 +152,8 @@ dotnet user-secrets set "Ai:Model" "gemma-4-e4b"
 | `/media` | Uploaded documents — **back this up** |
 | `/cache` | Generated document thumbnails (can be regenerated on demand) |
 
+The paths above are the container defaults; back the `/media` volume with durable storage. For **local Aspire dev** the AppHost instead points the WebApi at `.homestead-data/` at the repo root (auto-provisioned on first upload, gitignored). That directory lives under the mounted workspace, so it survives reboots, devcontainer rebuilds, and `/tmp` reaping — dev no longer writes uploads to `/tmp`.
+
 ### Health Checks
 
 | Endpoint | Purpose |

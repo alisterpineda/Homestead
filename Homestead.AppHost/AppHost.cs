@@ -1,5 +1,11 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
+// Durable local document storage. Lives at the repo root (outside both watched project dirs, so
+// `aspire run` / `dotnet watch` won't watch the churning blob folder) and survives reboots,
+// /tmp reaping, and devcontainer rebuilds (it's under the mounted workspace). Injected into the
+// WebApi as FileStorage__MediaPath / __CachePath — mirroring how Postgres gets a named data volume.
+var dataRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", ".homestead-data"));
+
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume()
     .WithPgAdmin();
@@ -16,6 +22,8 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
     .WaitFor(keycloak)
     .WithReference(postgresdb)
     .WithReference(keycloak)
+    .WithEnvironment("FileStorage__MediaPath", Path.Combine(dataRoot, "media"))
+    .WithEnvironment("FileStorage__CachePath", Path.Combine(dataRoot, "cache"))
     .WithEnvironment(context =>
     {
         context.EnvironmentVariables["OIDC_AUTHORITY"] =

@@ -1,10 +1,12 @@
 using MediatR;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocumentFile;
 
-public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuration)
+public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions> storage)
     : IRequestHandler<GetDocumentFileQuery, IResult>
 {
     public async Task<IResult> Handle(GetDocumentFileQuery request, CancellationToken ct)
@@ -33,8 +35,7 @@ public class GetDocumentFileHandler(AppDbContext db, IConfiguration configuratio
         if (version is null)
             return Results.NotFound();
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var physicalPath = version.GetPhysicalPath(mediaPath);
 

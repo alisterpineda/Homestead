@@ -1,3 +1,6 @@
+using Homestead.WebApi.Infrastructure.Storage;
+using Microsoft.Extensions.Options;
+
 namespace Homestead.WebApi.Infrastructure.Thumbnails;
 
 public class ThumbnailService
@@ -14,12 +17,11 @@ public class ThumbnailService
 
     public ThumbnailService(
         IEnumerable<IThumbnailGenerator> generators,
-        IConfiguration configuration,
+        IOptions<FileStorageOptions> storage,
         ILogger<ThumbnailService> logger)
     {
         _generators = generators;
-        _cachePath = configuration["FileStorage:CachePath"]
-            ?? throw new InvalidOperationException("FileStorage:CachePath is not configured.");
+        _cachePath = storage.Value.CachePath;
         _logger = logger;
     }
 

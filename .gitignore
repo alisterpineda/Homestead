@@ -18,6 +18,9 @@ Homestead.WebApi/wwwroot/
 
 .local/
 
+# Local dev document storage (provisioned by the Aspire AppHost; see AppHost.cs)
+.homestead-data/
+
 # Claude Code
 .claude/settings.local.json
 .claude/skills/*-workspace/

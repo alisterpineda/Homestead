@@ -4,14 +4,16 @@ using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.CreateDocument;
 
-public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
+public class CreateDocumentHandler(IOptions<FileStorageOptions> storage, ICurrentUserAccessor currentUser, IJobQueue jobQueue,
     AppDbContext db, IDocumentQueryService accessService)
     : IRequestHandler<CreateDocumentCommand, CreateDocumentResponse>
 {
@@ -33,8 +35,7 @@ public class CreateDocumentHandler(IConfiguration configuration, ICurrentUserAcc
         var extension = Path.GetExtension(file.FileName);
         var uploadId = Guid.NewGuid();
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
         var uploadsDir = Path.Combine(mediaPath, DocumentVersion.UploadsSubroot);
         Directory.CreateDirectory(uploadsDir);
 

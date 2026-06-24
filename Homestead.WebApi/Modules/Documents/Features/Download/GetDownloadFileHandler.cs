@@ -1,14 +1,16 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Download;
 
 public class GetDownloadFileHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     ICurrentUserAccessor currentUser) : IRequestHandler<GetDownloadFileQuery, IResult>
 {
     public async Task<IResult> Handle(GetDownloadFileQuery request, CancellationToken ct)
@@ -28,8 +30,7 @@ public class GetDownloadFileHandler(
                 detail: "Download is not ready yet.",
                 statusCode: StatusCodes.Status409Conflict);
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var zipPath = DownloadCleanupHelper.GetDownloadPath(mediaPath, job.Id);
 

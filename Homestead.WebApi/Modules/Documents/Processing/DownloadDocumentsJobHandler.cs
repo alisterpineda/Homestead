@@ -1,15 +1,17 @@
 using System.IO.Compression;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Modules.Documents.Features.Download;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
 
 public class DownloadDocumentsJobHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     ILogger<DownloadDocumentsJobHandler> logger,
     IProcessingNotifier notifier,
     IDownloadPathBuilder pathBuilder) : IJobHandler
@@ -21,8 +23,7 @@ public class DownloadDocumentsJobHandler(
         var payload = job.GetPayload<DownloadDocumentsPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         DownloadCleanupHelper.CleanupExpired(mediaPath, logger);
 

@@ -4,16 +4,18 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
 
 public class UploadDocumentVersionJobHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     ILogger<UploadDocumentVersionJobHandler> logger,
     IProcessingNotifier notifier,
     ThumbnailService thumbnailService,
@@ -27,8 +29,7 @@ public class UploadDocumentVersionJobHandler(
         var payload = job.GetPayload<UploadDocumentVersionPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         // Fail early (before extraction/file move) if the parent document is gone
         var documentExists = await db.Documents.AnyAsync(d => d.Id == payload.DocumentId, ct);

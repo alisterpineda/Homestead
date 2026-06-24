@@ -27,6 +27,7 @@ using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Modules.Documents.Features.Download;
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using Microsoft.EntityFrameworkCore;
@@ -221,6 +222,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Sc
 builder.Services.AddProcessing(builder.Configuration);
 builder.Services.AddPriceProviders(builder.Configuration);
 builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
+builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddAiServices(builder.Configuration);
 builder.Services.AddScoped<IAiClassificationService, AiClassificationService>();

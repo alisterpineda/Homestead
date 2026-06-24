@@ -2,15 +2,17 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Processing;
 
 public class ReprocessDocumentVersionJobHandler(
     AppDbContext db,
-    IConfiguration configuration,
+    IOptions<FileStorageOptions> storage,
     IProcessingNotifier notifier,
     TextExtractionHelper textExtractionHelper,
     ISender sender) : IJobHandler
@@ -22,8 +24,7 @@ public class ReprocessDocumentVersionJobHandler(
         var payload = job.GetPayload<ReprocessDocumentVersionPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
-        var mediaPath = configuration["FileStorage:MediaPath"]
-            ?? throw new InvalidOperationException("FileStorage:MediaPath is not configured.");
+        var mediaPath = storage.Value.MediaPath;
 
         var version = await db.DocumentVersions
             .AsNoTracking()

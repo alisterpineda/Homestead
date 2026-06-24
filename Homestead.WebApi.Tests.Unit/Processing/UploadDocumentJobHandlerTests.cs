@@ -7,11 +7,12 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
@@ -40,19 +41,17 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         _notifier = Substitute.For<IProcessingNotifier>();
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["FileStorage:MediaPath"] = _mediaPath,
-                ["FileStorage:CachePath"] = Path.Combine(_mediaPath, "cache")
-            })
-            .Build();
+        var storage = Options.Create(new FileStorageOptions
+        {
+            MediaPath = _mediaPath,
+            CachePath = Path.Combine(_mediaPath, "cache")
+        });
 
         var logger = Substitute.For<ILogger<UploadDocumentJobHandler>>();
         _classifier = Substitute.For<IDocumentClassifier>();
         _classifier.IsAutoClassifyEnabledAsync(Arg.Any<CancellationToken>()).Returns(false);
         _thumbnailService = new ThumbnailService(
-            Enumerable.Empty<IThumbnailGenerator>(), config,
+            Enumerable.Empty<IThumbnailGenerator>(), storage,
             Substitute.For<ILogger<ThumbnailService>>());
         var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
 
@@ -61,7 +60,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns(_ => new CreateDocumentFromUploadResult(Guid.NewGuid(), "Test Document"));
 
         _handler = new UploadDocumentJobHandler(
-            _db, config, logger,
+            _db, storage, logger,
             _notifier, _classifier, _thumbnailService, textExtractionHelper, _sender);
     }
 
