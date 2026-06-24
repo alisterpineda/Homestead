@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { debounceTime, distinctUntilChanged, of, switchMap, map, tap } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSearch, lucidePackage, lucideBoxes } from '@ng-icons/lucide';
+import { lucideSearch, lucidePackage, lucideBoxes, lucideFileText, lucideImage } from '@ng-icons/lucide';
 import { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { CommandFilter } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@/shared/components/spartan/command';
@@ -37,7 +37,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmCommandImports, HlmSpinner, NgIcon],
-  providers: [provideIcons({ lucideSearch, lucidePackage, lucideBoxes })],
+  providers: [provideIcons({ lucideSearch, lucidePackage, lucideBoxes, lucideFileText, lucideImage })],
   template: `
     <hlm-command-dialog
       title="Search"

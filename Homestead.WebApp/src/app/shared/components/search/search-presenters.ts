@@ -25,6 +25,11 @@ export class SearchPresenterRegistry {
       navigate: (hit) => ['/inventory/items', hit.id],
       viewAll: (query) => ({ commands: ['/inventory/items'], queryParams: { search: query } }),
     },
+    documents: {
+      icon: (hit) => (hit.type === 'image' ? 'lucideImage' : 'lucideFileText'),
+      navigate: (hit) => ['/documents', hit.id],
+      viewAll: (query) => ({ commands: ['/documents'], queryParams: { search: query } }),
+    },
   };
 
   get(source: string): SourcePresenter | undefined {

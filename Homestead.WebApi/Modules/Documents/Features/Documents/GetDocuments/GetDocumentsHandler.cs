@@ -30,22 +30,10 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
 
         var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
         string? tsQueryString = search is not null ? SearchTsQueryBuilder.Build(search) : null;
-        var ilikeSearch = search?.Replace("\"", string.Empty);
 
         if (search is not null)
         {
-            var namePattern = $"%{ilikeSearch}%";
-            var hasTsQuery = tsQueryString is not null;
-            var tsq = tsQueryString ?? "";
-
-            query = query.Where(d =>
-                EF.Functions.ILike(d.Name, namePattern) ||
-                d.Versions.Any(v => v.ExtractedText != null
-                    && EF.Functions.ILike(v.ExtractedText, namePattern)) ||
-                d.DocumentTags.Any(dt => EF.Functions.ILike(dt.Tag.Name, namePattern)) ||
-                d.DocumentParties.Any(dp => EF.Functions.ILike(dp.Party.Name, namePattern)) ||
-                (hasTsQuery && d.SearchVector != null &&
-                 d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsq))));
+            query = DocumentSearchPredicate.ApplyTextSearch(query, search, tsQueryString);
         }
 
         var defaultSort = request.Deleted == true ? DocumentSortBy.DeletedAt : (DocumentSortBy?)null;
@@ -238,12 +226,17 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
         IQueryable<Domain.Documents.Document> query, DocumentSortBy? sortBy, SortDirection? sortDir,
         string? tsQueryString = null)
     {
-        // When searching without an explicit sort, order by relevance
+        // When searching without an explicit sort, order by relevance. ILIKE/tag/party-only matches
+        // share an identical rank-0 score, so a deterministic UpdatedAt tiebreaker is required —
+        // without it Skip/Take pagination over the tied rows is non-deterministic across requests.
+        // The universal-search palette (DocumentSearchSource) applies the same tiebreaker; keeping them
+        // in lockstep is what makes palette results == list results for the same query.
         if (sortBy is null && tsQueryString is not null)
         {
             var tsq = tsQueryString;
-            return query.OrderByDescending(d =>
-                d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)));
+            return query
+                .OrderByDescending(d => d.SearchVector!.RankCoverDensity(EF.Functions.ToTsQuery(TsLanguage, tsq)))
+                .ThenByDescending(d => d.UpdatedAt);
         }
 
         var effectiveSortBy = sortBy ?? DocumentSortBy.UpdatedAt;

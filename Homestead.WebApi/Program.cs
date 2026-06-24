@@ -8,6 +8,7 @@ using Homestead.WebApi.Common.Settings;
 using Homestead.WebApi.Modules.Admin;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
+using Homestead.WebApi.Modules.Documents.Features.Search;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
@@ -188,6 +189,7 @@ builder.Services.AddScoped<IStockService, StockService>();
 // Universal-search source for inventory items. Registered against the IEnumerable<ISearchSource>
 // seam (multi-impl precedent: IThumbnailGenerator / IJobHandler) — other modules add their own.
 builder.Services.AddScoped<ISearchSource, InventorySearchSource>();
+builder.Services.AddScoped<ISearchSource, DocumentSearchSource>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
