@@ -55,7 +55,7 @@ const NONE_VALUE = '__none__';
         @if (tag(); as t) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
             <hlm-field>
-              <label hlmLabel for="tag-name">Name</label>
+              <label hlmFieldLabel for="tag-name">Name</label>
               <input
                 hlmInput
                 id="tag-name"
@@ -93,7 +93,7 @@ const NONE_VALUE = '__none__';
             </div>
 
             <hlm-field>
-              <label hlmLabel for="tag-description">Description</label>
+              <label hlmFieldLabel for="tag-description">Description</label>
               <textarea
                 hlmInput
                 id="tag-description"

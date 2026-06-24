@@ -415,7 +415,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <!-- Name -->
           <hlm-field>
-            <label hlmLabel for="doc-name">
+            <label hlmFieldLabel for="doc-name">
               Name
               @if (pendingNameSuggestion() || nameIsAiSuggested()) {
                 <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
@@ -508,7 +508,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Version Details</p>
 
           <hlm-field>
-            <label hlmLabel for="version-label">Label</label>
+            <label hlmFieldLabel for="version-label">Label</label>
             <input hlmInput id="version-label" maxlength="256"
               placeholder="e.g., Final Draft, Signed Copy"
               [value]="editVersionLabel()"

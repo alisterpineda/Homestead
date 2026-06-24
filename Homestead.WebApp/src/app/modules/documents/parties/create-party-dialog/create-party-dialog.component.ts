@@ -36,7 +36,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <hlm-field>
-            <label hlmLabel for="create-party-name">Name</label>
+            <label hlmFieldLabel for="create-party-name">Name</label>
             <input
               hlmInput
               id="create-party-name"

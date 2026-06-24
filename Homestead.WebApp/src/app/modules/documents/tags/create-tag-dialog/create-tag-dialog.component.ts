@@ -38,7 +38,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <hlm-field>
-            <label hlmLabel for="create-tag-path">Path</label>
+            <label hlmFieldLabel for="create-tag-path">Path</label>
             <input
               hlmInput
               id="create-tag-path"
@@ -48,7 +48,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
             <hlm-field-error>Tag path is required.</hlm-field-error>
           </hlm-field>
           <hlm-field>
-            <label hlmLabel for="create-tag-description">Description</label>
+            <label hlmFieldLabel for="create-tag-description">Description</label>
             <textarea
               hlmInput
               id="create-tag-description"

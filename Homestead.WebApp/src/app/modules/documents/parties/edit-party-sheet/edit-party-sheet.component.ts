@@ -42,7 +42,7 @@ import { toast } from '@spartan-ng/brain/sonner';
         @if (party(); as p) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
             <hlm-field>
-              <label hlmLabel for="party-name">Name</label>
+              <label hlmFieldLabel for="party-name">Name</label>
               <input
                 hlmInput
                 id="party-name"
