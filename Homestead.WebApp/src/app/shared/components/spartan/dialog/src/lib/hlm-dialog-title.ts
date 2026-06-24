@@ -5,12 +5,10 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmDialogTitle]',
 	hostDirectives: [BrnDialogTitle],
-	host: {
-		'data-slot': 'dialog-title',
-	},
+	host: { 'data-slot': 'dialog-title' },
 })
 export class HlmDialogTitle {
 	constructor() {
-		classes(() => 'text-lg leading-none font-semibold');
+		classes(() => 'leading-none font-medium');
 	}
 }

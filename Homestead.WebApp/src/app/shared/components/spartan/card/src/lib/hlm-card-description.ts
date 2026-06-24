@@ -3,9 +3,7 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmCardDescription]',
-	host: {
-		'data-slot': 'card-description',
-	},
+	host: { 'data-slot': 'card-description' },
 })
 export class HlmCardDescription {
 	constructor() {

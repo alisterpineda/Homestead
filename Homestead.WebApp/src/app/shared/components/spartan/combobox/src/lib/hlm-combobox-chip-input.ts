@@ -4,10 +4,8 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: 'input[hlmComboboxChipInput]',
-	hostDirectives: [{ directive: BrnComboboxChipInput, inputs: ['id'] }],
-	host: {
-		'data-slott': 'combobox-chip-input',
-	},
+	hostDirectives: [{ directive: BrnComboboxChipInput, inputs: ['id', 'aria-invalid'] }],
+	host: { 'data-slot': 'combobox-chip-input' },
 })
 export class HlmComboboxChipInput {
 	constructor() {

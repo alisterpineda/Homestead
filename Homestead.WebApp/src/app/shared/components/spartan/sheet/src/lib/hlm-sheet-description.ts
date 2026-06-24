@@ -5,9 +5,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmSheetDescription]',
 	hostDirectives: [BrnSheetDescription],
-	host: {
-		'data-slot': 'sheet-description',
-	},
+	host: { 'data-slot': 'sheet-description' },
 })
 export class HlmSheetDescription {
 	constructor() {

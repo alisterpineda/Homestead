@@ -17,7 +17,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
@@ -37,7 +37,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     HlmBadgeImports,
     CommodityPricesSectionComponent,
     EditCommoditySheetComponent,

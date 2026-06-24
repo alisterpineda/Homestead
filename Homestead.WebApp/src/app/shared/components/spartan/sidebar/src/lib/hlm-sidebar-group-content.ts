@@ -10,6 +10,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmSidebarGroupContent {
 	constructor() {
-		classes(() => 'w-full text-sm');
+		classes(() => 'text-sm w-full');
 	}
 }

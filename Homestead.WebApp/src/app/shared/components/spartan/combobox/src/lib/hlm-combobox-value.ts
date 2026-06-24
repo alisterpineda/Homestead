@@ -5,6 +5,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmComboboxValue],hlm-combobox-value',
 	hostDirectives: [{ directive: BrnComboboxValue, inputs: ['placeholder'] }],
+	host: { 'data-slot': 'combobox-value' },
 })
 export class HlmComboboxValue {
 	constructor() {

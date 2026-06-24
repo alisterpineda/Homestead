@@ -17,23 +17,20 @@
       "@/*": [
         "./src/app/*"
       ],
+      "@/shared/components/spartan/icon": [
+        "./src/app/shared/components/spartan/icon/src/index.ts"
+      ],
       "@/shared/components/spartan/alert-dialog": [
         "./src/app/shared/components/spartan/alert-dialog/src/index.ts"
       ],
       "@/shared/components/spartan/utils": [
         "./src/app/shared/components/spartan/utils/src/index.ts"
       ],
-      "@/shared/components/spartan/button": [
-        "./src/app/shared/components/spartan/button/src/index.ts"
-      ],
       "@/shared/components/spartan/badge": [
         "./src/app/shared/components/spartan/badge/src/index.ts"
       ],
       "@/shared/components/spartan/breadcrumb": [
         "./src/app/shared/components/spartan/breadcrumb/src/index.ts"
-      ],
-      "@/shared/components/spartan/icon": [
-        "./src/app/shared/components/spartan/icon/src/index.ts"
       ],
       "@/shared/components/spartan/button-group": [
         "./src/app/shared/components/spartan/button-group/src/index.ts"
@@ -53,6 +50,21 @@
       "@/shared/components/spartan/collapsible": [
         "./src/app/shared/components/spartan/collapsible/src/index.ts"
       ],
+      "@/shared/components/spartan/combobox": [
+        "./src/app/shared/components/spartan/combobox/src/index.ts"
+      ],
+      "@/shared/components/spartan/input-group": [
+        "./src/app/shared/components/spartan/input-group/src/index.ts"
+      ],
+      "@/shared/components/spartan/input": [
+        "./src/app/shared/components/spartan/input/src/index.ts"
+      ],
+      "@/shared/components/spartan/textarea": [
+        "./src/app/shared/components/spartan/textarea/src/index.ts"
+      ],
+      "@/shared/components/spartan/command": [
+        "./src/app/shared/components/spartan/command/src/index.ts"
+      ],
       "@/shared/components/spartan/dialog": [
         "./src/app/shared/components/spartan/dialog/src/index.ts"
       ],
@@ -62,26 +74,17 @@
       "@/shared/components/spartan/empty": [
         "./src/app/shared/components/spartan/empty/src/index.ts"
       ],
-      "@/shared/components/spartan/form-field": [
-        "./src/app/shared/components/spartan/form-field/src/index.ts"
+      "@/shared/components/spartan/field": [
+        "./src/app/shared/components/spartan/field/src/index.ts"
       ],
-      "@/shared/components/spartan/input": [
-        "./src/app/shared/components/spartan/input/src/index.ts"
-      ],
-      "@/shared/components/spartan/input-group": [
-        "./src/app/shared/components/spartan/input-group/src/index.ts"
-      ],
-      "@/shared/components/spartan/textarea": [
-        "./src/app/shared/components/spartan/textarea/src/index.ts"
-      ],
-      "@/shared/components/spartan/item": [
-        "./src/app/shared/components/spartan/item/src/index.ts"
+      "@/shared/components/spartan/label": [
+        "./src/app/shared/components/spartan/label/src/index.ts"
       ],
       "@/shared/components/spartan/separator": [
         "./src/app/shared/components/spartan/separator/src/index.ts"
       ],
-      "@/shared/components/spartan/label": [
-        "./src/app/shared/components/spartan/label/src/index.ts"
+      "@/shared/components/spartan/item": [
+        "./src/app/shared/components/spartan/item/src/index.ts"
       ],
       "@/shared/components/spartan/pagination": [
         "./src/app/shared/components/spartan/pagination/src/index.ts"
@@ -125,17 +128,14 @@
       "@/shared/components/spartan/tabs": [
         "./src/app/shared/components/spartan/tabs/src/index.ts"
       ],
-      "@/shared/components/spartan/combobox": [
-        "./src/app/shared/components/spartan/combobox/src/index.ts"
+      "@/shared/components/spartan/toggle": [
+        "./src/app/shared/components/spartan/toggle/src/index.ts"
       ],
       "@/shared/components/spartan/toggle-group": [
         "./src/app/shared/components/spartan/toggle-group/src/index.ts"
       ],
-      "@/shared/components/spartan/toggle": [
-        "./src/app/shared/components/spartan/toggle/src/index.ts"
-      ],
-      "@/shared/components/spartan/command": [
-        "./src/app/shared/components/spartan/command/src/index.ts"
+      "@/shared/components/spartan/button": [
+        "./src/app/shared/components/spartan/button/src/index.ts"
       ]
     }
   },

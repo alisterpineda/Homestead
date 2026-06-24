@@ -1,6 +1,5 @@
 import { Directive } from '@angular/core';
-import { provideBrnDialogDefaultOptions } from '@spartan-ng/brain/dialog';
-import { BrnPopover, provideBrnPopoverConfig } from '@spartan-ng/brain/popover';
+import { BrnPopover, provideBrnPopoverConfig, provideBrnPopoverDefaultOptions } from '@spartan-ng/brain/popover';
 import { BrnSelectMultiple } from '@spartan-ng/brain/select';
 import { classes } from '@/shared/components/spartan/utils';
 
@@ -11,9 +10,7 @@ import { classes } from '@/shared/components/spartan/utils';
 			align: 'start',
 			sideOffset: 6,
 		}),
-		provideBrnDialogDefaultOptions({
-			autoFocus: 'first-heading',
-		}),
+		provideBrnPopoverDefaultOptions({ role: null }),
 	],
 	hostDirectives: [
 		{
@@ -23,22 +20,11 @@ import { classes } from '@/shared/components/spartan/utils';
 		},
 		{
 			directive: BrnPopover,
-			inputs: [
-				'align',
-				'autoFocus',
-				'closeDelay',
-				'closeOnOutsidePointerEvents',
-				'sideOffset',
-				'state',
-				'offsetX',
-				'restoreFocus',
-			],
+			inputs: ['align', 'closeOnOutsidePointerEvents', 'sideOffset', 'state', 'offsetX'],
 			outputs: ['stateChanged', 'closed'],
 		},
 	],
-	host: {
-		'data-slot': 'select',
-	},
+	host: { 'data-slot': 'select' },
 })
 export class HlmSelectMultiple {
 	constructor() {

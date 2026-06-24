@@ -4,6 +4,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmBreadcrumbPage]',
 	host: {
+		'data-slot': 'breadcrumb-page',
 		role: 'link',
 		'aria-disabled': 'true',
 		'aria-current': 'page',

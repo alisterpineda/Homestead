@@ -62,7 +62,7 @@ import { formatNetWorthValue } from './format-net-worth';
         />
         <div class="flex items-center gap-2">
           <hlm-checkbox
-            id="show-breakdown"
+            inputId="show-breakdown"
             [checked]="showBreakdown()"
             (checkedChange)="showBreakdown.set($event)"
             aria-label="Show assets and liabilities"

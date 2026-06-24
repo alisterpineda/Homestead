@@ -50,7 +50,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
           </div>
 
           <div class="flex items-center gap-2">
-            <hlm-checkbox id="schedule-enabled" [checked]="enabled()" (checkedChange)="enabled.set($event)"
+            <hlm-checkbox inputId="schedule-enabled" [checked]="enabled()" (checkedChange)="enabled.set($event)"
               aria-label="Enabled" />
             <label hlmLabel for="schedule-enabled" class="cursor-pointer">Enabled</label>
           </div>

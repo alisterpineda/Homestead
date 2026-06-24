@@ -1,4 +1,5 @@
 {
   "componentsPath": "src/app/shared/components/spartan",
-  "importAlias": "@/shared/components/spartan"
+  "importAlias": "@/shared/components/spartan",
+  "style": "nova"
 }

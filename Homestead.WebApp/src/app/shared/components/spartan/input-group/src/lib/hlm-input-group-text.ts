@@ -2,13 +2,10 @@ import { Directive } from '@angular/core';
 import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
-	selector: 'span[hlmInputGroupText]',
+	selector: '[hlmInputGroupText],hlm-input-group-text',
 })
 export class HlmInputGroupText {
 	constructor() {
-		classes(
-			() =>
-				`text-muted-foreground flex items-center gap-2 text-sm [&_ng-icon]:pointer-events-none [&_ng-icon:not([class*='text-'])]:text-base`,
-		);
+		classes(() => 'text-muted-foreground gap-2 text-sm [&_ng-icon:not([class*=\'text-\'])]:text-[length:--spacing(4)] flex items-center [&_ng-icon]:pointer-events-none');
 	}
 }

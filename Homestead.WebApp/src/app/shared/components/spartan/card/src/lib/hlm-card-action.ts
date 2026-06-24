@@ -3,9 +3,7 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmCardAction]',
-	host: {
-		'data-slot': 'card-action',
-	},
+	host: { 'data-slot': 'card-action' },
 })
 export class HlmCardAction {
 	constructor() {

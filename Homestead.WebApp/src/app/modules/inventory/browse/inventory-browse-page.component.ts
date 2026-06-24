@@ -17,7 +17,7 @@ import { lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { InventoryOverviewApiService } from '@/api/services/inventory-overview-api.service';
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -51,7 +51,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     PlaceBrowserComponent,
     InventoryWarningPanelsComponent,
     InventoryRecentlyUpdatedComponent,

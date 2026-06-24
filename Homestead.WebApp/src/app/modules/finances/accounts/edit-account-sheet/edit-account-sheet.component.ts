@@ -83,7 +83,7 @@ import { KIND_LABELS, isUserAccountKind, type UserAccountKind } from '../../shar
 
             <div class="flex items-center gap-2">
               <hlm-checkbox
-                id="account-archived"
+                inputId="account-archived"
                 [checked]="editArchived()"
                 (checkedChange)="editArchived.set($event)"
               />

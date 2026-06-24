@@ -18,7 +18,7 @@ import { lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DurableDetailPageComponent } from '../../durables/durable-detail-page/durable-detail-page.component';
@@ -45,7 +45,7 @@ import type { ItemDetailResponse } from '@/api/generated/models/item-detail-resp
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     DurableDetailPageComponent,
     ConsumableDetailPageComponent,
   ],

@@ -5,12 +5,10 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmSheetTitle]',
 	hostDirectives: [BrnSheetTitle],
-	host: {
-		'data-slot': 'sheet-title',
-	},
+	host: { 'data-slot': 'sheet-title' },
 })
 export class HlmSheetTitle {
 	constructor() {
-		classes(() => 'text-foreground font-semibold');
+		classes(() => 'text-foreground font-medium');
 	}
 }

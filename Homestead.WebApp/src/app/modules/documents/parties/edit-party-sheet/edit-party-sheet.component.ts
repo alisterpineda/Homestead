@@ -11,7 +11,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
-import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
+import { HlmFieldImports } from '@/shared/components/spartan/field';
 import { PartyApiService } from '@/api/services/party-api.service';
 import type { GetPartiesResponse } from '@/api/generated/models/get-parties-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -29,7 +29,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmLabel,
     HlmInput,
     HlmTextareaImports,
-    HlmFormFieldImports,
+    HlmFieldImports,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)" (closed)="onClosed()">
@@ -41,7 +41,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 
         @if (party(); as p) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-            <hlm-form-field>
+            <hlm-field>
               <label hlmLabel for="party-name">Name</label>
               <input
                 hlmInput
@@ -50,14 +50,14 @@ import { toast } from '@spartan-ng/brain/sonner';
                 [value]="editName()"
                 (input)="editName.set(asValue($event))"
               />
-              <hlm-error>
+              <hlm-field-error>
                 @if (nameRequiredError()) {
                   Party name is required.
                 } @else if (nameMaxLenError()) {
                   Party name must be 256 characters or fewer.
                 }
-              </hlm-error>
-            </hlm-form-field>
+              </hlm-field-error>
+            </hlm-field>
 
             <div class="space-y-2">
               <label hlmLabel for="party-desc">Description</label>

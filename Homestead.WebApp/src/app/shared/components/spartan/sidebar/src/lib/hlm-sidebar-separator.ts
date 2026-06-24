@@ -4,7 +4,7 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmSidebarSeparator],hlm-sidebar-separator',
-	hostDirectives: [{ directive: HlmSeparator }],
+	hostDirectives: [HlmSeparator],
 	host: {
 		'data-slot': 'sidebar-separator',
 		'data-sidebar': 'separator',

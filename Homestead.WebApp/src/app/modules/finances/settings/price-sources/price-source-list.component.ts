@@ -17,7 +17,7 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import type { GetPriceSourcesResponse } from '@/api/generated/models/get-price-sources-response';
 import type { PriceSourceSummary } from '@/api/generated/models/price-source-summary';
@@ -37,7 +37,7 @@ type StatusPill = { label: string; variant: 'default' | 'destructive' | 'seconda
     HlmEmptyImports,
     HlmTableImports,
     HlmBadge,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
   ],
   providers: [provideIcons({ lucideRss })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },

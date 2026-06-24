@@ -5,9 +5,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmSelectGroup],hlm-select-group',
 	hostDirectives: [{ directive: BrnSelectGroup }],
-	host: {
-		'data-slot': 'select-group',
-	},
+	host: { 'data-slot': 'select-group' },
 })
 export class HlmSelectGroup {
 	constructor() {

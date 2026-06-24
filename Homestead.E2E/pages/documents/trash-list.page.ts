@@ -37,22 +37,27 @@ export class TrashListPage {
 
   async deletePermanently() {
     await this.page.getByRole('button', { name: /Delete Permanently/ }).click();
-    // Confirm in alert dialog and wait for API response
+    // Wait for the alert dialog to finish opening (V1 overlay animation) and scope the confirm
+    // click to the dialog content, so we never re-target the trigger button behind the backdrop.
+    const dialog = this.page.locator('[data-slot="alert-dialog-content"]');
+    await expect(dialog).toBeVisible();
     const deleteResponse = this.page.waitForResponse(
       (resp) => resp.url().includes('/api/v1/documents/bulk-permanently-delete') && resp.request().method() === 'POST',
     );
-    await this.page.getByRole('button', { name: /Delete Permanently/ }).last().click();
+    await dialog.getByRole('button', { name: /Delete Permanently/ }).click();
     await deleteResponse;
   }
 
   async emptyTrash() {
     // Click the "Empty Trash" toolbar button (not in selection mode)
     await this.page.getByRole('button', { name: 'Empty Trash' }).first().click();
-    // Confirm in alert dialog and wait for API response
+    // Wait for the alert dialog to finish opening, then confirm scoped to the dialog content.
+    const dialog = this.page.locator('[data-slot="alert-dialog-content"]');
+    await expect(dialog).toBeVisible();
     const emptyResponse = this.page.waitForResponse(
       (resp) => resp.url().includes('/api/v1/documents/empty-trash') && resp.request().method() === 'POST',
     );
-    await this.page.getByRole('button', { name: /Empty Trash/ }).last().click();
+    await dialog.getByRole('button', { name: /Empty Trash/ }).click();
     await emptyResponse;
   }
 

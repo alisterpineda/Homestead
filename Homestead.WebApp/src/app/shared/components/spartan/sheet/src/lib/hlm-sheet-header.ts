@@ -3,12 +3,10 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmSheetHeader],hlm-sheet-header',
-	host: {
-		'data-slot': 'sheet-header',
-	},
+	host: { 'data-slot': 'sheet-header' },
 })
 export class HlmSheetHeader {
 	constructor() {
-		classes(() => 'flex flex-col gap-1.5 p-4');
+		classes(() => 'gap-1.5 p-4 flex flex-col');
 	}
 }

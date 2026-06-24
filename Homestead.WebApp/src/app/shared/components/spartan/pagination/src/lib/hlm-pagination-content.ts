@@ -3,12 +3,10 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: 'ul[hlmPaginationContent]',
-	host: {
-		'data-slot': 'pagination-content',
-	},
+	host: { 'data-slot': 'pagination-content' },
 })
 export class HlmPaginationContent {
 	constructor() {
-		classes(() => 'flex flex-row items-center gap-1');
+		classes(() => 'gap-1 flex items-center');
 	}
 }

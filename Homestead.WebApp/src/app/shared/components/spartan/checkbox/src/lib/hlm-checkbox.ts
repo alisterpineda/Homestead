@@ -9,13 +9,14 @@ import {
 	linkedSignal,
 	model,
 	output,
+	viewChild,
 } from '@angular/core';
 import { type ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideCheck } from '@ng-icons/lucide';
 import { BrnCheckbox } from '@spartan-ng/brain/checkbox';
+import { BrnFieldControlDescribedBy } from '@spartan-ng/brain/field';
 import type { ChangeFn, TouchFn } from '@spartan-ng/brain/forms';
-import { HlmIcon } from '@/shared/components/spartan/icon';
 import { hlm } from '@/shared/components/spartan/utils';
 import type { ClassValue } from 'clsx';
 
@@ -27,22 +28,21 @@ export const HLM_CHECKBOX_VALUE_ACCESSOR = {
 
 @Component({
 	selector: 'hlm-checkbox',
-	imports: [BrnCheckbox, NgIcon, HlmIcon],
+	imports: [BrnCheckbox, NgIcon],
 	providers: [HLM_CHECKBOX_VALUE_ACCESSOR],
 	viewProviders: [provideIcons({ lucideCheck })],
 	changeDetection: ChangeDetectionStrategy.OnPush,
+	hostDirectives: [BrnFieldControlDescribedBy],
 	host: {
 		class: 'contents peer',
 		'data-slot': 'checkbox',
-		'[attr.id]': 'null',
 		'[attr.aria-label]': 'null',
 		'[attr.aria-labelledby]': 'null',
-		'[attr.aria-describedby]': 'null',
 		'[attr.data-disabled]': '_disabled() ? "" : null',
 	},
 	template: `
 		<brn-checkbox
-			[id]="id()"
+			[id]="inputId()"
 			[name]="name()"
 			[class]="_computedClass()"
 			[checked]="checked()"
@@ -52,12 +52,13 @@ export const HLM_CHECKBOX_VALUE_ACCESSOR = {
 			[aria-label]="ariaLabel()"
 			[aria-labelledby]="ariaLabelledby()"
 			[aria-describedby]="ariaDescribedby()"
+			[forceInvalid]="forceInvalid()"
 			(checkedChange)="_handleChange($event)"
 			(touched)="_onTouched?.()"
 		>
 			@if (checked() || indeterminate()) {
-				<span class="flex items-center justify-center text-current transition-none">
-					<ng-icon hlm size="14px" name="lucideCheck" />
+				<span class="[&>ng-icon]:text-[length:--spacing(3.5)] flex items-center justify-center text-current transition-none">
+					<ng-icon name="lucideCheck" />
 				</span>
 			}
 		</brn-checkbox>
@@ -68,14 +69,14 @@ export class HlmCheckbox implements ControlValueAccessor {
 
 	protected readonly _computedClass = computed(() =>
 		hlm(
-			'border-input dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive peer size-4 shrink-0 cursor-default rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
+			'border-input dark:bg-input/30 data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary data-checked:border-primary data-[matches-spartan-invalid=true]:aria-checked:border-primary data-[matches-spartan-invalid=true]:border-destructive dark:data-[matches-spartan-invalid=true]:border-destructive/50 focus-visible:border-ring focus-visible:ring-ring/50 data-[matches-spartan-invalid=true]:ring-destructive/20 dark:data-[matches-spartan-invalid=true]:ring-destructive/40 flex size-4 items-center justify-center rounded-[4px] border shadow-xs transition-shadow group-has-disabled/field:opacity-50 focus-visible:ring-3 data-[matches-spartan-invalid=true]:ring-3 peer shrink-0 cursor-default outline-none disabled:cursor-not-allowed disabled:opacity-50',
 			this.userClass(),
-			this._disabled() ? 'cursor-not-allowed opacity-50' : '',
+			this._errorStateClass(),
 		),
 	);
 
 	/** Used to set the id on the underlying brn element. */
-	public readonly id = input<string | null>(null);
+	public readonly inputId = input<string | null>(null);
 
 	/** Used to set the aria-label attribute on the underlying brn element. */
 	public readonly ariaLabel = input<string | null>(null, { alias: 'aria-label' });
@@ -87,7 +88,8 @@ export class HlmCheckbox implements ControlValueAccessor {
 	public readonly ariaDescribedby = input<string | null>(null, { alias: 'aria-describedby' });
 
 	/** The checked state of the checkbox. */
-	public readonly checked = model<boolean>(false);
+	public readonly checkedInput = input<boolean, BooleanInput>(false, { alias: 'checked', transform: booleanAttribute });
+	public readonly checked = linkedSignal(this.checkedInput);
 
 	/** Emits when checked state changes. */
 	public readonly checkedChange = output<boolean>();
@@ -107,7 +109,19 @@ export class HlmCheckbox implements ControlValueAccessor {
 	/** Whether the checkbox is disabled. */
 	public readonly disabled = input<boolean, BooleanInput>(false, { transform: booleanAttribute });
 
+	/** Whether to force the checkbox into an invalid state. */
+	public readonly forceInvalid = input<boolean, BooleanInput>(false, { transform: booleanAttribute });
+
 	protected readonly _disabled = linkedSignal(this.disabled);
+
+	private readonly _brnCheckbox = viewChild.required(BrnCheckbox);
+
+	private readonly _spartanInvalid = computed(() => this.forceInvalid() || this._brnCheckbox().spartanInvalid?.());
+	protected readonly _errorStateClass = computed(() =>
+		this._spartanInvalid()
+			? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40'
+			: '',
+	);
 
 	protected _onChange?: ChangeFn<boolean>;
 	protected _onTouched?: TouchFn;

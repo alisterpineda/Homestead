@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
+import { HlmFieldImports } from '@/shared/components/spartan/field';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { ColorPickerComponent } from '../color-picker/color-picker.component';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -21,7 +21,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
     HlmButton,
     HlmInput,
     HlmLabel,
-    HlmFormFieldImports,
+    HlmFieldImports,
     ColorPickerComponent,
   ],
   template: `
@@ -37,7 +37,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
-          <hlm-form-field>
+          <hlm-field>
             <label hlmLabel for="create-tag-path">Path</label>
             <input
               hlmInput
@@ -45,9 +45,9 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
               placeholder="e.g., finance/invoices"
               [formControl]="pathControl"
             />
-            <hlm-error>Tag path is required.</hlm-error>
-          </hlm-form-field>
-          <hlm-form-field>
+            <hlm-field-error>Tag path is required.</hlm-field-error>
+          </hlm-field>
+          <hlm-field>
             <label hlmLabel for="create-tag-description">Description</label>
             <textarea
               hlmInput
@@ -56,8 +56,8 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
               [formControl]="descriptionControl"
               rows="2"
             ></textarea>
-            <hlm-error>Description must be 512 characters or fewer.</hlm-error>
-          </hlm-form-field>
+            <hlm-field-error>Description must be 512 characters or fewer.</hlm-field-error>
+          </hlm-field>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Color</label>
             <app-color-picker [color]="selectedColor()" (colorChange)="selectedColor.set($event)" />

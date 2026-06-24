@@ -22,7 +22,7 @@ import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmCheckbox } from '@/shared/components/spartan/checkbox';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-sources-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -38,7 +38,7 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
     FormsModule, DatePipe, HlmSpinner,
     HlmButton, HlmInput, HlmLabel, HlmBadge, HlmCheckbox,
     NgIcon, HlmIconImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     PriceSourceConfigFormComponent,
   ],
   providers: [provideIcons({ lucideX, lucidePlus })],
@@ -80,7 +80,7 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
           @if (d.kind === 'External') {
             <div class="flex items-center gap-2">
               <hlm-checkbox
-                id="enabled"
+                inputId="enabled"
                 [checked]="isEnabled()"
                 (checkedChange)="setEnabled($event)"
               />
@@ -236,7 +236,7 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
               <input hlmInput id="cron" [(ngModel)]="cronExpression" placeholder="0 6 * * *" />
               <p class="text-xs text-muted-foreground">UTC. Example: <code>0 6 * * *</code> runs daily at 06:00 UTC.</p>
               <div class="flex items-center gap-2">
-                <hlm-checkbox id="schedule-enabled" [checked]="scheduleEnabled()" (checkedChange)="scheduleEnabled.set($event)" />
+                <hlm-checkbox inputId="schedule-enabled" [checked]="scheduleEnabled()" (checkedChange)="scheduleEnabled.set($event)" />
                 <label hlmLabel for="schedule-enabled">Enabled</label>
               </div>
               @if (d.schedule; as s) {

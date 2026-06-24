@@ -9,6 +9,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmCommandShortcut {
 	constructor() {
-		classes(() => 'text-muted-foreground ml-auto text-xs tracking-widest');
+		classes(() => 'text-muted-foreground group-data-[selected]/command-item:text-foreground ms-auto text-xs tracking-widest');
 	}
 }

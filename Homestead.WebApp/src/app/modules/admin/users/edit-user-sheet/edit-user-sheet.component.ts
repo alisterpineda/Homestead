@@ -87,7 +87,7 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 
             <div class="flex items-center gap-2">
               <hlm-checkbox
-                id="user-is-active"
+                inputId="user-is-active"
                 [checked]="editIsActive()"
                 (checkedChange)="editIsActive.set($event)"
               />

@@ -5,12 +5,10 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmComboboxStatus],hlm-combobox-status',
 	hostDirectives: [BrnComboboxStatus],
-	host: {
-		'data-slot': 'combobox-status',
-	},
+	host: { 'data-slot': 'combobox-status' },
 })
 export class HlmComboboxStatus {
 	constructor() {
-		classes(() => 'text-muted-foreground flex w-full items-center justify-center gap-2 py-2 text-center text-sm');
+		classes(() => 'text-muted-foreground gap-2 px-3 py-2 text-sm flex w-full items-center justify-center text-center');
 	}
 }

@@ -16,9 +16,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmSelectScrollUp {
 	constructor() {
-		classes(
-			() =>
-				"bg-popover sticky top-0 z-10 flex w-full cursor-default items-center justify-center py-1 data-hidden:hidden [&_ng-icon:not([class*='text-'])]:text-base",
-		);
+		classes(() => 'bg-popover z-10 flex cursor-default items-center justify-center py-1 [&_ng-icon:not([class*=\'text-\'])]:text-[length:--spacing(4)] sticky top-0 w-full data-hidden:hidden');
 	}
 }

@@ -13,7 +13,7 @@ import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
-import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
+import { HlmFieldImports } from '@/shared/components/spartan/field';
 
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { TagApiService } from '@/api/services/tag-api.service';
@@ -39,7 +39,7 @@ const NONE_VALUE = '__none__';
     HlmButton,
     HlmLabel,
     HlmInput,
-    HlmFormFieldImports,
+    HlmFieldImports,
         HlmSelectImports,
     ColorPickerComponent,
     TagBadgeComponent,
@@ -54,7 +54,7 @@ const NONE_VALUE = '__none__';
 
         @if (tag(); as t) {
           <div class="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-            <hlm-form-field>
+            <hlm-field>
               <label hlmLabel for="tag-name">Name</label>
               <input
                 hlmInput
@@ -63,8 +63,8 @@ const NONE_VALUE = '__none__';
                 [value]="editName()"
                 (input)="editName.set(asValue($event))"
               />
-              <hlm-hint>Cannot contain '/' characters.</hlm-hint>
-              <hlm-error>
+              <hlm-field-description>Cannot contain '/' characters.</hlm-field-description>
+              <hlm-field-error>
                 @if (nameRequiredError()) {
                   Tag name is required.
                 } @else if (namePatternError()) {
@@ -72,8 +72,8 @@ const NONE_VALUE = '__none__';
                 } @else if (nameMaxLenError()) {
                   Tag name must be 256 characters or fewer.
                 }
-              </hlm-error>
-            </hlm-form-field>
+              </hlm-field-error>
+            </hlm-field>
 
             <div class="space-y-2">
               <label hlmLabel>Parent</label>
@@ -92,7 +92,7 @@ const NONE_VALUE = '__none__';
               </hlm-select>
             </div>
 
-            <hlm-form-field>
+            <hlm-field>
               <label hlmLabel for="tag-description">Description</label>
               <textarea
                 hlmInput
@@ -102,8 +102,8 @@ const NONE_VALUE = '__none__';
                 (input)="editDescription.set(asValue($event))"
                 rows="3"
               ></textarea>
-              <hlm-error>Description must be 512 characters or fewer.</hlm-error>
-            </hlm-form-field>
+              <hlm-field-error>Description must be 512 characters or fewer.</hlm-field-error>
+            </hlm-field>
 
             <div class="space-y-2">
               <label hlmLabel>Color</label>

@@ -5,9 +5,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmCollapsibleContent],hlm-collapsible-content',
 	hostDirectives: [{ directive: BrnCollapsibleContent, inputs: ['id'] }],
-	host: {
-		'data-slot': 'collapsible-content',
-	},
+	host: { 'data-slot': 'collapsible-content' },
 })
 export class HlmCollapsibleContent {
 	constructor() {

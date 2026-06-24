@@ -10,26 +10,27 @@ import { classes } from '@/shared/components/spartan/utils';
 	imports: [HlmInputGroupImports, NgIcon, BrnCommandInput],
 	providers: [provideIcons({ lucideSearch })],
 	changeDetection: ChangeDetectionStrategy.OnPush,
+	host: {
+		'data-slot': 'command-input-wrapper',
+	},
 	template: `
-		<hlm-input-group
-			class="bg-input/30 border-input/30 h-8 rounded-lg shadow-none *:data-[slot=input-group-addon]:pl-2"
-		>
+		<hlm-input-group class="bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:pl-2!">
 			<input
 				brnCommandInput
 				data-slot="command-input"
-				class="w-full outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
-				[id]="id()"
+				class="w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+				[id]="inputId()"
 				[placeholder]="placeholder()"
 			/>
 
 			<hlm-input-group-addon>
-				<ng-icon name="lucideSearch" />
+				<ng-icon name="lucideSearch" class="shrink-0 text-[length:--spacing(4)] opacity-50" />
 			</hlm-input-group-addon>
 		</hlm-input-group>
 	`,
 })
 export class HlmCommandInput {
-	public readonly id = input<string | undefined>();
+	public readonly inputId = input<string | undefined>();
 	public readonly placeholder = input<string>('');
 
 	constructor() {

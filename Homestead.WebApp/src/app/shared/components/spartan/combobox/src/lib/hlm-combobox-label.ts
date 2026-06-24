@@ -5,9 +5,7 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: '[hlmComboboxLabel]',
 	hostDirectives: [{ directive: BrnComboboxLabel, inputs: ['id'] }],
-	host: {
-		'data-slot': 'combobox-label',
-	},
+	host: { 'data-slot': 'combobox-label' },
 })
 export class HlmComboboxLabel {
 	constructor() {

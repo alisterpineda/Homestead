@@ -3,9 +3,7 @@ import { classes } from '@/shared/components/spartan/utils';
 
 @Directive({
 	selector: '[hlmEmptyTitle]',
-	host: {
-		'data-slot': 'empty-title',
-	},
+	host: { 'data-slot': 'empty-title' },
 })
 export class HlmEmptyTitle {
 	constructor() {

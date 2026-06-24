@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
 import { FinanceSettingsService } from '../../shared/finance-settings.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -24,7 +24,7 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
 @Component({
   selector: 'app-general-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, HlmLabel, HlmBreadCrumbImports, CurrencyPickerComponent],
+  imports: [HlmButton, HlmLabel, HlmBreadcrumbImports, CurrencyPickerComponent],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <ng-template #headerTitle>

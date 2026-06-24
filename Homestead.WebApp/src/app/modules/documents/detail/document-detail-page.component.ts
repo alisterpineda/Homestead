@@ -45,11 +45,11 @@ import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group'
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmInput } from '@/shared/components/spartan/input';
-import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
+import { HlmFieldImports } from '@/shared/components/spartan/field';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmTextareaImports } from '@/shared/components/spartan/textarea';
 import { HlmBadge } from '@/shared/components/spartan/badge';
@@ -98,11 +98,11 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmSpinner,
     HlmTabsImports,
     HlmResizableImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     HlmDropdownMenuImports,
     HlmAlertDialogImports,
     HlmInput,
-    HlmFormFieldImports,
+    HlmFieldImports,
     HlmLabel,
     TagInputComponent,
     PartyInputComponent,
@@ -414,7 +414,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           }
 
           <!-- Name -->
-          <hlm-form-field>
+          <hlm-field>
             <label hlmLabel for="doc-name">
               Name
               @if (pendingNameSuggestion() || nameIsAiSuggested()) {
@@ -448,7 +448,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 (input)="editName.set(asInputValue($event)); appliedTransientName.set(null)"
               />
             }
-          </hlm-form-field>
+          </hlm-field>
 
           <!-- Parties -->
           <div class="space-y-2">
@@ -507,13 +507,13 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Version Details</p>
 
-          <hlm-form-field>
+          <hlm-field>
             <label hlmLabel for="version-label">Label</label>
             <input hlmInput id="version-label" maxlength="256"
               placeholder="e.g., Final Draft, Signed Copy"
               [value]="editVersionLabel()"
               (input)="editVersionLabel.set(asInputValue($event))" />
-          </hlm-form-field>
+          </hlm-field>
         </div>
       </ng-template>
 

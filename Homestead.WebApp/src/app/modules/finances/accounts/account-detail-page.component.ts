@@ -31,7 +31,7 @@ import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmBreadCrumbImports } from '@/shared/components/spartan/breadcrumb';
+import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -71,7 +71,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmButton,
     HlmSpinner,
     HlmEmptyImports,
-    HlmBreadCrumbImports,
+    HlmBreadcrumbImports,
     HlmDropdownMenuImports,
     KindBadgeComponent,
     AccountActivityTabComponent,

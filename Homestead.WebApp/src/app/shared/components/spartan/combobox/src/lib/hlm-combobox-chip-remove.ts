@@ -6,12 +6,10 @@ import { classes } from '@/shared/components/spartan/utils';
 @Directive({
 	selector: 'button[hlmComboboxChipRemove]',
 	hostDirectives: [BrnComboboxChipRemove],
-	host: {
-		'data-slot': 'combobox-chip-remove',
-	},
+	host: { 'data-slot': 'combobox-chip-remove' },
 })
 export class HlmComboboxChipRemove {
 	constructor() {
-		classes(() => ['-ml-1 opacity-50 hover:opacity-100', buttonVariants({ variant: 'ghost', size: 'icon-xs' })]);
+		classes(() => ['-ms-1 opacity-50 hover:opacity-100', buttonVariants({ variant: 'ghost', size: 'icon-xs' })]);
 	}
 }

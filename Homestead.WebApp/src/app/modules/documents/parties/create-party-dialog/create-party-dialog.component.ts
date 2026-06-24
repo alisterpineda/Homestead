@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmFormFieldImports } from '@/shared/components/spartan/form-field';
+import { HlmFieldImports } from '@/shared/components/spartan/field';
 import { PartyApiService } from '@/api/services/party-api.service';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -20,7 +20,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
     HlmButton,
     HlmInput,
     HlmLabel,
-    HlmFormFieldImports,
+    HlmFieldImports,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -35,7 +35,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
         </div>
 
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
-          <hlm-form-field>
+          <hlm-field>
             <label hlmLabel for="create-party-name">Name</label>
             <input
               hlmInput
@@ -43,14 +43,14 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
               placeholder="Enter a name for this party"
               [formControl]="nameControl"
             />
-            <hlm-error>
+            <hlm-field-error>
               @if (nameControl.hasError('required')) {
                 Party name is required.
               } @else if (nameControl.hasError('maxlength')) {
                 Party name must be 256 characters or fewer.
               }
-            </hlm-error>
-          </hlm-form-field>
+            </hlm-field-error>
+          </hlm-field>
           <div class="flex flex-col gap-1.5">
             <label hlmLabel for="create-party-desc">Description (optional)</label>
             <input

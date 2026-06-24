@@ -128,3 +128,8 @@
     input[hlmComboboxChipInput] { font-size: 16px; }
   }
 }
+
+/* Command palette search input: keep ≥16px so iOS Safari doesn't auto-zoom on focus.
+   Scoped override so the generated helm command-input stays byte-for-byte stock.
+   Unlayered → beats the helm template's `text-sm` (Tailwind `@layer utilities`) with no `!important`. */
+[data-slot='command-input'] { font-size: 1rem; line-height: 1.5rem; }

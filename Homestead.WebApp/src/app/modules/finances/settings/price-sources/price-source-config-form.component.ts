@@ -23,7 +23,7 @@ import type { PriceProviderConfigSchema } from '@/api/generated/models/price-pro
             </label>
             @if (field.type === 'Boolean') {
               <hlm-checkbox
-                [id]="'cfg-' + field.key"
+                [inputId]="'cfg-' + field.key"
                 [checked]="boolValue(field.key)"
                 (checkedChange)="setValue(field.key, $event)"
               />
