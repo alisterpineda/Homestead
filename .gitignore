@@ -28,3 +28,7 @@ Homestead.WebApi/wwwroot/
 
 # Playwright MCP (Claude Code self-QA)
 .playwright-mcp/
+
+# AI eval harness: disk cache (under-test + judge responses), results store, and generated report
+**/.eval-reports/
+**/report.html
