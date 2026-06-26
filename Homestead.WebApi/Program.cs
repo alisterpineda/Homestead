@@ -107,6 +107,14 @@ if (!string.IsNullOrEmpty(aiEndpoint))
     var aiApiKey = Environment.GetEnvironmentVariable("AI_API_KEY");
     if (!string.IsNullOrEmpty(aiApiKey))
         builder.Configuration["Ai:ApiKey"] = aiApiKey;
+
+    // Optional page-1 image classification knobs. Unset -> AiOptions defaults (image on, 1024px edge).
+    var aiImageInput = Environment.GetEnvironmentVariable("AI_IMAGE_INPUT");
+    if (!string.IsNullOrEmpty(aiImageInput))
+        builder.Configuration["Ai:ImageInput"] = aiImageInput;
+    var aiImageRenderMaxEdge = Environment.GetEnvironmentVariable("AI_IMAGE_RENDER_MAX_EDGE");
+    if (!string.IsNullOrEmpty(aiImageRenderMaxEdge))
+        builder.Configuration["Ai:ImageRenderMaxEdge"] = aiImageRenderMaxEdge;
 }
 
 void MapCsvEnvToConfigArray(string envVar, string configPrefix)
@@ -225,6 +233,7 @@ builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddTextExtraction(builder.Configuration);
 builder.Services.AddAiServices(builder.Configuration);
+builder.Services.AddAiPageRendering();
 builder.Services.AddScoped<IAiClassificationService, AiClassificationService>();
 builder.Services.AddThumbnails();
 

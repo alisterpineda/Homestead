@@ -61,7 +61,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
         var parties = new List<PartyInfo> { new(Guid.NewGuid(), "ACME", null) };
 
-        await _sut.ClassifyAsync("Doc", "some text", tags, parties, ClassificationScope.Tags, ct);
+        await _sut.ClassifyAsync("Doc", "some text", null, tags, parties, ClassificationScope.Tags, ct);
 
         // System prompt: tag instruction present; party/summary/title absent.
         Assert.Contains("Select applicable tags", SystemPrompt);
@@ -88,7 +88,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
         var parties = new List<PartyInfo> { new(Guid.NewGuid(), "ACME", null) };
 
-        await _sut.ClassifyAsync("Doc", "some text", tags, parties, ClassificationScope.Summary, ct);
+        await _sut.ClassifyAsync("Doc", "some text", null, tags, parties, ClassificationScope.Summary, ct);
 
         Assert.DoesNotContain("Available tags:", UserMessage);
         Assert.DoesNotContain("Available parties:", UserMessage);
@@ -104,7 +104,7 @@ public class AiClassificationServiceTests
         var ct = TestContext.Current.CancellationToken;
 
         var result = await _sut.ClassifyAsync(
-            "Doc", extractedText: null, [], [], ClassificationScope.Summary, ct);
+            "Doc", extractedText: null, pageImage: null, [], [], ClassificationScope.Summary, ct);
 
         Assert.Null(result);
         await _client.DidNotReceive().GetResponseAsync(
@@ -119,7 +119,7 @@ public class AiClassificationServiceTests
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
 
         var result = await _sut.ClassifyAsync(
-            "Doc", "some text", tags, [], ClassificationScope.None, ct);
+            "Doc", "some text", null, tags, [], ClassificationScope.None, ct);
 
         Assert.Null(result);
         await _client.DidNotReceive().GetResponseAsync(
@@ -142,7 +142,7 @@ public class AiClassificationServiceTests
         var parties = new List<PartyInfo> { new(partyId, "ACME", null) };
 
         var result = await _sut.ClassifyAsync(
-            "Original Name", "some text", tags, parties, ClassificationScope.Tags, ct);
+            "Original Name", "some text", null, tags, parties, ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -162,7 +162,7 @@ public class AiClassificationServiceTests
         // 1 repeated, 5 (out of range), -1 (out of range), then 0.
         RespondWith("""{"tagIndexes":[1,1,5,-1,0]}""");
 
-        var result = await _sut.ClassifyAsync("Doc", "text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "text", null, tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([t1, t0], result!.MatchedTagIds);  // order preserved, duplicates + out-of-range dropped
@@ -190,7 +190,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"tagIndexes":[2,0],"partyIndexes":[1]}""");
 
         var result = await _sut.ClassifyAsync(
-            "Doc", "text", tags, parties, ClassificationScope.Tags | ClassificationScope.Parties, ct);
+            "Doc", "text", null, tags, parties, ClassificationScope.Tags | ClassificationScope.Parties, ct);
 
         // Each emitted catalog entry's "index" equals its array position, and no GUID is leaked into the prompt.
         AssertCatalogIsPositional(UserMessage, "Available tags:", [.. tags.Select(t => t.Name)]);
@@ -231,7 +231,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"tagIndexes":[]}""");
         var tags = new List<TagInfo> { new(Guid.NewGuid(), "Finance", "Finance") };
 
-        await _sut.ClassifyAsync("Doc", "text", tags, [], ClassificationScope.Tags, ct);
+        await _sut.ClassifyAsync("Doc", "text", null, tags, [], ClassificationScope.Tags, ct);
 
         // 1.1 — deterministic sampling.
         Assert.Equal(0f, _capturedOptions!.Temperature);
@@ -280,7 +280,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -325,7 +325,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -360,7 +360,7 @@ public class AiClassificationServiceTests
             .ThrowsAsync(contextLength);
 
         await Assert.ThrowsAsync<ClientResultException>(() =>
-            _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct));
+            _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct));
 
         // Exactly one attempt — the error was surfaced, not masked behind a degraded retry.
         await _client.Received(1).GetResponseAsync(
@@ -394,7 +394,7 @@ public class AiClassificationServiceTests
             Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
 
-        var result = await _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct);
+        var result = await _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct);
 
         Assert.NotNull(result);
         Assert.Equal([tagId], result!.MatchedTagIds);
@@ -414,7 +414,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"summary":"S"}""");
         var sut = SutWith(new AiOptions { MaxInputChars = 40_000 });
 
-        await sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        await sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 
         // 20k-char body fits inside the 40k budget -> sent whole, no elision, both ends present.
         Assert.DoesNotContain("[...document text omitted...]", UserMessage);
@@ -429,7 +429,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"summary":"S"}""");
 
         // Default AiOptions — no override, so the default budget applies and the 20k body is sampled.
-        await _sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        await _sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 
         Assert.Contains("[...document text omitted...]", UserMessage);
     }
@@ -443,7 +443,7 @@ public class AiClassificationServiceTests
         RespondWith("""{"summary":"S"}""");
         var sut = SutWith(new AiOptions { MaxInputChars = 10 });
 
-        await sut.ClassifyAsync("Doc", MakeLongText(), [], [], ClassificationScope.Summary, ct);
+        await sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 
         Assert.Contains("[...document text omitted...]", UserMessage);
         Assert.Contains("DOC_START_SENTINEL", UserMessage);   // not truncated to ~10 chars
@@ -464,10 +464,80 @@ public class AiClassificationServiceTests
             .ThrowsAsync(rateLimited);
 
         await Assert.ThrowsAsync<ClientResultException>(() =>
-            _sut.ClassifyAsync("Doc", "some text", tags, [], ClassificationScope.Tags, ct));
+            _sut.ClassifyAsync("Doc", "some text", null, tags, [], ClassificationScope.Tags, ct));
 
         // No JSON-mode fallback for a non-400 error — only the single strict attempt was made.
         await _client.Received(1).GetResponseAsync(
             Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>());
+    }
+
+    // ---- Image input (multimodal user turn) -------------------------------------------------------
+
+    [Fact]
+    public async Task PageImagePresent_UserTurnCarriesTextAndPngDataContent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"suggestedTitle":"T"}""");
+        var image = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+
+        await _sut.ClassifyAsync("Doc", "some text", image, [], [], ClassificationScope.Name, ct);
+
+        // The user turn (messages[1]) is multimodal: a text part + an image/png data part carrying the bytes.
+        var userContents = _captured![1].Contents;
+        Assert.Contains(userContents, c => c is TextContent);
+        var data = Assert.IsType<DataContent>(userContents.Single(c => c is DataContent));
+        Assert.StartsWith("image/png", data.MediaType);
+        Assert.Equal(image, data.Data.ToArray());
+
+        // The text part is still the full prompt (name + extracted text), unchanged by the image.
+        Assert.Contains("Extracted text:", UserMessage);
+    }
+
+    [Fact]
+    public async Task NoPageImage_UserTurnIsPlainText_NoDataContent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        RespondWith("""{"suggestedTitle":"T"}""");
+
+        await _sut.ClassifyAsync("Doc", "some text", null, [], [], ClassificationScope.Name, ct);
+
+        Assert.DoesNotContain(_captured![1].Contents, c => c is DataContent);
+    }
+
+    [Fact]
+    public async Task PageImagePresent_StructuredOutput400_StillDegradesToJsonMode_ImageRetained()
+    {
+        // The degradation ladder is image-agnostic: a 400 on the strict attempt still falls back to JSON
+        // mode, and the image rides along on the retry.
+        var ct = TestContext.Current.CancellationToken;
+        var tagId = Guid.NewGuid();
+        var tags = new List<TagInfo> { new(tagId, "Finance", "Finance") };
+        var image = new byte[] { 1, 2, 3, 4 };
+
+        var response = Substitute.For<PipelineResponse>();
+        response.Status.Returns(400);
+        var schemaUnsupported = new ClientResultException("json_schema response format not supported", response);
+
+        _client.GetResponseAsync(
+            Arg.Any<IEnumerable<ChatMessage>>(),
+            Arg.Is<ChatOptions>(o => IsStructuredOutput(o)),
+            Arg.Any<CancellationToken>())
+            .ThrowsAsync(schemaUnsupported);
+        _client.GetResponseAsync(
+            Arg.Any<IEnumerable<ChatMessage>>(),
+            Arg.Is<ChatOptions>(o => IsJsonMode(o)),
+            Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"tagIndexes":[0]}"""))));
+
+        var result = await _sut.ClassifyAsync("Doc", "some text", image, tags, [], ClassificationScope.Tags, ct);
+
+        Assert.NotNull(result);
+        Assert.Equal([tagId], result!.MatchedTagIds);
+
+        // The JSON-mode fallback request still carried the image data part.
+        await _client.Received(1).GetResponseAsync(
+            Arg.Is<IEnumerable<ChatMessage>>(m => m.ToList()[1].Contents.Any(c => c is DataContent)),
+            Arg.Is<ChatOptions>(o => IsJsonMode(o)),
+            Arg.Any<CancellationToken>());
     }
 }

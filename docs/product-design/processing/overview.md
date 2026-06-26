@@ -201,7 +201,7 @@ Triggered when a new document is uploaded. The HTTP endpoint stages the file und
 2. Computes the SHA-256 hash; rejects the upload as a duplicate if any other version (including in trashed documents) shares the hash. The duplicate exception is `IStructuredJobError` so the client can offer "view the existing document".
 3. Moves the file from staging to its hash-addressed final location (copy + delete to be safe across filesystems).
 4. Creates the `Document` and its first `DocumentVersion` in the same transaction; rolls back the file move on DB failure.
-5. If auto-classify is enabled (the `AutoClassifyOnUpload` setting plus a resolvable default provider), runs `ClassifyAndApplyAsync` **inline**. Non-fatal — a classification failure logs a warning and the upload still succeeds.
+5. If auto-classify is enabled (the `AutoClassifyOnUpload` setting plus AI being configured), renders the first-page image and runs classification **inline** at full `All` scope, folding the result into document creation. Non-fatal — a classification failure logs a warning and the upload still succeeds.
 6. Sends the SignalR completion notification — deliberately **after** classification, so the UI sees the AI-suggested name/tags/parties/summary the moment the upload lands.
 7. Generates a thumbnail (post-notification, best-effort).
 
@@ -231,12 +231,12 @@ Triggered by the bulk-reprocess action on the documents list. The handler:
 
 ### `ClassifyDocument`
 
-Enqueued only as a child of a `BulkClassifyDocuments` parent — one per document. Two other classification paths deliberately do **not** use this job type: single-document classify from the detail page runs synchronously through the `classify-preview` query (persisting nothing until the user saves the edit form), and auto-classify-on-upload calls the classifier inline inside `UploadDocument` rather than spawning a separate job. The handler:
+Enqueued as a child of a `BulkClassifyDocuments` parent — one per document. Both interactive bulk classify **and** the detail page's single-document classify run through this path (single-doc classify enqueues a one-item bulk job, so its image-carrying classification stays on the background path). The one classification path that does **not** spawn this job is auto-classify-on-upload, which calls the classifier inline inside `UploadDocument` (see above). The handler:
 
-1. Load the document with its current tags and any pending suggestions.
-2. Resolve the AI provider via `IAiProviderResolver` (explicit ID → settings default → null). If no provider resolves, skip classification but still send a notification.
-3. Load the latest version's `ExtractedText` and all available tags (Id, Name, Path).
-4. Call `IAiClassificationService.ClassifyAsync()` — builds a prompt with the document's name, extracted text, and available tags; parses the structured JSON response.
+1. Load the document with its current tags, parties, and any pending suggestions.
+2. Gate on AI being configured (`IAiClientFactory.IsConfigured`). If it is not, skip classification but still send a notification.
+3. Load the latest version's `ExtractedText`, render the first-page image (scope permitting — see the [overview](../documents/overview.md#ai-classification-and-summarization)), and load the available tags and parties.
+4. Call `IAiClassificationService.ClassifyAsync()` — builds a prompt with the document's name, extracted text, and the in-scope tag/party catalogs, attaches the page image when present, and parses the structured JSON response.
 5. Clear any prior pending suggestions: revert AI-applied tags, name, and summary to their pre-AI state. Persist deletes before applying new data (two-save pattern to avoid composite key collisions on the `DocumentTag` join table).
 6. Auto-apply the new classification: add AI-suggested tags (skipping tags already on the document), set the suggested title, and set the summary. A `DocumentSuggestion` record is created for each applied **tag, party, and name** — but **not** for the summary, which is written directly and is purely AI-managed (no approve/decline).
 7. Send a SignalR notification. (Setting the document's name/summary in step 6 fires the database trigger that refreshes the search vector — there is no app-side vector update.)
@@ -247,7 +247,7 @@ Sets `EntityType = Document`, `EntityId = documentId`.
 
 ### `BulkClassifyDocuments` *(parent)*
 
-Triggered by the bulk-classify action on the documents list. The handler fans out to one `ClassifyDocument` child per document, optionally pinning a specific AI provider. Follows the same idempotent parent pattern as `BulkReprocessDocuments` — checks for existing children on re-entry and short-circuits. Per-document write authorisation is verified before enqueue.
+Triggered by the bulk-classify action on the documents list (and by the detail page's single-document classify, which enqueues a one-item bulk). The handler fans out to one `ClassifyDocument` child per document. Follows the same idempotent parent pattern as `BulkReprocessDocuments` — checks for existing children on re-entry and short-circuits. Per-document write authorisation is verified before enqueue.
 
 ### `DownloadDocuments`
 

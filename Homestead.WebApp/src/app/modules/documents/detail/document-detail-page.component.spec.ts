@@ -11,7 +11,6 @@ import { DocumentEditStateService } from './document-edit-state.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
-import type { DocumentEditState } from './document-edit-state.service';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
@@ -343,14 +342,18 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       getDocument: ReturnType<typeof vi.fn>;
       getDocumentFile: ReturnType<typeof vi.fn>;
       patchDocument: ReturnType<typeof vi.fn>;
-      classifyPreview: ReturnType<typeof vi.fn>;
-      summarizeDocument: ReturnType<typeof vi.fn>;
+      bulkClassifyDocuments: ReturnType<typeof vi.fn>;
+      bulkSummarizeDocuments: ReturnType<typeof vi.fn>;
     };
     let guardVersionApi: {
       getDocumentVersion: ReturnType<typeof vi.fn>;
       getDocumentActivity: ReturnType<typeof vi.fn>;
       patchDocumentVersion: ReturnType<typeof vi.fn>;
       createComment: ReturnType<typeof vi.fn>;
+    };
+    let guardProcessingHub: {
+      jobCompleted$: Subject<unknown>;
+      waitForJob: ReturnType<typeof vi.fn>;
     };
     let docResponse: GetDocumentResponse | null;
     let versionDetailSubject: Subject<GetDocumentVersionResponse | null>;
@@ -450,8 +453,8 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         getDocument: vi.fn(() => of(docResponse)),
         getDocumentFile: vi.fn(() => EMPTY),
         patchDocument: vi.fn(() => of(null)),
-        classifyPreview: vi.fn(() => of({ suggestedTitle: null, summary: null, tags: [], parties: [] })),
-        summarizeDocument: vi.fn(() => of({ summary: 'AI generated summary.' })),
+        bulkClassifyDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
+        bulkSummarizeDocuments: vi.fn(() => of({ jobIds: ['job-1'] })),
       };
 
       guardVersionApi = {
@@ -459,6 +462,13 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
         getDocumentActivity: vi.fn(() => of({ items: [] })),
         patchDocumentVersion: vi.fn(() => of(null)),
         createComment: vi.fn(() => of(null)),
+      };
+
+      // waitForJob returns a never-resolving promise so the busy flag stays set for the assertion;
+      // the enqueue + waitForJob calls are what these specs verify.
+      guardProcessingHub = {
+        jobCompleted$: jobCompletedSubject,
+        waitForJob: vi.fn(() => new Promise<never>(() => {})),
       };
 
       TestBed.configureTestingModule({
@@ -471,10 +481,7 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
           { provide: DocumentEditStateService, useValue: guardEditStateService },
           { provide: DocumentApiService, useValue: guardDocumentApi },
           { provide: DocumentVersionApiService, useValue: guardVersionApi },
-          {
-            provide: ProcessingHubService,
-            useValue: { jobCompleted$: jobCompletedSubject, waitForJob: vi.fn(() => new Promise(() => {})) },
-          },
+          { provide: ProcessingHubService, useValue: guardProcessingHub },
           {
             provide: ActivatedRoute,
             useValue: {
@@ -630,135 +637,6 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       expect(guardComponent.editExtractedText()).toBe('v1 late text');
     });
 
-    describe('buildEditState persists transient AI metadata', () => {
-      function triggerSaveAndGetState(): DocumentEditState {
-        guardOpenDocsSignal.set([{ id: 'doc-1', name: 'Doc 1' }]);
-
-        Object.defineProperty(guardComponent, 'hasChanges', {
-          value: () => true,
-          writable: true,
-          configurable: true,
-        });
-
-        guardComponent.ngOnDestroy();
-
-        const calls = (guardEditStateService.saveState as ReturnType<typeof vi.fn>).mock.calls;
-        expect(calls.length).toBeGreaterThan(0);
-        return calls[0][1] as DocumentEditState;
-      }
-
-      it('includes transientAi metadata when AI suggestions are active', () => {
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.preClassifyName.set('Doc 1');
-        guardComponent.appliedTransientName.set('AI Name');
-        guardComponent.editName.set('AI Name');
-
-        const saved = triggerSaveAndGetState();
-        expect(saved.editName).toBe('AI Name');
-        expect(saved.transientAi).toEqual({
-          appliedTransientName: 'AI Name',
-          preClassifyName: 'Doc 1',
-          aiTransientTagPaths: [],
-          aiTransientPartyIds: [],
-        });
-      });
-
-      it('includes transient tag paths in metadata', () => {
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.editTags.set(['Existing', 'AI Tag']);
-        guardComponent.aiTransientTagPaths.set(new Set(['AI Tag']));
-
-        const saved = triggerSaveAndGetState();
-        expect(saved.editTags).toEqual(['Existing', 'AI Tag']);
-        expect(saved.transientAi?.aiTransientTagPaths).toEqual(['AI Tag']);
-      });
-
-      it('includes transient party ids in metadata', () => {
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.editParties.set([{ id: 'party-1', name: 'AI Party' }]);
-        guardComponent.aiTransientPartyIds.set(new Set(['party-1']));
-
-        const saved = triggerSaveAndGetState();
-        expect(saved.editParties).toEqual([{ id: 'party-1', name: 'AI Party' }]);
-        expect(saved.transientAi?.aiTransientPartyIds).toEqual(['party-1']);
-      });
-
-      it('omits transientAi when no AI suggestions are active', () => {
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.editName.set('Manual Edit');
-        guardComponent.editTags.set(['Manual Tag']);
-
-        const saved = triggerSaveAndGetState();
-        expect(saved.editName).toBe('Manual Edit');
-        expect(saved.transientAi).toBeUndefined();
-      });
-    });
-
-    describe('init effect restores transient AI metadata from saved state', () => {
-      it('restores transient signals when saved state has transientAi', () => {
-        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-          editName: 'AI Name',
-          editDocumentDate: null,
-          editExpiryDate: null,
-          editNotes: '',
-          editParties: [],
-          editTags: ['AI Tag'],
-          editVersionLabel: '',
-          editExtractedText: '',
-          versionId: null,
-          transientAi: {
-            appliedTransientName: 'AI Name',
-            preClassifyName: 'Original',
-            aiTransientTagPaths: ['AI Tag'],
-          },
-        });
-
-        docResponse = makeDoc({ name: 'Original' });
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        expect(guardComponent.editName()).toBe('AI Name');
-        expect(guardComponent.appliedTransientName()).toBe('AI Name');
-        expect(guardComponent.preClassifyName()).toBe('Original');
-        expect(guardComponent.aiTransientTagPaths()).toEqual(new Set(['AI Tag']));
-      });
-
-      it('does not set transient signals when saved state lacks transientAi', () => {
-        (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-          editName: 'Manual Edit',
-          editDocumentDate: null,
-          editExpiryDate: null,
-          editNotes: '',
-          editParties: [],
-          editTags: [],
-          editVersionLabel: '',
-          editExtractedText: '',
-          versionId: null,
-        });
-
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        expect(guardComponent.editName()).toBe('Manual Edit');
-        expect(guardComponent.appliedTransientName()).toBeNull();
-        expect(guardComponent.preClassifyName()).toBeNull();
-        expect(guardComponent.aiTransientTagPaths().size).toBe(0);
-      });
-    });
-
     describe('ngOnDestroy does not save when document is closed', () => {
       it('skips save when document has been removed from open list', () => {
         docResponse = makeDoc();
@@ -779,90 +657,35 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
       });
     });
 
-    describe('handleClassify preserves original name on re-classify', () => {
-      it('keeps the original preClassifyName when classify is run twice', () => {
-        docResponse = makeDoc({ name: 'Original' });
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.editName.set('Original');
-        guardComponent.preClassifyName.set(null);
-        guardComponent.appliedTransientName.set(null);
-
-        guardComponent.preClassifyName.set(guardComponent.preClassifyName() ?? guardComponent.editName());
-        expect(guardComponent.preClassifyName()).toBe('Original');
-
-        guardComponent.editName.set('AI Name 1');
-        guardComponent.appliedTransientName.set('AI Name 1');
-
-        guardComponent.preClassifyName.set(guardComponent.preClassifyName() ?? guardComponent.editName());
-        expect(guardComponent.preClassifyName()).toBe('Original');
-      });
-    });
-
-    describe('field-scoped classify and summarize', () => {
-      it('forwards the selected fields to classifyPreview', () => {
+    describe('classify and summarize enqueue async jobs', () => {
+      it('enqueues a single-document bulk classify with the selected fields and waits on the job', () => {
         docResponse = makeDoc({ name: 'Original' });
         setGuardDocumentId('doc-1');
         guardFixture.detectChanges();
 
         guardComponent.handleClassify({ fields: ['Tags'] });
 
-        expect(guardDocumentApi.classifyPreview).toHaveBeenCalledWith({
-          documentId: 'doc-1',
-          body: { fields: ['Tags'] },
+        expect(guardDocumentApi.bulkClassifyDocuments).toHaveBeenCalledWith({
+          body: { ids: ['doc-1'], fields: ['Tags'] },
         });
+        // The parent job is awaited via the processing hub (SignalR), not a synchronous endpoint.
+        expect(guardProcessingHub.waitForJob).toHaveBeenCalledWith('job-1');
+        // Busy flag stays set across the background run (waitForJob never resolves in this mock).
+        expect(guardComponent.classifyingPreview()).toBe(true);
       });
 
-      it('leaves editName untouched when Name is unchecked (null suggestedTitle)', () => {
+      it('enqueues a single-document bulk summarize and waits on the job', () => {
         docResponse = makeDoc({ name: 'Original' });
         setGuardDocumentId('doc-1');
         guardFixture.detectChanges();
 
-        guardComponent.editName.set('Original');
-        // Name unchecked => backend returns null suggestedTitle.
-        (guardDocumentApi.classifyPreview as ReturnType<typeof vi.fn>).mockReturnValue(
-          of({ suggestedTitle: null, summary: null, tags: [], parties: [] }));
-
-        guardComponent.handleClassify({ fields: ['Tags', 'Parties'] });
-        guardFixture.detectChanges();
-
-        expect(guardComponent.editName()).toBe('Original');
-      });
-
-      it('handleSummarize calls summarizeDocument and refreshes the document', () => {
-        docResponse = makeDoc({ name: 'Original' });
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        const before = guardComponent.refreshTrigger();
         guardComponent.handleSummarize();
-        guardFixture.detectChanges();
 
-        expect(guardDocumentApi.summarizeDocument).toHaveBeenCalledWith({
-          documentId: 'doc-1',
-          body: {},
+        expect(guardDocumentApi.bulkSummarizeDocuments).toHaveBeenCalledWith({
+          body: { ids: ['doc-1'] },
         });
-        expect(guardComponent.refreshTrigger()).toBeGreaterThan(before);
-      });
-    });
-
-    describe('handleSave clears transient state', () => {
-      it('clears all transient signals on save success', () => {
-        docResponse = makeDoc();
-        setGuardDocumentId('doc-1');
-        guardFixture.detectChanges();
-
-        guardComponent.preClassifyName.set('Original');
-        guardComponent.appliedTransientName.set('AI Name');
-        guardComponent.aiTransientTagPaths.set(new Set(['Tag']));
-
-        guardComponent.handleSave();
-        guardFixture.detectChanges();
-
-        expect(guardComponent.appliedTransientName()).toBeNull();
-        expect(guardComponent.preClassifyName()).toBeNull();
-        expect(guardComponent.aiTransientTagPaths().size).toBe(0);
+        expect(guardProcessingHub.waitForJob).toHaveBeenCalledWith('job-1');
+        expect(guardComponent.summarizing()).toBe(true);
       });
     });
 });

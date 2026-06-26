@@ -44,6 +44,14 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
             var aiApiKey = builder.Configuration["Ai:ApiKey"];
             if (!string.IsNullOrWhiteSpace(aiApiKey))
                 context.EnvironmentVariables["AI_API_KEY"] = aiApiKey;
+
+            // Optional page-1 image classification knobs. Unset -> WebApi falls back to AiOptions defaults.
+            var aiImageInput = builder.Configuration["Ai:ImageInput"];
+            if (!string.IsNullOrWhiteSpace(aiImageInput))
+                context.EnvironmentVariables["AI_IMAGE_INPUT"] = aiImageInput;
+            var aiImageRenderMaxEdge = builder.Configuration["Ai:ImageRenderMaxEdge"];
+            if (!string.IsNullOrWhiteSpace(aiImageRenderMaxEdge))
+                context.EnvironmentVariables["AI_IMAGE_RENDER_MAX_EDGE"] = aiImageRenderMaxEdge;
         }
     })
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })

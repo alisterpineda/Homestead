@@ -27,8 +27,11 @@ public class SummarizeDocumentHandler(
         // Track for the activity stream (matches PatchDocument); flushed by UnitOfWorkBehavior.
         audit.Track<DocumentSnapshot, Document>(document, "Document", document.Id);
 
+        // This summarize command is synchronous; never attach the page image (image-carrying classification
+        // must run on the background-job path, and this is the handler the slow-work architecture test
+        // explicitly allowlists). Stays text-only.
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, ClassificationScope.Summary, ct);
+            request.DocumentId, document.Name, ClassificationScope.Summary, ct, attachImage: false);
 
         // null = no provider / nothing to summarize; blank = the model produced no usable summary.
         // Either way it's a graceful no-op — never overwrite an existing summary with nothing (no undo).

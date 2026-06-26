@@ -9,4 +9,14 @@ public static class AiServiceExtensions
 
         return services;
     }
+
+    // The dedicated AI page-render path (renderer + cache service), mirroring AddThumbnails. Singletons:
+    // both are stateless over the file system, like the thumbnail generators.
+    public static IServiceCollection AddAiPageRendering(this IServiceCollection services)
+    {
+        services.AddSingleton<IDocumentPageRenderer, DocumentPageRenderer>();
+        services.AddSingleton<AiPageRenderService>();
+
+        return services;
+    }
 }

@@ -17,7 +17,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, finalize, Subscription } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, forkJoin, filter, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideFileText,
@@ -75,7 +75,6 @@ import { replace } from '@/shared/json-patch';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 import type { GetActivityResponse } from '@/api/generated/models/get-activity-response';
-import type { ClassifyPreviewResponse } from '@/api/generated/models/classify-preview-response';
 import type { DocumentSuggestionField } from '@/api/generated/models/document-suggestion-field';
 import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
@@ -396,18 +395,14 @@ import { toast } from '@spartan-ng/brain/sonner';
       <ng-template #infoContent>
         <div class="space-y-4">
           <!-- AI Suggestions summary -->
-          @if (totalSuggestionCount() > 0) {
+          @if (pendingSuggestionCount() > 0) {
             <div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
               <ng-icon hlm name="lucideSparkles" size="sm" class="text-muted-foreground" />
-              <span class="text-muted-foreground">AI suggestions ({{ totalSuggestionCount() }})</span>
+              <span class="text-muted-foreground">AI suggestions ({{ pendingSuggestionCount() }})</span>
               <span class="ml-auto flex items-center gap-1">
                 @if (pendingSuggestionCount() >= 2) {
                   <button hlmBtn variant="ghost" size="sm" (click)="approveAllSuggestions()">Approve all</button>
                   <button hlmBtn variant="ghost" size="sm" (click)="declineAllSuggestions()">Decline all</button>
-                }
-                @if (hasTransientSuggestions()) {
-                  <button hlmBtn variant="ghost" size="sm" (click)="applyAllTransient()">Apply all</button>
-                  <button hlmBtn variant="ghost" size="sm" (click)="dismissAllTransient()">Dismiss all</button>
                 }
               </span>
             </div>
@@ -417,7 +412,7 @@ import { toast } from '@spartan-ng/brain/sonner';
           <hlm-field>
             <label hlmFieldLabel for="doc-name">
               Name
-              @if (pendingNameSuggestion() || nameIsAiSuggested()) {
+              @if (pendingNameSuggestion()) {
                 <span hlmBadge class="ml-auto bg-ai/10 text-ai border-transparent dark:bg-ai/20">
                   <ng-icon hlm name="lucideSparkles" size="xs" />
                   AI Suggested
@@ -430,7 +425,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   hlmInputGroupInput
                   id="doc-name"
                   [value]="editName()"
-                  (input)="editName.set(asInputValue($event)); appliedTransientName.set(null)"
+                  (input)="editName.set(asInputValue($event))"
                   [hlmTooltip]="'Original: ' + (suggestion.originalValue ?? '(none)')"
                 />
                 <button hlmInputGroupButton size="icon-xs" (click)="approveSuggestion(suggestion.id)" aria-label="Approve name suggestion">
@@ -445,7 +440,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 hlmInput
                 id="doc-name"
                 [value]="editName()"
-                (input)="editName.set(asInputValue($event)); appliedTransientName.set(null)"
+                (input)="editName.set(asInputValue($event))"
               />
             }
           </hlm-field>
@@ -456,7 +451,6 @@ import { toast } from '@spartan-ng/brain/sonner';
             <app-party-input
               [value]="editParties()"
               [aiPendingParties]="aiPendingPartyIds()"
-              [aiTransientParties]="aiTransientPartyIds()"
               (valueChange)="onEditPartiesChanged($event)"
               (partyApproved)="approvePartyById($event)"
               (partyDeclined)="declinePartyById($event)"
@@ -470,7 +464,6 @@ import { toast } from '@spartan-ng/brain/sonner';
               [value]="editTags()"
               [initialColorMap]="tagColorMap()"
               [aiPendingTags]="aiPendingTagPaths()"
-              [aiTransientTags]="aiTransientTagPaths()"
               (valueChange)="onEditTagsChanged($event)"
               (tagApproved)="approveTagByPath($event)"
               (tagDeclined)="declineTagByPath($event)"
@@ -792,11 +785,10 @@ export class DocumentDetailPageComponent implements OnDestroy {
   activityLoading = signal(false);
   commentBody = signal('');
   commentSubmitting = signal(false);
-  transientClassification = signal<ClassifyPreviewResponse | null>(null);
+  // Busy flags for the Classify / Summarize menu items. Set true on enqueue and cleared when the async
+  // job reaches a terminal status (SignalR), so the buttons stay disabled across the whole background run.
   classifyingPreview = signal(false);
   summarizing = signal(false);
-  appliedTransientName = signal<string | null>(null);
-  preClassifyName = signal<string | null>(null);
 
   formatBytes = formatBytes;
 
@@ -963,9 +955,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
 
   private fileSub: Subscription | null = null;
   private versionDetailSub: Subscription | null = null;
-  private classifySub: Subscription | null = null;
-  private summarizeSub: Subscription | null = null;
-  private preserveTransientOnNextInit = false;
 
   private documentData = toSignal(
     combineLatest([toObservable(this.documentId), toObservable(this.refreshTrigger)]).pipe(
@@ -1008,13 +997,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (c) map[t.path] = c;
       }
     }
-    const tc = this.transientClassification();
-    if (tc?.tags) {
-      for (const t of tc.tags) {
-        const c = t.effectiveColor ?? t.color;
-        if (c) map[t.path] = c;
-      }
-    }
     return map;
   });
 
@@ -1053,9 +1035,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return new Set(suggestions.map(s => s.party!.id));
   });
 
-  aiTransientTagPaths = signal<Set<string>>(new Set());
-  aiTransientPartyIds = signal<Set<string>>(new Set());
-
   pendingTagPathToSuggestionId = computed(() => {
     const suggestions = this.pendingTagSuggestions();
     const map = new Map<string, string>();
@@ -1074,22 +1053,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return map;
   });
 
-  hasTransientSuggestions = computed(() =>
-    this.aiTransientTagPaths().size > 0 || this.aiTransientPartyIds().size > 0 || this.nameIsAiSuggested(),
-  );
-
-  nameIsAiSuggested = computed(() => {
-    const applied = this.appliedTransientName();
-    return applied !== null && this.editName() === applied;
-  });
-
-  totalSuggestionCount = computed(() =>
-    this.pendingSuggestionCount()
-    + this.aiTransientTagPaths().size
-    + this.aiTransientPartyIds().size
-    + (this.nameIsAiSuggested() ? 1 : 0),
-  );
-
   constructor() {
     // Save edit state when documentId changes (component reuse on sidebar navigation)
     // and initialize edit fields when a new document loads.
@@ -1101,7 +1064,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
           untracked(() => this.editStateService.saveState(prevDocId!, this.buildEditState()));
         }
         untracked(() => this.editStateService.setActiveHasChanges(prevDocId!, false));
-        untracked(() => this.classifySub?.unsubscribe());
       }
       prevDocId = id;
     });
@@ -1115,21 +1077,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (doc.id === this.initializedDocId) return;
         this.initializedDocId = doc.id;
 
-        let preservedTransient = false;
-        if (this.preserveTransientOnNextInit) {
-          this.preserveTransientOnNextInit = false;
-          preservedTransient = true;
-        } else {
-          this.clearTransientState();
-        }
-
-        // Capture transient party options (with names) before editParties is reset/restored,
-        // so the preserve block below can re-add them without depending on the non-persisted
-        // transientClassification signal.
-        const priorTransientPartyOptions = preservedTransient
-          ? untracked(() => this.editParties().filter(p => this.aiTransientPartyIds().has(p.id)))
-          : [];
-
         const saved = untracked(() => this.editStateService.getState(doc.id));
         if (saved) {
           this.editName.set(saved.editName);
@@ -1140,12 +1087,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editNotes.set(saved.editNotes ?? '');
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
-          if (saved.transientAi) {
-            this.appliedTransientName.set(saved.transientAi.appliedTransientName);
-            this.preClassifyName.set(saved.transientAi.preClassifyName);
-            this.aiTransientTagPaths.set(new Set(saved.transientAi.aiTransientTagPaths));
-            this.aiTransientPartyIds.set(new Set(saved.transientAi.aiTransientPartyIds));
-          }
           this.initializedVersionId = saved.versionId
             ?? untracked(() => this.activeVersion()?.id ?? null);
           untracked(() => this.editStateService.clearState(doc.id));
@@ -1157,40 +1098,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editExpiryDate.set(this.origExpiryDate());
           this.editNotes.set(this.origNotes());
           this.initializedVersionId = null;
-        }
-
-        if (preservedTransient) {
-          const transient = this.aiTransientTagPaths();
-          if (transient.size > 0) {
-            const serverPaths = new Set(this.editTags());
-            const stillTransient = [...transient].filter(p => !serverPaths.has(p));
-            if (stillTransient.length > 0) {
-              this.editTags.update(tags => [...tags, ...stillTransient]);
-            }
-            if (stillTransient.length < transient.size) {
-              this.aiTransientTagPaths.set(new Set(stillTransient));
-            }
-          }
-
-          const transientPartyIds = this.aiTransientPartyIds();
-          if (transientPartyIds.size > 0) {
-            const serverPartyIds = new Set((doc.parties ?? []).map(p => p.id));
-            const stillTransientIds = new Set(
-              [...transientPartyIds].filter(id => !serverPartyIds.has(id)),
-            );
-            const currentPartyIds = new Set(this.editParties().map(p => p.id));
-            const toAdd = priorTransientPartyOptions
-              .filter(p => stillTransientIds.has(p.id) && !currentPartyIds.has(p.id));
-            if (toAdd.length > 0) {
-              this.editParties.update(parties => [
-                ...parties,
-                ...toAdd.map(p => ({ id: p.id, name: p.name })),
-              ]);
-            }
-            if (stillTransientIds.size !== transientPartyIds.size) {
-              this.aiTransientPartyIds.set(stillTransientIds);
-            }
-          }
         }
       }
     });
@@ -1334,8 +1241,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
     this.fileSub?.unsubscribe();
     this.versionDetailSub?.unsubscribe();
-    this.classifySub?.unsubscribe();
-    this.summarizeSub?.unsubscribe();
     this.swapBlobUrl(null);
     this.hubSub.unsubscribe();
     this.pageHeaderService.clearTitle();
@@ -1472,76 +1377,51 @@ export class DocumentDetailPageComponent implements OnDestroy {
     });
   }
 
+  // Classify runs on the shared async job + SignalR path (image-carrying classification must run in the
+  // background, ~15–30s for the vision prefill). Enqueue a single-document bulk-classify, then wait for the
+  // parent job's terminal status and refresh so the server-persisted pending suggestions surface in the
+  // accept/decline UI — same result surface as upload auto-classify and bulk classify.
   handleClassify(options: { fields: DocumentSuggestionField[] }): void {
     const id = this.documentId();
     if (!id) return;
     this.classifyingPreview.set(true);
-    this.transientClassification.set(null);
-    this.appliedTransientName.set(null);
-    this.preClassifyName.set(this.preClassifyName() ?? this.editName());
-    this.classifySub?.unsubscribe();
 
-    // Bridge the (synchronous) classify request to a promise so a single toast
-    // tracks loading -> done, instead of dismissing the loading toast and
-    // flashing a separate success toast. finalize() settles the promise on
-    // error/unsubscribe too (handleMutationError swallows 4xx into a silent
-    // completion); rejecting after a resolve is a no-op. Omitting `error` from
-    // toast.promise means a rejection just dismisses the loading toast and
-    // leaves error toasting to handleMutationError / the interceptor.
-    let settle!: { resolve: (count: number) => void; reject: () => void };
-    const classified = new Promise<number>((resolve, reject) => {
-      settle = { resolve, reject };
-    });
-
-    this.classifySub = this.documentApi.classifyPreview({
-      documentId: id,
-      body: { fields: options.fields },
+    this.documentApi.bulkClassifyDocuments({
+      body: { ids: [id], fields: options.fields },
     }).pipe(
-      handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to classify document.'),
-      finalize(() => settle.reject()),
+      handleMutationError(this.errorHandler, this.classifyingPreview, 'Failed to start AI classification.'),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: (result) => {
-        this.classifyingPreview.set(false);
-        this.transientClassification.set(result);
-        if (result.suggestedTitle && this.editName() === this.preClassifyName()) {
-          this.editName.set(result.suggestedTitle);
-          this.appliedTransientName.set(result.suggestedTitle);
+      next: (r) => {
+        const parentJobId = r.jobIds[0];
+        if (!parentJobId) {
+          this.classifyingPreview.set(false);
+          return;
         }
-        let newTagCount = 0;
-        if (result.tags?.length) {
-          const currentPaths = new Set(this.editTags());
-          const newPaths = result.tags.filter(t => !currentPaths.has(t.path)).map(t => t.path);
-          newTagCount = newPaths.length;
-          if (newPaths.length > 0) {
-            this.editTags.update(tags => [...tags, ...newPaths]);
-            const existing = this.aiTransientTagPaths();
-            this.aiTransientTagPaths.set(new Set([...existing, ...newPaths]));
-          }
-        }
-        let newPartyCount = 0;
-        if (result.parties?.length) {
-          const currentIds = new Set(this.editParties().map(p => p.id));
-          const newParties = result.parties.filter(p => !currentIds.has(p.id));
-          newPartyCount = newParties.length;
-          if (newParties.length > 0) {
-            this.editParties.update(parties => [
-              ...parties,
-              ...newParties.map(p => ({ id: p.id, name: p.name })),
-            ]);
-            const existing = this.aiTransientPartyIds();
-            this.aiTransientPartyIds.set(new Set([...existing, ...newParties.map(p => p.id)]));
-          }
-        }
-        settle.resolve((result.suggestedTitle ? 1 : 0) + newTagCount + newPartyCount);
+        toast.promise(
+          this.processingHub.waitForJob(parentJobId)
+            .then(() => {
+              // This component is reused across /documents/:id navigation, and waitForJob is a bare promise
+              // that outlives a navigation. If the user moved to another document before the ~15-30s job
+              // finished, do nothing — re-seeding/refreshing here would clobber the now-current document's
+              // unsaved edits. The classified doc's pending suggestions are persisted and show on next visit.
+              if (this.documentId() !== id) return;
+              // Classify applies the AI name/tags/parties to the document server-side; re-seed the edit
+              // form from the refreshed server state (mirroring approve/decline) so the Name field and the
+              // tag/party inputs reflect the applied values rather than the stale pre-classify ones.
+              this.initializedDocId = null;
+              this.initializedVersionId = null;
+              this.refreshTrigger.update(v => v + 1);
+            })
+            .finally(() => this.classifyingPreview.set(false)),
+          {
+            loading: 'Classifying document...',
+            success: 'Classification complete. Review the suggestions below.',
+            error: (err: unknown) =>
+              `Classification failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+          },
+        );
       },
-    });
-
-    toast.promise(classified, {
-      loading: 'Classifying document...',
-      success: (count) =>
-        count > 0
-          ? `${count} suggestion${count === 1 ? '' : 's'} ready to review.`
-          : 'No new suggestions.',
     });
   }
 
@@ -1549,42 +1429,36 @@ export class DocumentDetailPageComponent implements OnDestroy {
     const id = this.documentId();
     if (!id) return;
     this.summarizing.set(true);
-    this.summarizeSub?.unsubscribe();
-    const toastId = toast.loading('Summarizing document...');
-    this.summarizeSub = this.documentApi.summarizeDocument({
-      documentId: id,
-      body: {},
+
+    this.documentApi.bulkSummarizeDocuments({
+      body: { ids: [id] },
     }).pipe(
-      handleMutationError(this.errorHandler, this.summarizing, 'Failed to summarize document.'),
-      finalize(() => toast.dismiss(toastId)),
+      handleMutationError(this.errorHandler, this.summarizing, 'Failed to start AI summarization.'),
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: (result) => {
-        this.summarizing.set(false);
-        // Refresh the document so the read-only summary block reflects the new summary.
-        this.refreshTrigger.update(v => v + 1);
-        toast.success(result.summary ? 'Summary updated.' : 'No summary was generated.');
+      next: (r) => {
+        const parentJobId = r.jobIds[0];
+        if (!parentJobId) {
+          this.summarizing.set(false);
+          return;
+        }
+        toast.promise(
+          this.processingHub.waitForJob(parentJobId)
+            .then(() => {
+              // See handleClassify: ignore a completion that lands after navigating to another document.
+              if (this.documentId() !== id) return;
+              this.refreshTrigger.update(v => v + 1);
+            })
+            .finally(() => this.summarizing.set(false)),
+          {
+            loading: 'Summarizing document...',
+            success: 'Summary updated.',
+            error: (err: unknown) =>
+              `Summarization failed: ${err instanceof Error ? err.message : 'An unknown error occurred.'}`,
+          },
+        );
       },
     });
-  }
-
-  applyAllTransient(): void {
-    this.clearTransientState();
-  }
-
-  dismissAllTransient(): void {
-    const transientPaths = this.aiTransientTagPaths();
-    if (transientPaths.size > 0) {
-      this.editTags.update(tags => tags.filter(t => !transientPaths.has(t)));
-    }
-    const transientPartyIds = this.aiTransientPartyIds();
-    if (transientPartyIds.size > 0) {
-      this.editParties.update(parties => parties.filter(p => !transientPartyIds.has(p.id)));
-    }
-    const pre = this.preClassifyName();
-    if (pre !== null) {
-      this.editName.set(pre);
-    }
-    this.clearTransientState();
   }
 
   approveTagByPath(path: string): void {
@@ -1606,16 +1480,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   onEditTagsChanged(newTags: string[]): void {
-    const newSet = new Set(newTags);
-    const removed = new Set(this.editTags().filter(t => !newSet.has(t)));
     this.editTags.set(newTags);
-    if (removed.size > 0) {
-      const transient = this.aiTransientTagPaths();
-      const updated = new Set([...transient].filter(t => !removed.has(t)));
-      if (updated.size !== transient.size) {
-        this.aiTransientTagPaths.set(updated);
-      }
-    }
   }
 
   approvePartyById(partyId: string): void {
@@ -1637,16 +1502,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
   }
 
   onEditPartiesChanged(newParties: PartyOption[]): void {
-    const newIds = new Set(newParties.map(p => p.id));
-    const removed = new Set(this.editParties().filter(p => !newIds.has(p.id)).map(p => p.id));
     this.editParties.set(newParties);
-    if (removed.size > 0) {
-      const transient = this.aiTransientPartyIds();
-      const updated = new Set([...transient].filter(id => !removed.has(id)));
-      if (updated.size !== transient.size) {
-        this.aiTransientPartyIds.set(updated);
-      }
-    }
   }
 
   approveSuggestion(suggestionId: string): void {
@@ -1656,7 +1512,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestion.'),
     ).subscribe({
       next: () => {
-        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1672,7 +1527,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestion.'),
     ).subscribe({
       next: () => {
-        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1688,7 +1542,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to approve suggestions.'),
     ).subscribe({
       next: () => {
-        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1704,7 +1557,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       handleMutationError(this.errorHandler, signal(false), 'Failed to decline suggestions.'),
     ).subscribe({
       next: () => {
-        this.preserveTransientOnNextInit = true;
         this.initializedDocId = null;
         this.initializedVersionId = null;
         this.refreshTrigger.update(v => v + 1);
@@ -1738,7 +1590,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.saving.set(false);
-        this.clearTransientState();
         const savedId = this.documentId();
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values
@@ -1799,22 +1650,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     return ops;
   }
 
-  private clearTransientState(): void {
-    this.transientClassification.set(null);
-    this.appliedTransientName.set(null);
-    this.preClassifyName.set(null);
-    this.aiTransientTagPaths.set(new Set());
-    this.aiTransientPartyIds.set(new Set());
-  }
-
   private buildEditState(): DocumentEditState {
-    const appliedName = this.appliedTransientName();
-    const preName = this.preClassifyName();
-    const transientPaths = this.aiTransientTagPaths();
-    const transientPartyIds = this.aiTransientPartyIds();
-    const hasTransient = appliedName !== null || preName !== null
-      || transientPaths.size > 0 || transientPartyIds.size > 0;
-
     return {
       editName: this.editName(),
       editDocumentDate: toIsoDateString(this.editDocumentDate()),
@@ -1825,14 +1661,6 @@ export class DocumentDetailPageComponent implements OnDestroy {
       editVersionLabel: this.editVersionLabel(),
       editExtractedText: this.editExtractedText(),
       versionId: this.versionId(),
-      ...(hasTransient ? {
-        transientAi: {
-          appliedTransientName: appliedName,
-          preClassifyName: preName,
-          aiTransientTagPaths: [...transientPaths],
-          aiTransientPartyIds: [...transientPartyIds],
-        },
-      } : {}),
     };
   }
 

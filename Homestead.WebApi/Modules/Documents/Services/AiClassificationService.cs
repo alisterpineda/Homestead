@@ -42,6 +42,7 @@ public class AiClassificationService(
     public async Task<ClassificationResult?> ClassifyAsync(
         string documentName,
         string? extractedText,
+        byte[]? pageImage,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
         ClassificationScope scope,
@@ -53,11 +54,14 @@ public class AiClassificationService(
             return null;
 
         // Scope-aware early return: skip the model call when nothing in scope could produce a useful result.
-        // A tag/party field is only useful if there is a catalog to match against; Name/Summary need text.
+        // A tag/party field is only useful if there is a catalog to match against; Name/Summary need a
+        // source signal — extracted text OR a page image (the image is the whole point when OCR is empty,
+        // e.g. a scanned PDF/photo, so a render alone is enough to justify the call).
         var hasText = !string.IsNullOrWhiteSpace(extractedText);
+        var hasImage = pageImage is not null;
         var tagsUseful = scope.HasFlag(ClassificationScope.Tags) && availableTags.Count > 0;
         var partiesUseful = scope.HasFlag(ClassificationScope.Parties) && availableParties.Count > 0;
-        if (!hasText && !tagsUseful && !partiesUseful)
+        if (!hasText && !hasImage && !tagsUseful && !partiesUseful)
             return null;
 
         // The factory owns and reuses the client (app-lifetime, connection-pooled), so do not dispose it here.
@@ -67,10 +71,22 @@ public class AiClassificationService(
         var budget = _options.ResolveMaxInputChars();
         var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope, budget);
 
+        // When a page render is supplied, send a multimodal user turn (text + PNG) so the model can read
+        // layout cues OCR flattens (letterheads, title blocks, columns). Otherwise keep the plain-text turn.
+        // The service stays "dumb": image in -> attach it; the scope gate that decides whether to render
+        // lives upstream in DocumentClassifier.
+        var userTurn = pageImage is not null
+            ? new ChatMessage(ChatRole.User, new List<AIContent>
+            {
+                new TextContent(userMessage),
+                new DataContent(pageImage, "image/png")
+            })
+            : new ChatMessage(ChatRole.User, userMessage);
+
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, systemPrompt),
-            new(ChatRole.User, userMessage)
+            userTurn
         };
 
         logger.LogTrace("Classification system prompt:\n{SystemPrompt}", systemPrompt);

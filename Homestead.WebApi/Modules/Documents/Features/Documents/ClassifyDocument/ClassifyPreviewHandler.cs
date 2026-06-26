@@ -20,8 +20,10 @@ public class ClassifyPreviewHandler(AppDbContext db, IDocumentClassifier classif
 
         var scope = ClassificationScopeExtensions.FromFields(request.Fields);
 
+        // Synchronous preview path: never attach the page image (the ~15-30s vision prefill must run only on
+        // the background-job path). This endpoint stays text-only.
         var output = await classifier.ClassifyAsync(
-            request.DocumentId, document.Name, scope, ct);
+            request.DocumentId, document.Name, scope, ct, attachImage: false);
 
         if (output is null)
         {

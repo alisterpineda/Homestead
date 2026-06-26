@@ -41,14 +41,30 @@ public sealed class FakeAiClassificationService : IAiClassificationService
         _release = null;
     }
 
+    // Captures the pageImage of the most recent classify call so image-augmentation tests can assert the
+    // classifier received non-null render bytes. Static for the same reason as the gate (scoped service,
+    // serial suite); reset via ResetLastCall in a finally when a test inspects it.
+    public static byte[]? LastPageImage { get; private set; }
+    public static ClassificationScope? LastScope { get; private set; }
+
+    public static void ResetLastCall()
+    {
+        LastPageImage = null;
+        LastScope = null;
+    }
+
     public async Task<ClassificationResult?> ClassifyAsync(
         string documentName,
         string? extractedText,
+        byte[]? pageImage,
         List<TagInfo> availableTags,
         List<PartyInfo> availableParties,
         ClassificationScope scope,
         CancellationToken ct)
     {
+        LastPageImage = pageImage;
+        LastScope = scope;
+
         // Gate ONLY the dedicated summarize path (the one the idle-in-transaction acceptance test arms
         // around). Both summarize entry points pass EXACTLY ClassificationScope.Summary, so an exact-equality
         // check excludes every other path that might resolve a provider during the armed window: classify/

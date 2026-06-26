@@ -45,4 +45,16 @@ public static class ClassificationScopeExtensions
 
         return scope;
     }
+
+    /// <summary>
+    /// Whether a classification run for this scope should attach the page-1 image. The visual cues an image
+    /// adds (letterhead, title block, layout) most help <see cref="ClassificationScope.Name"/>,
+    /// <see cref="ClassificationScope.Parties"/>, and <see cref="ClassificationScope.Summary"/>. Tags-only
+    /// (and None) skip it: the text + tag catalog dominate tag selection, and skipping spares the ~30s
+    /// vision prefill.
+    /// </summary>
+    public static bool ShouldAttachImage(this ClassificationScope scope) =>
+        scope.HasFlag(ClassificationScope.Name)
+        || scope.HasFlag(ClassificationScope.Parties)
+        || scope.HasFlag(ClassificationScope.Summary);
 }

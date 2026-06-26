@@ -4,9 +4,11 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Services;
 
@@ -19,16 +21,20 @@ public interface IDocumentClassifier
     /// <summary>
     /// Classifies an existing document by loading its latest version's extracted text. Pure — performs
     /// no document writes. Returns null when AI is not configured or the model produced nothing.
+    /// Attaches the page-1 image when <paramref name="attachImage"/> is true and the scope/config allow it;
+    /// synchronous callers (the interactive preview / summarize endpoints) pass <c>false</c> so the slow
+    /// vision prefill only ever runs on the background-job path.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct);
+        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct,
+        bool attachImage = true);
 
     /// <summary>
-    /// Classifies from an in-memory document name + extracted text — used during upload, before the
-    /// document exists. Pure — performs no document writes.
+    /// Classifies from an in-memory document name + extracted text (+ an optional pre-rendered page image)
+    /// — used during upload, before the document exists. Pure — performs no document writes.
     /// </summary>
     Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct);
+        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct);
 
     /// <summary>
     /// Applies a classification result to a tracked (or newly-constructed) document as a net diff —
@@ -48,10 +54,17 @@ public interface IDocumentClassifier
 public class DocumentClassifier(
     AppDbContext db,
     IAiClientFactory clientFactory,
-    IAiClassificationService classificationService) : IDocumentClassifier
+    IAiClassificationService classificationService,
+    AiPageRenderService aiPageRenderService,
+    IOptions<AiOptions> aiOptions,
+    IOptions<FileStorageOptions> storageOptions) : IDocumentClassifier
 {
+    private readonly AiOptions _aiOptions = aiOptions.Value;
+    private readonly FileStorageOptions _storageOptions = storageOptions.Value;
+
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct)
+        Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct,
+        bool attachImage = true)
     {
         // Gate on configured-ness before touching the database so an unconfigured AI integration
         // short-circuits without loading the latest version.
@@ -63,20 +76,34 @@ public class DocumentClassifier(
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefaultAsync(ct);
 
-        return await ClassifyCoreAsync(documentName, latestVersion?.ExtractedText, scope, ct);
+        // Attach the page-1 render when the caller allows it (synchronous endpoints opt out — image-carrying
+        // classification must stay on the background path), the image is enabled, and the scope benefits
+        // from it (Name/Parties/Summary). GetOrCreateAsync caches by FileHash, so re-classify reuses an
+        // upload-warmed render.
+        byte[]? pageImage = null;
+        if (attachImage && latestVersion is not null && _aiOptions.ImageInput && scope.ShouldAttachImage())
+        {
+            pageImage = await aiPageRenderService.GetOrCreateAsync(
+                latestVersion.FileHash,
+                latestVersion.GetPhysicalPath(_storageOptions.MediaPath),
+                latestVersion.ContentType,
+                ct);
+        }
+
+        return await ClassifyCoreAsync(documentName, latestVersion?.ExtractedText, pageImage, scope, ct);
     }
 
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
-        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct)
     {
         if (!clientFactory.IsConfigured)
             return null;
 
-        return await ClassifyCoreAsync(documentName, extractedText, scope, ct);
+        return await ClassifyCoreAsync(documentName, extractedText, pageImage, scope, ct);
     }
 
     private async Task<DocumentClassificationOutput?> ClassifyCoreAsync(
-        string documentName, string? extractedText, ClassificationScope scope, CancellationToken ct)
+        string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct)
     {
         // Only load a catalog when its field is in scope — mirrors the service omitting it from the prompt.
         var allTags = scope.HasFlag(ClassificationScope.Tags)
@@ -94,7 +121,7 @@ public class DocumentClassifier(
             : [];
 
         var result = await classificationService.ClassifyAsync(
-            documentName, extractedText, allTags, allParties, scope, ct);
+            documentName, extractedText, pageImage, allTags, allParties, scope, ct);
 
         if (result is null)
             return null;

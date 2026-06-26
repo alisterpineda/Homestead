@@ -58,7 +58,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
 
         var output = new DocumentClassificationOutput(
             new ClassificationResult([], [], "Generated summary", "Test Doc"), []);
-        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns(output);
 
         var response = await _sut.Handle(
@@ -81,7 +81,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         SeedDocument(summary: "existing summary");
 
-        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns((DocumentClassificationOutput?)null);
 
         var response = await _sut.Handle(
@@ -103,7 +103,7 @@ public class SummarizeDocumentHandlerTests : IDisposable
 
         var output = new DocumentClassificationOutput(
             new ClassificationResult([], [], "   ", "Test Doc"), []);
-        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct)
+        _classifier.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Summary, ct, Arg.Any<bool>())
             .Returns(output);
 
         var response = await _sut.Handle(

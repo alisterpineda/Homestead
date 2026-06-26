@@ -5,6 +5,7 @@ using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
+using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
@@ -17,9 +18,12 @@ namespace Homestead.WebApi.Modules.Documents.Processing;
 public class UploadDocumentJobHandler(
     AppDbContext db,
     IOptions<FileStorageOptions> storage,
+    IOptions<AiOptions> aiOptions,
     ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier,
     IDocumentClassifier classifier,
+    IAiClientFactory aiClientFactory,
+    AiPageRenderService aiPageRenderService,
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
     ISender sender) : IJobHandler
@@ -100,8 +104,17 @@ public class UploadDocumentJobHandler(
             {
                 if (await classifier.IsAutoClassifyEnabledAsync(ct))
                 {
+                    // Render page 1 here (scope is All -> ShouldAttachImage) and hand the bytes to the
+                    // in-memory classify overload, since the document/version doesn't exist yet. This also
+                    // warms the FileHash-keyed render cache for any later interactive re-classify. Gate on
+                    // AI being configured too: otherwise classify no-ops and the render is wasted CPU + a junk
+                    // cache file (IsAutoClassifyEnabledAsync only reads the setting, not configured-ness).
+                    byte[]? pageImage = aiClientFactory.IsConfigured && aiOptions.Value.ImageInput
+                        ? await aiPageRenderService.GetOrCreateAsync(fileHash, finalPath, payload.ContentType, ct)
+                        : null;
+
                     var output = await classifier.ClassifyAsync(
-                        documentName, extractedText, ClassificationScope.All, ct);
+                        documentName, extractedText, pageImage, ClassificationScope.All, ct);
                     if (output is not null)
                         classification = output.Classification;
                 }

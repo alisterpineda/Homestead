@@ -33,6 +33,33 @@ public class AiOptions
     public int ResolveMaxInputChars() =>
         MaxInputChars is int n && n >= MinInputChars ? n : DefaultMaxInputChars;
 
+    // Kill-switch for attaching a rendered page-1 image to the classify call (in addition to OCR text +
+    // catalogs). Defaults on; flip to false to fall back to text-only classification even when AI is
+    // configured (e.g. to skip the slow vision prefill, or while debugging).
+    public bool ImageInput { get; set; } = true;
+
+    // Long-edge pixel budget for the dedicated AI page render. The image cost flattens at ~1024px on the
+    // target endpoint and larger renders don't add tokens, so this is the only fidelity lever — exposed
+    // for future tuning once an eval set exists. Clamped by ResolveImageRenderMaxEdge.
+    public int ImageRenderMaxEdge { get; set; } = DefaultImageRenderMaxEdge;
+
+    // Default long-edge budget, applied when ImageRenderMaxEdge is below the floor (treated as "unset").
+    public const int DefaultImageRenderMaxEdge = 1024;
+
+    // Floor for a configured render edge. A value below this is treated as "unset" and falls back to the
+    // default, so a degenerate tiny value can never starve the render of legible detail.
+    public const int MinImageRenderMaxEdge = 256;
+
+    // Ceiling for a configured render edge. Bounds memory/decode cost; values above are clamped down.
+    public const int MaxImageRenderMaxEdge = 4096;
+
+    // Resolves the effective render long-edge: a sub-floor value falls back to the default, anything else
+    // is clamped to the ceiling. Mirrors ResolveMaxInputChars's "below floor => default" posture.
+    public int ResolveImageRenderMaxEdge() =>
+        ImageRenderMaxEdge < MinImageRenderMaxEdge
+            ? DefaultImageRenderMaxEdge
+            : Math.Min(ImageRenderMaxEdge, MaxImageRenderMaxEdge);
+
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Endpoint) && !string.IsNullOrWhiteSpace(Model);
 }

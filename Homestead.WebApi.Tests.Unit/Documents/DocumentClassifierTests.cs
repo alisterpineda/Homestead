@@ -4,9 +4,12 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Parties;
 using Homestead.WebApi.Domain.Settings;
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Modules.Documents.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
@@ -16,7 +19,11 @@ public class DocumentClassifierTests : IDisposable
     private readonly TestAppDbContext _db;
     private readonly IAiClientFactory _clientFactory;
     private readonly IAiClassificationService _classificationService;
+    private readonly AiPageRenderService _aiPageRenderService;
+    private readonly AiOptions _aiOptions = new();
     private readonly DocumentClassifier _sut;
+
+    private const string MediaPath = "/media";
 
     private readonly Guid _documentId = Guid.NewGuid();
 
@@ -26,7 +33,16 @@ public class DocumentClassifierTests : IDisposable
         _clientFactory = Substitute.For<IAiClientFactory>();
         _clientFactory.IsConfigured.Returns(true);
         _classificationService = Substitute.For<IAiClassificationService>();
-        _sut = new DocumentClassifier(_db, _clientFactory, _classificationService);
+        // GetOrCreateAsync is virtual; substitute it to assert the scope/config gate without real I/O.
+        _aiPageRenderService = Substitute.For<AiPageRenderService>(
+            Substitute.For<IDocumentPageRenderer>(),
+            Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }),
+            Options.Create(_aiOptions),
+            Substitute.For<ILogger<AiPageRenderService>>());
+        _sut = new DocumentClassifier(
+            _db, _clientFactory, _classificationService,
+            _aiPageRenderService, Options.Create(_aiOptions),
+            Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }));
     }
 
     public void Dispose()
@@ -48,7 +64,7 @@ public class DocumentClassifierTests : IDisposable
 
         _classificationService.ClassifyAsync(
             "Test Doc", "extracted text here",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([tagId], [], "A summary", "Better Title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
@@ -72,7 +88,7 @@ public class DocumentClassifierTests : IDisposable
 
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
     }
 
@@ -85,7 +101,7 @@ public class DocumentClassifierTests : IDisposable
 
         _classificationService.ClassifyAsync(
             "Test Doc", "some text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns((ClassificationResult?)null);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
@@ -132,7 +148,7 @@ public class DocumentClassifierTests : IDisposable
 
         _classificationService.ClassifyAsync(
             "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "summary", "title"));
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
@@ -140,7 +156,7 @@ public class DocumentClassifierTests : IDisposable
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
             "Test Doc", "latest text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
     }
 
     [Fact]
@@ -151,15 +167,15 @@ public class DocumentClassifierTests : IDisposable
 
         _classificationService.ClassifyAsync(
             "Upload Name", "in-memory text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
             .Returns(new ClassificationResult([], [], "summary", "title"));
 
-        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", ClassificationScope.All, ct);
+        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
 
         Assert.NotNull(result);
         await _classificationService.Received(1).ClassifyAsync(
             "Upload Name", "in-memory text",
-            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
+            Arg.Any<byte[]?>(), Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct);
     }
 
     [Fact]
@@ -168,12 +184,123 @@ public class DocumentClassifierTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         _clientFactory.IsConfigured.Returns(false);
 
-        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", ClassificationScope.All, ct);
+        var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
 
         Assert.Null(result);
         await _classificationService.DidNotReceive().ClassifyAsync(
-            Arg.Any<string>(), Arg.Any<string?>(),
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
+    }
+
+    // ---- Image-augmentation scope gate (ClassifyAsync overload a) ---------------------------------
+
+    [Fact]
+    public async Task ClassifyAsync_ById_ImageInputOn_ScopeAttachesImage_RendersAndForwardsBytes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("text");
+        var image = new byte[] { 1, 2, 3 };
+        _aiOptions.ImageInput = true;
+        _aiPageRenderService.GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), ct).Returns(image);
+        _classificationService.ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "s", "t"));
+
+        await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        // Render keyed by the latest version's FileHash + physical path + content type.
+        await _aiPageRenderService.Received(1).GetOrCreateAsync(
+            "abc123", Path.Combine(MediaPath, "test/file.pdf"), "application/pdf", ct);
+        // The rendered bytes reach the AI service.
+        await _classificationService.Received(1).ClassifyAsync(
+            "Test Doc", "text", image,
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_TagsOnlyScope_DoesNotRenderImage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("text");
+        _aiOptions.ImageInput = true;
+        _classificationService.ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "", "Test Doc"));
+
+        await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.Tags, ct);
+
+        // Tags-only does not satisfy ShouldAttachImage -> no render, null page image.
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _classificationService.Received(1).ClassifyAsync(
+            "Test Doc", "text", null,
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.Tags, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_ImageInputOff_DoesNotRenderImage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("text");
+        _aiOptions.ImageInput = false;
+        _classificationService.ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "s", "t"));
+
+        await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        // Kill-switch off -> no render even though the scope (All) would otherwise attach an image.
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _classificationService.Received(1).ClassifyAsync(
+            "Test Doc", "text", null,
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_ById_AttachImageFalse_DoesNotRenderImage_EvenWhenScopeWould()
+    {
+        // The synchronous preview/summarize endpoints pass attachImage:false so image-carrying classification
+        // never runs on a synchronous request, even though the scope (All) would otherwise attach one.
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocumentWithVersion("text");
+        _aiOptions.ImageInput = true;
+        _classificationService.ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "s", "t"));
+
+        await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct, attachImage: false);
+
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _classificationService.Received(1).ClassifyAsync(
+            "Test Doc", "text", null,
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
+    }
+
+    [Fact]
+    public async Task ClassifyAsync_InMemoryOverload_ForwardsProvidedPageImage_WithoutRendering()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var image = new byte[] { 9, 8, 7 };
+        _classificationService.ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
+            .Returns(new ClassificationResult([], [], "s", "t"));
+
+        await _sut.ClassifyAsync("Upload Name", "in-memory text", image, ClassificationScope.All, ct);
+
+        // The in-memory overload renders nothing; it forwards the caller-provided bytes verbatim.
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _classificationService.Received(1).ClassifyAsync(
+            "Upload Name", "in-memory text", image,
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
     }
 
     // ---- ApplyAsync (net-diff onto a tracked/new document; no save, no audit) ----------------------
