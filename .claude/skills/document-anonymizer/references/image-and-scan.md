@@ -26,7 +26,13 @@ information was withheld.
 
    Parse the TSV, find the words/runs that make up each PII string, and take the
    union of their boxes. Multi-word values span several rows — group by `line_num`
-   and match the sequence, not single words.
+   and match the sequence, not single words. Redact **every** occurrence, not just
+   the first: a value often repeats (an invoice number in the header *and* the
+   footer), and stopping at the first silently leaks the rest. Because matching is
+   substring-based and *every* hit is edited, a short/numeric key (`5.00`, `1007`)
+   can match inside an unrelated kept token (`$1,005.00`, `21007`) and over-edit it
+   — so prefer specific keys, and in step 4 eyeball the **kept** content too, not
+   only the scrubbed values (the text-based verify won't flag a corrupted keeper).
 
 2. **Cover** each PII box with a filled rectangle — white, or a sampled background
    color for a realistic look:
@@ -78,7 +84,7 @@ neighbors, so the script does two specific things (see the module docstring):
   with a mask the model still subtly redraws the "kept" pixels, and pasting the
   whole crop lets that drift land on the page (doubled/displaced neighbors).
 
-Two more box details that matter for fidelity:
+Three box details that matter for fidelity:
 
 - It locates the *tightest* box around each value: a label sharing the OCR line
   (`VIN: <value>`, `Phone: <value>`) must stay **out** of the mask, or it gets
@@ -89,6 +95,12 @@ Two more box details that matter for fidelity:
   replacement usually renders wider than the original even at the same character
   count, and a tight mask clips its end glyph(s); the headroom prevents that
   without overwriting a neighbor.
+- It also grows the box **vertically** (up and down by ~1/3 line-height), bounded
+  by the rows above/below. tesseract boxes hug the ink, and the model tends to
+  render the replacement a hair taller or shifted; a mask tight to the original
+  glyph height slices the top/bottom off into a clean **horizontal cut**. Keep the
+  vertical headroom modest — too much and the model floats the text off the
+  baseline instead of clipping it.
 
 Configure in a gitignored `<skill>/.env` file — the only config source (never
 committed; the committed skill knows only the key names):
