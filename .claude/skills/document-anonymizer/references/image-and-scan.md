@@ -63,19 +63,40 @@ channel** is what carries meaning; supply any separate text yourself.
 
 The local cover-and-reinsert path can't match an unknown scanned font — it pastes a
 clean replacement that may not blend in. When an Azure image-edit deployment is
-configured, `scripts/redact_image_ai.py` instead **inpaints** each PII region
-(crop → mask → edit → paste back), matching the surrounding font style and
-background far better. It is **off by default** and falls back to the local path
-when unconfigured.
+configured, `scripts/redact_image_ai.py` instead **inpaints** each PII region,
+matching the surrounding font style and background far better. It is **off by
+default** and falls back to the local path when unconfigured.
+
+How it crops matters — the naive version produced black bars and ghosted
+neighbors, so the script does two specific things (see the module docstring):
+
+- **Sends a square crop.** Image-edit models regenerate the whole canvas at a fixed
+  output size (often a square). Squishing a square result back into a thin text
+  strip vertically crushes every glyph (the black-bar artifact). Square in → square
+  out → a *uniform* scale back, no distortion.
+- **Composites back only the masked text box**, never the whole returned crop —
+  with a mask the model still subtly redraws the "kept" pixels, and pasting the
+  whole crop lets that drift land on the page (doubled/displaced neighbors).
+
+Two more box details that matter for fidelity:
+
+- It locates the *tightest* box around each value: a label sharing the OCR line
+  (`VIN: <value>`, `Phone: <value>`) must stay **out** of the mask, or it gets
+  regenerated away with the value.
+- It then widens that box into the surrounding whitespace — to the **right** for
+  left-aligned values, spilling **left** when the right is blocked (right-aligned
+  amounts, tight columns) — bounded by the flanking words on the row. A
+  replacement usually renders wider than the original even at the same character
+  count, and a tight mask clips its end glyph(s); the headroom prevents that
+  without overwriting a neighbor.
 
 Configure in a gitignored `<skill>/.env` file — the only config source (never
 committed; the committed skill knows only the key names):
 
 ```ini
-ANON_AZURE_IMAGE_ENDPOINT=https://<resource>.openai.azure.com
+ANON_AZURE_IMAGE_ENDPOINT=https://<resource>.services.ai.azure.com
 ANON_AZURE_IMAGE_KEY=<resource key>
 ANON_AZURE_IMAGE_DEPLOYMENT=<image-edit deployment, e.g. gpt-image-1>
-# ANON_AZURE_IMAGE_APIVERSION=2025-04-01-preview   # optional
 ```
 
 Then `pip install openai pillow` and run
