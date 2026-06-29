@@ -16,6 +16,13 @@ Homestead.WebApi/wwwroot/
 # never committed. The manifest + ref + script are tracked; the downloaded models are not.
 **/*.traineddata
 
+# Python (skill scripts + tooling)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv-anon/
+
 .local/
 
 # Local dev document storage (provisioned by the Aspire AppHost; see AppHost.cs)
@@ -25,6 +32,9 @@ Homestead.WebApi/wwwroot/
 .claude/settings.local.json
 .claude/skills/*-workspace/
 .claude/scheduled_tasks.lock
+
+# document-anonymizer: optional Azure image-edit config (endpoint/key) — never commit
+.claude/skills/document-anonymizer/.env
 
 # Playwright MCP (Claude Code self-QA)
 .playwright-mcp/
