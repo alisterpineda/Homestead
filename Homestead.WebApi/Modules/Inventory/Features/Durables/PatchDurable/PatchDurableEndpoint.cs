@@ -22,6 +22,7 @@ public static class PatchDurableEndpoint
         .WithName("PatchDurable")
         .Accepts<JsonPatchDocument<PatchDurableModel>>("application/json-patch+json")
         .Produces<DurableResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }

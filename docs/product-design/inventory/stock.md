@@ -133,6 +133,7 @@ One narrow exception: a rare **uniqueness-collision** race — an inflow landing
 - A consume or transfer may not exceed the quantity on-hand at the source location — over-consume/over-transfer is rejected (with the `>= 0` constraint as the last-resort backstop).
 - Movement `Quantity` is a positive magnitude; direction comes from the location fields, never from a signed quantity.
 - `UnitCost` and `UnitCostCurrencyId` are set together or not at all; the currency references the seeded, read-only currency set (see [overview.md](overview.md#every-amount-carries-its-currency)).
+- A receive/transfer/convert-in **destination** must be a **live** container — stock moves out of a `Sold`/`Discarded`/`Archived` container but never into one (the complement of the sealing gate; see [locations.md](locations.md#holder-emptiness-and-terminal-status)). Sources stay existence-only. An *adjust* that **lowers** the count is a source too — stranded stock can still be reconciled **out** of a terminal container — but an *adjust* that **raises** it is an inflow and is rejected into a terminal container like any other destination.
 
 ## Transfers
 

@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
@@ -12,7 +13,7 @@ public class GetDurableHandler(AppDbContext db, IItemLocationResolver locationRe
     {
         var response = await db.Items
             .AsNoTracking()
-            .Where(i => i.Id == request.Id)
+            .Where(i => i.Id == request.Id && i.Fungibility == Fungibility.NonFungible)
             .Select(DurableResponseMapper.Projection)
             .FirstOrDefaultAsync(ct);
 

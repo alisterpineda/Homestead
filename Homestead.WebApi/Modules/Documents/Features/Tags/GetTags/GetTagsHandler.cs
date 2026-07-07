@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Search;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +15,10 @@ public class GetTagsHandler(AppDbContext db)
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var searchPattern = $"%{request.Search.Trim()}%";
+            var searchPattern = $"%{LikeEscaper.Escape(request.Search.Trim())}%";
             query = query.Where(t =>
-                EF.Functions.ILike(t.Name, searchPattern) ||
-                EF.Functions.ILike(t.Path, searchPattern));
+                EF.Functions.ILike(t.Name, searchPattern, LikeEscaper.EscapeChar) ||
+                EF.Functions.ILike(t.Path, searchPattern, LikeEscaper.EscapeChar));
         }
         else if (!string.IsNullOrWhiteSpace(request.ParentPath))
         {

@@ -370,6 +370,39 @@ public class OverviewEndpointTests : IntegrationTestBase
         Assert.DoesNotContain(durables[1], ids);
     }
 
+    // B5: recency is derived from the append-only movement ledger, so a consumable consumed to zero
+    // (its stock entry purged) keeps its bump instead of dropping back to its stale metadata time.
+    [Fact]
+    public async Task Overview_RecentlyUpdated_EmptiedConsumableStillRanksAboveStaleItem()
+    {
+        var client = await CreateAdminClientAsync();
+        var areaId = await CreateAreaAsync(client, "Garage");
+
+        // Oldest metadata: the consumable is created first.
+        var screws = await CreateConsumableAsync(client, "Wood screws", "pcs");
+
+        // A stale durable created AFTER the consumable's metadata, never touched again. If recency fell
+        // back to the consumable's Item.UpdatedAt (what happens when its purged entry leaves no
+        // StockEntry timestamp) the consumable would rank BELOW this item.
+        var stale = await CreateDurableAsync(client, new { name = "Stale widget" });
+
+        // Newest activity is on the consumable: receive then consume to zero, which DELETES the entry.
+        await ReceiveAsync(client, screws.Id, areaId, 3m);
+        var consumeResp = await client.PostAsJsonAsync(
+            $"/api/v1/inventory/consumables/{screws.Id}/consume", new { areaId, quantity = 3m }, CT);
+        Assert.Equal(HttpStatusCode.OK, consumeResp.StatusCode);
+
+        var overview = await GetOverviewAsync(client);
+
+        var ids = overview.RecentlyUpdated.Select(r => r.Durable?.Id ?? r.Consumable?.Id).ToList();
+        var screwsIndex = ids.IndexOf(screws.Id);
+        var staleIndex = ids.IndexOf(stale.Id);
+        Assert.True(screwsIndex >= 0, "Emptied consumable must still appear in the recency strip.");
+        Assert.True(staleIndex >= 0, "Stale item must appear in the recency strip.");
+        Assert.True(screwsIndex < staleIndex,
+            "Emptied consumable's ledger activity must rank it above the stale, untouched item.");
+    }
+
     [Fact]
     public async Task Overview_Unauthenticated_Returns401()
     {

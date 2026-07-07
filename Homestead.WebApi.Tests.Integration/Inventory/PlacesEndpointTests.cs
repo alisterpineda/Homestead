@@ -60,6 +60,17 @@ public class PlacesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
     }
 
+    private static async Task LendAsync(HttpClient client, Guid durableId, string lentTo)
+    {
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{durableId}",
+            new object[]
+            {
+                new { op = "replace", path = "/status", value = (object)"Lent" },
+                new { op = "replace", path = "/lentTo", value = (object)lentTo },
+            });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
     // ----- Tests -----
 
     [Fact]
@@ -145,6 +156,41 @@ public class PlacesEndpointTests : IntegrationTestBase
         Assert.Equal(10m, consumableRow.LocalQuantity);
         Assert.Equal(15m, consumableRow.Consumable.TotalOnHand);
         Assert.Equal(2, consumableRow.Consumable.StockLocations!.Count);
+    }
+
+    // B10: a container scope's scoped counts are DIRECT (its own contents), not the rolled subtree —
+    // and lent includes a child container that is itself Lent (the client-side recompute missed it).
+    [Fact]
+    public async Task Contents_ContainerScope_ScopedCountsAreDirect_IncludingLentChildContainer()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
+
+        // A direct low-stock consumable in the chest.
+        var lowGlue = await CreateConsumableAsync(client, "Glue", "tubes", threshold: 5m);
+        await ReceiveAsync(client, lowGlue.Id, areaId: null, 2m, containerItemId: chest.Id);
+
+        // A direct lent durable in the chest.
+        var lentDrill = await CreateDurableAsync(client, new { name = "Drill", parentItemId = chest.Id });
+        await LendAsync(client, lentDrill.Id, "Dave");
+
+        // A direct child CONTAINER that is itself Lent — counted server-side, missed by the old
+        // client-side `items.filter` (child containers render as PlaceContainerSummary, not items).
+        var lentBin = await CreateDurableAsync(client,
+            new { name = "Lent bin", parentItemId = chest.Id, durableKind = "Container" });
+        await LendAsync(client, lentBin.Id, "Sam");
+
+        // A DEEPER low consumable nested one level down must NOT count — direct semantics, not subtree.
+        var deepGlue = await CreateConsumableAsync(client, "Deep glue", "tubes", threshold: 5m);
+        await ReceiveAsync(client, deepGlue.Id, areaId: null, 1m, containerItemId: lentBin.Id);
+
+        var contents = await GetContentsAsync(client, $"containerItemId={chest.Id}");
+
+        // Direct low stock: only the glue directly in the chest (the deeper one is excluded).
+        Assert.Equal(1, contents.ScopedLowStockCount);
+        // Direct lent: the drill + the child bin that is itself Lent = 2.
+        Assert.Equal(2, contents.ScopedLentCount);
     }
 
     [Fact]

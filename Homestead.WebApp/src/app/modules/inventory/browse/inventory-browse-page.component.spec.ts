@@ -343,13 +343,14 @@ describe('InventoryBrowsePageComponent', () => {
     expect(current?.textContent?.trim()).toBe('Bedroom');
   });
 
-  it('renders container-scoped low-stock and lent alerts count-only (no links) using DIRECT counts', async () => {
-    // Direct children: one low consumable + two lent durables (one Active durable is not counted). Both
-    // alerts fold into needs-attention and both render count-only — the items list can't scope to a
-    // container (Browse owns containment), so the matching items already appear in the contents table
-    // below. Per the product-design doc a container scopes its panels by its DIRECT contents, so lent
-    // is counted from the direct durable rows — NOT from the backend's rolled `scopedLentCount` (set
-    // here to a deliberately-wrong subtree total that must be ignored).
+  it('renders container-scoped low-stock and lent alerts count-only (no links) using the backend DIRECT counts', async () => {
+    // B10: for a container scope the backend computes DIRECT counts server-side (its own contents, not
+    // the rolled subtree), and the component displays scopedLowStockCount/scopedLentCount verbatim
+    // rather than recomputing from the rows. Proven here by a lent CHILD CONTAINER that the old
+    // `items.filter` recompute could not see (child containers render as container summaries, not
+    // items): the backend lent count (3) exceeds the two lent durables in `items`. Both alerts render
+    // count-only — the items list can't scope to a container (Browse owns containment), so the matching
+    // rows already appear in the contents table below.
     placeApi.contents = {
       ...GARAGE_CONTENTS,
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
@@ -357,7 +358,11 @@ describe('InventoryBrowsePageComponent', () => {
         id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
         durableKind: 'Container', path: [], createdAt: '', updatedAt: '',
       },
-      scopedLentCount: 99,
+      scopedLowStockCount: 1,
+      scopedLentCount: 3, // 2 lent durables below + 1 lent child container the row recompute couldn't see
+      containers: [
+        { id: 'bin', name: 'Lent bin', status: 'Lent', itemCount: 0, lowStockCount: 0, previewNames: [] },
+      ],
       items: [
         { id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
         { id: 'saw', name: 'Saw', fungibility: 'NonFungible', status: 'Lent', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
@@ -376,9 +381,9 @@ describe('InventoryBrowsePageComponent', () => {
     const content = text(harness);
     expect(content).toContain('Low consumables stored here');
     expect(content).toContain('Items lent from here');
-    // The collapsed summary uses the DIRECT lent count (2), never the rolled subtree total (99).
-    expect(content).toContain('2 lent');
-    expect(content).not.toContain('99');
+    // Displays the backend's authoritative DIRECT count (3), not the two lent rows a client recompute
+    // would see — the lent child container is included.
+    expect(content).toContain('3 lent');
     // No list deep-links from a container drill — both alerts are count-only here.
     expect(hrefs(harness).some(h => h.includes('container=chest'))).toBe(false);
     expect(hrefs(harness)).not.toContain('/inventory/items?lent=true');

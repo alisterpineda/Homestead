@@ -284,6 +284,27 @@ public class SearchEndpointTests : IntegrationTestBase
         Assert.Null(ampleHit.Badge);
     }
 
+    // ----- ILIKE wildcard escaping (B4) -----
+
+    [Fact]
+    public async Task Search_EscapesLikeWildcard_MatchesLiteralPercentOnly()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // The "%" lives in a non-fuzzy field (Unit) and the names are dissimilar to the query, so the
+        // Name-only word_similarity fallback stays out of it and this isolates the ILIKE path. Pre-fix,
+        // the unescaped "%" widened the pattern to "%50%%" and matched the "500" unit too; escaped, "50%"
+        // is a literal substring that matches only the "50%" unit.
+        var literal = await CreateConsumableAsync(client, new { name = "Alpha tape", unit = "50%" });
+        var other = await CreateConsumableAsync(client, new { name = "Beta tape", unit = "500" });
+
+        var group = Inventory(await SearchAsync(client, "50%"));
+
+        Assert.NotNull(group);
+        Assert.Contains(group!.Results, h => h.Id == literal.Id.ToString());
+        Assert.DoesNotContain(group.Results, h => h.Id == other.Id.ToString());
+    }
+
     // ----- Authorization -----
 
     [Fact]

@@ -1,3 +1,4 @@
+using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Domain.Documents;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,14 +21,14 @@ internal static class DocumentSearchPredicate
     public static IQueryable<Document> ApplyTextSearch(
         IQueryable<Document> query, string search, string? tsQueryString)
     {
-        var namePattern = $"%{search.Replace("\"", string.Empty)}%";
+        var namePattern = $"%{LikeEscaper.Escape(search.Replace("\"", string.Empty))}%";
         var hasTs = tsQueryString is not null;
         var tsq = tsQueryString ?? "";
         return query.Where(d =>
-            EF.Functions.ILike(d.Name, namePattern)
-            || d.Versions.Any(v => v.ExtractedText != null && EF.Functions.ILike(v.ExtractedText, namePattern))
-            || d.DocumentTags.Any(dt => EF.Functions.ILike(dt.Tag.Name, namePattern))
-            || d.DocumentParties.Any(dp => EF.Functions.ILike(dp.Party.Name, namePattern))
+            EF.Functions.ILike(d.Name, namePattern, LikeEscaper.EscapeChar)
+            || d.Versions.Any(v => v.ExtractedText != null && EF.Functions.ILike(v.ExtractedText, namePattern, LikeEscaper.EscapeChar))
+            || d.DocumentTags.Any(dt => EF.Functions.ILike(dt.Tag.Name, namePattern, LikeEscaper.EscapeChar))
+            || d.DocumentParties.Any(dp => EF.Functions.ILike(dp.Party.Name, namePattern, LikeEscaper.EscapeChar))
             || (hasTs && d.SearchVector != null
                 && d.SearchVector.Matches(EF.Functions.ToTsQuery(TsLanguage, tsq))));
     }

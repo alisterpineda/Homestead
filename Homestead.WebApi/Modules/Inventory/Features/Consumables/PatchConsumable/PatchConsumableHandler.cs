@@ -48,6 +48,10 @@ public class PatchConsumableHandler(
             throw new BusinessRuleException("Unit must be 32 characters or fewer.");
         if (model.RestockThreshold is < 0m)
             throw new BusinessRuleException("Restock threshold must be zero or positive.");
+        // Also the B2 guard for consumables: JsonPatch can bind an out-of-range integer to the
+        // enum-typed Status (allowIntegerValues defaults true), but this Active/Archived allowlist
+        // already rejects any undefined value before it can persist and re-serialize as a JSON number
+        // — no separate Enum.IsDefined check needed here (unlike PatchDurable, which has no allowlist).
         if (!FungibleStatuses.Contains(model.Status))
             throw new BusinessRuleException("A consumable can only be Active or Archived.");
 

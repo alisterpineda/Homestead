@@ -14,6 +14,7 @@ public static class CreateDurableEndpoint
         })
         .WithName("CreateDurable")
         .Produces<DurableResponse>(StatusCodes.Status201Created)
+        .Produces(StatusCodes.Status400BadRequest)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

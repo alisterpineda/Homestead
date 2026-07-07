@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -841,5 +842,164 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         var resp = await ReceiveAsync(client, consumable.Id, new { areaId, quantity = 1m, note = longNote });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ----- B1: a terminal container cannot be a stock destination; sources still work (escape hatch) -----
+
+    [Fact]
+    public async Task Receive_IntoArchivedContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        // Archiving the empty container is allowed; receiving stock into it is not.
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{bin.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        var consumable = await CreateConsumableAsync(client);
+
+        var resp = await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 5m });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Transfer_ToTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{bin.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { areaId = garageId, quantity = 10m });
+
+        var resp = await TransferAsync(client, consumable.Id,
+            new { fromAreaId = garageId, toContainerItemId = bin.Id, quantity = 3m });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // The API can't seal a container that holds stock, so strand it directly — this is the state the
+    // source escape hatch (and the adjust-down reconcile) exist for.
+    private async Task ArchiveContainerDirectAsync(Guid containerId)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var container = await db.Items.FirstAsync(i => i.Id == containerId, CT);
+        container.Status = ItemStatus.Archived;
+        await db.SaveChangesAsync(CT);
+    }
+
+    [Fact]
+    public async Task Consume_FromTerminalContainer_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 5m });
+
+        // Consuming stock OUT of the now-terminal container must still work.
+        await ArchiveContainerDirectAsync(bin.Id);
+
+        var resp = await ConsumeAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 2m });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Adjust_UpIntoTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 5m });
+        await ArchiveContainerDirectAsync(bin.Id);
+
+        // Adjusting UP (5 -> 10) is an inflow into a terminal container — blocked like a receive.
+        var resp = await AdjustAsync(client, consumable.Id, new { containerItemId = bin.Id, newQuantity = 10m });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Adjust_DownInTerminalContainer_Succeeds()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 5m });
+        await ArchiveContainerDirectAsync(bin.Id);
+
+        // Adjusting DOWN (5 -> 2) reconciles stranded stock out — the escape hatch stays open.
+        var resp = await AdjustAsync(client, consumable.Id, new { containerItemId = bin.Id, newQuantity = 2m });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    // ----- B8: ledger paging is stable across same-instant rows -----
+
+    private static async Task<PaginatedResult<StockMovementItem>> GetMovementsPageAsync(
+        HttpClient client, Guid id, int page, int pageSize)
+    {
+        var resp = await client.GetAsync(
+            $"/api/v1/inventory/consumables/{id}/movements?page={page}&pageSize={pageSize}", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<PaginatedResult<StockMovementItem>>(CT))!;
+    }
+
+    [Fact]
+    public async Task GetMovements_SameInstantRows_PageWithoutDuplicateOrSkip()
+    {
+        var client = await CreateAdminClientAsync();
+        var consumable = await CreateConsumableAsync(client);
+
+        // The API stamps its own UtcNow, so it can't produce a tie. Insert three movements that share
+        // the exact same OccurredAt AND CreatedAt directly, so only the Id tiebreaker separates them;
+        // without it, offset paging over the identical sort keys can repeat or skip a row at the boundary.
+        var instant = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        List<Guid> expectedOrder;
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (var id in ids)
+            {
+                db.StockMovements.Add(new StockMovement
+                {
+                    Id = id,
+                    ItemId = consumable.Id,
+                    Kind = MovementKind.Flow,
+                    Quantity = 1m,
+                    OccurredAt = instant,
+                    CreatedAt = instant,
+                });
+            }
+            await db.SaveChangesAsync(CT);
+
+            // The order the handler MUST produce, computed by the database with the same tiebreaker —
+            // so the reference is Postgres's uuid ordering, not .NET's (different) Guid ordering. With
+            // all three rows tied on OccurredAt+CreatedAt, this is a total order by Id descending.
+            expectedOrder = await db.StockMovements.AsNoTracking()
+                .Where(m => m.ItemId == consumable.Id)
+                .OrderByDescending(m => m.OccurredAt)
+                .ThenByDescending(m => m.CreatedAt)
+                .ThenByDescending(m => m.Id)
+                .Select(m => m.Id)
+                .ToListAsync(CT);
+        }
+
+        var page1 = await GetMovementsPageAsync(client, consumable.Id, page: 1, pageSize: 2);
+        var page2 = await GetMovementsPageAsync(client, consumable.Id, page: 2, pageSize: 2);
+
+        Assert.Equal(3, page1.TotalCount);
+        var seen = page1.Items.Concat(page2.Items).Select(m => m.Id).ToList();
+        // Exact sequence, not just set membership: without the .ThenByDescending(m => m.Id) tiebreaker
+        // the tied rows come back in an unspecified scan order (≠ Id-descending for random Guids), so
+        // this equality — and thus the no-duplicate/no-skip partition across the page boundary — only
+        // holds once the tiebreaker makes the order total and stable.
+        Assert.Equal(expectedOrder, seen);
     }
 }

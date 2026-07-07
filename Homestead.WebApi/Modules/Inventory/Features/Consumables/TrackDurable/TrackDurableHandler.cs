@@ -24,10 +24,21 @@ public class TrackDurableHandler(
         var body = request.Body;
         var now = DateTimeOffset.UtcNow;
 
+        // The source container also becomes the new item's parent, so it must be live. ConvertOutAsync
+        // validates the source only for existence + container-kind (a terminal source is allowed so
+        // stranded stock can still be carved out) — it never proved liveness — so gate the parent here:
+        // things move OUT of a terminal holder but never INTO one (the complement of the sealing gate).
+        if (body.ContainerItemId is { } containerId)
+        {
+            var container = await db.Items.AsNoTracking()
+                .FirstOrDefaultAsync(i => i.Id == containerId, ct);
+            if (container is not null && container.Status.IsTerminal())
+                throw new BusinessRuleException("ContainerItemId must reference a live container.");
+        }
+
         // The new item carries a client-side Guid so its id is known before insert — the conversion
         // movement's RelatedItemId can point at it within the same transaction. The source location
-        // becomes the item's location; ConvertOutAsync's location validation proves a container is
-        // live, so no separate container check is needed here.
+        // becomes the item's location.
         var item = new Item
         {
             Id = Guid.NewGuid(),

@@ -49,6 +49,14 @@ public class PatchDurableHandler(
 
         request.PatchDocument.ApplyOrThrow(model);
 
+        // JsonPatch binds arbitrary integers to the enum-typed fields (allowIntegerValues defaults
+        // true), so an out-of-range Status/DurableKind would persist via HasConversion<string>() and
+        // later re-serialize as a JSON number, breaking the TS string-union types. Reject them here.
+        if (!Enum.IsDefined(model.Status))
+            throw new BusinessRuleException("Status is not a valid item status.");
+        if (model.DurableKind is { } patchedKind && !Enum.IsDefined(patchedKind))
+            throw new BusinessRuleException("DurableKind is not a valid value.");
+
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");
         if (model.Name.Length > 256)
@@ -118,6 +126,11 @@ public class PatchDurableHandler(
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
             if (parent.Fungibility != Fungibility.NonFungible || !parent.DurableKind.IsHolder())
                 throw new BusinessRuleException("ParentItemId must reference a container or assembly item.");
+            // Things move OUT of a terminal holder but never INTO one — unconditional on the moved
+            // item's own status (block universally). A patch that both re-parents and goes terminal
+            // already freezes location above, so this only guards a live-item re-parent.
+            if (parent.Status.IsTerminal())
+                throw new BusinessRuleException("ParentItemId must reference a live container or assembly.");
 
             // Cycle: an item cannot be placed inside itself or inside any of its own descendants.
             if (newParentId == item.Id)

@@ -34,7 +34,7 @@ public class StockService(
     {
         var item = await LoadFungibleItemAsync(itemId, ct);
         RequirePositive(request.Quantity);
-        await ValidateLocationAsync(request.To, ct);
+        await ValidateLocationAsync(request.To, ct, isDestination: true);
         await ValidateUnitCostAsync(request.UnitCost, request.UnitCostCurrencyId, ct);
         var occurredAt = ResolveOccurredAt(request.OccurredAt);
 
@@ -62,7 +62,7 @@ public class StockService(
         var item = await LoadFungibleItemAsync(itemId, ct);
         RequirePositive(request.Quantity);
         await ValidateLocationAsync(request.From, ct);
-        await ValidateLocationAsync(request.To, ct);
+        await ValidateLocationAsync(request.To, ct, isDestination: true);
         if (SameLocation(request.From, request.To))
             throw new BusinessRuleException("Transfer source and destination must differ.");
         var occurredAt = ResolveOccurredAt(request.OccurredAt);
@@ -83,6 +83,12 @@ public class StockService(
         await ValidateLocationAsync(request.Location, ct);
         var occurredAt = ResolveOccurredAt(request.OccurredAt);
 
+        // Adjust is a source — you may recount stranded stock DOWN, out of a terminal container — but an
+        // adjust that RAISES the count is an inflow, and nothing may be added INTO a terminal container
+        // (B1). The container's status doesn't change during the command, so resolve it once here; the
+        // per-attempt delta sign decides whether it applies (and the sign can flip across retries).
+        var locationIsTerminalContainer = await IsTerminalContainerAsync(request.Location, ct);
+
         // An adjustment is an authoritative recount: the new value is set absolutely, not as a delta.
         // The write is guarded on the value we read and retried on a concurrent change, so the recorded
         // Adjustment magnitude always matches the change actually applied and a concurrent inflow can't be
@@ -100,6 +106,11 @@ public class StockService(
             // with the module's net-zero-writes-nothing stance).
             if (delta == 0m)
                 return;
+
+            // Adjusting UP inside a terminal container is an inflow — blocked like a receive/transfer-in.
+            // Adjusting DOWN stays allowed (the reconcile-stranded-stock-out escape hatch).
+            if (delta > 0m && locationIsTerminalContainer)
+                throw new BusinessRuleException("Cannot add stock into a Sold/Discarded/Archived container.");
 
             if (entry is null)
             {
@@ -168,7 +179,7 @@ public class StockService(
     public async Task ConvertInAsync(Guid itemId, StockConvertInRequest request, CancellationToken ct)
     {
         var item = await LoadConvertibleItemAsync(itemId, ct);
-        await ValidateLocationAsync(request.To, ct);
+        await ValidateLocationAsync(request.To, ct, isDestination: true);
         if (request.RelatedItemIds.Count == 0)
             throw new BusinessRuleException("At least one item must be selected to collapse.");
         var occurredAt = ResolveOccurredAt(request.OccurredAt);
@@ -343,7 +354,10 @@ public class StockService(
         return item;
     }
 
-    private async Task ValidateLocationAsync(StockLocation location, CancellationToken ct)
+    // Sources are existence-only (so stranded stock can still be reconciled out of a terminal
+    // container); destinations must additionally be live. Pass <paramref name="isDestination"/> true
+    // at every receive/transfer-to/convert-in call site.
+    private async Task ValidateLocationAsync(StockLocation location, CancellationToken ct, bool isDestination = false)
     {
         if (!location.IsValid)
             throw new BusinessRuleException("A stock location must be exactly one of an area or a container.");
@@ -362,6 +376,25 @@ public class StockService(
         // Loose stock can only sit in a Container — an Assembly holds components, not a place that takes stock.
         if (container.Fungibility != Fungibility.NonFungible || container.DurableKind != DurableKind.Container)
             throw new BusinessRuleException("ContainerItemId must reference a container item.");
+        // A destination must be live: stock moves OUT of a terminal (Sold/Discarded/Archived) container
+        // but never INTO one — the complement of the durable sealing gate.
+        if (isDestination && container.Status.IsTerminal())
+            throw new BusinessRuleException("Cannot place stock into a Sold/Discarded/Archived container.");
+    }
+
+    // True only for a container location whose holder is terminal (Sold/Discarded/Archived); area
+    // locations have no status. Used by AdjustAsync to block an adjust-UP inflow into a terminal
+    // container while still allowing an adjust-DOWN reconcile-out. Assumes the location was already
+    // validated (existence + container-kind) by ValidateLocationAsync.
+    private async Task<bool> IsTerminalContainerAsync(StockLocation location, CancellationToken ct)
+    {
+        if (location.ContainerItemId is not { } containerId)
+            return false;
+        var status = await db.Items.AsNoTracking()
+            .Where(i => i.Id == containerId)
+            .Select(i => (ItemStatus?)i.Status)
+            .FirstOrDefaultAsync(ct);
+        return status is { } s && s.IsTerminal();
     }
 
     private async Task ValidateUnitCostAsync(decimal? unitCost, Guid? currencyId, CancellationToken ct)

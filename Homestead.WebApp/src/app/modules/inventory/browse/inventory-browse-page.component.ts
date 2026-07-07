@@ -281,18 +281,13 @@ export class InventoryBrowsePageComponent implements OnDestroy {
       const param: Record<string, string> = { area: ref.id };
       return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param };
     }
-    // Container: both counts are DIRECT — the container's own contents — per the product-design doc
-    // ("a drilled container scopes its panels by its direct contents"). Low stock is counted from the
-    // direct consumable rows, lent from the direct durable rows (status Lent). We deliberately do NOT
-    // use the backend `scopedLowStockCount`/`scopedLentCount` here: those are rolled subtree totals
-    // (right for an area, wrong for a container). The items list can't scope to a container (Browse
-    // owns containment), so the panel is count-only (param null) — the matching items already render
-    // in the contents table below. Trade-off: nested sub-containers aren't counted.
-    return {
-      lowStockCount: c.consumables.filter(s => s.consumable.isLow).length,
-      lentCount: c.items.filter(i => i.status === 'Lent').length,
-      param: null,
-    };
+    // Container: both counts are the backend's DIRECT scoped counts — for a container scope
+    // `scopedLowStockCount`/`scopedLentCount` are the container's own direct contents (not the rolled
+    // subtree), computed server-side so the one place that knows a container's direct contents also
+    // counts them (including a child container that is itself Lent). The items list can't scope to a
+    // container (Browse owns containment), so the panel is count-only (param null) — the matching rows
+    // already render in the contents table below.
+    return { lowStockCount: c.scopedLowStockCount, lentCount: c.scopedLentCount, param: null };
   });
 
   // The alert region's scope: global at root (the full overview, for the low-stock + lent previews),

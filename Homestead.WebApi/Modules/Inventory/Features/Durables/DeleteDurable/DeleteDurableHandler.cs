@@ -31,6 +31,14 @@ public class DeleteDurableHandler(AppDbContext db, IAuditContext audit, IUnitOfW
         if (hasStock)
             throw new BusinessRuleException("Item holds stock and cannot be deleted. Move or use it up first.");
 
+        // A durable carved out of a consumable (track-one) is the RelatedItem of its Conversion
+        // movement. The RelatedItemId FK is SetNull, so deleting the durable would silently sever that
+        // back-reference from the ledger — gate it, mirroring DeleteConsumable's ledger check.
+        var isTrackedInLedger = await db.StockMovements.AnyAsync(m => m.RelatedItemId == item.Id, ct);
+        if (isTrackedInLedger)
+            throw new BusinessRuleException(
+                "Item is referenced by stock history (it was tracked from a consumable) and cannot be deleted. Archive it instead.");
+
         db.Items.Remove(item);
         audit.Deleted("Item", item.Id, item.Name);
         await unitOfWork.SaveChangesAsync(ct);

@@ -1,4 +1,8 @@
+using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
@@ -513,5 +517,53 @@ public class ConversionsEndpointTests : IntegrationTestBase
         Assert.Equal(before.Consumable.TotalOnHand, after.Consumable.TotalOnHand);
         Assert.Equal(movementsBefore, (await GetMovementsAsync(client, consumable.Id)).Count);
         Assert.Equal("Active", (await GetDurableAsync(client, good.Id)).Status);
+    }
+
+    // ----- B7: a track-converted durable is referenced by the ledger and cannot be deleted -----
+
+    [Fact]
+    public async Task DeleteDurable_TrackedFromConsumable_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var areaId = await CreateAreaAsync(client, "Garage");
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { areaId, quantity = 3m });
+
+        // Track-one carves out a durable and writes a Conversion movement whose RelatedItemId points at
+        // it. The FK is SET NULL, so deleting the durable would silently sever that ledger back-reference
+        // — the delete must be blocked (mirrors DeleteConsumable_WithHistory_Returns400).
+        var tracked = (await OkTrackAsync(await TrackOneAsync(client, consumable.Id,
+            new { areaId, name = "Tracked bit" }))).Item;
+
+        var resp = await client.DeleteAsync($"/api/v1/inventory/durables/{tracked.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ----- B1: track-one cannot place the new item into a terminal container -----
+
+    [Fact]
+    public async Task TrackOne_IntoTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var bin = await CreateContainerAsync(client, "Bin", areaId: garageId);
+        var consumable = await CreateConsumableAsync(client);
+        await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 3m });
+
+        // The API can't seal a container that holds stock, so strand it directly. Track-one places the
+        // new item INTO the container (as its parent), so a terminal container must be rejected — even
+        // though consuming the stock straight out (a pure source op) would still be allowed.
+        using (var scope = CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var container = await db.Items.FirstAsync(i => i.Id == bin.Id, CT);
+            container.Status = ItemStatus.Archived;
+            await db.SaveChangesAsync(CT);
+        }
+
+        var resp = await TrackOneAsync(client, consumable.Id, new { containerItemId = bin.Id, name = "Nope" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 }

@@ -69,14 +69,28 @@ public class GetInventoryOverviewHandlerTests : IAsyncLifetime
         _db.Items.Add(consumable);
         if (quantity is { } qty)
         {
+            var stockAt = stockUpdatedAt ?? itemUpdatedAt;
             _db.StockEntries.Add(new StockEntry
             {
                 Id = Guid.NewGuid(),
                 ItemId = consumable.Id,
                 AreaId = _garage.Id,
                 Quantity = qty,
-                CreatedAt = stockUpdatedAt ?? itemUpdatedAt,
-                UpdatedAt = stockUpdatedAt ?? itemUpdatedAt,
+                CreatedAt = stockAt,
+                UpdatedAt = stockAt,
+            });
+            // Recency now derives from the append-only movement ledger (B5) — a consumed-to-zero item
+            // keeps its bump even after its entry is purged — so the "stock touched at" instant must be
+            // expressed as a movement's CreatedAt, not just the (purge-prone) entry's UpdatedAt.
+            _db.StockMovements.Add(new StockMovement
+            {
+                Id = Guid.NewGuid(),
+                ItemId = consumable.Id,
+                Kind = MovementKind.Flow,
+                Quantity = qty,
+                ToAreaId = _garage.Id,
+                OccurredAt = stockAt,
+                CreatedAt = stockAt,
             });
         }
         await _db.SaveChangesAsync(Ct);

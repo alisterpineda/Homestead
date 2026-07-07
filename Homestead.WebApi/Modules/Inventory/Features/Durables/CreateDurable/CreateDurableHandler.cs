@@ -37,6 +37,10 @@ public class CreateDurableHandler(
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
             if (parent.Fungibility != Fungibility.NonFungible || !parent.DurableKind.IsHolder())
                 throw new BusinessRuleException("ParentItemId must reference a container or assembly item.");
+            // Things move OUT of a terminal (Sold/Discarded/Archived) holder but never INTO one — the
+            // complement of the sealing gate. A new item must be parented into a live holder.
+            if (parent.Status.IsTerminal())
+                throw new BusinessRuleException("ParentItemId must reference a live container or assembly.");
         }
 
         // Value and its currency are set together or not at all.

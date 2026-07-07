@@ -22,6 +22,7 @@ public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolve
             .Where(m => m.ItemId == request.Id)
             .OrderByDescending(m => m.OccurredAt)
             .ThenByDescending(m => m.CreatedAt)
+            .ThenByDescending(m => m.Id)
             .Select(m => new MovementRow
             {
                 Id = m.Id,

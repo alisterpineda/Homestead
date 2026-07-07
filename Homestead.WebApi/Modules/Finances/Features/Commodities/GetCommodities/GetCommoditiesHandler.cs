@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -18,10 +19,10 @@ public class GetCommoditiesHandler(AppDbContext db)
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var pattern = $"%{request.Search.Trim()}%";
+            var pattern = $"%{LikeEscaper.Escape(request.Search.Trim())}%";
             query = query.Where(c =>
-                EF.Functions.ILike(c.Symbol, pattern) ||
-                EF.Functions.ILike(c.Name, pattern));
+                EF.Functions.ILike(c.Symbol, pattern, LikeEscaper.EscapeChar) ||
+                EF.Functions.ILike(c.Name, pattern, LikeEscaper.EscapeChar));
         }
 
         return await query

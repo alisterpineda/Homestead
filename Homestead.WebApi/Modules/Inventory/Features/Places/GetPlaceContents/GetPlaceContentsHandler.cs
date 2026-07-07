@@ -70,26 +70,26 @@ public class GetPlaceContentsHandler(
         // carrying its own rolled subtree count.
         var childAreas = await LoadChildAreasAsync(request, placement, ct);
 
-        // Scoped warning counts for the Browse drilled panels, resolved with the overview-card
-        // semantics: low-stock consumables stored here + lent items from here. Count-only — the
-        // actual items already appear in the contents list. Unplaced has neither (it's the absence
-        // of a place: holds no stock, and a lent item without a resolved area is just unplaced).
+        // Scoped warning counts for the Browse drilled panels. An AREA scope reports overview-card
+        // (rolled-subtree) semantics, linkable via the ?area= items filter. A CONTAINER scope reports
+        // its DIRECT contents instead — the items list can't scope to a container (Browse owns
+        // containment), so the panel is count-only and the matching rows already appear in the contents
+        // list. This computation used to live in the frontend; it moves here so the one place that
+        // knows a container's direct contents also counts them (fixing the client miss of a Lent
+        // sub-container). Unplaced has neither warning (it's the absence of a place).
         var scopedLowStockCount = request switch
         {
             { AreaId: { } areaId } => placement.AreaLowStockCounts.GetValueOrDefault(areaId),
-            { ContainerItemId: { } containerId } =>
-                placement.ContainerStats.TryGetValue(containerId, out var lowStats)
-                    ? lowStats.LowStockCount
-                    : 0,
+            // Direct child consumables that are globally low (one row per consumable ⇒ already distinct).
+            { ContainerItemId: not null } => consumables.Count(s => s.Consumable.IsLow),
             _ => 0,
         };
         var scopedLentCount = request switch
         {
             { AreaId: { } areaId } => placement.AreaLentCounts.GetValueOrDefault(areaId),
-            { ContainerItemId: { } containerId } =>
-                placement.ContainerStats.TryGetValue(containerId, out var lentStats)
-                    ? lentStats.LentCount
-                    : 0,
+            // Direct lent children — `children` spans both non-container durables AND child containers,
+            // so a child container that is itself Lent is counted (the client-side version missed it).
+            { ContainerItemId: not null } => children.Count(c => c.Status == ItemStatus.Lent),
             _ => 0,
         };
 

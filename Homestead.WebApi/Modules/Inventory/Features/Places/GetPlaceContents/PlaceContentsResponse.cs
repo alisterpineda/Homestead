@@ -22,15 +22,16 @@ public record PlaceContentsResponse
     public DurableResponse? ContainerItem { get; init; }
 
     /// <summary>
-    /// Distinct low-stock consumables resolving to this place (area/container scope; 0 for Unplaced) —
-    /// "low consumables stored here", resolved semantics (globally-low consumables that resolve here, NOT
-    /// a per-location threshold). Drives the Browse drilled low-stock warning panel (count-only).
+    /// Low-stock consumable count for this place (0 for Unplaced), globally-low consumables (NOT a
+    /// per-location threshold): the resolved subtree for an AREA scope, the container's DIRECT contents
+    /// for a CONTAINER scope. Drives the Browse drilled low-stock warning panel (count-only).
     /// </summary>
     public required int ScopedLowStockCount { get; init; }
 
     /// <summary>
-    /// Lent items resolving to this place (area/container scope; 0 for Unplaced) — "items lent from
-    /// here", resolved semantics. Drives the Browse drilled lent warning panel (count-only).
+    /// Lent-item count for this place (0 for Unplaced): the resolved subtree for an AREA scope, the
+    /// container's DIRECT lent children (durables and child containers alike) for a CONTAINER scope.
+    /// Drives the Browse drilled lent warning panel (count-only).
     /// </summary>
     public required int ScopedLentCount { get; init; }
 

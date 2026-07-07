@@ -102,8 +102,9 @@ public class GetInventoryOverviewHandler(
     /// <summary>
     /// The browse-root "Recently updated" strip: the <see cref="RecentCount"/> most-recently-touched
     /// live items, newest first. Recency is the effective last-activity time — the later of
-    /// <c>Item.UpdatedAt</c> and (for a consumable) its latest <c>StockEntry.UpdatedAt</c>, so a
-    /// restock/move/consume bumps a consumable even though it only touches its stock rows.
+    /// <c>Item.UpdatedAt</c> and (for a consumable) its latest <c>StockMovement.CreatedAt</c>, so a
+    /// restock/move/consume bumps a consumable even though it only touches its stock rows — and a
+    /// consume-to-zero still counts, because the ledger row survives the entry's purge.
     /// </summary>
     /// <remarks>
     /// Materialize-then-merge in memory rather than gamble on EF translating a CASE-over-correlated-MAX
@@ -124,8 +125,12 @@ public class GetInventoryOverviewHandler(
                 i.Id,
                 i.Fungibility,
                 i.UpdatedAt,
+                // Derive fungible recency from the append-only movement ledger, not the stock entry:
+                // running a consumable out DELETES its entry, so MAX(entry.UpdatedAt) would drop the
+                // just-emptied item off the strip. CreatedAt (record-time, not back-datable OccurredAt)
+                // survives the purge and is written by every op. Null when no movements.
                 LastStockAt = i.Fungibility == Fungibility.Fungible
-                    ? i.StockEntries.Max(e => (DateTimeOffset?)e.UpdatedAt) // null when no stock entries
+                    ? db.StockMovements.Where(m => m.ItemId == i.Id).Max(m => (DateTimeOffset?)m.CreatedAt)
                     : null,
             })
             .ToListAsync(ct);

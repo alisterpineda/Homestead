@@ -23,17 +23,17 @@ public class InventorySearchSource(AppDbContext db) : ISearchSource
 
     public async Task<SearchSourceResult> SearchAsync(string query, int limit, CancellationToken ct)
     {
-        var pattern = $"%{query}%";
+        var pattern = $"%{LikeEscaper.Escape(query)}%";
 
         // Live items only (excludes Sold/Discarded/Archived); both durables and consumables.
         var filtered = db.Items.AsNoTracking()
             .Where(i => ItemStatusExtensions.LiveStatuses.Contains(i.Status))
             .Where(i =>
-                EF.Functions.ILike(i.Name, pattern)
-                || (i.Serial != null && EF.Functions.ILike(i.Serial, pattern))
-                || (i.Unit != null && EF.Functions.ILike(i.Unit, pattern))
-                || (i.Compartment != null && EF.Functions.ILike(i.Compartment, pattern))
-                || (i.Notes != null && EF.Functions.ILike(i.Notes, pattern))
+                EF.Functions.ILike(i.Name, pattern, LikeEscaper.EscapeChar)
+                || (i.Serial != null && EF.Functions.ILike(i.Serial, pattern, LikeEscaper.EscapeChar))
+                || (i.Unit != null && EF.Functions.ILike(i.Unit, pattern, LikeEscaper.EscapeChar))
+                || (i.Compartment != null && EF.Functions.ILike(i.Compartment, pattern, LikeEscaper.EscapeChar))
+                || (i.Notes != null && EF.Functions.ILike(i.Notes, pattern, LikeEscaper.EscapeChar))
                 || EF.Functions.TrigramsWordSimilarity(query, i.Name) >= NameSimilarityThreshold);
 
         // Full (uncapped) match count drives "View all (N)".

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
@@ -45,8 +46,8 @@ public class GetTransactionsHandler(AppDbContext db)
 
         if (!string.IsNullOrWhiteSpace(request.MemoContains))
         {
-            var needle = request.MemoContains.Trim();
-            query = query.Where(t => EF.Functions.ILike(t.Memo, $"%{needle}%"));
+            var needle = LikeEscaper.Escape(request.MemoContains.Trim());
+            query = query.Where(t => EF.Functions.ILike(t.Memo, $"%{needle}%", LikeEscaper.EscapeChar));
         }
 
         var orderedQuery = query

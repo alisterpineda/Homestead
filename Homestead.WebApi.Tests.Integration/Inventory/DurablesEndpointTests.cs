@@ -347,20 +347,26 @@ public class DurablesEndpointTests : IntegrationTestBase
         var garageId = await CreateAreaAsync(client, "Garage");
         var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
 
-        // Seal the (empty) container, then place a live item inside it — the API permits placing
-        // into a terminal container, and the resolver walks straight through it.
+        // Nothing may be placed INTO a terminal container (B1). But a container can go terminal with a
+        // leftover inside it: place a live item, take the item terminal first (so the container's
+        // sealing gate sees only a terminal child), then seal the container. The resolver must still
+        // walk straight through the now-terminal container to the area.
+        var wrench = await CreateDurableAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+        await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/durables/{wrench.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
         var sealResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
             new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
         Assert.Equal(HttpStatusCode.OK, sealResp.StatusCode);
 
-        var wrench = await CreateDurableAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+        var resolved = await GetDurableAsync(client, wrench.Id);
 
-        Assert.Equal(garageId, wrench.ResolvedAreaId);
-        Assert.NotNull(wrench.Path);
-        Assert.Equal(2, wrench.Path!.Count);
-        Assert.Equal(garageId, wrench.Path[0].Id);
-        Assert.Equal(chest.Id, wrench.Path[1].Id);
+        Assert.Equal(garageId, resolved.ResolvedAreaId);
+        Assert.NotNull(resolved.Path);
+        Assert.Equal(2, resolved.Path!.Count);
+        Assert.Equal(garageId, resolved.Path[0].Id);
+        Assert.Equal(chest.Id, resolved.Path[1].Id);
     }
 
     // ----- Containment: rejections (400) -----
@@ -574,5 +580,117 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, roleOffResp.StatusCode);
         var noLongerContainer = (await roleOffResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
         Assert.Equal("Plain", noLongerContainer.DurableKind);
+    }
+
+    // ----- B3: the durables endpoint is the non-fungible surface -----
+
+    [Fact]
+    public async Task GetDurable_OnFungibleConsumableId_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var createResp = await client.PostAsJsonAsync("/api/v1/inventory/consumables", new { name = "Screws" }, CT);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var consumable = (await createResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+
+        // A fungible consumable id is "not found" on the durables surface — never a consumable shaped
+        // as a durable (mirrors DeleteItem_OnFungibleConsumableId_Returns404NotRawError).
+        var resp = await client.GetAsync($"/api/v1/inventory/durables/{consumable.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    // ----- B2: undefined enum values are rejected, not persisted -----
+
+    [Fact]
+    public async Task CreateDurable_WithUndefinedDurableKind_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+
+        // durableKind:99 binds via JsonStringEnumConverter (allowIntegerValues) to an out-of-range
+        // DurableKind; the IsInEnum() validator must reject it rather than let it persist.
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
+            new { name = "Weird", durableKind = 99 }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchDurable_WithUndefinedStatus_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Drill" });
+
+        // The generated client can't produce an integer status; a raw JSON-Patch can. The handler's
+        // Enum.IsDefined guard must reject 99 before it persists and re-serializes as a JSON number.
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/durables/{item.Id}",
+            new[] { new { op = "replace", path = "/status", value = 99 } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchDurable_WithUndefinedDurableKind_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Drill" });
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/durables/{item.Id}",
+            new[] { new { op = "replace", path = "/durableKind", value = 99 } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ----- B1: nothing may be placed INTO a terminal container -----
+
+    [Fact]
+    public async Task CreateDurable_IntoTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var chest = await CreateContainerAsync(client, "Tool chest");
+        // Archiving the empty container is allowed; parenting a new item into it is not.
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
+            new { name = "Wrench", parentItemId = chest.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchDurable_ReparentIntoTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var chest = await CreateContainerAsync(client, "Tool chest");
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+        var wrench = await CreateDurableAsync(client, new { name = "Wrench" });
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{wrench.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object)chest.Id } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // Block-universally pin: even an already-terminal item (which normally may be freely re-located
+    // via the escape hatch) cannot be re-parented INTO a terminal container.
+    [Fact]
+    public async Task PatchDurable_TerminalItemReparentIntoTerminalContainer_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var chest = await CreateContainerAsync(client, "Tool chest");
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{chest.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+
+        var wrench = await CreateDurableAsync(client, new { name = "Wrench" });
+        await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{wrench.Id}",
+            new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{wrench.Id}",
+            new[] { new { op = "replace", path = "/parentItemId", value = (object)chest.Id } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }
 }
