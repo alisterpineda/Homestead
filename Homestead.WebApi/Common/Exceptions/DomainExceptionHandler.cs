@@ -1,6 +1,8 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Homestead.WebApi.Common;
 
@@ -30,6 +32,13 @@ public class DomainExceptionHandler : IExceptionHandler
             // its intended status (400) instead. Defense-in-depth for the whole API.
             Microsoft.AspNetCore.Http.BadHttpRequestException e =>
                 ProblemDetailsFactory.Create(e.StatusCode, "Bad Request", e.Message),
+            // A uniqueness collision that slipped past a pre-check (a concurrent insert won the race)
+            // surfaces as a raw Npgsql 23505 at flush. Map to a retryable 409 instead of an unhandled 500 —
+            // app-wide defense for every pre-check-then-insert TOCTOU (e.g. StockService receiving into a
+            // just-purged entry).
+            DbUpdateException { InnerException: PostgresException { SqlState: "23505" } } =>
+                ProblemDetailsFactory.Create(StatusCodes.Status409Conflict, "Conflict",
+                    "The operation collided with a concurrent update. Please retry."),
             _ => null
         };
 

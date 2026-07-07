@@ -126,6 +126,8 @@ Stock changes are applied as **deltas** (`quantity = quantity - n`), not as abso
 
 **Concurrency.** Inventory does not use optimistic concurrency (no row-version/`xmin` token) — consistent with the rest of the codebase, which is last-write-wins throughout. For metadata that is fine. For quantities, correctness comes not from a conflict token but from applying the change as an **atomic database-level decrement** and backing it with a **`Quantity >= 0` check constraint**: two concurrent "use one" operations both decrement rather than both overwriting a stale read, and an over-consume that would drive the quantity negative is rejected by the constraint rather than silently losing a movement. This gives quantity correctness without inventing a 409-conflict retry UX that exists nowhere else in the app.
 
+One narrow exception: a rare **uniqueness-collision** race — an inflow landing at a location whose entry was concurrently purged to zero (the entry is re-inserted so the movement never vanishes), or two simultaneous first-receives at one location — can lose the `(ItemId, AreaId, ContainerItemId)` unique-index race and degrade to a **retryable 409**. This is a genuine uniqueness collision (the same 409 the app already returns for duplicates elsewhere), not a routine optimistic-concurrency retry UX — there is still no row-version token, and the everyday decrement/adjust paths retry internally rather than surfacing a conflict.
+
 ### Validation
 
 - A consume or transfer may not exceed the quantity on-hand at the source location — over-consume/over-transfer is rejected (with the `>= 0` constraint as the last-resort backstop).

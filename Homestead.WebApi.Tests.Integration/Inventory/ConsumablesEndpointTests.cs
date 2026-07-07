@@ -707,16 +707,22 @@ public class ConsumablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task Adjust_NoChange_Returns400()
+    public async Task Adjust_NoChange_Returns200NoOp()
     {
         var client = await CreateAdminClientAsync();
         var areaId = await CreateAreaAsync(client, "Garage");
         var consumable = await CreateConsumableAsync(client);
         await ReceiveAsync(client, consumable.Id, new { areaId, quantity = 5m });
 
-        var resp = await AdjustAsync(client, consumable.Id, new { areaId, newQuantity = 5m });
+        // A confirming recount (new == current) changes nothing: a 200 no-op, no Adjustment appended —
+        // consistent with the module's net-zero-writes-nothing stance.
+        var detail = await OkDetailAsync(await AdjustAsync(client, consumable.Id, new { areaId, newQuantity = 5m }));
+        Assert.Equal(5m, detail.Consumable.TotalOnHand);
 
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        // Only the seed inflow remains in the ledger — no Adjustment row was written.
+        var movements = await GetMovementsAsync(client, consumable.Id);
+        Assert.Single(movements);
+        Assert.DoesNotContain(movements, m => m.Kind == "Adjustment");
     }
 
     // ----- Location-deletion gates -----
