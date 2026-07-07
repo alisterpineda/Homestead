@@ -15,6 +15,7 @@ public static class TrackDurableEndpoint
         })
         .WithName("TrackDurableIndividually")
         .Produces<TrackDurableResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }

@@ -15,7 +15,9 @@ public static class AdjustStockEndpoint
         })
         .WithName("AdjustStock")
         .Produces<ConsumableDetailResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status409Conflict)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
 }

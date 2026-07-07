@@ -15,6 +15,7 @@ public static class ConsumeStockEndpoint
         })
         .WithName("ConsumeStock")
         .Produces<ConsumableDetailResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound)
         .RequireAuthorization(AuthPolicies.RequireContributor);
     }
