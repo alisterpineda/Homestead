@@ -5,8 +5,10 @@ import { DurableKind } from '../models/durable-kind';
 export interface CreateDurableCommand {
   acquiredOn?: (string | null);
   areaId?: (string | null);
+  brandId?: (string | null);
   compartment?: (string | null);
   durableKind?: DurableKind;
+  model?: (string | null);
   name: string;
   notes?: (string | null);
   parentItemId?: (string | null);

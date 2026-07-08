@@ -15,6 +15,8 @@ public class PatchDurableModel
     public string Name { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public string? Serial { get; set; }
+    public Guid? BrandId { get; set; }
+    public string? Model { get; set; }
     public DateOnly? AcquiredOn { get; set; }
     public decimal? Value { get; set; }
     public Guid? ValueCurrencyId { get; set; }

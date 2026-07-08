@@ -36,6 +36,8 @@ public class PatchDurableHandler(
             Name = item.Name,
             Notes = item.Notes,
             Serial = item.Serial,
+            BrandId = item.BrandId,
+            Model = item.Model,
             AcquiredOn = item.AcquiredOn,
             Value = item.Value,
             ValueCurrencyId = item.ValueCurrencyId,
@@ -63,6 +65,8 @@ public class PatchDurableHandler(
             throw new BusinessRuleException("Name must be 256 characters or fewer.");
         if (model.Serial is { Length: > 128 })
             throw new BusinessRuleException("Serial must be 128 characters or fewer.");
+        if (model.Model is { Length: > 128 })
+            throw new BusinessRuleException("Model must be 128 characters or fewer.");
         if (model.LentTo is { Length: > 256 })
             throw new BusinessRuleException("LentTo must be 256 characters or fewer.");
         if (model.Compartment is { Length: > 256 })
@@ -83,6 +87,13 @@ public class PatchDurableHandler(
                 throw new BusinessRuleException("ValueCurrencyId must reference an existing commodity.");
             if (currency.Kind != CommodityKind.Currency)
                 throw new BusinessRuleException("ValueCurrencyId must reference a currency commodity.");
+        }
+
+        if (model.BrandId is { } brandId && brandId != item.BrandId)
+        {
+            var brandExists = await db.Brands.AnyAsync(b => b.Id == brandId, ct);
+            if (!brandExists)
+                throw new BusinessRuleException("BrandId must reference an existing brand.");
         }
 
         // Lent requires a recipient; any other status clears the LentTo note.
@@ -195,6 +206,8 @@ public class PatchDurableHandler(
         item.Name = model.Name.Trim();
         item.Notes = Normalize(model.Notes);
         item.Serial = Normalize(model.Serial);
+        item.BrandId = model.BrandId;
+        item.Model = Normalize(model.Model);
         item.AcquiredOn = model.AcquiredOn;
         item.Value = model.Value;
         item.ValueCurrencyId = model.ValueCurrencyId;

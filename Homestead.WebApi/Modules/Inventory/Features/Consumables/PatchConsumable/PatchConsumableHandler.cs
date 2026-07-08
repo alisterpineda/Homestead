@@ -34,6 +34,7 @@ public class PatchConsumableHandler(
             Name = item.Name,
             Unit = item.Unit,
             RestockThreshold = item.RestockThreshold,
+            BrandId = item.BrandId,
             Notes = item.Notes,
             Status = item.Status,
         };
@@ -55,9 +56,17 @@ public class PatchConsumableHandler(
         if (!FungibleStatuses.Contains(model.Status))
             throw new BusinessRuleException("A consumable can only be Active or Archived.");
 
+        if (model.BrandId is { } brandId && brandId != item.BrandId)
+        {
+            var brandExists = await db.Brands.AnyAsync(b => b.Id == brandId, ct);
+            if (!brandExists)
+                throw new BusinessRuleException("BrandId must reference an existing brand.");
+        }
+
         item.Name = model.Name.Trim();
         item.Unit = Normalize(model.Unit);
         item.RestockThreshold = model.RestockThreshold;
+        item.BrandId = model.BrandId;
         item.Notes = Normalize(model.Notes);
         item.Status = model.Status;
         item.UpdatedAt = DateTimeOffset.UtcNow;

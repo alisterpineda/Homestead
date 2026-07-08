@@ -875,6 +875,32 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("areas", "inventory");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Brand", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("brands", "inventory");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
                 {
                     b.Property<Guid>("Id")
@@ -885,6 +911,9 @@ namespace Homestead.WebApi.Migrations
                         .HasColumnType("date");
 
                     b.Property<Guid?>("AreaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BrandId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Compartment")
@@ -911,6 +940,10 @@ namespace Homestead.WebApi.Migrations
                     b.Property<string>("LentTo")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -957,6 +990,8 @@ namespace Homestead.WebApi.Migrations
 
                     b.HasIndex("AreaId");
 
+                    b.HasIndex("BrandId");
+
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("ParentItemId");
@@ -977,7 +1012,7 @@ namespace Homestead.WebApi.Migrations
 
                             t.HasCheckConstraint("CK_items_location_not_both", "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL)");
+                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"Model\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL)");
 
                             t.HasCheckConstraint("CK_items_value_currency_pair", "(\"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL) OR (\"Value\" IS NOT NULL AND \"ValueCurrencyId\" IS NOT NULL)");
                         });
@@ -1764,6 +1799,11 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("AreaId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Brand", "Brand")
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
@@ -1785,6 +1825,8 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Area");
+
+                    b.Navigation("Brand");
 
                     b.Navigation("CreatedByUser");
 

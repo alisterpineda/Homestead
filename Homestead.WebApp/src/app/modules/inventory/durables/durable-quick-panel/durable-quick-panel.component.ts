@@ -191,6 +191,20 @@ type InlineForm = 'move' | 'lent' | null;
                       <dt class="text-muted-foreground">Serial</dt>
                       <dd class="truncate">{{ it.serial }}</dd>
                     }
+                    @if (it.model) {
+                      <dt class="text-muted-foreground">Model</dt>
+                      <dd class="truncate">{{ it.model }}</dd>
+                    }
+                    @if (it.brandId) {
+                      <dt class="text-muted-foreground">Brand</dt>
+                      <dd class="truncate">
+                        <a
+                          routerLink="/inventory/items"
+                          [queryParams]="{ brand: it.brandId }"
+                          class="hover:underline"
+                        >{{ it.brandName }}</a>
+                      </dd>
+                    }
                     @if (it.value != null) {
                       <dt class="text-muted-foreground">Value</dt>
                       <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
@@ -293,7 +307,8 @@ export class DurableQuickPanelComponent {
     const it = this.view();
     return (
       !!it &&
-      (it.value != null || !!it.serial || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo) || !!it.notes)
+      (it.value != null || !!it.serial || !!it.model || !!it.brandId || !!it.acquiredOn
+        || (it.status === 'Lent' && !!it.lentTo) || !!it.notes)
     );
   });
 

@@ -105,6 +105,40 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Handle_SetBrand_MapsBrandIdAndName()
+    {
+        var apple = new Brand { Id = Guid.NewGuid(), Name = "Apple" };
+        _db.Brands.Add(apple);
+        await _db.SaveChangesAsync(Ct);
+        var item = await AddItemAsync();
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.BrandId, apple.Id));
+
+        Assert.Equal(apple.Id, resp.BrandId);
+        Assert.Equal("Apple", resp.BrandName);
+    }
+
+    [Fact]
+    public async Task Handle_SetUnknownBrand_Throws()
+    {
+        var item = await AddItemAsync();
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p => p.Replace(m => m.BrandId, Guid.NewGuid())));
+    }
+
+    [Fact]
+    public async Task Handle_SetModel_TrimsAndStores()
+    {
+        var item = await AddItemAsync();
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Model, "  MRW23  "));
+
+        Assert.Equal("MRW23", resp.Model);
+        Assert.Equal("MRW23", _db.Items.Single(i => i.Id == item.Id).Model);
+    }
+
+    [Fact]
     public async Task Handle_LentWithoutLentTo_Throws()
     {
         var item = await AddItemAsync();

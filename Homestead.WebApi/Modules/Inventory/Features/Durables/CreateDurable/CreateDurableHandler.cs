@@ -56,6 +56,13 @@ public class CreateDurableHandler(
                 throw new BusinessRuleException("ValueCurrencyId must reference a currency commodity.");
         }
 
+        if (request.BrandId is { } brandId)
+        {
+            var brandExists = await db.Brands.AnyAsync(b => b.Id == brandId, ct);
+            if (!brandExists)
+                throw new BusinessRuleException("BrandId must reference an existing brand.");
+        }
+
         var item = new Item
         {
             Id = Guid.NewGuid(),
@@ -65,6 +72,8 @@ public class CreateDurableHandler(
             DurableKind = request.DurableKind,
             Notes = Normalize(request.Notes),
             Serial = Normalize(request.Serial),
+            BrandId = request.BrandId,
+            Model = Normalize(request.Model),
             AcquiredOn = request.AcquiredOn,
             Value = request.Value,
             ValueCurrencyId = request.ValueCurrencyId,

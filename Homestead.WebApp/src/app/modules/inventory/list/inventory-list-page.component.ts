@@ -15,6 +15,7 @@ import {
   catchError,
   forkJoin,
   debounceTime,
+  distinctUntilChanged,
   filter,
 } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -32,6 +33,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
+import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-dialog.component';
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
@@ -43,6 +45,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { AreaResponse } from '@/api/generated/models/area-response';
+import type { BrandResponse } from '@/api/generated/models/brand-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 /** 'all' | 'unplaced' | an area id. */
@@ -127,7 +130,7 @@ interface ListData {
       }
 
       @if (data() !== null) {
-        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm() && areaFilter() === 'all') {
+        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm() && areaFilter() === 'all' && brandFilter() === 'all') {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
@@ -209,6 +212,31 @@ interface ListData {
                   </button>
                 }
               </div>
+
+              @if (brands().length > 0) {
+                <span hlmSeparator></span>
+                <div class="max-h-[240px] overflow-y-auto p-1">
+                  <span class="block px-2 py-1 text-xs font-medium text-muted-foreground">Brand</span>
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    (click)="selectBrandFilter('all')"
+                  >
+                    <span>All brands</span>
+                    @if (brandFilter() === 'all') { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                  </button>
+                  @for (brand of brands(); track brand.id) {
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      (click)="selectBrandFilter(brand.id)"
+                    >
+                      <span class="truncate">{{ brand.name }}</span>
+                      @if (brandFilter() === brand.id) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                    </button>
+                  }
+                </div>
+              }
             </div>
           </app-inventory-items-view>
         }
@@ -235,6 +263,7 @@ export class InventoryListPageComponent {
   private durableApi = inject(InventoryDurableApiService);
   private consumableApi = inject(InventoryConsumableApiService);
   private areaApi = inject(InventoryAreaApiService);
+  private brandApi = inject(InventoryBrandApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
@@ -246,6 +275,11 @@ export class InventoryListPageComponent {
   // below and stripped from the URL (read-once, not two-way synced — that's the lenses feature).
   // Container-level navigation lives on Browse, so the list seeds only the area scope and the
   // non-place lenses; a container's "View contents" routes to /inventory/browse/container/:id.
+  // 'brand' is deliberately NOT in this list: unlike the other params it can also arrive while the
+  // component is already mounted (from a quick panel overlaid on this same route), which the one-shot
+  // construction seed can't catch — so it is owned instead by the reactive handler in the constructor
+  // (seeded from the snapshot below, like `searchInput`). Keeping it out of both lists also avoids two
+  // strip-navigations racing on a combined `?brand=&area=` deep link.
   private deepLink = seedDeepLinkParams(this.route, this.router, ['lowStock', 'lent', 'kind', 'area', 'sort', 'dir']);
 
   // The non-place refinements live in the items-view; pass the deep-link values as its one-shot seeds.
@@ -257,6 +291,12 @@ export class InventoryListPageComponent {
     sortStateFromParams(this.deepLink['sort'], this.deepLink['dir']);
 
   areaFilter = signal<AreaFilter>(this.deepLink['area'] ?? 'all');
+  /**
+   * 'all' | a brand id. A page-level fetch key, mirroring areaFilter — not a one-shot lens. Seeded
+   * synchronously from the URL here (so a cold `?brand=` load fetches once, not all→brand); the
+   * constructor handler owns the strip and any mid-mount re-application. See the deepLink note above.
+   */
+  brandFilter = signal<string>(this.route.snapshot.queryParamMap.get('brand') ?? 'all');
 
   /** What the user is typing (immediate); synced to the URL after a 300ms debounce. */
   searchInput = signal((this.route.snapshot.queryParamMap.get('search') ?? '').trim());
@@ -278,24 +318,26 @@ export class InventoryListPageComponent {
     tick: this.refreshTrigger(),
     term: this.searchTerm(),
     area: this.areaFilter(),
+    brand: this.brandFilter(),
   }));
 
   data = toSignal<ListData | null, ListData | null>(
     toObservable(this.listKey).pipe(
-      switchMap(({ term, area }) => {
+      switchMap(({ term, area, brand }) => {
         this.loading.set(true);
         this.error.set(false);
         // Resolved-area filter goes to the server: a specific area sends AreaId (the server rolls in
         // descendants); 'unplaced' sends Unplaced; 'all' sends neither.
         const areaId = area !== 'all' && area !== 'unplaced' ? area : undefined;
         const unplaced = area === 'unplaced' ? true : undefined;
+        const brandId = brand !== 'all' ? brand : undefined;
         const search = term || undefined;
         return forkJoin({
           durables: this.durableApi.getDurables({
-            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced,
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId,
           }),
           consumables: this.consumableApi.getConsumables({
-            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced,
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId,
           }),
         }).pipe(
           map(({ durables, consumables }) => {
@@ -329,6 +371,20 @@ export class InventoryListPageComponent {
 
   /** Areas indented by depth for the filter dropdown. */
   protected areaTree = computed<AreaTreeNode[]>(() => orderAreaTree(this.areas()));
+
+  // Brand facet source — loaded once for the page (household-scale lists are small). Refetched with
+  // the same trigger as areas so a just-created brand shows up after onChanged().
+  protected brands = toSignal(
+    toObservable(this.refreshTrigger).pipe(
+      switchMap(() =>
+        this.brandApi.getBrands({ Page: 1, PageSize: 200 }).pipe(
+          map(r => r.items ?? []),
+          catchError(() => of<BrandResponse[]>([])),
+        ),
+      ),
+    ),
+    { initialValue: [] as BrandResponse[] },
+  );
 
   allDurables = computed(() => this.data()?.durables ?? []);
   allConsumables = computed(() => this.data()?.consumables ?? []);
@@ -376,7 +432,7 @@ export class InventoryListPageComponent {
   // Drives the items-view Reset button: the popover's own filters OR any parent scope (area/search)
   // being active.
   protected extraFiltersActive = computed(() =>
-    this.areaFilter() !== 'all' || this.searchTerm() !== '');
+    this.areaFilter() !== 'all' || this.brandFilter() !== 'all' || this.searchTerm() !== '');
 
   constructor() {
     // Debounced URL sync for the search box: commit the trimmed term once typing pauses. No
@@ -396,6 +452,29 @@ export class InventoryListPageComponent {
     toObservable(this.searchTerm).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(term => {
       if (term) this.areaFilter.set('all');
       if (term !== this.searchInput().trim()) this.searchInput.set(term);
+    });
+
+    // Sole owner of the `brand` deep-link param (deliberately excluded from seedDeepLinkParams above).
+    // brandFilter is seeded synchronously from the snapshot; this handles the strip AND the one case
+    // the one-shot seed can't: a brand link inside a quick panel overlaid on THIS list page navigates
+    // to /inventory/items?brand=… without reconstructing the component. Watching the param covers that
+    // (and cross-route arrivals from the detail-page chip / Browse alike): apply the brand, close any
+    // open quick panel so the filtered list is visible, then strip the param (read-once, clean URL).
+    this.route.queryParamMap.pipe(
+      map(p => p.get('brand')),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(brand => {
+      if (!brand) return;
+      this.brandFilter.set(brand);
+      this.durableQuickPanelState.set('closed');
+      this.consumableQuickPanelState.set('closed');
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { brand: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
     });
   }
 
@@ -425,10 +504,16 @@ export class InventoryListPageComponent {
     this.areaFilter.set(af);
   }
 
-  /** The items-view Reset clears its own refinements; the page clears its scope (search/area). */
+  /** Picking a brand is orthogonal to search/area — the server ANDs the filters, so leave them be. */
+  selectBrandFilter(bf: string): void {
+    this.brandFilter.set(bf);
+  }
+
+  /** The items-view Reset clears its own refinements; the page clears its scope (search/area/brand). */
   onReset(): void {
     this.clearSearch();
     this.areaFilter.set('all');
+    this.brandFilter.set('all');
   }
 
   onChanged(): void {

@@ -53,7 +53,19 @@ public class Item
     public Guid? ValueCurrencyId { get; set; }
     public Commodity? ValueCurrency { get; set; }
 
+    /// <summary>
+    /// Optional canonical brand this item is attributed to. Applies to both durables and consumables
+    /// (the FK lives on the shared row); single-valued and the axis for brand grouping. Restrict on
+    /// delete — a brand in use can't be removed.
+    /// </summary>
+    public Guid? BrandId { get; set; }
+    public Brand? Brand { get; set; }
+
     public string? Serial { get; set; }
+
+    /// <summary>Optional free-text model designation ("MRW23"); durable-only, sits beside <see cref="Serial"/>.</summary>
+    public string? Model { get; set; }
+
     public DateOnly? AcquiredOn { get; set; }
 
     /// <summary>Free-text "lent to whom"; set only when <see cref="Status"/> is <see cref="ItemStatus.Lent"/>.</summary>

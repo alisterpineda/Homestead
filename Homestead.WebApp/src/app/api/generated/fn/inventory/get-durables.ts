@@ -13,6 +13,7 @@ import { PaginatedResponseOfDurableResponse } from '../../models/paginated-respo
 export interface GetDurables$Params {
   AreaId?: string;
   ParentItemId?: string;
+  BrandId?: string;
   DurableKinds?: Array<DurableKind>;
   Unplaced?: boolean;
   IncludeInactive?: boolean;
@@ -26,6 +27,7 @@ export function getDurables(http: HttpClient, rootUrl: string, params?: GetDurab
   if (params) {
     rb.query('AreaId', params.AreaId, {});
     rb.query('ParentItemId', params.ParentItemId, {});
+    rb.query('BrandId', params.BrandId, {});
     rb.query('DurableKinds', params.DurableKinds, {});
     rb.query('Unplaced', params.Unplaced, {});
     rb.query('IncludeInactive', params.IncludeInactive, {});

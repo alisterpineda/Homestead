@@ -16,9 +16,11 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import type { DurableKind } from '@/api/generated/models/durable-kind';
+import type { BrandResponse } from '@/api/generated/models/brand-response';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
+import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
@@ -42,6 +44,7 @@ type EntryKind = 'durable' | 'consumable';
     HlmLabel,
     HlmSelectImports,
     LocationPickerComponent,
+    BrandPickerComponent,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -95,6 +98,16 @@ type EntryKind = 'durable' | 'consumable';
             />
           </div>
 
+          <!-- Brand applies to both kinds, so it lives outside the kind-specific grid. -->
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Brand (optional)</label>
+            <app-brand-picker
+              [value]="brand()"
+              (valueChange)="brand.set($event)"
+              ariaLabel="Brand"
+            />
+          </div>
+
           <!-- Both field sets share one grid cell so the dialog reserves max height and never reflows
                on toggle; the inactive variant is hidden (still occupies space) and made inert. -->
           <div class="grid grid-cols-1">
@@ -127,6 +140,18 @@ type EntryKind = 'durable' | 'consumable';
                     </hlm-select-group>
                   </hlm-select-content>
                 </hlm-select>
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <label hlmLabel for="create-entry-model">Model (optional)</label>
+                <input
+                  hlmInput
+                  id="create-entry-model"
+                  maxlength="128"
+                  placeholder="e.g. MRW23"
+                  [value]="model()"
+                  (input)="model.set(asValue($event))"
+                />
               </div>
             </div>
 
@@ -220,10 +245,13 @@ export class CreateEntryDialogComponent {
   kind = signal<EntryKind>('durable');
   name = signal('');
   notes = signal('');
+  // Brand applies to both kinds.
+  brand = signal<BrandResponse | null>(null);
   // Durable fields
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
   durableKind = signal<DurableKind>('Plain');
+  model = signal('');
   // Consumable fields
   unit = signal('');
   threshold = signal('');
@@ -296,8 +324,10 @@ export class CreateEntryDialogComponent {
       this.kind.set('durable');
       this.name.set('');
       this.notes.set('');
+      this.brand.set(null);
       this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
       this.durableKind.set('Plain');
+      this.model.set('');
       this.unit.set('');
       this.threshold.set('');
       this.initialQuantity.set('');
@@ -329,6 +359,7 @@ export class CreateEntryDialogComponent {
           name: this.name().trim(),
           unit: this.unit().trim() || undefined,
           restockThreshold: t === '' ? null : Number(t),
+          brandId: this.brand()?.id ?? null,
           notes: this.notes().trim() ? this.notes().trim() : null,
           initialQuantity: placeStock ? qty : null,
           initialAreaId: placeStock && loc!.kind === 'area' ? loc!.id : null,
@@ -347,6 +378,8 @@ export class CreateEntryDialogComponent {
         areaId: this.areaId(),
         parentItemId: this.parentItemId(),
         durableKind: this.durableKind(),
+        brandId: this.brand()?.id ?? null,
+        model: this.model().trim() ? this.model().trim() : null,
         notes: this.notes().trim() ? this.notes().trim() : null,
       },
     }).subscribe({

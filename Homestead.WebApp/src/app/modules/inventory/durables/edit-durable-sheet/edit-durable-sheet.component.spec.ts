@@ -169,6 +169,31 @@ describe('EditDurableSheetComponent', () => {
       expect(ops()).toEqual([{ op: 'replace', path: '/name', value: 'Hammer' }]);
     });
 
+    it('seeds brand and model from the item and emits no ops when unchanged', () => {
+      open(makeItem({ brandId: 'apple', brandName: 'Apple', model: 'MRW23' }));
+      expect(component.editBrand()).toEqual({ id: 'apple', name: 'Apple' });
+      expect(component.editModel()).toBe('MRW23');
+      expect(ops()).toEqual([]);
+    });
+
+    it('emits a /model op (trimmed) when the model changes', () => {
+      open(makeItem());
+      component.editModel.set('  MRW23  ');
+      expect(ops()).toEqual([{ op: 'replace', path: '/model', value: 'MRW23' }]);
+    });
+
+    it('emits a /brandId op when a brand is picked', () => {
+      open(makeItem());
+      component.editBrand.set({ id: 'apple', name: 'Apple' });
+      expect(ops()).toEqual([{ op: 'replace', path: '/brandId', value: 'apple' }]);
+    });
+
+    it('clears the brand by emitting /brandId:null', () => {
+      open(makeItem({ brandId: 'apple', brandName: 'Apple' }));
+      component.editBrand.set(null);
+      expect(ops()).toEqual([{ op: 'replace', path: '/brandId', value: null }]);
+    });
+
     it('moves an item by replacing /areaId', () => {
       open(makeItem({ areaId: 'garage', areaName: 'Garage' }));
       component.editAreaId.set('office');

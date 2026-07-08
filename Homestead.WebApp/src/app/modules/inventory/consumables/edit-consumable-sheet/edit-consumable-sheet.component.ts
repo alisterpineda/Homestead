@@ -15,11 +15,13 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
+import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { itemStatusLabel } from '../../shared/item-status-meta';
 import { CONSUMABLE_STATUSES } from '../consumable-shared';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
+import type { BrandResponse } from '@/api/generated/models/brand-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -31,7 +33,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
 @Component({
   selector: 'app-edit-consumable-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmSelectImports],
+  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmSelectImports, BrandPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -81,6 +83,15 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 (input)="editThreshold.set(asValue($event))"
               />
               <p class="text-xs text-muted-foreground">Flagged low when the total on hand is at or below this.</p>
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Brand</label>
+              <app-brand-picker
+                [value]="editBrand()"
+                (valueChange)="editBrand.set($event)"
+                ariaLabel="Brand"
+              />
             </div>
 
             <div class="space-y-2">
@@ -145,6 +156,10 @@ export class EditConsumableSheetComponent {
     return t != null ? String(t) : '';
   });
   editStatus = seededLinkedSignal<string, ItemStatus>(this.seedKey, () => this.openConsumable()?.status ?? 'Active');
+  editBrand = seededLinkedSignal<string, BrandResponse | null>(this.seedKey, () => {
+    const c = this.openConsumable();
+    return c?.brandId ? { id: c.brandId, name: c.brandName ?? '' } : null;
+  });
   editNotes = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.notes ?? '');
   saving = seededLinkedSignal(this.seedKey, () => false);
 
@@ -200,6 +215,9 @@ export class EditConsumableSheetComponent {
 
     const status = this.editStatus();
     if (status !== s.status) ops.push(replace('/status', status));
+
+    const brandId = this.editBrand()?.id ?? null;
+    if (brandId !== (s.brandId ?? null)) ops.push(replace('/brandId', brandId));
 
     const notes = this.editNotes().trim() ? this.editNotes().trim() : null;
     if (notes !== (s.notes ?? null)) ops.push(replace('/notes', notes));

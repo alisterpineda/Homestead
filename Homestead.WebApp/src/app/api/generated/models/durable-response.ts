@@ -9,12 +9,15 @@ export interface DurableResponse {
   acquiredOn?: (string | null);
   areaId?: (string | null);
   areaName?: (string | null);
+  brandId?: (string | null);
+  brandName?: (string | null);
   compartment?: (string | null);
   createdAt: string;
   durableKind?: (null | DurableKind);
   fungibility: Fungibility;
   id: string;
   lentTo?: (string | null);
+  model?: (string | null);
   name: string;
   notes?: (string | null);
   parentDurableKind?: (null | DurableKind);

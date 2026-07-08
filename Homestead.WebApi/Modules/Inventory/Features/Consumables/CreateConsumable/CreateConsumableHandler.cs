@@ -19,6 +19,13 @@ public class CreateConsumableHandler(
 {
     public async Task<ConsumableResponse> Handle(CreateConsumableCommand request, CancellationToken ct)
     {
+        if (request.BrandId is { } brandId)
+        {
+            var brandExists = await db.Brands.AnyAsync(b => b.Id == brandId, ct);
+            if (!brandExists)
+                throw new BusinessRuleException("BrandId must reference an existing brand.");
+        }
+
         var item = new Item
         {
             Id = Guid.NewGuid(),
@@ -27,6 +34,7 @@ public class CreateConsumableHandler(
             Status = ItemStatus.Active,
             Unit = Normalize(request.Unit),
             RestockThreshold = request.RestockThreshold,
+            BrandId = request.BrandId,
             Notes = Normalize(request.Notes),
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,

@@ -255,4 +255,59 @@ describe('CreateEntryDialogComponent', () => {
 
     expect(successToast).toHaveBeenCalledWith('Consumable created with 12 at Pantry.');
   });
+
+  it('sends the selected brandId and trimmed model when creating a durable', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.onStateChanged('open');
+    component.name.set('MacBook Pro');
+    component.brand.set({ id: 'apple-1', name: 'Apple' });
+    component.model.set('  MRW23  ');
+
+    component.handleSubmit(new Event('submit'));
+
+    const body = submittedDurableBody();
+    expect(body.brandId).toBe('apple-1');
+    expect(body.model).toBe('MRW23');
+  });
+
+  it('sends null brandId/model for a durable with no brand or model', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.onStateChanged('open');
+    component.name.set('Cordless drill');
+
+    component.handleSubmit(new Event('submit'));
+
+    const body = submittedDurableBody();
+    expect(body.brandId).toBeNull();
+    expect(body.model).toBeNull();
+  });
+
+  it('sends the selected brandId when creating a consumable (no model field)', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.onStateChanged('open');
+    component.onKindChange('consumable');
+    component.name.set('Lightning cables');
+    component.brand.set({ id: 'apple-1', name: 'Apple' });
+
+    component.handleSubmit(new Event('submit'));
+
+    const body = submittedBody();
+    expect(body.brandId).toBe('apple-1');
+    expect('model' in body).toBe(false);
+  });
+
+  it('resets the brand and model on open', () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    component.brand.set({ id: 'stale', name: 'Stale' });
+    component.model.set('stale-model');
+
+    component.onStateChanged('open');
+
+    expect(component.brand()).toBeNull();
+    expect(component.model()).toBe('');
+  });
 });

@@ -19,11 +19,13 @@ import { FinancesCommodityApiService } from '@/api/services/finances-commodity-a
 import { CurrencyPickerComponent } from '@/modules/finances/shared/currency-picker/currency-picker.component';
 import { commodityResource } from '@/modules/finances/shared/commodity-resource';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
+import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel, isTerminalStatus } from '../../shared/item-status-meta';
 import { tomorrowIso } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
+import type { BrandResponse } from '@/api/generated/models/brand-response';
 import type { DurableKind } from '@/api/generated/models/durable-kind';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -46,6 +48,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
     HlmSelectImports,
     CurrencyPickerComponent,
     LocationPickerComponent,
+    BrandPickerComponent,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -79,6 +82,28 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 placeholder="(none)"
                 [value]="editSerial()"
                 (input)="editSerial.set(asValue($event))"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel for="durable-model">Model</label>
+              <input
+                hlmInput
+                id="durable-model"
+                class="w-full"
+                maxlength="128"
+                placeholder="(none)"
+                [value]="editModel()"
+                (input)="editModel.set(asValue($event))"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Brand</label>
+              <app-brand-picker
+                [value]="editBrand()"
+                (valueChange)="editBrand.set($event)"
+                ariaLabel="Brand"
               />
             </div>
 
@@ -247,6 +272,11 @@ export class EditDurableSheetComponent {
 
   editName = seededLinkedSignal(this.seedKey, () => this.openDurable()?.name ?? '');
   editSerial = seededLinkedSignal(this.seedKey, () => this.openDurable()?.serial ?? '');
+  editModel = seededLinkedSignal(this.seedKey, () => this.openDurable()?.model ?? '');
+  editBrand = seededLinkedSignal<string, BrandResponse | null>(this.seedKey, () => {
+    const d = this.openDurable();
+    return d?.brandId ? { id: d.brandId, name: d.brandName ?? '' } : null;
+  });
   editAcquiredOn = seededLinkedSignal(this.seedKey, () => this.openDurable()?.acquiredOn ?? '');
   editValue = seededLinkedSignal(this.seedKey, () => {
     const v = this.openDurable()?.value;
@@ -379,6 +409,12 @@ export class EditDurableSheetComponent {
 
     const serial = this.editSerial().trim() ? this.editSerial().trim() : null;
     if (serial !== (it.serial ?? null)) ops.push(replace('/serial', serial));
+
+    const model = this.editModel().trim() ? this.editModel().trim() : null;
+    if (model !== (it.model ?? null)) ops.push(replace('/model', model));
+
+    const brandId = this.editBrand()?.id ?? null;
+    if (brandId !== (it.brandId ?? null)) ops.push(replace('/brandId', brandId));
 
     const acquired = this.editAcquiredOn() ? this.editAcquiredOn() : null;
     if (acquired !== (it.acquiredOn ?? null)) ops.push(replace('/acquiredOn', acquired));

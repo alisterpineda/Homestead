@@ -22,6 +22,12 @@ public record ConsumableResponse
     /// <summary>Optional global low-stock trigger, compared against <see cref="TotalOnHand"/>.</summary>
     public decimal? RestockThreshold { get; init; }
 
+    /// <summary>Canonical brand id, or null when unattributed.</summary>
+    public Guid? BrandId { get; init; }
+
+    /// <summary>Brand name, denormalised for display; null when unattributed.</summary>
+    public string? BrandName { get; init; }
+
     /// <summary>Sum of quantity across every stock entry; zero when nothing is on hand.</summary>
     public required decimal TotalOnHand { get; init; }
 

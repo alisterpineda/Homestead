@@ -18,6 +18,9 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     /// <summary>Restrict to direct children of this holder (container or assembly).</summary>
     public Guid? ParentItemId { get; init; }
 
+    /// <summary>Restrict to items attributed to this brand. Backs the Items-list Brand facet.</summary>
+    public Guid? BrandId { get; init; }
+
     /// <summary>
     /// Restrict to items whose holder-role is one of these kinds. Empty/absent ⇒ no kind filter (all
     /// non-fungible items, components included). The placement picker passes

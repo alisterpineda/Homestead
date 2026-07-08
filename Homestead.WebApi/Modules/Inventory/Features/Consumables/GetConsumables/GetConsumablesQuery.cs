@@ -11,6 +11,9 @@ public record GetConsumablesQuery : PaginatedRequest, IRequest<PaginatedResponse
     /// <summary>Restrict to consumables at or below their restock threshold (the reorder view).</summary>
     public bool? LowStockOnly { get; init; }
 
+    /// <summary>Restrict to consumables attributed to this brand. Backs the Items-list Brand facet.</summary>
+    public Guid? BrandId { get; init; }
+
     /// <summary>
     /// Restrict to consumables with stock whose <b>resolved</b> area is this area or any descendant —
     /// a consumable matches when <b>any</b> of its stock locations walks up to the area (or a

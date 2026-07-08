@@ -42,7 +42,17 @@ public record DurableResponse
     public Guid? ValueCurrencyId { get; init; }
     public string? ValueCurrencySymbol { get; init; }
 
+    /// <summary>Canonical brand id, or null when unattributed.</summary>
+    public Guid? BrandId { get; init; }
+
+    /// <summary>Brand name, denormalised for display (like <see cref="ValueCurrencySymbol"/>); null when unattributed.</summary>
+    public string? BrandName { get; init; }
+
     public string? Serial { get; init; }
+
+    /// <summary>Free-text model designation; durable-only.</summary>
+    public string? Model { get; init; }
+
     public DateOnly? AcquiredOn { get; init; }
     public string? LentTo { get; init; }
 

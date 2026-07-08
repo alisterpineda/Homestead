@@ -9,6 +9,7 @@ import { InventoryListPageComponent } from './inventory-list-page.component';
 import { InventoryItemsViewComponent } from './inventory-items-view.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
+import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import type { InventoryRow } from './inventory-row';
 import { durableToRow, consumableToRow } from './inventory-row';
@@ -59,7 +60,8 @@ const GARAGE = 'garage';
 
 // chest(garage) ← wrench, bin(garage), archivedInChest ; bin ← screw(grandchild) ; floating(unplaced)
 const CHEST = makeItem({ id: 'chest', name: 'Tool chest', durableKind: 'Container', areaId: GARAGE, resolvedAreaId: GARAGE });
-const WRENCH = makeItem({ id: 'wrench', name: 'Wrench', parentItemId: 'chest', resolvedAreaId: GARAGE });
+const APPLE = 'apple';
+const WRENCH = makeItem({ id: 'wrench', name: 'Wrench', parentItemId: 'chest', resolvedAreaId: GARAGE, brandId: APPLE, brandName: 'Apple' });
 const BIN = makeItem({
   id: 'bin', name: 'Bin', durableKind: 'Container', parentItemId: 'chest', resolvedAreaId: GARAGE,
   path: [
@@ -75,7 +77,7 @@ const LADDER = makeItem({ id: 'ladder', name: 'Ladder', status: 'Lent' as ItemSt
 // tape: stocked in the garage area ; screws: split chest(4) + garage(6), low ;
 // glue: zero stock ; loose: stocked in an unplaced container (no area root)
 const TAPE = makeConsumable({
-  id: 'tape', name: 'Tape', totalOnHand: 5,
+  id: 'tape', name: 'Tape', totalOnHand: 5, brandId: APPLE, brandName: 'Apple',
   stockLocations: [{
     id: 'e-tape', quantity: 5, areaId: GARAGE,
     path: [{ id: GARAGE, name: 'Garage', kind: 'Area' }], locationLabel: 'Garage',
@@ -110,7 +112,7 @@ const LOOSE = makeConsumable({
 // The list page now filters by RESOLVED area on the server, so the stubs simulate that filter to
 // prove the page passes the fetch params through (no client-side area pass). Test AREAS has no
 // nesting, so an area's inclusive subtree is just itself.
-interface ListFetchParams { Search?: string; AreaId?: string; Unplaced?: boolean; totalCountOverride?: number }
+interface ListFetchParams { Search?: string; AreaId?: string; Unplaced?: boolean; BrandId?: string; totalCountOverride?: number }
 
 function durableResolvedArea(d: DurableResponse): string | null {
   return d.resolvedAreaId ?? null;
@@ -132,6 +134,7 @@ class StubDurableApi {
     if (p?.Search) items = items.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase()));
     if (p?.AreaId) items = items.filter(i => durableResolvedArea(i) === p.AreaId);
     else if (p?.Unplaced) items = items.filter(i => durableResolvedArea(i) === null);
+    if (p?.BrandId) items = items.filter(i => i.brandId === p.BrandId);
     return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchDurable = () => of(makeItem({}));
@@ -146,6 +149,7 @@ class StubConsumableApi {
     if (p?.Search) items = items.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()));
     if (p?.AreaId) items = items.filter(s => consumableResolvedAreas(s).includes(p.AreaId!));
     else if (p?.Unplaced) items = items.filter(s => consumableResolvedAreas(s).includes(null));
+    if (p?.BrandId) items = items.filter(s => s.brandId === p.BrandId);
     return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchConsumable = () => of(makeConsumable({}));
@@ -154,10 +158,14 @@ class StubConsumableApi {
 class StubAreaApi {
   getAreas = () => of({ items: AREAS, page: 1, pageSize: 200, totalCount: AREAS.length });
 }
+class StubBrandApi {
+  getBrands = () => of({ items: BRANDS, page: 1, pageSize: 200, totalCount: BRANDS.length });
+}
 
 const ITEMS: DurableResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING, LADDER];
 const CONSUMABLES: ConsumableResponse[] = [TAPE, SCREWS, GLUE, LOOSE];
 const AREAS: AreaResponse[] = [{ id: GARAGE, name: 'Garage', liveItemCount: 0, createdAt: '', updatedAt: '' }];
+const BRANDS = [{ id: APPLE, name: 'Apple' }, { id: 'sony', name: 'Sony' }];
 
 describe('InventoryListPageComponent', () => {
   let fixture: ComponentFixture<InventoryListPageComponent>;
@@ -177,6 +185,7 @@ describe('InventoryListPageComponent', () => {
         { provide: InventoryDurableApiService, useValue: durableApi },
         { provide: InventoryConsumableApiService, useValue: consumableApi },
         { provide: InventoryAreaApiService, useValue: new StubAreaApi() },
+        { provide: InventoryBrandApiService, useValue: new StubBrandApi() },
       ],
     });
     fixture = TestBed.createComponent(InventoryListPageComponent);
@@ -243,6 +252,59 @@ describe('InventoryListPageComponent', () => {
     expect(durableApi.lastParams?.AreaId).toBeUndefined();
     expect(durableApi.lastParams?.Unplaced).toBeUndefined();
     expect(consumableApi.lastParams?.AreaId).toBeUndefined();
+  });
+
+  it('selecting a brand drives the server fetch (BrandId param) on both kinds', async () => {
+    component.selectBrandFilter(APPLE);
+    await settle();
+
+    expect(durableApi.lastParams?.BrandId).toBe(APPLE);
+    expect(consumableApi.lastParams?.BrandId).toBe(APPLE);
+    // Only the Apple-branded rows survive, across both kinds.
+    expect(ids(scopedRows())).toEqual(['tape', 'wrench']);
+  });
+
+  it('sends no BrandId for the "all" brand scope', () => {
+    expect(durableApi.lastParams?.BrandId).toBeUndefined();
+    expect(consumableApi.lastParams?.BrandId).toBeUndefined();
+  });
+
+  it('the brand filter is orthogonal to search and area (all three go to the fetch together)', async () => {
+    component.areaFilter.set(GARAGE);
+    component.selectBrandFilter(APPLE);
+    await settle();
+
+    expect(durableApi.lastParams?.AreaId).toBe(GARAGE);
+    expect(durableApi.lastParams?.BrandId).toBe(APPLE);
+    // Picking a brand does not clear the area scope.
+    expect(component.areaFilter()).toBe(GARAGE);
+  });
+
+  it('applies a ?brand= that arrives while already mounted (quick-panel link) and closes the panel', async () => {
+    // A brand link inside a quick panel overlaid on the list navigates to ?brand= without
+    // reconstructing the component; the reactive handler must still apply it, close the panel,
+    // and strip the param.
+    component.onOpenDurable(WRENCH);
+    expect(component.durableQuickPanelState()).toBe('open');
+
+    await TestBed.inject(Router).navigate([], { queryParams: { brand: APPLE } });
+    await settle();
+
+    expect(component.brandFilter()).toBe(APPLE);
+    expect(component.durableQuickPanelState()).toBe('closed');
+    expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['brand']).toBeUndefined();
+    expect(ids(scopedRows())).toEqual(['tape', 'wrench']);
+  });
+
+  it('onReset clears the brand scope too', async () => {
+    component.selectBrandFilter(APPLE);
+    await settle();
+    expect(component.brandFilter()).toBe(APPLE);
+
+    component.onReset();
+    await settle();
+    expect(component.brandFilter()).toBe('all');
+    expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
   it('shows a "Showing X of N" notice when a kind\'s total exceeds the rows shown', async () => {
@@ -395,6 +457,13 @@ describe('InventoryListPageComponent', () => {
       const stripped = TestBed.inject(Router).routerState.snapshot.root.queryParams;
       expect(stripped['area']).toBeUndefined();
       expect(stripped['kind']).toBeUndefined();
+    });
+
+    it('?brand seeds the page brand scope and strips the param (detail-page chip deep link)', async () => {
+      const f = await createWithParams({ brand: APPLE });
+      expect(f.componentInstance.brandFilter()).toBe(APPLE);
+      expect(ids(f.componentInstance['scopedRows']())).toEqual(['tape', 'wrench']);
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['brand']).toBeUndefined();
     });
 
     it('an unknown ?kind value falls back to all kinds', async () => {

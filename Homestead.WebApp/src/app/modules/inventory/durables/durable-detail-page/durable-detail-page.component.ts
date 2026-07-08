@@ -177,6 +177,20 @@ import { toast } from '@spartan-ng/brain/sonner';
                 <dt class="text-muted-foreground">Serial</dt>
                 <dd class="break-words">{{ it.serial }}</dd>
               }
+              @if (it.model) {
+                <dt class="text-muted-foreground">Model</dt>
+                <dd class="break-words">{{ it.model }}</dd>
+              }
+              @if (it.brandId) {
+                <dt class="text-muted-foreground">Brand</dt>
+                <dd class="break-words">
+                  <a
+                    routerLink="/inventory/items"
+                    [queryParams]="{ brand: it.brandId }"
+                    class="hover:underline"
+                  >{{ it.brandName }}</a>
+                </dd>
+              }
               @if (it.acquiredOn) {
                 <dt class="text-muted-foreground">Acquired on</dt>
                 <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
@@ -494,7 +508,8 @@ export class DurableDetailPageComponent {
   // would be an empty card, so it's hidden (location now leads as the headline, not a Details row).
   protected hasDetails = computed(() => {
     const it = this.durable();
-    return !!it && (it.value != null || !!it.serial || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo));
+    return !!it && (it.value != null || !!it.serial || !!it.model || !!it.brandId
+      || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo));
   });
 
   protected updatedRelative = computed(() => {

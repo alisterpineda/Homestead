@@ -12,6 +12,7 @@ import { PaginatedResponseOfConsumableResponse } from '../../models/paginated-re
 export interface GetConsumables$Params {
   IncludeInactive?: boolean;
   LowStockOnly?: boolean;
+  BrandId?: string;
   AreaId?: string;
   Unplaced?: boolean;
   Search?: string;
@@ -24,6 +25,7 @@ export function getConsumables(http: HttpClient, rootUrl: string, params?: GetCo
   if (params) {
     rb.query('IncludeInactive', params.IncludeInactive, {});
     rb.query('LowStockOnly', params.LowStockOnly, {});
+    rb.query('BrandId', params.BrandId, {});
     rb.query('AreaId', params.AreaId, {});
     rb.query('Unplaced', params.Unplaced, {});
     rb.query('Search', params.Search, {});

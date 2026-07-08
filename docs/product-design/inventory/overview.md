@@ -23,6 +23,7 @@ The module is not an asset-management system, a warehouse/WMS, a shopping-list a
 - **Lifecycle status** — items carry a status (`Active`, `Lent`, `InRepair`, `Sold`, `Discarded`, `Archived`) that records the real-world state of the thing, with terminal states hidden from default views.
 - **"Track this one individually"** — carve a single non-fungible instance out of fungible stock (and the reverse), losslessly and atomically.
 - **Estimated value** — an optional per-item value in a chosen currency, for insurance/rollup, captured but not yet aggregated.
+- **Brand and model** — an optional **brand** (a canonical, shared lookup applied to *both* durables and consumables, and the axis for "show me all my Apple devices" grouping) plus, for durables only, an optional free-text **model** designation sitting alongside the serial. Both round out the make/model/serial identity cluster of a manufactured good.
 
 ## Out of scope for v1
 
@@ -51,12 +52,18 @@ See [locations.md](locations.md) for the area model, the area hierarchy and roll
 
 An **Item** is anything the household owns. Every item is one of two kinds, set by a neutral **fungibility** discriminator that is fixed for the life of the row:
 
-- A **non-fungible** item is a single, identity-tracked instance — *this* drill, *this* passport. It lives in exactly one place at a time, or nowhere yet ("Unplaced"). It can carry an estimated value, a serial number, an acquired-on date, and a free-text compartment note ("top drawer").
+- A **non-fungible** item is a single, identity-tracked instance — *this* drill, *this* passport. It lives in exactly one place at a time, or nowhere yet ("Unplaced"). It can carry an estimated value, a serial number, a **model** designation, an acquired-on date, and a free-text compartment note ("top drawer"). Like any item it can also name a **brand** (see below).
 - A **fungible** item is a *type* of consumable — screws, paper towels, printer paper — measured in a unit ("screws," "rolls," "gal"). It holds no single location; instead its quantity is spread across one or more **stock entries**, one per location, and its total on-hand is their sum.
 
 The labels users see — "durables" vs "consumables" — are presentation only. The persisted discriminator is the neutral `Fungibility` value, so the wording can change without touching data. Fungibility never flips on an existing row: converting between the two kinds is always done by creating or retiring rows (see *Track this one individually*), never by toggling a flag, which keeps each row's location and stock columns coherent.
 
 See [stock.md](stock.md) for the fungible model in full: stock entries, the movement ledger, thresholds, and the conversion operations.
+
+### Brand
+
+A **Brand** is a canonical, first-class lookup entity — a consumer manufacturer name ("Apple," "Makita," "Sony") an item is attributed to. It is deliberately *not* free text and *not* a tag: it is a single shared row that both durables and consumables can reference through one optional foreign key on the item, so a brand is single-valued per item and applies to **both** kinds. Brand is the axis for the grouping question "show me everything I own by this maker," surfaced in v1 as a single-select **filter facet** on the Items list (matching the Area facet) and as a click-through chip on each item's detail — not as a list column. "Brand" is the label because the grouping people want is by *consumer* brand, not the OEM that actually built the part.
+
+Brands are created by **find-or-create at entry time**: a combobox on the item forms autocompletes existing brands and offers "Create 'X'" for a new name; creation is idempotent and case-insensitive, so typing "apple," "Apple," or " apple " all resolve to the one canonical row (a database unique index on the lower-cased name is the backstop). There is no Brands admin page, no rename/merge surface, and no sidebar entry in v1 — canonicalisation rests entirely on entry-time dedup. A brand that is in use **cannot be deleted** (the item reference restricts it), so an attributed history never dangles. Brand is intentionally *not* wired into full-text item search or the ⌘K palette in v1 — it is a discovery facet only, additive later.
 
 ### Holders: containment vs composition
 
@@ -176,6 +183,7 @@ Like Documents and Finances, Inventory has no per-item owner and no per-user sco
 The following must be addable later without re-migrating items, areas, stock, or movement history:
 
 - **Item categories** as a user-curated taxonomy — added as a flat lookup (the Documents Party pattern) referenced from items, with no change to the item table beyond an optional foreign key. Nothing in v1 branches on category, so it slots in additively.
+- **A richer Brand surface.** v1 ships brand as a find-or-create lookup with a filter facet and detail chip only. Deferred, all additive on top of the existing `Brand` row and `Item.BrandId` FK: **brand metadata** (logo, website, support contact) as extra columns on the brand row; a **Brands admin / rename / merge** surface (with a sidebar entry); brand as an **Items-list column**; a **per-brand value rollup** and **item counts**; and making brand **searchable** (a trigram index + search-query wiring) so it joins the ⌘K palette rather than staying facet-only.
 - **Photos / attachments** on items, in their own table keyed by `Item.Id` — important for non-fungible items and insurance claims.
 - **Barcode / QR scanning** and **printable container labels**, keyed off the stable item and area IDs.
 - **Expiry / perishables and per-category custom fields**, feeding reminders through a future Calendar/Maintenance module.

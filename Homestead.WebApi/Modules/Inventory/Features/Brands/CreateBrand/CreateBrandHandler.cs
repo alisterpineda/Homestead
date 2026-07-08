@@ -1,0 +1,41 @@
+using Homestead.WebApi.Common;
+using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Persistence;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace Homestead.WebApi.Modules.Inventory.Features.Brands.CreateBrand;
+
+public class CreateBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWork unitOfWork)
+    : IRequestHandler<CreateBrandCommand, BrandResponse>
+{
+    public async Task<BrandResponse> Handle(CreateBrandCommand request, CancellationToken ct)
+    {
+        // Find-or-create (modelled on TagPathResolver.ResolveOrCreateAsync, not CreateParty which
+        // 409s): a case-/whitespace-variant of an existing brand returns the existing row so the
+        // endpoint stays idempotent. The unique lower("Name") index is the backstop.
+        var name = request.Name.Trim();
+        var nameLower = name.ToLower();
+
+        var existing = await db.Brands
+            .FirstOrDefaultAsync(b => b.Name.ToLower() == nameLower, ct);
+        if (existing is not null)
+            return BrandResponseMapper.ToResponse(existing);
+
+        var brand = new Brand
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+
+        db.Brands.Add(brand);
+        audit.Created("Brand", brand.Id);
+
+        await unitOfWork.SaveChangesAsync(ct);
+
+        return BrandResponseMapper.ToResponse(brand);
+    }
+}

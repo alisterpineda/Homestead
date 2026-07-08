@@ -8,7 +8,7 @@ import {
   inject,
   DestroyRef,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, defer, type Observable } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -72,6 +72,7 @@ interface StepperPayload {
   selector: 'app-consumable-quick-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmSheetImports,
@@ -127,6 +128,22 @@ interface StepperPayload {
                 }
               </div>
             </div>
+
+            <!-- Brand -->
+            @if (s.brandId) {
+              <div hlmItem variant="outline">
+                <div hlmItemContent class="min-w-0">
+                  <span class="text-sm text-muted-foreground">Brand</span>
+                  <p>
+                    <a
+                      routerLink="/inventory/items"
+                      [queryParams]="{ brand: s.brandId }"
+                      class="hover:underline"
+                    >{{ s.brandName }}</a>
+                  </p>
+                </div>
+              </div>
+            }
 
             <!-- Per-location stock -->
             <div class="flex items-center justify-between gap-2">

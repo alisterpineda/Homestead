@@ -24,6 +24,13 @@ public record CreateDurableCommand : ICommand<DurableResponse>
 
     public string? Notes { get; init; }
     public string? Serial { get; init; }
+
+    /// <summary>Optional canonical brand this item is attributed to.</summary>
+    public Guid? BrandId { get; init; }
+
+    /// <summary>Optional free-text model designation ("MRW23").</summary>
+    public string? Model { get; init; }
+
     public DateOnly? AcquiredOn { get; init; }
     public decimal? Value { get; init; }
     public Guid? ValueCurrencyId { get; init; }

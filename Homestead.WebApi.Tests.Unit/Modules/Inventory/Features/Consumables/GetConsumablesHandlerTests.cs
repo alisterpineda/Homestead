@@ -123,6 +123,26 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Handle_FiltersByBrand_NarrowsToBrandAndProjectsName()
+    {
+        var apple = new Brand { Id = Guid.NewGuid(), Name = "Apple" };
+        _db.Brands.Add(apple);
+        await _db.SaveChangesAsync(Ct);
+
+        var branded = await AddBareConsumableAsync("Lightning cables");
+        branded.BrandId = apple.Id;
+        await _db.SaveChangesAsync(Ct);
+        await AddBareConsumableAsync("Generic wire");
+
+        var resp = await _sut.Handle(new GetConsumablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal("Lightning cables", resp.Items[0].Name);
+        Assert.Equal(apple.Id, resp.Items[0].BrandId);
+        Assert.Equal("Apple", resp.Items[0].BrandName);
+    }
+
+    [Fact]
     public async Task Handle_LowStockOnly_ReturnsConsumablesAtOrBelowThreshold()
     {
         await AddConsumableAsync("Wood screws", quantity: 4, restockThreshold: 5); // below

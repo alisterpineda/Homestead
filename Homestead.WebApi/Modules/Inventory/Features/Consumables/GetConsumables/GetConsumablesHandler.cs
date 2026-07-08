@@ -25,6 +25,9 @@ public class GetConsumablesHandler(AppDbContext db, IItemLocationResolver locati
             query = query.Where(i =>
                 i.RestockThreshold != null && i.StockEntries.Sum(e => e.Quantity) <= i.RestockThreshold);
 
+        if (request.BrandId is { } brandId)
+            query = query.Where(i => i.BrandId == brandId);
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLower();

@@ -21,6 +21,9 @@ public record CreateConsumableCommand : ICommand<ConsumableResponse>
     /// <summary>Optional global low-stock trigger, compared against total on-hand.</summary>
     public decimal? RestockThreshold { get; init; }
 
+    /// <summary>Optional canonical brand this consumable is attributed to.</summary>
+    public Guid? BrandId { get; init; }
+
     public string? Notes { get; init; }
 
     /// <summary>Optional starting location (area) for seeded stock. Set together with

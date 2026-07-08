@@ -48,11 +48,13 @@ A single `Item` table holds both kinds, discriminated by `Fungibility`. Shared f
 | `Notes` | all | nullable |
 | `CreatedAt`, `UpdatedAt` | all | UTC |
 | `CreatedByUserId`, `UpdatedByUserId` | all | attribution; nullable, cleared if the user is deleted |
+| `BrandId` | all | optional FK to the canonical `Brand` lookup; single-valued; applies to **both** kinds; `OnDelete(Restrict)` — a brand in use can't be deleted. See [overview.md](overview.md#brand) |
 | `AreaId` / `ParentItemId` | non-fungible | the location pair — **at most one** set (see *The location rule*) |
 | `DurableKind` | non-fungible | holder-role: `Plain` \| `Container` \| `Assembly`. Set on every non-fungible item; **null on fungible**. Only a `Container`/`Assembly` may be a parent |
 | `Compartment` | non-fungible | free-text sub-position within a parent ("top drawer"); also doubles as the component slot label under an `Assembly` ("CPU"); nullable |
 | `Value` / `ValueCurrencyId` | non-fungible | estimated value + its currency — both or neither; nullable |
 | `Serial` | non-fungible | nullable |
+| `Model` | non-fungible | free-text model designation ("MRW23"); sits beside `Serial`; nullable |
 | `AcquiredOn` | non-fungible | date; nullable |
 | `LentTo` | non-fungible | free text; set when `Status = Lent` |
 | `Unit` | fungible | "screws", "rolls", "gal" — see [stock.md](stock.md) |

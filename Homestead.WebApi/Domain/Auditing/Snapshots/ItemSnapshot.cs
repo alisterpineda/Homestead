@@ -15,7 +15,9 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
     public string? Compartment { get; init; }
     public decimal? Value { get; init; }
     public Guid? ValueCurrencyId { get; init; }
+    public Guid? BrandId { get; init; }
     public string? Serial { get; init; }
+    public string? Model { get; init; }
     public DateOnly? AcquiredOn { get; init; }
     public string? LentTo { get; init; }
     public string? Unit { get; init; }
@@ -32,7 +34,9 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
         Compartment = source.Compartment,
         Value = source.Value,
         ValueCurrencyId = source.ValueCurrencyId,
+        BrandId = source.BrandId,
         Serial = source.Serial,
+        Model = source.Model,
         AcquiredOn = source.AcquiredOn,
         LentTo = source.LentTo,
         Unit = source.Unit,
@@ -61,8 +65,12 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
             changes.Add(new ScalarFieldChange("Value", Format(Value), Format(other.Value)));
         if (ValueCurrencyId != other.ValueCurrencyId)
             changes.Add(new ScalarFieldChange("ValueCurrencyId", ValueCurrencyId?.ToString(), other.ValueCurrencyId?.ToString()));
+        if (BrandId != other.BrandId)
+            changes.Add(new ScalarFieldChange("BrandId", BrandId?.ToString(), other.BrandId?.ToString()));
         if (Serial != other.Serial)
             changes.Add(new ScalarFieldChange("Serial", Serial, other.Serial));
+        if (Model != other.Model)
+            changes.Add(new ScalarFieldChange("Model", Model, other.Model));
         if (AcquiredOn != other.AcquiredOn)
             changes.Add(new ScalarFieldChange("AcquiredOn", Format(AcquiredOn), Format(other.AcquiredOn)));
         if (LentTo != other.LentTo)

@@ -257,6 +257,10 @@ export type { DeleteArea$Params as DeleteArea$Params } from './fn/inventory/dele
 export { deleteArea as deleteArea } from './fn/inventory/delete-area';
 export type { PatchArea$Params as PatchArea$Params } from './fn/inventory/patch-area';
 export { patchArea as patchArea } from './fn/inventory/patch-area';
+export type { GetBrands$Params as GetBrands$Params } from './fn/inventory/get-brands';
+export { getBrands as getBrands } from './fn/inventory/get-brands';
+export type { CreateBrand$Params as CreateBrand$Params } from './fn/inventory/create-brand';
+export { createBrand as createBrand } from './fn/inventory/create-brand';
 export type { GetDurables$Params as GetDurables$Params } from './fn/inventory/get-durables';
 export { getDurables as getDurables } from './fn/inventory/get-durables';
 export type { CreateDurable$Params as CreateDurable$Params } from './fn/inventory/create-durable';

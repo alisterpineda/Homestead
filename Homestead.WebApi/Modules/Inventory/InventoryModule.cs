@@ -4,6 +4,8 @@ using Homestead.WebApi.Modules.Inventory.Features.Areas.CreateArea;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.DeleteArea;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.GetAreas;
 using Homestead.WebApi.Modules.Inventory.Features.Areas.PatchArea;
+using Homestead.WebApi.Modules.Inventory.Features.Brands.CreateBrand;
+using Homestead.WebApi.Modules.Inventory.Features.Brands.GetBrands;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.CreateDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.DeleteDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurable;
@@ -52,6 +54,10 @@ public static class InventoryModule
         CreateAreaEndpoint.Map(areas);
         PatchAreaEndpoint.Map(areas);
         DeleteAreaEndpoint.Map(areas);
+
+        var brands = v1.MapGroup("/brands");
+        GetBrandsEndpoint.Map(brands);
+        CreateBrandEndpoint.Map(brands);
 
         var durables = v1.MapGroup("/durables");
         GetDurablesEndpoint.Map(durables);

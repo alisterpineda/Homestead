@@ -4,6 +4,8 @@
 import { ItemStatus } from '../models/item-status';
 import { StockEntryResponse } from '../models/stock-entry-response';
 export interface ConsumableResponse {
+  brandId?: (string | null);
+  brandName?: (string | null);
   createdAt: string;
   id: string;
   isLow: boolean;

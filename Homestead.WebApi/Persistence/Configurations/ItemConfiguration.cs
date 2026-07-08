@@ -10,11 +10,13 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
     private const string LocationNotBothSql =
         "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)";
 
-    // A fungible row carries none of the non-fungible columns and has no durable kind.
+    // A fungible row carries none of the non-fungible columns and has no durable kind. BrandId is
+    // deliberately absent — a brand is legal on both kinds.
     private const string NonFungibleFieldsSql =
         "\"Fungibility\" = 'NonFungible' OR ("
         + "\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL "
         + "AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL "
+        + "AND \"Model\" IS NULL "
         + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL)";
 
     // A non-fungible row carries none of the fungible columns and always names a durable kind.
@@ -65,6 +67,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
 
         builder.Property(i => i.Compartment).HasMaxLength(256);
         builder.Property(i => i.Serial).HasMaxLength(128);
+        builder.Property(i => i.Model).HasMaxLength(128);
         builder.Property(i => i.LentTo).HasMaxLength(256);
         builder.Property(i => i.Unit).HasMaxLength(32);
 
@@ -100,6 +103,12 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             .HasForeignKey(i => i.ValueCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // A brand in use can't be deleted — mirrors the ValueCurrency FK.
+        builder.HasOne(i => i.Brand)
+            .WithMany()
+            .HasForeignKey(i => i.BrandId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(i => i.CreatedByUser)
             .WithMany()
             .HasForeignKey(i => i.CreatedByUserId)
@@ -113,5 +122,6 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.HasIndex(i => i.AreaId);
         builder.HasIndex(i => i.ParentItemId);
         builder.HasIndex(i => i.Status);
+        builder.HasIndex(i => i.BrandId);
     }
 }

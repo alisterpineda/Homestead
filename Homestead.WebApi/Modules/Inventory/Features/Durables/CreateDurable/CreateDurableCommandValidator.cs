@@ -18,6 +18,9 @@ public class CreateDurableCommandValidator : AbstractValidator<CreateDurableComm
         RuleFor(x => x.Serial)
             .MaximumLength(128).WithMessage("Serial must be 128 characters or fewer.");
 
+        RuleFor(x => x.Model)
+            .MaximumLength(128).WithMessage("Model must be 128 characters or fewer.");
+
         // At most one location: an item is created in an area, in a container, or nowhere.
         RuleFor(x => x.ParentItemId)
             .Null().WithMessage("An item can be created in an area or a container, not both.")

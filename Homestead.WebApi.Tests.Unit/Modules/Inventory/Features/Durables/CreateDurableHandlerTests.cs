@@ -58,6 +58,14 @@ public class CreateDurableHandlerTests : IDisposable
         return c;
     }
 
+    private async Task<Brand> AddBrandAsync(string name = "Apple")
+    {
+        var b = new Brand { Id = Guid.NewGuid(), Name = name };
+        _db.Brands.Add(b);
+        await _db.SaveChangesAsync(Ct);
+        return b;
+    }
+
     [Fact]
     public async Task Handle_AppliesNonFungibleActiveDefaults()
     {
@@ -193,6 +201,46 @@ public class CreateDurableHandlerTests : IDisposable
         Assert.Equal(LocationSegmentKind.Area, result.Path[0].Kind);
         Assert.Equal(chest.Id, result.Path[1].Id);
         Assert.Equal(LocationSegmentKind.Container, result.Path[1].Kind);
+    }
+
+    [Fact]
+    public async Task Handle_WithUnknownBrand_Throws()
+    {
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new CreateDurableCommand { Name = "MacBook", BrandId = Guid.NewGuid() }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_WithKnownBrand_MapsBrandIdAndName()
+    {
+        var apple = await AddBrandAsync();
+
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "MacBook", BrandId = apple.Id }, Ct);
+
+        Assert.Equal(apple.Id, result.BrandId);
+        Assert.Equal("Apple", result.BrandName);
+        Assert.Equal(apple.Id, _db.Items.Single().BrandId);
+    }
+
+    [Fact]
+    public async Task Handle_WithModel_TrimsAndStoresModel()
+    {
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "MacBook", Model = "  MRW23  " }, Ct);
+
+        Assert.Equal("MRW23", result.Model);
+        Assert.Equal("MRW23", _db.Items.Single().Model);
+    }
+
+    [Fact]
+    public async Task Handle_WithBlankModel_StoresNull()
+    {
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "MacBook", Model = "   " }, Ct);
+
+        Assert.Null(result.Model);
+        Assert.Null(_db.Items.Single().Model);
     }
 
     [Fact]

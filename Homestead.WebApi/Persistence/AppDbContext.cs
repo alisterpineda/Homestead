@@ -40,6 +40,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CommodityPriceSourceSettings> CommodityPriceSourceSettings { get; set; }
 
     public DbSet<Area> Areas { get; set; }
+    public DbSet<Brand> Brands { get; set; }
     public DbSet<Item> Items { get; set; }
     public DbSet<StockEntry> StockEntries { get; set; }
     public DbSet<StockMovement> StockMovements { get; set; }

@@ -31,7 +31,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
 
     private async Task<Item> AddItemAsync(
         string name, ItemStatus status = ItemStatus.Active, Guid? areaId = null,
-        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain)
+        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain, Guid? brandId = null)
     {
         var item = new Item
         {
@@ -42,10 +42,36 @@ public class GetDurablesHandlerTests : IAsyncLifetime
             AreaId = areaId,
             ParentItemId = parentItemId,
             DurableKind = durableKind,
+            BrandId = brandId,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(Ct);
         return item;
+    }
+
+    private async Task<Brand> AddBrandAsync(string name)
+    {
+        var b = new Brand { Id = Guid.NewGuid(), Name = name };
+        _db.Brands.Add(b);
+        await _db.SaveChangesAsync(Ct);
+        return b;
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByBrand_NarrowsToBrand()
+    {
+        var apple = await AddBrandAsync("Apple");
+        var sony = await AddBrandAsync("Sony");
+        await AddItemAsync("MacBook", brandId: apple.Id);
+        await AddItemAsync("Bravia TV", brandId: sony.Id);
+        await AddItemAsync("Unbranded drill");
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, BrandId = apple.Id }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal("MacBook", resp.Items[0].Name);
+        Assert.Equal(apple.Id, resp.Items[0].BrandId);
+        Assert.Equal("Apple", resp.Items[0].BrandName);
     }
 
     [Fact]

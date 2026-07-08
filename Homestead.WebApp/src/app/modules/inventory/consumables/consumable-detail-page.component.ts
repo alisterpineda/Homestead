@@ -9,7 +9,7 @@ import {
   DestroyRef,
   LOCALE_ID,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { formatDate } from '@angular/common';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
@@ -65,6 +65,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   selector: 'app-consumable-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     NgIcon,
     HlmIconImports,
     HlmButton,
@@ -128,6 +129,16 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               }
               Updated {{ updatedRelative() }}
             </p>
+            @if (s.brandId) {
+              <p class="text-sm text-muted-foreground">
+                Brand:
+                <a
+                  routerLink="/inventory/items"
+                  [queryParams]="{ brand: s.brandId }"
+                  class="text-foreground hover:underline"
+                >{{ s.brandName }}</a>
+              </p>
+            }
             @if (s.notes) {
               <p class="max-w-prose text-sm text-muted-foreground">{{ s.notes }}</p>
             }
