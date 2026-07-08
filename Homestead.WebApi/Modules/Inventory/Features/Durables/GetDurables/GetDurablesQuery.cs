@@ -22,6 +22,17 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     public Guid? BrandId { get; init; }
 
     /// <summary>
+    /// Restrict to items carrying any of these tags. Backs the Items-list Tag facet. Combined with
+    /// <see cref="IncludeChildTags"/> to also match descendant tags.
+    /// </summary>
+    [FromQuery(Name = "TagIds")]
+    public Guid[]? TagIds { get; init; }
+
+    /// <summary>When true, <see cref="TagIds"/> also matches items tagged with any descendant tag.</summary>
+    [FromQuery(Name = "IncludeChildTags")]
+    public bool? IncludeChildTags { get; init; }
+
+    /// <summary>
     /// Restrict to items whose holder-role is one of these kinds. Empty/absent ⇒ no kind filter (all
     /// non-fungible items, components included). The placement picker passes
     /// <c>[Container, Assembly]</c>; the list can pass a single kind.

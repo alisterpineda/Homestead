@@ -8,7 +8,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmFieldImports } from '@/shared/components/spartan/field';
 import { TagApiService } from '@/api/services/tag-api.service';
-import { ColorPickerComponent } from '../color-picker/color-picker.component';
+import { ColorPickerComponent } from '@/shared/components/color-picker/color-picker.component';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 

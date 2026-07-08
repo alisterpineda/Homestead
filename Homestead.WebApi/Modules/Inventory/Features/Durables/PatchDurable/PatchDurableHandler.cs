@@ -16,12 +16,15 @@ public class PatchDurableHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IItemLocationResolver locationResolver,
+    IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<PatchDurableCommand, DurableResponse>
 {
     public async Task<DurableResponse> Handle(PatchDurableCommand request, CancellationToken ct)
     {
-        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == request.Id, ct);
+        var item = await db.Items
+            .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
+            .FirstOrDefaultAsync(i => i.Id == request.Id, ct);
         if (item is null)
             throw new EntityNotFoundException("Item not found.");
 
@@ -47,6 +50,7 @@ public class PatchDurableHandler(
             ParentItemId = item.ParentItemId,
             DurableKind = item.DurableKind,
             Compartment = item.Compartment,
+            Tags = item.ItemTags.Select(it => it.Tag.Path).ToList(),
         };
 
         request.PatchDocument.ApplyOrThrow(model);
@@ -219,6 +223,14 @@ public class PatchDurableHandler(
         item.Compartment = targetCompartment;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByUserId = currentUser.UserId;
+
+        // Whole-set replace: model.Tags is seeded from the item's current paths, so an omitted /tags
+        // op is a no-op; a replace swaps the entire set (ancestors upserted).
+        // `?? []`: JsonPatch `replace /tags null` silently nulls the List (no ApplyOrThrow error), and
+        // `null.Where(...)` would throw ArgumentNullException → unhandled 500. Treat null as "clear".
+        var tagPaths = (model.Tags ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+        var resolvedTags = await tagResolver.ResolveOrCreateManyAsync(tagPaths, currentUser.UserId, ct);
+        InventoryItemTagSync.SetItemTags(item, resolvedTags);
 
         await unitOfWork.SaveChangesAsync(ct);
 

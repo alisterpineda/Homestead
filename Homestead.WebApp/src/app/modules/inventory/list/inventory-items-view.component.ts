@@ -118,7 +118,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
             <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
             {{ filterLabel() }}
           </button>
-          <div hlmPopoverContent *hlmPopoverPortal class="w-[260px] p-0" align="start">
+          <div hlmPopoverContent *hlmPopoverPortal class="max-h-[min(70vh,32rem)] w-[260px] overflow-y-auto p-0" align="start">
             <div class="flex items-center justify-between px-3 py-2">
               <span class="text-sm font-medium">Filters</span>
               @if (showInactive() || lowStockOnly() || lentOnly() || extraFiltersActive()) {

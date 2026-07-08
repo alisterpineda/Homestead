@@ -21,8 +21,8 @@ import type { JsonPatchDocument } from '@/api/generated/models/json-patch-docume
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { replace } from '@/shared/json-patch';
-import { ColorPickerComponent } from '../color-picker/color-picker.component';
-import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
+import { ColorPickerComponent } from '@/shared/components/color-picker/color-picker.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';

@@ -98,6 +98,79 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync(Ct);
     }
 
+    private async Task<Tag> AddTagAsync(string name, string path, Guid? parentId = null)
+    {
+        var tag = new Tag { Id = Guid.NewGuid(), Name = name, Path = path, ParentId = parentId };
+        _db.InventoryTags.Add(tag);
+        await _db.SaveChangesAsync(Ct);
+        return tag;
+    }
+
+    private async Task TagItemAsync(Guid itemId, Guid tagId)
+    {
+        _db.ItemTags.Add(new ItemTag { ItemId = itemId, TagId = tagId });
+        await _db.SaveChangesAsync(Ct);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByTagIds_NarrowsToTaggedConsumables()
+    {
+        var cleaning = await AddTagAsync("cleaning", "cleaning");
+        var fasteners = await AddTagAsync("fasteners", "fasteners");
+        var soap = await AddBareConsumableAsync("Dish soap");
+        await TagItemAsync(soap.Id, cleaning.Id);
+        var screws = await AddBareConsumableAsync("Wood screws");
+        await TagItemAsync(screws.Id, fasteners.Id);
+        await AddBareConsumableAsync("Untagged tape");
+
+        var resp = await _sut.Handle(
+            new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [cleaning.Id] }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal("Dish soap", resp.Items[0].Name);
+        // The projection populates Tags on returned rows.
+        Assert.Single(resp.Items[0].Tags);
+        Assert.Equal("cleaning", resp.Items[0].Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByTagIds_IncludeChildTags_MatchesDescendantTag()
+    {
+        var hardware = await AddTagAsync("hardware", "hardware");
+        var fasteners = await AddTagAsync("fasteners", "hardware/fasteners", hardware.Id);
+        var screws = await AddBareConsumableAsync("Wood screws");
+        await TagItemAsync(screws.Id, fasteners.Id); // tagged with the CHILD tag only
+
+        var narrow = await _sut.Handle(
+            new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [hardware.Id], IncludeChildTags = false }, Ct);
+        Assert.Empty(narrow.Items);
+
+        var expanded = await _sut.Handle(
+            new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [hardware.Id], IncludeChildTags = true }, Ct);
+        Assert.Single(expanded.Items);
+        Assert.Equal("Wood screws", expanded.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task Handle_TagFilter_ComposesWithAreaFilter()
+    {
+        var office = await AddAreaAsync("Office");
+        var fasteners = await AddTagAsync("fasteners", "fasteners");
+        var garageScrews = await AddBareConsumableAsync("Garage screws");
+        await TagItemAsync(garageScrews.Id, fasteners.Id);
+        await AddStockAsync(garageScrews.Id, 6, areaId: _garage.Id);
+        var officeScrews = await AddBareConsumableAsync("Office screws");
+        await TagItemAsync(officeScrews.Id, fasteners.Id);
+        await AddStockAsync(officeScrews.Id, 6, areaId: office.Id);
+
+        var resp = await _sut.Handle(
+            new GetConsumablesQuery { Page = 1, PageSize = 50, TagIds = [fasteners.Id], AreaId = _garage.Id }, Ct);
+
+        // Both are tagged, but only the one with stock resolving to the garage survives the composed filter.
+        Assert.Single(resp.Items);
+        Assert.Equal("Garage screws", resp.Items[0].Name);
+    }
+
     [Fact]
     public async Task Handle_HidesArchivedConsumablesByDefault()
     {

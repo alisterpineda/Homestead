@@ -37,4 +37,10 @@ public record CreateConsumableCommand : ICommand<ConsumableResponse>
     /// <summary>Optional starting quantity to receive at the starting location on create. When set,
     /// exactly one of <see cref="InitialAreaId"/> / <see cref="InitialContainerItemId"/> must be set.</summary>
     public decimal? InitialQuantity { get; init; }
+
+    /// <summary>
+    /// Slash-delimited classification tag paths. Missing ancestors are upserted; the item's tag set is
+    /// replaced with exactly these. Omit or empty ⇒ no tags.
+    /// </summary>
+    public IReadOnlyList<string>? Tags { get; init; }
 }

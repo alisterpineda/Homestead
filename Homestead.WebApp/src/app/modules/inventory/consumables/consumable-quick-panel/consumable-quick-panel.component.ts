@@ -28,6 +28,7 @@ import {
   type ItemLocationValue,
 } from '../../shared/location-picker/location-picker.component';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { isTerminalStatus } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatQty } from '../consumable-shared';
@@ -85,6 +86,7 @@ interface StepperPayload {
     HlmSpinner,
     LocationPickerComponent,
     ItemStatusBadgeComponent,
+    TagBadgeComponent,
     UnitPipe,
   ],
   providers: [provideIcons({ lucideMinus, lucidePlus, lucideTriangleAlert, lucideArrowRight })],
@@ -102,6 +104,16 @@ interface StepperPayload {
 
         @if (consumableView(); as s) {
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
+            @if (s.tags?.length) {
+              <div class="flex flex-wrap gap-1">
+                @for (t of s.tags ?? []; track t.id) {
+                  <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
+                    <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
+                  </a>
+                }
+              </div>
+            }
+
             <!-- On-hand summary -->
             <div hlmItem variant="outline">
               <div hlmItemContent>

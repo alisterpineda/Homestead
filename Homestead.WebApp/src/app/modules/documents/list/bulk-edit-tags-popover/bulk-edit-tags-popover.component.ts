@@ -23,7 +23,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { TagApiService } from '@/api/services/tag-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
-import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { CreateTagDialogComponent } from '../../tags/create-tag-dialog/create-tag-dialog.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';

@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using MediatR;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables.GetConsumables;
 
@@ -13,6 +14,17 @@ public record GetConsumablesQuery : PaginatedRequest, IRequest<PaginatedResponse
 
     /// <summary>Restrict to consumables attributed to this brand. Backs the Items-list Brand facet.</summary>
     public Guid? BrandId { get; init; }
+
+    /// <summary>
+    /// Restrict to consumables carrying any of these tags. Backs the Items-list Tag facet. Combined
+    /// with <see cref="IncludeChildTags"/> to also match descendant tags.
+    /// </summary>
+    [FromQuery(Name = "TagIds")]
+    public Guid[]? TagIds { get; init; }
+
+    /// <summary>When true, <see cref="TagIds"/> also matches items tagged with any descendant tag.</summary>
+    [FromQuery(Name = "IncludeChildTags")]
+    public bool? IncludeChildTags { get; init; }
 
     /// <summary>
     /// Restrict to consumables with stock whose <b>resolved</b> area is this area or any descendant —

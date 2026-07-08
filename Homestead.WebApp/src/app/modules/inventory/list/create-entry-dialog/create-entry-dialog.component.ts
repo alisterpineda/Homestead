@@ -21,6 +21,7 @@ import { InventoryDurableApiService } from '@/api/services/inventory-durable-api
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
+import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
@@ -45,6 +46,7 @@ type EntryKind = 'durable' | 'consumable';
     HlmSelectImports,
     LocationPickerComponent,
     BrandPickerComponent,
+    TagInputComponent,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -106,6 +108,12 @@ type EntryKind = 'durable' | 'consumable';
               (valueChange)="brand.set($event)"
               ariaLabel="Brand"
             />
+          </div>
+
+          <!-- Tags apply to both kinds, so they live outside the kind-specific grid. -->
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel>Tags (optional)</label>
+            <app-tag-input [value]="tags()" (valueChange)="tags.set($event)" />
           </div>
 
           <!-- Both field sets share one grid cell so the dialog reserves max height and never reflows
@@ -247,6 +255,8 @@ export class CreateEntryDialogComponent {
   notes = signal('');
   // Brand applies to both kinds.
   brand = signal<BrandResponse | null>(null);
+  // Tags apply to both kinds (the desired path list; the backend upserts ancestors).
+  tags = signal<string[]>([]);
   // Durable fields
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
@@ -325,6 +335,7 @@ export class CreateEntryDialogComponent {
       this.name.set('');
       this.notes.set('');
       this.brand.set(null);
+      this.tags.set([]);
       this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
       this.durableKind.set('Plain');
       this.model.set('');
@@ -360,6 +371,7 @@ export class CreateEntryDialogComponent {
           unit: this.unit().trim() || undefined,
           restockThreshold: t === '' ? null : Number(t),
           brandId: this.brand()?.id ?? null,
+          tags: this.tags(),
           notes: this.notes().trim() ? this.notes().trim() : null,
           initialQuantity: placeStock ? qty : null,
           initialAreaId: placeStock && loc!.kind === 'area' ? loc!.id : null,
@@ -380,6 +392,7 @@ export class CreateEntryDialogComponent {
         durableKind: this.durableKind(),
         brandId: this.brand()?.id ?? null,
         model: this.model().trim() ? this.model().trim() : null,
+        tags: this.tags(),
         notes: this.notes().trim() ? this.notes().trim() : null,
       },
     }).subscribe({

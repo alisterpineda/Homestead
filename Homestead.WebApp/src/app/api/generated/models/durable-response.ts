@@ -4,6 +4,7 @@
 import { DurableKind } from '../models/durable-kind';
 import { Fungibility } from '../models/fungibility';
 import { ItemStatus } from '../models/item-status';
+import { ItemTagDto } from '../models/item-tag-dto';
 import { LocationSegmentResponse } from '../models/location-segment-response';
 export interface DurableResponse {
   acquiredOn?: (string | null);
@@ -27,6 +28,7 @@ export interface DurableResponse {
   restockThreshold?: (number | null);
   serial?: (string | null);
   status: ItemStatus;
+  tags?: Array<ItemTagDto>;
   unit?: (string | null);
   updatedAt: string;
   value?: (number | null);

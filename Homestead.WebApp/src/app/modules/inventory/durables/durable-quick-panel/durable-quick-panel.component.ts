@@ -27,6 +27,7 @@ import {
   type ItemLocationValue,
 } from '../../shared/location-picker/location-picker.component';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatPath } from '../../list/inventory-row';
@@ -65,6 +66,7 @@ type InlineForm = 'move' | 'lent' | null;
     HlmDropdownMenuImports,
     LocationPickerComponent,
     ItemStatusBadgeComponent,
+    TagBadgeComponent,
   ],
   providers: [provideIcons({ lucideBox, lucideCpu, lucideArrowRight })],
   template: `
@@ -86,6 +88,16 @@ type InlineForm = 'move' | 'lent' | null;
 
         @if (view(); as it) {
           <div class="flex-1 space-y-4 overflow-y-auto px-4 py-1">
+            @if (it.tags?.length) {
+              <div class="flex flex-wrap gap-1">
+                @for (t of it.tags ?? []; track t.id) {
+                  <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
+                    <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
+                  </a>
+                }
+              </div>
+            }
+
             <!-- Location -->
             <div hlmItem variant="outline">
               <div hlmItemContent class="min-w-0">

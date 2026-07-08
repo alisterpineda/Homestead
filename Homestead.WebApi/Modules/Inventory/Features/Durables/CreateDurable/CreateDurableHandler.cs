@@ -15,6 +15,7 @@ public class CreateDurableHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IItemLocationResolver locationResolver,
+    IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CreateDurableCommand, DurableResponse>
 {
@@ -89,6 +90,11 @@ public class CreateDurableHandler(
         };
 
         db.Items.Add(item);
+
+        var tagPaths = request.Tags?.Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
+        var tags = await tagResolver.ResolveOrCreateManyAsync(tagPaths, currentUser.UserId, ct);
+        InventoryItemTagSync.SetItemTags(item, tags);
+
         audit.Created("Item", item.Id);
 
         await unitOfWork.SaveChangesAsync(ct);

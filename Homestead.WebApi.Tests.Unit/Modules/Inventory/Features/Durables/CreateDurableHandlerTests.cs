@@ -27,7 +27,7 @@ public class CreateDurableHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateDurableHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), _unitOfWork);
+        _sut = new CreateDurableHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), new InventoryTagPathResolver(_db), _unitOfWork);
     }
 
     private async Task<Item> AddContainerAsync(Guid? areaId = null, DurableKind durableKind = DurableKind.Container)
@@ -248,6 +248,37 @@ public class CreateDurableHandlerTests : IDisposable
     {
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = Guid.NewGuid() }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_WithTags_ResolvesOrCreatesTagsAndPopulatesResponse()
+    {
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "Drill", Tags = ["tools/power"] }, Ct);
+
+        // Ancestors upserted: both "tools" and "tools/power" exist.
+        Assert.Equal(2, _db.InventoryTags.Count());
+        Assert.Contains(_db.InventoryTags, t => t.Path == "tools");
+        var leaf = _db.InventoryTags.Single(t => t.Path == "tools/power");
+
+        // The created item carries the leaf ItemTag join row (not the ancestor).
+        var itemTags = _db.ItemTags.Where(it => it.ItemId == result.Id).ToList();
+        Assert.Single(itemTags);
+        Assert.Equal(leaf.Id, itemTags[0].TagId);
+
+        // The response .Tags projection is populated with the leaf.
+        Assert.Single(result.Tags);
+        Assert.Equal("tools/power", result.Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task Handle_WithNoTags_LeavesItemUntagged()
+    {
+        var result = await _sut.Handle(new CreateDurableCommand { Name = "Drill" }, Ct);
+
+        Assert.Empty(result.Tags);
+        Assert.Empty(_db.ItemTags.Where(it => it.ItemId == result.Id));
+        Assert.Empty(_db.InventoryTags);
     }
 
     [Fact]

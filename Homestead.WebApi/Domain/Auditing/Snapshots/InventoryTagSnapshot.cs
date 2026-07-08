@@ -1,0 +1,39 @@
+using Homestead.WebApi.Domain.Inventory;
+
+namespace Homestead.WebApi.Domain.Auditing.Snapshots;
+
+public record InventoryTagSnapshot : IAuditSnapshot<InventoryTagSnapshot, Tag>
+{
+    public required string Name { get; init; }
+    public required string Path { get; init; }
+    public Guid? ParentId { get; init; }
+    public string? Color { get; init; }
+    public string? Description { get; init; }
+
+    public static InventoryTagSnapshot From(Tag source) => new()
+    {
+        Name = source.Name,
+        Path = source.Path,
+        ParentId = source.ParentId,
+        Color = source.Color,
+        Description = source.Description
+    };
+
+    public List<FieldChange> Diff(InventoryTagSnapshot other)
+    {
+        var changes = new List<FieldChange>();
+
+        if (Name != other.Name)
+            changes.Add(new ScalarFieldChange("Name", Name, other.Name));
+        if (Path != other.Path)
+            changes.Add(new ScalarFieldChange("Path", Path, other.Path));
+        if (ParentId != other.ParentId)
+            changes.Add(new ScalarFieldChange("ParentId", ParentId?.ToString(), other.ParentId?.ToString()));
+        if (Color != other.Color)
+            changes.Add(new ScalarFieldChange("Color", Color, other.Color));
+        if (Description != other.Description)
+            changes.Add(new ScalarFieldChange("Description", Description, other.Description));
+
+        return changes;
+    }
+}

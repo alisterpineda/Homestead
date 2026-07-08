@@ -29,6 +29,12 @@ public class GetDurablesHandler(AppDbContext db, IItemLocationResolver locationR
         if (request.DurableKinds is { Length: > 0 } kinds)
             query = query.Where(i => i.DurableKind != null && kinds.Contains(i.DurableKind.Value));
 
+        if (request.TagIds is { Length: > 0 })
+        {
+            var tagIds = await InventoryTagFilter.ExpandTagIdsAsync(db, request.TagIds, request.IncludeChildTags == true, ct);
+            query = query.Where(i => i.ItemTags.Any(it => tagIds.Contains(it.TagId)));
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLower();

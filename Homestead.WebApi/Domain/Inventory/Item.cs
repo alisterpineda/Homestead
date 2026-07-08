@@ -83,4 +83,10 @@ public class Item
     /// the sum of these entries' quantities — no denormalised total is stored on the item.
     /// </summary>
     public ICollection<StockEntry> StockEntries { get; set; } = [];
+
+    /// <summary>
+    /// Hierarchical classification tags. Multi-valued across both item kinds; the join carries no
+    /// column on the items table (identity lives on <see cref="Tag.Path"/>).
+    /// </summary>
+    public ICollection<ItemTag> ItemTags { get; set; } = [];
 }

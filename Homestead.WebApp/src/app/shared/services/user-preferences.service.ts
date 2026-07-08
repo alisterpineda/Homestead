@@ -82,6 +82,12 @@ export class UserPreferencesService {
     validate: isVisibilityState,
   });
 
+  readonly inventoryTagColumnVisibility = persistedSignal<VisibilityState>({
+    key: 'homestead-inventory-tag-column-visibility',
+    defaultValue: {},
+    validate: isVisibilityState,
+  });
+
   readonly netWorthRange = persistedSignal<NetWorthRangePref>({
     key: 'homestead-finances-net-worth-range',
     defaultValue: { kind: 'All' },

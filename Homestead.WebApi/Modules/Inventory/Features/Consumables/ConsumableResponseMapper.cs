@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Features.Items;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables;
 
@@ -21,6 +22,14 @@ internal static class ConsumableResponseMapper
         BrandName = i.Brand != null ? i.Brand.Name : null,
         TotalOnHand = i.StockEntries.Sum(e => e.Quantity),
         IsLow = i.RestockThreshold != null && i.StockEntries.Sum(e => e.Quantity) <= i.RestockThreshold,
+        Tags = i.ItemTags.Select(it => new ItemTagDto
+        {
+            Id = it.Tag.Id,
+            Name = it.Tag.Name,
+            Path = it.Tag.Path,
+            Color = it.Tag.Color,
+            EffectiveColor = it.Tag.EffectiveColor
+        }).ToList(),
         CreatedAt = i.CreatedAt,
         UpdatedAt = i.UpdatedAt,
     };

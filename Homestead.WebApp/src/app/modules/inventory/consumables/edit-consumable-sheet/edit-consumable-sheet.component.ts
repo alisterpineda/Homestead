@@ -16,6 +16,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
+import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
 import { itemStatusLabel } from '../../shared/item-status-meta';
 import { CONSUMABLE_STATUSES } from '../consumable-shared';
 import { replace } from '@/shared/json-patch';
@@ -33,7 +34,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
 @Component({
   selector: 'app-edit-consumable-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmSelectImports, BrandPickerComponent],
+  imports: [FormsModule, HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmSelectImports, BrandPickerComponent, TagInputComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -91,6 +92,15 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 [value]="editBrand()"
                 (valueChange)="editBrand.set($event)"
                 ariaLabel="Brand"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Tags</label>
+              <app-tag-input
+                [value]="editTags()"
+                [initialColorMap]="tagColorMap()"
+                (valueChange)="editTags.set($event)"
               />
             </div>
 
@@ -160,8 +170,19 @@ export class EditConsumableSheetComponent {
     const c = this.openConsumable();
     return c?.brandId ? { id: c.brandId, name: c.brandName ?? '' } : null;
   });
+  editTags = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.tags?.map((t) => t.path) ?? []);
   editNotes = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.notes ?? '');
   saving = seededLinkedSignal(this.seedKey, () => false);
+
+  /** path → effective colour, feeding the tag-input so seeded chips render coloured before any search. */
+  protected tagColorMap = computed(() => {
+    const map: Record<string, string> = {};
+    for (const t of this.openConsumable()?.tags ?? []) {
+      const c = t.effectiveColor ?? t.color;
+      if (c) map[t.path] = c;
+    }
+    return map;
+  });
 
   private consumableApi = inject(InventoryConsumableApiService);
   private errorHandler = inject(ErrorHandlerService);
@@ -218,6 +239,14 @@ export class EditConsumableSheetComponent {
 
     const brandId = this.editBrand()?.id ?? null;
     if (brandId !== (s.brandId ?? null)) ops.push(replace('/brandId', brandId));
+
+    // /tags carries the whole desired path list (whole-set replace); only send it when the set
+    // actually changed vs the seed, comparing order-independently.
+    const origTags = (s.tags?.map((t) => t.path) ?? []).slice().sort();
+    const currTags = this.editTags().slice().sort();
+    if (origTags.length !== currTags.length || origTags.some((t, i) => t !== currTags[i])) {
+      ops.push(replace('/tags', this.editTags()));
+    }
 
     const notes = this.editNotes().trim() ? this.editNotes().trim() : null;
     if (notes !== (s.notes ?? null)) ops.push(replace('/notes', notes));

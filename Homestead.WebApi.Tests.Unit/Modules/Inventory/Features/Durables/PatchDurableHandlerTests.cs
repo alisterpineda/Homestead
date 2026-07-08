@@ -29,7 +29,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new PatchDurableHandler(_db, currentUser, _audit, new ItemLocationResolver(_db), _unitOfWork);
+        _sut = new PatchDurableHandler(_db, currentUser, _audit, new ItemLocationResolver(_db), new InventoryTagPathResolver(_db), _unitOfWork);
 
         _garage = new Area { Id = Guid.NewGuid(), Name = "Garage" };
         _office = new Area { Id = Guid.NewGuid(), Name = "Office" };
@@ -438,6 +438,66 @@ public class PatchDurableHandlerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Sold)));
+    }
+
+    [Fact]
+    public async Task Handle_ReplaceTags_SwapsEntireSet()
+    {
+        var ct = Ct;
+        var item = await AddItemAsync();
+        var oldTag = new Tag { Id = Guid.NewGuid(), Name = "old", Path = "old" };
+        _db.InventoryTags.Add(oldTag);
+        await _db.SaveChangesAsync(ct);
+        _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = oldTag.Id });
+        await _db.SaveChangesAsync(ct);
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Tags, new List<string> { "tools/power" }));
+
+        // The response reflects the new leaf tag only.
+        Assert.Single(resp.Tags);
+        Assert.Equal("tools/power", resp.Tags[0].Path);
+
+        // Join rows swapped: old gone, new leaf present; ancestors upserted.
+        var itemTagPaths = _db.ItemTags.Where(it => it.ItemId == item.Id)
+            .Join(_db.InventoryTags, it => it.TagId, t => t.Id, (it, t) => t.Path).ToList();
+        Assert.Equal(["tools/power"], itemTagPaths);
+        Assert.Contains(_db.InventoryTags, t => t.Path == "tools");
+    }
+
+    [Fact]
+    public async Task Handle_NoTagsOp_LeavesTagsUntouched()
+    {
+        var ct = Ct;
+        var item = await AddItemAsync();
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "keep", Path = "keep" };
+        _db.InventoryTags.Add(tag);
+        await _db.SaveChangesAsync(ct);
+        _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
+        await _db.SaveChangesAsync(ct);
+
+        // A patch that never touches /tags must leave the item's tag set intact (seeded-from-current).
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Name, "Renamed"));
+
+        Assert.Single(resp.Tags);
+        Assert.Equal("keep", resp.Tags[0].Path);
+        Assert.Single(_db.ItemTags.Where(it => it.ItemId == item.Id));
+    }
+
+    [Fact]
+    public async Task Handle_ClearTags_RemovesAllJoins()
+    {
+        var ct = Ct;
+        var item = await AddItemAsync();
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "old", Path = "old" };
+        _db.InventoryTags.Add(tag);
+        await _db.SaveChangesAsync(ct);
+        _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
+        await _db.SaveChangesAsync(ct);
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Tags, new List<string>()));
+
+        Assert.Empty(resp.Tags);
+        Assert.Empty(_db.ItemTags.Where(it => it.ItemId == item.Id));
     }
 
     [Fact]

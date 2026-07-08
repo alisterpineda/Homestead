@@ -20,6 +20,7 @@ import { CurrencyPickerComponent } from '@/modules/finances/shared/currency-pick
 import { commodityResource } from '@/modules/finances/shared/commodity-resource';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
+import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel, isTerminalStatus } from '../../shared/item-status-meta';
 import { tomorrowIso } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
@@ -49,6 +50,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
     CurrencyPickerComponent,
     LocationPickerComponent,
     BrandPickerComponent,
+    TagInputComponent,
   ],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
@@ -104,6 +106,15 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 [value]="editBrand()"
                 (valueChange)="editBrand.set($event)"
                 ariaLabel="Brand"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Tags</label>
+              <app-tag-input
+                [value]="editTags()"
+                [initialColorMap]="tagColorMap()"
+                (valueChange)="editTags.set($event)"
               />
             </div>
 
@@ -277,7 +288,18 @@ export class EditDurableSheetComponent {
     const d = this.openDurable();
     return d?.brandId ? { id: d.brandId, name: d.brandName ?? '' } : null;
   });
+  editTags = seededLinkedSignal(this.seedKey, () => this.openDurable()?.tags?.map((t) => t.path) ?? []);
   editAcquiredOn = seededLinkedSignal(this.seedKey, () => this.openDurable()?.acquiredOn ?? '');
+
+  /** path → effective colour, feeding the tag-input so seeded chips render coloured before any search. */
+  protected tagColorMap = computed(() => {
+    const map: Record<string, string> = {};
+    for (const t of this.openDurable()?.tags ?? []) {
+      const c = t.effectiveColor ?? t.color;
+      if (c) map[t.path] = c;
+    }
+    return map;
+  });
   editValue = seededLinkedSignal(this.seedKey, () => {
     const v = this.openDurable()?.value;
     return v != null ? String(v) : '';
@@ -415,6 +437,14 @@ export class EditDurableSheetComponent {
 
     const brandId = this.editBrand()?.id ?? null;
     if (brandId !== (it.brandId ?? null)) ops.push(replace('/brandId', brandId));
+
+    // /tags carries the whole desired path list (whole-set replace); only send it when the set
+    // actually changed vs the seed, comparing order-independently.
+    const origTags = (it.tags?.map((t) => t.path) ?? []).slice().sort();
+    const currTags = this.editTags().slice().sort();
+    if (origTags.length !== currTags.length || origTags.some((t, i) => t !== currTags[i])) {
+      ops.push(replace('/tags', this.editTags()));
+    }
 
     const acquired = this.editAcquiredOn() ? this.editAcquiredOn() : null;
     if (acquired !== (it.acquiredOn ?? null)) ops.push(replace('/acquiredOn', acquired));

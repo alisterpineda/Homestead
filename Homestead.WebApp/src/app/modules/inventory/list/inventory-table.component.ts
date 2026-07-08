@@ -31,6 +31,7 @@ import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-m
 import { formatQty } from '../consumables/consumable-shared';
 import { UnitPipe } from '../consumables/unit.pipe';
 import { escapeHtml } from '@/shared/utils';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import type { InventoryRow, InventorySortId, InventorySortState } from './inventory-row';
 import { formatPath } from './inventory-row';
 
@@ -47,11 +48,19 @@ interface InventoryTableMeta {
 @Component({
   selector: 'app-inventory-name-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TagBadgeComponent],
   template: `
     <div class="min-w-0">
       <span class="block truncate text-sm font-medium">{{ row.name }}</span>
       @if (row.durable?.serial) {
         <span class="block truncate text-xs text-muted-foreground">{{ row.durable?.serial }}</span>
+      }
+      @if (row.tags.length) {
+        <div class="mt-1 flex flex-wrap gap-1">
+          @for (t of row.tags; track t.id) {
+            <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
+          }
+        </div>
       }
     </div>
   `,

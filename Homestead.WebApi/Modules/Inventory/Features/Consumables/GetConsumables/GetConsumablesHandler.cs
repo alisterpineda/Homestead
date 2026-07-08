@@ -28,6 +28,12 @@ public class GetConsumablesHandler(AppDbContext db, IItemLocationResolver locati
         if (request.BrandId is { } brandId)
             query = query.Where(i => i.BrandId == brandId);
 
+        if (request.TagIds is { Length: > 0 })
+        {
+            var tagIds = await InventoryTagFilter.ExpandTagIdsAsync(db, request.TagIds, request.IncludeChildTags == true, ct);
+            query = query.Where(i => i.ItemTags.Any(it => tagIds.Contains(it.TagId)));
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLower();

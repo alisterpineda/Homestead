@@ -4,6 +4,7 @@ using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumable;
+using Homestead.WebApi.Modules.Inventory.Services;
 using Microsoft.AspNetCore.JsonPatch.SystemTextJson;
 using NSubstitute;
 
@@ -23,7 +24,7 @@ public class PatchConsumableHandlerTests : IAsyncLifetime
         var unitOfWork = Substitute.For<IUnitOfWork>();
         unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new PatchConsumableHandler(_db, currentUser, audit, unitOfWork);
+        _sut = new PatchConsumableHandler(_db, currentUser, audit, new InventoryTagPathResolver(_db), unitOfWork);
         await ValueTask.CompletedTask;
     }
 
@@ -78,5 +79,45 @@ public class PatchConsumableHandlerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             PatchAsync(item.Id, p => p.Replace(m => m.BrandId, Guid.NewGuid())));
+    }
+
+    [Fact]
+    public async Task Handle_ReplaceTags_SwapsEntireSet()
+    {
+        var ct = Ct;
+        var item = await AddConsumableAsync();
+        var oldTag = new Tag { Id = Guid.NewGuid(), Name = "old", Path = "old" };
+        _db.InventoryTags.Add(oldTag);
+        await _db.SaveChangesAsync(ct);
+        _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = oldTag.Id });
+        await _db.SaveChangesAsync(ct);
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Tags, new List<string> { "hardware/fasteners" }));
+
+        Assert.Single(resp.Tags);
+        Assert.Equal("hardware/fasteners", resp.Tags[0].Path);
+
+        var itemTagPaths = _db.ItemTags.Where(it => it.ItemId == item.Id)
+            .Join(_db.InventoryTags, it => it.TagId, t => t.Id, (it, t) => t.Path).ToList();
+        Assert.Equal(["hardware/fasteners"], itemTagPaths);
+        Assert.Contains(_db.InventoryTags, t => t.Path == "hardware");
+    }
+
+    [Fact]
+    public async Task Handle_NoTagsOp_LeavesTagsUntouched()
+    {
+        var ct = Ct;
+        var item = await AddConsumableAsync();
+        var tag = new Tag { Id = Guid.NewGuid(), Name = "keep", Path = "keep" };
+        _db.InventoryTags.Add(tag);
+        await _db.SaveChangesAsync(ct);
+        _db.ItemTags.Add(new ItemTag { ItemId = item.Id, TagId = tag.Id });
+        await _db.SaveChangesAsync(ct);
+
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Name, "Renamed"));
+
+        Assert.Single(resp.Tags);
+        Assert.Equal("keep", resp.Tags[0].Path);
+        Assert.Single(_db.ItemTags.Where(it => it.ItemId == item.Id));
     }
 }

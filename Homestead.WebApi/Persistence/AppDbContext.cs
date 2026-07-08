@@ -20,7 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Document> Documents { get; set; }
     public DbSet<DocumentVersion> DocumentVersions { get; set; }
     public DbSet<DocumentComment> DocumentComments { get; set; }
-    public DbSet<Tag> Tags { get; set; }
+    public DbSet<Domain.Documents.Tag> Tags { get; set; }
     public DbSet<DocumentTag> DocumentTags { get; set; }
     public DbSet<Party> Parties { get; set; }
     public DbSet<DocumentParty> DocumentParties { get; set; }
@@ -44,6 +44,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Item> Items { get; set; }
     public DbSet<StockEntry> StockEntries { get; set; }
     public DbSet<StockMovement> StockMovements { get; set; }
+    public DbSet<Domain.Inventory.Tag> InventoryTags { get; set; }
+    public DbSet<Domain.Inventory.ItemTag> ItemTags { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

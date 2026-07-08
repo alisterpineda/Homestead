@@ -26,6 +26,13 @@ public class PatchDurableModel
     public Guid? ParentItemId { get; set; }
     public DurableKind? DurableKind { get; set; }
     public string? Compartment { get; set; }
+
+    /// <summary>
+    /// Whole desired classification tag set as slash-delimited paths. Seeded from the item's current
+    /// tags, so a patch that omits <c>/tags</c> leaves them untouched; a <c>replace('/tags', […])</c>
+    /// replaces the entire set (missing ancestors upserted).
+    /// </summary>
+    public List<string> Tags { get; set; } = [];
 }
 
 public record PatchDurableCommand : ICommand<DurableResponse>

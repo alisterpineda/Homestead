@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, tap, catchError } from 'rxjs';
-import { TagBadgeComponent } from '../tag-badge/tag-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { CreateTagDialogComponent } from '../create-tag-dialog/create-tag-dialog.component';
 import { TagApiService } from '@/api/services/tag-api.service';
 import type { GetTagsResponse } from '@/api/generated/models/get-tags-response';

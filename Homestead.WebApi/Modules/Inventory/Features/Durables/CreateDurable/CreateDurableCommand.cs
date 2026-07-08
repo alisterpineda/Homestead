@@ -34,4 +34,10 @@ public record CreateDurableCommand : ICommand<DurableResponse>
     public DateOnly? AcquiredOn { get; init; }
     public decimal? Value { get; init; }
     public Guid? ValueCurrencyId { get; init; }
+
+    /// <summary>
+    /// Slash-delimited classification tag paths. Missing ancestors are upserted; the item's tag set is
+    /// replaced with exactly these. Omit or empty ⇒ no tags.
+    /// </summary>
+    public IReadOnlyList<string>? Tags { get; init; }
 }

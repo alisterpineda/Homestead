@@ -14,6 +14,7 @@ public class CreateConsumableHandler(
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IStockService stock,
+    IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CreateConsumableCommand, ConsumableResponse>
 {
@@ -43,6 +44,11 @@ public class CreateConsumableHandler(
         };
 
         db.Items.Add(item);
+
+        var tagPaths = request.Tags?.Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? [];
+        var tags = await tagResolver.ResolveOrCreateManyAsync(tagPaths, currentUser.UserId, ct);
+        InventoryItemTagSync.SetItemTags(item, tags);
+
         audit.Created("Item", item.Id);
 
         // The item must exist before ReceiveAsync's lookups (LoadFungibleItemAsync reads db.Items);

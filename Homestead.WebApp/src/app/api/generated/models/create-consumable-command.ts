@@ -9,5 +9,6 @@ export interface CreateConsumableCommand {
   name: string;
   notes?: (string | null);
   restockThreshold?: (number | null);
+  tags?: (Array<string> | null);
   unit?: (string | null);
 }

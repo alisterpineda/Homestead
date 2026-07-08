@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Features.Items;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Durables;
 
@@ -33,6 +34,14 @@ internal static class DurableResponseMapper
         LentTo = i.LentTo,
         Unit = i.Unit,
         RestockThreshold = i.RestockThreshold,
+        Tags = i.ItemTags.Select(it => new ItemTagDto
+        {
+            Id = it.Tag.Id,
+            Name = it.Tag.Name,
+            Path = it.Tag.Path,
+            Color = it.Tag.Color,
+            EffectiveColor = it.Tag.EffectiveColor
+        }).ToList(),
         CreatedAt = i.CreatedAt,
         UpdatedAt = i.UpdatedAt,
     };

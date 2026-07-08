@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, LOCALE_ID } from '@angular/
 import { formatDate } from '@angular/common';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { formatBytes } from '@/shared/utils';
-import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { PartyBadgeComponent } from '../../parties/party-badge/party-badge.component';
 import { MatchSnippetComponent } from '../match-snippet/match-snippet.component';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';

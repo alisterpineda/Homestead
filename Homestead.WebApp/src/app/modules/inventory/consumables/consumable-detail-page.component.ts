@@ -38,6 +38,7 @@ import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog'
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { ItemStatusBadgeComponent } from '../shared/item-status-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { isTerminalStatus, LOW_STOCK_BADGE_CLASS } from '../shared/item-status-meta';
 import { EditConsumableSheetComponent } from './edit-consumable-sheet/edit-consumable-sheet.component';
 import {
@@ -75,6 +76,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
+    TagBadgeComponent,
     EditConsumableSheetComponent,
     StockOpSheetComponent,
     TrackDurableSheetComponent,
@@ -141,6 +143,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             }
             @if (s.notes) {
               <p class="max-w-prose text-sm text-muted-foreground">{{ s.notes }}</p>
+            }
+            @if (s.tags?.length) {
+              <div class="flex flex-wrap gap-1 pt-1">
+                @for (t of s.tags ?? []; track t.id) {
+                  <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
+                    <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
+                  </a>
+                }
+              </div>
             }
           </div>
           <div class="flex items-center gap-2">

@@ -38,6 +38,7 @@ import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-men
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryPlaceApiService } from '@/api/services/inventory-place-api.service';
 import { ItemStatusBadgeComponent } from '../../shared/item-status-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { isTerminalStatus } from '../../shared/item-status-meta';
 import { EditDurableSheetComponent } from '../edit-durable-sheet/edit-durable-sheet.component';
 import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick-panel.component';
@@ -79,6 +80,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
     ItemStatusBadgeComponent,
+    TagBadgeComponent,
     EditDurableSheetComponent,
     DurableQuickPanelComponent,
     CreateEntryDialogComponent,
@@ -135,6 +137,15 @@ import { toast } from '@spartan-ng/brain/sonner';
             <p class="text-xs text-muted-foreground">Updated {{ updatedRelative() }}</p>
             @if (it.notes) {
               <p class="max-w-prose whitespace-pre-wrap text-sm text-muted-foreground">{{ it.notes }}</p>
+            }
+            @if (it.tags?.length) {
+              <div class="flex flex-wrap gap-1 pt-1">
+                @for (t of it.tags ?? []; track t.id) {
+                  <a [routerLink]="['/inventory/items']" [queryParams]="{ tagIds: t.id }">
+                    <app-tag-badge [path]="t.path" [color]="t.effectiveColor" [compact]="true" />
+                  </a>
+                }
+              </div>
             }
           </div>
           <div class="flex items-center gap-2">

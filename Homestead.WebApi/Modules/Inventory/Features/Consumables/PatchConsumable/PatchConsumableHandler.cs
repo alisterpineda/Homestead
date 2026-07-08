@@ -3,6 +3,7 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ public class PatchConsumableHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
+    IInventoryTagPathResolver tagResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<PatchConsumableCommand, ConsumableResponse>
 {
@@ -21,7 +23,9 @@ public class PatchConsumableHandler(
 
     public async Task<ConsumableResponse> Handle(PatchConsumableCommand request, CancellationToken ct)
     {
-        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == request.Id, ct);
+        var item = await db.Items
+            .Include(i => i.ItemTags).ThenInclude(it => it.Tag)
+            .FirstOrDefaultAsync(i => i.Id == request.Id, ct);
         if (item is null)
             throw new EntityNotFoundException("Consumable not found.");
         if (item.Fungibility != Fungibility.Fungible)
@@ -37,6 +41,7 @@ public class PatchConsumableHandler(
             BrandId = item.BrandId,
             Notes = item.Notes,
             Status = item.Status,
+            Tags = item.ItemTags.Select(it => it.Tag.Path).ToList(),
         };
 
         request.PatchDocument.ApplyOrThrow(model);
@@ -71,6 +76,14 @@ public class PatchConsumableHandler(
         item.Status = model.Status;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByUserId = currentUser.UserId;
+
+        // Whole-set replace: model.Tags is seeded from the item's current paths, so an omitted /tags
+        // op is a no-op; a replace swaps the entire set (ancestors upserted).
+        // `?? []`: JsonPatch `replace /tags null` silently nulls the List (no ApplyOrThrow error), and
+        // `null.Where(...)` would throw ArgumentNullException → unhandled 500. Treat null as "clear".
+        var tagPaths = (model.Tags ?? []).Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+        var resolvedTags = await tagResolver.ResolveOrCreateManyAsync(tagPaths, currentUser.UserId, ct);
+        InventoryItemTagSync.SetItemTags(item, resolvedTags);
 
         await unitOfWork.SaveChangesAsync(ct);
 

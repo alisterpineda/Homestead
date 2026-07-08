@@ -19,4 +19,5 @@ export { InventoryPlaceApiService } from './inventory-place-api.service';
 export { InventoryAreaApiService } from './inventory-area-api.service';
 export { InventoryBrandApiService } from './inventory-brand-api.service';
 export { InventoryConsumableApiService } from './inventory-consumable-api.service';
+export { InventoryTagApiService } from './inventory-tag-api.service';
 export { SearchApiService } from './search-api.service';

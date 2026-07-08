@@ -13,6 +13,7 @@ export interface CreateDurableCommand {
   notes?: (string | null);
   parentItemId?: (string | null);
   serial?: (string | null);
+  tags?: (Array<string> | null);
   value?: (number | null);
   valueCurrencyId?: (string | null);
 }

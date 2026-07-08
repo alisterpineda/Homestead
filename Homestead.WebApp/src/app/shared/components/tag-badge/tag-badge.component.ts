@@ -99,7 +99,7 @@ export class TagBadgeComponent {
   compactPath = computed(() => {
     const segments = this.path().split('/');
     if (segments.length <= 2) return this.path();
-    return `${segments[0]}/\u2026/${segments[segments.length - 1]}`;
+    return `${segments[0]}/…/${segments[segments.length - 1]}`;
   });
 
   onRemove(event: Event): void {

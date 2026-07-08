@@ -13,6 +13,8 @@ export interface GetConsumables$Params {
   IncludeInactive?: boolean;
   LowStockOnly?: boolean;
   BrandId?: string;
+  TagIds?: Array<string>;
+  IncludeChildTags?: boolean;
   AreaId?: string;
   Unplaced?: boolean;
   Search?: string;
@@ -26,6 +28,8 @@ export function getConsumables(http: HttpClient, rootUrl: string, params?: GetCo
     rb.query('IncludeInactive', params.IncludeInactive, {});
     rb.query('LowStockOnly', params.LowStockOnly, {});
     rb.query('BrandId', params.BrandId, {});
+    rb.query('TagIds', params.TagIds, {});
+    rb.query('IncludeChildTags', params.IncludeChildTags, {});
     rb.query('AreaId', params.AreaId, {});
     rb.query('Unplaced', params.Unplaced, {});
     rb.query('Search', params.Search, {});

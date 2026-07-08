@@ -57,6 +57,78 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         return b;
     }
 
+    private async Task<Tag> AddTagAsync(string name, string path, Guid? parentId = null)
+    {
+        var tag = new Tag { Id = Guid.NewGuid(), Name = name, Path = path, ParentId = parentId };
+        _db.InventoryTags.Add(tag);
+        await _db.SaveChangesAsync(Ct);
+        return tag;
+    }
+
+    private async Task TagItemAsync(Guid itemId, Guid tagId)
+    {
+        _db.ItemTags.Add(new ItemTag { ItemId = itemId, TagId = tagId });
+        await _db.SaveChangesAsync(Ct);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByTagIds_NarrowsToTaggedItems()
+    {
+        var electronics = await AddTagAsync("electronics", "electronics");
+        var garden = await AddTagAsync("garden", "garden");
+        var tv = await AddItemAsync("Bravia TV");
+        await TagItemAsync(tv.Id, electronics.Id);
+        var mower = await AddItemAsync("Lawn mower");
+        await TagItemAsync(mower.Id, garden.Id);
+        await AddItemAsync("Untagged drill");
+
+        var resp = await _sut.Handle(
+            new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [electronics.Id] }, Ct);
+
+        Assert.Single(resp.Items);
+        Assert.Equal("Bravia TV", resp.Items[0].Name);
+        // The projection populates Tags on returned rows.
+        Assert.Single(resp.Items[0].Tags);
+        Assert.Equal("electronics", resp.Items[0].Tags[0].Path);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByTagIds_IncludeChildTags_MatchesDescendantTag()
+    {
+        var tools = await AddTagAsync("tools", "tools");
+        var power = await AddTagAsync("power", "tools/power", tools.Id);
+        var drill = await AddItemAsync("Cordless drill");
+        await TagItemAsync(drill.Id, power.Id); // tagged with the CHILD tag only
+
+        // Without descendant expansion, filtering on the parent tag matches nothing.
+        var narrow = await _sut.Handle(
+            new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [tools.Id], IncludeChildTags = false }, Ct);
+        Assert.Empty(narrow.Items);
+
+        // With IncludeChildTags, the parent filter rolls in items tagged with any descendant.
+        var expanded = await _sut.Handle(
+            new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [tools.Id], IncludeChildTags = true }, Ct);
+        Assert.Single(expanded.Items);
+        Assert.Equal("Cordless drill", expanded.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task Handle_TagFilter_ComposesWithAreaFilter()
+    {
+        var electronics = await AddTagAsync("electronics", "electronics");
+        var garageTv = await AddItemAsync("Garage TV", areaId: _garage.Id);
+        await TagItemAsync(garageTv.Id, electronics.Id);
+        var officeTv = await AddItemAsync("Office TV", areaId: _office.Id);
+        await TagItemAsync(officeTv.Id, electronics.Id);
+
+        var resp = await _sut.Handle(
+            new GetDurablesQuery { Page = 1, PageSize = 50, TagIds = [electronics.Id], AreaId = _garage.Id }, Ct);
+
+        // Both are tagged, but only the garage one satisfies the composed area filter.
+        Assert.Single(resp.Items);
+        Assert.Equal("Garage TV", resp.Items[0].Name);
+    }
+
     [Fact]
     public async Task Handle_FiltersByBrand_NarrowsToBrand()
     {

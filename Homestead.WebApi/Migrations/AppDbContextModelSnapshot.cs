@@ -1018,6 +1018,23 @@ namespace Homestead.WebApi.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemTag", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TagId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ItemId", "TagId");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("item_tags", "inventory");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1146,6 +1163,72 @@ namespace Homestead.WebApi.Migrations
 
                             t.HasCheckConstraint("CK_stock_movements_unit_cost_currency_pair", "(\"UnitCost\" IS NULL AND \"UnitCostCurrencyId\" IS NULL) OR (\"UnitCost\" IS NOT NULL AND \"UnitCostCurrencyId\" IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Tag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("EffectiveColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_tags1");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("IX_tags_CreatedByUserId1");
+
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("IX_tags_ParentId1");
+
+                    b.HasIndex("Path")
+                        .IsUnique()
+                        .HasDatabaseName("IX_tags_Path1");
+
+                    b.HasIndex("UpdatedByUserId")
+                        .HasDatabaseName("IX_tags_UpdatedByUserId1");
+
+                    b.ToTable("tags", "inventory");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
@@ -1837,6 +1920,25 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("ValueCurrency");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.ItemTag", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "Item")
+                        .WithMany("ItemTags")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Tag", "Tag")
+                        .WithMany("ItemTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("Tag");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.StockEntry", b =>
                 {
                     b.HasOne("Homestead.WebApi.Domain.Inventory.Area", "Area")
@@ -1920,6 +2022,30 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("ToContainerItem");
 
                     b.Navigation("UnitCostCurrency");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Tag", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Inventory.Tag", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Parent");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.DocumentParty", b =>
@@ -2030,7 +2156,16 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
                 {
+                    b.Navigation("ItemTags");
+
                     b.Navigation("StockEntries");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Tag", b =>
+                {
+                    b.Navigation("Children");
+
+                    b.Navigation("ItemTags");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Parties.Party", b =>

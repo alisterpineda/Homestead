@@ -26,7 +26,7 @@ public class CreateConsumableHandlerTests : IDisposable
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
-        _sut = new CreateConsumableHandler(_db, currentUser, _audit, _stock, _unitOfWork);
+        _sut = new CreateConsumableHandler(_db, currentUser, _audit, _stock, new InventoryTagPathResolver(_db), _unitOfWork);
     }
 
     public void Dispose() => _db.Dispose();
@@ -71,5 +71,26 @@ public class CreateConsumableHandlerTests : IDisposable
         Assert.Equal(apple.Id, result.BrandId);
         Assert.Equal("Apple", result.BrandName);
         Assert.Equal(apple.Id, _db.Items.Single().BrandId);
+    }
+
+    [Fact]
+    public async Task Handle_WithTags_ResolvesOrCreatesTagsAndPopulatesResponse()
+    {
+        var result = await _sut.Handle(
+            new CreateConsumableCommand { Name = "Wood screws", Tags = ["hardware/fasteners"] }, Ct);
+
+        // Ancestors upserted: both "hardware" and "hardware/fasteners" exist.
+        Assert.Equal(2, _db.InventoryTags.Count());
+        Assert.Contains(_db.InventoryTags, t => t.Path == "hardware");
+        var leaf = _db.InventoryTags.Single(t => t.Path == "hardware/fasteners");
+
+        // The created item carries the leaf ItemTag join row.
+        var itemTags = _db.ItemTags.Where(it => it.ItemId == result.Id).ToList();
+        Assert.Single(itemTags);
+        Assert.Equal(leaf.Id, itemTags[0].TagId);
+
+        // The response .Tags projection is populated with the leaf.
+        Assert.Single(result.Tags);
+        Assert.Equal("hardware/fasteners", result.Tags[0].Path);
     }
 }

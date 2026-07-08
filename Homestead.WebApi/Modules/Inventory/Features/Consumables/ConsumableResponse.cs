@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Inventory;
+using Homestead.WebApi.Modules.Inventory.Features.Items;
 
 namespace Homestead.WebApi.Modules.Inventory.Features.Consumables;
 
@@ -33,6 +34,9 @@ public record ConsumableResponse
 
     /// <summary>True when a threshold is set and the total is at or below it.</summary>
     public required bool IsLow { get; init; }
+
+    /// <summary>Hierarchical classification tags on this item, each with resolved effective colour.</summary>
+    public IReadOnlyList<ItemTagDto> Tags { get; init; } = [];
 
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }

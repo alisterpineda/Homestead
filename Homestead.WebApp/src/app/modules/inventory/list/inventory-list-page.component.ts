@@ -31,10 +31,14 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
 import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
+import { InventoryTagApiService } from '@/api/services/inventory-tag-api.service';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { CreateEntryDialogComponent } from './create-entry-dialog/create-entry-dialog.component';
 import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/durable-quick-panel.component';
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
@@ -46,6 +50,8 @@ import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrandResponse } from '@/api/generated/models/brand-response';
+import type { GetInventoryTagsResponse } from '@/api/generated/models/get-inventory-tags-response';
+import type { GetInventoryTagsByIdsResponse } from '@/api/generated/models/get-inventory-tags-by-ids-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 /** 'all' | 'unplaced' | an area id. */
@@ -96,6 +102,9 @@ interface ListData {
     HlmSpinner,
     HlmEmptyImports,
     HlmSeparatorImports,
+    HlmCheckboxImports,
+    HlmLabel,
+    TagBadgeComponent,
     InventoryItemsViewComponent,
     CreateEntryDialogComponent,
     DurableQuickPanelComponent,
@@ -130,7 +139,7 @@ interface ListData {
       }
 
       @if (data() !== null) {
-        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm() && areaFilter() === 'all' && brandFilter() === 'all') {
+        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm() && areaFilter() === 'all' && brandFilter() === 'all' && tagFilter().size === 0) {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
@@ -237,6 +246,51 @@ interface ListData {
                   }
                 </div>
               }
+
+              <span hlmSeparator></span>
+              <div class="p-1">
+                <span class="block px-2 py-1 text-xs font-medium text-muted-foreground">Tags</span>
+                <label class="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm" hlmLabel>
+                  <hlm-checkbox
+                    [checked]="includeChildTags()"
+                    (checkedChange)="includeChildTags.set($event === true)"
+                    [aria-label]="'Include sub-tags'"
+                  />
+                  <span>Include sub-tags</span>
+                </label>
+                @if (tagChips().length > 0) {
+                  <div class="flex flex-wrap gap-1 px-2 py-1.5">
+                    @for (chip of tagChips(); track chip.id) {
+                      <app-tag-badge [path]="chip.path" [removable]="true" [compact]="true" (removed)="toggleTagFilter(chip.id)" />
+                    }
+                  </div>
+                }
+                <div class="relative px-1 pb-1">
+                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    hlmInput
+                    placeholder="Search tags..."
+                    class="h-8 w-full min-w-0 pl-8"
+                    aria-label="Search tags"
+                    [value]="tagSearchInput()"
+                    (input)="tagSearchInput.set($any($event.target).value)"
+                  />
+                </div>
+                <div class="max-h-[180px] overflow-y-auto">
+                  @for (tag of tagOptions(); track tag.id) {
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      (click)="toggleTagFilter(tag.id)"
+                    >
+                      <span class="truncate">{{ tag.path }}</span>
+                      @if (tagFilter().has(tag.id)) { <ng-icon hlm name="lucideCheck" size="sm" /> }
+                    </button>
+                  } @empty {
+                    <span class="block px-2 py-2 text-xs text-muted-foreground">No tags found.</span>
+                  }
+                </div>
+              </div>
             </div>
           </app-inventory-items-view>
         }
@@ -264,6 +318,7 @@ export class InventoryListPageComponent {
   private consumableApi = inject(InventoryConsumableApiService);
   private areaApi = inject(InventoryAreaApiService);
   private brandApi = inject(InventoryBrandApiService);
+  private tagApi = inject(InventoryTagApiService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
@@ -298,6 +353,17 @@ export class InventoryListPageComponent {
    */
   brandFilter = signal<string>(this.route.snapshot.queryParamMap.get('brand') ?? 'all');
 
+  /**
+   * Selected tag-filter ids (multi-select) + the descendant-expansion toggle. Page-level fetch keys
+   * like areaFilter/brandFilter, seeded synchronously from the repeated `?tagIds=` and
+   * `?includeChildTags=` params; the constructor handler owns the strip and any mid-mount
+   * re-application (a badge/CRUD deep-link into `/inventory/items?tagIds=…`). See the deepLink note.
+   */
+  tagFilter = signal<Set<string>>(new Set(this.route.snapshot.queryParamMap.getAll('tagIds')));
+  includeChildTags = signal<boolean>(this.route.snapshot.queryParamMap.get('includeChildTags') === 'true');
+  /** Free text driving the refine popover's tag checklist (client search over the tag list). */
+  tagSearchInput = signal('');
+
   /** What the user is typing (immediate); synced to the URL after a 300ms debounce. */
   searchInput = signal((this.route.snapshot.queryParamMap.get('search') ?? '').trim());
   /** The committed (trimmed) search term from the URL — the source of truth for the server fetch. */
@@ -319,11 +385,16 @@ export class InventoryListPageComponent {
     term: this.searchTerm(),
     area: this.areaFilter(),
     brand: this.brandFilter(),
+    tags: [...this.tagFilter()].sort().join(','),
+    // Key on the *resolved* toggle: with no tags selected the sub-tag toggle is inert server-side
+    // (fetch collapses it to undefined), so keep it inert in the key too — otherwise flipping the
+    // checkbox before picking a tag fires an identical, wasted durables+consumables refetch.
+    includeChildTags: this.tagFilter().size > 0 && this.includeChildTags(),
   }));
 
   data = toSignal<ListData | null, ListData | null>(
     toObservable(this.listKey).pipe(
-      switchMap(({ term, area, brand }) => {
+      switchMap(({ term, area, brand, tags, includeChildTags }) => {
         this.loading.set(true);
         this.error.set(false);
         // Resolved-area filter goes to the server: a specific area sends AreaId (the server rolls in
@@ -331,13 +402,17 @@ export class InventoryListPageComponent {
         const areaId = area !== 'all' && area !== 'unplaced' ? area : undefined;
         const unplaced = area === 'unplaced' ? true : undefined;
         const brandId = brand !== 'all' ? brand : undefined;
+        // Tag filter is applied server-side on both kinds (same expanded id set); the sub-tag toggle
+        // rides along and is inert server-side when no tags are selected.
+        const tagIds = tags ? tags.split(',') : undefined;
+        const childTags = tagIds ? includeChildTags || undefined : undefined;
         const search = term || undefined;
         return forkJoin({
           durables: this.durableApi.getDurables({
-            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId,
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId, TagIds: tagIds, IncludeChildTags: childTags,
           }),
           consumables: this.consumableApi.getConsumables({
-            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId,
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced, BrandId: brandId, TagIds: tagIds, IncludeChildTags: childTags,
           }),
         }).pipe(
           map(({ durables, consumables }) => {
@@ -386,6 +461,38 @@ export class InventoryListPageComponent {
     { initialValue: [] as BrandResponse[] },
   );
 
+  // Resolved labels for the currently-selected tag ids — via /resolve, so a deep-linked tag not in
+  // the current tag-list page still renders (and is removable) as a chip in the refine popover.
+  protected tagChips = toSignal(
+    toObservable(this.tagFilter).pipe(
+      switchMap(set => {
+        const ids = [...set];
+        return ids.length === 0
+          ? of<GetInventoryTagsByIdsResponse[]>([])
+          : this.tagApi.getTagsByIds({ body: { ids } }).pipe(
+              map(r => r as GetInventoryTagsByIdsResponse[]),
+              catchError(() => of<GetInventoryTagsByIdsResponse[]>([])),
+            );
+      }),
+    ),
+    { initialValue: [] as GetInventoryTagsByIdsResponse[] },
+  );
+
+  // Search-driven tag options for the refine popover's multi-select checklist (household-scale, so a
+  // 50-row page with a name/path ILIKE is plenty). Debounced so typing doesn't spam the endpoint.
+  protected tagOptions = toSignal(
+    toObservable(this.tagSearchInput).pipe(
+      debounceTime(200),
+      switchMap(search =>
+        this.tagApi.getTags({ Search: search || undefined, IncludeChildren: true, Page: 1, PageSize: 50 }).pipe(
+          map(r => (r.items ?? []) as GetInventoryTagsResponse[]),
+          catchError(() => of<GetInventoryTagsResponse[]>([])),
+        ),
+      ),
+    ),
+    { initialValue: [] as GetInventoryTagsResponse[] },
+  );
+
   allDurables = computed(() => this.data()?.durables ?? []);
   allConsumables = computed(() => this.data()?.consumables ?? []);
 
@@ -432,7 +539,7 @@ export class InventoryListPageComponent {
   // Drives the items-view Reset button: the popover's own filters OR any parent scope (area/search)
   // being active.
   protected extraFiltersActive = computed(() =>
-    this.areaFilter() !== 'all' || this.brandFilter() !== 'all' || this.searchTerm() !== '');
+    this.areaFilter() !== 'all' || this.brandFilter() !== 'all' || this.tagFilter().size > 0 || this.searchTerm() !== '');
 
   constructor() {
     // Debounced URL sync for the search box: commit the trimmed term once typing pauses. No
@@ -476,6 +583,33 @@ export class InventoryListPageComponent {
         replaceUrl: true,
       });
     });
+
+    // Sole owner of the `tagIds`/`includeChildTags` deep-link params (excluded from seedDeepLinkParams,
+    // same reasoning as `brand`). tagFilter/includeChildTags are seeded synchronously from the snapshot;
+    // this handles the strip AND the mid-mount case the one-shot seed can't: a tag badge/CRUD link into
+    // `/inventory/items?tagIds=…` (from a quick panel overlaid on THIS page, or cross-route) applies the
+    // filter without reconstruction. Serialize the (repeated ids + toggle) pair for distinctUntilChanged.
+    this.route.queryParamMap.pipe(
+      map(p => JSON.stringify({ ids: p.getAll('tagIds'), inc: p.get('includeChildTags') })),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(serialized => {
+      const { ids, inc } = JSON.parse(serialized) as { ids: string[]; inc: string | null };
+      // A tagIds-less emission is never a real tag deep-link (the app always pairs them). Bail before
+      // touching state — otherwise a stray `?includeChildTags=true` (manual URL / back-nav) would wipe
+      // the user's in-memory tag selection while leaving the checkbox checked.
+      if (ids.length === 0) return;
+      this.tagFilter.set(new Set(ids));
+      this.includeChildTags.set(inc === 'true');
+      this.durableQuickPanelState.set('closed');
+      this.consumableQuickPanelState.set('closed');
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tagIds: null, includeChildTags: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
   }
 
   /**
@@ -509,11 +643,25 @@ export class InventoryListPageComponent {
     this.brandFilter.set(bf);
   }
 
-  /** The items-view Reset clears its own refinements; the page clears its scope (search/area/brand). */
+  /** The items-view Reset clears its own refinements; the page clears its scope (search/area/brand/tags). */
   onReset(): void {
     this.clearSearch();
     this.areaFilter.set('all');
     this.brandFilter.set('all');
+    // Guard the writes: signals compare Sets/booleans by reference/value, so a blind reset when
+    // already empty would perturb listKey and fire a redundant refetch (unlike the string filters,
+    // which self-dedupe via `.set('all')`).
+    if (this.tagFilter().size > 0) this.tagFilter.set(new Set());
+    if (this.includeChildTags()) this.includeChildTags.set(false);
+  }
+
+  /** Toggles a tag id in the multi-select filter set (orthogonal to search/area/brand — server ANDs). */
+  toggleTagFilter(id: string): void {
+    this.tagFilter.update(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }
 
   onChanged(): void {

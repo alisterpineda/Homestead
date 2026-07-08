@@ -9,7 +9,7 @@ import { HlmBadge } from '@/shared/components/spartan/badge';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 import type { GetDocumentsTagDto } from '@/api/generated/models/get-documents-tag-dto';
-import { TagBadgeComponent } from '../../tags/tag-badge/tag-badge.component';
+import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.component';
 import { MatchSnippetComponent } from '../match-snippet/match-snippet.component';
 
 @Component({

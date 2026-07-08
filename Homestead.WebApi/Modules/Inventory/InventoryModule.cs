@@ -27,6 +27,12 @@ using Homestead.WebApi.Modules.Inventory.Features.Consumables.PatchConsumable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.ReceiveStock;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.TrackDurable;
 using Homestead.WebApi.Modules.Inventory.Features.Consumables.TransferStock;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.BulkDeleteTags;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.CreateTag;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.DeleteTag;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.GetTags;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.GetTagsByIds;
+using Homestead.WebApi.Modules.Inventory.Features.Tags.PatchTag;
 
 namespace Homestead.WebApi.Modules.Inventory;
 
@@ -58,6 +64,14 @@ public static class InventoryModule
         var brands = v1.MapGroup("/brands");
         GetBrandsEndpoint.Map(brands);
         CreateBrandEndpoint.Map(brands);
+
+        var tags = v1.MapGroup("/tags");
+        BulkDeleteTagsEndpoint.Map(tags);
+        CreateTagEndpoint.Map(tags);
+        DeleteTagEndpoint.Map(tags);
+        GetTagsEndpoint.Map(tags);
+        GetTagsByIdsEndpoint.Map(tags);
+        PatchTagEndpoint.Map(tags);
 
         var durables = v1.MapGroup("/durables");
         GetDurablesEndpoint.Map(durables);

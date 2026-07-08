@@ -261,6 +261,18 @@ export type { GetBrands$Params as GetBrands$Params } from './fn/inventory/get-br
 export { getBrands as getBrands } from './fn/inventory/get-brands';
 export type { CreateBrand$Params as CreateBrand$Params } from './fn/inventory/create-brand';
 export { createBrand as createBrand } from './fn/inventory/create-brand';
+export type { BulkDeleteInventoryTags$Params as BulkDeleteInventoryTags$Params } from './fn/inventory/bulk-delete-inventory-tags';
+export { bulkDeleteInventoryTags as bulkDeleteInventoryTags } from './fn/inventory/bulk-delete-inventory-tags';
+export type { GetInventoryTags$Params as GetInventoryTags$Params } from './fn/inventory/get-inventory-tags';
+export { getInventoryTags as getInventoryTags } from './fn/inventory/get-inventory-tags';
+export type { CreateInventoryTag$Params as CreateInventoryTag$Params } from './fn/inventory/create-inventory-tag';
+export { createInventoryTag as createInventoryTag } from './fn/inventory/create-inventory-tag';
+export type { DeleteInventoryTag$Params as DeleteInventoryTag$Params } from './fn/inventory/delete-inventory-tag';
+export { deleteInventoryTag as deleteInventoryTag } from './fn/inventory/delete-inventory-tag';
+export type { PatchInventoryTag$Params as PatchInventoryTag$Params } from './fn/inventory/patch-inventory-tag';
+export { patchInventoryTag as patchInventoryTag } from './fn/inventory/patch-inventory-tag';
+export type { GetInventoryTagsByIds$Params as GetInventoryTagsByIds$Params } from './fn/inventory/get-inventory-tags-by-ids';
+export { getInventoryTagsByIds as getInventoryTagsByIds } from './fn/inventory/get-inventory-tags-by-ids';
 export type { GetDurables$Params as GetDurables$Params } from './fn/inventory/get-durables';
 export { getDurables as getDurables } from './fn/inventory/get-durables';
 export type { CreateDurable$Params as CreateDurable$Params } from './fn/inventory/create-durable';

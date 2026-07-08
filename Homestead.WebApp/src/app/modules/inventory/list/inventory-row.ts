@@ -3,6 +3,7 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
 import type { PlaceConsumableResponse } from '@/api/generated/models/place-consumable-response';
 import type { StockEntryResponse } from '@/api/generated/models/stock-entry-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
+import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
 import { formatQty } from '../consumables/consumable-shared';
 import { itemStatusLabel } from '../shared/item-status-meta';
 
@@ -57,6 +58,8 @@ export interface InventoryRow {
   readonly isLow: boolean;
   /** Muted hint after the quantity (drilled consumable rows: "of N total"). */
   readonly onHandHint?: string;
+  /** Classification tags on this item (both kinds), each carrying its resolved effective colour. */
+  readonly tags: readonly ItemTagDto[];
   readonly durable?: DurableResponse;
   readonly consumable?: ConsumableResponse;
 }
@@ -88,6 +91,7 @@ export function durableToRow(durable: DurableResponse): InventoryRow {
     onHand: null,
     unit: null,
     isLow: false,
+    tags: durable.tags ?? [],
     durable,
   };
 }
@@ -124,6 +128,7 @@ export function consumableToRow(consumable: ConsumableResponse): InventoryRow {
     onHand: consumable.totalOnHand,
     unit: consumable.unit ?? null,
     isLow: consumable.isLow,
+    tags: consumable.tags ?? [],
     consumable,
   };
 }
