@@ -32,6 +32,16 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
  * Client-side filtering is disabled ({@link alwaysVisible}) — the backend already filtered and
  * fuzzy-matched, and a literal client filter would hide typo matches (e.g. "battry" → "Battery").
  * The brain command primitive still provides keyboard navigation over the rendered results.
+ *
+ * Known iOS limitation: on desktop the search input is auto-focused when the palette opens (CDK
+ * Dialog's `autoFocus: 'first-tabbable'` default, via Spartan's BrnDialog) and the caret lands ready
+ * to type. On iPhone/iPad the input still gets focus but the on-screen keyboard does NOT appear —
+ * mobile Safari only raises the keyboard when `.focus()` runs synchronously inside the originating
+ * tap handler, and our open path is async (tap → signal → linkedSignal → BrnDialog effect → overlay
+ * attach → focus-trap), so iOS treats the focus as programmatic and suppresses the keyboard. The user
+ * taps the field once more to bring it up. Making the keyboard auto-open on iOS would require priming
+ * a hidden input synchronously within the tap and relocating focus once the real input mounts — a
+ * fragile platform workaround we've deliberately chosen not to add.
  */
 @Component({
   selector: 'app-command-palette',
