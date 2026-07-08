@@ -15,6 +15,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
 import { replace, type JsonPatchOperation } from '@/shared/json-patch';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { openGeneration } from '@/shared/utils/open-generation';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { AreaParentPickerComponent } from '../../shared/area-parent-picker/area-parent-picker.component';
@@ -75,7 +76,8 @@ export class EditAreaDialogComponent {
   saved = output<AreaResponse>();
   closed = output<void>();
 
-  private seedKey = computed(() => `${this.area()?.id ?? ''}|${this.state() === 'open'}`);
+  private openGen = openGeneration(this.state);
+  private seedKey = computed(() => `${this.area()?.id ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
   editName = seededLinkedSignal(this.seedKey, () => {
     const a = this.area();

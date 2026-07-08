@@ -8,9 +8,10 @@ namespace Homestead.WebApi.Modules.Inventory.Features.Durables.GetDurables;
 public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<DurableResponse>>
 {
     /// <summary>
-    /// Restrict to items <b>directly placed</b> in this area. This is direct-placement, not resolved —
-    /// items nested in a container that resolves to this area are not matched (resolved filtering is
-    /// done client-side off <see cref="DurableResponse.ResolvedAreaId"/>).
+    /// Restrict to items whose <b>resolved</b> area is this area or any of its descendants. Resolved,
+    /// not direct-placement: an item nested in a container that walks up to this area (or a sub-area)
+    /// is matched. Resolved area is not stored/SQL-expressible, so this filter resolves the full
+    /// candidate set in memory before paginating (see <see cref="DurableResponse.ResolvedAreaId"/>).
     /// </summary>
     public Guid? AreaId { get; init; }
 
@@ -26,8 +27,8 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     public DurableKind[]? DurableKinds { get; init; }
 
     /// <summary>
-    /// Restrict to items with no <b>direct</b> location (neither area nor container). Like
-    /// <see cref="AreaId"/>, this is direct-placement semantics, not resolved-Unplaced.
+    /// Restrict to items whose <b>resolved</b> area is null — the container chain reaches no area (or
+    /// the item is directly unplaced). Like <see cref="AreaId"/>, this is resolved, not direct.
     /// </summary>
     public bool? Unplaced { get; init; }
 

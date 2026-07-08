@@ -1,5 +1,5 @@
 import { Subject, of, throwError } from 'rxjs';
-import { StockStepperEngine, stockLocationKey, type StepperHooks } from './stock-stepper.engine';
+import { StockStepperEngine, stockLocationKey, stepperKey, type StepperHooks } from './stock-stepper.engine';
 import type { ConsumableDetailResponse } from '@/api/generated/models/consumable-detail-response';
 
 const DETAIL = {
@@ -42,6 +42,13 @@ describe('stockLocationKey', () => {
     expect(stockLocationKey({ areaId: 'a1', containerItemId: null })).toBe('a1|');
     expect(stockLocationKey({ areaId: null, containerItemId: 'c1' })).toBe('|c1');
     expect(stockLocationKey({})).toBe('|');
+  });
+});
+
+describe('stepperKey', () => {
+  it('prefixes the location key with the consumable id', () => {
+    expect(stepperKey('s1', { areaId: 'a1', containerItemId: null })).toBe('s1|a1|');
+    expect(stepperKey('s2', { areaId: null, containerItemId: 'c1' })).toBe('s2||c1');
   });
 });
 
@@ -146,6 +153,34 @@ describe('StockStepperEngine', () => {
       vi.advanceTimersByTime(DEBOUNCE_MS);
 
       expect(commits[0].payload).toBe('payload-at-tap-time');
+    });
+
+    it('scopes deltas per consumable so two consumables at one location never bleed', () => {
+      const { hooks, commits } = makeControlledHooks();
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
+
+      const loc = { areaId: 'pantry', containerItemId: null };
+      const aKey = stepperKey('A', loc); // 'A|pantry|'
+      const bKey = stepperKey('B', loc); // 'B|pantry|'
+
+      engine.tap(aKey, 3, aKey);
+      engine.tap(bKey, 2, bKey);
+
+      // Same location, different consumables — each key holds only its own delta, and a
+      // per-consumable total never picks up the other consumable's taps.
+      expect(engine.deltaFor(aKey)).toBe(3);
+      expect(engine.deltaFor(bKey)).toBe(2);
+      expect(engine.totalDelta('A')).toBe(3);
+      expect(engine.totalDelta('B')).toBe(2);
+
+      // A's commit fails: discardKey purges A's key only; B's delta at the same location survives.
+      vi.advanceTimersByTime(DEBOUNCE_MS);
+      expect(commits[0].payload).toBe(aKey);
+      commits[0].response.error(new Error('409 stock changed'));
+
+      expect(engine.deltaFor(aKey)).toBe(0);
+      expect(engine.deltaFor(bKey)).toBe(2);
+      expect(engine.totalDelta('B')).toBe(2);
     });
   });
 
@@ -315,6 +350,30 @@ describe('StockStepperEngine', () => {
 
       expect(jobErr).toBe(boom);
       expect(errors.length).toBe(0);
+    });
+
+    it('recovers from a synchronous throw in the job factory instead of wedging the queue', async () => {
+      const { hooks } = makeControlledHooks();
+      const engine = new StockStepperEngine(hooks, DEBOUNCE_MS);
+
+      const boom = new Error('sync boom');
+      let jobErr: unknown;
+      engine.enqueue(
+        () => { throw boom; }, // synchronous throw escapes the observable path entirely
+        () => {},
+        (err) => (jobErr = err),
+      );
+
+      // onError fired and `running` was reset (a following job still runs, proving no wedge).
+      expect(jobErr).toBe(boom);
+      let ranNext = false;
+      engine.enqueue(
+        () => of('ok'),
+        () => (ranNext = true),
+        () => {},
+      );
+      expect(ranNext).toBe(true);
+      await expect(engine.whenIdle()).resolves.toBeUndefined();
     });
   });
 

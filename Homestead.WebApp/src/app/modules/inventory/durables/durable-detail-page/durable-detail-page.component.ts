@@ -49,7 +49,7 @@ import { UnitPipe } from '../../consumables/unit.pipe';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { replace } from '@/shared/json-patch';
-import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { PlaceContentsResponse } from '@/api/generated/models/place-contents-response';
@@ -103,17 +103,13 @@ import { toast } from '@spartan-ng/brain/sonner';
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
-      @if (loading() && !durable()) {
-        <div class="flex justify-center py-16"><hlm-spinner /></div>
-      } @else if (notFound()) {
-        <div hlmEmpty>
-          <div hlmEmptyHeader>
-            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
-            <div hlmEmptyTitle>Durable not found</div>
-            <div hlmEmptyDescription>It may have been deleted.</div>
+      @if (durable(); as it) {
+        @if (loadError()) {
+          <div class="flex items-center justify-between gap-3 rounded-md border border-dashed border-destructive/50 p-3 text-sm text-destructive">
+            <span>Couldn't refresh. Showing the last loaded version.</span>
+            <button type="button" hlmBtn variant="outline" size="sm" (click)="onChanged()">Retry</button>
           </div>
-        </div>
-      } @else if (durable(); as it) {
+        }
         <!-- Header -->
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-1">
@@ -351,6 +347,27 @@ import { toast } from '@spartan-ng/brain/sonner';
             }
           }
         </section>
+      } @else if (notFound()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
+            <div hlmEmptyTitle>Durable not found</div>
+            <div hlmEmptyDescription>It may have been deleted.</div>
+          </div>
+        </div>
+      } @else if (loadError()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
+            <div hlmEmptyTitle>Couldn't load durable</div>
+            <div hlmEmptyDescription>Something went wrong. Check your connection and try again.</div>
+          </div>
+          <div hlmEmptyContent>
+            <button type="button" hlmBtn variant="outline" (click)="onChanged()">Retry</button>
+          </div>
+        </div>
+      } @else if (loading()) {
+        <div class="flex justify-center py-16"><hlm-spinner /></div>
       }
     </div>
 
@@ -414,6 +431,8 @@ export class DurableDetailPageComponent {
   refreshTrigger = signal(0);
   loading = signal(false);
   notFound = signal(false);
+  // A non-404 load/refetch failure — retryable, and never allowed to replace already-rendered data.
+  loadError = signal(false);
   contentsError = signal(false);
   activityError = signal(false);
 
@@ -428,16 +447,13 @@ export class DurableDetailPageComponent {
         if (tick === 0 && untracked(() => this.preloaded())?.id === id) return of(null);
         this.loading.set(true);
         this.notFound.set(false);
+        this.loadError.set(false);
         return this.durableApi.getDurable({ id }).pipe(
           map((it) => {
             this.loading.set(false);
             return it;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.notFound.set(true);
-            return of(null);
-          }),
+          catchError((err) => handleDetailLoadError(err, { notFound: this.notFound, loadError: this.loadError }, this.loading)),
         );
       }),
     ),

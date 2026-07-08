@@ -74,7 +74,7 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_FiltersByArea()
+    public async Task Handle_FiltersByArea_MatchesDirectlyPlaced()
     {
         await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Stapler", areaId: _office.Id);
@@ -87,7 +87,40 @@ public class GetDurablesHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_FiltersUnplaced()
+    public async Task Handle_FiltersByArea_MatchesResolvedNotJustDirect()
+    {
+        // Wrench nested in a chest that sits in the garage — resolves to garage, not directly placed.
+        var chest = await AddItemAsync("Tool chest", areaId: _garage.Id, durableKind: DurableKind.Container);
+        await AddItemAsync("Wrench", parentItemId: chest.Id);
+        await AddItemAsync("Stapler", areaId: _office.Id);
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+
+        // Both the chest (direct) and the nested wrench (resolved) match; the office stapler does not.
+        Assert.Equal(2, resp.Items.Count);
+        Assert.Contains(resp.Items, i => i.Name == "Wrench");
+        Assert.Contains(resp.Items, i => i.Name == "Tool chest");
+        Assert.DoesNotContain(resp.Items, i => i.Name == "Stapler");
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByArea_ExpandsToDescendantAreas()
+    {
+        var bench = new Area { Id = Guid.NewGuid(), Name = "Workbench", ParentAreaId = _garage.Id };
+        _db.Areas.Add(bench);
+        await _db.SaveChangesAsync(Ct);
+        await AddItemAsync("Vise", areaId: bench.Id); // in a sub-area of the garage
+        await AddItemAsync("Stapler", areaId: _office.Id);
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, AreaId = _garage.Id }, Ct);
+
+        // Filtering the parent area rolls in items resolved to its descendant areas.
+        Assert.Single(resp.Items);
+        Assert.Equal("Vise", resp.Items[0].Name);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersUnplaced_MatchesDirectlyUnplaced()
     {
         await AddItemAsync("Drill", areaId: _garage.Id);
         await AddItemAsync("Floating thing");
@@ -97,6 +130,37 @@ public class GetDurablesHandlerTests : IAsyncLifetime
         Assert.Single(resp.Items);
         Assert.Equal("Floating thing", resp.Items[0].Name);
         Assert.Null(resp.Items[0].AreaId);
+    }
+
+    [Fact]
+    public async Task Handle_FiltersUnplaced_MatchesBrokenContainerChain()
+    {
+        // A container with no area holding a screw → the screw resolves to no area (unplaced).
+        var floatingBin = await AddItemAsync("Floating bin", durableKind: DurableKind.Container);
+        await AddItemAsync("Screw", parentItemId: floatingBin.Id);
+        await AddItemAsync("Drill", areaId: _garage.Id);
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 50, Unplaced = true }, Ct);
+
+        // Both the unplaced bin and the screw nested inside it resolve to null.
+        Assert.Equal(2, resp.Items.Count);
+        Assert.Contains(resp.Items, i => i.Name == "Floating bin");
+        Assert.Contains(resp.Items, i => i.Name == "Screw");
+        Assert.DoesNotContain(resp.Items, i => i.Name == "Drill");
+    }
+
+    [Fact]
+    public async Task Handle_FiltersByArea_TotalCountReflectsFilteredSet_NotPageLocal()
+    {
+        // Seed more matching items than one page so TotalCount can't be the page-local count.
+        for (var i = 0; i < 5; i++)
+            await AddItemAsync($"Garage item {i:D2}", areaId: _garage.Id);
+        await AddItemAsync("Office stapler", areaId: _office.Id);
+
+        var resp = await _sut.Handle(new GetDurablesQuery { Page = 1, PageSize = 2, AreaId = _garage.Id }, Ct);
+
+        Assert.Equal(2, resp.Items.Count); // one page
+        Assert.Equal(5, resp.TotalCount);  // whole filtered set, not the page or the office item
     }
 
     [Fact]

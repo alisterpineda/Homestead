@@ -25,9 +25,9 @@ public class DurablesEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
     }
 
-    private static async Task<Guid> CreateAreaAsync(HttpClient client, string name)
+    private static async Task<Guid> CreateAreaAsync(HttpClient client, string name, Guid? parentAreaId = null)
     {
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/areas", new { name }, CT);
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/areas", new { name, parentAreaId }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var area = await resp.Content.ReadFromJsonAsync<AreaItem>(CT);
         return area!.Id;
@@ -692,5 +692,80 @@ public class DurablesEndpointTests : IntegrationTestBase
             new[] { new { op = "replace", path = "/parentItemId", value = (object)chest.Id } });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ----- Resolved-area list filtering (?areaId / ?unplaced) -----
+
+    private static async Task<PaginatedResult<DurableItem>?> ListDurablesAsync(HttpClient client, string query)
+    {
+        var resp = await client.GetAsync($"/api/v1/inventory/durables?{query}", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return await resp.Content.ReadFromJsonAsync<PaginatedResult<DurableItem>>(CT);
+    }
+
+    [Fact]
+    public async Task GetDurables_AreaFilter_MatchesResolvedNotDirect()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var wrench = await CreateDurableAsync(client, new { name = "Wrench", parentItemId = chest.Id });
+        var stapler = await CreateDurableAsync(client, new { name = "Stapler", areaId = officeId });
+
+        var list = await ListDurablesAsync(client, $"page=1&pageSize=200&areaId={garageId}");
+
+        // The nested wrench resolves to the garage (not directly placed) and matches; the office
+        // stapler does not.
+        Assert.Contains(list!.Items, i => i.Id == wrench.Id);
+        Assert.Contains(list.Items, i => i.Id == chest.Id);
+        Assert.DoesNotContain(list.Items, i => i.Id == stapler.Id);
+    }
+
+    [Fact]
+    public async Task GetDurables_AreaFilter_ExpandsToDescendantArea()
+    {
+        var client = await CreateAdminClientAsync();
+        var houseId = await CreateAreaAsync(client, "House");
+        var bedroomId = await CreateAreaAsync(client, "Bedroom", parentAreaId: houseId);
+        var lamp = await CreateDurableAsync(client, new { name = "Lamp", areaId = bedroomId });
+
+        var list = await ListDurablesAsync(client, $"page=1&pageSize=200&areaId={houseId}");
+
+        // Filtering the parent area rolls in an item resolved to a descendant area.
+        Assert.Contains(list!.Items, i => i.Id == lamp.Id);
+    }
+
+    [Fact]
+    public async Task GetDurables_Unplaced_MatchesBrokenContainerChain()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var floatingBin = await CreateContainerAsync(client, "Floating bin"); // no area
+        var screw = await CreateDurableAsync(client, new { name = "Screw", parentItemId = floatingBin.Id });
+        var drill = await CreateDurableAsync(client, new { name = "Drill", areaId = garageId });
+
+        var list = await ListDurablesAsync(client, "page=1&pageSize=200&unplaced=true");
+
+        Assert.Contains(list!.Items, i => i.Id == screw.Id);       // resolves to no area
+        Assert.Contains(list.Items, i => i.Id == floatingBin.Id);
+        Assert.DoesNotContain(list.Items, i => i.Id == drill.Id);
+    }
+
+    [Fact]
+    public async Task GetDurables_AreaFilter_TotalCountReflectsFilteredSet()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        for (var i = 0; i < 3; i++)
+            await CreateDurableAsync(client, new { name = $"Garage tool {i}", areaId = garageId });
+        await CreateDurableAsync(client, new { name = "Office stapler", areaId = officeId });
+
+        // pageSize below the filtered count so TotalCount can't be the page-local count.
+        var list = await ListDurablesAsync(client, $"page=1&pageSize=2&areaId={garageId}");
+
+        Assert.Equal(2, list!.Items.Count);
+        Assert.Equal(3, list.TotalCount); // all garage items, not the page or the office one
     }
 }

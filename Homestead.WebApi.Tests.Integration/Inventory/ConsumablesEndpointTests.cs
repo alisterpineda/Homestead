@@ -42,9 +42,9 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         return (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
     }
 
-    private static async Task<Guid> CreateAreaAsync(HttpClient client, string name)
+    private static async Task<Guid> CreateAreaAsync(HttpClient client, string name, Guid? parentAreaId = null)
     {
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/areas", new { name }, CT);
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/areas", new { name, parentAreaId }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<AreaItem>(CT))!.Id;
     }
@@ -1001,5 +1001,109 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         // this equality — and thus the no-duplicate/no-skip partition across the page boundary — only
         // holds once the tiebreaker makes the order total and stable.
         Assert.Equal(expectedOrder, seen);
+    }
+
+    // ----- Resolved-area list filtering (?areaId / ?unplaced) -----
+
+    private static async Task<PaginatedResult<ConsumableItem>?> ListConsumablesAsync(HttpClient client, string query)
+    {
+        var resp = await client.GetAsync($"/api/v1/inventory/consumables?{query}", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return await resp.Content.ReadFromJsonAsync<PaginatedResult<ConsumableItem>>(CT);
+    }
+
+    [Fact]
+    public async Task GetConsumables_AreaFilter_MatchesStockResolvingIntoAreaOrSubtree()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var benchId = await CreateAreaAsync(client, "Workbench", parentAreaId: garageId);
+        var officeId = await CreateAreaAsync(client, "Office");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+
+        // Stock inside a nested container that resolves to the garage.
+        var screws = await CreateConsumableAsync(client, "Screws");
+        await ReceiveAsync(client, screws.Id, new { containerItemId = chest.Id, quantity = 4m });
+        // Stock in a sub-area of the garage — matched by the parent-area filter (descendant rollup).
+        var nails = await CreateConsumableAsync(client, "Nails");
+        await ReceiveAsync(client, nails.Id, new { areaId = benchId, quantity = 20m });
+        // Stock in an unrelated area — not matched.
+        var clips = await CreateConsumableAsync(client, "Clips");
+        await ReceiveAsync(client, clips.Id, new { areaId = officeId, quantity = 5m });
+
+        var list = await ListConsumablesAsync(client, $"page=1&pageSize=200&areaId={garageId}");
+
+        Assert.Contains(list!.Items, s => s.Id == screws.Id);
+        Assert.Contains(list.Items, s => s.Id == nails.Id);
+        Assert.DoesNotContain(list.Items, s => s.Id == clips.Id);
+    }
+
+    [Fact]
+    public async Task GetConsumables_AreaFilter_CountsMultiLocationConsumableOnce()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
+        var screws = await CreateConsumableAsync(client, "Screws");
+        await ReceiveAsync(client, screws.Id, new { areaId = garageId, quantity = 6m });      // resolves to garage
+        await ReceiveAsync(client, screws.Id, new { containerItemId = chest.Id, quantity = 4m }); // also garage
+
+        var list = await ListConsumablesAsync(client, $"page=1&pageSize=200&areaId={garageId}");
+
+        Assert.Single(list!.Items, s => s.Id == screws.Id); // counted once despite two matching locations
+        Assert.Equal(1, list.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetConsumables_Unplaced_MatchesStockWithNoAreaRoot()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var floatingBin = await CreateContainerAsync(client, "Floating bin"); // no area
+        var washers = await CreateConsumableAsync(client, "Washers");
+        await ReceiveAsync(client, washers.Id, new { containerItemId = floatingBin.Id, quantity = 3m });
+        var placed = await CreateConsumableAsync(client, "Screws");
+        await ReceiveAsync(client, placed.Id, new { areaId = garageId, quantity = 6m });
+
+        var list = await ListConsumablesAsync(client, "page=1&pageSize=200&unplaced=true");
+
+        Assert.Contains(list!.Items, s => s.Id == washers.Id);
+        Assert.DoesNotContain(list.Items, s => s.Id == placed.Id);
+    }
+
+    [Fact]
+    public async Task GetConsumables_AreaFilter_ExcludesZeroStockConsumable()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var stocked = await CreateConsumableAsync(client, "Screws");
+        await ReceiveAsync(client, stocked.Id, new { areaId = garageId, quantity = 6m });
+        var empty = await CreateConsumableAsync(client, "Glue"); // never stocked — no locations
+
+        var areaList = await ListConsumablesAsync(client, $"page=1&pageSize=200&areaId={garageId}");
+        Assert.DoesNotContain(areaList!.Items, s => s.Id == empty.Id);
+
+        var unplacedList = await ListConsumablesAsync(client, "page=1&pageSize=200&unplaced=true");
+        Assert.DoesNotContain(unplacedList!.Items, s => s.Id == empty.Id);
+    }
+
+    [Fact]
+    public async Task GetConsumables_AreaFilter_TotalCountReflectsFilteredSet()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        for (var i = 0; i < 3; i++)
+        {
+            var c = await CreateConsumableAsync(client, $"Garage stock {i}");
+            await ReceiveAsync(client, c.Id, new { areaId = garageId, quantity = 1m });
+        }
+        var officePen = await CreateConsumableAsync(client, "Office pen");
+        await ReceiveAsync(client, officePen.Id, new { areaId = officeId, quantity = 1m });
+
+        var list = await ListConsumablesAsync(client, $"page=1&pageSize=2&areaId={garageId}");
+
+        Assert.Equal(2, list!.Items.Count);   // one page
+        Assert.Equal(3, list.TotalCount);     // whole filtered set, not the page or the office pen
     }
 }

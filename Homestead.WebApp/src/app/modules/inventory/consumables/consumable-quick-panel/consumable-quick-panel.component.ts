@@ -32,7 +32,7 @@ import { isTerminalStatus } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatQty } from '../consumable-shared';
 import { UnitPipe } from '../unit.pipe';
-import { StockStepperEngine, stockLocationKey } from './stock-stepper.engine';
+import { StockStepperEngine, stockLocationKey, stepperKey } from './stock-stepper.engine';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -441,11 +441,19 @@ export class ConsumableQuickPanelComponent {
     },
   });
 
-  displayedQty(entry: StockEntryResponse): number {
-    return entry.quantity + this.engine.deltaFor(stockLocationKey(entry));
+  /** Engine key for an entry, scoped to the current consumable so deltas never bleed across them. */
+  private keyFor(entry: { areaId?: string | null; containerItemId?: string | null }): string {
+    return stepperKey(this.consumableView()?.id ?? '', entry);
   }
 
-  displayedTotal = computed(() => (this.consumableView()?.totalOnHand ?? 0) + this.engine.totalDelta());
+  displayedQty(entry: StockEntryResponse): number {
+    return entry.quantity + this.engine.deltaFor(this.keyFor(entry));
+  }
+
+  displayedTotal = computed(() => {
+    const id = this.consumableView()?.id;
+    return (this.consumableView()?.totalOnHand ?? 0) + (id ? this.engine.totalDelta(id) : 0);
+  });
 
   /** Low tracks optimistic taps, not just the last server response. */
   isLowNow = computed(() => {
@@ -500,13 +508,13 @@ export class ConsumableQuickPanelComponent {
 
   protected entryForm(entry: StockEntryResponse): InlineForm | null {
     const f = this.inlineForm();
-    return f && f.kind !== 'assign' && f.key === stockLocationKey(entry) ? f : null;
+    return f && f.kind !== 'assign' && f.key === this.keyFor(entry) ? f : null;
   }
 
   onTap(entry: StockEntryResponse, delta: 1 | -1): void {
     const consumableId = this.consumableView()?.id;
     if (!consumableId) return;
-    this.engine.tap(stockLocationKey(entry), delta, {
+    this.engine.tap(stepperKey(consumableId, entry), delta, {
       consumableId,
       areaId: entry.areaId ?? null,
       containerItemId: entry.containerItemId ?? null,
@@ -523,14 +531,14 @@ export class ConsumableQuickPanelComponent {
     const src = this.toOpSource(entry);
     this.engine.flushAll();
     this.formOpenCount.update(n => n + 1);
-    this.inlineForm.set({ kind: 'move', key: stockLocationKey(entry), src });
+    this.inlineForm.set({ kind: 'move', key: this.keyFor(entry), src });
   }
 
   openCorrect(entry: StockEntryResponse): void {
     const src = this.toOpSource(entry);
     this.engine.flushAll();
     this.formOpenCount.update(n => n + 1);
-    this.inlineForm.set({ kind: 'correct', key: stockLocationKey(entry), src });
+    this.inlineForm.set({ kind: 'correct', key: this.keyFor(entry), src });
   }
 
   closeForm(): void {
@@ -565,12 +573,15 @@ export class ConsumableQuickPanelComponent {
       // Submitting the current on-hand unchanged is a no-op the server rejects, so block it here.
       // Compare against the LIVE entry quantity (kept fresh by resyncs), not the click-time
       // snapshot — the snapshot goes stale if the open-triggered flush fails.
-      const live = this.entries().find((e) => stockLocationKey(e) === f.key)?.quantity ?? 0;
+      const live = this.entries().find((e) => this.keyFor(e) === f.key)?.quantity ?? 0;
       if (q === live) return 'Enter a different quantity to correct.';
       return null;
     }
 
     if (q <= 0) return 'Quantity must be greater than zero.';
+
+    // Advisory over-draw guard for a move — the source snapshot is captured optimistically at open.
+    if (f.kind === 'move' && q > f.src.quantity) return `Only ${formatQty(f.src.quantity)} on hand here.`;
 
     const dest = f.kind === 'assign' ? this.assignDest() : this.moveDest();
     if (dest.kind === 'unplaced') return f.kind === 'move' ? 'Pick a destination.' : 'Pick a location.';

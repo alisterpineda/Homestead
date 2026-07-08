@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, RouterLink, Router, NavigationEnd } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, filter, combineLatest } from 'rxjs';
+import { switchMap, map, filter, combineLatest, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePencil, lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -20,7 +20,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
-import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
+import { handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { CommodityPricesSectionComponent } from './commodity-prices-section.component';
 import { EditCommoditySheetComponent } from './edit-commodity-sheet/edit-commodity-sheet.component';
@@ -74,6 +74,12 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       @if (commodity(); as c) {
+        @if (loadError()) {
+          <div class="flex items-center justify-between gap-3 rounded-md border border-dashed border-destructive/50 p-3 text-sm text-destructive">
+            <span>Couldn't refresh. Showing the last loaded version.</span>
+            <button type="button" hlmBtn variant="outline" size="sm" (click)="retry()">Retry</button>
+          </div>
+        }
         <header class="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground">
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="text-2xl font-semibold">{{ c.symbol }}</h1>
@@ -91,12 +97,24 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         <app-commodity-prices-section [commodity]="c" />
       } @else if (loading()) {
         <div class="flex justify-center py-16"><hlm-spinner /></div>
+      } @else if (loadError()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
+            <div hlmEmptyTitle>Couldn't load commodity</div>
+            <div hlmEmptyDescription>Something went wrong. Check your connection and try again.</div>
+          </div>
+          <div hlmEmptyContent class="flex gap-2">
+            <button type="button" hlmBtn variant="outline" (click)="retry()">Retry</button>
+            <a hlmBtn variant="ghost" routerLink="/finances/commodities">Back to commodities</a>
+          </div>
+        </div>
       } @else {
         <div hlmEmpty>
           <div hlmEmptyHeader>
             <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
             <div hlmEmptyTitle>Commodity not found</div>
-            <div hlmEmptyDescription>The commodity couldn't be loaded.</div>
+            <div hlmEmptyDescription>It may have been deleted.</div>
           </div>
           <div hlmEmptyContent>
             <a hlmBtn variant="outline" routerLink="/finances/commodities">Back to commodities</a>
@@ -121,7 +139,10 @@ export class CommodityDetailPageComponent implements OnDestroy {
 
   refreshTrigger = signal(0);
   loading = signal(false);
-  error = signal(false);
+  // A real 404 → the "not found" empty state; any other error → a retryable loadError that never
+  // replaces an already-rendered commodity on a failed refetch.
+  notFound = signal(false);
+  loadError = signal(false);
   sheetState = signal<BrnDialogState>('closed');
 
   private headerActionsTpl = viewChild.required<TemplateRef<unknown>>('headerActions');
@@ -137,13 +158,14 @@ export class CommodityDetailPageComponent implements OnDestroy {
       switchMap(([id]) => {
         if (!id) return [null];
         this.loading.set(true);
-        this.error.set(false);
+        this.notFound.set(false);
+        this.loadError.set(false);
         return this.commodityApi.getCommodity({ id }).pipe(
           map(c => {
             this.loading.set(false);
             return c as CommodityResponse | null;
           }),
-          handleQueryError(this.loading, this.error, null),
+          catchError((err) => handleDetailLoadError(err, { notFound: this.notFound, loadError: this.loadError }, this.loading)),
         );
       }),
     ),
@@ -167,6 +189,11 @@ export class CommodityDetailPageComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.pageHeaderService.clearActions();
     this.pageHeaderService.clearTitle();
+  }
+
+  /** Retry a failed load/refetch — same mechanism onSheetSaved uses to refresh. */
+  retry(): void {
+    this.refreshTrigger.update(v => v + 1);
   }
 
   openEdit(): void {

@@ -332,6 +332,15 @@ describe('ConsumableQuickPanelComponent', () => {
       component.openMove(PANTRY);
       expect(component.moveQty()).toBe('5'); // fresh prefill, not the abandoned draft
     });
+
+    it('blocks a move quantity above the on-hand snapshot before submit', async () => {
+      await open();
+      component.openMove(PANTRY); // on-hand snapshot is 5
+      component.moveDest.set({ kind: 'area', id: 'garage' });
+      component.moveQty.set('12');
+      expect(component.formError()).toBe('Only 5 on hand here.');
+      expect(component.canSubmitForm()).toBe(false);
+    });
   });
 
   describe('inline correct form', () => {

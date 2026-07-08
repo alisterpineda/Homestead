@@ -1,4 +1,5 @@
 import { type WritableSignal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { type Observable, catchError, EMPTY, of } from 'rxjs';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 
@@ -40,4 +41,28 @@ export function handleQueryError<T, F>(
     errorSignal.set(true);
     return of(fallbackValue);
   });
+}
+
+/**
+ * Detail-page load-error handler. A real 404 → notFound (terminal "not found" state). Any other
+ * error → a retryable loadError flag and EMPTY, so an already-rendered page is NEVER replaced by an
+ * error state on a failed refetch. Reset loadError (and notFound) at the top of the switchMap before
+ * each fetch, exactly like the existing notFound reset.
+ *
+ * Use inside the inner (per-fetch) observable's `catchError`, e.g.
+ *   switchMap(() => api.get(id).pipe(catchError((err) => handleDetailLoadError(err, { notFound, loadError }, loading))))
+ * On a non-404 the returned EMPTY emits nothing, so `toSignal` keeps its previous (rendered) value.
+ */
+export function handleDetailLoadError(
+  err: unknown,
+  flags: { notFound: WritableSignal<boolean>; loadError: WritableSignal<boolean> },
+  loading: WritableSignal<boolean>,
+): Observable<null> {
+  loading.set(false);
+  if (err instanceof HttpErrorResponse && err.status === 404) {
+    flags.notFound.set(true);
+    return of(null); // blank → not-found state (there is genuinely nothing to show)
+  }
+  flags.loadError.set(true);
+  return EMPTY as unknown as Observable<null>; // keep the last-emitted (rendered) value in toSignal
 }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { NgTemplateOutlet } from '@angular/common';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -122,12 +122,36 @@ describe('ItemDetailPageComponent', () => {
     expect(text(harness)).not.toContain('child:');
   });
 
-  it('shows the not-found state when the item is missing', async () => {
-    itemApi.result = throwError(() => new Error('not found'));
+  it('shows the not-found state on a 404', async () => {
+    itemApi.result = throwError(() => new HttpErrorResponse({ status: 404 }));
     const { harness, component } = await navigate('/inventory/items/missing');
 
     expect(component.notFound()).toBe(true);
+    expect(component.loadError()).toBe(false);
     expect(text(harness)).toContain('Item not found');
+  });
+
+  it('shows a retryable error state (not "not found") on a non-404 failure, and Retry re-fetches', async () => {
+    itemApi.result = throwError(() => new HttpErrorResponse({ status: 500 }));
+    const { harness, component } = await navigate('/inventory/items/d1');
+
+    expect(component.notFound()).toBe(false);
+    expect(component.loadError()).toBe(true);
+    expect(text(harness)).toContain("Couldn't load item");
+    expect(text(harness)).not.toContain('Item not found');
+
+    // Recover the backend and retry — the dispatcher re-fetches and renders the child.
+    itemApi.result = of(DURABLE_ITEM);
+    (harness.routeNativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('button')
+      .forEach(b => { if (b.textContent?.trim() === 'Retry') b.click(); });
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(itemApi.getItemCalls).toBe(2);
+    expect(component.loadError()).toBe(false);
+    expect(text(harness)).toContain('durable child: Cordless Drill');
   });
 
   it('renders the durable child, preloaded, for a NonFungible item', async () => {

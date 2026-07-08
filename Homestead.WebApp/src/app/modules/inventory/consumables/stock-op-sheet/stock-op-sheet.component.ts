@@ -26,6 +26,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { openGeneration } from '@/shared/utils/open-generation';
 
 export type StockOpMode = 'receive' | 'consume' | 'transfer' | 'adjust';
 
@@ -189,8 +190,9 @@ export class StockOpSheetComponent {
   protected meta = computed(() => META[this.mode()]);
 
   // Reset all fields whenever the sheet (re)opens for a given consumable/mode/location.
+  private openGen = openGeneration(this.state);
   private seedKey = computed(() =>
-    `${this.consumableId()}|${this.mode()}|${this.fromLocation()?.label ?? ''}|${this.state() === 'open'}`);
+    `${this.consumableId()}|${this.mode()}|${this.fromLocation()?.label ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
   quantity = seededLinkedSignal(this.seedKey, () => {
     // Adjust pre-fills the current on-hand so the user edits a number, not enters one blind.
@@ -226,6 +228,11 @@ export class StockOpSheetComponent {
       if (q === (this.fromLocation()?.quantity ?? 0)) return 'Enter a different quantity to correct.';
     } else if (q <= 0) {
       return 'Quantity must be greater than zero.';
+    } else if (this.mode() === 'consume' || this.mode() === 'transfer') {
+      // Advisory snapshot check — the server is authoritative, but blocking an obvious over-draw
+      // here saves a round-trip and matches the steppers, which gate on optimistic on-hand.
+      const onHand = this.fromLocation()?.quantity ?? 0;
+      if (q > onHand) return `Only ${formatQty(onHand)} on hand here.`;
     }
 
     if ((this.mode() === 'receive' || this.mode() === 'transfer') && this.destValue().kind === 'unplaced') {

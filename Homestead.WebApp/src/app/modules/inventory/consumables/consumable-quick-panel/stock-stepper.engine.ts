@@ -7,6 +7,11 @@ export function stockLocationKey(loc: { areaId?: string | null; containerItemId?
   return `${loc.areaId ?? ''}|${loc.containerItemId ?? ''}`;
 }
 
+/** Engine key scoped to one consumable so deltas never bleed across consumables sharing a location. */
+export function stepperKey(consumableId: string, loc: { areaId?: string | null; containerItemId?: string | null }): string {
+  return `${consumableId}|${stockLocationKey(loc)}`;
+}
+
 /**
  * Hooks parameterised on a payload captured at tap time. The payload — not component state read
  * later — identifies what a commit acts on, so jobs that run after the panel has moved to another
@@ -65,13 +70,17 @@ export class StockStepperEngine<P> {
     return (this._pending().get(key)?.delta ?? 0) + (this._committing().get(key) ?? 0);
   }
 
-  /** Net optimistic delta across all locations — keeps the total in step with the steppers. */
-  readonly totalDelta: Signal<number> = computed(() => {
+  /**
+   * Net optimistic delta; with a consumableId prefix, only that consumable's location keys.
+   * Reading the signals keeps it reactive when called from a `computed`.
+   */
+  totalDelta(prefix?: string): number {
     let total = 0;
-    for (const burst of this._pending().values()) total += burst.delta;
-    for (const delta of this._committing().values()) total += delta;
+    const match = (k: string) => !prefix || k.startsWith(`${prefix}|`);
+    for (const [k, b] of this._pending()) if (match(k)) total += b.delta;
+    for (const [k, d] of this._committing()) if (match(k)) total += d;
     return total;
-  });
+  }
 
   readonly isBusy: Signal<boolean> = computed(
     () => this._pending().size > 0 || this._committing().size > 0,
@@ -156,7 +165,18 @@ export class StockStepperEngine<P> {
       return;
     }
     this.running = true;
-    job.run().subscribe({
+    let commit$: Observable<unknown>;
+    try {
+      // A synchronous throw from the run() factory (e.g. the commit/enqueue closure) would
+      // otherwise escape pump(), leaving `running` stuck true and wedging the queue forever.
+      commit$ = job.run();
+    } catch (err) {
+      this.running = false;
+      job.onError(err);
+      this.pump();
+      return;
+    }
+    commit$.subscribe({
       next: (result) => {
         this.running = false;
         job.onNext(result);

@@ -32,6 +32,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { openGeneration } from '@/shared/utils/open-generation';
 
 @Component({
   selector: 'app-edit-durable-sheet',
@@ -241,7 +242,8 @@ export class EditDurableSheetComponent {
   protected readonly statuses = ALL_ITEM_STATUSES;
   protected readonly maxAcquiredDate = tomorrowIso();
 
-  private seedKey = computed(() => `${this.durable()?.id ?? ''}|${this.state() === 'open'}`);
+  private openGen = openGeneration(this.state);
+  private seedKey = computed(() => `${this.durable()?.id ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
   editName = seededLinkedSignal(this.seedKey, () => this.openDurable()?.name ?? '');
   editSerial = seededLinkedSignal(this.seedKey, () => this.openDurable()?.serial ?? '');

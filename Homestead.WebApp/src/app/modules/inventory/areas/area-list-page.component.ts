@@ -4,9 +4,10 @@ import {
   inject,
   signal,
   computed,
+  DestroyRef,
 } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, map, firstValueFrom } from 'rxjs';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { switchMap, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePlus,
@@ -25,7 +26,7 @@ import { InventoryAreaApiService } from '@/api/services/inventory-area-api.servi
 import { AreaTableComponent, type AreaSortId, type AreaSortState } from './area-table.component';
 import { CreateAreaDialogComponent } from './create-area-dialog/create-area-dialog.component';
 import { EditAreaDialogComponent } from './edit-area-dialog/edit-area-dialog.component';
-import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { AreaResponse } from '@/api/generated/models/area-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -166,6 +167,9 @@ interface AreaSortFieldOption {
             deleted — move or remove those first.
           </p>
         </div>
+        @if (deleteError()) {
+          <p class="text-sm text-destructive">{{ deleteError() }}</p>
+        }
         <div hlmAlertDialogFooter>
           <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
           <button
@@ -184,6 +188,7 @@ interface AreaSortFieldOption {
 export class AreaListPageComponent {
   private areaApi = inject(InventoryAreaApiService);
   private errorHandler = inject(ErrorHandlerService);
+  private destroyRef = inject(DestroyRef);
 
   readonly sortFields: readonly AreaSortFieldOption[] = [
     { id: 'name', label: 'Name', defaultDesc: false },
@@ -203,6 +208,7 @@ export class AreaListPageComponent {
   pendingDelete = signal<AreaResponse | null>(null);
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
+  deleteError = signal('');
 
   data = toSignal<AreaResponse[] | null, AreaResponse[] | null>(
     toObservable(this.refreshTrigger).pipe(
@@ -274,6 +280,7 @@ export class AreaListPageComponent {
   }
 
   onDeleteRequest(area: AreaResponse): void {
+    this.deleteError.set('');
     this.pendingDelete.set(area);
     this.deleteState.set('open');
   }
@@ -282,17 +289,21 @@ export class AreaListPageComponent {
     const area = this.pendingDelete();
     if (!area) return;
     this.deleting.set(true);
-    const result$ = this.areaApi.deleteArea({ id: area.id }).pipe(
-      handleMutationError(this.errorHandler, this.deleting, 'Failed to delete area.'),
-    );
-    firstValueFrom(result$).then(() => {
-      this.deleting.set(false);
-      ctx.close();
-      this.pendingDelete.set(null);
-      this.onChanged();
-      toast.success('Area deleted.');
-    }).catch(() => {
-      this.deleting.set(false);
+    this.deleteError.set('');
+    this.areaApi.deleteArea({ id: area.id }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        ctx.close();
+        this.pendingDelete.set(null);
+        this.onChanged();
+        toast.success('Area deleted.');
+      },
+      // Inline, not a toast: the open dialog overlay would obscure a toast, and the rejection reason
+      // ("has sub-areas or items — move or remove those first") is what the user needs to read here.
+      error: (err: unknown) => {
+        this.deleting.set(false);
+        this.deleteError.set(this.errorHandler.getErrorMessage(err, 'Failed to delete area.'));
+      },
     });
   }
 }

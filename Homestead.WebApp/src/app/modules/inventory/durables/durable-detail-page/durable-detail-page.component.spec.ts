@@ -1,6 +1,6 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, HttpErrorResponse } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -104,13 +104,16 @@ const PC_CONTENTS: PlaceContentsResponse = {
 class StubDurableApi {
   item: DurableResponse = LEAF_ITEM;
   getDurableError = false;
+  getDurableErrorStatus = 404; // 404 → notFound; anything else → retryable loadError
   getDurableCalls = 0;
   patchCalls: { id: string; body: unknown }[] = [];
   deleteCalls: string[] = [];
 
   getDurable = (params: { id: string }) => {
     this.getDurableCalls++;
-    return this.getDurableError ? throwError(() => new Error('not found')) : of(this.item);
+    return this.getDurableError
+      ? throwError(() => new HttpErrorResponse({ status: this.getDurableErrorStatus }))
+      : of(this.item);
   };
   activityCalls: { id: string; Page: number; PageSize: number }[] = [];
   getDurableActivity = (p: { id: string; Page: number; PageSize: number }) => {
@@ -236,12 +239,54 @@ describe('DurableDetailPageComponent', () => {
     expect(text(harness)).toContain('Unplaced');
   });
 
-  it('shows the not-found state when the item is missing', async () => {
+  it('shows the not-found state on a 404', async () => {
     durableApi.getDurableError = true;
+    durableApi.getDurableErrorStatus = 404;
     const { harness, component } = await navigate('/inventory/items/missing');
 
     expect(component.notFound()).toBe(true);
+    expect(component.loadError()).toBe(false);
     expect(text(harness)).toContain('Durable not found');
+  });
+
+  it('shows a retryable error state (not "not found") on a non-404 load failure', async () => {
+    durableApi.getDurableError = true;
+    durableApi.getDurableErrorStatus = 500;
+    const { harness, component } = await navigate('/inventory/items/item1');
+
+    expect(component.notFound()).toBe(false);
+    expect(component.loadError()).toBe(true);
+    expect(text(harness)).toContain("Couldn't load durable");
+    expect(text(harness)).not.toContain('Durable not found');
+
+    // Retry re-runs the fetch; with the backend recovered the page renders.
+    durableApi.getDurableError = false;
+    buttons(harness).find(b => b.textContent?.trim() === 'Retry')!.click();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    expect(durableApi.getDurableCalls).toBe(2);
+    expect(text(harness)).toContain('Cordless Drill');
+    expect(component.loadError()).toBe(false);
+  });
+
+  it('keeps the rendered page and shows a banner when a refetch fails (non-404)', async () => {
+    const { harness, component } = await navigate('/inventory/items/item1');
+    expect(text(harness)).toContain('Cordless Drill');
+
+    // A mutation-triggered refetch fails transiently — the page must stay rendered.
+    durableApi.getDurableError = true;
+    durableApi.getDurableErrorStatus = 500;
+    component.onChanged();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(component.durable()).not.toBeNull();
+    expect(text(harness)).toContain('Cordless Drill'); // last-loaded page preserved
+    expect(component.loadError()).toBe(true);
+    expect(text(harness)).toContain("Couldn't refresh");
+    expect(text(harness)).not.toContain('may have been deleted');
   });
 
   it('opens the edit sheet on Edit and refreshes the detail on save', async () => {

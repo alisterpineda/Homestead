@@ -112,4 +112,21 @@ describe('TrackDurableSheetComponent', () => {
     component.handleSubmit();
     expect(api.trackCalls).toBe(0);
   });
+
+  it('reseeds the form when reopened for the same source after being closed', () => {
+    setup(AREA_SOURCE);
+    TestBed.flushEffects(); // settle openGeneration to 1
+    expect(component.name()).toBe('Drill bits');
+
+    // User edits the draft, then closes without the field being read again
+    // (mirrors the portal being destroyed while the sheet is closed).
+    component.name.set('Custom name');
+    fixture.componentRef.setInput('state', 'closed');
+    TestBed.flushEffects(); // no bump on close
+
+    // Reopen for the same consumable/source: the draft must reseed, not persist stale.
+    fixture.componentRef.setInput('state', 'open');
+    TestBed.flushEffects(); // openGeneration bumps -> reseed
+    expect(component.name()).toBe('Drill bits');
+  });
 });

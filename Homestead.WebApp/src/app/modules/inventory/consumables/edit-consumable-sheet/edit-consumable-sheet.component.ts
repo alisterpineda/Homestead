@@ -26,6 +26,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { openGeneration } from '@/shared/utils/open-generation';
 
 @Component({
   selector: 'app-edit-consumable-sheet',
@@ -134,7 +135,8 @@ export class EditConsumableSheetComponent {
 
   protected readonly statuses = CONSUMABLE_STATUSES;
 
-  private seedKey = computed(() => `${this.consumable()?.id ?? ''}|${this.state() === 'open'}`);
+  private openGen = openGeneration(this.state);
+  private seedKey = computed(() => `${this.consumable()?.id ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
   editName = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.name ?? '');
   editUnit = seededLinkedSignal(this.seedKey, () => this.openConsumable()?.unit ?? '');

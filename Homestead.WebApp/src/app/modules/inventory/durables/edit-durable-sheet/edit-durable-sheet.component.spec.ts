@@ -76,6 +76,22 @@ describe('EditDurableSheetComponent', () => {
       expect(component.editAreaId()).toBeNull();
     });
 
+    it('reseeds the form when reopened for the same item after being closed', () => {
+      open(makeItem({ name: 'Drill' }));
+      expect(component.editName()).toBe('Drill');
+
+      // Edit the draft, then close. While closed the portal is destroyed, so nothing
+      // reads the field — the linkedSignal never observes the intermediate closed key.
+      component.editName.set('Renamed');
+      fixture.componentRef.setInput('state', 'closed');
+      fixture.detectChanges();
+
+      // Reopen for the same item: the draft must reseed to source, not stay 'Renamed'.
+      fixture.componentRef.setInput('state', 'open');
+      fixture.detectChanges();
+      expect(component.editName()).toBe('Drill');
+    });
+
     it('seeds the container / parent / compartment fields from the item', () => {
       open(makeItem({
         parentItemId: 'chest', durableKind: 'Container', compartment: 'Top drawer',

@@ -52,6 +52,7 @@ import { AddPositionSheetComponent } from './add-position-sheet/add-position-she
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { toDateOnly } from '../shared/date';
 import { PageHeaderService } from '@/shared/services/page-header.service';
+import { handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -111,24 +112,13 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     </ng-template>
 
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
-      @if (loading()) {
-        <div class="flex justify-center py-16">
-          <hlm-spinner />
-        </div>
-      } @else if (error()) {
-        <div hlmEmpty>
-          <div hlmEmptyHeader>
-            <div hlmEmptyMedia variant="icon">
-              <ng-icon name="lucideCircleAlert" />
-            </div>
-            <div hlmEmptyTitle>Account not found</div>
-            <div hlmEmptyDescription>The account couldn't be loaded.</div>
+      @if (account(); as a) {
+        @if (loadError()) {
+          <div class="flex items-center justify-between gap-3 rounded-md border border-dashed border-destructive/50 p-3 text-sm text-destructive">
+            <span>Couldn't refresh. Showing the last loaded version.</span>
+            <button type="button" hlmBtn variant="outline" size="sm" (click)="retry()">Retry</button>
           </div>
-          <div hlmEmptyContent>
-            <a hlmBtn variant="outline" routerLink="/finances/accounts">Back to accounts</a>
-          </div>
-        </div>
-      } @else if (account(); as a) {
+        }
         <header class="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground">
           <div class="flex flex-row items-start justify-between gap-3">
             <div class="flex flex-col gap-2 min-w-0">
@@ -234,6 +224,37 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           [refreshKey]="refreshTrigger()"
           (transactionClicked)="onTransactionClicked($event)"
         />
+      } @else if (notFound()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideCircleAlert" />
+            </div>
+            <div hlmEmptyTitle>Account not found</div>
+            <div hlmEmptyDescription>It may have been deleted.</div>
+          </div>
+          <div hlmEmptyContent>
+            <a hlmBtn variant="outline" routerLink="/finances/accounts">Back to accounts</a>
+          </div>
+        </div>
+      } @else if (loadError()) {
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon">
+              <ng-icon name="lucideCircleAlert" />
+            </div>
+            <div hlmEmptyTitle>Couldn't load account</div>
+            <div hlmEmptyDescription>Something went wrong. Check your connection and try again.</div>
+          </div>
+          <div hlmEmptyContent class="flex gap-2">
+            <button type="button" hlmBtn variant="outline" (click)="retry()">Retry</button>
+            <a hlmBtn variant="ghost" routerLink="/finances/accounts">Back to accounts</a>
+          </div>
+        </div>
+      } @else if (loading()) {
+        <div class="flex justify-center py-16">
+          <hlm-spinner />
+        </div>
       }
     </div>
 
@@ -328,7 +349,10 @@ export class AccountDetailPageComponent implements OnDestroy {
 
   refreshTrigger = signal(0);
   loading = signal(false);
-  error = signal(false);
+  // Split the old generic `error` into a terminal 404 state and a retryable load error, so a failed
+  // refetch (after ~15 mutation handlers bump refreshTrigger) never blanks an already-rendered page.
+  notFound = signal(false);
+  loadError = signal(false);
 
   editSheetState = signal<BrnDialogState>('closed');
 
@@ -382,17 +406,14 @@ export class AccountDetailPageComponent implements OnDestroy {
       switchMap(([id]) => {
         if (!id) return of(null);
         this.loading.set(true);
-        this.error.set(false);
+        this.notFound.set(false);
+        this.loadError.set(false);
         return this.accountApi.getAccount({ id }).pipe(
           map(a => {
             this.loading.set(false);
             return a;
           }),
-          catchError(() => {
-            this.loading.set(false);
-            this.error.set(true);
-            return of(null);
-          }),
+          catchError((err) => handleDetailLoadError(err, { notFound: this.notFound, loadError: this.loadError }, this.loading)),
         );
       }),
     ),
@@ -463,6 +484,11 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
 
   // ─── Action handlers ─────────────────────────────────────────────────────
+
+  /** Retry a failed load/refetch — same mechanism the mutation handlers use to refresh. */
+  retry(): void {
+    this.refreshTrigger.update(v => v + 1);
+  }
 
   openEdit(): void {
     this.editSheetState.set('open');

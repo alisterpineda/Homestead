@@ -43,6 +43,7 @@ function makeDetail(over: Partial<ConsumableDetailResponse> = {}): ConsumableDet
 class StubConsumableApi {
   detail: ConsumableDetailResponse = makeDetail();
   getConsumableError = false;
+  getConsumableErrorStatus = 404; // 404 → notFound; anything else → retryable loadError
   getConsumableCalls = 0;
   patchCalls: { id: string; body: unknown }[] = [];
   deleteCalls: string[] = [];
@@ -50,7 +51,9 @@ class StubConsumableApi {
 
   getConsumable = (_p: { id: string }) => {
     this.getConsumableCalls++;
-    return this.getConsumableError ? throwError(() => new Error('not found')) : of(this.detail);
+    return this.getConsumableError
+      ? throwError(() => new HttpErrorResponse({ status: this.getConsumableErrorStatus }))
+      : of(this.detail);
   };
   getConsumableMovements = (p: { id: string; Page: number; PageSize: number }) =>
     of({ items: [] as StockMovementResponse[], page: p.Page, pageSize: p.PageSize, totalCount: 0, totalPages: 0 });
@@ -119,12 +122,56 @@ describe('ConsumableDetailPageComponent', () => {
     expect(hrefs(harness)).not.toContain('/inventory/items');
   });
 
-  it('shows the not-found state when the consumable is missing', async () => {
+  function buttons(harness: RouterTestingHarness): HTMLButtonElement[] {
+    return Array.from((harness.routeNativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
+  }
+
+  it('shows the not-found state on a 404', async () => {
     consumableApi.getConsumableError = true;
+    consumableApi.getConsumableErrorStatus = 404;
     const { harness, component } = await navigate('/inventory/items/missing');
 
     expect(component.notFound()).toBe(true);
+    expect(component.loadError()).toBe(false);
     expect(text(harness)).toContain('Consumable not found');
+  });
+
+  it('shows a retryable error state (not "not found") on a non-404 load failure, and Retry re-fetches', async () => {
+    consumableApi.getConsumableError = true;
+    consumableApi.getConsumableErrorStatus = 500;
+    const { harness, component } = await navigate('/inventory/items/c1');
+
+    expect(component.notFound()).toBe(false);
+    expect(component.loadError()).toBe(true);
+    expect(text(harness)).toContain("Couldn't load consumable");
+    expect(text(harness)).not.toContain('Consumable not found');
+
+    consumableApi.getConsumableError = false;
+    buttons(harness).find(b => b.textContent?.trim() === 'Retry')!.click();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    expect(consumableApi.getConsumableCalls).toBe(2);
+    expect(text(harness)).toContain('Wood Screws');
+    expect(component.loadError()).toBe(false);
+  });
+
+  it('keeps the rendered page and shows a banner when a refetch fails (non-404)', async () => {
+    const { harness, component } = await navigate('/inventory/items/c1');
+    expect(text(harness)).toContain('Wood Screws');
+
+    consumableApi.getConsumableError = true;
+    consumableApi.getConsumableErrorStatus = 500;
+    component.onStockUpdated(); // a mutation bumps refreshTrigger → refetch fails
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+
+    expect(component.consumable()).not.toBeNull();
+    expect(text(harness)).toContain('Wood Screws'); // last-loaded page preserved
+    expect(component.loadError()).toBe(true);
+    expect(text(harness)).toContain("Couldn't refresh");
+    expect(text(harness)).not.toContain('may have been deleted');
   });
 
   it('archives an active consumable: patches status → Archived and refreshes the detail', async () => {

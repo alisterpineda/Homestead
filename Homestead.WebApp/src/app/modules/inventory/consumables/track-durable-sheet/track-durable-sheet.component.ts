@@ -21,6 +21,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { openGeneration } from '@/shared/utils/open-generation';
 
 /**
  * Carves one unit out of fungible stock at a fixed location into a new individually-tracked durable.
@@ -123,8 +124,9 @@ export class TrackDurableSheetComponent {
   private destroyRef = inject(DestroyRef);
 
   // Reset all fields whenever the sheet (re)opens for a given consumable/location.
+  private openGen = openGeneration(this.state);
   private seedKey = computed(() =>
-    `${this.consumableId()}|${this.fromLocation()?.label ?? ''}|${this.state() === 'open'}`);
+    `${this.consumableId()}|${this.fromLocation()?.label ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
 
   // Name is prefilled with the consumable name as a sensible starting point.
   name = seededLinkedSignal(this.seedKey, () => this.consumableName());

@@ -107,21 +107,46 @@ const LOOSE = makeConsumable({
   }],
 });
 
+// The list page now filters by RESOLVED area on the server, so the stubs simulate that filter to
+// prove the page passes the fetch params through (no client-side area pass). Test AREAS has no
+// nesting, so an area's inclusive subtree is just itself.
+interface ListFetchParams { Search?: string; AreaId?: string; Unplaced?: boolean; totalCountOverride?: number }
+
+function durableResolvedArea(d: DurableResponse): string | null {
+  return d.resolvedAreaId ?? null;
+}
+function consumableResolvedAreas(c: ConsumableResponse): (string | null)[] {
+  return (c.stockLocations ?? []).map(loc => {
+    let resolved: string | null = null;
+    for (const seg of loc.path ?? []) if (seg.kind === 'Area') resolved = seg.id;
+    return resolved;
+  });
+}
+
 class StubDurableApi {
-  // The list page fetches the full set with an optional Search; container scoping moved to Browse.
-  getDurables = (p: { Search?: string }) => {
-    const items = p?.Search ? ITEMS.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase())) : ITEMS;
-    return of({ items, page: 1, pageSize: 200, totalCount: items.length });
+  lastParams: ListFetchParams | undefined;
+  totalCountOverride: number | null = null;
+  getDurables = (p: ListFetchParams) => {
+    this.lastParams = p;
+    let items = ITEMS;
+    if (p?.Search) items = items.filter(i => i.name.toLowerCase().includes(p.Search!.toLowerCase()));
+    if (p?.AreaId) items = items.filter(i => durableResolvedArea(i) === p.AreaId);
+    else if (p?.Unplaced) items = items.filter(i => durableResolvedArea(i) === null);
+    return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchDurable = () => of(makeItem({}));
   deleteDurable = () => of(undefined);
 }
 class StubConsumableApi {
-  getConsumables = (p?: { Search?: string }) => {
-    const items = p?.Search
-      ? CONSUMABLES.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()))
-      : CONSUMABLES;
-    return of({ items, page: 1, pageSize: 200, totalCount: items.length });
+  lastParams: ListFetchParams | undefined;
+  totalCountOverride: number | null = null;
+  getConsumables = (p: ListFetchParams) => {
+    this.lastParams = p;
+    let items = CONSUMABLES;
+    if (p?.Search) items = items.filter(s => s.name.toLowerCase().includes(p.Search!.toLowerCase()));
+    if (p?.AreaId) items = items.filter(s => consumableResolvedAreas(s).includes(p.AreaId!));
+    else if (p?.Unplaced) items = items.filter(s => consumableResolvedAreas(s).includes(null));
+    return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchConsumable = () => of(makeConsumable({}));
   deleteConsumable = () => of(undefined);
@@ -137,16 +162,20 @@ const AREAS: AreaResponse[] = [{ id: GARAGE, name: 'Garage', liveItemCount: 0, c
 describe('InventoryListPageComponent', () => {
   let fixture: ComponentFixture<InventoryListPageComponent>;
   let component: InventoryListPageComponent;
+  let durableApi: StubDurableApi;
+  let consumableApi: StubConsumableApi;
 
   beforeEach(async () => {
+    durableApi = new StubDurableApi();
+    consumableApi = new StubConsumableApi();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: InventoryDurableApiService, useValue: new StubDurableApi() },
-        { provide: InventoryConsumableApiService, useValue: new StubConsumableApi() },
+        { provide: InventoryDurableApiService, useValue: durableApi },
+        { provide: InventoryConsumableApiService, useValue: consumableApi },
         { provide: InventoryAreaApiService, useValue: new StubAreaApi() },
       ],
     });
@@ -183,20 +212,47 @@ describe('InventoryListPageComponent', () => {
     expect(scopedRows().length).toBe(ITEMS.length + CONSUMABLES.length);
   });
 
-  it('resolved-area filter matches nested items and consumables stocked there', () => {
+  it('selecting an area drives the server fetch (AreaId param) rather than a client-side pass', async () => {
     component.areaFilter.set(GARAGE);
-    // Items that walk up to Garage plus consumables with stock resolving to Garage —
-    // including screws, whose second entry sits inside the chest container.
+    await settle();
+
+    // The area scope goes to BOTH fetches as AreaId (resolved on the server), not Unplaced.
+    expect(durableApi.lastParams?.AreaId).toBe(GARAGE);
+    expect(durableApi.lastParams?.Unplaced).toBeUndefined();
+    expect(consumableApi.lastParams?.AreaId).toBe(GARAGE);
+
+    // scopedRows just reflects the server-filtered payload — nested items + stock resolving to Garage,
+    // including screws (its second entry sits inside the chest container). Zero-stock glue is absent.
     expect(ids(scopedRows())).toEqual(['archived', 'bin', 'chest', 'ladder', 'screw', 'screws', 'tape', 'wrench']);
-    // The zero-stock consumable only appears under "All areas".
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
   });
 
-  it('resolved-unplaced bucket matches unplaced items and stock with no area root', () => {
+  it('selecting "unplaced" drives the server fetch (Unplaced param)', async () => {
     component.areaFilter.set('unplaced');
+    await settle();
+
+    expect(durableApi.lastParams?.Unplaced).toBe(true);
+    expect(durableApi.lastParams?.AreaId).toBeUndefined();
+    expect(consumableApi.lastParams?.Unplaced).toBe(true);
+
     expect(ids(scopedRows())).toEqual(['floating', 'loose']);
-    // Zero stock is not "unplaced stock" — glue matches neither bucket.
     expect(scopedRows().some(r => r.id === 'glue')).toBe(false);
+  });
+
+  it('sends neither area param for the "all" scope', () => {
+    expect(durableApi.lastParams?.AreaId).toBeUndefined();
+    expect(durableApi.lastParams?.Unplaced).toBeUndefined();
+    expect(consumableApi.lastParams?.AreaId).toBeUndefined();
+  });
+
+  it('shows a "Showing X of N" notice when a kind\'s total exceeds the rows shown', async () => {
+    durableApi.totalCountOverride = 250; // server reports more than the 200-row page returned
+    component.onChanged(); // re-fetch with the inflated total
+    await settle();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(`Showing ${ITEMS.length} of 250 durables`);
+    expect(text).toContain('refine with search');
   });
 
   it('routes a container "View contents" to the Browse container drill (list no longer drills)', () => {

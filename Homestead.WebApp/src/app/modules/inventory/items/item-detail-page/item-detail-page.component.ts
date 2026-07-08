@@ -18,8 +18,10 @@ import { lucideCircleAlert } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
+import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmBreadcrumbImports } from '@/shared/components/spartan/breadcrumb';
 import { InventoryItemApiService } from '@/api/services/inventory-item-api.service';
+import { handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DurableDetailPageComponent } from '../../durables/durable-detail-page/durable-detail-page.component';
 import { ConsumableDetailPageComponent } from '../../consumables/consumable-detail-page.component';
@@ -45,6 +47,7 @@ import type { ItemDetailResponse } from '@/api/generated/models/item-detail-resp
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
+    HlmButton,
     HlmBreadcrumbImports,
     DurableDetailPageComponent,
     ConsumableDetailPageComponent,
@@ -94,6 +97,19 @@ import type { ItemDetailResponse } from '@/api/generated/models/item-detail-resp
       }
     } @else if (notFound()) {
       <ng-container [ngTemplateOutlet]="notFoundState" />
+    } @else if (loadError()) {
+      <div class="flex min-h-0 flex-1 flex-col gap-6 p-4 md:p-6">
+        <div hlmEmpty>
+          <div hlmEmptyHeader>
+            <div hlmEmptyMedia variant="icon"><ng-icon name="lucideCircleAlert" /></div>
+            <div hlmEmptyTitle>Couldn't load item</div>
+            <div hlmEmptyDescription>Something went wrong. Check your connection and try again.</div>
+          </div>
+          <div hlmEmptyContent>
+            <button type="button" hlmBtn variant="outline" (click)="retry()">Retry</button>
+          </div>
+        </div>
+      </div>
     } @else {
       <div class="flex justify-center py-16"><hlm-spinner /></div>
     }
@@ -134,25 +150,38 @@ export class ItemDetailPageComponent implements OnDestroy {
     return it?.durable?.name ?? it?.consumable?.consumable?.name ?? 'Item';
   });
 
-  // The spinner shows whenever `item()` is null and we're not in the not-found state, so a separate
-  // loading flag would be write-only — `notFound` is the only error state the template reads.
+  refreshTrigger = signal(0);
+  loading = signal(false);
+  // A real 404 → "not found"; any other load error → a distinct retryable state (never labelled
+  // "may have been deleted"). The Retry action re-runs the fetch via refreshTrigger.
   notFound = signal(false);
+  loadError = signal(false);
+
+  private fetchKey = computed(() => ({ id: this.itemId(), tick: this.refreshTrigger() }));
 
   private fetchedItem = toSignal<ItemDetailResponse | null>(
-    toObservable(this.itemId).pipe(
-      switchMap((id) => {
+    toObservable(this.fetchKey).pipe(
+      switchMap(({ id }) => {
         if (!id) return of(null);
+        this.loading.set(true);
         this.notFound.set(false);
+        this.loadError.set(false);
         return this.itemApi.getItem({ id }).pipe(
-          catchError(() => {
-            this.notFound.set(true);
-            return of(null);
+          map((it) => {
+            this.loading.set(false);
+            return it;
           }),
+          catchError((err) => handleDetailLoadError(err, { notFound: this.notFound, loadError: this.loadError }, this.loading)),
         );
       }),
     ),
     { initialValue: null },
   );
+
+  /** Retry a failed load by re-running the item fetch. */
+  retry(): void {
+    this.refreshTrigger.update((v) => v + 1);
+  }
 
   // Only surface the item once it matches the current route id. A navigation therefore drops to the
   // central spinner (the previous item no longer matches) and remounts the child fresh with the

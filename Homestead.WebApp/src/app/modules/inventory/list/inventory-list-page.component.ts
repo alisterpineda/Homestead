@@ -38,7 +38,7 @@ import { DurableQuickPanelComponent } from '../durables/durable-quick-panel/dura
 import { ConsumableQuickPanelComponent } from '../consumables/consumable-quick-panel/consumable-quick-panel.component';
 import { InventoryItemsViewComponent, kindFilterFromParam, type KindFilter } from './inventory-items-view.component';
 import { durableToRow, consumableToRow, sortStateFromParams, type InventoryRow, type InventorySortState } from './inventory-row';
-import { orderAreaTree, buildDescendantMap, type AreaTreeNode } from '../shared/area-tree';
+import { orderAreaTree, type AreaTreeNode } from '../shared/area-tree';
 import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
@@ -76,6 +76,9 @@ function seedDeepLinkParams(
 interface ListData {
   durables: DurableResponse[];
   consumables: ConsumableResponse[];
+  /** Server totals for the current filter — drive the "Showing X of N" cap notice. */
+  durablesTotal: number;
+  consumablesTotal: number;
   /** The search term this payload was fetched with — lets consumers detect stale data mid-search. */
   term: string;
 }
@@ -124,7 +127,7 @@ interface ListData {
       }
 
       @if (data() !== null) {
-        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm()) {
+        @if (allDurables().length === 0 && allConsumables().length === 0 && !searchTerm() && areaFilter() === 'all') {
           <div hlmEmpty>
             <div hlmEmptyHeader>
               <div hlmEmptyMedia variant="icon">
@@ -141,6 +144,9 @@ interface ListData {
             </div>
           </div>
         } @else {
+          @if (truncationNotice()) {
+            <p class="text-xs text-muted-foreground">{{ truncationNotice() }}</p>
+          }
           <app-inventory-items-view
             [rows]="scopedRows()"
             [initialKind]="initialKind"
@@ -266,24 +272,41 @@ export class InventoryListPageComponent {
   consumableQuickPanelState = signal<BrnDialogState>('closed');
 
   // Server-side search: matches stay correct beyond the 200-row page cap.
-  private listKey = computed(() => ({ tick: this.refreshTrigger(), term: this.searchTerm() }));
+  // Area is part of the fetch key now: the resolved-area filter is applied server-side, so changing
+  // it re-queries rather than re-filtering the (200-row-capped) client set.
+  private listKey = computed(() => ({
+    tick: this.refreshTrigger(),
+    term: this.searchTerm(),
+    area: this.areaFilter(),
+  }));
 
   data = toSignal<ListData | null, ListData | null>(
     toObservable(this.listKey).pipe(
-      switchMap(({ term }) => {
+      switchMap(({ term, area }) => {
         this.loading.set(true);
         this.error.set(false);
+        // Resolved-area filter goes to the server: a specific area sends AreaId (the server rolls in
+        // descendants); 'unplaced' sends Unplaced; 'all' sends neither.
+        const areaId = area !== 'all' && area !== 'unplaced' ? area : undefined;
+        const unplaced = area === 'unplaced' ? true : undefined;
+        const search = term || undefined;
         return forkJoin({
-          durables: this.durableApi
-            .getDurables({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
-            .pipe(map(r => (r.items ?? []) as DurableResponse[])),
-          consumables: this.consumableApi
-            .getConsumables({ Page: 1, PageSize: 200, IncludeInactive: true, Search: term || undefined })
-            .pipe(map(r => (r.items ?? []) as ConsumableResponse[])),
+          durables: this.durableApi.getDurables({
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced,
+          }),
+          consumables: this.consumableApi.getConsumables({
+            Page: 1, PageSize: 200, IncludeInactive: true, Search: search, AreaId: areaId, Unplaced: unplaced,
+          }),
         }).pipe(
-          map(d => {
+          map(({ durables, consumables }) => {
             this.loading.set(false);
-            return { ...d, term } as ListData | null;
+            return {
+              durables: (durables.items ?? []) as DurableResponse[],
+              consumables: (consumables.items ?? []) as ConsumableResponse[],
+              durablesTotal: durables.totalCount ?? 0,
+              consumablesTotal: consumables.totalCount ?? 0,
+              term,
+            } as ListData | null;
           }),
           handleQueryError(this.loading, this.error, null),
         );
@@ -306,17 +329,14 @@ export class InventoryListPageComponent {
 
   /** Areas indented by depth for the filter dropdown. */
   protected areaTree = computed<AreaTreeNode[]>(() => orderAreaTree(this.areas()));
-  /** Each area id → its descendant set (inclusive), so the area filter matches nested areas too. */
-  private areaDescendants = computed(() => buildDescendantMap(this.areas()));
 
   allDurables = computed(() => this.data()?.durables ?? []);
   allConsumables = computed(() => this.data()?.consumables ?? []);
 
-  /** Rows in the current scope (area filter), before the kind/inactive/low filters. */
+  /** Rows for the current server-filtered payload, before the client kind/inactive/low filters. */
   protected scopedRows = computed<InventoryRow[]>(() => {
-    // Area filter uses RESOLVED areas, so a nested durable — or consumable stock inside a nested
-    // container — shows under the area it walks up to. Zero-stock consumables only appear under
-    // "All areas".
+    // The area filter is applied server-side now (resolved area + descendants), so there is no
+    // client-side area pass here — the payload already scopes to the selected area.
     let rows = [...this.allDurables().map(durableToRow), ...this.allConsumables().map(consumableToRow)];
     // While a freshly committed term's fetch is in flight, the cached rows were fetched with a
     // different term; mirror the server's name filter client-side so the unfiltered set never
@@ -326,13 +346,19 @@ export class InventoryListPageComponent {
       const needle = term.toLowerCase();
       rows = rows.filter(r => r.name.toLowerCase().includes(needle));
     }
-    const af = this.areaFilter();
-    if (af === 'all') return rows;
-    if (af === 'unplaced') return rows.filter(r => r.resolvedAreaIds.includes(null));
-    // Match the selected area AND all its descendants, so the list mirrors the (rolled-up) area
-    // card count: a row whose resolved leaf area is the area itself or any sub-area of it shows.
-    const descendants = this.areaDescendants().get(af) ?? new Set([af]);
-    return rows.filter(r => r.resolvedAreaIds.some(id => id != null && descendants.has(id)));
+    return rows;
+  });
+
+  // The list is still capped at 200 rows per kind; when the server's total exceeds what's shown,
+  // tell the user so they refine with search rather than assume they're seeing everything. (Full
+  // numbered pagination of the merged two-kind list is a separate table-ux concern — a follow-up.)
+  protected truncationNotice = computed<string | null>(() => {
+    const d = this.data();
+    if (!d) return null;
+    const parts: string[] = [];
+    if (d.durablesTotal > d.durables.length) parts.push(`${d.durables.length} of ${d.durablesTotal} durables`);
+    if (d.consumablesTotal > d.consumables.length) parts.push(`${d.consumables.length} of ${d.consumablesTotal} consumables`);
+    return parts.length ? `Showing ${parts.join(' and ')} — refine with search to narrow the list.` : null;
   });
 
   // Higher-precedence trigger label for the refine popover: the selected area (the items-view falls
