@@ -132,7 +132,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-2">
+              <div class="min-w-0 space-y-2">
                 <label hlmLabel for="durable-value">Value</label>
                 <input
                   hlmInput
@@ -146,7 +146,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
                   (input)="editValue.set(asValue($event))"
                 />
               </div>
-              <div class="space-y-2">
+              <div class="min-w-0 space-y-2">
                 <label hlmLabel>Currency</label>
                 <app-currency-picker
                   [value]="editCurrencyId()"

@@ -41,11 +41,11 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         @if (displayLabel(); as label) {
-          <span class="truncate">{{ label }}</span>
+          <span class="min-w-0 truncate">{{ label }}</span>
         } @else {
-          <span class="truncate text-muted-foreground italic">None (top-level)</span>
+          <span class="min-w-0 truncate text-muted-foreground italic">None (top-level)</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="text-muted-foreground" />
+        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[340px] p-0" align="start">
         <div class="relative p-2">

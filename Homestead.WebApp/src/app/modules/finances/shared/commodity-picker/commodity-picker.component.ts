@@ -34,7 +34,7 @@ import type { CommodityKind } from '@/api/generated/models/commodity-kind';
         class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         @if (selected(); as sel) {
-          <span class="truncate">
+          <span class="min-w-0 truncate">
             <span class="font-medium">{{ sel.symbol }}</span>
             @if (sel.exchange) {
               <span class="text-muted-foreground"> · {{ sel.exchange }}</span>
@@ -42,9 +42,9 @@ import type { CommodityKind } from '@/api/generated/models/commodity-kind';
             <span class="text-muted-foreground"> — {{ sel.name }}</span>
           </span>
         } @else {
-          <span class="truncate text-muted-foreground">{{ placeholder() }}</span>
+          <span class="min-w-0 truncate text-muted-foreground">{{ placeholder() }}</span>
         }
-        <ng-icon hlm name="lucideChevronDown" size="sm" class="text-muted-foreground" />
+        <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[360px] p-0" align="start">
         <div class="relative p-2">
