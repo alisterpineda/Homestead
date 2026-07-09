@@ -261,6 +261,12 @@ export type { GetBrands$Params as GetBrands$Params } from './fn/inventory/get-br
 export { getBrands as getBrands } from './fn/inventory/get-brands';
 export type { CreateBrand$Params as CreateBrand$Params } from './fn/inventory/create-brand';
 export { createBrand as createBrand } from './fn/inventory/create-brand';
+export type { DeleteBrand$Params as DeleteBrand$Params } from './fn/inventory/delete-brand';
+export { deleteBrand as deleteBrand } from './fn/inventory/delete-brand';
+export type { PatchBrand$Params as PatchBrand$Params } from './fn/inventory/patch-brand';
+export { patchBrand as patchBrand } from './fn/inventory/patch-brand';
+export type { MergeBrand$Params as MergeBrand$Params } from './fn/inventory/merge-brand';
+export { mergeBrand as mergeBrand } from './fn/inventory/merge-brand';
 export type { BulkDeleteInventoryTags$Params as BulkDeleteInventoryTags$Params } from './fn/inventory/bulk-delete-inventory-tags';
 export { bulkDeleteInventoryTags as bulkDeleteInventoryTags } from './fn/inventory/bulk-delete-inventory-tags';
 export type { GetInventoryTags$Params as GetInventoryTags$Params } from './fn/inventory/get-inventory-tags';

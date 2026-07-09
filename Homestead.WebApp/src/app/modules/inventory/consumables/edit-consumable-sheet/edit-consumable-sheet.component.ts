@@ -22,7 +22,7 @@ import { CONSUMABLE_STATUSES } from '../consumable-shared';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
-import type { BrandResponse } from '@/api/generated/models/brand-response';
+import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -166,7 +166,7 @@ export class EditConsumableSheetComponent {
     return t != null ? String(t) : '';
   });
   editStatus = seededLinkedSignal<string, ItemStatus>(this.seedKey, () => this.openConsumable()?.status ?? 'Active');
-  editBrand = seededLinkedSignal<string, BrandResponse | null>(this.seedKey, () => {
+  editBrand = seededLinkedSignal<string, BrandPickerValue | null>(this.seedKey, () => {
     const c = this.openConsumable();
     return c?.brandId ? { id: c.brandId, name: c.brandName ?? '' } : null;
   });

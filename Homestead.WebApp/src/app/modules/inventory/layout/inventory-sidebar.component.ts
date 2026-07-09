@@ -3,7 +3,7 @@ import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePackage, lucideMapPin, lucideCompass, lucideTags } from '@ng-icons/lucide';
+import { lucidePackage, lucideMapPin, lucideCompass, lucideTags, lucideBookmark } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { isNavItemActive } from '@/shared/utils';
@@ -12,7 +12,7 @@ import { isNavItemActive } from '@/shared/utils';
   selector: 'app-inventory-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports],
-  providers: [provideIcons({ lucidePackage, lucideMapPin, lucideCompass, lucideTags })],
+  providers: [provideIcons({ lucidePackage, lucideMapPin, lucideCompass, lucideTags, lucideBookmark })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupContent>
@@ -49,6 +49,12 @@ import { isNavItemActive } from '@/shared/utils';
               <span>Tags</span>
             </a>
           </li>
+          <li hlmSidebarMenuItem>
+            <a hlmSidebarMenuButton routerLink="/inventory/brands" [isActive]="isActive('/inventory/brands')">
+              <ng-icon hlm name="lucideBookmark" size="sm" />
+              <span>Brands</span>
+            </a>
+          </li>
         </ul>
       </div>
     </div>
@@ -67,7 +73,7 @@ export class InventorySidebarComponent {
 
   private urlPath = computed(() => this.url().split('?')[0]);
 
-  private readonly navPaths = ['/inventory/browse', '/inventory/items', '/inventory/areas', '/inventory/tags'];
+  private readonly navPaths = ['/inventory/browse', '/inventory/items', '/inventory/areas', '/inventory/tags', '/inventory/brands'];
 
   isActive(path: string): boolean {
     // The unified item detail route (/inventory/items/:id) sits under Items, so it highlights that

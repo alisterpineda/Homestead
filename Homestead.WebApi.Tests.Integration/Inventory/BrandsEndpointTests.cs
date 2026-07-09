@@ -7,6 +7,7 @@ using Npgsql;
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
 internal record BrandItem(Guid Id, string Name);
+internal record BrandDetail(Guid Id, string Name, int ItemCount, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 internal record BrandDurableItem(Guid Id, string Name, Guid? BrandId, string? BrandName, string? Model);
 internal record BrandConsumableItem(Guid Id, string Name, Guid? BrandId, string? BrandName);
 internal record BrandItemDetail(Guid Id, string Fungibility, BrandDurableItem? Durable);
@@ -23,6 +24,207 @@ public class BrandsEndpointTests : IntegrationTestBase
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/brands", new { name }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<BrandItem>(CT))!;
+    }
+
+    private static async Task<BrandDurableItem> CreateDurableWithBrandAsync(
+        HttpClient client, string name, Guid brandId)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables", new { name, brandId }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<BrandDurableItem>(CT))!;
+    }
+
+    // ----- PatchBrand (rename) -----
+
+    [Fact]
+    public async Task PatchBrand_Rename_Returns200AndUpdatesRow()
+    {
+        var client = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(client, "Apple");
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/brands/{apple.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"Apple Inc" } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = await resp.Content.ReadFromJsonAsync<BrandDetail>(CT);
+        Assert.Equal("Apple Inc", patched!.Name);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal("Apple Inc", (await db.Brands.AsNoTracking().SingleAsync(b => b.Id == apple.Id, CT)).Name);
+    }
+
+    [Fact]
+    public async Task PatchBrand_RenameOntoExistingName_Returns409()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreateBrandAsync(client, "Apple");
+        var samsung = await CreateBrandAsync(client, "Samsung");
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/brands/{samsung.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"apple" } });
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchBrand_BlankName_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(client, "Apple");
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/brands/{apple.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"   " } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchBrand_Missing_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await SendJsonPatchAsync(client,
+            $"/api/v1/inventory/brands/{Guid.NewGuid()}",
+            new[] { new { op = "replace", path = "/name", value = (object)"Apple" } });
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchBrand_NonContributor_Returns403()
+    {
+        var admin = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(admin, "Apple");
+        var viewer = await CreateViewerClientAsync();
+
+        var resp = await SendJsonPatchAsync(viewer,
+            $"/api/v1/inventory/brands/{apple.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"Apple Inc" } });
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    // ----- DeleteBrand -----
+
+    [Fact]
+    public async Task DeleteBrand_Unused_Returns204()
+    {
+        var client = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(client, "Apple");
+
+        var resp = await client.DeleteAsync($"/api/v1/inventory/brands/{apple.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.NoContent, resp.StatusCode);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Brands.AsNoTracking().AnyAsync(b => b.Id == apple.Id, CT));
+    }
+
+    [Fact]
+    public async Task DeleteBrand_InUse_Returns400AndKeepsRow()
+    {
+        var client = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(client, "Apple");
+        await CreateDurableWithBrandAsync(client, "MacBook", apple.Id);
+
+        var resp = await client.DeleteAsync($"/api/v1/inventory/brands/{apple.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await db.Brands.AsNoTracking().AnyAsync(b => b.Id == apple.Id, CT));
+    }
+
+    [Fact]
+    public async Task DeleteBrand_Missing_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var resp = await client.DeleteAsync($"/api/v1/inventory/brands/{Guid.NewGuid()}", CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    // ----- MergeBrand -----
+
+    [Fact]
+    public async Task MergeBrand_RepointsItems_RemovesSource_GrowsTargetCount()
+    {
+        var client = await CreateAdminClientAsync();
+        var source = await CreateBrandAsync(client, "Apple Inc");
+        var target = await CreateBrandAsync(client, "Apple");
+        var sourceItem = await CreateDurableWithBrandAsync(client, "iPhone", source.Id);
+        await CreateDurableWithBrandAsync(client, "iPad", target.Id);
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/inventory/brands/{source.Id}/merge", new { targetId = target.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var merged = await resp.Content.ReadFromJsonAsync<BrandDetail>(CT);
+        Assert.Equal(target.Id, merged!.Id);
+        Assert.Equal(2, merged.ItemCount);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Brands.AsNoTracking().AnyAsync(b => b.Id == source.Id, CT));
+        Assert.Equal(target.Id,
+            (await db.Items.AsNoTracking().SingleAsync(i => i.Id == sourceItem.Id, CT)).BrandId);
+    }
+
+    [Fact]
+    public async Task MergeBrand_Self_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var apple = await CreateBrandAsync(client, "Apple");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/inventory/brands/{apple.Id}/merge", new { targetId = apple.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MergeBrand_MissingTarget_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var source = await CreateBrandAsync(client, "Apple Inc");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/inventory/brands/{source.Id}/merge", new { targetId = Guid.NewGuid() }, CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MergeBrand_MissingSource_Returns404()
+    {
+        var client = await CreateAdminClientAsync();
+        var target = await CreateBrandAsync(client, "Apple");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/inventory/brands/{Guid.NewGuid()}/merge", new { targetId = target.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MergeBrand_NonContributor_Returns403()
+    {
+        var admin = await CreateAdminClientAsync();
+        var source = await CreateBrandAsync(admin, "Apple Inc");
+        var target = await CreateBrandAsync(admin, "Apple");
+        var viewer = await CreateViewerClientAsync();
+
+        var resp = await viewer.PostAsJsonAsync(
+            $"/api/v1/inventory/brands/{source.Id}/merge", new { targetId = target.Id }, CT);
+
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 
     [Fact]
@@ -106,6 +308,60 @@ public class BrandsEndpointTests : IntegrationTestBase
         Assert.Single(list!.Items);
         Assert.Equal(cable.Id, list.Items[0].Id);
         Assert.Equal("Apple", list.Items[0].BrandName);
+    }
+
+    // ----- GetBrands: enrichment + sort translation (real Postgres; InMemory unit tests can't prove
+    // the correlated-count ORDER BY / projection translates) -----
+
+    [Fact]
+    public async Task GetBrands_SortByItemsDesc_OrdersByCountThenName_AndPopulatesItemCount()
+    {
+        var client = await CreateAdminClientAsync();
+        var alpha = await CreateBrandAsync(client, "Alpha");   // 2 items
+        await CreateBrandAsync(client, "Bravo");               // 0 items
+        var charlie = await CreateBrandAsync(client, "Charlie"); // 1 item
+        await CreateDurableWithBrandAsync(client, "A1", alpha.Id);
+        await CreateDurableWithBrandAsync(client, "A2", alpha.Id);
+        await CreateDurableWithBrandAsync(client, "C1", charlie.Id);
+
+        var list = await (await client.GetAsync(
+                "/api/v1/inventory/brands?page=1&pageSize=100&sortBy=items&sortDir=desc", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<BrandDetail>>(CT);
+
+        Assert.Equal(["Alpha", "Charlie", "Bravo"], list!.Items.Select(b => b.Name));
+        Assert.Equal([2, 1, 0], list.Items.Select(b => b.ItemCount));
+    }
+
+    [Fact]
+    public async Task GetBrands_SortByItems_TiesBreakByName()
+    {
+        // All three tie on itemCount 0 → the Name tiebreaker gives a deterministic order (else
+        // pagination could skip/repeat rows). Insertion order differs from name order on purpose.
+        var client = await CreateAdminClientAsync();
+        await CreateBrandAsync(client, "Zeta");
+        await CreateBrandAsync(client, "Alpha");
+        await CreateBrandAsync(client, "Mike");
+
+        var list = await (await client.GetAsync(
+                "/api/v1/inventory/brands?page=1&pageSize=100&sortBy=items&sortDir=asc", CT))
+            .Content.ReadFromJsonAsync<PaginatedResult<BrandDetail>>(CT);
+
+        Assert.Equal(["Alpha", "Mike", "Zeta"], list!.Items.Select(b => b.Name));
+    }
+
+    [Fact]
+    public async Task GetBrands_SortByUpdated_Translates()
+    {
+        var client = await CreateAdminClientAsync();
+        await CreateBrandAsync(client, "Apple");
+        await CreateBrandAsync(client, "Sony");
+
+        var resp = await client.GetAsync(
+            "/api/v1/inventory/brands?page=1&pageSize=100&sortBy=updated&sortDir=desc", CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var list = await resp.Content.ReadFromJsonAsync<PaginatedResult<BrandDetail>>(CT);
+        Assert.Equal(2, list!.Items.Count);
     }
 
     [Fact]

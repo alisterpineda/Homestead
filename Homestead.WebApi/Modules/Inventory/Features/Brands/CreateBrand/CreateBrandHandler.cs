@@ -21,7 +21,12 @@ public class CreateBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
         var existing = await db.Brands
             .FirstOrDefaultAsync(b => b.Name.ToLower() == nameLower, ct);
         if (existing is not null)
-            return BrandResponseMapper.ToResponse(existing);
+        {
+            // Find-or-create hit: report the existing row's real count so the response is consistent
+            // with what the list/patch/merge handlers return for the same brand.
+            var existingCount = await db.Items.CountAsync(i => i.BrandId == existing.Id, ct);
+            return BrandResponseMapper.ToResponse(existing, existingCount);
+        }
 
         var brand = new Brand
         {
@@ -36,6 +41,6 @@ public class CreateBrandHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
 
         await unitOfWork.SaveChangesAsync(ct);
 
-        return BrandResponseMapper.ToResponse(brand);
+        return BrandResponseMapper.ToResponse(brand, 0);
     }
 }

@@ -16,7 +16,7 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import type { DurableKind } from '@/api/generated/models/durable-kind';
-import type { BrandResponse } from '@/api/generated/models/brand-response';
+import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
 import { LocationPickerComponent, type ItemLocationValue } from '../../shared/location-picker/location-picker.component';
@@ -254,7 +254,7 @@ export class CreateEntryDialogComponent {
   name = signal('');
   notes = signal('');
   // Brand applies to both kinds.
-  brand = signal<BrandResponse | null>(null);
+  brand = signal<BrandPickerValue | null>(null);
   // Tags apply to both kinds (the desired path list; the backend upserts ancestors).
   tags = signal<string[]>([]);
   // Durable fields

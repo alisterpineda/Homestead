@@ -4,6 +4,7 @@ import { InventoryBrowsePageComponent } from './browse/inventory-browse-page.com
 import { InventoryListPageComponent } from './list/inventory-list-page.component';
 import { AreaListPageComponent } from './areas/area-list-page.component';
 import { TagListComponent } from './tags/tag-list.component';
+import { BrandListComponent } from './brands/brand-list.component';
 import { ItemDetailPageComponent } from './items/item-detail-page/item-detail-page.component';
 
 export const INVENTORY_ROUTES: Routes = [
@@ -29,6 +30,7 @@ export const INVENTORY_ROUTES: Routes = [
       { path: 'items/:id', component: ItemDetailPageComponent, data: { title: 'Item' } },
       { path: 'areas', component: AreaListPageComponent, data: { title: 'Areas' } },
       { path: 'tags', component: TagListComponent, data: { title: 'Tags' } },
+      { path: 'brands', component: BrandListComponent, data: { title: 'Brands' } },
       // Consumables merged into the unified Items list; deep links keep working.
       { path: 'consumables', redirectTo: 'items', pathMatch: 'full' },
     ],

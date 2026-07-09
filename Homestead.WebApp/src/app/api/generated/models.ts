@@ -135,6 +135,7 @@ export type { LogLevelRule } from './models/log-level-rule';
 export type { LogLevelSource } from './models/log-level-source';
 export type { LogLevelsResponse } from './models/log-levels-response';
 export type { LowStockConsumablePreview } from './models/low-stock-consumable-preview';
+export type { MergeBrandRequest } from './models/merge-brand-request';
 export type { MovementKind } from './models/movement-kind';
 export type { NetWorthGranularity } from './models/net-worth-granularity';
 export type { NetWorthHistoryPoint } from './models/net-worth-history-point';

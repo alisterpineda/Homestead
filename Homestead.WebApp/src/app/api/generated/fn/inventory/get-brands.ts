@@ -11,6 +11,8 @@ import { PaginatedResponseOfBrandResponse } from '../../models/paginated-respons
 
 export interface GetBrands$Params {
   Search?: string;
+  SortBy?: string;
+  SortDir?: string;
   Page?: number;
   PageSize?: number;
 }
@@ -19,6 +21,8 @@ export function getBrands(http: HttpClient, rootUrl: string, params?: GetBrands$
   const rb = new RequestBuilder(rootUrl, getBrands.PATH, 'get');
   if (params) {
     rb.query('Search', params.Search, {});
+    rb.query('SortBy', params.SortBy, {});
+    rb.query('SortDir', params.SortDir, {});
     rb.query('Page', params.Page, {});
     rb.query('PageSize', params.PageSize, {});
   }

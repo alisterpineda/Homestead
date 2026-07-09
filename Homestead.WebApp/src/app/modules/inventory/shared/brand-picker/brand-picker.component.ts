@@ -1,11 +1,13 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  effect,
   inject,
   input,
   output,
   signal,
   computed,
+  untracked,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, catchError, distinctUntilChanged } from 'rxjs';
@@ -18,6 +20,13 @@ import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { BrandResponse } from '@/api/generated/models/brand-response';
+
+/**
+ * The minimum a caller must supply to seed the picker's current value: identity only. Callers that
+ * hold a full <see cref="BrandResponse"/> (list/search results) satisfy this structurally; item forms
+ * that only know the attributed brand's id/name can seed it without the count/timestamps.
+ */
+export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
 
 @Component({
   selector: 'app-brand-picker',
@@ -59,18 +68,20 @@ import type { BrandResponse } from '@/api/generated/models/brand-response';
           />
         </div>
         <div class="max-h-[280px] overflow-y-auto p-1">
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
-            (click)="onClear()"
-          >
-            <span class="size-4 shrink-0 flex items-center justify-center">
-              @if (value() === null) {
-                <ng-icon hlm name="lucideCheck" size="sm" />
-              }
-            </span>
-            <span class="text-muted-foreground">No brand</span>
-          </button>
+          @if (allowCreate()) {
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer min-w-0"
+              (click)="onClear()"
+            >
+              <span class="size-4 shrink-0 flex items-center justify-center">
+                @if (value() === null) {
+                  <ng-icon hlm name="lucideCheck" size="sm" />
+                }
+              </span>
+              <span class="text-muted-foreground">No brand</span>
+            </button>
+          }
 
           @if (loading()) {
             <div class="flex justify-center py-6">
@@ -120,14 +131,25 @@ import type { BrandResponse } from '@/api/generated/models/brand-response';
   `,
 })
 export class BrandPickerComponent {
-  /** The currently-selected brand, or null when unattributed. Seeded by the parent form. */
-  value = input<BrandResponse | null>(null);
+  /** The currently-selected brand (identity only), or null when unattributed. Seeded by the parent form. */
+  value = input<BrandPickerValue | null>(null);
   disabled = input(false);
   placeholder = input('Select brand');
   ariaLabel = input<string | null>(null);
 
-  /** Emits the selected brand ({ id, name }), or null when cleared. */
-  valueChange = output<BrandResponse | null>();
+  /**
+   * When false, hides the "Create 'X'" and "No brand" rows — the picker becomes a pure chooser over
+   * existing brands. The merge dialog opts out (you merge into an existing brand, never create/clear).
+   * Defaults to true so the item forms' find-or-create behaviour is unchanged.
+   */
+  allowCreate = input(true);
+  /** A brand id to omit from results — the merge dialog excludes the source so you can't merge into it. */
+  excludeId = input<string | null>(null);
+  /** Seeds the search box on first render (e.g. the rename-409 handoff pre-searches the attempted name). */
+  initialSearch = input('');
+
+  /** Emits the selected brand (identity only), or null when cleared. */
+  valueChange = output<BrandPickerValue | null>();
 
   popoverState = signal<'open' | 'closed'>('closed');
   searchTerm = signal('');
@@ -138,6 +160,16 @@ export class BrandPickerComponent {
   private errorHandler = inject(ErrorHandlerService);
 
   private readonly pageSize = 50;
+
+  constructor() {
+    // Seed the search box from initialSearch once, on first render. The value is set once by the
+    // parent (the merge handoff) and never changes, so this runs a single time; user typing updates
+    // searchTerm independently (untracked write, initialSearch is the only tracked dep).
+    effect(() => {
+      const seed = this.initialSearch();
+      if (seed) untracked(() => this.searchTerm.set(seed));
+    });
+  }
 
   private response = toSignal(
     toObservable(this.searchTerm).pipe(
@@ -162,20 +194,26 @@ export class BrandPickerComponent {
     { initialValue: { items: [] as BrandResponse[], total: 0 } },
   );
 
-  results = computed(() => this.response().items);
+  results = computed(() => {
+    const exclude = this.excludeId();
+    const items = this.response().items;
+    return exclude ? items.filter(b => b.id !== exclude) : items;
+  });
   truncated = computed(() => this.response().total > this.pageSize);
 
   // Offer the create row when the typed name doesn't already exist (case-insensitive) — the backend
-  // is idempotent, but this keeps the UI honest and avoids an obvious no-op create.
+  // is idempotent, but this keeps the UI honest and avoids an obvious no-op create. Suppressed when
+  // allowCreate is false (the merge dialog's chooser).
   showCreateRow = computed(() => {
+    if (!this.allowCreate()) return false;
     const text = this.searchTerm().trim();
     if (!text || this.loading()) return false;
     const lower = text.toLowerCase();
     return !this.results().some(b => b.name.toLowerCase() === lower);
   });
 
-  onSelect(brand: BrandResponse): void {
-    this.valueChange.emit(brand);
+  onSelect(brand: BrandPickerValue): void {
+    this.valueChange.emit({ id: brand.id, name: brand.name });
     this.searchTerm.set('');
     this.popoverState.set('closed');
   }

@@ -26,7 +26,7 @@ import { tomorrowIso } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
-import type { BrandResponse } from '@/api/generated/models/brand-response';
+import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import type { DurableKind } from '@/api/generated/models/durable-kind';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -284,7 +284,7 @@ export class EditDurableSheetComponent {
   editName = seededLinkedSignal(this.seedKey, () => this.openDurable()?.name ?? '');
   editSerial = seededLinkedSignal(this.seedKey, () => this.openDurable()?.serial ?? '');
   editModel = seededLinkedSignal(this.seedKey, () => this.openDurable()?.model ?? '');
-  editBrand = seededLinkedSignal<string, BrandResponse | null>(this.seedKey, () => {
+  editBrand = seededLinkedSignal<string, BrandPickerValue | null>(this.seedKey, () => {
     const d = this.openDurable();
     return d?.brandId ? { id: d.brandId, name: d.brandName ?? '' } : null;
   });
