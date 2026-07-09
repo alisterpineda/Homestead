@@ -75,15 +75,11 @@ import { openGeneration } from '@/shared/utils/open-generation';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel for="durable-serial">Serial</label>
-              <input
-                hlmInput
-                id="durable-serial"
-                class="w-full"
-                maxlength="128"
-                placeholder="(none)"
-                [value]="editSerial()"
-                (input)="editSerial.set(asValue($event))"
+              <label hlmLabel>Brand</label>
+              <app-brand-picker
+                [value]="editBrand()"
+                (valueChange)="editBrand.set($event)"
+                ariaLabel="Brand"
               />
             </div>
 
@@ -101,11 +97,15 @@ import { openGeneration } from '@/shared/utils/open-generation';
             </div>
 
             <div class="space-y-2">
-              <label hlmLabel>Brand</label>
-              <app-brand-picker
-                [value]="editBrand()"
-                (valueChange)="editBrand.set($event)"
-                ariaLabel="Brand"
+              <label hlmLabel for="durable-serial">Serial</label>
+              <input
+                hlmInput
+                id="durable-serial"
+                class="w-full"
+                maxlength="128"
+                placeholder="(none)"
+                [value]="editSerial()"
+                (input)="editSerial.set(asValue($event))"
               />
             </div>
 
@@ -116,48 +116,6 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 [initialColorMap]="tagColorMap()"
                 (valueChange)="editTags.set($event)"
               />
-            </div>
-
-            <div class="space-y-2">
-              <label hlmLabel for="durable-acquired">Acquired on</label>
-              <input
-                hlmInput
-                id="durable-acquired"
-                type="date"
-                class="w-full"
-                [max]="maxAcquiredDate"
-                [value]="editAcquiredOn()"
-                (input)="editAcquiredOn.set(asValue($event))"
-              />
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div class="min-w-0 space-y-2">
-                <label hlmLabel for="durable-value">Value</label>
-                <input
-                  hlmInput
-                  id="durable-value"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="w-full"
-                  placeholder="0.00"
-                  [value]="editValue()"
-                  (input)="editValue.set(asValue($event))"
-                />
-              </div>
-              <div class="min-w-0 space-y-2">
-                <label hlmLabel>Currency</label>
-                <app-currency-picker
-                  [value]="editCurrencyId()"
-                  (valueChange)="editCurrencyId.set($event)"
-                  (commodityChange)="pickedCurrency.set($event)"
-                  [selectedCommodity]="selectedCurrency()"
-                  [disabled]="!editValue().trim()"
-                  placeholder="Select currency"
-                  ariaLabel="Value currency"
-                />
-              </div>
             </div>
 
             <div class="space-y-2">
@@ -240,6 +198,48 @@ import { openGeneration } from '@/shared/utils/open-generation';
                 />
               </div>
             }
+
+            <div class="space-y-2">
+              <label hlmLabel for="durable-acquired">Acquired on</label>
+              <input
+                hlmInput
+                id="durable-acquired"
+                type="date"
+                class="w-full"
+                [max]="maxAcquiredDate"
+                [value]="editAcquiredOn()"
+                (input)="editAcquiredOn.set(asValue($event))"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="min-w-0 space-y-2">
+                <label hlmLabel for="durable-value">Value</label>
+                <input
+                  hlmInput
+                  id="durable-value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="w-full"
+                  placeholder="0.00"
+                  [value]="editValue()"
+                  (input)="editValue.set(asValue($event))"
+                />
+              </div>
+              <div class="min-w-0 space-y-2">
+                <label hlmLabel>Currency</label>
+                <app-currency-picker
+                  [value]="editCurrencyId()"
+                  (valueChange)="editCurrencyId.set($event)"
+                  (commodityChange)="pickedCurrency.set($event)"
+                  [selectedCommodity]="selectedCurrency()"
+                  [disabled]="!editValue().trim()"
+                  placeholder="Select currency"
+                  ariaLabel="Value currency"
+                />
+              </div>
+            </div>
 
             <div class="space-y-2">
               <label hlmLabel for="durable-notes">Notes</label>

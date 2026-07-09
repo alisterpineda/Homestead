@@ -125,6 +125,18 @@ type EntryKind = 'durable' | 'consumable';
               [attr.inert]="kind() === 'durable' ? null : ''"
             >
               <div class="flex flex-col gap-1.5">
+                <label hlmLabel for="create-entry-model">Model (optional)</label>
+                <input
+                  hlmInput
+                  id="create-entry-model"
+                  maxlength="128"
+                  placeholder="e.g. MRW23"
+                  [value]="model()"
+                  (input)="model.set(asValue($event))"
+                />
+              </div>
+
+              <div class="flex flex-col gap-1.5">
                 <label hlmLabel>Location</label>
                 <app-location-picker
                   [value]="locationValue()"
@@ -148,18 +160,6 @@ type EntryKind = 'durable' | 'consumable';
                     </hlm-select-group>
                   </hlm-select-content>
                 </hlm-select>
-              </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel for="create-entry-model">Model (optional)</label>
-                <input
-                  hlmInput
-                  id="create-entry-model"
-                  maxlength="128"
-                  placeholder="e.g. MRW23"
-                  [value]="model()"
-                  (input)="model.set(asValue($event))"
-                />
               </div>
             </div>
 
