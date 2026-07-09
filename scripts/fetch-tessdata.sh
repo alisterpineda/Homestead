@@ -42,11 +42,26 @@ fi
 
 download() {
     # $1 = url, $2 = output path. Fails loudly (no silent half-downloads).
-    if [ "$DOWNLOADER" = curl ]; then
-        curl -fsSL "$1" -o "$2"
-    else
-        wget -q -O "$2" "$1"
-    fi
+    #
+    # Retries transient failures with backoff. raw.githubusercontent.com rate-limits
+    # shared CI IP pools with HTTP 429, so a single fetch is flaky under load. curl's
+    # own --retry already backs off on transient errors (incl. 429 since curl 7.66,
+    # honouring any Retry-After); the outer loop is the portable safety net that also
+    # covers busybox wget, which has no retry flags.
+    attempt=1
+    max_attempts=5
+    while :; do
+        if [ "$DOWNLOADER" = curl ]; then
+            curl -fsSL --connect-timeout 20 --retry 3 --retry-delay 2 "$1" -o "$2" && return 0
+        else
+            wget -q -O "$2" "$1" && return 0
+        fi
+        [ "$attempt" -ge "$max_attempts" ] && return 1
+        delay=$((attempt * 4))
+        echo "fetch-tessdata: download failed (attempt $attempt/$max_attempts), retrying in ${delay}s" >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
 }
 
 BASE_URL="https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/$REF"
