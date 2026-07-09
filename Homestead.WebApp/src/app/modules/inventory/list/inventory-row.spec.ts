@@ -9,6 +9,7 @@ import {
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { PlaceConsumableResponse } from '@/api/generated/models/place-consumable-response';
+import type { ItemTagDto } from '@/api/generated/models/item-tag-dto';
 
 function makeItem(over: Partial<DurableResponse> = {}): DurableResponse {
   return {
@@ -92,6 +93,27 @@ describe('placeConsumableToRow', () => {
     });
     expect(row.onHand).toBe(7);
     expect(row.onHandHint).toBeUndefined();
+  });
+});
+
+describe('tag mapping', () => {
+  const tag = {
+    id: 'g1', name: 'Cordless', path: 'Tools/Cordless', color: null, effectiveColor: '#3b82f6',
+  } satisfies ItemTagDto;
+
+  it('carries a durable\'s tags through, defaulting undefined to an empty array', () => {
+    expect(durableToRow(makeItem({ tags: [tag] })).tags).toEqual([tag]);
+    expect(durableToRow(makeItem({})).tags).toEqual([]);
+  });
+
+  it('carries a consumable\'s tags through, defaulting undefined to an empty array', () => {
+    expect(consumableToRow(makeConsumable({ tags: [tag] })).tags).toEqual([tag]);
+    expect(consumableToRow(makeConsumable({})).tags).toEqual([]);
+  });
+
+  it('inherits the consumable\'s tags on a place-scoped row', () => {
+    const row = placeConsumableToRow({ consumable: makeConsumable({ tags: [tag] }), localQuantity: 1 });
+    expect(row.tags).toEqual([tag]);
   });
 });
 

@@ -1,0 +1,198 @@
+import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import {
+  TagTableComponent,
+  HIDEABLE_COLUMNS,
+  DEFAULT_COLUMN_VISIBILITY,
+} from './tag-table.component';
+
+describe('TagTableComponent exports', () => {
+  describe('HIDEABLE_COLUMNS', () => {
+    it('should include path, description and createdAt', () => {
+      const ids = HIDEABLE_COLUMNS.map(c => c.id);
+      expect(ids).toEqual(['path', 'description', 'createdAt', 'updatedAt']);
+    });
+
+    it('should label path as "Path"', () => {
+      const col = HIDEABLE_COLUMNS.find(c => c.id === 'path');
+      expect(col?.label).toBe('Path');
+    });
+
+    it('should label description as "Description"', () => {
+      const col = HIDEABLE_COLUMNS.find(c => c.id === 'description');
+      expect(col?.label).toBe('Description');
+    });
+
+    it('should label createdAt as "Date Added"', () => {
+      const col = HIDEABLE_COLUMNS.find(c => c.id === 'createdAt');
+      expect(col?.label).toBe('Date Added');
+    });
+  });
+
+  describe('DEFAULT_COLUMN_VISIBILITY', () => {
+    it('should hide createdAt by default', () => {
+      expect(DEFAULT_COLUMN_VISIBILITY['createdAt']).toBe(false);
+    });
+
+    it('should contain path and createdAt', () => {
+      expect(Object.keys(DEFAULT_COLUMN_VISIBILITY).sort()).toEqual(['createdAt', 'path', 'updatedAt']);
+    });
+
+    it('should hide path by default', () => {
+      expect(DEFAULT_COLUMN_VISIBILITY['path']).toBe(false);
+    });
+
+    it('should not hide description by default', () => {
+      expect(DEFAULT_COLUMN_VISIBILITY['description']).toBeUndefined();
+    });
+  });
+});
+
+describe('TagTableComponent', () => {
+  let fixture: ComponentFixture<TagTableComponent>;
+  let component: TagTableComponent;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      // The Inventory TagNameCell renders a routerLink (the Documents cell is plain text), so the
+      // rows-rendering tests below need the router providers (ActivatedRoute).
+      providers: [provideZonelessChangeDetection(), provideRouter([])],
+    });
+    fixture = TestBed.createComponent(TagTableComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('tags', []);
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should define all expected columns', () => {
+    fixture.detectChanges();
+    const columnIds = component['_columns'].map(c => c.id);
+    expect(columnIds).toEqual(['select', 'color', 'name', 'path', 'description', 'itemCount', 'createdAt', 'updatedAt']);
+  });
+
+  it('should map name column to Name sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'Name');
+    fixture.componentRef.setInput('sortDir', 'Asc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'name', desc: false }]);
+  });
+
+  it('should map path column to Path sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'Path');
+    fixture.componentRef.setInput('sortDir', 'Asc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'path', desc: false }]);
+  });
+
+  it('should map itemCount column to ItemCount sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'ItemCount');
+    fixture.componentRef.setInput('sortDir', 'Desc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'itemCount', desc: true }]);
+  });
+
+  it('should map createdAt column to CreatedAt sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'CreatedAt');
+    fixture.componentRef.setInput('sortDir', 'Desc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'createdAt', desc: true }]);
+  });
+
+  it('should map updatedAt column to UpdatedAt sort key via sort input', () => {
+    fixture.componentRef.setInput('sortBy', 'UpdatedAt');
+    fixture.componentRef.setInput('sortDir', 'Desc');
+    fixture.detectChanges();
+
+    const sorting = component['_sorting']();
+    expect(sorting).toEqual([{ id: 'updatedAt', desc: true }]);
+  });
+
+  it('should clear sorting when sortBy is null', () => {
+    fixture.componentRef.setInput('sortBy', 'Name');
+    fixture.componentRef.setInput('sortDir', 'Asc');
+    fixture.detectChanges();
+    expect(component['_sorting']().length).toBe(1);
+
+    fixture.componentRef.setInput('sortBy', null);
+    fixture.detectChanges();
+    expect(component['_sorting']()).toEqual([]);
+  });
+
+  it('should sync column visibility input to table state', () => {
+    fixture.componentRef.setInput('columnVisibility', { createdAt: false, path: true });
+    fixture.detectChanges();
+
+    const vis = component['_columnVisibility']();
+    expect(vis['createdAt']).toBe(false);
+    expect(vis['path']).toBe(true);
+  });
+
+  it('should sync selected IDs input to row selection state', () => {
+    fixture.componentRef.setInput('tags', [
+      { id: 't1', name: 'A', path: 'A', itemCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: 't2', name: 'B', path: 'B', itemCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    ]);
+    fixture.componentRef.setInput('selectedIds', new Set(['t1']));
+    fixture.detectChanges();
+
+    const selection = component['_rowSelection']();
+    expect(selection['t1']).toBe(true);
+    expect(selection['t2']).toBeUndefined();
+  });
+
+  it('should emit sortChange when sorting changes via table', () => {
+    fixture.componentRef.setInput('tags', []);
+    fixture.detectChanges();
+
+    let emitted: { sortBy: string; sortDir: string } | null | undefined;
+    component.sortChange.subscribe(val => (emitted = val));
+
+    const tableOptions = component['table'].options;
+    const onSortingChange = tableOptions.onSortingChange!;
+    (onSortingChange as (updater: unknown) => void)(() => [{ id: 'name', desc: false }]);
+
+    expect(emitted).toEqual({ sortBy: 'Name', sortDir: 'Asc' });
+  });
+
+  it('should emit null sortChange when sorting is cleared', () => {
+    fixture.componentRef.setInput('tags', []);
+    fixture.detectChanges();
+
+    let emitted: { sortBy: string; sortDir: string } | null | undefined;
+    component.sortChange.subscribe(val => (emitted = val));
+
+    const tableOptions = component['table'].options;
+    const onSortingChange = tableOptions.onSortingChange!;
+    (onSortingChange as (updater: unknown) => void)(() => []);
+
+    expect(emitted).toBeNull();
+  });
+
+  it('should emit selectionChange when row selection changes via table', () => {
+    fixture.componentRef.setInput('tags', [
+      { id: 't1', name: 'A', path: 'A', itemCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    ]);
+    fixture.detectChanges();
+
+    let emitted: Set<string> | undefined;
+    component.selectionChange.subscribe(val => (emitted = val));
+
+    const tableOptions = component['table'].options;
+    const onRowSelectionChange = tableOptions.onRowSelectionChange!;
+    (onRowSelectionChange as (updater: unknown) => void)(() => ({ t1: true }));
+
+    expect(emitted).toEqual(new Set(['t1']));
+  });
+});

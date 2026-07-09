@@ -11,11 +11,13 @@ import { InventoryDurableApiService } from '@/api/services/inventory-durable-api
 import { InventoryAreaApiService } from '@/api/services/inventory-area-api.service';
 import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
+import { InventoryTagApiService } from '@/api/services/inventory-tag-api.service';
 import type { InventoryRow } from './inventory-row';
 import { durableToRow, consumableToRow } from './inventory-row';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
 import type { ConsumableResponse } from '@/api/generated/models/consumable-response';
 import type { AreaResponse } from '@/api/generated/models/area-response';
+import type { GetInventoryTagsResponse } from '@/api/generated/models/get-inventory-tags-response';
 import type { ItemStatus } from '@/api/generated/models/item-status';
 
 // brn-select (in child sheets) uses ResizeObserver; safe to stub for the rendered template.
@@ -112,7 +114,7 @@ const LOOSE = makeConsumable({
 // The list page now filters by RESOLVED area on the server, so the stubs simulate that filter to
 // prove the page passes the fetch params through (no client-side area pass). Test AREAS has no
 // nesting, so an area's inclusive subtree is just itself.
-interface ListFetchParams { Search?: string; AreaId?: string; Unplaced?: boolean; BrandId?: string; totalCountOverride?: number }
+interface ListFetchParams { Search?: string; AreaId?: string; Unplaced?: boolean; BrandId?: string; TagIds?: string[]; IncludeChildTags?: boolean; totalCountOverride?: number }
 
 function durableResolvedArea(d: DurableResponse): string | null {
   return d.resolvedAreaId ?? null;
@@ -135,6 +137,7 @@ class StubDurableApi {
     if (p?.AreaId) items = items.filter(i => durableResolvedArea(i) === p.AreaId);
     else if (p?.Unplaced) items = items.filter(i => durableResolvedArea(i) === null);
     if (p?.BrandId) items = items.filter(i => i.brandId === p.BrandId);
+    if (p?.TagIds) items = items.filter(i => (i.tags ?? []).some(t => p.TagIds!.includes(t.id)));
     return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchDurable = () => of(makeItem({}));
@@ -150,6 +153,7 @@ class StubConsumableApi {
     if (p?.AreaId) items = items.filter(s => consumableResolvedAreas(s).includes(p.AreaId!));
     else if (p?.Unplaced) items = items.filter(s => consumableResolvedAreas(s).includes(null));
     if (p?.BrandId) items = items.filter(s => s.brandId === p.BrandId);
+    if (p?.TagIds) items = items.filter(s => (s.tags ?? []).some(t => p.TagIds!.includes(t.id)));
     return of({ items, page: 1, pageSize: 200, totalCount: this.totalCountOverride ?? items.length });
   };
   patchConsumable = () => of(makeConsumable({}));
@@ -161,11 +165,22 @@ class StubAreaApi {
 class StubBrandApi {
   getBrands = () => of({ items: BRANDS, page: 1, pageSize: 200, totalCount: BRANDS.length });
 }
+// The refine popover's tag checklist (getTags) and the selected-chip resolver (getTagsByIds). The
+// list fixtures carry no tags, so any TagIds fetch filters to empty — exactly the empty-state case.
+class StubTagApi {
+  getTags = () => of({ items: TAGS, page: 1, pageSize: 50, totalCount: TAGS.length });
+  getTagsByIds = (params: { body: { ids: string[] } }) =>
+    of(params.body.ids.map(id => ({ id, path: `tag/${id}` })));
+}
 
 const ITEMS: DurableResponse[] = [CHEST, WRENCH, BIN, SCREW, ARCHIVED, FLOATING, LADDER];
 const CONSUMABLES: ConsumableResponse[] = [TAPE, SCREWS, GLUE, LOOSE];
 const AREAS: AreaResponse[] = [{ id: GARAGE, name: 'Garage', liveItemCount: 0, createdAt: '', updatedAt: '' }];
 const BRANDS = [{ id: APPLE, name: 'Apple' }, { id: 'sony', name: 'Sony' }];
+const TAGS: GetInventoryTagsResponse[] = [
+  { id: 't-a', name: 'A', path: 'A', itemCount: 0, createdAt: '', updatedAt: '' },
+  { id: 't-b', name: 'B', path: 'B', itemCount: 0, createdAt: '', updatedAt: '' },
+];
 
 describe('InventoryListPageComponent', () => {
   let fixture: ComponentFixture<InventoryListPageComponent>;
@@ -186,6 +201,7 @@ describe('InventoryListPageComponent', () => {
         { provide: InventoryConsumableApiService, useValue: consumableApi },
         { provide: InventoryAreaApiService, useValue: new StubAreaApi() },
         { provide: InventoryBrandApiService, useValue: new StubBrandApi() },
+        { provide: InventoryTagApiService, useValue: new StubTagApi() },
       ],
     });
     fixture = TestBed.createComponent(InventoryListPageComponent);
@@ -342,9 +358,12 @@ describe('InventoryListPageComponent', () => {
     await settle();
   }
 
-  // Let the 300ms searchInput debounce fire and the resulting navigation/fetch settle.
+  // Let the 300ms searchInput debounce fire and the resulting navigation/fetch settle. The margin
+  // over 300ms is generous on purpose: these are real timers, and the page's other debounced
+  // pipelines (tagOptions/tagChips) plus CPU contention under the build gate can otherwise steal the
+  // tail of a tight window and flake the commit assertion.
   async function flushDebounce(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 350));
+    await new Promise(resolve => setTimeout(resolve, 700));
     await settle();
   }
 
@@ -426,7 +445,7 @@ describe('InventoryListPageComponent', () => {
   // and the page's own area scope once at construction, and are then stripped from the URL. Container
   // navigation lives on Browse, so ?container= is no longer a list deep link.
   describe('deep-link param seeding', () => {
-    async function createWithParams(params: Record<string, string>): Promise<ComponentFixture<InventoryListPageComponent>> {
+    async function createWithParams(params: Record<string, string | string[]>): Promise<ComponentFixture<InventoryListPageComponent>> {
       await TestBed.inject(Router).navigate([], { queryParams: params });
       const f = TestBed.createComponent(InventoryListPageComponent);
       f.detectChanges();
@@ -464,6 +483,21 @@ describe('InventoryListPageComponent', () => {
       expect(f.componentInstance.brandFilter()).toBe(APPLE);
       expect(ids(f.componentInstance['scopedRows']())).toEqual(['tape', 'wrench']);
       expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['brand']).toBeUndefined();
+    });
+
+    it('?tagIds (+?includeChildTags) seed the page tag scope on both fetches and strip the params', async () => {
+      const f = await createWithParams({ tagIds: ['t-a', 't-b'], includeChildTags: 'true' });
+
+      expect(f.componentInstance.tagFilter()).toEqual(new Set(['t-a', 't-b']));
+      expect(f.componentInstance.includeChildTags()).toBe(true);
+      // Both server fetches carry the resolved tag scope (same expanded id set + toggle).
+      expect(durableApi.lastParams?.TagIds).toEqual(['t-a', 't-b']);
+      expect(consumableApi.lastParams?.TagIds).toEqual(['t-a', 't-b']);
+      expect(durableApi.lastParams?.IncludeChildTags).toBe(true);
+      expect(consumableApi.lastParams?.IncludeChildTags).toBe(true);
+      const stripped = TestBed.inject(Router).routerState.snapshot.root.queryParams;
+      expect(stripped['tagIds']).toBeUndefined();
+      expect(stripped['includeChildTags']).toBeUndefined();
     });
 
     it('an unknown ?kind value falls back to all kinds', async () => {
@@ -507,5 +541,63 @@ describe('InventoryListPageComponent', () => {
     component.onOpenConsumable(TAPE);
     expect(component.quickPanelConsumable()).toBe(TAPE);
     expect(component.consumableQuickPanelState()).toBe('open');
+  });
+
+  describe('tag filter facet', () => {
+    it('applies a ?tagIds= that arrives while already mounted (quick-panel link) and closes the panel', async () => {
+      // A tag badge/CRUD link inside a quick panel overlaid on the list navigates to ?tagIds=
+      // without reconstructing the component; the reactive handler must apply it, close the panel,
+      // and strip the param.
+      component.onOpenDurable(WRENCH);
+      expect(component.durableQuickPanelState()).toBe('open');
+
+      await TestBed.inject(Router).navigate([], { queryParams: { tagIds: 't-x' } });
+      await settle();
+
+      expect(component.tagFilter().has('t-x')).toBe(true);
+      expect(component.durableQuickPanelState()).toBe('closed');
+      expect(TestBed.inject(Router).routerState.snapshot.root.queryParams['tagIds']).toBeUndefined();
+    });
+
+    it('resolves the selected tag ids to chip labels via getTagsByIds', async () => {
+      component.tagFilter.set(new Set(['t-a']));
+      await settle();
+      expect(component['tagChips']()).toEqual([{ id: 't-a', path: 'tag/t-a' }]);
+    });
+
+    it('toggleTagFilter flips set membership', () => {
+      component.toggleTagFilter('t-a');
+      expect(component.tagFilter().has('t-a')).toBe(true);
+      component.toggleTagFilter('t-a');
+      expect(component.tagFilter().has('t-a')).toBe(false);
+    });
+
+    it('onReset clears the tag scope and the sub-tag toggle', async () => {
+      component.tagFilter.set(new Set(['t-a']));
+      component.includeChildTags.set(true);
+      await settle();
+
+      component.onReset();
+      await settle();
+      expect(component.tagFilter().size).toBe(0);
+      expect(component.includeChildTags()).toBe(false);
+    });
+
+    it('extraFiltersActive is true when only a tag filter is active', () => {
+      expect(component['extraFiltersActive']()).toBe(false);
+      component.tagFilter.set(new Set(['t-a']));
+      expect(component['extraFiltersActive']()).toBe(true);
+    });
+
+    it('does not render the "No items yet" empty state while a tag filter is active', async () => {
+      // The tag filter returns zero rows (fixtures carry no tags); the empty-state guard's
+      // `tagFilter().size === 0` clause must keep "No items yet" hidden and show the filtered state.
+      component.tagFilter.set(new Set(['t-a']));
+      await settle();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).not.toContain('No items yet');
+      expect(text).toContain('Nothing matches');
+    });
   });
 });
