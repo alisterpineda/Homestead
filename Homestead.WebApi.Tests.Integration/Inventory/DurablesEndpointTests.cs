@@ -768,4 +768,133 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal(2, list!.Items.Count);
         Assert.Equal(3, list.TotalCount); // all garage items, not the page or the office one
     }
+
+    // ----- Classification tags (create/patch whole-set-replace + TagIds facet) -----
+
+    // Reads the global tag list. ItemTagRef binds the fields we assert on; the extra list columns
+    // (ParentId, timestamps, …) are ignored by System.Text.Json.
+    private static async Task<IReadOnlyList<ItemTagRef>> ListTagsAsync(HttpClient client)
+    {
+        var resp = await client.GetAsync("/api/v1/inventory/tags?Page=1&PageSize=200", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<PaginatedResult<ItemTagRef>>(CT))!.Items;
+    }
+
+    [Fact]
+    public async Task CreateDurable_WithTags_PopulatesResponseAndUpsertsAncestors()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var item = await CreateDurableAsync(client, new { name = "Drill", tags = new[] { "Tools/Cordless" } });
+
+        // Response carries the leaf badge.
+        var badge = Assert.Single(item.Tags!);
+        Assert.Equal("Cordless", badge.Name);
+        Assert.Equal("Tools/Cordless", badge.Path);
+
+        // Both the leaf and its ancestor are upserted into the tag tree.
+        var tags = await ListTagsAsync(client);
+        Assert.Contains(tags, t => t.Path == "Tools");
+        Assert.Contains(tags, t => t.Path == "Tools/Cordless");
+
+        // The join is written — visible on the item detail read.
+        var detail = await GetDurableAsync(client, item.Id);
+        Assert.Single(detail.Tags!, t => t.Path == "Tools/Cordless");
+    }
+
+    [Fact]
+    public async Task PatchDurable_ReplaceTags_WholeSetReplace()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Drill", tags = new[] { "Old" } });
+        Assert.Single(item.Tags!, t => t.Name == "Old");
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{item.Id}",
+            new[] { new { op = "replace", path = "/tags", value = (object)new[] { "New" } } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Single(patched.Tags!, t => t.Name == "New");
+        Assert.DoesNotContain(patched.Tags!, t => t.Name == "Old"); // whole set swapped
+    }
+
+    [Fact]
+    public async Task PatchDurable_NoTagsOp_LeavesTagsUntouched()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Drill", tags = new[] { "Keep" } });
+
+        // A patch with no /tags op is seeded from the current set, so tags survive untouched.
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{item.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"Renamed drill" } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Equal("Renamed drill", patched.Name);
+        Assert.Single(patched.Tags!, t => t.Name == "Keep");
+    }
+
+    [Fact]
+    public async Task PatchDurable_ClearTags_EmptyArray()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateDurableAsync(client, new { name = "Drill", tags = new[] { "Remove" } });
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{item.Id}",
+            new[] { new { op = "replace", path = "/tags", value = (object)Array.Empty<string>() } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
+        Assert.Empty(patched.Tags!);
+    }
+
+    [Fact]
+    public async Task GetDurables_TagIdsFilter_Narrows()
+    {
+        var client = await CreateAdminClientAsync();
+        var tagged = await CreateDurableAsync(client, new { name = "Tagged drill", tags = new[] { "Facet" } });
+        await CreateDurableAsync(client, new { name = "Plain drill" });
+        var facetId = tagged.Tags!.Single().Id;
+
+        var list = await ListDurablesAsync(client, $"page=1&pageSize=200&TagIds={facetId}");
+
+        var only = Assert.Single(list!.Items);
+        Assert.Equal(tagged.Id, only.Id);
+    }
+
+    [Fact]
+    public async Task GetDurables_IncludeChildTags_PullsDescendants()
+    {
+        var client = await CreateAdminClientAsync();
+        // The item carries only the leaf; filtering by the parent needs subtree expansion to match.
+        var child = await CreateDurableAsync(client, new { name = "Child-tagged", tags = new[] { "Parent/Child" } });
+        var parentId = (await ListTagsAsync(client)).Single(t => t.Path == "Parent").Id;
+
+        // Without expansion the parent id matches nothing (the item holds only the descendant tag).
+        var without = await ListDurablesAsync(client, $"page=1&pageSize=200&TagIds={parentId}");
+        Assert.DoesNotContain(without!.Items, i => i.Id == child.Id);
+
+        // IncludeChildTags expands the parent to its subtree, so the child-tagged item matches.
+        var with = await ListDurablesAsync(client, $"page=1&pageSize=200&TagIds={parentId}&IncludeChildTags=true");
+        Assert.Contains(with!.Items, i => i.Id == child.Id);
+    }
+
+    [Fact]
+    public async Task GetDurables_TagFilter_ComposesWithAreaFilter()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+        var inGarage = await CreateDurableAsync(client,
+            new { name = "Garage tagged", areaId = garageId, tags = new[] { "Facet" } });
+        var facetId = inGarage.Tags!.Single().Id;
+        await CreateDurableAsync(client, new { name = "Garage plain", areaId = garageId });
+        await CreateDurableAsync(client, new { name = "Office tagged", areaId = officeId, tags = new[] { "Facet" } });
+
+        // Facet alone would match both tagged items; intersecting with the garage area narrows to one.
+        var list = await ListDurablesAsync(client, $"page=1&pageSize=200&TagIds={facetId}&areaId={garageId}");
+
+        var only = Assert.Single(list!.Items);
+        Assert.Equal(inGarage.Id, only.Id);
+    }
 }

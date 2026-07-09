@@ -10,7 +10,9 @@ namespace Homestead.WebApi.Tests.Integration.Inventory;
 internal record ConsumableItem(
     Guid Id, string Name, string Status, string? Unit, decimal? RestockThreshold,
     decimal TotalOnHand, bool IsLow, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    IReadOnlyList<StockEntryItem>? StockLocations);
+    IReadOnlyList<StockEntryItem>? StockLocations,
+    // Trailing + defaulted: absent `tags` binds to null, so existing tag-agnostic tests are unaffected.
+    IReadOnlyList<ItemTagRef>? Tags = null);
 
 internal record StockEntryItem(
     Guid Id, decimal Quantity, Guid? AreaId, Guid? ContainerItemId,
@@ -1105,5 +1107,142 @@ public class ConsumablesEndpointTests : IntegrationTestBase
 
         Assert.Equal(2, list!.Items.Count);   // one page
         Assert.Equal(3, list.TotalCount);     // whole filtered set, not the page or the office pen
+    }
+
+    // ----- Classification tags (create/patch whole-set-replace + TagIds facet) -----
+
+    private static async Task<ConsumableItem> CreateConsumableWithTagsAsync(
+        HttpClient client, string name, params string[] tags)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/inventory/consumables", new { name, tags }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+    }
+
+    // ItemTagRef binds the fields we assert on; the extra tag-list columns are ignored by System.Text.Json.
+    private static async Task<IReadOnlyList<ItemTagRef>> ListTagsAsync(HttpClient client)
+    {
+        var resp = await client.GetAsync("/api/v1/inventory/tags?Page=1&PageSize=200", CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<PaginatedResult<ItemTagRef>>(CT))!.Items;
+    }
+
+    [Fact]
+    public async Task CreateConsumable_WithTags_PopulatesResponseAndUpsertsAncestors()
+    {
+        var client = await CreateAdminClientAsync();
+
+        var item = await CreateConsumableWithTagsAsync(client, "Screws", "Tools/Cordless");
+
+        var badge = Assert.Single(item.Tags!);
+        Assert.Equal("Cordless", badge.Name);
+        Assert.Equal("Tools/Cordless", badge.Path);
+
+        var tags = await ListTagsAsync(client);
+        Assert.Contains(tags, t => t.Path == "Tools");
+        Assert.Contains(tags, t => t.Path == "Tools/Cordless");
+
+        var detail = await GetConsumableAsync(client, item.Id);
+        Assert.Single(detail.Consumable.Tags!, t => t.Path == "Tools/Cordless");
+    }
+
+    [Fact]
+    public async Task PatchConsumable_ReplaceTags_WholeSetReplace()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateConsumableWithTagsAsync(client, "Screws", "Old");
+        Assert.Single(item.Tags!, t => t.Name == "Old");
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/consumables/{item.Id}",
+            new[] { new { op = "replace", path = "/tags", value = (object)new[] { "New" } } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Single(patched.Tags!, t => t.Name == "New");
+        Assert.DoesNotContain(patched.Tags!, t => t.Name == "Old");
+    }
+
+    [Fact]
+    public async Task PatchConsumable_NoTagsOp_LeavesTagsUntouched()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateConsumableWithTagsAsync(client, "Screws", "Keep");
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/consumables/{item.Id}",
+            new[] { new { op = "replace", path = "/name", value = (object)"Wood screws" } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Equal("Wood screws", patched.Name);
+        Assert.Single(patched.Tags!, t => t.Name == "Keep");
+    }
+
+    [Fact]
+    public async Task PatchConsumable_ClearTags_EmptyArray()
+    {
+        var client = await CreateAdminClientAsync();
+        var item = await CreateConsumableWithTagsAsync(client, "Screws", "Remove");
+
+        var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/consumables/{item.Id}",
+            new[] { new { op = "replace", path = "/tags", value = (object)Array.Empty<string>() } });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var patched = (await resp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        Assert.Empty(patched.Tags!);
+    }
+
+    [Fact]
+    public async Task GetConsumables_TagIdsFilter_Narrows()
+    {
+        var client = await CreateAdminClientAsync();
+        var tagged = await CreateConsumableWithTagsAsync(client, "Tagged screws", "Facet");
+        await CreateConsumableWithTagsAsync(client, "Plain screws");
+        var facetId = tagged.Tags!.Single().Id;
+
+        var list = await ListConsumablesAsync(client, $"page=1&pageSize=200&TagIds={facetId}");
+
+        var only = Assert.Single(list!.Items);
+        Assert.Equal(tagged.Id, only.Id);
+    }
+
+    [Fact]
+    public async Task GetConsumables_IncludeChildTags_PullsDescendants()
+    {
+        var client = await CreateAdminClientAsync();
+        var child = await CreateConsumableWithTagsAsync(client, "Child-tagged", "Parent/Child");
+        var parentId = (await ListTagsAsync(client)).Single(t => t.Path == "Parent").Id;
+
+        var without = await ListConsumablesAsync(client, $"page=1&pageSize=200&TagIds={parentId}");
+        Assert.DoesNotContain(without!.Items, i => i.Id == child.Id);
+
+        var with = await ListConsumablesAsync(client, $"page=1&pageSize=200&TagIds={parentId}&IncludeChildTags=true");
+        Assert.Contains(with!.Items, i => i.Id == child.Id);
+    }
+
+    [Fact]
+    public async Task GetConsumables_TagFilter_ComposesWithAreaFilter()
+    {
+        var client = await CreateAdminClientAsync();
+        var garageId = await CreateAreaAsync(client, "Garage");
+        var officeId = await CreateAreaAsync(client, "Office");
+
+        // Tagged with stock in the garage — the target of the composed filter.
+        var inGarageResp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Garage screws", tags = new[] { "Facet" }, initialQuantity = 5m, initialAreaId = garageId }, CT);
+        Assert.Equal(HttpStatusCode.Created, inGarageResp.StatusCode);
+        var inGarage = (await inGarageResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+        var facetId = inGarage.Tags!.Single().Id;
+
+        // Same tag but stock in a different area — matched by tag alone, excluded once the area intersects.
+        await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Office screws", tags = new[] { "Facet" }, initialQuantity = 5m, initialAreaId = officeId }, CT);
+        // Untagged but in the garage — matched by area alone, excluded once the tag intersects.
+        await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Garage nails", initialQuantity = 5m, initialAreaId = garageId }, CT);
+
+        var list = await ListConsumablesAsync(client, $"page=1&pageSize=200&TagIds={facetId}&areaId={garageId}");
+
+        var only = Assert.Single(list!.Items);
+        Assert.Equal(inGarage.Id, only.Id);
     }
 }

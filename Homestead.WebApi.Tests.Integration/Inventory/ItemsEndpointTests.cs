@@ -82,4 +82,39 @@ public class ItemsEndpointTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task GetItem_DurableId_ReturnsTags()
+    {
+        var client = await CreateAdminClientAsync();
+        var drill = await CreateDurableAsync(client, new { name = "Cordless drill", tags = new[] { "Tools/Cordless" } });
+
+        var resp = await client.GetAsync($"/api/v1/inventory/items/{drill.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var item = (await resp.Content.ReadFromJsonAsync<ItemDetailItem>(CT))!;
+        Assert.NotNull(item.Durable);
+        var badge = Assert.Single(item.Durable!.Tags!);
+        Assert.Equal("Cordless", badge.Name);
+        Assert.Equal("Tools/Cordless", badge.Path);
+    }
+
+    [Fact]
+    public async Task GetItem_ConsumableId_ReturnsTags()
+    {
+        var client = await CreateAdminClientAsync();
+        var createResp = await client.PostAsJsonAsync("/api/v1/inventory/consumables",
+            new { name = "Wood screws", unit = "screws", tags = new[] { "Tools/Fasteners" } }, CT);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var screws = (await createResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
+
+        var resp = await client.GetAsync($"/api/v1/inventory/items/{screws.Id}", CT);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var item = (await resp.Content.ReadFromJsonAsync<ItemDetailItem>(CT))!;
+        Assert.NotNull(item.Consumable);
+        var badge = Assert.Single(item.Consumable!.Consumable.Tags!);
+        Assert.Equal("Fasteners", badge.Name);
+        Assert.Equal("Tools/Fasteners", badge.Path);
+    }
 }

@@ -16,9 +16,14 @@ internal record DurableItem(
     Guid Id, string Name, string Fungibility, string Status,
     Guid? AreaId, string? AreaName, string? LentTo, string? Serial, string? DurableKind,
     Guid? ParentItemId, string? ParentDurableKind, string? Compartment, Guid? ResolvedAreaId,
-    IReadOnlyList<LocationSegmentItem>? Path);
+    IReadOnlyList<LocationSegmentItem>? Path,
+    // Whole classification-tag set on the item, each badge carrying its resolved effective colour.
+    // Trailing + defaulted: an absent `tags` in JSON falls back to null, so tag-agnostic tests bind unchanged.
+    IReadOnlyList<ItemTagRef>? Tags = null);
 // Enum serializes as a string server-side, so Kind is "Area" | "Container".
 internal record LocationSegmentItem(Guid Id, string Name, string Kind);
+// Read-only tag badge shared by the durable/consumable item projections.
+internal record ItemTagRef(Guid Id, string Name, string Path, string? Color, string? EffectiveColor);
 
 [Collection("Integration")]
 public class AreasEndpointTests : IntegrationTestBase
