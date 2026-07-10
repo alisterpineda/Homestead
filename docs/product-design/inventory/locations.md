@@ -56,6 +56,9 @@ A single `Item` table holds both kinds, discriminated by `Fungibility`. Shared f
 | `Serial` | non-fungible | nullable |
 | `Model` | non-fungible | free-text model designation ("MRW23"); sits beside `Serial`; nullable |
 | `AcquiredOn` | non-fungible | date; nullable |
+| `AcquisitionKind` | non-fungible | how the item entered the household: `Purchased` \| `Gift` \| `Inherited` \| `Other` (string-backed); null = not recorded — the normal state for a backfilled household |
+| `AcquisitionCost` / `AcquisitionCostCurrencyId` | non-fungible | purchase price + its currency — both or neither; a historical fact, distinct from the estimated `Value`; nullable |
+| `AcquiredFrom` | non-fungible | free-text source — a store or a person ("Home Depot", "Mom"); `LentTo` precedent, no vendor entity; nullable |
 | `LentTo` | non-fungible | free text; set when `Status = Lent` |
 | `Unit` | fungible | "screws", "rolls", "gal" — see [stock.md](stock.md) |
 | `RestockThreshold` | fungible | optional global low-stock trigger — see [stock.md](stock.md#total-on-hand-and-low-stock) |

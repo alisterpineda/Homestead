@@ -19,6 +19,10 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
     public string? Serial { get; init; }
     public string? Model { get; init; }
     public DateOnly? AcquiredOn { get; init; }
+    public AcquisitionKind? AcquisitionKind { get; init; }
+    public decimal? AcquisitionCost { get; init; }
+    public Guid? AcquisitionCostCurrencyId { get; init; }
+    public string? AcquiredFrom { get; init; }
     public string? LentTo { get; init; }
     public string? Unit { get; init; }
     public decimal? RestockThreshold { get; init; }
@@ -38,6 +42,10 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
         Serial = source.Serial,
         Model = source.Model,
         AcquiredOn = source.AcquiredOn,
+        AcquisitionKind = source.AcquisitionKind,
+        AcquisitionCost = source.AcquisitionCost,
+        AcquisitionCostCurrencyId = source.AcquisitionCostCurrencyId,
+        AcquiredFrom = source.AcquiredFrom,
         LentTo = source.LentTo,
         Unit = source.Unit,
         RestockThreshold = source.RestockThreshold,
@@ -73,6 +81,14 @@ public record ItemSnapshot : IAuditSnapshot<ItemSnapshot, Item>
             changes.Add(new ScalarFieldChange("Model", Model, other.Model));
         if (AcquiredOn != other.AcquiredOn)
             changes.Add(new ScalarFieldChange("AcquiredOn", Format(AcquiredOn), Format(other.AcquiredOn)));
+        if (AcquisitionKind != other.AcquisitionKind)
+            changes.Add(new ScalarFieldChange("AcquisitionKind", AcquisitionKind?.ToString(), other.AcquisitionKind?.ToString()));
+        if (AcquisitionCost != other.AcquisitionCost)
+            changes.Add(new ScalarFieldChange("AcquisitionCost", Format(AcquisitionCost), Format(other.AcquisitionCost)));
+        if (AcquisitionCostCurrencyId != other.AcquisitionCostCurrencyId)
+            changes.Add(new ScalarFieldChange("AcquisitionCostCurrencyId", AcquisitionCostCurrencyId?.ToString(), other.AcquisitionCostCurrencyId?.ToString()));
+        if (AcquiredFrom != other.AcquiredFrom)
+            changes.Add(new ScalarFieldChange("AcquiredFrom", AcquiredFrom, other.AcquiredFrom));
         if (LentTo != other.LentTo)
             changes.Add(new ScalarFieldChange("LentTo", LentTo, other.LentTo));
         if (Unit != other.Unit)

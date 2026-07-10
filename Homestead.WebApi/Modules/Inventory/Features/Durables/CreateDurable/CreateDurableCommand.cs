@@ -32,6 +32,17 @@ public record CreateDurableCommand : ICommand<DurableResponse>
     public string? Model { get; init; }
 
     public DateOnly? AcquiredOn { get; init; }
+
+    /// <summary>How the item entered the household; null = not recorded.</summary>
+    public AcquisitionKind? AcquisitionKind { get; init; }
+
+    /// <summary>Purchase price (historical fact, distinct from <see cref="Value"/>); paired both-or-neither with <see cref="AcquisitionCostCurrencyId"/>.</summary>
+    public decimal? AcquisitionCost { get; init; }
+    public Guid? AcquisitionCostCurrencyId { get; init; }
+
+    /// <summary>Free-text source — a store or a person ("Home Depot", "Mom").</summary>
+    public string? AcquiredFrom { get; init; }
+
     public decimal? Value { get; init; }
     public Guid? ValueCurrencyId { get; init; }
 

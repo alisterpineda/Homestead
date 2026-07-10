@@ -58,6 +58,59 @@ public class ItemSnapshotTests
     }
 
     [Fact]
+    public void From_MapsAcquisitionFields()
+    {
+        var currencyId = Guid.NewGuid();
+        var item = new Item
+        {
+            Name = "Drill",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Active,
+            AcquisitionKind = AcquisitionKind.Purchased,
+            AcquisitionCost = 189m,
+            AcquisitionCostCurrencyId = currencyId,
+            AcquiredFrom = "Home Depot",
+        };
+
+        var snapshot = ItemSnapshot.From(item);
+
+        Assert.Equal(AcquisitionKind.Purchased, snapshot.AcquisitionKind);
+        Assert.Equal(189m, snapshot.AcquisitionCost);
+        Assert.Equal(currencyId, snapshot.AcquisitionCostCurrencyId);
+        Assert.Equal("Home Depot", snapshot.AcquiredFrom);
+    }
+
+    [Fact]
+    public void Diff_DetectsAcquisitionKindChange()
+    {
+        var before = new ItemSnapshot { Name = "Item", Status = ItemStatus.Active, AcquisitionKind = AcquisitionKind.Gift };
+        var after = new ItemSnapshot { Name = "Item", Status = ItemStatus.Active, AcquisitionKind = AcquisitionKind.Purchased };
+
+        var changes = before.Diff(after);
+
+        var change = Assert.Single(changes);
+        var scalar = Assert.IsType<ScalarFieldChange>(change);
+        Assert.Equal("AcquisitionKind", scalar.Field);
+        Assert.Equal("Gift", scalar.OldValue);
+        Assert.Equal("Purchased", scalar.NewValue);
+    }
+
+    [Fact]
+    public void Diff_DetectsAcquisitionCostChange()
+    {
+        var before = new ItemSnapshot { Name = "Item", Status = ItemStatus.Active, AcquisitionCost = 100m };
+        var after = new ItemSnapshot { Name = "Item", Status = ItemStatus.Active, AcquisitionCost = 189.5m };
+
+        var changes = before.Diff(after);
+
+        var change = Assert.Single(changes);
+        var scalar = Assert.IsType<ScalarFieldChange>(change);
+        Assert.Equal("AcquisitionCost", scalar.Field);
+        Assert.Equal("100", scalar.OldValue);
+        Assert.Equal("189.5", scalar.NewValue);
+    }
+
+    [Fact]
     public void Diff_ReturnsEmpty_WhenBrandAndModelUnchanged()
     {
         var brandId = Guid.NewGuid();

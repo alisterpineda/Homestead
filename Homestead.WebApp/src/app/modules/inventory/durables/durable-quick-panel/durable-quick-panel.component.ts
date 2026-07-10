@@ -7,8 +7,8 @@ import {
   inject,
   signal,
   DestroyRef,
+  LOCALE_ID,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
@@ -31,6 +31,7 @@ import { TagBadgeComponent } from '@/shared/components/tag-badge/tag-badge.compo
 import { ALL_ITEM_STATUSES, itemStatusLabel } from '../../shared/item-status-meta';
 import { injectSheetSide } from '../../shared/sheet-side';
 import { formatPath } from '../../list/inventory-row';
+import { acquisitionSummary } from '../acquisition-summary';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { replace } from '@/shared/json-patch';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -54,7 +55,6 @@ type InlineForm = 'move' | 'lent' | null;
   selector: 'app-durable-quick-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DatePipe,
     RouterLink,
     NgIcon,
     HlmIconImports,
@@ -218,12 +218,12 @@ type InlineForm = 'move' | 'lent' | null;
                       </dd>
                     }
                     @if (it.value != null) {
-                      <dt class="text-muted-foreground">Value</dt>
+                      <dt class="text-muted-foreground">Est. value</dt>
                       <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
                     }
-                    @if (it.acquiredOn) {
-                      <dt class="text-muted-foreground">Acquired on</dt>
-                      <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
+                    @if (acquisitionLine(); as acquired) {
+                      <dt class="text-muted-foreground">Acquired</dt>
+                      <dd class="break-words tabular-nums">{{ acquired }}</dd>
                     }
                     @if (it.status === 'Lent' && it.lentTo) {
                       <dt class="text-muted-foreground">Lent to</dt>
@@ -312,6 +312,14 @@ export class DurableQuickPanelComponent {
     return n === 1 ? 'item' : 'items';
   });
 
+  private locale = inject(LOCALE_ID);
+
+  /** Composed "Acquired" row (kind · date · cost · from …), null when nothing is recorded. */
+  protected acquisitionLine = computed<string | null>(() => {
+    const it = this.view();
+    return it ? acquisitionSummary(it, this.locale) : null;
+  });
+
   // Drives whether the Details card renders at all — when serial/value/acquired/lent/notes are all
   // empty it would be an empty box (status moved to the header, Updated to the footer). Mirrors
   // `hasDetails` on durable-detail-page, plus notes (which live inside this card, not the header here).
@@ -319,7 +327,8 @@ export class DurableQuickPanelComponent {
     const it = this.view();
     return (
       !!it &&
-      (it.value != null || !!it.serial || !!it.model || !!it.brandId || !!it.acquiredOn
+      (it.value != null || !!it.serial || !!it.model || !!it.brandId
+        || this.acquisitionLine() !== null
         || (it.status === 'Lent' && !!it.lentTo) || !!it.notes)
     );
   });

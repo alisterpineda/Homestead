@@ -51,5 +51,23 @@ public class CreateDurableCommandValidator : AbstractValidator<CreateDurableComm
         RuleFor(x => x.Value)
             .NotNull().WithMessage("Value is required when ValueCurrencyId is set.")
             .When(x => x.ValueCurrencyId.HasValue);
+
+        // Same integer-binding hole as DurableKind: reject out-of-range values (null passes).
+        RuleFor(x => x.AcquisitionKind).IsInEnum();
+
+        RuleFor(x => x.AcquiredFrom)
+            .MaximumLength(256).WithMessage("AcquiredFrom must be 256 characters or fewer.");
+
+        RuleFor(x => x.AcquisitionCost)
+            .GreaterThanOrEqualTo(0m).WithMessage("AcquisitionCost must be zero or positive.")
+            .When(x => x.AcquisitionCost.HasValue);
+
+        // Acquisition cost and its currency are set together or not at all.
+        RuleFor(x => x.AcquisitionCostCurrencyId)
+            .NotNull().WithMessage("AcquisitionCostCurrencyId is required when AcquisitionCost is set.")
+            .When(x => x.AcquisitionCost.HasValue);
+        RuleFor(x => x.AcquisitionCost)
+            .NotNull().WithMessage("AcquisitionCost is required when AcquisitionCostCurrencyId is set.")
+            .When(x => x.AcquisitionCostCurrencyId.HasValue);
     }
 }

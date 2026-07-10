@@ -2,6 +2,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Features.Durables;
 using Homestead.WebApi.Modules.Inventory.Features.Durables.PatchDurable;
@@ -180,6 +181,82 @@ public class PatchDurableHandlerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             PatchAsync(item.Id, p => p.Replace(m => m.Value, 100m)));
+    }
+
+    private async Task<Commodity> AddCurrencyAsync(string symbol = "CAD")
+    {
+        var c = new Commodity { Id = Guid.NewGuid(), Symbol = symbol, Name = symbol, Kind = CommodityKind.Currency, DisplayPrecision = 2 };
+        _db.Commodities.Add(c);
+        await _db.SaveChangesAsync(Ct);
+        return c;
+    }
+
+    [Fact]
+    public async Task Handle_SetAcquisitionCluster_Persists()
+    {
+        var cad = await AddCurrencyAsync();
+        var item = await AddItemAsync();
+
+        var resp = await PatchAsync(item.Id, p =>
+        {
+            p.Replace(m => m.AcquisitionKind, AcquisitionKind.Purchased);
+            p.Replace(m => m.AcquisitionCost, 189m);
+            p.Replace(m => m.AcquisitionCostCurrencyId, cad.Id);
+            p.Replace(m => m.AcquiredFrom, "  Home Depot  ");
+        });
+
+        Assert.Equal(AcquisitionKind.Purchased, resp.AcquisitionKind);
+        Assert.Equal(189m, resp.AcquisitionCost);
+        Assert.Equal(cad.Id, resp.AcquisitionCostCurrencyId);
+        Assert.Equal("CAD", resp.AcquisitionCostCurrencySymbol);
+        Assert.Equal("Home Depot", resp.AcquiredFrom);
+    }
+
+    [Fact]
+    public async Task Handle_AcquisitionCostWithoutCurrency_Throws()
+    {
+        var item = await AddItemAsync();
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p => p.Replace(m => m.AcquisitionCost, 189m)));
+    }
+
+    [Fact]
+    public async Task Handle_UndefinedAcquisitionKind_Throws()
+    {
+        var item = await AddItemAsync();
+
+        // JSON Patch binds bare ints past the string converter; an out-of-range value must be a 400.
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(item.Id, p => p.Replace(m => m.AcquisitionKind, (AcquisitionKind)99)));
+    }
+
+    [Fact]
+    public async Task Handle_UnrelatedPatch_PreservesAcquisitionFields()
+    {
+        var cad = await AddCurrencyAsync();
+        var item = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Drill",
+            Fungibility = Fungibility.NonFungible,
+            Status = ItemStatus.Active,
+            DurableKind = DurableKind.Plain,
+            AcquisitionKind = AcquisitionKind.Gift,
+            AcquisitionCost = 50m,
+            AcquisitionCostCurrencyId = cad.Id,
+            AcquiredFrom = "Mom",
+        };
+        _db.Items.Add(item);
+        await _db.SaveChangesAsync(Ct);
+
+        // A rename must not silently null the acquisition cluster (guards the seed block).
+        var resp = await PatchAsync(item.Id, p => p.Replace(m => m.Name, "Renamed"));
+
+        Assert.Equal(AcquisitionKind.Gift, resp.AcquisitionKind);
+        Assert.Equal(50m, resp.AcquisitionCost);
+        Assert.Equal(cad.Id, resp.AcquisitionCostCurrencyId);
+        Assert.Equal("Mom", resp.AcquiredFrom);
     }
 
     [Fact]

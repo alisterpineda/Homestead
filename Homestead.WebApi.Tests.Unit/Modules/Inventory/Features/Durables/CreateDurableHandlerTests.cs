@@ -143,6 +143,76 @@ public class CreateDurableHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_WithAcquisitionCostButNoCurrency_Throws()
+    {
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_WithNonCurrencyAcquisitionCommodity_Throws()
+    {
+        var security = new Commodity { Id = Guid.NewGuid(), Symbol = "AAPL", Exchange = "NASDAQ", Name = "Apple", Kind = CommodityKind.Security, DisplayPrecision = 2 };
+        _db.Commodities.Add(security);
+        await _db.SaveChangesAsync(Ct);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.Handle(new CreateDurableCommand
+            {
+                Name = "Drill",
+                AcquisitionCost = 189m,
+                AcquisitionCostCurrencyId = security.Id,
+            }, Ct));
+    }
+
+    [Fact]
+    public async Task Handle_WithFullAcquisitionCluster_StoresAndProjectsSymbol()
+    {
+        var cad = await AddCurrencyAsync();
+
+        var result = await _sut.Handle(new CreateDurableCommand
+        {
+            Name = "Drill",
+            AcquisitionKind = AcquisitionKind.Purchased,
+            AcquisitionCost = 189m,
+            AcquisitionCostCurrencyId = cad.Id,
+            AcquiredFrom = "Home Depot",
+            AcquiredOn = new DateOnly(2024, 6, 12),
+        }, Ct);
+
+        Assert.Equal(AcquisitionKind.Purchased, result.AcquisitionKind);
+        Assert.Equal(189m, result.AcquisitionCost);
+        Assert.Equal(cad.Id, result.AcquisitionCostCurrencyId);
+        Assert.Equal("CAD", result.AcquisitionCostCurrencySymbol);
+        Assert.Equal("Home Depot", result.AcquiredFrom);
+
+        var stored = _db.Items.Single();
+        Assert.Equal(AcquisitionKind.Purchased, stored.AcquisitionKind);
+        Assert.Equal(189m, stored.AcquisitionCost);
+        Assert.Equal("Home Depot", stored.AcquiredFrom);
+    }
+
+    [Fact]
+    public async Task Handle_WithAcquiredFrom_TrimsAndStores()
+    {
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "Drill", AcquiredFrom = "  Home Depot  " }, Ct);
+
+        Assert.Equal("Home Depot", result.AcquiredFrom);
+        Assert.Equal("Home Depot", _db.Items.Single().AcquiredFrom);
+    }
+
+    [Fact]
+    public async Task Handle_WithBlankAcquiredFrom_StoresNull()
+    {
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "Drill", AcquiredFrom = "   " }, Ct);
+
+        Assert.Null(result.AcquiredFrom);
+        Assert.Null(_db.Items.Single().AcquiredFrom);
+    }
+
+    [Fact]
     public async Task Handle_WithContainerKind_CreatesContainer()
     {
         var result = await _sut.Handle(

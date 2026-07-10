@@ -55,6 +55,18 @@ public record DurableResponse
     public string? Model { get; init; }
 
     public DateOnly? AcquiredOn { get; init; }
+
+    /// <summary>How the item entered the household; null = not recorded.</summary>
+    public AcquisitionKind? AcquisitionKind { get; init; }
+
+    /// <summary>Purchase price (historical fact, distinct from the estimated <see cref="Value"/>).</summary>
+    public decimal? AcquisitionCost { get; init; }
+    public Guid? AcquisitionCostCurrencyId { get; init; }
+    public string? AcquisitionCostCurrencySymbol { get; init; }
+
+    /// <summary>Free-text source — a store or a person.</summary>
+    public string? AcquiredFrom { get; init; }
+
     public string? LentTo { get; init; }
 
     public string? Unit { get; init; }

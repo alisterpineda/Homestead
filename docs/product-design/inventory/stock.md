@@ -65,6 +65,7 @@ Every change to fungible quantity appends one **movement** row, written in the s
 | `CreatedByUserId` | who recorded it (nullable; cleared if that user is deleted) |
 | `RelatedItemId` | for `Conversion`: the non-fungible item carved out / collapsed (nullable) |
 | `Note` | free text (nullable) |
+| `Source` | free text — where the stock came from ("Costco"); written only by the deliberate receive operation, null on every other movement (nullable) |
 
 ### Direction is structural
 

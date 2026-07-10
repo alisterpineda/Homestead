@@ -7,9 +7,9 @@ import {
   computed,
   untracked,
   DestroyRef,
+  LOCALE_ID,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, of, catchError } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -45,6 +45,7 @@ import { DurableQuickPanelComponent } from '../durable-quick-panel/durable-quick
 import { CreateEntryDialogComponent } from '../../list/create-entry-dialog/create-entry-dialog.component';
 import type { ItemLocationValue } from '../../shared/location-picker/location-picker.component';
 import { formatPath } from '../../list/inventory-row';
+import { acquisitionSummary } from '../acquisition-summary';
 import { formatQty } from '../../consumables/consumable-shared';
 import { UnitPipe } from '../../consumables/unit.pipe';
 import { formatRelativeAge } from '@/shared/utils/relative-age';
@@ -71,7 +72,6 @@ import { toast } from '@spartan-ng/brain/sonner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
-    DatePipe,
     NgIcon,
     HlmIconImports,
     HlmButton,
@@ -181,7 +181,7 @@ import { toast } from '@spartan-ng/brain/sonner';
             <h2 class="text-sm font-medium text-muted-foreground">Details</h2>
             <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border p-4 text-sm sm:max-w-lg">
               @if (it.value != null) {
-                <dt class="text-muted-foreground">Value</dt>
+                <dt class="text-muted-foreground">Est. value</dt>
                 <dd class="tabular-nums">{{ it.value }}{{ it.valueCurrencySymbol ? ' ' + it.valueCurrencySymbol : '' }}</dd>
               }
               @if (it.serial) {
@@ -202,9 +202,9 @@ import { toast } from '@spartan-ng/brain/sonner';
                   >{{ it.brandName }}</a>
                 </dd>
               }
-              @if (it.acquiredOn) {
-                <dt class="text-muted-foreground">Acquired on</dt>
-                <dd>{{ it.acquiredOn | date: 'mediumDate' }}</dd>
+              @if (acquisitionLine(); as acquired) {
+                <dt class="text-muted-foreground">Acquired</dt>
+                <dd class="break-words tabular-nums">{{ acquired }}</dd>
               }
               @if (it.status === 'Lent' && it.lentTo) {
                 <dt class="text-muted-foreground">Lent to</dt>
@@ -515,12 +515,21 @@ export class DurableDetailPageComponent {
     return it ? formatPath(it) : '';
   });
 
+  private locale = inject(LOCALE_ID);
+
+  /** Composed "Acquired" row (kind · date · cost · from …), null when nothing is recorded. */
+  protected acquisitionLine = computed<string | null>(() => {
+    const it = this.durable();
+    return it ? acquisitionSummary(it, this.locale) : null;
+  });
+
   // Drives whether the Details box renders at all — when value/serial/acquired/lent are all empty it
   // would be an empty card, so it's hidden (location now leads as the headline, not a Details row).
   protected hasDetails = computed(() => {
     const it = this.durable();
     return !!it && (it.value != null || !!it.serial || !!it.model || !!it.brandId
-      || !!it.acquiredOn || (it.status === 'Lent' && !!it.lentTo));
+      || this.acquisitionLine() !== null
+      || (it.status === 'Lent' && !!it.lentTo));
   });
 
   protected updatedRelative = computed(() => {

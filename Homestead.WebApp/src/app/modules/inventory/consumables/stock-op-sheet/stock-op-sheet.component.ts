@@ -27,6 +27,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { openGeneration } from '@/shared/utils/open-generation';
+import { trimToNull } from '@/modules/finances/shared/trim-to-null';
 
 export type StockOpMode = 'receive' | 'consume' | 'transfer' | 'adjust';
 
@@ -142,6 +143,19 @@ const META: Record<StockOpMode, { title: string; description: string; action: st
                 />
               </div>
             </div>
+
+            <div class="space-y-2">
+              <label hlmLabel for="stock-source">Source (optional)</label>
+              <input
+                hlmInput
+                id="stock-source"
+                class="w-full"
+                maxlength="256"
+                placeholder="e.g. Costco"
+                [value]="source()"
+                (input)="source.set(asValue($event))"
+              />
+            </div>
           }
 
           <!-- Note -->
@@ -206,6 +220,7 @@ export class StockOpSheetComponent {
   currencyId = seededLinkedSignal<string, string | null>(this.seedKey, () => null);
   pickedCurrency = seededLinkedSignal<string, CommodityResponse | null>(this.seedKey, () => null);
   note = seededLinkedSignal(this.seedKey, () => '');
+  source = seededLinkedSignal(this.seedKey, () => '');
   destValue = seededLinkedSignal<string, ItemLocationValue>(this.seedKey, () => ({ kind: 'unplaced' }));
   saving = seededLinkedSignal(this.seedKey, () => false);
 
@@ -275,7 +290,7 @@ export class StockOpSheetComponent {
     if (!this.canSubmit()) return;
     const id = this.consumableId();
     const qty = this.parsedQuantity();
-    const note = this.note().trim() ? this.note().trim() : null;
+    const note = trimToNull(this.note());
     this.saving.set(true);
 
     const op$ = (() => {
@@ -292,6 +307,7 @@ export class StockOpSheetComponent {
               unitCost: cost === '' ? null : Number(cost),
               unitCostCurrencyId: cost === '' ? null : this.currencyId(),
               note,
+              source: trimToNull(this.source()),
             },
           });
         }

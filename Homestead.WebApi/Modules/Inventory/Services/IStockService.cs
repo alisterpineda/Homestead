@@ -54,7 +54,8 @@ public record StockReceiveRequest(
     decimal? UnitCost,
     Guid? UnitCostCurrencyId,
     DateTimeOffset? OccurredAt,
-    string? Note);
+    string? Note,
+    string? Source);
 
 public record StockConsumeRequest(
     StockLocation From,

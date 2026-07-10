@@ -26,7 +26,7 @@ internal record StockMovementItem(
     Guid? ToAreaId, Guid? ToContainerItemId, string? ToLabel,
     decimal? UnitCost, Guid? UnitCostCurrencyId, string? UnitCostCurrencySymbol,
     DateTimeOffset OccurredAt, Guid? RelatedItemId, string? RelatedItemName,
-    Guid? CreatedByUserId, string? CreatedByDisplayName, string? Note, DateTimeOffset CreatedAt);
+    Guid? CreatedByUserId, string? CreatedByDisplayName, string? Note, string? Source, DateTimeOffset CreatedAt);
 
 [Collection("Integration")]
 public class ConsumablesEndpointTests : IntegrationTestBase
@@ -459,6 +459,19 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         Assert.Equal(2.5m, m.UnitCost);
         Assert.Equal(currencyId, m.UnitCostCurrencyId);
         Assert.NotNull(m.UnitCostCurrencySymbol);
+    }
+
+    [Fact]
+    public async Task Receive_WithSource_RecordsSourceOnMovement()
+    {
+        var client = await CreateAdminClientAsync();
+        var areaId = await CreateAreaAsync(client, "Garage");
+        var consumable = await CreateConsumableAsync(client);
+
+        await ReceiveAsync(client, consumable.Id, new { areaId, quantity = 4m, source = "  Costco  " });
+
+        var m = Assert.Single(await GetMovementsAsync(client, consumable.Id));
+        Assert.Equal("Costco", m.Source);
     }
 
     [Fact]

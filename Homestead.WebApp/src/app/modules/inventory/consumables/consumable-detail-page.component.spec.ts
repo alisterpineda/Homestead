@@ -209,6 +209,44 @@ describe('ConsumableDetailPageComponent', () => {
     expect(component.consumable()?.status).toBe('Active');
   });
 
+  it('shows a "from {source}" token in the movement meta line when a receive recorded one', async () => {
+    const movement: StockMovementResponse = {
+      id: 'm1',
+      kind: 'Flow',
+      quantity: 4,
+      toAreaId: 'garage',
+      toLabel: 'Garage',
+      note: 'weekly run',
+      source: 'Costco',
+      occurredAt: '2026-06-01T00:00:00Z',
+      createdAt: '2026-06-01T00:00:00Z',
+    };
+    consumableApi.getConsumableMovements = (p: { id: string; Page: number; PageSize: number }) =>
+      of({ items: [movement], page: p.Page, pageSize: p.PageSize, totalCount: 1, totalPages: 1 });
+    const { harness } = await navigate('/inventory/items/c1');
+
+    expect(text(harness)).toContain('weekly run · from Costco');
+  });
+
+  it('renders the movement meta line without a source token when none was recorded', async () => {
+    const movement: StockMovementResponse = {
+      id: 'm2',
+      kind: 'Flow',
+      quantity: 4,
+      toAreaId: 'garage',
+      toLabel: 'Garage',
+      note: 'weekly run',
+      occurredAt: '2026-06-01T00:00:00Z',
+      createdAt: '2026-06-01T00:00:00Z',
+    };
+    consumableApi.getConsumableMovements = (p: { id: string; Page: number; PageSize: number }) =>
+      of({ items: [movement], page: p.Page, pageSize: p.PageSize, totalCount: 1, totalPages: 1 });
+    const { harness } = await navigate('/inventory/items/c1');
+
+    expect(text(harness)).toContain('weekly run');
+    expect(text(harness)).not.toContain('from Costco');
+  });
+
   it('deletes a consumable and navigates back to the item list', async () => {
     const { component } = await navigate('/inventory/items/c1');
     const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

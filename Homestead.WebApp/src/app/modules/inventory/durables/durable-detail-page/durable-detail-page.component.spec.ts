@@ -229,6 +229,48 @@ describe('DurableDetailPageComponent', () => {
     expect(content).not.toContain('Details'); // empty Details box is hidden entirely
   });
 
+  it('renders the composed Acquired line with kind, date, cost, and source', async () => {
+    durableApi.item = {
+      ...LEAF_ITEM,
+      acquisitionKind: 'Purchased',
+      acquiredOn: '2024-06-12',
+      acquisitionCost: 189,
+      acquisitionCostCurrencySymbol: 'CAD',
+      acquiredFrom: 'Home Depot',
+    };
+    const { harness } = await navigate('/inventory/items/item1');
+
+    const content = text(harness);
+    expect(content).toContain('Acquired');
+    expect(content).toContain('Purchased · Jun 12, 2024 · 189 CAD · from Home Depot');
+    // Value relabelled now that a purchase price can sit beside it.
+    expect(content).toContain('Est. value');
+    expect(content).not.toContain('Acquired on');
+  });
+
+  it('renders a date-only Acquired line like today when only acquiredOn is set', async () => {
+    durableApi.item = { ...LEAF_ITEM, acquiredOn: '2024-06-12' };
+    const { harness } = await navigate('/inventory/items/item1');
+
+    const content = text(harness);
+    expect(content).toContain('Acquired');
+    expect(content).toContain('Jun 12, 2024');
+    expect(content).not.toContain('·'); // a single part renders without separators
+  });
+
+  it('shows the Details box when only an acquisition field is set', async () => {
+    durableApi.item = {
+      id: 'bare2', name: 'Gifted Thing', fungibility: 'NonFungible', status: 'Active',
+      durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+      acquisitionKind: 'Gift',
+    };
+    const { harness } = await navigate('/inventory/items/bare2');
+
+    const content = text(harness);
+    expect(content).toContain('Details');
+    expect(content).toContain('Gift');
+  });
+
   it('shows Unplaced as the location headline for an unplaced durable', async () => {
     durableApi.item = {
       id: 'floating', name: 'Floating Thing', fungibility: 'NonFungible', status: 'Active',

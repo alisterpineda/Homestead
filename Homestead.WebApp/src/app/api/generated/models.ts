@@ -4,6 +4,7 @@
 export type { AccountKind } from './models/account-kind';
 export type { AccountResponse } from './models/account-response';
 export type { AccountType } from './models/account-type';
+export type { AcquisitionKind } from './models/acquisition-kind';
 export type { AddGroupMemberRequest } from './models/add-group-member-request';
 export type { AdjustStockRequest } from './models/adjust-stock-request';
 export type { AiStatusResponse } from './models/ai-status-response';

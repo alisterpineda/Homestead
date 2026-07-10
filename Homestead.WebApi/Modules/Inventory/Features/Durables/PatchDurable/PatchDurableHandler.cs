@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using Homestead.WebApi.Domain.Auditing.Snapshots;
-using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
@@ -42,6 +41,10 @@ public class PatchDurableHandler(
             BrandId = item.BrandId,
             Model = item.Model,
             AcquiredOn = item.AcquiredOn,
+            AcquisitionKind = item.AcquisitionKind,
+            AcquisitionCost = item.AcquisitionCost,
+            AcquisitionCostCurrencyId = item.AcquisitionCostCurrencyId,
+            AcquiredFrom = item.AcquiredFrom,
             Value = item.Value,
             ValueCurrencyId = item.ValueCurrencyId,
             Status = item.Status,
@@ -62,6 +65,8 @@ public class PatchDurableHandler(
             throw new BusinessRuleException("Status is not a valid item status.");
         if (model.DurableKind is { } patchedKind && !Enum.IsDefined(patchedKind))
             throw new BusinessRuleException("DurableKind is not a valid value.");
+        if (model.AcquisitionKind is { } patchedAcquisitionKind && !Enum.IsDefined(patchedAcquisitionKind))
+            throw new BusinessRuleException("AcquisitionKind is not a valid value.");
 
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new BusinessRuleException("Name is required.");
@@ -73,6 +78,8 @@ public class PatchDurableHandler(
             throw new BusinessRuleException("Model must be 128 characters or fewer.");
         if (model.LentTo is { Length: > 256 })
             throw new BusinessRuleException("LentTo must be 256 characters or fewer.");
+        if (model.AcquiredFrom is { Length: > 256 })
+            throw new BusinessRuleException("AcquiredFrom must be 256 characters or fewer.");
         if (model.Compartment is { Length: > 256 })
             throw new BusinessRuleException("Compartment must be 256 characters or fewer.");
 
@@ -85,12 +92,19 @@ public class PatchDurableHandler(
         if (model.Value is < 0)
             throw new BusinessRuleException("Value must be zero or positive.");
         if (model.ValueCurrencyId is { } currencyId)
+            await CurrencyValidation.EnsureCurrencyAsync(db, currencyId, "ValueCurrencyId", ct);
+
+        // Acquisition cost and its currency are set together or not at all.
+        if (model.AcquisitionCost.HasValue != model.AcquisitionCostCurrencyId.HasValue)
+            throw new BusinessRuleException("AcquisitionCost and AcquisitionCostCurrencyId must be set together.");
+        if (model.AcquisitionCost is < 0)
+            throw new BusinessRuleException("AcquisitionCost must be zero or positive.");
+
+        // Same currency as the value pair ⇒ the lookup above already validated it.
+        if (model.AcquisitionCostCurrencyId is { } acquisitionCurrencyId
+            && acquisitionCurrencyId != model.ValueCurrencyId)
         {
-            var currency = await db.Commodities.FirstOrDefaultAsync(c => c.Id == currencyId, ct);
-            if (currency is null)
-                throw new BusinessRuleException("ValueCurrencyId must reference an existing commodity.");
-            if (currency.Kind != CommodityKind.Currency)
-                throw new BusinessRuleException("ValueCurrencyId must reference a currency commodity.");
+            await CurrencyValidation.EnsureCurrencyAsync(db, acquisitionCurrencyId, "AcquisitionCostCurrencyId", ct);
         }
 
         if (model.BrandId is { } brandId && brandId != item.BrandId)
@@ -213,6 +227,10 @@ public class PatchDurableHandler(
         item.BrandId = model.BrandId;
         item.Model = Normalize(model.Model);
         item.AcquiredOn = model.AcquiredOn;
+        item.AcquisitionKind = model.AcquisitionKind;
+        item.AcquisitionCost = model.AcquisitionCost;
+        item.AcquisitionCostCurrencyId = model.AcquisitionCostCurrencyId;
+        item.AcquiredFrom = Normalize(model.AcquiredFrom);
         item.Value = model.Value;
         item.ValueCurrencyId = model.ValueCurrencyId;
         item.Status = model.Status;

@@ -36,6 +36,28 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { openGeneration } from '@/shared/utils/open-generation';
+import { trimToNull } from '@/modules/finances/shared/trim-to-null';
+
+/** An amount + currency normalised both-or-neither: '' clears the pair; unparseable input → NaN. */
+function parseMoneyPair(raw: string, currencyId: string | null): { amount: number | null; currencyId: string | null } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { amount: null, currencyId: null };
+  const num = Number(trimmed);
+  return { amount: Number.isFinite(num) ? num : NaN, currencyId };
+}
+
+/** The three checks every money pair shares, worded per field ("Value" / "Purchase price"). */
+function moneyPairError(
+  pair: { amount: number | null; currencyId: string | null },
+  label: string,
+  phrase: string,
+): string | null {
+  if (pair.amount === null) return null;
+  if (Number.isNaN(pair.amount)) return `${label} must be a number.`;
+  if (pair.amount < 0) return `${label} must be zero or positive.`;
+  if (!pair.currencyId) return `Pick a currency for the ${phrase}.`;
+  return null;
+}
 
 @Component({
   selector: 'app-edit-durable-sheet',
@@ -199,6 +221,28 @@ import { openGeneration } from '@/shared/utils/open-generation';
               </div>
             }
 
+            <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acquisition</p>
+
+            <div class="space-y-2">
+              <label hlmLabel>How acquired</label>
+              <hlm-select
+                [ngModel]="editAcquisitionKind()"
+                (ngModelChange)="editAcquisitionKind.set($event)"
+                [itemToString]="acquisitionKindToString"
+              >
+                <hlm-select-trigger class="w-full" aria-label="How acquired">
+                  <hlm-select-value />
+                </hlm-select-trigger>
+                <hlm-select-content *hlmSelectPortal>
+                  <hlm-select-group>
+                    @for (k of acquisitionKinds; track k) {
+                      <hlm-select-item [value]="k">{{ acquisitionKindToString(k) }}</hlm-select-item>
+                    }
+                  </hlm-select-group>
+                </hlm-select-content>
+              </hlm-select>
+            </div>
+
             <div class="space-y-2">
               <label hlmLabel for="durable-acquired">Acquired on</label>
               <input
@@ -214,7 +258,49 @@ import { openGeneration } from '@/shared/utils/open-generation';
 
             <div class="grid grid-cols-2 gap-3">
               <div class="min-w-0 space-y-2">
-                <label hlmLabel for="durable-value">Value</label>
+                <label hlmLabel for="durable-acquisition-cost">Purchase price</label>
+                <input
+                  hlmInput
+                  id="durable-acquisition-cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="w-full"
+                  placeholder="0.00"
+                  [value]="editAcquisitionCost()"
+                  (input)="editAcquisitionCost.set(asNumberValue($event))"
+                />
+              </div>
+              <div class="min-w-0 space-y-2">
+                <label hlmLabel>Currency</label>
+                <app-currency-picker
+                  [value]="editAcquisitionCurrencyId()"
+                  (valueChange)="editAcquisitionCurrencyId.set($event)"
+                  (commodityChange)="pickedAcquisitionCurrency.set($event)"
+                  [selectedCommodity]="selectedAcquisitionCurrency()"
+                  [disabled]="!editAcquisitionCost().trim()"
+                  placeholder="Select currency"
+                  ariaLabel="Purchase price currency"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel for="durable-acquired-from">Acquired from</label>
+              <input
+                hlmInput
+                id="durable-acquired-from"
+                class="w-full"
+                maxlength="256"
+                placeholder="e.g. Home Depot, Mom"
+                [value]="editAcquiredFrom()"
+                (input)="editAcquiredFrom.set(asValue($event))"
+              />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="min-w-0 space-y-2">
+                <label hlmLabel for="durable-value">Estimated value</label>
                 <input
                   hlmInput
                   id="durable-value"
@@ -224,7 +310,7 @@ import { openGeneration } from '@/shared/utils/open-generation';
                   class="w-full"
                   placeholder="0.00"
                   [value]="editValue()"
-                  (input)="editValue.set(asValue($event))"
+                  (input)="editValue.set(asNumberValue($event))"
                 />
               </div>
               <div class="min-w-0 space-y-2">
@@ -276,6 +362,8 @@ export class EditDurableSheetComponent {
   closed = output<void>();
 
   protected readonly statuses = ALL_ITEM_STATUSES;
+  // '' is the "Not recorded" sentinel — hlm-select items can't carry null.
+  protected readonly acquisitionKinds = ['', 'Purchased', 'Gift', 'Inherited', 'Other'];
   protected readonly maxAcquiredDate = tomorrowIso();
 
   private openGen = openGeneration(this.state);
@@ -290,6 +378,16 @@ export class EditDurableSheetComponent {
   });
   editTags = seededLinkedSignal(this.seedKey, () => this.openDurable()?.tags?.map((t) => t.path) ?? []);
   editAcquiredOn = seededLinkedSignal(this.seedKey, () => this.openDurable()?.acquiredOn ?? '');
+  // '' is the "Not recorded" sentinel — hlm-select items can't carry null.
+  editAcquisitionKind = seededLinkedSignal<string, string>(
+    this.seedKey, () => this.openDurable()?.acquisitionKind ?? '');
+  editAcquisitionCost = seededLinkedSignal(this.seedKey, () => {
+    const c = this.openDurable()?.acquisitionCost;
+    return c != null ? String(c) : '';
+  });
+  editAcquisitionCurrencyId = seededLinkedSignal<string, string | null>(
+    this.seedKey, () => this.openDurable()?.acquisitionCostCurrencyId ?? null);
+  editAcquiredFrom = seededLinkedSignal(this.seedKey, () => this.openDurable()?.acquiredFrom ?? '');
 
   /** path → effective colour, feeding the tag-input so seeded chips render coloured before any search. */
   protected tagColorMap = computed(() => {
@@ -318,6 +416,7 @@ export class EditDurableSheetComponent {
   editLentTo = seededLinkedSignal(this.seedKey, () => this.openDurable()?.lentTo ?? '');
   editNotes = seededLinkedSignal(this.seedKey, () => this.openDurable()?.notes ?? '');
   pickedCurrency = seededLinkedSignal<string, CommodityResponse | null>(this.seedKey, () => null);
+  pickedAcquisitionCurrency = seededLinkedSignal<string, CommodityResponse | null>(this.seedKey, () => null);
   saving = seededLinkedSignal(this.seedKey, () => false);
 
   private durableApi = inject(InventoryDurableApiService);
@@ -332,6 +431,15 @@ export class EditDurableSheetComponent {
   );
 
   protected selectedCurrency = computed(() => this.pickedCurrency() ?? this.valueCurrency.value());
+
+  private acquisitionCurrency = commodityResource(
+    this.commodityApi,
+    () => this.durable()?.acquisitionCostCurrencyId,
+    () => this.state() === 'open',
+  );
+
+  protected selectedAcquisitionCurrency = computed(
+    () => this.pickedAcquisitionCurrency() ?? this.acquisitionCurrency.value());
 
   private openDurable(): DurableResponse | null {
     return this.state() === 'open' ? this.durable() : null;
@@ -391,19 +499,18 @@ export class EditDurableSheetComponent {
   }
 
   /** Value/currency normalised as a both-or-neither pair. */
-  private normalizedValue = computed<{ value: number | null; currencyId: string | null }>(() => {
-    const raw = this.editValue().trim();
-    if (raw === '') return { value: null, currencyId: null };
-    const num = Number(raw);
-    return { value: Number.isFinite(num) ? num : NaN, currencyId: this.editCurrencyId() };
-  });
+  private normalizedValue = computed(() => parseMoneyPair(this.editValue(), this.editCurrencyId()));
+
+  /** Purchase price/currency normalised as a both-or-neither pair, mirroring the value pair. */
+  private normalizedAcquisitionCost = computed(() =>
+    parseMoneyPair(this.editAcquisitionCost(), this.editAcquisitionCurrencyId()));
 
   validationError = computed<string | null>(() => {
     if (!this.editName().trim()) return 'Name is required.';
-    const nv = this.normalizedValue();
-    if (nv.value !== null && Number.isNaN(nv.value)) return 'Value must be a number.';
-    if (nv.value !== null && nv.value < 0) return 'Value must be zero or positive.';
-    if (nv.value !== null && !nv.currencyId) return 'Pick a currency for the value.';
+    const valueError = moneyPairError(this.normalizedValue(), 'Value', 'value');
+    if (valueError) return valueError;
+    const costError = moneyPairError(this.normalizedAcquisitionCost(), 'Purchase price', 'purchase price');
+    if (costError) return costError;
     if (this.editStatus() === 'Lent' && !this.editLentTo().trim()) return 'Lent to is required when the status is Lent.';
     return null;
   });
@@ -417,8 +524,20 @@ export class EditDurableSheetComponent {
   durableKindToString = (kind: DurableKind): string =>
     kind === 'Plain' ? 'Plain item' : kind;
 
+  acquisitionKindToString = (kind: string): string => (kind === '' ? 'Not recorded' : kind);
+
   asValue(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
+  }
+
+  /**
+   * For number inputs: the browser reports unparseable typing (badInput) as value '', which is
+   * indistinguishable from a deliberately cleared field and would silently wipe a stored
+   * amount+currency pair on save. Surface it as 'NaN' so validation blocks the save instead.
+   */
+  asNumberValue(event: Event): string {
+    const el = event.target as HTMLInputElement;
+    return el.validity?.badInput ? 'NaN' : el.value;
   }
 
   private buildOps(): JsonPatchDocument {
@@ -429,10 +548,10 @@ export class EditDurableSheetComponent {
     const name = this.editName().trim();
     if (name !== it.name) ops.push(replace('/name', name));
 
-    const serial = this.editSerial().trim() ? this.editSerial().trim() : null;
+    const serial = trimToNull(this.editSerial());
     if (serial !== (it.serial ?? null)) ops.push(replace('/serial', serial));
 
-    const model = this.editModel().trim() ? this.editModel().trim() : null;
+    const model = trimToNull(this.editModel());
     if (model !== (it.model ?? null)) ops.push(replace('/model', model));
 
     const brandId = this.editBrand()?.id ?? null;
@@ -449,11 +568,24 @@ export class EditDurableSheetComponent {
     const acquired = this.editAcquiredOn() ? this.editAcquiredOn() : null;
     if (acquired !== (it.acquiredOn ?? null)) ops.push(replace('/acquiredOn', acquired));
 
-    const notes = this.editNotes().trim() ? this.editNotes().trim() : null;
+    const acquisitionKind = this.editAcquisitionKind() || null;
+    if (acquisitionKind !== (it.acquisitionKind ?? null)) ops.push(replace('/acquisitionKind', acquisitionKind));
+
+    const acquiredFrom = trimToNull(this.editAcquiredFrom());
+    if (acquiredFrom !== (it.acquiredFrom ?? null)) ops.push(replace('/acquiredFrom', acquiredFrom));
+
+    // Purchase price + currency move as a pair so the server's both-or-neither rule never trips.
+    const { amount: cost, currencyId: acquisitionCurrencyId } = this.normalizedAcquisitionCost();
+    if (cost !== (it.acquisitionCost ?? null) || acquisitionCurrencyId !== (it.acquisitionCostCurrencyId ?? null)) {
+      ops.push(replace('/acquisitionCost', cost));
+      ops.push(replace('/acquisitionCostCurrencyId', acquisitionCurrencyId));
+    }
+
+    const notes = trimToNull(this.editNotes());
     if (notes !== (it.notes ?? null)) ops.push(replace('/notes', notes));
 
     // Value + currency move as a pair so the server's both-or-neither rule never trips.
-    const { value, currencyId } = this.normalizedValue();
+    const { amount: value, currencyId } = this.normalizedValue();
     const v0 = it.value ?? null;
     const c0 = it.valueCurrencyId ?? null;
     if (value !== v0 || currencyId !== c0) {
@@ -484,7 +616,7 @@ export class EditDurableSheetComponent {
 
     // Compartment only travels while in a container; the server auto-clears it on unplace.
     if (parentItemId !== null) {
-      const compartment = this.editCompartment().trim() ? this.editCompartment().trim() : null;
+      const compartment = trimToNull(this.editCompartment());
       if (compartment !== (it.compartment ?? null)) ops.push(replace('/compartment', compartment));
     }
 

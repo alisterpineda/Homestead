@@ -17,7 +17,8 @@ public class ReceiveStockHandler(
         var body = request.Body;
         await stock.ReceiveAsync(request.ConsumableId, new StockReceiveRequest(
             new StockLocation(body.AreaId, body.ContainerItemId),
-            body.Quantity, body.UnitCost, body.UnitCostCurrencyId, body.OccurredAt, body.Note), ct);
+            body.Quantity, body.UnitCost, body.UnitCostCurrencyId, body.OccurredAt, body.Note,
+            body.Source), ct);
 
         await unitOfWork.SaveChangesAsync(ct);
 

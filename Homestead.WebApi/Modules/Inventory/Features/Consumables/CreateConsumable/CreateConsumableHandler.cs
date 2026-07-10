@@ -63,7 +63,7 @@ public class CreateConsumableHandler(
             var to = new StockLocation(request.InitialAreaId, request.InitialContainerItemId);
             await stock.ReceiveAsync(item.Id,
                 new StockReceiveRequest(to, qty, UnitCost: null, UnitCostCurrencyId: null,
-                    OccurredAt: null, Note: null), ct);
+                    OccurredAt: null, Note: null, Source: null), ct);
             await unitOfWork.SaveChangesAsync(ct);
         }
 

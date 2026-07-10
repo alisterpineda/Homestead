@@ -17,7 +17,9 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         + "\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL "
         + "AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL "
         + "AND \"Model\" IS NULL "
-        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL)";
+        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL "
+        + "AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL "
+        + "AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)";
 
     // A non-fungible row carries none of the fungible columns and always names a durable kind.
     private const string FungibleFieldsSql =
@@ -28,6 +30,11 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
     private const string ValueCurrencyPairSql =
         "(\"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL) OR "
         + "(\"Value\" IS NOT NULL AND \"ValueCurrencyId\" IS NOT NULL)";
+
+    // Acquisition cost and its currency are set together or not at all.
+    private const string AcquisitionCostCurrencyPairSql =
+        "(\"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL) OR "
+        + "(\"AcquisitionCost\" IS NOT NULL AND \"AcquisitionCostCurrencyId\" IS NOT NULL)";
 
     // LentTo is only meaningful while the item is Lent.
     private const string LentToRequiresLentSql =
@@ -45,6 +52,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             table.HasCheckConstraint("CK_items_nonfungible_fields", NonFungibleFieldsSql);
             table.HasCheckConstraint("CK_items_fungible_fields", FungibleFieldsSql);
             table.HasCheckConstraint("CK_items_value_currency_pair", ValueCurrencyPairSql);
+            table.HasCheckConstraint("CK_items_acquisition_cost_currency_pair", AcquisitionCostCurrencyPairSql);
             table.HasCheckConstraint("CK_items_lent_to_requires_lent", LentToRequiresLentSql);
             table.HasCheckConstraint("CK_items_fungible_status", FungibleStatusSql);
         });
@@ -69,12 +77,18 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.Serial).HasMaxLength(128);
         builder.Property(i => i.Model).HasMaxLength(128);
         builder.Property(i => i.LentTo).HasMaxLength(256);
+        builder.Property(i => i.AcquiredFrom).HasMaxLength(256);
         builder.Property(i => i.Unit).HasMaxLength(32);
 
         builder.Property(i => i.Value).HasColumnType("numeric");
+        builder.Property(i => i.AcquisitionCost).HasColumnType("numeric");
         builder.Property(i => i.RestockThreshold).HasColumnType("numeric");
 
         builder.Property(i => i.DurableKind)
+            .HasConversion<string>()
+            .HasMaxLength(16);
+
+        builder.Property(i => i.AcquisitionKind)
             .HasConversion<string>()
             .HasMaxLength(16);
 
@@ -101,6 +115,11 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.HasOne(i => i.ValueCurrency)
             .WithMany()
             .HasForeignKey(i => i.ValueCurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(i => i.AcquisitionCostCurrency)
+            .WithMany()
+            .HasForeignKey(i => i.AcquisitionCostCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // A brand in use can't be deleted — mirrors the ValueCurrency FK.

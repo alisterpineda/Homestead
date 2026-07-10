@@ -68,6 +68,20 @@ public class Item
 
     public DateOnly? AcquiredOn { get; set; }
 
+    /// <summary>How the item entered the household; null = not recorded. Durable-only.</summary>
+    public AcquisitionKind? AcquisitionKind { get; set; }
+
+    /// <summary>
+    /// What was actually paid — a historical fact, distinct from the estimated current
+    /// <see cref="Value"/>. Paired both-or-neither with <see cref="AcquisitionCostCurrencyId"/>.
+    /// </summary>
+    public decimal? AcquisitionCost { get; set; }
+    public Guid? AcquisitionCostCurrencyId { get; set; }
+    public Commodity? AcquisitionCostCurrency { get; set; }
+
+    /// <summary>Free-text source — a store or a person ("Home Depot", "Mom"); <see cref="LentTo"/> precedent, no vendor entity.</summary>
+    public string? AcquiredFrom { get; set; }
+
     /// <summary>Free-text "lent to whom"; set only when <see cref="Status"/> is <see cref="ItemStatus.Lent"/>.</summary>
     public string? LentTo { get; set; }
 

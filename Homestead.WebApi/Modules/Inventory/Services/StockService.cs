@@ -25,6 +25,9 @@ public class StockService(
     // than letting them reach the INSERT and surface as a raw database-length 500.
     private const int NoteMaxLength = 1000;
 
+    // Matches the StockMovement.Source column length; same clean-400 rationale as NoteMaxLength.
+    private const int SourceMaxLength = 256;
+
     // Track-one's whole-number rule, rejected in two places (ConvertOutAsync's advisory pre-check and
     // ApplyDeltaAsync's race-path guard); kept as one string so the two can't drift apart.
     private const string WholeNumberRequiredMessage =
@@ -41,7 +44,8 @@ public class StockService(
         await ApplyDeltaAsync(itemId, request.To, request.Quantity, ct);
 
         AppendMovement(item, MovementKind.Flow, from: null, to: request.To, request.Quantity,
-            request.UnitCost, request.UnitCostCurrencyId, occurredAt, relatedItemId: null, request.Note);
+            request.UnitCost, request.UnitCostCurrencyId, occurredAt, relatedItemId: null, request.Note,
+            request.Source);
     }
 
     public async Task ConsumeAsync(Guid itemId, StockConsumeRequest request, CancellationToken ct)
@@ -54,7 +58,8 @@ public class StockService(
         await ApplyDeltaAsync(itemId, request.From, -request.Quantity, ct);
 
         AppendMovement(item, MovementKind.Flow, from: request.From, to: null, request.Quantity,
-            unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId: null, request.Note);
+            unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId: null, request.Note,
+            source: null);
     }
 
     public async Task TransferAsync(Guid itemId, StockTransferRequest request, CancellationToken ct)
@@ -72,7 +77,8 @@ public class StockService(
         await ApplyDeltaAsync(itemId, request.To, request.Quantity, ct);
 
         AppendMovement(item, MovementKind.Flow, from: request.From, to: request.To, request.Quantity,
-            unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId: null, request.Note);
+            unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId: null, request.Note,
+            source: null);
     }
 
     public async Task AdjustAsync(Guid itemId, StockAdjustRequest request, CancellationToken ct)
@@ -152,7 +158,7 @@ public class StockService(
             from: delta < 0 ? request.Location : null,
             to: delta > 0 ? request.Location : null,
             Math.Abs(delta), unitCost: null, unitCostCurrencyId: null, occurredAt,
-            relatedItemId: null, request.Note);
+            relatedItemId: null, request.Note, source: null);
 
     public async Task ConvertOutAsync(Guid itemId, StockConvertOutRequest request, CancellationToken ct)
     {
@@ -173,7 +179,7 @@ public class StockService(
 
         AppendMovement(item, MovementKind.Conversion, from: request.From, to: null, 1m,
             unitCost: null, unitCostCurrencyId: null, occurredAt,
-            relatedItemId: request.RelatedItemId, request.Note);
+            relatedItemId: request.RelatedItemId, request.Note, source: null);
     }
 
     public async Task ConvertInAsync(Guid itemId, StockConvertInRequest request, CancellationToken ct)
@@ -191,7 +197,8 @@ public class StockService(
         foreach (var relatedItemId in request.RelatedItemIds)
         {
             AppendMovement(item, MovementKind.Conversion, from: null, to: request.To, 1m,
-                unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId, request.Note);
+                unitCost: null, unitCostCurrencyId: null, occurredAt, relatedItemId, request.Note,
+                source: null);
         }
     }
 
@@ -281,11 +288,15 @@ public class StockService(
     private void AppendMovement(
         Item item, MovementKind kind, StockLocation? from, StockLocation? to, decimal quantity,
         decimal? unitCost, Guid? unitCostCurrencyId, DateTimeOffset occurredAt, Guid? relatedItemId,
-        string? note)
+        string? note, string? source)
     {
         var trimmedNote = Normalize(note);
         if (trimmedNote is { Length: > NoteMaxLength })
             throw new BusinessRuleException($"Note must be {NoteMaxLength} characters or fewer.");
+
+        var trimmedSource = Normalize(source);
+        if (trimmedSource is { Length: > SourceMaxLength })
+            throw new BusinessRuleException($"Source must be {SourceMaxLength} characters or fewer.");
 
         db.StockMovements.Add(new StockMovement
         {
@@ -303,6 +314,7 @@ public class StockService(
             CreatedByUserId = currentUser.UserId,
             RelatedItemId = relatedItemId,
             Note = trimmedNote,
+            Source = trimmedSource,
             CreatedAt = DateTimeOffset.UtcNow,
         });
     }
@@ -404,13 +416,7 @@ public class StockService(
         if (unitCost is < 0m)
             throw new BusinessRuleException("UnitCost must be zero or positive.");
         if (currencyId is { } id)
-        {
-            var currency = await db.Commodities.FirstOrDefaultAsync(c => c.Id == id, ct);
-            if (currency is null)
-                throw new BusinessRuleException("UnitCostCurrencyId must reference an existing commodity.");
-            if (currency.Kind != CommodityKind.Currency)
-                throw new BusinessRuleException("UnitCostCurrencyId must reference a currency commodity.");
-        }
+            await CurrencyValidation.EnsureCurrencyAsync(db, id, "UnitCostCurrencyId", ct);
     }
 
     private static void RequirePositive(decimal quantity)

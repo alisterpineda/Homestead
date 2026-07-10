@@ -53,6 +53,9 @@ public class StockMovement
 
     public string? Note { get; set; }
 
+    /// <summary>Where the stock came from ("Costco"); free text, written only by a receive.</summary>
+    public string? Source { get; set; }
+
     /// <summary>When the row was recorded (UTC); distinct from <see cref="OccurredAt"/>.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 }

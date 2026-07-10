@@ -37,6 +37,8 @@ public class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement
 
         builder.Property(m => m.Note).HasMaxLength(1000);
 
+        builder.Property(m => m.Source).HasMaxLength(256);
+
         builder.Property(m => m.OccurredAt).IsRequired();
 
         builder.Property(m => m.CreatedAt)

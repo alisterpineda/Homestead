@@ -7,6 +7,7 @@ export interface ReceiveStockRequest {
   note?: (string | null);
   occurredAt?: (string | null);
   quantity: number;
+  source?: (string | null);
   unitCost?: (number | null);
   unitCostCurrencyId?: (string | null);
 }

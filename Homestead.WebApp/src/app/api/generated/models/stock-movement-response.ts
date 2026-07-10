@@ -16,6 +16,7 @@ export interface StockMovementResponse {
   quantity: number;
   relatedItemId?: (string | null);
   relatedItemName?: (string | null);
+  source?: (string | null);
   toAreaId?: (string | null);
   toContainerItemId?: (string | null);
   toLabel?: (string | null);

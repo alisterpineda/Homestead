@@ -12,6 +12,9 @@ public record ReceiveStockRequest
     public Guid? UnitCostCurrencyId { get; init; }
     public DateTimeOffset? OccurredAt { get; init; }
     public string? Note { get; init; }
+
+    /// <summary>Where the stock came from ("Costco"); free text, receive-only.</summary>
+    public string? Source { get; init; }
 }
 
 public record ReceiveStockCommand : ICommand<ConsumableDetailResponse>

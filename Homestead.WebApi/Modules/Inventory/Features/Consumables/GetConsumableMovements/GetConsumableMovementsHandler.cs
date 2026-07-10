@@ -41,6 +41,7 @@ public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolve
                 CreatedByUserId = m.CreatedByUserId,
                 CreatedByDisplayName = m.CreatedByUser != null ? m.CreatedByUser.DisplayName : null,
                 Note = m.Note,
+                Source = m.Source,
                 CreatedAt = m.CreatedAt,
             })
             .ToPaginatedAsync(request, ct);
@@ -77,6 +78,7 @@ public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolve
             CreatedByUserId = m.CreatedByUserId,
             CreatedByDisplayName = m.CreatedByDisplayName,
             Note = m.Note,
+            Source = m.Source,
             CreatedAt = m.CreatedAt,
         }).ToList();
 
@@ -107,6 +109,7 @@ public class GetConsumableMovementsHandler(AppDbContext db, IItemLocationResolve
         public Guid? CreatedByUserId { get; init; }
         public string? CreatedByDisplayName { get; init; }
         public string? Note { get; init; }
+        public string? Source { get; init; }
         public required DateTimeOffset CreatedAt { get; init; }
     }
 }

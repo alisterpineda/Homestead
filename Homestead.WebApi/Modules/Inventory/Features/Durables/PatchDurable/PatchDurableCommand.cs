@@ -18,6 +18,10 @@ public class PatchDurableModel
     public Guid? BrandId { get; set; }
     public string? Model { get; set; }
     public DateOnly? AcquiredOn { get; set; }
+    public AcquisitionKind? AcquisitionKind { get; set; }
+    public decimal? AcquisitionCost { get; set; }
+    public Guid? AcquisitionCostCurrencyId { get; set; }
+    public string? AcquiredFrom { get; set; }
     public decimal? Value { get; set; }
     public Guid? ValueCurrencyId { get; set; }
     public ItemStatus Status { get; set; }

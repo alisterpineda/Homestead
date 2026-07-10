@@ -267,8 +267,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                             <ng-icon hlm name="lucideMinus" size="xs" class="text-muted-foreground" />
                           }
                         </span>
-                        @if (m.note) {
-                          <span class="block truncate text-xs text-muted-foreground">{{ m.note }}</span>
+                        @if (movementMeta(m); as meta) {
+                          <!-- title: the row truncates, and this line is the only surface showing a
+                               movement's source — hover must still reveal the full text. -->
+                          <span class="block truncate text-xs text-muted-foreground" [title]="meta">{{ meta }}</span>
                         }
                       </td>
                       <td hlmTd>
@@ -635,6 +637,12 @@ export class ConsumableDetailPageComponent {
 
   protected occurred(m: StockMovementResponse): string {
     return formatDate(m.occurredAt, 'mediumDate', this.locale);
+  }
+
+  /** The row's meta line: the note, plus a `from {source}` token when a receive recorded one. */
+  protected movementMeta(m: StockMovementResponse): string | null {
+    const parts = [m.note, m.source ? `from ${m.source}` : null].filter(Boolean);
+    return parts.length ? parts.join(' · ') : null;
   }
 
   // A human action label derived from kind + structural direction (the ledger still stores only the

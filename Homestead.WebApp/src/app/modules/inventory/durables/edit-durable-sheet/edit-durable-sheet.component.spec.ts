@@ -225,6 +225,71 @@ describe('EditDurableSheetComponent', () => {
     });
   });
 
+  describe('acquisition fields', () => {
+    it('seeds the acquisition fields from the item on open', () => {
+      open(makeItem({
+        acquisitionKind: 'Purchased', acquisitionCost: 189, acquisitionCostCurrencyId: 'cad',
+        acquiredFrom: 'Home Depot',
+      }));
+
+      expect(component.editAcquisitionKind()).toBe('Purchased');
+      expect(component.editAcquisitionCost()).toBe('189');
+      expect(component.editAcquisitionCurrencyId()).toBe('cad');
+      expect(component.editAcquiredFrom()).toBe('Home Depot');
+    });
+
+    it('seeds unset acquisition fields to their empty defaults', () => {
+      open(makeItem());
+      expect(component.editAcquisitionKind()).toBe('');
+      expect(component.editAcquisitionCost()).toBe('');
+      expect(component.editAcquisitionCurrencyId()).toBeNull();
+      expect(component.editAcquiredFrom()).toBe('');
+    });
+
+    it('emits an /acquisitionKind op when a kind is picked', () => {
+      open(makeItem());
+      component.editAcquisitionKind.set('Gift');
+      expect(ops()).toEqual([{ op: 'replace', path: '/acquisitionKind', value: 'Gift' }]);
+    });
+
+    it('clears the kind by emitting /acquisitionKind:null', () => {
+      open(makeItem({ acquisitionKind: 'Purchased' }));
+      component.editAcquisitionKind.set('');
+      expect(ops()).toEqual([{ op: 'replace', path: '/acquisitionKind', value: null }]);
+    });
+
+    it('emits an /acquiredFrom op (trimmed) when the source changes', () => {
+      open(makeItem());
+      component.editAcquiredFrom.set('  Home Depot  ');
+      expect(ops()).toEqual([{ op: 'replace', path: '/acquiredFrom', value: 'Home Depot' }]);
+    });
+
+    it('sends purchase price and currency together as a pair', () => {
+      open(makeItem({ acquisitionCost: 100, acquisitionCostCurrencyId: 'cad' }));
+      component.editAcquisitionCost.set('250');
+      expect(ops()).toEqual([
+        { op: 'replace', path: '/acquisitionCost', value: 250 },
+        { op: 'replace', path: '/acquisitionCostCurrencyId', value: 'cad' },
+      ]);
+    });
+
+    it('clears purchase price and currency together when the price is emptied', () => {
+      open(makeItem({ acquisitionCost: 100, acquisitionCostCurrencyId: 'cad' }));
+      component.editAcquisitionCost.set('');
+      expect(ops()).toEqual([
+        { op: 'replace', path: '/acquisitionCost', value: null },
+        { op: 'replace', path: '/acquisitionCostCurrencyId', value: null },
+      ]);
+    });
+
+    it('rejects a price without a currency', () => {
+      open(makeItem());
+      component.editAcquisitionCost.set('50');
+      expect(component.validationError()).toBe('Pick a currency for the purchase price.');
+      expect(component.canSave()).toBe(false);
+    });
+  });
+
   describe('LentTo behaviour', () => {
     it('requires LentTo when status is Lent', () => {
       open(makeItem({ status: 'Active' }));

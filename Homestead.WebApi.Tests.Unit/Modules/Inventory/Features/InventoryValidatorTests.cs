@@ -108,6 +108,50 @@ public class CreateDurableCommandValidatorTests
     }
 
     [Fact]
+    public async Task NegativeAcquisitionCost_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateDurableCommand { Name = "Drill", AcquisitionCost = -1m, AcquisitionCostCurrencyId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AcquisitionCost");
+    }
+
+    [Fact]
+    public async Task AcquisitionCostWithoutCurrency_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AcquisitionCostCurrencyId");
+    }
+
+    [Fact]
+    public async Task AcquisitionCurrencyWithoutCost_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateDurableCommand { Name = "Drill", AcquisitionCostCurrencyId = Guid.NewGuid() }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AcquisitionCost");
+    }
+
+    [Fact]
+    public async Task AcquisitionCostWithCurrency_IsValid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateDurableCommand { Name = "Drill", AcquisitionCost = 189m, AcquisitionCostCurrencyId = Guid.NewGuid() }, Ct);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task AcquiredFromOver256_IsInvalid()
+    {
+        var result = await _sut.ValidateAsync(
+            new CreateDurableCommand { Name = "Drill", AcquiredFrom = new string('a', 257) }, Ct);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AcquiredFrom");
+    }
+
+    [Fact]
     public async Task AreaAndParentBothSet_IsInvalid()
     {
         var result = await _sut.ValidateAsync(

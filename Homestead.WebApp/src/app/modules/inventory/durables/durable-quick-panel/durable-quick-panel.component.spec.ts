@@ -305,6 +305,43 @@ describe('DurableQuickPanelComponent', () => {
       await open(makeItem({ id: 'd-notes', notes: 'Keep dry' }));
       expect(component['hasDetails']()).toBe(true);
     });
+
+    it('is true when only an acquisition field is present', async () => {
+      await open(makeItem({ id: 'd-kind', acquisitionKind: 'Gift' }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-cost', acquisitionCost: 189, acquisitionCostCurrencyId: 'cad' }));
+      expect(component['hasDetails']()).toBe(true);
+
+      await open(makeItem({ id: 'd-from', acquiredFrom: 'Home Depot' }));
+      expect(component['hasDetails']()).toBe(true);
+    });
+  });
+
+  describe('acquisition line', () => {
+    it('composes the Acquired parts in order (kind · date · cost · from)', async () => {
+      await open(makeItem({
+        acquisitionKind: 'Purchased',
+        acquiredOn: '2024-06-12',
+        acquisitionCost: 189,
+        acquisitionCostCurrencySymbol: 'CAD',
+        acquiredFrom: 'Home Depot',
+      }));
+
+      expect(component['acquisitionLine']()).toBe('Purchased · Jun 12, 2024 · 189 CAD · from Home Depot');
+      expect((fixture.nativeElement as HTMLElement).ownerDocument.body.textContent)
+        .toContain('Purchased · Jun 12, 2024 · 189 CAD · from Home Depot');
+    });
+
+    it('renders a date-only line when only acquiredOn is set', async () => {
+      await open(makeItem({ acquiredOn: '2024-06-12' }));
+      expect(component['acquisitionLine']()).toBe('Jun 12, 2024');
+    });
+
+    it('is null when nothing about the acquisition is recorded', async () => {
+      await open(makeItem());
+      expect(component['acquisitionLine']()).toBeNull();
+    });
   });
 
   describe('outputs', () => {

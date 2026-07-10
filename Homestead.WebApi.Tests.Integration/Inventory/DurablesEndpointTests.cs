@@ -1,4 +1,8 @@
+using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Homestead.WebApi.Tests.Integration.Inventory;
 
@@ -31,6 +35,39 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         var area = await resp.Content.ReadFromJsonAsync<AreaItem>(CT);
         return area!.Id;
+    }
+
+    private async Task<Guid> GetCurrencyIdAsync()
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Commodities
+            .Where(c => c.Kind == CommodityKind.Currency)
+            .Select(c => c.Id)
+            .FirstAsync(CT);
+    }
+
+    [Fact]
+    public async Task CreateDurable_WithAcquisitionCluster_RoundTrips()
+    {
+        var client = await CreateAdminClientAsync();
+        var currencyId = await GetCurrencyIdAsync();
+
+        var created = await CreateDurableAsync(client, new
+        {
+            name = "Cordless drill",
+            acquisitionKind = "Purchased",
+            acquisitionCost = 189m,
+            acquisitionCostCurrencyId = currencyId,
+            acquiredFrom = "Home Depot",
+        });
+
+        var fetched = await GetDurableAsync(client, created.Id);
+        Assert.Equal("Purchased", fetched.AcquisitionKind);
+        Assert.Equal(189m, fetched.AcquisitionCost);
+        Assert.Equal(currencyId, fetched.AcquisitionCostCurrencyId);
+        Assert.NotNull(fetched.AcquisitionCostCurrencySymbol);
+        Assert.Equal("Home Depot", fetched.AcquiredFrom);
     }
 
     [Fact]

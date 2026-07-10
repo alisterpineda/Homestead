@@ -19,7 +19,11 @@ internal record DurableItem(
     IReadOnlyList<LocationSegmentItem>? Path,
     // Whole classification-tag set on the item, each badge carrying its resolved effective colour.
     // Trailing + defaulted: an absent `tags` in JSON falls back to null, so tag-agnostic tests bind unchanged.
-    IReadOnlyList<ItemTagRef>? Tags = null);
+    IReadOnlyList<ItemTagRef>? Tags = null,
+    // Acquisition cluster — trailing + defaulted for the same reason.
+    string? AcquisitionKind = null, decimal? AcquisitionCost = null,
+    Guid? AcquisitionCostCurrencyId = null, string? AcquisitionCostCurrencySymbol = null,
+    string? AcquiredFrom = null);
 // Enum serializes as a string server-side, so Kind is "Area" | "Container".
 internal record LocationSegmentItem(Guid Id, string Name, string Kind);
 // Read-only tag badge shared by the durable/consumable item projections.

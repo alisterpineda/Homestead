@@ -1,7 +1,6 @@
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
-using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Inventory;
 using Homestead.WebApi.Modules.Inventory.Services;
 using Homestead.WebApi.Persistence;
@@ -49,12 +48,17 @@ public class CreateDurableHandler(
             throw new BusinessRuleException("Value and ValueCurrencyId must be set together.");
 
         if (request.ValueCurrencyId is { } currencyId)
+            await CurrencyValidation.EnsureCurrencyAsync(db, currencyId, "ValueCurrencyId", ct);
+
+        // Acquisition cost and its currency are set together or not at all.
+        if (request.AcquisitionCost.HasValue != request.AcquisitionCostCurrencyId.HasValue)
+            throw new BusinessRuleException("AcquisitionCost and AcquisitionCostCurrencyId must be set together.");
+
+        // Same currency as the value pair ⇒ the lookup above already validated it.
+        if (request.AcquisitionCostCurrencyId is { } acquisitionCurrencyId
+            && acquisitionCurrencyId != request.ValueCurrencyId)
         {
-            var currency = await db.Commodities.FirstOrDefaultAsync(c => c.Id == currencyId, ct);
-            if (currency is null)
-                throw new BusinessRuleException("ValueCurrencyId must reference an existing commodity.");
-            if (currency.Kind != CommodityKind.Currency)
-                throw new BusinessRuleException("ValueCurrencyId must reference a currency commodity.");
+            await CurrencyValidation.EnsureCurrencyAsync(db, acquisitionCurrencyId, "AcquisitionCostCurrencyId", ct);
         }
 
         if (request.BrandId is { } brandId)
@@ -76,6 +80,10 @@ public class CreateDurableHandler(
             BrandId = request.BrandId,
             Model = Normalize(request.Model),
             AcquiredOn = request.AcquiredOn,
+            AcquisitionKind = request.AcquisitionKind,
+            AcquisitionCost = request.AcquisitionCost,
+            AcquisitionCostCurrencyId = request.AcquisitionCostCurrencyId,
+            AcquiredFrom = Normalize(request.AcquiredFrom),
             Value = request.Value,
             ValueCurrencyId = request.ValueCurrencyId,
             AreaId = request.AreaId,

@@ -35,5 +35,8 @@ public record StockMovementResponse
 
     public string? Note { get; init; }
 
+    /// <summary>Where the stock came from ("Costco"); free text, written only by a receive.</summary>
+    public string? Source { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 }
