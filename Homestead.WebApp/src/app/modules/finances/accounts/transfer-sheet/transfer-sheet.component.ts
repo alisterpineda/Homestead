@@ -12,6 +12,8 @@ import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -19,7 +21,7 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
-import { todayIso, tomorrowIso, toDateOnly } from '../../shared/date';
+import { todayIso, tomorrowDate, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityResource } from '../../shared/commodity-resource';
 import { AccountPickerComponent } from '../../shared/account-picker/account-picker.component';
@@ -34,7 +36,7 @@ export type TransferDirection = 'outgoing' | 'incoming';
 @Component({
   selector: 'app-transfer-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, AccountPickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, AccountPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -131,15 +133,15 @@ export type TransferDirection = 'outgoing' | 'incoming';
 
             <div class="space-y-2">
               <label hlmLabel for="transfer-date">Date</label>
-              <input
-                hlmInput
-                id="transfer-date"
+              <hlm-date-picker
                 class="w-full"
-                type="date"
+                captionLayout="dropdown"
+                [date]="datePicker.date()"
                 [max]="maxDate"
-                [value]="date()"
-                (input)="date.set(asValue($event))"
-              />
+                (dateChange)="datePicker.set($event)"
+              >
+                <hlm-date-picker-input inputId="transfer-date" placeholder="Select date" />
+              </hlm-date-picker>
             </div>
 
             <div class="space-y-2">
@@ -275,7 +277,9 @@ export class TransferSheetComponent {
     () => this.state() === 'open',
   );
 
-  readonly maxDate = tomorrowIso();
+  readonly maxDate = tomorrowDate();
+
+  protected readonly datePicker = isoDateBinding(this.date);
 
   isCrossCurrency = computed(() => {
     const a = this.anchorCurrency.value();

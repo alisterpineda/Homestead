@@ -10,13 +10,15 @@ import { HlmSheetImports } from '@/shared/components/spartan/sheet';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
-import { todayIso, tomorrowIso } from '../../shared/date';
+import { todayIso, tomorrowDate } from '../../shared/date';
 import { commodityStep } from '../../shared/format-currency';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityResource } from '../../shared/commodity-resource';
@@ -29,7 +31,7 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
 @Component({
   selector: 'app-opening-balance-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -97,15 +99,15 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
 
             <div class="space-y-2">
               <label hlmLabel for="opening-balance-date">As-of date</label>
-              <input
-                hlmInput
-                id="opening-balance-date"
+              <hlm-date-picker
                 class="w-full"
-                type="date"
+                captionLayout="dropdown"
+                [date]="asOfDatePicker.date()"
                 [max]="maxDate"
-                [value]="asOfDate()"
-                (input)="asOfDate.set(asValue($event))"
-              />
+                (dateChange)="asOfDatePicker.set($event)"
+              >
+                <hlm-date-picker-input inputId="opening-balance-date" placeholder="Select date" />
+              </hlm-date-picker>
             </div>
 
             <div class="space-y-2">
@@ -208,7 +210,9 @@ export class OpeningBalanceSheetComponent {
     () => this.state() === 'open',
   );
 
-  readonly maxDate = tomorrowIso();
+  readonly maxDate = tomorrowDate();
+
+  protected readonly asOfDatePicker = isoDateBinding(this.asOfDate);
 
   commodityLabel = computed(() => {
     const c = this.commodity.value();

@@ -14,6 +14,8 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinanceSettingsService } from '../../shared/finance-settings.service';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
@@ -22,7 +24,7 @@ import type { UserAccountKind } from '../../shared/account-kind-meta';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import { toast } from '@spartan-ng/brain/sonner';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
-import { todayIso, tomorrowIso } from '../../shared/date';
+import { todayIso, tomorrowDate } from '../../shared/date';
 
 @Component({
   selector: 'app-create-account-dialog',
@@ -32,6 +34,8 @@ import { todayIso, tomorrowIso } from '../../shared/date';
     HlmButton,
     HlmInput,
     HlmLabel,
+    HlmDatePicker,
+    HlmDatePickerInput,
     CurrencyPickerComponent,
     KindPickerComponent,
   ],
@@ -114,14 +118,15 @@ import { todayIso, tomorrowIso } from '../../shared/date';
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label hlmLabel for="create-account-as-of">As-of date</label>
-                  <input
-                    hlmInput
-                    id="create-account-as-of"
-                    type="date"
+                  <hlm-date-picker
+                    class="w-full"
+                    captionLayout="dropdown"
+                    [date]="initialAsOfDatePicker.date()"
                     [max]="maxAsOfDate"
-                    [value]="initialAsOfDate()"
-                    (input)="initialAsOfDate.set(asValue($event))"
-                  />
+                    (dateChange)="initialAsOfDatePicker.set($event)"
+                  >
+                    <hlm-date-picker-input inputId="create-account-as-of" placeholder="Select date" />
+                  </hlm-date-picker>
                 </div>
               </div>
             </fieldset>
@@ -162,7 +167,9 @@ export class CreateAccountDialogComponent {
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
 
-  readonly maxAsOfDate = tomorrowIso();
+  readonly maxAsOfDate = tomorrowDate();
+
+  protected readonly initialAsOfDatePicker = isoDateBinding(this.initialAsOfDate);
 
   showInitialBalance = computed(() => {
     const k = this.kind();

@@ -14,7 +14,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
-import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { toast } from '@spartan-ng/brain/sonner';
@@ -35,7 +35,8 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
     HlmInput,
     HlmLabel,
     CurrencyPickerComponent,
-    DatePickerComponent,
+    HlmDatePicker,
+    HlmDatePickerInput,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -70,12 +71,15 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
 
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1.5">
-              <label hlmLabel>Date</label>
-              <app-date-picker
-                [date]="dateValue()"
-                (dateChange)="dateValue.set($event)"
-                ariaLabel="Price date"
-              />
+              <label hlmLabel for="new-price-date">Date</label>
+              <hlm-date-picker
+                class="w-full"
+                captionLayout="dropdown"
+                [date]="dateValue() ?? undefined"
+                (dateChange)="dateValue.set($event ?? null)"
+              >
+                <hlm-date-picker-input inputId="new-price-date" placeholder="Select date" />
+              </hlm-date-picker>
             </div>
             <div class="flex flex-col gap-1.5">
               <label hlmLabel for="new-price-time">Time</label>

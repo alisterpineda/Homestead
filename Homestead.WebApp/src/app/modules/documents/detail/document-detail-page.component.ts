@@ -57,7 +57,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
 import { HlmScrollAreaImports } from '@/shared/components/spartan/scroll-area';
 import { HlmInputGroupImports } from '@/shared/components/spartan/input-group';
-import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { NgScrollbar } from 'ngx-scrollbar';
 import { HlmTooltipImports } from '@/shared/components/spartan/tooltip';
@@ -116,7 +116,8 @@ import { toast } from '@spartan-ng/brain/sonner';
     ClassifyOptionsDialogComponent,
     HlmBadge,
     HlmEmptyImports,
-    DatePickerComponent,
+    HlmDatePicker,
+    HlmDatePickerInput,
     RouterLink,
   ],
   providers: [
@@ -472,14 +473,28 @@ import { toast } from '@spartan-ng/brain/sonner';
 
           <!-- Document Date -->
           <div class="space-y-2">
-            <label hlmLabel>Document Date</label>
-            <app-date-picker [(date)]="editDocumentDate" ariaLabel="Document Date" />
+            <label hlmLabel for="doc-document-date">Document Date</label>
+            <hlm-date-picker
+              class="w-full"
+              captionLayout="dropdown"
+              [date]="editDocumentDate() ?? undefined"
+              (dateChange)="editDocumentDate.set($event ?? null)"
+            >
+              <hlm-date-picker-input inputId="doc-document-date" placeholder="Select date" />
+            </hlm-date-picker>
           </div>
 
           <!-- Expiry Date -->
           <div class="space-y-2">
-            <label hlmLabel>Expiry Date</label>
-            <app-date-picker [(date)]="editExpiryDate" ariaLabel="Expiry Date" />
+            <label hlmLabel for="doc-expiry-date">Expiry Date</label>
+            <hlm-date-picker
+              class="w-full"
+              captionLayout="dropdown"
+              [date]="editExpiryDate() ?? undefined"
+              (dateChange)="editExpiryDate.set($event ?? null)"
+            >
+              <hlm-date-picker-input inputId="doc-expiry-date" placeholder="Select date" />
+            </hlm-date-picker>
           </div>
 
           <!-- Notes -->

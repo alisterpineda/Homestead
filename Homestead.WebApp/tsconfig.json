@@ -136,6 +136,9 @@
       ],
       "@/shared/components/spartan/button": [
         "./src/app/shared/components/spartan/button/src/index.ts"
+      ],
+      "@/shared/components/spartan/date-picker": [
+        "./src/app/shared/components/spartan/date-picker/src/index.ts"
       ]
     }
   },

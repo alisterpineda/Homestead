@@ -12,7 +12,7 @@ import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
@@ -30,7 +30,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-edit-price-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, DatePickerComponent],
+  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmDatePicker, HlmDatePickerInput],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[480px]">
@@ -42,12 +42,15 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <div class="grid grid-cols-2 gap-3">
             <div class="flex flex-col gap-1.5">
-              <label hlmLabel>Date</label>
-              <app-date-picker
-                [date]="dateValue()"
-                (dateChange)="dateValue.set($event)"
-                ariaLabel="Price date"
-              />
+              <label hlmLabel for="edit-price-date">Date</label>
+              <hlm-date-picker
+                class="w-full"
+                captionLayout="dropdown"
+                [date]="dateValue() ?? undefined"
+                (dateChange)="dateValue.set($event ?? null)"
+              >
+                <hlm-date-picker-input inputId="edit-price-date" placeholder="Select date" />
+              </hlm-date-picker>
             </div>
             <div class="flex flex-col gap-1.5">
               <label hlmLabel for="edit-price-time">Time</label>

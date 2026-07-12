@@ -1,3 +1,5 @@
+import { parseDate } from '@/shared/utils';
+
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -6,6 +8,11 @@ export function tomorrowIso(): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
+}
+
+/** `tomorrowIso()` as a local Date — the max-date cap for hlm-date-picker `[max]`. */
+export function tomorrowDate(): Date {
+  return parseDate(tomorrowIso())!;
 }
 
 export function toDateOnly(isoString: string | null | undefined): string {

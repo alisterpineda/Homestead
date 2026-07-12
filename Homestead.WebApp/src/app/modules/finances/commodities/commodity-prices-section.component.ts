@@ -33,12 +33,13 @@ import { FinancesPriceSourcesApiService } from '@/api/services/finances-price-so
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { handleQueryError, handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { datesEqual } from '@/shared/utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { NewPriceDialogComponent } from './new-price-dialog/new-price-dialog.component';
 import { EditPriceDialogComponent } from './edit-price-dialog/edit-price-dialog.component';
 import { CommodityPricesTableComponent } from './commodity-prices-table.component';
 import { CurrencyPickerComponent } from '../shared/currency-picker/currency-picker.component';
-import { DatePickerComponent } from '@/shared/components/date-picker/date-picker.component';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { CommodityPricesStateService } from './commodity-prices-state.service';
 import { startOfDayLocal, endOfDayLocal } from '../shared/date-time';
@@ -80,7 +81,8 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
     EditPriceDialogComponent,
     CommodityPricesTableComponent,
     CurrencyPickerComponent,
-    DatePickerComponent,
+    HlmDatePicker,
+    HlmDatePickerInput,
     PaginationComponent,
   ],
   providers: [
@@ -169,20 +171,26 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div class="flex flex-col gap-1">
-                  <span class="text-[11px] uppercase text-muted-foreground">From</span>
-                  <app-date-picker
-                    [date]="fromAtDate()"
-                    (dateChange)="onFromAtChange($event)"
-                    ariaLabel="From date"
-                  />
+                  <label hlmLabel class="text-[11px] uppercase text-muted-foreground" for="price-from-date">From</label>
+                  <hlm-date-picker
+                    class="w-full"
+                    captionLayout="dropdown"
+                    [date]="fromAtDate() ?? undefined"
+                    (dateChange)="onFromAtChange($event ?? null)"
+                  >
+                    <hlm-date-picker-input inputId="price-from-date" placeholder="Select date" />
+                  </hlm-date-picker>
                 </div>
                 <div class="flex flex-col gap-1">
-                  <span class="text-[11px] uppercase text-muted-foreground">To</span>
-                  <app-date-picker
-                    [date]="toAtDate()"
-                    (dateChange)="onToAtChange($event)"
-                    ariaLabel="To date"
-                  />
+                  <label hlmLabel class="text-[11px] uppercase text-muted-foreground" for="price-to-date">To</label>
+                  <hlm-date-picker
+                    class="w-full"
+                    captionLayout="dropdown"
+                    [date]="toAtDate() ?? undefined"
+                    (dateChange)="onToAtChange($event ?? null)"
+                  >
+                    <hlm-date-picker-input inputId="price-to-date" placeholder="Select date" />
+                  </hlm-date-picker>
                 </div>
               </div>
             </div>
@@ -610,6 +618,8 @@ export class CommodityPricesSectionComponent {
   }
 
   onFromAtChange(date: Date | null): void {
+    // hlm-date-picker-input re-commits on every blur; don't reset pagination for a no-op.
+    if (datesEqual(date, this.fromAtDate())) return;
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { fromAt: date ? startOfDayLocal(date).toISOString() : null, page: 1 },
@@ -619,6 +629,7 @@ export class CommodityPricesSectionComponent {
   }
 
   onToAtChange(date: Date | null): void {
+    if (datesEqual(date, this.toAtDate())) return;
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { toAt: date ? endOfDayLocal(date).toISOString() : null, page: 1 },

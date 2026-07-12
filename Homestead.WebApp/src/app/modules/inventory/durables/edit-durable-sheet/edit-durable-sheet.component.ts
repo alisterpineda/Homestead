@@ -14,6 +14,8 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
+import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { CurrencyPickerComponent } from '@/modules/finances/shared/currency-picker/currency-picker.component';
@@ -22,7 +24,7 @@ import { LocationPickerComponent, type ItemLocationValue } from '../../shared/lo
 import { BrandPickerComponent } from '../../shared/brand-picker/brand-picker.component';
 import { TagInputComponent } from '../../tags/tag-input/tag-input.component';
 import { ALL_ITEM_STATUSES, itemStatusLabel, isTerminalStatus } from '../../shared/item-status-meta';
-import { tomorrowIso } from '../../shared/date';
+import { tomorrowDate } from '../../shared/date';
 import { replace } from '@/shared/json-patch';
 import type { JsonPatchDocument } from '@/api/generated/models/json-patch-document';
 import type { DurableResponse } from '@/api/generated/models/durable-response';
@@ -69,6 +71,8 @@ function moneyPairError(
     HlmLabel,
     HlmInput,
     HlmSelectImports,
+    HlmDatePicker,
+    HlmDatePickerInput,
     CurrencyPickerComponent,
     LocationPickerComponent,
     BrandPickerComponent,
@@ -245,15 +249,15 @@ function moneyPairError(
 
             <div class="space-y-2">
               <label hlmLabel for="durable-acquired">Acquired on</label>
-              <input
-                hlmInput
-                id="durable-acquired"
-                type="date"
+              <hlm-date-picker
                 class="w-full"
+                captionLayout="dropdown"
+                [date]="editAcquiredOnPicker.date()"
                 [max]="maxAcquiredDate"
-                [value]="editAcquiredOn()"
-                (input)="editAcquiredOn.set(asValue($event))"
-              />
+                (dateChange)="editAcquiredOnPicker.set($event)"
+              >
+                <hlm-date-picker-input inputId="durable-acquired" placeholder="Select date" />
+              </hlm-date-picker>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -364,7 +368,7 @@ export class EditDurableSheetComponent {
   protected readonly statuses = ALL_ITEM_STATUSES;
   // '' is the "Not recorded" sentinel — hlm-select items can't carry null.
   protected readonly acquisitionKinds = ['', 'Purchased', 'Gift', 'Inherited', 'Other'];
-  protected readonly maxAcquiredDate = tomorrowIso();
+  protected readonly maxAcquiredDate = tomorrowDate();
 
   private openGen = openGeneration(this.state);
   private seedKey = computed(() => `${this.durable()?.id ?? ''}|${this.state() === 'open'}|${this.openGen()}`);
@@ -378,6 +382,7 @@ export class EditDurableSheetComponent {
   });
   editTags = seededLinkedSignal(this.seedKey, () => this.openDurable()?.tags?.map((t) => t.path) ?? []);
   editAcquiredOn = seededLinkedSignal(this.seedKey, () => this.openDurable()?.acquiredOn ?? '');
+  protected readonly editAcquiredOnPicker = isoDateBinding(this.editAcquiredOn);
   // '' is the "Not recorded" sentinel — hlm-select items can't carry null.
   editAcquisitionKind = seededLinkedSignal<string, string>(
     this.seedKey, () => this.openDurable()?.acquisitionKind ?? '');
