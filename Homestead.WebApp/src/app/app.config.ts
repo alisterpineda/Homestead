@@ -26,6 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideHlmDatePickerConfig<Date>({
       autoCloseOnSelect: true,
       formatDate: formatPickerDate,
+      formatInputDate: formatPickerDate,
       parseDate: parsePickerDate,
     }),
     provideEchartsCore({ echarts: loadEcharts }),
