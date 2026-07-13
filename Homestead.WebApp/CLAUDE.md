@@ -54,6 +54,17 @@ Before declaring a UI-affecting change complete, validate it in a real browser v
 - Always import from the local `@/shared/components/spartan/` path aliases, not directly from `@spartan-ng/brain`
 - **`hlm-checkbox` aria-label**: Use input binding `[aria-label]="expr"`, NOT attribute binding `[attr.aria-label]="expr"`. The host nullifies the attribute and forwards the input to the inner `brn-checkbox`. Same applies to `aria-labelledby` and `aria-describedby`
 
+### Control sizing & search conventions
+
+The vendored helm (nova, Spartan 1.1.0) sizes buttons, inputs, select-triggers, and input-groups uniformly at **h-8** (the `default`/`sm` split is h-8/h-7). Keep controls consistent with these rules:
+
+- **Default button (h-8) is the norm** for page toolbars, page headers (`#headerActions`), and dialog/sheet footers. Reserve `size="sm"` (h-7) for genuinely dense contexts — table row actions, card footers, inline chip/preset actions, and filter-popover internals. Same split for icon buttons: `size="icon"` (size-8) in toolbars, `size="icon-sm"`/`icon-xs` for dense/inline.
+- **Search boxes** always use the shared `app-search-input` (`shared/components/search-input/`) — never hand-roll an absolute-positioned icon + `hlmInput`. It's a `model()`-based two-way `[(value)]` control that inherits h-8 + zoom-safe font from the helm input-group.
+- **Custom picker trigger buttons** (account/commodity/currency/brand/location/area-parent pickers) use the `appPickerTrigger` directive (`shared/directives/picker-trigger.directive.ts`), which mirrors `hlm-select-trigger` so they sit flush beside real select triggers and date pickers.
+- **iOS zoom guard**: any native `input`/`textarea`/`select` (or a bare focusable input not using `hlmInput`) must keep a ≥16px font below `md` — compose `hlmInput`, or add `text-base md:text-sm`. Never leave a bare `text-sm`/`text-xs` as the only font size on a focusable control (mobile Safari zooms the viewport on focus). Prefer `hlm-select` over a native `<select>`.
+- **No unconditional font-size/height overrides** on hlm components (e.g. `class="h-8 text-xs"` on a select-trigger, `size="sm" class="h-7 text-xs"` on a button) — pick the right variant `size` instead. Overrides that fight the variant are the anti-pattern this convention exists to prevent.
+- **`max-md:h-11`** is the sanctioned mobile touch-target pattern for primary tap actions (reference: inventory quick-panels) — it's an intentional responsive bump, not a variant-fighting override.
+
 ## Homestead State Management Conventions
 
 - Use `persistedSignal()` from `shared/utils/persisted-signal.ts` for state that must survive page refresh — never access `localStorage`/`sessionStorage` directly

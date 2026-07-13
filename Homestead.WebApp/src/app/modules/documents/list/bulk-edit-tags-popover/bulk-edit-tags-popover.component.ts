@@ -52,7 +52,7 @@ import { type TagCheckboxItem, nextState, isChanged, buildConfirmationMessage } 
   },
   template: `
     <div hlmPopover [state]="popoverState()" [closeOnOutsidePointerEvents]="!dialogOpen()" (stateChanged)="onPopoverStateChanged($event)">
-      <button hlmPopoverTrigger hlmBtn variant="outline" size="sm" [disabled]="disabled()">
+      <button hlmPopoverTrigger hlmBtn variant="outline" [disabled]="disabled()">
         <ng-icon hlm name="lucideTags" size="sm" />
         Tags
       </button>

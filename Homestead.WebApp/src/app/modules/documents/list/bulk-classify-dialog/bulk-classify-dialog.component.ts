@@ -17,7 +17,7 @@ import { ClassifyOptionsDialogComponent } from '../../shared/classify-options-di
   imports: [HlmButton, HlmIconImports, NgIcon, ClassifyOptionsDialogComponent],
   providers: [provideIcons({ lucideSparkles })],
   template: `
-    <button hlmBtn variant="outline" size="sm" [disabled]="disabled()" (click)="optionsDialog.open()">
+    <button hlmBtn variant="outline" [disabled]="disabled()" (click)="optionsDialog.open()">
       <ng-icon hlm name="lucideSparkles" size="sm" />
       Classify
     </button>

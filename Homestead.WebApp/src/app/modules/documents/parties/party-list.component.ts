@@ -5,11 +5,11 @@ import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationErro
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, map, combineLatest, debounceTime, distinctUntilChanged, filter, take, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideUsers, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
+import { lucideUsers, lucidePlus, lucideTrash2, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -39,7 +39,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
-    HlmInput,
+    SearchInputComponent,
     HlmButton,
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
@@ -48,7 +48,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     EditPartySheetComponent,
     PaginationComponent,
   ],
-  providers: [provideIcons({ lucideUsers, lucidePlus, lucideTrash2, lucideSearch, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown })],
+  providers: [provideIcons({ lucideUsers, lucidePlus, lucideTrash2, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
@@ -92,12 +92,9 @@ import { toast } from '@spartan-ng/brain/sonner';
           <!-- Normal toolbar -->
           <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()" [attr.inert]="hasSelection() ? '' : null">
             <div class="flex items-center gap-2 mb-3">
-              <div class="relative flex-1 min-w-0">
-                <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input hlmInput placeholder="Search parties..." class="pl-8 h-8 w-full min-w-0" aria-label="Search parties" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
-              </div>
+              <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search parties..." ariaLabel="Search parties" />
               <div class="flex items-center gap-2">
-                <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
+                <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
                   <ng-icon hlm [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
                   {{ sortLabel() }}
                 </button>
@@ -129,7 +126,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                     <ng-container [ngTemplateOutlet]="sortGroup" [ngTemplateOutletInjector]="'outlet'" />
                   </hlm-dropdown-menu>
                 </ng-template>
-                <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
+                <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
                   <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
                   Columns
                 </button>
@@ -147,7 +144,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   </hlm-dropdown-menu>
                 </ng-template>
                 <!-- Mobile: Overflow menu (below sm) -->
-                <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
+                <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                         [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
                   <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
                 </button>
@@ -174,7 +171,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                   </hlm-dropdown-menu>
                 </ng-template>
                 @if (auth.canWrite()) {
-                  <app-create-party-dialog triggerSize="sm" (created)="onRefresh()">
+                  <app-create-party-dialog (created)="onRefresh()">
                     <ng-icon hlm name="lucidePlus" size="sm" />
                     New Party
                   </app-create-party-dialog>
@@ -189,11 +186,11 @@ import { toast } from '@spartan-ng/brain/sonner';
               {{ selectionCount() }} {{ selectionCount() > 1 ? 'parties' : 'party' }} selected
             </span>
             <div class="ml-auto flex items-center gap-2">
-              <button hlmBtn variant="outline" size="sm" (click)="clearSelection()">
+              <button hlmBtn variant="outline" (click)="clearSelection()">
                 Clear selection
               </button>
               <hlm-alert-dialog>
-                <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
+                <button hlmBtn variant="destructive" hlmAlertDialogTrigger>
                   <ng-icon hlm name="lucideTrash2" size="sm" />
                   Delete
                 </button>

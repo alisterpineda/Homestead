@@ -36,7 +36,7 @@ export interface FilterOption {
   template: `
     @if (!isMobile()) {
       <div hlmPopover>
-        <button hlmPopoverTrigger hlmBtn variant="outline" size="sm" aria-label="Filter documents">
+        <button hlmPopoverTrigger hlmBtn variant="outline" aria-label="Filter documents">
           <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
           <span>{{ triggerLabel() }}</span>
         </button>
@@ -46,7 +46,7 @@ export interface FilterOption {
       </div>
     } @else {
       <hlm-sheet side="bottom">
-        <button hlmSheetTrigger hlmBtn variant="outline" size="sm" aria-label="Filter documents">
+        <button hlmSheetTrigger hlmBtn variant="outline" aria-label="Filter documents">
           <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
           @if (activeCount() > 0) {
             <span hlmBadge variant="secondary" class="font-normal">{{ activeCount() }}</span>

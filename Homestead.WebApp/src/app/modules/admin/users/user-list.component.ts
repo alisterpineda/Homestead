@@ -8,7 +8,7 @@ import { lucideUsers, lucideSearch, lucidePlus, lucideTrash2 } from '@ng-icons/l
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { UserTableComponent } from './user-table/user-table.component';
@@ -31,7 +31,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
-    HlmInput,
+    SearchInputComponent,
     HlmButton,
     HlmAlertDialogImports,
     UserTableComponent,
@@ -83,20 +83,9 @@ import { toast } from '@spartan-ng/brain/sonner';
             <!-- Normal toolbar -->
             <div [class.opacity-0]="hasSelection()" [class.pointer-events-none]="hasSelection()">
               <div class="flex items-center gap-2 mb-4">
-                <div class="relative">
-                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    hlmInput
-                    type="text"
-                    placeholder="Search users..."
-                    class="pl-9"
-                    [value]="searchInput()"
-                    (input)="searchInput.set($any($event.target).value)"
-                    aria-label="Search users"
-                  />
-                </div>
+                <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search users..." ariaLabel="Search users" />
                 <div class="ml-auto flex items-center gap-2">
-                  <app-create-user-dialog triggerSize="sm" (created)="onRefresh()">
+                  <app-create-user-dialog (created)="onRefresh()">
                     <ng-icon hlm name="lucidePlus" size="sm" />
                     New User
                   </app-create-user-dialog>
@@ -110,11 +99,11 @@ import { toast } from '@spartan-ng/brain/sonner';
                 {{ selectionCount() }} {{ selectionCount() > 1 ? 'users' : 'user' }} selected
               </span>
               <div class="ml-auto flex items-center gap-2">
-                <button hlmBtn variant="outline" size="sm" (click)="clearSelection()">
+                <button hlmBtn variant="outline" (click)="clearSelection()">
                   Clear selection
                 </button>
                 <hlm-alert-dialog>
-                  <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger>
+                  <button hlmBtn variant="destructive" hlmAlertDialogTrigger>
                     <ng-icon hlm name="lucideTrash2" size="sm" />
                     Delete
                   </button>

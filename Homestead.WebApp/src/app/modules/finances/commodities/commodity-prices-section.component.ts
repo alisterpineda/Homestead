@@ -161,12 +161,12 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
             <div class="p-3">
               <div class="text-xs font-medium text-muted-foreground mb-2">Date range</div>
               <div class="flex flex-wrap gap-1.5 mb-2">
-                <button hlmBtn variant="outline" size="sm" class="h-7 text-xs" (click)="applyPreset('last30')">Last 30 days</button>
-                <button hlmBtn variant="outline" size="sm" class="h-7 text-xs" (click)="applyPreset('thisMonth')">This month</button>
-                <button hlmBtn variant="outline" size="sm" class="h-7 text-xs" (click)="applyPreset('ytd')">YTD</button>
-                <button hlmBtn variant="outline" size="sm" class="h-7 text-xs" (click)="applyPreset('lastYear')">Last year</button>
+                <button hlmBtn variant="outline" size="sm" (click)="applyPreset('last30')">Last 30 days</button>
+                <button hlmBtn variant="outline" size="sm" (click)="applyPreset('thisMonth')">This month</button>
+                <button hlmBtn variant="outline" size="sm" (click)="applyPreset('ytd')">YTD</button>
+                <button hlmBtn variant="outline" size="sm" (click)="applyPreset('lastYear')">Last year</button>
                 @if (fromAtDate() || toAtDate()) {
-                  <button hlmBtn variant="ghost" size="sm" class="h-7 text-xs" (click)="clearDateRange()">All</button>
+                  <button hlmBtn variant="ghost" size="sm" (click)="clearDateRange()">All</button>
                 }
               </div>
               <div class="grid grid-cols-2 gap-2">

@@ -12,10 +12,11 @@ import {
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, debounceTime, of, map, catchError, distinctUntilChanged } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideChevronDown, lucideSearch, lucideCheck, lucidePlus } from '@ng-icons/lucide';
+import { lucideChevronDown, lucideCheck, lucidePlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
+import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { InventoryBrandApiService } from '@/api/services/inventory-brand-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -35,10 +36,11 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
     NgIcon,
     HlmIconImports,
     HlmPopoverImports,
-    HlmInput,
+    SearchInputComponent,
+    PickerTriggerDirective,
     HlmSpinner,
   ],
-  providers: [provideIcons({ lucideChevronDown, lucideSearch, lucideCheck, lucidePlus })],
+  providers: [provideIcons({ lucideChevronDown, lucideCheck, lucidePlus })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
       <button
@@ -46,7 +48,7 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
         type="button"
         [disabled]="disabled()"
         [attr.aria-label]="ariaLabel() || 'Select brand'"
-        class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        appPickerTrigger
       >
         @if (value(); as sel) {
           <span class="min-w-0 truncate">{{ sel.name }}</span>
@@ -56,16 +58,8 @@ export type BrandPickerValue = Pick<BrandResponse, 'id' | 'name'>;
         <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[320px] p-0" align="start">
-        <div class="relative p-2">
-          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            hlmInput
-            class="h-8 w-full pl-8"
-            placeholder="Search or add a brand..."
-            [value]="searchTerm()"
-            (input)="onSearch($event)"
-            aria-label="Search brands"
-          />
+        <div class="p-2">
+          <app-search-input [value]="searchTerm()" (valueChange)="onSearch($event)" placeholder="Search or add a brand..." ariaLabel="Search brands" />
         </div>
         <div class="max-h-[280px] overflow-y-auto p-1">
           @if (allowCreate()) {
@@ -241,15 +235,11 @@ export class BrandPickerComponent {
     });
   }
 
-  onSearch(event: Event): void {
-    this.searchTerm.set(this.asValue(event));
+  onSearch(value: string): void {
+    this.searchTerm.set(value);
     // Flip the spinner on immediately. loading() is otherwise only set inside the debounced switchMap,
     // so during the ~200ms pre-debounce window results() is stale — long enough for the "Create 'X'"
     // row (gated on !loading) to flash for a brand that already exists. Eager loading suppresses that.
     this.loading.set(true);
-  }
-
-  asValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 }

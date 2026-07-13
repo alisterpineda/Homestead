@@ -9,10 +9,10 @@ import { Router, ActivatedRoute, NavigationEnd, NavigationCancel, NavigationErro
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap, map, debounceTime, distinctUntilChanged, combineLatest, filter, take, firstValueFrom, forkJoin, of } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch, lucideListFilter } from '@ng-icons/lucide';
+import { lucidePlus, lucideCircleAlert, lucideCoins, lucideListFilter } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -49,7 +49,7 @@ const COMMODITY_TOTAL_GUARD = 1000;
     NgIcon,
     HlmIconImports,
     HlmButton,
-    HlmInput,
+    SearchInputComponent,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -61,26 +61,15 @@ const COMMODITY_TOTAL_GUARD = 1000;
     CreateCommodityDialogComponent,
     EditCommoditySheetComponent,
   ],
-  providers: [provideIcons({ lucidePlus, lucideCircleAlert, lucideCoins, lucideSearch, lucideListFilter })],
+  providers: [provideIcons({ lucidePlus, lucideCircleAlert, lucideCoins, lucideListFilter })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="relative max-w-sm flex-1 min-w-0">
-            <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              hlmInput
-              class="pl-9"
-              type="search"
-              placeholder="Search by symbol or name"
-              aria-label="Search commodities"
-              [value]="searchInput()"
-              (input)="searchInput.set(asValue($event))"
-            />
-          </div>
+          <app-search-input class="max-w-sm flex-1 min-w-0" [(value)]="searchInput" placeholder="Search by symbol or name" ariaLabel="Search commodities" />
           <div hlmPopover>
-            <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+            <button hlmPopoverTrigger hlmBtn variant="outline">
               <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
               {{ filterTriggerLabel() }}
             </button>
@@ -122,7 +111,7 @@ const COMMODITY_TOTAL_GUARD = 1000;
             </div>
           </div>
         </div>
-        <app-create-commodity-dialog triggerSize="sm" (created)="onChanged()">
+        <app-create-commodity-dialog (created)="onChanged()">
           <ng-icon hlm name="lucidePlus" size="sm" />
           New security
         </app-create-commodity-dialog>
@@ -376,10 +365,6 @@ export class CommodityListPageComponent {
         replaceUrl: true,
       });
     });
-  }
-
-  asValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   onChanged(): void {

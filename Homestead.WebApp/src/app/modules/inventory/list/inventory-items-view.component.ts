@@ -103,7 +103,6 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
         <hlm-toggle-group
           type="single"
           variant="outline"
-          size="sm"
           aria-label="Kind filter"
           [value]="kind()"
           (valueChange)="onKindFilterChange($event)"
@@ -114,7 +113,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
         </hlm-toggle-group>
 
         <div hlmPopover>
-          <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+          <button hlmPopoverTrigger hlmBtn variant="outline">
             <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
             {{ filterLabel() }}
           </button>
@@ -164,7 +163,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
           </div>
         </div>
 
-        <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="sortMenu">
+        <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
           <ng-icon hlm [name]="sort().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
           {{ sortFieldLabel() }}
         </button>

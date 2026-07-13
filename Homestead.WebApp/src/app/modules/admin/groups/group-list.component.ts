@@ -4,11 +4,11 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { switchMap, map, combineLatest } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideUsers2, lucideSearch, lucidePlus } from '@ng-icons/lucide';
+import { lucideUsers2, lucidePlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
@@ -21,10 +21,10 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
   selector: 'app-group-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, HlmInput,
+    NgIcon, HlmIconImports, HlmSpinner, HlmEmptyImports, SearchInputComponent,
     HlmTableImports, HlmBadge, PaginationComponent, CreateGroupDialogComponent,
   ],
-  providers: [provideIcons({ lucideUsers2, lucideSearch, lucidePlus })],
+  providers: [provideIcons({ lucideUsers2, lucidePlus })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col">
@@ -48,11 +48,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
       @if (!loading() || data()) {
         <div class="flex items-center gap-2 mb-4 shrink-0">
-          <div class="relative flex-1">
-            <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input hlmInput class="pl-9 w-full" placeholder="Search groups..."
-              [value]="searchInput()" (input)="searchInput.set(asInputValue($event))" />
-          </div>
+          <app-search-input class="flex-1" [(value)]="searchInput" placeholder="Search groups..." ariaLabel="Search groups" />
           <app-create-group-dialog (created)="onRefresh()">
             <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
             Create Group
@@ -174,10 +170,6 @@ export class GroupListComponent {
           replaceUrl: true,
         });
       });
-  }
-
-  asInputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   onPageChange(newPage: number): void {

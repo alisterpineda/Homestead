@@ -380,7 +380,7 @@ describe('InventoryListPageComponent', () => {
     expect(text).toContain('Nothing matches');
     expect(text).not.toContain('No items yet');
     // The toolbar (and with it the search box) must stay reachable to clear the search.
-    expect((fixture.nativeElement as HTMLElement).querySelector('input[hlmInput]')).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-search-input')).not.toBeNull();
   });
 
   it('committing a typed search drops the area scope and syncs the URL', async () => {

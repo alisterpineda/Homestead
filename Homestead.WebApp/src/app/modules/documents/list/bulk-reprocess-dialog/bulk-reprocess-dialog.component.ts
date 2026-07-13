@@ -22,7 +22,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   providers: [provideIcons({ lucideRefreshCw })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
-      <button hlmBtn variant="outline" size="sm" hlmDialogTrigger [disabled]="disabled()">
+      <button hlmBtn variant="outline" hlmDialogTrigger [disabled]="disabled()">
         <ng-icon hlm name="lucideRefreshCw" size="sm" />
         Reprocess
       </button>

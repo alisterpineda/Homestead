@@ -64,7 +64,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     <ng-template #headerActions>
       @if (commodity(); as c) {
         @if (!c.isSystemManaged) {
-          <button hlmBtn variant="outline" size="sm" (click)="openEdit()">
+          <button hlmBtn variant="outline" (click)="openEdit()">
             <ng-icon hlm name="lucidePencil" size="sm" />
             Edit
           </button>

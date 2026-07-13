@@ -172,7 +172,6 @@ import type { ConsumableResponse } from '@/api/generated/models/consumable-respo
                 >
                   <app-create-entry-dialog
                     toolbarEnd
-                    triggerSize="sm"
                     [initialLocation]="addLocation()"
                     [initialLocationLabel]="placeName()"
                     (created)="changed.emit()"

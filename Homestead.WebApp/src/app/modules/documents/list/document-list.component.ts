@@ -5,12 +5,12 @@ import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-i
 import { AuthService } from '@/shared/services/auth.service';
 import { switchMap, map, catchError, of, combineLatest, Subject, debounceTime, distinctUntilChanged, filter, take, takeUntil, takeWhile, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles } from '@ng-icons/lucide';
+import { lucideFileText, lucidePlus, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSkeletonImports } from '@/shared/components/spartan/skeleton';
 import { HlmCardImports } from '@/shared/components/spartan/card';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -55,7 +55,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     HlmSkeletonImports,
     HlmCardImports,
     HlmEmptyImports,
-    HlmInput,
+    SearchInputComponent,
     HlmButton,
     HlmButtonGroup,
     HlmAlertDialogImports,
@@ -74,21 +74,18 @@ import { toast } from '@spartan-ng/brain/sonner';
     DownloadProgressDialogComponent,
   ],
   host: { class: 'block' },
-  providers: [provideIcons({ lucideFileText, lucidePlus, lucideSearch, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles })],
+  providers: [provideIcons({ lucideFileText, lucidePlus, lucideTable, lucideLayoutGrid, lucideTrash2, lucideX, lucideSlidersHorizontal, lucideEllipsisVertical, lucideArrowUp, lucideArrowDown, lucideListChecks, lucideTags, lucideUsers, lucideDownload, lucideSparkles })],
   template: `
     <div>
       <div [class.hidden]="showInitialEmpty()">
             @if (!isInSelectionState() || !auth.canWrite()) {
               <div class="flex items-center gap-2 mb-3">
                 @if (auth.canWrite() && viewMode() === 'grid') {
-                  <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden" (click)="enterSelectionMode()" aria-label="Enter selection mode">
+                  <button hlmBtn variant="outline" size="icon" class="sm:hidden" (click)="enterSelectionMode()" aria-label="Enter selection mode">
                     <ng-icon hlm name="lucideListChecks" size="sm" />
                   </button>
                 }
-                <div class="relative flex-1 min-w-0">
-                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input hlmInput placeholder="Search documents..." class="pl-8 h-8 w-full min-w-0" aria-label="Search documents" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
-                </div>
+                <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search documents..." ariaLabel="Search documents" />
                 <div class="flex items-center gap-2">
                   <app-documents-filter-panel
                     [tagOptions]="tagOptions()"
@@ -107,7 +104,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                     (partySearchChange)="onPartySearchChange($event)"
                     (reset)="resetFilters()"
                   />
-                  <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
+                  <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
                     <ng-icon hlm [name]="effectiveSortDir() === 'Asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
                     {{ sortLabel() }}
                   </button>
@@ -146,7 +143,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                     </hlm-dropdown-menu>
                   </ng-template>
                   @if (viewMode() === 'table') {
-                  <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
+                  <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="columnsMenu">
                     <ng-icon hlm name="lucideSlidersHorizontal" size="sm" />
                     Columns
                   </button>
@@ -165,15 +162,15 @@ import { toast } from '@spartan-ng/brain/sonner';
                     </hlm-dropdown-menu>
                   </ng-template>
                   <div hlmButtonGroup class="hidden sm:flex" aria-label="View mode">
-                    <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('grid')" aria-label="Grid view">
+                    <button hlmBtn [variant]="viewMode() === 'grid' ? 'secondary' : 'outline'" size="icon" (click)="setViewMode('grid')" aria-label="Grid view">
                       <ng-icon hlm name="lucideLayoutGrid" size="sm" />
                     </button>
-                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon-sm" (click)="setViewMode('table')" aria-label="Table view">
+                    <button hlmBtn [variant]="viewMode() === 'table' ? 'secondary' : 'outline'" size="icon" (click)="setViewMode('table')" aria-label="Table view">
                       <ng-icon hlm name="lucideTable" size="sm" />
                     </button>
                   </div>
                   <!-- Mobile: Overflow menu (below sm) -->
-                  <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
+                  <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                           [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
                     <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
                   </button>
@@ -235,7 +232,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               </span>
 
               @if (!allPageSelected()) {
-                <button hlmBtn variant="outline" size="sm" (click)="selectAllOnPage()">
+                <button hlmBtn variant="outline" (click)="selectAllOnPage()">
                   Select all
                 </button>
               }
@@ -245,12 +242,12 @@ import { toast } from '@spartan-ng/brain/sonner';
               <app-bulk-reprocess-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (reprocessStarted)="onBulkReprocessStarted($event)" />
               <app-bulk-classify-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkClassifyConfirmed($event)" />
               <app-bulk-summarize-dialog [documentIds]="selectedDocumentIds()" [disabled]="!hasSelection()" (confirmed)="onBulkSummarizeConfirmed()" />
-              <button hlmBtn variant="outline" size="sm" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
+              <button hlmBtn variant="outline" (click)="onDownloadSelected()" [disabled]="!hasSelection()">
                 <ng-icon hlm name="lucideDownload" size="sm" />
                 Download
               </button>
               <hlm-alert-dialog>
-                <button hlmBtn variant="destructive" size="sm" hlmAlertDialogTrigger [disabled]="!hasSelection()">
+                <button hlmBtn variant="destructive" hlmAlertDialogTrigger [disabled]="!hasSelection()">
                   <ng-icon hlm name="lucideTrash2" size="sm" />
                   Delete
                 </button>
@@ -271,7 +268,7 @@ import { toast } from '@spartan-ng/brain/sonner';
                 </hlm-alert-dialog-content>
               </hlm-alert-dialog>
 
-              <button hlmBtn variant="outline" size="icon-sm" class="ml-auto" (click)="clearSelection()" aria-label="Exit selection mode">
+              <button hlmBtn variant="outline" size="icon" class="ml-auto" (click)="clearSelection()" aria-label="Exit selection mode">
                 <ng-icon hlm name="lucideX" size="sm" />
               </button>
             </div>

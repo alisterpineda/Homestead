@@ -11,14 +11,14 @@ import {
 import { toObservable, toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, of, map, catchError, debounceTime } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideX, lucideSearch } from '@ng-icons/lucide';
+import { lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmBadgeImports } from '@/shared/components/spartan/badge';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
@@ -51,12 +51,12 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
     HlmCheckboxImports,
     HlmBadgeImports,
     HlmButton,
-    HlmInput,
+    SearchInputComponent,
     HlmLabel,
     HlmSpinner,
     LocationPickerComponent,
   ],
-  providers: [provideIcons({ lucideX, lucideSearch })],
+  providers: [provideIcons({ lucideX })],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-dialog-content
@@ -89,17 +89,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           <!-- Search -->
           <div class="flex flex-col gap-1.5">
             <label hlmLabel>Durables to collapse</label>
-            <div class="relative">
-              <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                hlmInput
-                class="w-full pl-9"
-                placeholder="Search individually-tracked durables..."
-                [value]="searchTerm()"
-                (input)="searchTerm.set(asValue($event))"
-                aria-label="Search durables to collapse"
-              />
-            </div>
+            <app-search-input [(value)]="searchTerm" placeholder="Search individually-tracked durables..." ariaLabel="Search durables to collapse" />
             <div class="max-h-[240px] overflow-y-auto rounded-md border">
               @if (searching()) {
                 <div class="flex justify-center py-6"><hlm-spinner /></div>
@@ -284,10 +274,6 @@ export class CollapseDurablesDialogComponent {
     if (item.value != null) parts.push(`${item.valueCurrencySymbol ?? ''}${item.value}`);
     if (item.serial) parts.push(`SN ${item.serial}`);
     return parts.length > 0 ? parts.join(' · ') : null;
-  }
-
-  protected asValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   private targetFields(): { areaId: string | null; containerItemId: string | null } {

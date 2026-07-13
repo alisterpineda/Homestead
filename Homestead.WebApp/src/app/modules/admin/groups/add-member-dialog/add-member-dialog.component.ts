@@ -5,7 +5,7 @@ import { lucideUserPlus } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
@@ -19,7 +19,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 @Component({
   selector: 'app-add-member-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmSelectImports, ],
+  imports: [NgIcon, HlmIconImports, HlmDialogImports, HlmButton, SearchInputComponent, HlmLabel, HlmSelectImports, ],
   providers: [provideIcons({ lucideUserPlus })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -37,8 +37,13 @@ import { toast } from '@spartan-ng/brain/sonner';
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <div class="flex flex-col gap-2">
             <label hlmLabel for="member-search">Search Users</label>
-            <input hlmInput id="member-search" placeholder="Search by name or email"
-              [value]="userSearch()" (input)="onSearchInput(asInputValue($event))" />
+            <app-search-input
+              inputId="member-search"
+              ariaLabel="Search Users"
+              placeholder="Search by name or email"
+              [value]="userSearch()"
+              (valueChange)="onSearchInput($event)"
+            />
             @if (loadingUsers()) {
               <p class="text-xs text-muted-foreground">Loading...</p>
             }
@@ -117,10 +122,6 @@ export class AddMemberDialogComponent {
     this.destroyRef.onDestroy(() => {
       if (this.searchTimeout) clearTimeout(this.searchTimeout);
     });
-  }
-
-  asInputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 
   onSearchInput(value: string): void {

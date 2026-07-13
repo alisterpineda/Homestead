@@ -63,7 +63,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
                   </p>
                 </hlm-alert-dialog-header>
                 <hlm-alert-dialog-footer>
-                  <button hlmBtn variant="secondary" hlmAlertDialogCancel>Cancel</button>
+                  <button variant="secondary" hlmAlertDialogCancel>Cancel</button>
                   <button hlmBtn variant="destructive" (click)="handleDelete(ctx)" [disabled]="deleting()">
                     {{ deleting() ? 'Deleting...' : 'Delete' }}
                   </button>
@@ -101,7 +101,7 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
                         <td hlmTd>
                           <hlm-select [value]="member.accessLevel"
                             (valueChange)="onAccessLevelChange(g.id, member.userId, $any($event))">
-                            <hlm-select-trigger class="w-full h-8 text-xs">
+                            <hlm-select-trigger class="w-full">
                               <hlm-select-value />
                             </hlm-select-trigger>
                             <hlm-select-content *hlmSelectPortal>

@@ -23,11 +23,9 @@ import {
   lucidePlus,
   lucidePackage,
   lucideCircleAlert,
-  lucideCheck,
-  lucideSearch,
-} from '@ng-icons/lucide';
+  lucideCheck,} from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmSeparatorImports } from '@/shared/components/spartan/separator';
@@ -98,7 +96,7 @@ interface ListData {
   imports: [
     NgIcon,
     HlmIconImports,
-    HlmInput,
+    SearchInputComponent,
     HlmSpinner,
     HlmEmptyImports,
     HlmSeparatorImports,
@@ -114,9 +112,7 @@ interface ListData {
     lucidePlus,
     lucidePackage,
     lucideCircleAlert,
-    lucideCheck,
-    lucideSearch,
-  })],
+    lucideCheck,  })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
@@ -173,19 +169,9 @@ interface ListData {
             (viewContents)="onViewContents($event)"
             (reset)="onReset()"
           >
-            <div toolbarStart class="relative w-full min-w-0 sm:w-56 lg:w-64">
-              <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                hlmInput
-                placeholder="Search items..."
-                class="h-8 w-full min-w-0 pl-8"
-                aria-label="Search items"
-                [value]="searchInput()"
-                (input)="searchInput.set($any($event.target).value)"
-              />
-            </div>
+            <app-search-input toolbarStart class="w-full min-w-0 sm:w-56 lg:w-64" [(value)]="searchInput" placeholder="Search items..." ariaLabel="Search items" />
 
-            <app-create-entry-dialog toolbarEnd triggerSize="sm" (created)="onChanged()">
+            <app-create-entry-dialog toolbarEnd (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New item
             </app-create-entry-dialog>
@@ -265,16 +251,8 @@ interface ListData {
                     }
                   </div>
                 }
-                <div class="relative px-1 pb-1">
-                  <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    hlmInput
-                    placeholder="Search tags..."
-                    class="h-8 w-full min-w-0 pl-8"
-                    aria-label="Search tags"
-                    [value]="tagSearchInput()"
-                    (input)="tagSearchInput.set($any($event.target).value)"
-                  />
+                <div class="px-1 pb-1">
+                  <app-search-input [(value)]="tagSearchInput" placeholder="Search tags..." ariaLabel="Search tags" />
                 </div>
                 <div class="max-h-[180px] overflow-y-auto">
                   @for (tag of tagOptions(); track tag.id) {

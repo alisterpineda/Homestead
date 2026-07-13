@@ -50,7 +50,7 @@ import { CREATE_OPTION_ID } from '../tag-input-shared';
           (focus)="onFocus()"
           (keydown)="onKeyDown($event)"
           [placeholder]="value().length === 0 ? 'Add tags...' : ''"
-          class="min-w-[80px] flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+          class="min-w-[80px] flex-1 bg-transparent text-base md:text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 

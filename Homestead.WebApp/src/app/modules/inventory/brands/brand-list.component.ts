@@ -14,15 +14,13 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucidePlus,
   lucideBookmark,
-  lucideCircleAlert,
-  lucideSearch,
-  lucideArrowUp,
+  lucideCircleAlert,  lucideArrowUp,
   lucideArrowDown,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
@@ -55,7 +53,7 @@ interface BrandSortFieldOption {
     HlmIconImports,
     HlmSpinner,
     HlmEmptyImports,
-    HlmInput,
+    SearchInputComponent,
     HlmButton,
     HlmAlertDialogImports,
     HlmDropdownMenuImports,
@@ -68,9 +66,7 @@ interface BrandSortFieldOption {
   providers: [provideIcons({
     lucidePlus,
     lucideBookmark,
-    lucideCircleAlert,
-    lucideSearch,
-    lucideArrowUp,
+    lucideCircleAlert,    lucideArrowUp,
     lucideArrowDown,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
@@ -114,11 +110,8 @@ interface BrandSortFieldOption {
         </div>
 
         <div class="mb-3 flex items-center gap-2 shrink-0" [class.hidden]="showInitialEmpty()">
-          <div class="relative flex-1 min-w-0">
-            <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input hlmInput placeholder="Search brands..." class="pl-8 h-8 w-full min-w-0" aria-label="Search brands" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" />
-          </div>
-          <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="sortMenu">
+          <app-search-input class="flex-1 min-w-0" [(value)]="searchInput" placeholder="Search brands..." ariaLabel="Search brands" />
+          <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
             <ng-icon hlm [name]="effectiveSortDir() === 'asc' ? 'lucideArrowUp' : 'lucideArrowDown'" size="sm" />
             {{ sortLabel() }}
           </button>
@@ -148,7 +141,7 @@ interface BrandSortFieldOption {
             </hlm-dropdown-menu>
           </ng-template>
           @if (auth.canWrite()) {
-            <app-create-brand-dialog triggerSize="sm" (created)="onRefresh()">
+            <app-create-brand-dialog (created)="onRefresh()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New brand
             </app-create-brand-dialog>

@@ -10,10 +10,11 @@ import {
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { combineLatest, switchMap, debounceTime, of, map, tap, catchError, distinctUntilChanged, filter, forkJoin } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideChevronDown, lucideSearch, lucideCheck } from '@ng-icons/lucide';
+import { lucideChevronDown, lucideCheck } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmPopoverImports } from '@/shared/components/spartan/popover';
-import { HlmInput } from '@/shared/components/spartan/input';
+import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
+import { PickerTriggerDirective } from '@/shared/directives/picker-trigger.directive';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -22,8 +23,8 @@ import type { CommodityKind } from '@/api/generated/models/commodity-kind';
 @Component({
   selector: 'app-commodity-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmPopoverImports, HlmInput, HlmSpinner],
-  providers: [provideIcons({ lucideChevronDown, lucideSearch, lucideCheck })],
+  imports: [NgIcon, HlmIconImports, HlmPopoverImports, SearchInputComponent, HlmSpinner, PickerTriggerDirective],
+  providers: [provideIcons({ lucideChevronDown, lucideCheck })],
   template: `
     <div hlmPopover [state]="popoverState()" (stateChanged)="popoverState.set($event)">
       <button
@@ -31,7 +32,7 @@ import type { CommodityKind } from '@/api/generated/models/commodity-kind';
         type="button"
         [disabled]="disabled()"
         [attr.aria-label]="ariaLabel() || 'Select commodity'"
-        class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        appPickerTrigger
       >
         @if (selected(); as sel) {
           <span class="min-w-0 truncate">
@@ -47,16 +48,8 @@ import type { CommodityKind } from '@/api/generated/models/commodity-kind';
         <ng-icon hlm name="lucideChevronDown" size="sm" class="shrink-0 text-muted-foreground" />
       </button>
       <div hlmPopoverContent *hlmPopoverPortal class="w-[360px] p-0" align="start">
-        <div class="relative p-2">
-          <ng-icon hlm name="lucideSearch" size="sm" class="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            hlmInput
-            class="h-8 w-full pl-8"
-            [placeholder]="searchPlaceholder()"
-            [value]="searchTerm()"
-            (input)="searchTerm.set(asValue($event))"
-            [attr.aria-label]="searchPlaceholder()"
-          />
+        <div class="p-2">
+          <app-search-input [(value)]="searchTerm" [placeholder]="searchPlaceholder()" />
         </div>
         <div class="max-h-[280px] overflow-y-auto p-1">
           @if (loading()) {
@@ -173,9 +166,5 @@ export class CommodityPickerComponent {
   onSelect(commodity: CommodityResponse): void {
     this.commodityChange.emit(commodity);
     this.popoverState.set('closed');
-  }
-
-  asValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
   }
 }

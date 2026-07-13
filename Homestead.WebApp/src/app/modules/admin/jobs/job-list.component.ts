@@ -11,6 +11,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmBadge } from '@/shared/components/spartan/badge';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { statusBadgeVariant as _statusBadgeVariant, statusLabel as _statusLabel } from '@/shared/utils/processing-status.utils';
 import { processingJobTypeLabel } from '@/shared/utils/processing-job-type.utils';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
@@ -32,6 +33,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
     HlmTableImports,
     HlmBadge,
     HlmButton,
+    HlmSelectImports,
     PaginationComponent,
   ],
   providers: [provideIcons({ lucideActivity, lucideChevronRight, lucideChevronDown })],
@@ -58,21 +60,25 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
 
       @if (!loading() || data()) {
         <div class="flex items-center gap-2 mb-4 shrink-0">
-          <label for="status-filter" class="text-sm font-medium shrink-0">Status</label>
-          <select
-            id="status-filter"
-            class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            [value]="statusFilter() ?? ''"
-            (change)="onStatusChange(asSelectValue($event))"
-            aria-label="Filter by status"
+          <label class="text-sm font-medium shrink-0">Status</label>
+          <hlm-select
+            [value]="statusFilter() ?? 'all'"
+            (valueChange)="onStatusChange($any($event))"
           >
-            <option value="">All</option>
-            <option value="Pending">Pending</option>
-            <option value="InProgress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="Failed">Failed</option>
-            <option value="PartiallyCompleted">Partially Completed</option>
-          </select>
+            <hlm-select-trigger class="w-40" aria-label="Filter by status">
+              <hlm-select-value />
+            </hlm-select-trigger>
+            <hlm-select-content *hlmSelectPortal>
+              <hlm-select-group>
+                <hlm-select-item value="all">All</hlm-select-item>
+                <hlm-select-item value="Pending">Pending</hlm-select-item>
+                <hlm-select-item value="InProgress">In Progress</hlm-select-item>
+                <hlm-select-item value="Completed">Completed</hlm-select-item>
+                <hlm-select-item value="Failed">Failed</hlm-select-item>
+                <hlm-select-item value="PartiallyCompleted">Partially Completed</hlm-select-item>
+              </hlm-select-group>
+            </hlm-select-content>
+          </hlm-select>
         </div>
 
         @if (data(); as d) {
@@ -121,8 +127,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                               <button
                                 hlmBtn
                                 variant="ghost"
-                                size="icon"
-                                class="h-6 w-6"
+                                size="icon-xs"
                                 (click)="toggleExpand(job.id)"
                                 [attr.aria-expanded]="isExpanded(job.id)"
                                 aria-label="Toggle child jobs"
@@ -262,10 +267,6 @@ export class JobListComponent {
     { initialValue: null },
   );
 
-  asSelectValue(event: Event): string {
-    return (event.target as HTMLSelectElement).value;
-  }
-
   isParentJob(job: GetProcessingJobsResponse): boolean {
     return +(job.totalChildCount ?? 0) > 0;
   }
@@ -331,7 +332,7 @@ export class JobListComponent {
 
   onStatusChange(value: string): void {
     this.router.navigate(['/admin/jobs'], {
-      queryParams: { page: 1, status: value || null },
+      queryParams: { page: 1, status: value === 'all' ? null : value },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
