@@ -14,7 +14,7 @@ import { classes } from '@/shared/components/spartan/utils';
 		'data-slot': 'command-input-wrapper',
 	},
 	template: `
-		<hlm-input-group class="bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+		<hlm-input-group class="bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:ps-2!">
 			<input
 				brnCommandInput
 				data-slot="command-input"

@@ -19,6 +19,6 @@ export class HlmPaginationEllipsis {
 	public readonly srOnlyText = input<string>('More pages');
 
 	constructor() {
-		classes(() => 'size-9 [&_ng-icon:not([class*=\'text-\'])]:text-[length:--spacing(4)] flex items-center justify-center');
+		classes(() => "size-8 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] flex items-center justify-center");
 	}
 }

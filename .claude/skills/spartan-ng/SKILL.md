@@ -134,6 +134,24 @@ To re-install all components (e.g., after a major Spartan version upgrade):
 
 Then verify the build passes and run health checks (see below).
 
+**Driving generation non-interactively:** the no-arg `npx ng g @spartan-ng/cli:ui` opens an interactive multi-select picker that can't be driven from a script (piping `</dev/null` cancels it, generating nothing). Instead loop one component per command — `utils` first (others import from it), then the rest by directory name:
+
+```bash
+for c in $(ls src/app/shared/components/spartan/); do npx ng g @spartan-ng/cli:ui "$c" </dev/null; done
+```
+
+### Known upgrade gotchas (1.0.1 → 1.1.0, nova)
+
+A green `ng build` **and** a clean `healthcheck` are **not sufficient** after a regen — two of these are runtime-only regressions. Always run the `self-qa` subagent afterward.
+
+- **The `icon` helm was removed in 1.1.0.** There is no `ui:icon` template; regenerated helm imports `NgIcon`/`provideIcons` straight from `@ng-icons/core`. But this app uses `HlmIconImports` (~86 files) and `<ng-icon hlm size="sm|xs">` (~448 sites) that rely on the `HlmIcon` directive's token→px sizing. **Do NOT migrate** — restore the previous `icon` helm from git and re-add its tsconfig alias; it's self-contained and decoupled from the new helm, and the `Helm Icons` healthcheck passes with it:
+  ```bash
+  git checkout HEAD -- Homestead.WebApp/src/app/shared/components/spartan/icon
+  # then add "@/shared/components/spartan/icon" back to tsconfig.json paths
+  ```
+- **`HlmDatePickerConfig.parseDate` now returns `T | null`** (was `undefined`), and `hlm-date-picker`'s `dateChange` output emits `T | null`. This *is* a build error, so it's caught — fix app `parseDate` impls to return `null` and widen any `(dateChange)` setter to accept `null` (`shared/utils/date-picker-config.ts`).
+- **`hlmAlertDialogCancel` / `hlmAlertDialogAction` (also `hlmInputGroupButton`, `hlmSidebarTrigger`) now bring `HlmButton` via `hostDirectives`** (exposing `variant`/`size`). A button that adds `hlmBtn` alongside them double-applies `BrnButton` → **runtime `NG0309` "matches multiple times"** (build passes; only opening the dialog / self-QA catches it). Drop the redundant `hlmBtn`, keep the directive, pass `variant`/`size` as its inputs. Note `hlmDialogClose` does **not** bring `HlmButton`, so `hlmBtn + hlmDialogClose` remains correct.
+
 ## Updating Brain Primitives
 
 Brain is a regular npm package — update it with your package manager:

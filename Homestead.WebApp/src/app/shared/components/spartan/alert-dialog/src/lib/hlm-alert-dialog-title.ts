@@ -9,6 +9,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmAlertDialogTitle {
 	constructor() {
-		classes(() => 'text-lg font-medium sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2');
+		classes(() => 'text-base font-medium sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2');
 	}
 }

@@ -11,20 +11,21 @@ export function formatPickerDate(date: Date): string {
 }
 
 /** Lenient, local-safe parse: ISO-leading strings parse as LOCAL y/m/d (no UTC day
- *  shift); anything else falls back to `new Date(value)`; invalid → undefined. */
-export function parsePickerDate(value: string): Date | undefined {
+ *  shift); anything else falls back to `new Date(value)`; invalid → null.
+ *  (Spartan 1.1.0's `HlmDatePickerConfig.parseDate` contract returns `T | null`.) */
+export function parsePickerDate(value: string): Date | null {
   const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return parseDate(trimmed) ?? undefined;
+  if (!trimmed) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return parseDate(trimmed) ?? null;
   const d = new Date(trimmed);
-  return isNaN(d.getTime()) ? undefined : d;
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /** Bridge a `'yyyy-MM-dd'` string signal (empty string = no date) to
  *  hlm-date-picker's Date bindings: `[date]="x.date()" (dateChange)="x.set($event)"`. */
 export function isoDateBinding(sig: WritableSignal<string>): {
   date: Signal<Date | undefined>;
-  set: (date: Date | undefined) => void;
+  set: (date: Date | null | undefined) => void;
 } {
   return {
     date: computed(() => parseDate(sig()) ?? undefined),

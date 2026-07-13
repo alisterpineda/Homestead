@@ -7,6 +7,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmCardTitle {
 	constructor() {
-		classes(() => 'text-base leading-normal font-medium group-data-[size=sm]/card:text-sm');
+		classes(() => 'text-base leading-snug font-medium group-data-[size=sm]/card:text-sm');
 	}
 }

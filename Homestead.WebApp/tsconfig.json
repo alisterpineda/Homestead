@@ -17,14 +17,14 @@
       "@/*": [
         "./src/app/*"
       ],
-      "@/shared/components/spartan/icon": [
-        "./src/app/shared/components/spartan/icon/src/index.ts"
+      "@/shared/components/spartan/utils": [
+        "./src/app/shared/components/spartan/utils/src/index.ts"
       ],
       "@/shared/components/spartan/alert-dialog": [
         "./src/app/shared/components/spartan/alert-dialog/src/index.ts"
       ],
-      "@/shared/components/spartan/utils": [
-        "./src/app/shared/components/spartan/utils/src/index.ts"
+      "@/shared/components/spartan/button": [
+        "./src/app/shared/components/spartan/button/src/index.ts"
       ],
       "@/shared/components/spartan/badge": [
         "./src/app/shared/components/spartan/badge/src/index.ts"
@@ -68,6 +68,12 @@
       "@/shared/components/spartan/dialog": [
         "./src/app/shared/components/spartan/dialog/src/index.ts"
       ],
+      "@/shared/components/spartan/date-picker": [
+        "./src/app/shared/components/spartan/date-picker/src/index.ts"
+      ],
+      "@/shared/components/spartan/popover": [
+        "./src/app/shared/components/spartan/popover/src/index.ts"
+      ],
       "@/shared/components/spartan/dropdown-menu": [
         "./src/app/shared/components/spartan/dropdown-menu/src/index.ts"
       ],
@@ -88,9 +94,6 @@
       ],
       "@/shared/components/spartan/pagination": [
         "./src/app/shared/components/spartan/pagination/src/index.ts"
-      ],
-      "@/shared/components/spartan/popover": [
-        "./src/app/shared/components/spartan/popover/src/index.ts"
       ],
       "@/shared/components/spartan/progress": [
         "./src/app/shared/components/spartan/progress/src/index.ts"
@@ -134,11 +137,8 @@
       "@/shared/components/spartan/toggle-group": [
         "./src/app/shared/components/spartan/toggle-group/src/index.ts"
       ],
-      "@/shared/components/spartan/button": [
-        "./src/app/shared/components/spartan/button/src/index.ts"
-      ],
-      "@/shared/components/spartan/date-picker": [
-        "./src/app/shared/components/spartan/date-picker/src/index.ts"
+      "@/shared/components/spartan/icon": [
+        "./src/app/shared/components/spartan/icon/src/index.ts"
       ]
     }
   },

@@ -7,6 +7,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmFieldGroup {
 	constructor() {
-		classes(() => 'gap-7 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4 group/field-group @container/field-group flex w-full flex-col');
+		classes(() => 'gap-5 data-[slot=checkbox-group]:gap-3 *:data-[slot=field-group]:gap-4 group/field-group @container/field-group flex w-full flex-col');
 	}
 }

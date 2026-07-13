@@ -52,6 +52,6 @@ export class HlmPaginationPrevious {
 	protected readonly _size = computed<ButtonVariants['size']>(() => (this.iconOnly() ? 'icon' : 'default'));
 
 	protected readonly _computedClass = computed(() =>
-		hlm(!this.iconOnly() && 'ps-2!', this.userClass()),
+		hlm(!this.iconOnly() && 'ps-1.5!', this.userClass()),
 	);
 }

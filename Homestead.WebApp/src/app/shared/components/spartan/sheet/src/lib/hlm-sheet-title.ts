@@ -9,6 +9,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmSheetTitle {
 	constructor() {
-		classes(() => 'text-foreground font-medium');
+		classes(() => 'text-foreground text-base font-medium');
 	}
 }

@@ -7,6 +7,6 @@ import { classes } from '@/shared/components/spartan/utils';
 })
 export class HlmDropdownMenuShortcut {
 	constructor() {
-		classes(() => 'text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground ml-auto text-xs tracking-widest');
+		classes(() => 'text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground ms-auto text-xs tracking-widest');
 	}
 }

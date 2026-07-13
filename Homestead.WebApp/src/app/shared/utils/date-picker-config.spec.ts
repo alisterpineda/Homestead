@@ -33,10 +33,10 @@ describe('parsePickerDate', () => {
     expect(d!.getDate()).toBe(12);
   });
 
-  it('returns undefined for unparseable or empty input', () => {
-    expect(parsePickerDate('garbage')).toBeUndefined();
-    expect(parsePickerDate('')).toBeUndefined();
-    expect(parsePickerDate('   ')).toBeUndefined();
+  it('returns null for unparseable or empty input', () => {
+    expect(parsePickerDate('garbage')).toBeNull();
+    expect(parsePickerDate('')).toBeNull();
+    expect(parsePickerDate('   ')).toBeNull();
   });
 
   // hlm-date-picker-input re-parses the displayed text on every blur, so the
