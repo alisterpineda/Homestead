@@ -15,7 +15,7 @@ import { formatBytes, handleFileInputChange } from '@/shared/utils';
   providers: [provideIcons({ lucideUpload, lucideCheck, lucideAlertCircle, lucideLoader, lucideX, lucideRotateCw, lucideListX, lucideInfo })],
   template: `
     <div hlmPopover align="end">
-      <button hlmPopoverTrigger hlmBtn variant="ghost" size="sm" class="relative" aria-label="Upload">
+      <button hlmPopoverTrigger hlmBtn variant="ghost" class="relative" aria-label="Upload">
         <ng-icon hlm name="lucideUpload" size="sm" />
         <span class="hidden sm:inline">Upload</span>
         @switch (triggerBadge()) {
