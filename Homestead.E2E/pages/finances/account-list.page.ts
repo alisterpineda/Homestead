@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import type { AccountKind } from '../../helpers/api/finances';
+import { fillDatePicker } from '../../helpers/playwright.helpers';
 
 export const KIND_LABELS: Record<AccountKind, string> = {
   Cash: 'Cash',
@@ -74,7 +75,7 @@ export class AccountListPage {
     }
 
     if (input.asOfDate !== undefined && input.kind !== 'Investment') {
-      await this.page.getByLabel('As-of date').fill(input.asOfDate);
+      await fillDatePicker(this.page, 'As-of date', input.asOfDate);
     }
 
     const createResponse = this.page.waitForResponse(

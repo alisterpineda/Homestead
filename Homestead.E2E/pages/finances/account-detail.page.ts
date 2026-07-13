@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect } from '@playwright/test';
+import { fillDatePicker } from '../../helpers/playwright.helpers';
 
 export interface RecordBalanceInput {
   amount: string;
@@ -58,7 +59,7 @@ export class AccountDetailPage {
     await expect(sheet).toBeVisible();
 
     await sheet.getByLabel('Amount', { exact: true }).fill(input.amount);
-    await sheet.getByLabel('As-of date').fill(input.date);
+    await fillDatePicker(sheet, 'As-of date', input.date);
     if (input.memo !== undefined) {
       await sheet.getByLabel('Memo (optional)').fill(input.memo);
     }
@@ -91,7 +92,7 @@ export class AccountDetailPage {
       .click();
 
     await sheet.getByLabel(/Amount sent/).fill(input.amount);
-    await sheet.getByLabel('Date', { exact: true }).fill(input.date);
+    await fillDatePicker(sheet, 'Date', input.date, { exact: true });
     if (input.memo !== undefined) {
       await sheet.getByLabel('Memo (optional)').fill(input.memo);
     }
