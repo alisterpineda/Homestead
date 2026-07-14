@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, computed, viewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, computed, effect, viewChild } from '@angular/core';
 import { Router, RouterOutlet, NavigationEnd, NavigationStart, ActivatedRoute } from '@angular/router';
 import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -26,6 +26,7 @@ import { AuthService } from '@/shared/services/auth.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { PageHeaderService } from '@/shared/services/page-header.service';
 import { FinancesPrivacyAutoMaskService } from '@/modules/finances/shared/finances-privacy-auto-mask.service';
+import { UserPreferencesService } from '@/shared/services/user-preferences.service';
 import { getModuleByPath } from '@/modules/registry';
 
 @Component({
@@ -209,6 +210,7 @@ export class AppShellComponent {
   private activatedRoute = inject(ActivatedRoute);
   private processingHub = inject(ProcessingHubService);
   private pageHeaderService = inject(PageHeaderService);
+  private prefs = inject(UserPreferencesService);
 
   headerActions = this.pageHeaderService.actions;
   headerSecondaryActions = this.pageHeaderService.secondaryActions;
@@ -225,6 +227,14 @@ export class AppShellComponent {
         this.pageHeaderService.clearActions();
         this.pageHeaderService.clearTitle();
       });
+
+    // Remember the active module so a cold start (e.g. PWA relaunch) at '/' lands where the user
+    // left off. activeModule() is a stable-reference computed over the URL, so this fires only on
+    // genuine module crossings; equal values are coalesced by signal.set + the persisted effect.
+    effect(() => {
+      const mod = this.activeModule();
+      if (mod) this.prefs.lastModulePath.set(mod.basePath);
+    });
   }
 
   private url = toSignal(

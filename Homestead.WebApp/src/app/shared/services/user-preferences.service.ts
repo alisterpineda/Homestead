@@ -3,6 +3,10 @@ import type { VisibilityState } from '@tanstack/angular-table';
 import { persistedSignal } from '../utils/persisted-signal';
 import type { NetWorthRange } from '@/api/generated/models/net-worth-range';
 
+/** Top-level module base paths eligible for last-module cold-start restore.
+ *  Keep in sync with the AppShell children in app.routes.ts and modules/registry.ts basePaths. */
+const KNOWN_MODULE_PATHS = ['/documents', '/finances', '/inventory', '/admin'] as const;
+
 const NET_WORTH_RANGE_KINDS: readonly NetWorthRange[] = [
   'ThisMonth',
   'ThreeMonths',
@@ -49,6 +53,14 @@ export class UserPreferencesService {
     key: 'homestead-page-size',
     defaultValue: 50,
     validate: (v): v is number => typeof v === 'number' && [10, 20, 50, 100].includes(v),
+  });
+
+  /** Base path of the module the user was last in; restored on cold start at '/'. */
+  readonly lastModulePath = persistedSignal<string>({
+    key: 'homestead-last-module',
+    defaultValue: '/documents',
+    validate: (v): v is string =>
+      typeof v === 'string' && (KNOWN_MODULE_PATHS as readonly string[]).includes(v),
   });
 
   readonly documentViewMode = persistedSignal<'table' | 'grid'>({

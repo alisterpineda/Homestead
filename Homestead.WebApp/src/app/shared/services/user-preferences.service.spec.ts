@@ -46,6 +46,39 @@ describe('UserPreferencesService', () => {
     });
   });
 
+  describe('lastModulePath', () => {
+    it('should default to /documents when storage is empty', () => {
+      const service = createService();
+      expect(service.lastModulePath()).toBe('/documents');
+    });
+
+    it('should load a valid module path from storage', () => {
+      mockStorage['homestead-last-module'] = '"/inventory"';
+      const service = createService();
+      expect(service.lastModulePath()).toBe('/inventory');
+    });
+
+    it('should self-heal an unknown module path to /documents', () => {
+      mockStorage['homestead-last-module'] = '"/bogus"';
+      const service = createService();
+      expect(service.lastModulePath()).toBe('/documents');
+    });
+
+    it('should self-heal a literal "undefined" value to /documents', () => {
+      mockStorage['homestead-last-module'] = 'undefined';
+      const service = createService();
+      expect(service.lastModulePath()).toBe('/documents');
+    });
+
+    it('should persist when set', () => {
+      const service = createService();
+      TestBed.flushEffects(); // initial skip
+      service.lastModulePath.set('/finances');
+      TestBed.flushEffects();
+      expect(localStorage.setItem).toHaveBeenCalledWith('homestead-last-module', '"/finances"');
+    });
+  });
+
   describe('documentViewMode', () => {
     it('should default to grid', () => {
       const service = createService();

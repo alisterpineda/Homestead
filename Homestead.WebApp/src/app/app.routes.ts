@@ -3,6 +3,7 @@ import { authGuard } from '@/shared/guards/auth.guard';
 import { adminGuard } from '@/shared/guards/admin.guard';
 import { loginGuard } from '@/shared/guards/login.guard';
 import { pendingActivationGuard } from '@/shared/guards/pending-activation.guard';
+import { lastModuleRedirect } from '@/shared/guards/last-module-redirect';
 
 export const routes: Routes = [
   {
@@ -27,7 +28,7 @@ export const routes: Routes = [
       ),
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'documents', pathMatch: 'full' },
+      { path: '', redirectTo: lastModuleRedirect, pathMatch: 'full' },
       {
         path: 'documents',
         loadChildren: () =>
