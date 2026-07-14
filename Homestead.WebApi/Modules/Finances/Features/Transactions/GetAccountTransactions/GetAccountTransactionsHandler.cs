@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
 
-public class GetAccountTransactionsHandler(AppDbContext db)
+public class GetAccountTransactionsHandler(AppDbContext db, ICategoryPathResolver pathResolver)
     : IRequestHandler<GetAccountTransactionsQuery, PaginatedResponse<TransactionResponse>>
 {
     public async Task<PaginatedResponse<TransactionResponse>> Handle(
@@ -41,10 +41,11 @@ public class GetAccountTransactionsHandler(AppDbContext db)
             .ThenByDescending(t => t.Id);
 
         var page = await orderedQuery.ToPaginatedAsync(request, ct);
+        var categories = await pathResolver.GetPathMapAsync(ct);
 
         return new PaginatedResponse<TransactionResponse>
         {
-            Items = page.Items.Select(TransactionMapping.ToResponse).ToList(),
+            Items = page.Items.Select(t => TransactionMapping.ToResponse(t, categories)).ToList(),
             Page = page.Page,
             PageSize = page.PageSize,
             TotalCount = page.TotalCount,

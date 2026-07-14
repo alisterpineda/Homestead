@@ -30,6 +30,7 @@ export type { BulkReprocessDocumentsResponse } from './models/bulk-reprocess-doc
 export type { BulkSummarizeDocumentsCommand } from './models/bulk-summarize-documents-command';
 export type { BulkUpdateDocumentsCommand } from './models/bulk-update-documents-command';
 export type { BulkUpdateDocumentsResponse } from './models/bulk-update-documents-response';
+export type { CategoryResponse } from './models/category-response';
 export type { ClassifyDocumentBody } from './models/classify-document-body';
 export type { ClassifyPreviewPartyDto } from './models/classify-preview-party-dto';
 export type { ClassifyPreviewResponse } from './models/classify-preview-response';
@@ -48,6 +49,7 @@ export type { CreateAccountCommand } from './models/create-account-command';
 export type { CreateAreaCommand } from './models/create-area-command';
 export type { CreateBalanceEntryCommand } from './models/create-balance-entry-command';
 export type { CreateBrandCommand } from './models/create-brand-command';
+export type { CreateCategoryCommand } from './models/create-category-command';
 export type { CreateCommentCommand } from './models/create-comment-command';
 export type { CreateCommentResponse } from './models/create-comment-response';
 export type { CreateCommodityCommand } from './models/create-commodity-command';
@@ -167,6 +169,7 @@ export type { PaginatedResponseOfUserResponse } from './models/paginated-respons
 export type { PartyDto } from './models/party-dto';
 export type { PartySortBy } from './models/party-sort-by';
 export type { PatchBalanceEntryCommand } from './models/patch-balance-entry-command';
+export type { PatchCategoryCommand } from './models/patch-category-command';
 export type { PatchDividendCommand } from './models/patch-dividend-command';
 export type { PatchDocumentResponse } from './models/patch-document-response';
 export type { PatchDocumentVersionResponse } from './models/patch-document-version-response';

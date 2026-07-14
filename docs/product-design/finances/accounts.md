@@ -4,7 +4,7 @@ Detailed design for account management in the Finances module. Expands on the su
 
 ## Conceptual model
 
-Accounts are the units the user thinks about and manages. Each has a name, a user-facing **kind**, a reporting currency, and an optional institution. Accounts form a flat list in v1; a parent-child hierarchy is deferred to v2 when income/expense categories are added (categories are the feature that actually needs hierarchy).
+Accounts are the units the user thinks about and manages. Each has a name, a user-facing **kind**, a reporting currency, and an optional institution. Balance-sheet accounts (Asset/Liability) form a **flat list** — no parent-child hierarchy. Hierarchy landed only for **categories** (Income/Expense accounts), which are the feature that actually needs it and are managed on their own page; see [transactions.md](transactions.md#expense--income) and the finances overview's *Categorisation* section.
 
 There are two internal shapes, determined by kind:
 
@@ -36,8 +36,8 @@ Four system-created accounts always exist for each household:
 
 - **Equity:Opening Balances** (`AccountType=Equity`) — counterpart for wealth present before tracking began.
 - **Equity:Adjustments** (`AccountType=Equity`) — counterpart for unexplained balance-entry deltas.
-- **Income** (`AccountType=Income`) — counterpart for cash dividends in v1. Subsumed by user-created income accounts in v2; see [transactions.md](transactions.md#system-accounts-used-as-counterparts).
-- **Expense** (`AccountType=Expense`) — reserved for symmetry; no v1 shape posts to it. Seeded so v2 doesn't have to backfill it.
+- **Income** (`AccountType=Income`) — the read-only **Uncategorised Income** bucket: counterpart for cash dividends and any uncategorised income/refund flow. User-created Income **categories** (C-1) can now be the counterpart instead; see [transactions.md](transactions.md#system-accounts-used-as-counterparts).
+- **Expense** (`AccountType=Expense`) — the read-only **Uncategorised Expense** bucket: counterpart for any uncategorised spend flow. User-created Expense categories (C-1) can be the counterpart instead.
 
 All four are multi-position (postings can be in any commodity) and hidden from the account list.
 

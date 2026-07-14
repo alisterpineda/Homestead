@@ -191,6 +191,14 @@ export type { DeleteCommodity$Params as DeleteCommodity$Params } from './fn/fina
 export { deleteCommodity as deleteCommodity } from './fn/finances/delete-commodity';
 export type { PatchCommodity$Params as PatchCommodity$Params } from './fn/finances/patch-commodity';
 export { patchCommodity as patchCommodity } from './fn/finances/patch-commodity';
+export type { GetCategories$Params as GetCategories$Params } from './fn/finances/get-categories';
+export { getCategories as getCategories } from './fn/finances/get-categories';
+export type { CreateCategory$Params as CreateCategory$Params } from './fn/finances/create-category';
+export { createCategory as createCategory } from './fn/finances/create-category';
+export type { DeleteCategory$Params as DeleteCategory$Params } from './fn/finances/delete-category';
+export { deleteCategory as deleteCategory } from './fn/finances/delete-category';
+export type { PatchCategory$Params as PatchCategory$Params } from './fn/finances/patch-category';
+export { patchCategory as patchCategory } from './fn/finances/patch-category';
 export type { GetCommodityPrices$Params as GetCommodityPrices$Params } from './fn/finances/get-commodity-prices';
 export { getCommodityPrices as getCommodityPrices } from './fn/finances/get-commodity-prices';
 export type { CreateCommodityPrice$Params as CreateCommodityPrice$Params } from './fn/finances/create-commodity-price';

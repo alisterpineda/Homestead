@@ -10,6 +10,10 @@ using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.CreateBalanceEnt
 using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntries;
 using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.GetBalanceEntry;
 using Homestead.WebApi.Modules.Finances.Features.BalanceEntries.PatchBalanceEntry;
+using Homestead.WebApi.Modules.Finances.Features.Categories.CreateCategory;
+using Homestead.WebApi.Modules.Finances.Features.Categories.DeleteCategory;
+using Homestead.WebApi.Modules.Finances.Features.Categories.GetCategories;
+using Homestead.WebApi.Modules.Finances.Features.Categories.PatchCategory;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.CreateCommodity;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.DeleteCommodity;
 using Homestead.WebApi.Modules.Finances.Features.Commodities.GetCommodities;
@@ -94,6 +98,14 @@ public static class FinancesModule
         CreateCommodityEndpoint.Map(commodities);
         PatchCommodityEndpoint.Map(commodities);
         DeleteCommodityEndpoint.Map(commodities);
+
+        // Income/expense categories — Account rows of type Income/Expense, managed separately from
+        // balance-sheet accounts. Mirrors the commodities group.
+        var categories = v1.MapGroup("/categories");
+        GetCategoriesEndpoint.Map(categories);
+        CreateCategoryEndpoint.Map(categories);
+        PatchCategoryEndpoint.Map(categories);
+        DeleteCategoryEndpoint.Map(categories);
 
         var prices = v1.MapGroup("/commodity-prices");
         GetCommodityPricesEndpoint.Map(prices);

@@ -91,8 +91,15 @@ public record DividendDetails(
 /// by the response <see cref="TransactionResponse.Shape"/>, so no direction field is needed here.
 /// <see cref="Amount"/> is the positive magnitude of the user-account leg; <see cref="CurrencyId"/> is
 /// the account's reporting currency (both legs share it).
+///
+/// The category triple describes the counterpart leg: a flow posted to a user category carries its id,
+/// leaf <see cref="CategoryName"/>, and full breadcrumb <see cref="CategoryPath"/>. A flow left on the
+/// system Uncategorised bucket leaves all three null.
 /// </summary>
 public record FlowDetails(
     Guid AccountId,
     Guid CurrencyId,
-    decimal Amount) : TransactionDetails;
+    decimal Amount,
+    Guid? CategoryId,
+    string? CategoryName,
+    string? CategoryPath) : TransactionDetails;

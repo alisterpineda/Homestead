@@ -412,6 +412,9 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<Guid?>("ParentAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ReportingCurrencyId")
                         .HasColumnType("uuid");
 
@@ -433,6 +436,12 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("ReportingCurrencyId");
 
                     b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ParentAccountId", "AccountType", "Name")
+                        .IsUnique()
+                        .HasFilter("\"AccountType\" IN ('Income', 'Expense')");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ParentAccountId", "AccountType", "Name"), false);
 
                     b.ToTable("accounts", "finances");
                 });
@@ -1687,6 +1696,11 @@ namespace Homestead.WebApi.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Account", "ParentAccount")
+                        .WithMany("ChildAccounts")
+                        .HasForeignKey("ParentAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Homestead.WebApi.Domain.Finances.Commodity", "ReportingCurrency")
                         .WithMany()
                         .HasForeignKey("ReportingCurrencyId")
@@ -1699,6 +1713,8 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("ParentAccount");
 
                     b.Navigation("ReportingCurrency");
 
@@ -2171,6 +2187,11 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Children");
 
                     b.Navigation("DocumentTags");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.Account", b =>
+                {
+                    b.Navigation("ChildAccounts");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.AccountTransaction", b =>

@@ -10,4 +10,8 @@ public record PatchFlowCommand : ICommand<TransactionResponse>
     public required decimal Amount { get; init; }
     public required DateOnly Date { get; init; }
     public string? Description { get; init; }
+
+    // null → Uncategorised (posts to the system Expense/Income bucket). Editing this recategorises
+    // the flow — only the counterpart leg moves.
+    public Guid? CategoryId { get; init; }
 }

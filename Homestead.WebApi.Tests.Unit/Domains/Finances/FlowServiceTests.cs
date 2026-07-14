@@ -58,6 +58,17 @@ public class FlowServiceTests : IAsyncLifetime
         IsArchived = false,
     };
 
+    private Account CategoryAccount(string name, AccountType type) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        AccountType = type,
+        Kind = null,
+        ReportingCurrencyId = _cad.Id,
+        IsSystem = false,
+        IsArchived = false,
+    };
+
     private async Task<Account> AddAccount(AccountKind kind, Guid currencyId, string name)
     {
         var account = new Account
@@ -241,6 +252,47 @@ public class FlowServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Update_Recategorize_MovesOnlyCounterpartLeg_UserLegByteIdentical()
+    {
+        // The load-bearing C4 invariant: changing a flow's category re-points ONLY the counterpart leg's
+        // AccountId. The user-account leg (the balance-sheet side) stays byte-identical — no balance moves.
+        var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
+        var category = CategoryAccount("Groceries", AccountType.Expense);
+        _db.Accounts.Add(category);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        _counterparts.ResolveAsync(FlowDirection.Expense, category.Id, Arg.Any<CancellationToken>())
+            .Returns(category);
+
+        // Created uncategorised → counterpart is the system Expense bucket.
+        var created = await _sut.CreateAsync(
+            Create(FlowDirection.Expense, account.Id, 50m, new DateOnly(2026, 4, 23), "Groceries"),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var before = (NormalTransaction)created.Transaction!;
+        var userLeg = before.Splits.Single(s => s.AccountId == account.Id);
+        var counterLeg = before.Splits.Single(s => s.AccountId == _expense.Id);
+        var (userLegId, userQty, userCcy) = (userLeg.Id, userLeg.Quantity, userLeg.CommodityId);
+        var counterLegId = counterLeg.Id;
+
+        // Recategorise: identical amount/date, only CategoryId changes.
+        var updated = await _sut.UpdateAsync(created.Transaction!.Id,
+            new UpdateFlowRequest(account.Id, 50m, new DateOnly(2026, 4, 23), "Groceries", category.Id),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var after = (NormalTransaction)updated.Transaction!;
+        var userAfter = after.Splits.Single(s => s.Id == userLegId);
+        Assert.Equal(account.Id, userAfter.AccountId);   // unchanged
+        Assert.Equal(userQty, userAfter.Quantity);       // unchanged (−50)
+        Assert.Equal(userCcy, userAfter.CommodityId);    // unchanged
+
+        var counterAfter = after.Splits.Single(s => s.Id == counterLegId);  // same split row reused
+        Assert.Equal(category.Id, counterAfter.AccountId);  // ONLY this changed: bucket → category
+        Assert.Equal(-userQty, counterAfter.Quantity);
+    }
+
+    [Fact]
     public async Task Update_ChangingAccount_Throws()
     {
         var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
@@ -285,22 +337,106 @@ public class FlowServiceTests : IAsyncLifetime
     }
 }
 
-public class FlowCounterpartResolverTests
+public class FlowCounterpartResolverTests : IAsyncLifetime
 {
-    [Fact]
-    public async Task Resolve_Expense_ReturnsSystemExpense()
+    private TestAppDbContext _db = null!;
+    private FlowCounterpartResolver _sut = null!;
+    private Account _expense = null!;
+    private Account _income = null!;
+    private Guid _currencyId;
+
+    public async ValueTask InitializeAsync()
     {
-        var expense = new Account { Id = Guid.NewGuid(), Name = "Expense", AccountType = AccountType.Expense, ReportingCurrencyId = Guid.NewGuid(), IsSystem = true };
-        var income = new Account { Id = Guid.NewGuid(), Name = "Income", AccountType = AccountType.Income, ReportingCurrencyId = Guid.NewGuid(), IsSystem = true };
+        _db = TestAppDbContext.Create();
+        var cad = new Commodity { Id = Guid.NewGuid(), Symbol = "CAD", Name = "CAD", Kind = CommodityKind.Currency, DisplayPrecision = 2 };
+        _db.Commodities.Add(cad);
+        _currencyId = cad.Id;
+
+        _expense = Bucket("Expense", AccountType.Expense);
+        _income = Bucket("Income", AccountType.Income);
+        _db.Accounts.AddRange(_expense, _income);
+        await _db.SaveChangesAsync();
+
         var provider = Substitute.For<ISystemAccountProvider>();
-        provider.GetExpenseAsync(Arg.Any<CancellationToken>()).Returns(expense);
-        provider.GetIncomeAsync(Arg.Any<CancellationToken>()).Returns(income);
-        var sut = new FlowCounterpartResolver(provider);
+        provider.GetExpenseAsync(Arg.Any<CancellationToken>()).Returns(_expense);
+        provider.GetIncomeAsync(Arg.Any<CancellationToken>()).Returns(_income);
+        _sut = new FlowCounterpartResolver(_db, provider);
+    }
 
-        var expenseResult = await sut.ResolveAsync(FlowDirection.Expense, null, TestContext.Current.CancellationToken);
-        var incomeResult = await sut.ResolveAsync(FlowDirection.Income, null, TestContext.Current.CancellationToken);
+    public ValueTask DisposeAsync()
+    {
+        _db.Dispose();
+        return ValueTask.CompletedTask;
+    }
 
-        Assert.Same(expense, expenseResult);
-        Assert.Same(income, incomeResult);
+    private Account Bucket(string name, AccountType type) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, AccountType = type, Kind = null,
+        ReportingCurrencyId = _currencyId, IsSystem = true, IsArchived = false,
+    };
+
+    private async Task<Account> AddCategory(AccountType type, bool archived = false, string name = "Cat")
+    {
+        var account = new Account
+        {
+            Id = Guid.NewGuid(), Name = name, AccountType = type, Kind = null,
+            ReportingCurrencyId = _currencyId, IsSystem = false, IsArchived = archived,
+        };
+        _db.Accounts.Add(account);
+        await _db.SaveChangesAsync();
+        return account;
+    }
+
+    [Fact]
+    public async Task Resolve_NullHint_ReturnsSystemBucketByDirection()
+    {
+        Assert.Same(_expense, await _sut.ResolveAsync(FlowDirection.Expense, null, TestContext.Current.CancellationToken));
+        Assert.Same(_income, await _sut.ResolveAsync(FlowDirection.Income, null, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Resolve_ValidCategory_ReturnsIt()
+    {
+        var category = await AddCategory(AccountType.Expense);
+        var result = await _sut.ResolveAsync(FlowDirection.Expense, category.Id, TestContext.Current.CancellationToken);
+        Assert.Equal(category.Id, result.Id);
+    }
+
+    [Fact]
+    public async Task Resolve_WrongTypeCategory_Throws()
+    {
+        var incomeCategory = await AddCategory(AccountType.Income);
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.ResolveAsync(FlowDirection.Expense, incomeCategory.Id, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Resolve_ArchivedCategory_Throws()
+    {
+        var archived = await AddCategory(AccountType.Expense, archived: true);
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.ResolveAsync(FlowDirection.Expense, archived.Id, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Resolve_NonCategoryAccount_Throws()
+    {
+        var asset = new Account
+        {
+            Id = Guid.NewGuid(), Name = "Chequing", AccountType = AccountType.Asset, Kind = AccountKind.Cash,
+            ReportingCurrencyId = _currencyId, IsSystem = false, IsArchived = false,
+        };
+        _db.Accounts.Add(asset);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.ResolveAsync(FlowDirection.Expense, asset.Id, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Resolve_MissingCategory_Throws()
+    {
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.ResolveAsync(FlowDirection.Expense, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 }

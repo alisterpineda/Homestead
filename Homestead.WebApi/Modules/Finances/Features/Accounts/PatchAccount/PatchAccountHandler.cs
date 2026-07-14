@@ -26,6 +26,10 @@ public class PatchAccountHandler(
 
         if (account.IsSystem)
             throw new BusinessRuleException("System accounts cannot be modified.");
+        // Categories are mutable only through their own CRUD (/categories). From this endpoint's
+        // perspective a category is not an account — 404, consistent with GetAccount hiding it.
+        if (!account.AccountType.IsBalanceSheet())
+            throw new EntityNotFoundException("Account not found.");
 
         audit.Track<AccountSnapshot, Account>(account, "Account", account.Id);
 

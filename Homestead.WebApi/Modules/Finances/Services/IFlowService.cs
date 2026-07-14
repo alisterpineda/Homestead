@@ -24,14 +24,17 @@ public record CreateFlowRequest(
     Guid AccountId,
     decimal Amount,
     DateOnly Date,
-    string? Description);
+    string? Description,
+    Guid? CategoryId = null);
 
 // No Direction: a flow's direction is immutable (fixed by the stored shape) — the patch cannot flip it.
+// CategoryId can change: recategorising re-resolves the counterpart leg (see FlowService.UpdateAsync).
 public record UpdateFlowRequest(
     Guid AccountId,
     decimal Amount,
     DateOnly Date,
-    string? Description);
+    string? Description,
+    Guid? CategoryId = null);
 
 public record FlowMutationResult(
     AccountTransaction? Transaction,

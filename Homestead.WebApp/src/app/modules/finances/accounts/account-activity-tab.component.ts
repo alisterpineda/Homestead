@@ -431,6 +431,9 @@ export class AccountActivityTabComponent {
       if (assertedCommodity) {
         typeSubtitle = formatMaskedCurrency(tx.details.assertedAmount, assertedCommodity, masked);
       }
+    } else if (tx.details?.kind === 'flow') {
+      // Leaf category name; blank when Uncategorised. Full breadcrumb lives on the edit sheet.
+      typeSubtitle = tx.details.categoryName ?? '';
     }
 
     return {

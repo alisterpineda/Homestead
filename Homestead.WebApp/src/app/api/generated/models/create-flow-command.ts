@@ -5,6 +5,7 @@ import { FlowDirection } from '../models/flow-direction';
 export interface CreateFlowCommand {
   accountId: string;
   amount: number;
+  categoryId?: (string | null);
   date: string;
   description?: (string | null);
   direction: FlowDirection;

@@ -11,4 +11,7 @@ public record CreateFlowCommand : ICommand<TransactionResponse>
     public required decimal Amount { get; init; }
     public required DateOnly Date { get; init; }
     public string? Description { get; init; }
+
+    // null → Uncategorised (posts to the system Expense/Income bucket).
+    public Guid? CategoryId { get; init; }
 }

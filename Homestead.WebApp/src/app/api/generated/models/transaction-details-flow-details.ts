@@ -4,6 +4,9 @@
 export interface TransactionDetailsFlowDetails {
   accountId: string;
   amount: number;
+  categoryId: (string | null);
+  categoryName: (string | null);
+  categoryPath: (string | null);
   currencyId: string;
   kind: 'flow';
 }

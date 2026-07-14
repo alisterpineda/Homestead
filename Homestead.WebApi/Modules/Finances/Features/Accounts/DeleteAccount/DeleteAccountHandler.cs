@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,9 @@ public class DeleteAccountHandler(AppDbContext db, IAuditContext audit, IUnitOfW
 
         if (account.IsSystem)
             throw new BusinessRuleException("System accounts cannot be deleted.");
+        // Categories are deletable only through their own CRUD (/categories) — not an account here → 404.
+        if (!account.AccountType.IsBalanceSheet())
+            return false;
 
         var hasSplits = await db.AccountTransactionSplits
             .AnyAsync(s => s.AccountId == account.Id, ct);

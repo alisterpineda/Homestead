@@ -13,7 +13,11 @@ public class GetAccountsHandler(AppDbContext db, IValuationService valuations)
     public async Task<PaginatedResponse<AccountResponse>> Handle(
         GetAccountsQuery request, CancellationToken ct)
     {
-        var query = db.Accounts.AsNoTracking().Where(a => !a.IsSystem);
+        // Balance-sheet accounts only — categories (non-system Income/Expense) are managed under
+        // /categories and must not leak into the account list. !IsSystem stays for defence-in-depth.
+        var query = db.Accounts.AsNoTracking()
+            .Where(a => !a.IsSystem)
+            .Where(AccountQueries.IsBalanceSheetAccount);
 
         if (request.IncludeArchived != true)
             query = query.Where(a => !a.IsArchived);

@@ -22,7 +22,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 
 ## Out of scope for v1
 
-- Categories, category reporting, expense tracking in the conventional sense.
+- Category **reporting / drill-down** (a by-category spend report) — the *categorisation model and assignment* shipped in cut C-1 (see *Categorisation* below), but the report is a fast-follow (C-2) and is not built yet. Categorisation is **optional**: flows default to Uncategorised and income/expense balances stay out of net worth, so anyone who ignores categories sees the v1 tracker unchanged.
 - Tags on transactions or splits.
 - Recurring or scheduled transactions.
 - Budgeting.
@@ -42,14 +42,14 @@ These are excluded from v1 but the model must not block adding them later. See *
 
 Accounts are the units the user thinks about and manages. Users pick from a closed set of user-facing **kinds** — Cash, Credit Card, Loan, Other Liability, Investment, Other Asset — which determine the underlying Asset/Liability classification and whether the account holds one commodity or many. Kind and reporting currency are immutable after creation; everything else (name, institution, archived) is editable. Accounts are a flat list in v1 — the list groups by Kind, and Institution provides secondary grouping where users need it.
 
-Account types used at the model layer in v1: `asset`, `liability`, `equity`, `income`, `expense`. v1 uses `income` and `expense` only for two hidden system accounts — user-creatable income/expense accounts (and the categorisation features they enable) are deferred to v2.
+Account types used at the model layer: `asset`, `liability`, `equity`, `income`, `expense`. `income`/`expense` accounts are **categories** — as of cut C-1 users can create their own (nested), and a flow may post to a category instead of the hidden system bucket. Only `asset`/`liability` accounts are "balance-sheet accounts" that appear in the account list and sum into net worth; `income`/`expense` categories are managed separately (see *Categorisation*) and never enter net worth. The seeded `Income`/`Expense` system accounts remain as the read-only "Uncategorised" buckets.
 
 Four system accounts always exist per household, all hidden from user-facing lists:
 
 - **Equity:Opening Balances** — counterpart for wealth present before tracking began.
 - **Equity:Adjustments** — counterpart for unexplained balance-entry deltas. See *Balance entries*.
-- **Income** — counterpart for cash dividends and everyday income/refunds (the Income flow shape) in v1. Subsumed by user-created income accounts in v2.
-- **Expense** — counterpart for everyday spending (the Expense flow shape) in v1. Subsumed by user-created expense accounts in v2.
+- **Income** — the read-only **Uncategorised Income** bucket: counterpart for cash dividends and any income/refund flow the user hasn't categorised.
+- **Expense** — the read-only **Uncategorised Expense** bucket: counterpart for any spend flow the user hasn't categorised.
 
 See [accounts.md](accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
 
@@ -124,9 +124,11 @@ Split quantities follow the Beancount convention: asset and expense splits are p
 
 The schema supports any account holding any set of commodities. The "single-position" constraint on Cash / Credit Card / Loan / Other kinds is enforced by the UI — through the set of transaction shapes offered for each kind — not by the data layer. Only Investment accounts surface multi-commodity shapes. This keeps the model uniform and avoids a second set of tables for investment accounts.
 
-### Categorisation is a v2 concern
+### Categorisation (available, and optional)
 
-The model reserves `income` and `expense` account types and assumes categories will eventually be implemented as user-creatable accounts of those types. v1 seeds two hidden system accounts (`Income`, `Expense`) for shapes that need a categorised counterpart (Dividend and Income flows → `Income`; Expense flows → `Expense`), but does not let users create their own and does not surface category reporting. When v2 arrives, the system accounts are renamed to "uncategorised" buckets and user-creatable categories slot in alongside — no historical data is rewritten.
+Categories are `Account` rows of type `income`/`expense` with `IsSystem=false`, `Kind=null` — the locked "categories-are-accounts" philosophy (a split-level category tag and a separate `Category` entity were both rejected). Cut **C-1** shipped the model + assignment + a nested management page (`/finances/categories`): users create their own categories, nest them (`Food → Groceries → Produce`), and a spend/income flow may post to a category instead of the seeded system bucket. It is **opt-in at every level** — flows default to Uncategorised (the read-only `Income`/`Expense` buckets), income/expense balances stay out of net worth, and the by-category report is a separate C-2 surface — so a household that ignores categories sees the core net-worth tracker unchanged. Deliberately deferred: the by-category **report** (C-2); category **archive**, **merge**, bulk-recategorise, Dividend categorisation, and statement-import assignment (C-3). No historical flow is rewritten — existing flows stay Uncategorised until edited.
+
+The one load-bearing correctness rule this introduced: `!IsSystem` no longer means "balance-sheet account" (a category is `IsSystem=false` too). Every read path that sums or lists "real accounts" filters on the `Asset`/`Liability` predicate, not `!IsSystem`, so categories never leak into the account list or net worth.
 
 ### Accumulate prices and history from day one
 
@@ -160,11 +162,11 @@ Reverse of buy.
 
 ### Dividend
 
-Cash dividend received into an investment account. UI asks for the investment account, commodity the dividend was paid in, amount, and date. Produces a two-split transaction crediting the hidden system `Income` account. v2 categorised income accounts subsume this without rewriting history.
+Cash dividend received into an investment account. UI asks for the investment account, commodity the dividend was paid in, amount, and date. Produces a two-split transaction crediting the hidden `Income` (Uncategorised) bucket. Dividend categorisation is deferred to C-3, so dividends stay Uncategorised for now.
 
 ### Expense / Income
 
-Everyday spending or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund". One shared editor with an Expense/Income toggle (mirrors Buy/Sell). UI asks for the account (read-only), direction, amount, date, and an optional free-text description; the currency is inferred from the account's reporting currency (no picker). Produces a two-split transaction posting the non-account leg to the hidden system `Expense` (spend) or `Income` (income/refund) account. Available on all non-Investment kinds — Investment income is a Dividend instead. On a liability account an expense reads as a positive charge and income/refund as a negative (red) credit, the statement convention, with no per-account-type sign flip. Net worth is unaffected. This is also the prerequisite for statement line-item import (a later epic). v2 categorised accounts subsume the system counterparts without rewriting history.
+Everyday spending or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund". One shared editor with an Expense/Income toggle (mirrors Buy/Sell). UI asks for the account (read-only), direction, amount, date, an optional **category** (C-1; default Uncategorised), and an optional free-text description; the currency is inferred from the account's reporting currency (no picker). Produces a two-split transaction posting the non-account leg to the chosen category or, if none, the hidden `Expense`/`Income` Uncategorised bucket. Available on all non-Investment kinds — Investment income is a Dividend instead. On a liability account an expense reads as a positive charge and income/refund as a negative (red) credit, the statement convention, with no per-account-type sign flip. Net worth is unaffected (the counterpart — bucket or category — never enters net worth). This is also the prerequisite for statement line-item import (a later epic).
 
 ### DRIP / reinvestment
 
@@ -198,7 +200,7 @@ See [valuation.md](valuation.md) for the API contract: which valuations are inli
 
 The following must be addable later without rewriting history:
 
-- Income and expense accounts as categories; category reporting and drill-down. This is also when a parent-child account hierarchy would be introduced (categories are naturally hierarchical, e.g. Food → Groceries → Produce).
+- ~~Income and expense accounts as categories~~ — **shipped (C-1)**: nested user categories with a management page and per-flow assignment. Still ahead on this axis: category **reporting / drill-down** (C-2) and category archive/merge/bulk-recategorise (C-3). The parent-child hierarchy introduced here is scoped to categories only, not balance-sheet accounts.
 - Tags at the split level for cross-cutting labels (e.g. tax-relevant, trip-specific).
 - Adjusted cost basis and tax-lot tracking for non-registered accounts.
 - Additional automated price providers beyond the shipped Bank of Canada Valet and Alpha Vantage integrations (see in-scope list above).

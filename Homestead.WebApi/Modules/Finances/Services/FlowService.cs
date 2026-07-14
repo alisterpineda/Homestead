@@ -20,9 +20,10 @@ public class FlowService(
         var currency = await LoadCurrencyAsync(account.ReportingCurrencyId, ct);
         ValidateInputs(request.Amount);
 
-        // System counterpart (Expense/Income) — do not writability-check it (mirrors BalanceEntryService
-        // posting to Equity:Adjustments and DividendService posting to Income).
-        var counter = await counterparts.ResolveAsync(request.Direction, null, ct);
+        // Counterpart (Expense/Income) — the system bucket when CategoryId is null (uncategorised), or
+        // the chosen category otherwise. Not writability-checked (mirrors BalanceEntryService posting to
+        // Equity:Adjustments and DividendService posting to Income); the resolver validates the category.
+        var counter = await counterparts.ResolveAsync(request.Direction, request.CategoryId, ct);
 
         // Beancount sign follows flow direction, so one path works on asset and liability accounts alike:
         // Expense drains the account (−a) and lands on Expense (+a); Income does the reverse.
@@ -74,22 +75,30 @@ public class FlowService(
         var direction = transaction.NormalShape == NormalShape.Expense
             ? FlowDirection.Expense
             : FlowDirection.Income;
-        var counter = await counterparts.ResolveAsync(direction, null, ct);
 
-        // LoadFlowAsync guarantees two splits; confirm exactly one is the system counterpart so the
-        // slot-identification Singles below can't throw a 500 on a structurally-broken row.
-        if (transaction.Splits.Count(s => s.AccountId == counter.Id) != 1)
+        // Identify the legs structurally by sign, NOT by matching a resolved counterpart's AccountId:
+        // once a flow is posted to a category, the counterpart leg's AccountId is that category (not a
+        // system bucket), so an AccountId match would fail. FlowService writes the user-account leg as
+        // −amount for Expense / +amount for Income (validator guarantees amount > 0), so the expected-
+        // sign leg is unambiguously the user leg and the other is the counterpart.
+        var userSlot = direction == FlowDirection.Expense
+            ? transaction.Splits.FirstOrDefault(s => s.Quantity < 0m)
+            : transaction.Splits.FirstOrDefault(s => s.Quantity > 0m);
+        if (userSlot is null)
             throw new BusinessRuleException("Flow transaction is malformed.");
+        var counterSlot = transaction.Splits.Single(s => s.Id != userSlot.Id);
 
-        var accountSlot = transaction.Splits.Single(s => s.AccountId != counter.Id);
-        var counterSlot = transaction.Splits.Single(s => s.AccountId == counter.Id);
-
-        if (request.AccountId != accountSlot.AccountId)
+        if (request.AccountId != userSlot.AccountId)
             throw new BusinessRuleException("A flow's account cannot be changed.");
 
-        var account = await LoadAccountAsync(accountSlot.AccountId, ct);
+        var account = await LoadAccountAsync(userSlot.AccountId, ct);
         var currency = await LoadCurrencyAsync(account.ReportingCurrencyId, ct);
         ValidateInputs(request.Amount);
+
+        // Resolve the (possibly changed) counterpart. Recategorising moves ONLY the counterpart leg's
+        // AccountId — the user leg and its balance are untouched, so no balance-entry re-reconciliation
+        // beyond the amount/date edit this patch already makes.
+        var newCounter = await counterparts.ResolveAsync(direction, request.CategoryId, ct);
 
         var touchedBefore = TouchedFor(transaction).ToList();
 
@@ -101,10 +110,11 @@ public class FlowService(
 
         var accountQuantity = SignedAccountQuantity(direction, request.Amount);
 
-        accountSlot.AccountId = account.Id;
-        accountSlot.CommodityId = currency.Id;
-        accountSlot.Quantity = accountQuantity;
+        userSlot.AccountId = account.Id;
+        userSlot.CommodityId = currency.Id;
+        userSlot.Quantity = accountQuantity;
 
+        counterSlot.AccountId = newCounter.Id;
         counterSlot.CommodityId = currency.Id;
         counterSlot.Quantity = -accountQuantity;
 

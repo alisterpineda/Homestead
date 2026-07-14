@@ -54,7 +54,22 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasForeignKey(a => a.UpdatedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Self-referencing hierarchy for Income/Expense category accounts. Restrict so a category with
+        // children can't be orphan-deleted through the FK — DeleteCategory reparents children first.
+        builder.HasOne(a => a.ParentAccount)
+            .WithMany(a => a.ChildAccounts)
+            .HasForeignKey(a => a.ParentAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(a => a.Kind)
             .HasFilter("\"IsArchived\" = FALSE");
+
+        // Sibling-unique category names, scoped to (parent, type). Filtered to categories so balance-sheet
+        // accounts keep today's no-uniqueness behaviour. AreNullsDistinct(false) → PG15+ NULLS NOT DISTINCT,
+        // so two top-level ParentAccountId=NULL siblings still collide (a NULL parent = "root", not "unique").
+        builder.HasIndex(a => new { a.ParentAccountId, a.AccountType, a.Name })
+            .IsUnique()
+            .AreNullsDistinct(false)
+            .HasFilter("\"AccountType\" IN ('Income', 'Expense')");
     }
 }

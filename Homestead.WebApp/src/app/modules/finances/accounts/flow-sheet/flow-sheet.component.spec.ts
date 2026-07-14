@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideZonelessChangeDetection } from '@angular/core';
+import { of } from 'rxjs';
 import { FlowSheetComponent } from './flow-sheet.component';
+import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 
@@ -33,6 +35,23 @@ const incomeFlow: TransactionResponse = {
     accountId: 'cash-1',
     currencyId: 'cad',
     amount: 30,
+  } as never,
+};
+
+const categorizedExpenseFlow: TransactionResponse = {
+  id: 'tx-cat',
+  shape: 'Expense',
+  occurredAt: '2026-04-23T00:00:00.000Z',
+  memo: 'Groceries',
+  splits: [],
+  details: {
+    kind: 'flow',
+    accountId: 'cash-1',
+    currencyId: 'cad',
+    amount: 40,
+    categoryId: 'cat-groceries',
+    categoryName: 'Groceries',
+    categoryPath: 'Food › Groceries',
   } as never,
 };
 
@@ -108,5 +127,72 @@ describe('FlowSheetComponent', () => {
 
     expect(c.amount()).toBe('42');
     expect(c.description()).toBe('draft note');
+  });
+
+  it('defaults categoryId to null in create mode', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    expect(fixture.componentInstance.categoryId()).toBeNull();
+  });
+
+  it('seeds categoryId from an existing flow in edit mode', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('existing', categorizedExpenseFlow);
+    expect(fixture.componentInstance.categoryId()).toBe('cat-groceries');
+  });
+
+  it('clears the selected category when the direction is switched (create mode)', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    const c = fixture.componentInstance;
+    c.categoryId.set('cat-groceries');
+    c.setDirection('Income');
+    expect(c.selectedDirection()).toBe('Income');
+    expect(c.categoryId()).toBeNull();
+  });
+});
+
+describe('FlowSheetComponent categoryId payload', () => {
+  let createFlow: ReturnType<typeof vi.fn>;
+  let patchFlow: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    createFlow = vi.fn().mockReturnValue(of(incomeFlow));
+    patchFlow = vi.fn().mockReturnValue(of(incomeFlow));
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        {
+          provide: FinancesTransactionApiService,
+          useValue: { createFlow, patchFlow, deleteTransaction: vi.fn().mockReturnValue(of(void 0)) },
+        },
+      ],
+    });
+  });
+
+  it('sends categoryId in the create payload', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    const c = fixture.componentInstance;
+    c.amount.set('50');
+    c.categoryId.set('cat-1');
+    c.handleSave();
+
+    expect(createFlow).toHaveBeenCalledTimes(1);
+    expect(createFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ categoryId: 'cat-1' }));
+  });
+
+  it('sends categoryId in the edit (patch) payload', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('existing', categorizedExpenseFlow);
+    const c = fixture.componentInstance;
+    c.categoryId.set(null); // recategorise to Uncategorised
+    c.handleSave();
+
+    expect(patchFlow).toHaveBeenCalledTimes(1);
+    expect(patchFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ categoryId: null }));
   });
 });

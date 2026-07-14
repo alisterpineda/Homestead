@@ -14,5 +14,8 @@ public class CreateFlowCommandValidator : AbstractValidator<CreateFlowCommand>
         RuleFor(x => x.Date).NotInFuture();
         RuleFor(x => x.Description).MaximumLength(512)
             .When(x => x.Description is not null);
+        // null = Uncategorised; a supplied category must be a real id (the resolver validates the rest).
+        RuleFor(x => x.CategoryId).NotEqual(Guid.Empty)
+            .When(x => x.CategoryId is not null);
     }
 }

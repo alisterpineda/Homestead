@@ -31,9 +31,13 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
                 reason: "no_display_currency");
         }
 
+        // Balance-sheet accounts only. Category (Income/Expense) splits must not seed the earliest-
+        // activity date — and (below) must not fold into net worth. IsBalanceSheetAccount inlined here
+        // because it targets the split's navigation, which the stored Expression can't be applied to.
         var firstAt = await db.AccountTransactionSplits
             .AsNoTracking()
-            .Where(s => !s.Account.IsSystem)
+            .Where(s => s.Account.AccountType == AccountType.Asset
+                     || s.Account.AccountType == AccountType.Liability)
             .Select(s => (DateTimeOffset?)s.Transaction.OccurredAt)
             .MinAsync(ct);
 
@@ -60,9 +64,12 @@ public class GetNetWorthHistoryHandler(AppDbContext db, IValuationService valuat
         // non-system accounts. Beancount sign convention makes this exact without
         // per-type arithmetic. Archived accounts are kept — they held value historically
         // and excluding them would dent the line on the archive date.
+        // Balance-sheet accounts only. This both stops category balances folding into net worth and
+        // keeps Kind!.Value below safe — categories have Kind == null and would throw here.
         var accountInfos = await db.Accounts
             .AsNoTracking()
             .Where(a => !a.IsSystem)
+            .Where(AccountQueries.IsBalanceSheetAccount)
             .Select(a => new { a.Id, a.Kind })
             .ToListAsync(ct);
 

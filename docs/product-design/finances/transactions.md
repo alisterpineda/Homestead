@@ -60,8 +60,8 @@ No stored `Value` column. Display-currency values are computed at read time from
 
 Four hidden system accounts exist per household (see [accounts.md](accounts.md#system-accounts) for `Equity:Opening Balances` and `Equity:Adjustments`). Two are added in v1 specifically to support the transaction shapes here:
 
-- **`Income`** — `AccountType=Income`, multi-position, hidden, system. Counterpart for cash dividends **and the Income flow shape** in v1. v2 introduces user-creatable categorised income accounts; this account is renamed to a v2-appropriate "uncategorised" bucket as part of that migration — no historical data is rewritten.
-- **`Expense`** — `AccountType=Expense`, multi-position, hidden, system. Counterpart for the **Expense flow shape** — uncategorised spend capture (categories are a v2 concern). v2 introduces user-creatable categorised expense accounts; like `Income`, it is renamed to a v2 "uncategorised" bucket with no historical rewrite.
+- **`Income`** — `AccountType=Income`, multi-position, hidden, system. The read-only **Uncategorised Income** bucket: counterpart for cash dividends **and** any Income flow the user hasn't categorised. As of cut C-1, user-creatable Income **categories** (also `AccountType=Income`, but `IsSystem=false`, nested) can be the counterpart instead — a flow with a `categoryId` posts to the chosen category; without one it falls back to this bucket. Kept `IsSystem=true` so it stays out of net worth and the account list.
+- **`Expense`** — `AccountType=Expense`, multi-position, hidden, system. The read-only **Uncategorised Expense** bucket: counterpart for any Expense flow the user hasn't categorised. As of C-1, user-creatable Expense categories can be the counterpart instead (see `Income` above). Both buckets keep their stored `Name` (`"Income"`/`"Expense"`) so `SystemAccountProvider` and the seeder don't churn; the UI displays them as "Uncategorised Income/Expense".
 
 Both are seeded by `SystemAccountSeeder` alongside the equity accounts and never appear in user-facing lists or shape pickers.
 
@@ -174,7 +174,7 @@ Weight balance: USD = +5 + (-5) = 0 ✓. The Income split is negative because in
 
 ### Expense / Income
 
-Ordinary spend or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund", which no other shape captures. One shared editor with an Expense/Income direction toggle (mirrors Buy/Sell). The non-account leg posts to the seeded, hidden system `Expense` / `Income` account — uncategorised capture; categories are a v2 concern. UI collects: account (shown read-only), direction, amount, date, optional free-text description. The posting currency is **inferred from the account's reporting currency** (single-position kinds hold one commodity → no picker). Available on all non-Investment kinds (Cash, Credit Card, Loan, Other Liability, Other Asset); Investment income is a Dividend instead.
+Ordinary spend or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund", which no other shape captures. One shared editor with an Expense/Income direction toggle (mirrors Buy/Sell). The non-account leg posts to a user **category** when one is chosen, else to the seeded hidden `Expense` / `Income` Uncategorised bucket (categorisation shipped in C-1 and is optional — default Uncategorised). UI collects: account (shown read-only), direction, amount, date, an optional direction-filtered **Category** picker (with inline find-or-create), and an optional free-text description. The posting currency is **inferred from the account's reporting currency** (single-position kinds hold one commodity → no picker). Available on all non-Investment kinds (Cash, Credit Card, Loan, Other Liability, Other Asset); Investment income is a Dividend instead.
 
 **Expense** ($50 groceries from chequing on 2026-04-23):
 
@@ -194,7 +194,7 @@ Transaction: Type=Normal, Description="Refund", OccurredAt=2026-04-23T00:00:00Z
 
 Weight balance nets to zero per commodity ✓. Counter-leg signs follow the *Sign convention* table (Expense positive-when-increases, Income negative-when-increases). Like Transfer, the Beancount sign follows flow direction, so the same code path works on asset and liability accounts with **no per-account-type sign flip**: on a Credit Card an expense's `-50` account leg makes the (negative) balance more negative (more owed), which renders as a positive charge; an income/refund's `+30` renders negative-red — the statement convention. Both legs are in the account's reporting currency; no annotation, no price row. Net worth is unaffected (income/expense balances are excluded).
 
-The account counterpart is resolved through a dedicated `IFlowCounterpartResolver` seam — Phase 0 ignores any category hint and returns the system `Expense`/`Income` account; v2 categorization and statement-import commit reuse this seam.
+The account counterpart is resolved through a dedicated `IFlowCounterpartResolver` seam. As of C-1 it honours the `categoryId` hint: given one it validates the category (exists, is a category, direction matches, not archived) and returns it; given none it returns the system Uncategorised bucket by direction. Recategorising a flow (editing its category) re-points **only** the counterpart leg — the user-account leg and its balance are untouched. Statement-import commit reuses this same seam.
 
 **Validation:** account is writable (not archived, not system) and **not** an Investment; amount > 0; date not in the future; description ≤ 512 chars.
 
@@ -336,7 +336,7 @@ The date/time of these investment shapes is set via a native date picker plus a 
 
 Cross-shape constraints, beyond the per-shape rules above:
 
-- Every split's account is writable: `IsArchived=false`, and not a system account except for the specific counterparts noted (`Equity:Opening Balances`, `Equity:Adjustments`, `Income`, `Expense`).
+- Every split's *user-chosen* account leg is a writable **balance-sheet account** (`Asset`/`Liability`, `IsArchived=false`, non-system). Counterpart legs are the specific system accounts noted (`Equity:Opening Balances`, `Equity:Adjustments`, `Income`, `Expense`) **or** — for a categorised flow — a user Income/Expense **category**. A category is only ever a resolver-produced counterpart, never a user-selectable transaction target.
 - Every split's commodity exists.
 - Quantities and rates are finite decimals.
 - A split's price annotation is either fully populated (`UnitPriceRate` > 0 and `UnitPriceCommodityId` set to a `Kind=Currency` commodity distinct from `Split.Commodity`) or fully null.
@@ -369,7 +369,7 @@ Background reconciliation passes (re-derived balance-entry splits) audit as tran
 
 ## Future-compatibility
 
-- **Categorised income/expense.** The system `Income` and `Expense` accounts are renamed to v2-appropriate "uncategorised" buckets when user-creatable income/expense accounts arrive. Historical splits referencing them remain valid; existing dividends keep posting to the renamed system account until the user re-categorises.
+- **Categorised income/expense (shipped, C-1).** User-creatable nested Income/Expense categories now exist; a flow may post to one instead of the hidden Uncategorised bucket. The buckets kept their stored names (`Income`/`Expense`, displayed as "Uncategorised"), so no historical split was rewritten and existing dividends keep posting to the Income bucket until re-categorised. Still ahead: the by-category report (C-2); category archive/merge/bulk-recategorise and Dividend categorisation (C-3).
 - **Recurring / scheduled transactions.** A separate `TransactionTemplate` entity holds the shape + cadence; instances materialise as ordinary transactions on schedule. No change to the transaction model.
 - **Cost basis & tax lots.** Buy splits already carry quantity and a per-unit price annotation; a `TaxLot` entity references buy splits without modifying them. The annotation is exactly the cost-basis information a tax-lot tracker needs.
 - **Tags at split level.** New `SplitTag` join table; no impact on existing data.

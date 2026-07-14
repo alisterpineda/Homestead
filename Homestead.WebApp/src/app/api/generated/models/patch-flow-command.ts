@@ -4,6 +4,7 @@
 export interface PatchFlowCommand {
   accountId: string;
   amount: number;
+  categoryId?: (string | null);
   date: string;
   description?: (string | null);
   transactionId?: string;

@@ -15,6 +15,11 @@ public static class AccountWritability
             throw new BusinessRuleException($"System accounts cannot be modified directly ({account.Name}).");
         if (account.IsArchived)
             throw new BusinessRuleException($"Archived accounts cannot be modified ({account.Name}).");
+        // A category (Income/Expense) is only ever a counterpart leg produced by the resolver — never a
+        // user-chosen transaction target. Reject it here so no user leg can reference one.
+        if (!account.AccountType.IsBalanceSheet())
+            throw new BusinessRuleException(
+                $"'{account.Name}' is a category, not a balance-sheet account, and cannot be a transaction target.");
     }
 
     /// <summary>

@@ -1,10 +1,16 @@
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions;
 
 internal static class TransactionMapping
 {
-    public static TransactionResponse ToResponse(AccountTransaction transaction)
+    // categories: user-category path map (keyed by AccountId) from ICategoryPathResolver. Passed by flow-
+    // aware read paths so FlowDetails can name/breadcrumb the counterpart leg. Null (the default, and for
+    // non-flow mappers) → every flow reads as Uncategorised, exactly as before categorization.
+    public static TransactionResponse ToResponse(
+        AccountTransaction transaction,
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories = null)
     {
         var shape = ResolveShape(transaction);
         var splits = transaction.Splits
@@ -28,7 +34,7 @@ internal static class TransactionMapping
             Memo = transaction.Memo,
             RelatedTransactionId = transaction.RelatedTransactionId,
             Splits = splits,
-            Details = ResolveDetails(transaction, shape),
+            Details = ResolveDetails(transaction, shape, categories),
         };
     }
 
@@ -49,7 +55,9 @@ internal static class TransactionMapping
         _ => TransactionShape.Other,
     };
 
-    private static TransactionDetails? ResolveDetails(AccountTransaction transaction, TransactionShape shape)
+    private static TransactionDetails? ResolveDetails(
+        AccountTransaction transaction, TransactionShape shape,
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories)
         => transaction switch
         {
             BalanceEntryTransaction be => new BalanceEntryDetails(
@@ -65,7 +73,7 @@ internal static class TransactionMapping
                 BuildDividendDetails(normal),
             NormalTransaction normal when shape is TransactionShape.Expense
                                               or TransactionShape.Income =>
-                BuildFlowDetails(normal, shape),
+                BuildFlowDetails(normal, shape, categories),
             _ => null,
         };
 
@@ -127,7 +135,9 @@ internal static class TransactionMapping
             account.Quantity);
     }
 
-    private static FlowDetails? BuildFlowDetails(NormalTransaction flow, TransactionShape shape)
+    private static FlowDetails? BuildFlowDetails(
+        NormalTransaction flow, TransactionShape shape,
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories)
     {
         // Both legs are in the account's reporting currency. FlowService writes the user-account leg
         // as −amount for an Expense and +amount for an Income (the system counterpart carries the
@@ -139,9 +149,26 @@ internal static class TransactionMapping
         if (account is null)
             return null;
 
+        // The other leg is the counterpart. Present in the user-category map → a category (id + leaf +
+        // path); absent (system Uncategorised bucket, or no map supplied) → Uncategorised, all null.
+        var counter = flow.Splits.FirstOrDefault(s => s.Id != account.Id);
+        Guid? categoryId = null;
+        string? categoryName = null;
+        string? categoryPath = null;
+        if (counter is not null && categories is not null
+            && categories.TryGetValue(counter.AccountId, out var info))
+        {
+            categoryId = counter.AccountId;
+            categoryName = info.LeafName;
+            categoryPath = info.Path;
+        }
+
         return new FlowDetails(
             account.AccountId,
             account.CommodityId,
-            Math.Abs(account.Quantity));
+            Math.Abs(account.Quantity),
+            categoryId,
+            categoryName,
+            categoryPath);
     }
 }

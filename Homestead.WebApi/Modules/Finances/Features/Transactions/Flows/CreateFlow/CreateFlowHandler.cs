@@ -7,6 +7,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.CreateFl
 public class CreateFlowHandler(
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
+    ICategoryPathResolver pathResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CreateFlowCommand, TransactionResponse>
 {
@@ -18,7 +19,8 @@ public class CreateFlowHandler(
                 request.AccountId,
                 request.Amount,
                 request.Date,
-                request.Description),
+                request.Description,
+                request.CategoryId),
             ct);
 
         // Flush the primary change so the reconciler's DB queries see the new flow.
@@ -26,6 +28,7 @@ public class CreateFlowHandler(
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 
-        return TransactionMapping.ToResponse(result.Transaction!);
+        var categories = await pathResolver.GetPathMapAsync(ct);
+        return TransactionMapping.ToResponse(result.Transaction!, categories);
     }
 }

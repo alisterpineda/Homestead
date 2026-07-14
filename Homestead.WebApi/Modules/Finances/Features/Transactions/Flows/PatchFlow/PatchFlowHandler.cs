@@ -7,6 +7,7 @@ namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.PatchFlo
 public class PatchFlowHandler(
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
+    ICategoryPathResolver pathResolver,
     IUnitOfWork unitOfWork)
     : IRequestHandler<PatchFlowCommand, TransactionResponse>
 {
@@ -18,13 +19,15 @@ public class PatchFlowHandler(
                 request.AccountId,
                 request.Amount,
                 request.Date,
-                request.Description),
+                request.Description,
+                request.CategoryId),
             ct);
 
         await unitOfWork.SaveChangesAsync(ct);
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 
-        return TransactionMapping.ToResponse(result.Transaction!);
+        var categories = await pathResolver.GetPathMapAsync(ct);
+        return TransactionMapping.ToResponse(result.Transaction!, categories);
     }
 }

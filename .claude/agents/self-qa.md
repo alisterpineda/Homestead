@@ -132,6 +132,7 @@ sends unauthenticated → `/login` and inactive → `/pending-activation`.
 | `/finances/accounts/:id` | AccountDetailPageComponent (4 account sheets — linkedSignal seeding) |
 | `/finances/commodities` | CommodityListPageComponent |
 | `/finances/commodities/:id` | CommodityDetailPageComponent |
+| `/finances/categories` | CategoryListPageComponent (nested income/expense category tree; create dialog + edit sheet with parent picker; two read-only "Uncategorised Expense/Income" system nodes pinned last; per-node Edit/Delete menu). The Expense/Income flow sheet also has a direction-filtered **Category (optional)** picker (leaf name → activity subtitle). Sidebar order: Accounts / Commodities / Categories / Reports / Settings. |
 | `/finances/reports` | ReportsPageComponent |
 | `/finances/settings/general` | GeneralSettingsComponent |
 | `/finances/settings/price-sources` | PriceSourceListComponent |

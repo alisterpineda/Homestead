@@ -212,6 +212,7 @@ builder.Services.AddScoped<ITradeService, TradeService>();
 builder.Services.AddScoped<IDividendService, DividendService>();
 builder.Services.AddScoped<IFlowService, FlowService>();
 builder.Services.AddScoped<IFlowCounterpartResolver, FlowCounterpartResolver>();
+builder.Services.AddScoped<ICategoryPathResolver, CategoryPathResolver>();
 builder.Services.AddScoped<IDripService, DripService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();

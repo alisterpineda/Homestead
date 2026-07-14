@@ -9,6 +9,12 @@ public class Account
     public AccountType AccountType { get; set; }
     public AccountKind? Kind { get; set; }
 
+    // Self-referencing hierarchy — only meaningful for Income/Expense category accounts
+    // (IsSystem=false, Kind=null). Balance-sheet accounts leave these null.
+    public Guid? ParentAccountId { get; set; }
+    public Account? ParentAccount { get; set; }
+    public ICollection<Account> ChildAccounts { get; set; } = [];
+
     public Guid ReportingCurrencyId { get; set; }
     public Commodity ReportingCurrency { get; set; } = null!;
 

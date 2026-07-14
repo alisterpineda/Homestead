@@ -11,6 +11,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
+import { CategoryPickerComponent } from '../../shared/category-picker/category-picker.component';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -32,7 +33,7 @@ export type FlowDirection = 'Expense' | 'Income';
 @Component({
   selector: 'app-flow-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CategoryPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -53,7 +54,7 @@ export type FlowDirection = 'Expense' | 'Income';
                   [disabled]="mode() === 'edit'"
                   class="rounded-md border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   [class]="selectedDirection() === 'Expense' ? 'border-ring bg-accent text-accent-foreground' : 'border-input hover:bg-accent'"
-                  (click)="selectedDirection.set('Expense')"
+                  (click)="setDirection('Expense')"
                 >
                   <div class="font-medium">Expense</div>
                   <div class="text-xs text-muted-foreground">Money out</div>
@@ -65,12 +66,23 @@ export type FlowDirection = 'Expense' | 'Income';
                   [disabled]="mode() === 'edit'"
                   class="rounded-md border px-3 py-2 text-sm text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   [class]="selectedDirection() === 'Income' ? 'border-ring bg-accent text-accent-foreground' : 'border-input hover:bg-accent'"
-                  (click)="selectedDirection.set('Income')"
+                  (click)="setDirection('Income')"
                 >
                   <div class="font-medium">Income</div>
                   <div class="text-xs text-muted-foreground">Money in</div>
                 </button>
               </div>
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Category (optional)</label>
+              <app-category-picker
+                [value]="categoryId()"
+                [direction]="selectedDirection()"
+                ariaLabel="Select category"
+                (valueChange)="categoryId.set($event)"
+              />
+              <p class="text-xs text-muted-foreground">Leave as Uncategorised to skip.</p>
             </div>
 
             <div class="space-y-2">
@@ -184,6 +196,7 @@ export class FlowSheetComponent {
         amount: String(details.amount),
         date: toDateOnly(ex.occurredAt),
         description: ex.memo ?? '',
+        categoryId: details.categoryId ?? null,
       };
     }
     return { kind: 'create' as const };
@@ -204,6 +217,10 @@ export class FlowSheetComponent {
   description = seededLinkedSignal(this.seedKey, () => {
     const seed = this.seed();
     return seed.kind === 'edit' ? seed.description : '';
+  });
+  categoryId = seededLinkedSignal<string, string | null>(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? seed.categoryId : null;
   });
   saving = seededLinkedSignal(this.seedKey, () => false);
   deleting = seededLinkedSignal(this.seedKey, () => false);
@@ -260,6 +277,14 @@ export class FlowSheetComponent {
     return (event.target as HTMLInputElement).value;
   }
 
+  // Category is direction-specific — switching Expense↔Income (create mode only) drops the picked
+  // category, so a stale wrong-direction id can't be submitted.
+  setDirection(direction: FlowDirection): void {
+    if (this.selectedDirection() === direction) return;
+    this.selectedDirection.set(direction);
+    this.categoryId.set(null);
+  }
+
   handleSave(): void {
     const a = this.account();
     if (!a || !this.canSubmit()) return;
@@ -271,14 +296,15 @@ export class FlowSheetComponent {
     const date = this.date();
     const description = trimToNull(this.description());
 
+    const categoryId = this.categoryId();
     const ex = this.existing();
     const obs = this.mode() === 'edit' && ex
       ? this.txApi.patchFlow({
           transactionId: ex.id,
-          body: { accountId: a.id, amount, date, description },
+          body: { accountId: a.id, amount, date, description, categoryId },
         })
       : this.txApi.createFlow({
-          body: { direction: this.selectedDirection(), accountId: a.id, amount, date, description },
+          body: { direction: this.selectedDirection(), accountId: a.id, amount, date, description, categoryId },
         });
 
     obs.pipe(
