@@ -72,7 +72,7 @@ public class GetTransactionsHandler(AppDbContext db)
         TransactionShape.BalanceEntry => query.OfType<BalanceEntryTransaction>(),
         TransactionShape.OpeningBalance => query.OfType<OpeningBalanceTransaction>(),
         // Mirrors TransactionMapping.ResolveShape: the NormalShape discriminator distinguishes the
-        // user-facing shape of a normal transaction (Transfer / Buy / Sell / Dividend).
+        // user-facing shape of a normal transaction (Transfer / Buy / Sell / Dividend / Expense / Income).
         TransactionShape.Transfer =>
             query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Transfer),
         TransactionShape.InvestmentBuy =>
@@ -81,6 +81,10 @@ public class GetTransactionsHandler(AppDbContext db)
             query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.InvestmentSell),
         TransactionShape.Dividend =>
             query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Dividend),
+        TransactionShape.Expense =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Expense),
+        TransactionShape.Income =>
+            query.OfType<NormalTransaction>().Where(t => t.NormalShape == NormalShape.Income),
         _ => query,
     };
 }

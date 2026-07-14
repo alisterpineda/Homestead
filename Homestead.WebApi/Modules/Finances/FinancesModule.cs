@@ -43,6 +43,8 @@ using Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.CreateTrade
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Trades.PatchTrade;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.CreateDividend;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Dividends.PatchDividend;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.CreateFlow;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.PatchFlow;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.CreateDrip;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.PatchDrip;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.DeleteDrip;
@@ -117,6 +119,11 @@ public static class FinancesModule
         var dividends = transactions.MapGroup("/dividends");
         CreateDividendEndpoint.Map(dividends);
         PatchDividendEndpoint.Map(dividends);
+
+        // Ordinary spend/income flows (Expense/Income) — direction carried in the request body.
+        var flows = transactions.MapGroup("/flows");
+        CreateFlowEndpoint.Map(flows);
+        PatchFlowEndpoint.Map(flows);
 
         // DRIP (dividend reinvestment) writes a linked Dividend + Buy pair. The both-halves delete
         // lives here; the single-half delete stays on the generic /transactions delete.

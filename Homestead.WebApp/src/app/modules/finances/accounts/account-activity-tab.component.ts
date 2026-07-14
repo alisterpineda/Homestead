@@ -20,6 +20,8 @@ import {
   lucideTrendingUp,
   lucideTrendingDown,
   lucideBanknote,
+  lucideBanknoteArrowDown,
+  lucideBanknoteArrowUp,
   lucideChevronLeft,
   lucideChevronRight,
   lucideCircleAlert,
@@ -75,6 +77,7 @@ interface ActivityRowViewModel {
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
+    lucideBanknoteArrowDown, lucideBanknoteArrowUp,
   })],
   template: `
     <div class="flex items-center gap-2">
@@ -128,6 +131,7 @@ class ActivityAmountCell {
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
+    lucideBanknoteArrowDown, lucideBanknoteArrowUp,
     lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideListTodo,
   })],
   template: `

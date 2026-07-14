@@ -12,4 +12,6 @@ public enum NormalShape
     InvestmentBuy,
     InvestmentSell,
     Dividend,
+    Expense,
+    Income,
 }

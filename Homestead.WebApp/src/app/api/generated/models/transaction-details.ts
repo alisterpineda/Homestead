@@ -3,7 +3,8 @@
 
 import { TransactionDetailsBalanceEntryDetails } from '../models/transaction-details-balance-entry-details';
 import { TransactionDetailsDividendDetails } from '../models/transaction-details-dividend-details';
+import { TransactionDetailsFlowDetails } from '../models/transaction-details-flow-details';
 import { TransactionDetailsTradeDetails } from '../models/transaction-details-trade-details';
 import { TransactionDetailsTransferDetails } from '../models/transaction-details-transfer-details';
-export type TransactionDetails = (TransactionDetailsBalanceEntryDetails | TransactionDetailsTransferDetails | TransactionDetailsTradeDetails | TransactionDetailsDividendDetails);
+export type TransactionDetails = (TransactionDetailsBalanceEntryDetails | TransactionDetailsTransferDetails | TransactionDetailsTradeDetails | TransactionDetailsDividendDetails | TransactionDetailsFlowDetails);
 

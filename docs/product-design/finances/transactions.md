@@ -23,7 +23,7 @@ Users never create "transactions" directly. They pick a **shape** — Transfer, 
 
 Transactions use TPH (table-per-hierarchy) on `AccountTransaction.Type`. Most shapes share `NormalTransaction`. Two shapes get their own subtype: balance entries (`BalanceEntryTransaction`), because they extend the base contract with an asserted-quantity field; and opening balances (`OpeningBalanceTransaction`), which adds no fields but keeps a stable discriminator so the dedicated opening-balance editors and delete/re-reconcile logic can target opening-balance rows directly.
 
-Transfer, Investment buy, Investment sell, and Dividend are all 2-split `NormalTransaction`s, so split structure alone can't tell them apart. A second discriminator column — `NormalTransaction.NormalShape` (`Transfer | InvestmentBuy | InvestmentSell | Dividend`, stored as a string; NULL on non-normal TPH rows) — records the user-facing shape directly. The mapping reads it back O(1) with no commodity-kind joins, it's unambiguous, and it survives edits, mirroring the `Type`-discriminator philosophy.
+Transfer, Investment buy, Investment sell, Dividend, Expense, and Income are all 2-split `NormalTransaction`s, so split structure alone can't tell them apart. A second discriminator column — `NormalTransaction.NormalShape` (`Transfer | InvestmentBuy | InvestmentSell | Dividend | Expense | Income`, stored as a string; NULL on non-normal TPH rows) — records the user-facing shape directly. The mapping reads it back O(1) with no commodity-kind joins, it's unambiguous, and it survives edits, mirroring the `Type`-discriminator philosophy.
 
 | Shape                 | Stored type              | Splits | Priced legs | Notes |
 |-----------------------|--------------------------|--------|-------------|-------|
@@ -34,6 +34,8 @@ Transfer, Investment buy, Investment sell, and Dividend are all 2-split `NormalT
 | Investment buy        | `NormalTransaction`      | 2 | 1 | Annotation on the security leg. Both splits on the investment account. |
 | Investment sell       | `NormalTransaction`      | 2 | 1 | Mirror of buy. |
 | Dividend (cash)       | `NormalTransaction`      | 2 | 0 | Both splits in the dividend currency. Counterpart = system `Income` account. |
+| Expense               | `NormalTransaction`      | 2 | 0 | Ordinary spend on a non-Investment account. Both splits in the account's reporting currency. Counterpart = system `Expense` account. |
+| Income                | `NormalTransaction`      | 2 | 0 | Ordinary income/refund on a non-Investment account. Both splits in the account's reporting currency. Counterpart = system `Income` account. |
 | DRIP / reinvestment   | `NormalTransaction` × 2  | 2 each | 0 + 1 | Dividend half unpriced; Buy half priced. Paired via `RelatedTransactionId`. |
 | Balance entry         | `BalanceEntryTransaction`| 2 | 0 | Both splits in the asserted commodity. Carries `AssertedCommodityId` + `AssertedQuantity`; counterpart = `Equity:Adjustments`. |
 
@@ -58,8 +60,8 @@ No stored `Value` column. Display-currency values are computed at read time from
 
 Four hidden system accounts exist per household (see [accounts.md](accounts.md#system-accounts) for `Equity:Opening Balances` and `Equity:Adjustments`). Two are added in v1 specifically to support the transaction shapes here:
 
-- **`Income`** — `AccountType=Income`, multi-position, hidden, system. Counterpart for cash dividends in v1. v2 introduces user-creatable categorised income accounts; this account is renamed to a v2-appropriate "uncategorised" bucket as part of that migration — no historical data is rewritten.
-- **`Expense`** — `AccountType=Expense`, multi-position, hidden, system. Reserved for symmetry; no v1 shape posts to it. Seeded so v2 doesn't have to backfill it.
+- **`Income`** — `AccountType=Income`, multi-position, hidden, system. Counterpart for cash dividends **and the Income flow shape** in v1. v2 introduces user-creatable categorised income accounts; this account is renamed to a v2-appropriate "uncategorised" bucket as part of that migration — no historical data is rewritten.
+- **`Expense`** — `AccountType=Expense`, multi-position, hidden, system. Counterpart for the **Expense flow shape** — uncategorised spend capture (categories are a v2 concern). v2 introduces user-creatable categorised expense accounts; like `Income`, it is renamed to a v2 "uncategorised" bucket with no historical rewrite.
 
 Both are seeded by `SystemAccountSeeder` alongside the equity accounts and never appear in user-facing lists or shape pickers.
 
@@ -88,6 +90,7 @@ All timestamps stored UTC. Defaults per shape:
 | Opening balance (non-Investment)         | `00:00 UTC`                 | No                |
 | Opening balance (Investment, Add position) | `12:00 UTC`               | No (v1)           |
 | Transfer (any)                           | `00:00 UTC`                 | No                |
+| Expense / Income                         | `00:00 UTC`                 | No                |
 | Investment buy / sell / dividend / DRIP  | `12:00 UTC`                 | Yes               |
 | Balance entry                            | `23:59:59 UTC`              | No                |
 
@@ -168,6 +171,32 @@ Transaction: Type=Normal, Description="Dividend from VFV", OccurredAt=2026-04-23
 Weight balance: USD = +5 + (-5) = 0 ✓. The Income split is negative because income increases (Beancount-style — see *Sign convention*). No annotation, no price row (cash event only).
 
 **Validation:** account is an Investment; payment commodity is `Kind=Currency`; amount > 0.
+
+### Expense / Income
+
+Ordinary spend or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund", which no other shape captures. One shared editor with an Expense/Income direction toggle (mirrors Buy/Sell). The non-account leg posts to the seeded, hidden system `Expense` / `Income` account — uncategorised capture; categories are a v2 concern. UI collects: account (shown read-only), direction, amount, date, optional free-text description. The posting currency is **inferred from the account's reporting currency** (single-position kinds hold one commodity → no picker). Available on all non-Investment kinds (Cash, Credit Card, Loan, Other Liability, Other Asset); Investment income is a Dividend instead.
+
+**Expense** ($50 groceries from chequing on 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Groceries", OccurredAt=2026-04-23T00:00:00Z
+  Split 1: Account=<chequing>, Commodity=CAD, Quantity=-50
+  Split 2: Account=<Expense>,  Commodity=CAD, Quantity=+50
+```
+
+**Income** ($30 refund into chequing on 2026-04-23):
+
+```
+Transaction: Type=Normal, Description="Refund", OccurredAt=2026-04-23T00:00:00Z
+  Split 1: Account=<chequing>, Commodity=CAD, Quantity=+30
+  Split 2: Account=<Income>,   Commodity=CAD, Quantity=-30
+```
+
+Weight balance nets to zero per commodity ✓. Counter-leg signs follow the *Sign convention* table (Expense positive-when-increases, Income negative-when-increases). Like Transfer, the Beancount sign follows flow direction, so the same code path works on asset and liability accounts with **no per-account-type sign flip**: on a Credit Card an expense's `-50` account leg makes the (negative) balance more negative (more owed), which renders as a positive charge; an income/refund's `+30` renders negative-red — the statement convention. Both legs are in the account's reporting currency; no annotation, no price row. Net worth is unaffected (income/expense balances are excluded).
+
+The account counterpart is resolved through a dedicated `IFlowCounterpartResolver` seam — Phase 0 ignores any category hint and returns the system `Expense`/`Income` account; v2 categorization and statement-import commit reuse this seam.
+
+**Validation:** account is writable (not archived, not system) and **not** an Investment; amount > 0; date not in the future; description ≤ 512 chars.
 
 ### DRIP / reinvestment
 
@@ -259,14 +288,16 @@ v1 households are tiny; the full re-pass per affected `(account, commodity)` cha
 
 The "New Transaction" dropdown on each account's detail page surfaces only shapes that make sense for the account's `Kind`. This is a UI rule — the data layer accepts any valid balanced transaction.
 
-| Kind            | Transfer | Buy / Sell | Dividend | DRIP | Balance entry |
-|-----------------|----------|------------|----------|------|---------------|
-| Cash            | ✓        |            |          |      | ✓             |
-| Credit Card     | ✓        |            |          |      | ✓             |
-| Loan            | ✓        |            |          |      | ✓             |
-| Other Liability | ✓        |            |          |      | ✓             |
-| Other Asset     | ✓        |            |          |      | ✓             |
-| Investment      | ✓        | ✓          | ✓        | ✓    | ✓             |
+| Kind            | Expense / Income | Transfer | Buy / Sell | Dividend | DRIP | Balance entry |
+|-----------------|------------------|----------|------------|----------|------|---------------|
+| Cash            | ✓                | ✓        |            |          |      | ✓             |
+| Credit Card     | ✓                | ✓        |            |          |      | ✓             |
+| Loan            | ✓                | ✓        |            |          |      | ✓             |
+| Other Liability | ✓                | ✓        |            |          |      | ✓             |
+| Other Asset     | ✓                | ✓        |            |          |      | ✓             |
+| Investment      |                  | ✓        | ✓          | ✓        | ✓    | ✓             |
+
+Expense/Income lead the "New Transaction" menu for the five non-Investment kinds (they're the common case) and are absent on Investment accounts (whose income is a Dividend). On a liability account an expense reads as a positive charge and an income/refund reads as a negative (red) credit — the statement convention, identical to how Transfer renders (see *Sign convention*); there is no per-account-type sign flip.
 
 The household-level "+ New Transaction" entry point (when added) offers the union of all shapes and asks the user to pick a target account first.
 
@@ -279,6 +310,7 @@ Each transaction shape edits through its **own dedicated editor**, not a single 
 - **Opening balance** — `PatchOpeningBalance`, via the per-account (non-Investment) / per-position (Investment) sheets — see [accounts.md](accounts.md#editing-opening-balances).
 - **Investment buy / sell** — `PatchTrade`, via `trade-sheet` (one sheet, Buy/Sell toggle disabled in edit).
 - **Dividend** — `PatchDividend`, via `dividend-sheet`.
+- **Expense / Income** — `PatchFlow`, via `flow-sheet` (one sheet, Expense/Income toggle disabled in edit; direction is immutable). Created via `POST /flows` with the direction in the body; the account is also locked in edit. Delete routes through the generic `/transactions` delete (shape-agnostic, like any 2-split normal).
 - **DRIP / reinvested dividend** — `PatchDrip` (rewrites both halves atomically) / `DeleteDrip` (both-halves), via `drip-sheet`. Either clicked half routes here (detected by `relatedTransactionId != null`); the sheet seeds from the self-sufficient Buy half. Account, security, and payment currency are locked in edit (delete + recreate to change them). Delete offers a 3-way prompt — both / this one only / cancel.
 
 The date/time of these investment shapes is set via a native date picker plus a collapsible "Add time" affordance: a date-only entry pins the instant to noon UTC, and expanding the time field records a precise wall-clock instant (useful for multiple same-day trades of one security). Whether the per-shape editors later consolidate into a unified one is an open decision, deferred until enough shapes share edit behaviour to justify it. Only the **reads** (`GetTransaction` / `GetTransactions`) and **delete** (`DeleteTransaction`) are shape-agnostic. Every per-shape editor honours the same rules:

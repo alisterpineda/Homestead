@@ -15,6 +15,8 @@ public enum TransactionShape
     InvestmentBuy,
     InvestmentSell,
     Dividend,
+    Expense,
+    Income,
     Other,
 }
 
@@ -50,6 +52,7 @@ public record TransactionResponse
 [JsonDerivedType(typeof(TransferDetails), "transfer")]
 [JsonDerivedType(typeof(TradeDetails), "trade")]
 [JsonDerivedType(typeof(DividendDetails), "dividend")]
+[JsonDerivedType(typeof(FlowDetails), "flow")]
 public abstract record TransactionDetails;
 
 public record TransferDetails(
@@ -81,4 +84,15 @@ public record TradeDetails(
 public record DividendDetails(
     Guid AccountId,
     Guid PaymentCurrencyId,
+    decimal Amount) : TransactionDetails;
+
+/// <summary>
+/// Shape details for an ordinary spend/income flow (Expense or Income). Expense-vs-Income is conveyed
+/// by the response <see cref="TransactionResponse.Shape"/>, so no direction field is needed here.
+/// <see cref="Amount"/> is the positive magnitude of the user-account leg; <see cref="CurrencyId"/> is
+/// the account's reporting currency (both legs share it).
+/// </summary>
+public record FlowDetails(
+    Guid AccountId,
+    Guid CurrencyId,
     decimal Amount) : TransactionDetails;

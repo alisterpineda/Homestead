@@ -25,6 +25,8 @@ import {
   lucideTrendingUp,
   lucideTrendingDown,
   lucideBanknote,
+  lucideBanknoteArrowDown,
+  lucideBanknoteArrowUp,
   lucideRepeat,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -46,6 +48,7 @@ import { BalanceEntrySheetComponent, type BalanceEntrySheetMode } from './balanc
 import { TransferSheetComponent, type TransferSheetMode } from './transfer-sheet/transfer-sheet.component';
 import { TradeSheetComponent, type TradeSheetMode } from './trade-sheet/trade-sheet.component';
 import { DividendSheetComponent, type DividendSheetMode } from './dividend-sheet/dividend-sheet.component';
+import { FlowSheetComponent, type FlowSheetMode, type FlowDirection } from './flow-sheet/flow-sheet.component';
 import { DripSheetComponent, type DripSheetMode } from './drip-sheet/drip-sheet.component';
 import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
 import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
@@ -82,6 +85,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     TransferSheetComponent,
     TradeSheetComponent,
     DividendSheetComponent,
+    FlowSheetComponent,
     DripSheetComponent,
     OpeningBalanceSheetComponent,
     AddPositionSheetComponent,
@@ -90,6 +94,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
     lucideChevronDown, lucidePackagePlus,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote, lucideRepeat,
+    lucideBanknoteArrowDown, lucideBanknoteArrowUp,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -170,6 +175,19 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             </button>
             <ng-template #newTxMenu>
               <hlm-dropdown-menu class="w-52">
+                @if (a.kind !== 'Investment') {
+                  <hlm-dropdown-menu-group>
+                    <button hlmDropdownMenuItem (triggered)="openNewFlow('Expense')">
+                      <ng-icon hlm name="lucideBanknoteArrowDown" size="sm" />
+                      Expense
+                    </button>
+                    <button hlmDropdownMenuItem (triggered)="openNewFlow('Income')">
+                      <ng-icon hlm name="lucideBanknoteArrowUp" size="sm" />
+                      Income
+                    </button>
+                  </hlm-dropdown-menu-group>
+                  <hlm-dropdown-menu-separator />
+                }
                 <hlm-dropdown-menu-group>
                   <button hlmDropdownMenuItem (triggered)="openNewTransfer()">
                     <ng-icon hlm name="lucideArrowRightLeft" size="sm" />
@@ -307,6 +325,17 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
       (closed)="onDividendSheetClosed()"
     />
 
+    <app-flow-sheet
+      [account]="account()"
+      [state]="flowSheetState()"
+      [mode]="flowSheetMode()"
+      [existing]="flowSheetExisting()"
+      [direction]="flowSheetDirection()"
+      (saved)="onFlowSaved()"
+      (deleted)="onFlowDeleted()"
+      (closed)="onFlowSheetClosed()"
+    />
+
     <app-drip-sheet
       [account]="account()"
       [state]="dripSheetState()"
@@ -372,6 +401,11 @@ export class AccountDetailPageComponent implements OnDestroy {
   dividendSheetState = signal<BrnDialogState>('closed');
   dividendSheetMode = signal<DividendSheetMode>('create');
   dividendSheetExisting = signal<TransactionResponse | null>(null);
+
+  flowSheetState = signal<BrnDialogState>('closed');
+  flowSheetMode = signal<FlowSheetMode>('create');
+  flowSheetExisting = signal<TransactionResponse | null>(null);
+  flowSheetDirection = signal<FlowDirection>('Expense');
 
   dripSheetState = signal<BrnDialogState>('closed');
   dripSheetMode = signal<DripSheetMode>('create');
@@ -519,6 +553,13 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.dividendSheetState.set('open');
   }
 
+  openNewFlow(direction: FlowDirection): void {
+    this.flowSheetDirection.set(direction);
+    this.flowSheetMode.set('create');
+    this.flowSheetExisting.set(null);
+    this.flowSheetState.set('open');
+  }
+
   openNewDrip(): void {
     this.dripSheetMode.set('create');
     this.dripSheetExisting.set(null);
@@ -564,6 +605,10 @@ export class AccountDetailPageComponent implements OnDestroy {
       case 'Dividend':
         this.openDividendEditor(tx);
         break;
+      case 'Expense':
+      case 'Income':
+        this.openFlowEditor(tx);
+        break;
       // 'Other' is read-only on single-position account surfaces.
     }
   }
@@ -602,6 +647,14 @@ export class AccountDetailPageComponent implements OnDestroy {
     this.dividendSheetMode.set('edit');
     this.dividendSheetExisting.set(tx);
     this.dividendSheetState.set('open');
+  }
+
+  private openFlowEditor(tx: TransactionResponse): void {
+    // The sheet derives the (disabled) direction from the stored shape, so `direction`
+    // isn't set here — only `existing` matters.
+    this.flowSheetMode.set('edit');
+    this.flowSheetExisting.set(tx);
+    this.flowSheetState.set('open');
   }
 
   private openDripEditor(tx: TransactionResponse): void {
@@ -700,6 +753,18 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
   onDividendSheetClosed(): void {
     this.dividendSheetState.set('closed');
+  }
+
+  onFlowSaved(): void {
+    this.flowSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onFlowDeleted(): void {
+    this.flowSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onFlowSheetClosed(): void {
+    this.flowSheetState.set('closed');
   }
 
   onDripSaved(): void {

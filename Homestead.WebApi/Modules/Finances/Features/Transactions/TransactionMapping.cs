@@ -42,6 +42,8 @@ internal static class TransactionMapping
             NormalShape.InvestmentBuy => TransactionShape.InvestmentBuy,
             NormalShape.InvestmentSell => TransactionShape.InvestmentSell,
             NormalShape.Dividend => TransactionShape.Dividend,
+            NormalShape.Expense => TransactionShape.Expense,
+            NormalShape.Income => TransactionShape.Income,
             _ => TransactionShape.Other,
         },
         _ => TransactionShape.Other,
@@ -61,6 +63,9 @@ internal static class TransactionMapping
                 BuildTradeDetails(normal),
             NormalTransaction normal when shape == TransactionShape.Dividend =>
                 BuildDividendDetails(normal),
+            NormalTransaction normal when shape is TransactionShape.Expense
+                                              or TransactionShape.Income =>
+                BuildFlowDetails(normal, shape),
             _ => null,
         };
 
@@ -120,5 +125,23 @@ internal static class TransactionMapping
             account.AccountId,
             account.CommodityId,
             account.Quantity);
+    }
+
+    private static FlowDetails? BuildFlowDetails(NormalTransaction flow, TransactionShape shape)
+    {
+        // Both legs are in the account's reporting currency. FlowService writes the user-account leg
+        // as −amount for an Expense and +amount for an Income (the system counterpart carries the
+        // opposite sign), so the account leg is picked by the sign the known shape implies. Amount > 0
+        // is validator-guaranteed, so the expected-sign leg is unambiguously the account leg.
+        var account = shape == TransactionShape.Expense
+            ? flow.Splits.FirstOrDefault(s => s.Quantity < 0m)
+            : flow.Splits.FirstOrDefault(s => s.Quantity > 0m);
+        if (account is null)
+            return null;
+
+        return new FlowDetails(
+            account.AccountId,
+            account.CommodityId,
+            Math.Abs(account.Quantity));
     }
 }

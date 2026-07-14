@@ -12,6 +12,8 @@ import { createTrade } from '@/api/generated/fn/finances/create-trade';
 import { patchTrade } from '@/api/generated/fn/finances/patch-trade';
 import { createDividend } from '@/api/generated/fn/finances/create-dividend';
 import { patchDividend } from '@/api/generated/fn/finances/patch-dividend';
+import { createFlow } from '@/api/generated/fn/finances/create-flow';
+import { patchFlow } from '@/api/generated/fn/finances/patch-flow';
 import { createDrip } from '@/api/generated/fn/finances/create-drip';
 import { patchDrip } from '@/api/generated/fn/finances/patch-drip';
 import { deleteDrip } from '@/api/generated/fn/finances/delete-drip';
@@ -38,6 +40,8 @@ export type { CreateTrade$Params } from '@/api/generated/fn/finances/create-trad
 export type { PatchTrade$Params } from '@/api/generated/fn/finances/patch-trade';
 export type { CreateDividend$Params } from '@/api/generated/fn/finances/create-dividend';
 export type { PatchDividend$Params } from '@/api/generated/fn/finances/patch-dividend';
+export type { CreateFlow$Params } from '@/api/generated/fn/finances/create-flow';
+export type { PatchFlow$Params } from '@/api/generated/fn/finances/patch-flow';
 export type { CreateDrip$Params } from '@/api/generated/fn/finances/create-drip';
 export type { PatchDrip$Params } from '@/api/generated/fn/finances/patch-drip';
 export type { DeleteDrip$Params } from '@/api/generated/fn/finances/delete-drip';
@@ -90,6 +94,14 @@ export class FinancesTransactionApiService {
 
   patchDividend(params: Parameters<typeof patchDividend>[2]): Observable<TransactionResponse> {
     return patchDividend(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  createFlow(params: Parameters<typeof createFlow>[2]): Observable<TransactionResponse> {
+    return createFlow(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  patchFlow(params: Parameters<typeof patchFlow>[2]): Observable<TransactionResponse> {
+    return patchFlow(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   createDrip(params: Parameters<typeof createDrip>[2]): Observable<TransactionResponse> {

@@ -15,7 +15,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Household accounts covering cash, credit, debt, and investments.
 - Balances denominated in any currency.
 - Investment accounts that hold multiple commodities (currencies and securities) simultaneously.
-- A small, fixed set of transaction shapes: transfers between owned accounts, investment purchases and sales, dividends and DRIPs, and balance entries.
+- A small, fixed set of transaction shapes: everyday expenses and income (spend/refunds), transfers between owned accounts, investment purchases and sales, dividends and DRIPs, and balance entries.
 - Monthly reconciliation against institutional statements as the primary recurring user action.
 - Historical net-worth computation and display in a user-chosen currency.
 - Commodity prices: manual entry **and** automated import from external sources (e.g. Bank of Canada Valet for FX rates, Alpha Vantage for equity quotes), with per-source scheduling and an admin management UI — see [commodities.md](commodities.md#price-sources--model).
@@ -48,8 +48,8 @@ Four system accounts always exist per household, all hidden from user-facing lis
 
 - **Equity:Opening Balances** — counterpart for wealth present before tracking began.
 - **Equity:Adjustments** — counterpart for unexplained balance-entry deltas. See *Balance entries*.
-- **Income** — counterpart for cash dividends in v1. Subsumed by user-created income accounts in v2.
-- **Expense** — reserved; no v1 shape posts to it. Seeded so v2 doesn't have to backfill.
+- **Income** — counterpart for cash dividends and everyday income/refunds (the Income flow shape) in v1. Subsumed by user-created income accounts in v2.
+- **Expense** — counterpart for everyday spending (the Expense flow shape) in v1. Subsumed by user-created expense accounts in v2.
 
 See [accounts.md](accounts.md) for the full account-management design: kind taxonomy, creation flow, initial-balance mechanics, sign conventions, opening-balance editing, add-position flow for Investment accounts, archive/delete rules, and the list/detail UI.
 
@@ -126,7 +126,7 @@ The schema supports any account holding any set of commodities. The "single-posi
 
 ### Categorisation is a v2 concern
 
-The model reserves `income` and `expense` account types and assumes categories will eventually be implemented as user-creatable accounts of those types. v1 seeds two hidden system accounts (`Income`, `Expense`) for shapes that need a categorised counterpart (currently just Dividend → Income), but does not let users create their own and does not surface category reporting. When v2 arrives, the system accounts are renamed to "uncategorised" buckets and user-creatable categories slot in alongside — no historical data is rewritten.
+The model reserves `income` and `expense` account types and assumes categories will eventually be implemented as user-creatable accounts of those types. v1 seeds two hidden system accounts (`Income`, `Expense`) for shapes that need a categorised counterpart (Dividend and Income flows → `Income`; Expense flows → `Expense`), but does not let users create their own and does not surface category reporting. When v2 arrives, the system accounts are renamed to "uncategorised" buckets and user-creatable categories slot in alongside — no historical data is rewritten.
 
 ### Accumulate prices and history from day one
 
@@ -161,6 +161,10 @@ Reverse of buy.
 ### Dividend
 
 Cash dividend received into an investment account. UI asks for the investment account, commodity the dividend was paid in, amount, and date. Produces a two-split transaction crediting the hidden system `Income` account. v2 categorised income accounts subsume this without rewriting history.
+
+### Expense / Income
+
+Everyday spending or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund". One shared editor with an Expense/Income toggle (mirrors Buy/Sell). UI asks for the account (read-only), direction, amount, date, and an optional free-text description; the currency is inferred from the account's reporting currency (no picker). Produces a two-split transaction posting the non-account leg to the hidden system `Expense` (spend) or `Income` (income/refund) account. Available on all non-Investment kinds — Investment income is a Dividend instead. On a liability account an expense reads as a positive charge and income/refund as a negative (red) credit, the statement convention, with no per-account-type sign flip. Net worth is unaffected. This is also the prerequisite for statement line-item import (a later epic). v2 categorised accounts subsume the system counterparts without rewriting history.
 
 ### DRIP / reinvestment
 
