@@ -12,6 +12,7 @@ import { PageHeaderService } from '@/shared/services/page-header.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
+import type { TextExtractionProvenanceResponse } from '@/api/generated/models/text-extraction-provenance-response';
 import type { GetDocumentVersionDto } from '@/api/generated/models/get-document-version-dto';
 import type { GetDocumentVersionResponse } from '@/api/generated/models/get-document-version-response';
 
@@ -537,6 +538,82 @@ describe('DocumentDetailPageComponent — edit-state guards on refresh', () => {
 
       expect(guardComponent.editVersionLabel()).toBe('user typed label');
       expect(guardComponent.editExtractedText()).toBe('user typed text');
+    });
+
+    // Reprocess rewrites a version's extracted text in place, so the version id stays the same and cannot
+    // act as the seed key. These pin the `${versionId}|${extractedAt}` key: a re-extraction re-seeds, a
+    // plain re-fetch does not, and a restored draft outranks both.
+    function makeExtraction(extractedAt: string): TextExtractionProvenanceResponse {
+      return { engine: 'tesseract', engineKey: 'tesseract', extractedAt };
+    }
+
+    it('a re-extraction (new extractedAt) re-seeds editExtractedText even though the version id is unchanged', () => {
+      docResponse = makeDoc({
+        extractedText: 'old pdfpig text',
+        textExtraction: makeExtraction('2026-01-01T00:00:00Z'),
+      });
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editExtractedText()).toBe('old pdfpig text');
+
+      // Same document, same version id — only the extraction changed (i.e. an azure-layout reprocess).
+      docResponse = makeDoc({
+        extractedText: '<table><tr><td>azure</td></tr></table>',
+        textExtraction: makeExtraction('2026-01-02T00:00:00Z'),
+      });
+      jobCompletedSubject.next(null);
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editExtractedText()).toBe('<table><tr><td>azure</td></tr></table>');
+      // Without this the field is stale and hasChanges() is spuriously true, so a save would PATCH the old
+      // text back over the new extraction.
+      expect(guardComponent.hasChanges()).toBe(false);
+    });
+
+    it('a re-fetch with an unchanged extractedAt does not wipe edits', () => {
+      docResponse = makeDoc({
+        extractedText: 'server text',
+        textExtraction: makeExtraction('2026-01-01T00:00:00Z'),
+      });
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      guardComponent.editExtractedText.set('user typed text');
+
+      // Same extraction re-delivered — must not clobber the user.
+      docResponse = makeDoc({
+        extractedText: 'server text',
+        textExtraction: makeExtraction('2026-01-01T00:00:00Z'),
+      });
+      jobCompletedSubject.next(null);
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editExtractedText()).toBe('user typed text');
+    });
+
+    it('a restored draft is not clobbered when the extraction changed while it was away', () => {
+      (guardEditStateService.getState as ReturnType<typeof vi.fn>).mockReturnValue({
+        editName: 'saved name',
+        editDocumentDate: null,
+        editExpiryDate: null,
+        editNotes: 'saved notes',
+        editParties: [],
+        editTags: [],
+        editVersionLabel: 'saved label',
+        editExtractedText: 'draft text the user typed',
+        versionId: null,
+      });
+
+      // The server has since re-extracted — a naive key would seed over the draft here.
+      docResponse = makeDoc({
+        extractedText: 'newly extracted server text',
+        textExtraction: makeExtraction('2026-06-01T00:00:00Z'),
+      });
+      setGuardDocumentId('doc-1');
+      guardFixture.detectChanges();
+
+      expect(guardComponent.editExtractedText()).toBe('draft text the user typed');
     });
 
     it('saved-state restoration survives the first activeVersion() emit', () => {

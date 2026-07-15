@@ -826,7 +826,13 @@ export class DocumentDetailPageComponent implements OnDestroy {
   private pageHeaderService = inject(PageHeaderService);
   private hubSub: Subscription;
   private initializedDocId: string | null = null;
-  private initializedVersionId: string | null = null;
+  // Identity of the extraction the version-edit fields were last seeded from — `${versionId}|${extractedAt}`,
+  // not the version id alone. Reprocess rewrites a version's text in place, so the id cannot distinguish a
+  // plain re-fetch from a genuine re-extraction. See the seeding effect below.
+  private seededVersionKey: string | null = null;
+  // Set when a restored draft has already populated the version-edit fields: the next seed pass adopts the
+  // current key without writing, so the user's unsaved work survives while later re-extractions still seed.
+  private adoptVersionKeyWithoutSeeding = false;
 
   private headerTitleRef = viewChild<TemplateRef<unknown>>('headerTitle');
 
@@ -1114,8 +1120,11 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editNotes.set(saved.editNotes ?? '');
           this.editVersionLabel.set(saved.editVersionLabel);
           this.editExtractedText.set(saved.editExtractedText);
-          this.initializedVersionId = saved.versionId
-            ?? untracked(() => this.activeVersion()?.id ?? null);
+          // The draft, not the server, is the truth here. Don't compute the seed key now — on a non-latest
+          // version `versionDetail` (and so `extractedAt`) hasn't loaded yet, and a wrong key would let the
+          // seeding effect fire later and wipe the draft. Let that effect adopt whatever key is current.
+          this.seededVersionKey = null;
+          this.adoptVersionKeyWithoutSeeding = true;
           untracked(() => this.editStateService.clearState(doc.id));
         } else {
           this.editName.set(doc.name);
@@ -1124,7 +1133,8 @@ export class DocumentDetailPageComponent implements OnDestroy {
           this.editDocumentDate.set(this.origDocumentDate());
           this.editExpiryDate.set(this.origExpiryDate());
           this.editNotes.set(this.origNotes());
-          this.initializedVersionId = null;
+          this.seededVersionKey = null;
+          this.adoptVersionKeyWithoutSeeding = false;
         }
       }
     });
@@ -1137,16 +1147,28 @@ export class DocumentDetailPageComponent implements OnDestroy {
       }
     });
 
-    // Initialize version-level edit fields. Guard prevents refreshTrigger-driven
-    // re-emits from overwriting pending user edits.
+    // Initialize version-level edit fields. The seed key is the version id *plus* the extraction timestamp,
+    // because reprocess rewrites a version's text in place: the id alone cannot tell a plain re-fetch
+    // (refreshTrigger, or the jobCompleted$ bump that fires for *any* job — including a bulk reprocess
+    // started elsewhere) apart from a genuine re-extraction. `extractedAt` changes only on the latter, so
+    // this still ignores re-fetches while picking up new text. Without it the textarea keeps the old text
+    // while `displayExtractedText` moves on, and saving PATCHes the stale text back over the new extraction.
     effect(() => {
       const ver = this.activeVersion();
       const text = this.displayExtractedText();
+      // Provenance follows the same version/latest split as the text, so it is the co-located identity.
+      const extractedAt = this.displayTextExtraction()?.extractedAt ?? null;
       if (!ver) return;
-      if (ver.id === this.initializedVersionId) return;
+      const seedKey = `${ver.id}|${extractedAt ?? ''}`;
+      if (seedKey === this.seededVersionKey) return;
       const verId = untracked(() => this.versionId());
       if (verId && text === null) return; // wait for versionDetail on non-latest
-      this.initializedVersionId = ver.id;
+      if (this.adoptVersionKeyWithoutSeeding) {
+        this.adoptVersionKeyWithoutSeeding = false;
+        this.seededVersionKey = seedKey;
+        return;
+      }
+      this.seededVersionKey = seedKey;
       this.editVersionLabel.set(ver.label ?? '');
       this.editExtractedText.set(text ?? '');
     });
@@ -1361,7 +1383,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
         this.deletingVersion.set(false);
         toast.success('Version deleted.');
         // The active version is gone; reset version-edit state and show the new latest.
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.navigateToLatestVersion();
         this.refreshTrigger.update(v => v + 1);
       },
@@ -1437,7 +1459,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
               // form from the refreshed server state (mirroring approve/decline) so the Name field and the
               // tag/party inputs reflect the applied values rather than the stale pre-classify ones.
               this.initializedDocId = null;
-              this.initializedVersionId = null;
+              this.seededVersionKey = null;
               this.refreshTrigger.update(v => v + 1);
             })
             .finally(() => this.classifyingPreview.set(false)),
@@ -1540,7 +1562,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.initializedDocId = null;
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.refreshTrigger.update(v => v + 1);
         toast.success('Suggestion approved.');
       },
@@ -1555,7 +1577,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.initializedDocId = null;
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.refreshTrigger.update(v => v + 1);
         toast.success('Suggestion declined.');
       },
@@ -1570,7 +1592,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.initializedDocId = null;
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.refreshTrigger.update(v => v + 1);
         toast.success('All suggestions approved.');
       },
@@ -1585,7 +1607,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
     ).subscribe({
       next: () => {
         this.initializedDocId = null;
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.refreshTrigger.update(v => v + 1);
         toast.success('All suggestions declined.');
       },
@@ -1621,7 +1643,7 @@ export class DocumentDetailPageComponent implements OnDestroy {
         if (savedId) this.editStateService.clearState(savedId);
         // Reset so the re-fetch reinitializes edit fields with server values
         this.initializedDocId = null;
-        this.initializedVersionId = null;
+        this.seededVersionKey = null;
         this.refreshTrigger.update((v) => v + 1);
         toast.success('Document updated.');
       },
