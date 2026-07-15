@@ -15,6 +15,7 @@ import { bulkRestoreDocuments } from '@/api/generated/fn/documents/bulk-restore-
 import { bulkPermanentlyDeleteDocuments } from '@/api/generated/fn/documents/bulk-permanently-delete-documents';
 import { emptyTrash } from '@/api/generated/fn/documents/empty-trash';
 import { getMyGroups } from '@/api/generated/fn/documents/get-my-groups';
+import { getTextExtractionEngines } from '@/api/generated/fn/documents/get-text-extraction-engines';
 import { getDocumentSettings } from '@/api/generated/fn/documents/get-document-settings';
 import { patchDocumentSettings } from '@/api/generated/fn/documents/patch-document-settings';
 import { classifyPreview } from '@/api/generated/fn/documents/classify-preview';
@@ -25,6 +26,7 @@ import { approveSuggestion } from '@/api/generated/fn/documents/approve-suggesti
 import { declineSuggestion } from '@/api/generated/fn/documents/decline-suggestion';
 import { approveAllSuggestions } from '@/api/generated/fn/documents/approve-all-suggestions';
 import { declineAllSuggestions } from '@/api/generated/fn/documents/decline-all-suggestions';
+import type { TextExtractionEngineResponse } from '@/api/generated/models/text-extraction-engine-response';
 import type { GetDocumentsResult } from '@/api/generated/models/get-documents-result';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
@@ -114,6 +116,10 @@ export class DocumentApiService {
 
   getMyGroups(): Observable<Array<GetMyGroupsResponse>> {
     return getMyGroups(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  }
+
+  getTextExtractionEngines(): Observable<Array<TextExtractionEngineResponse>> {
+    return getTextExtractionEngines(this.http, this.config.rootUrl).pipe(map(r => r.body));
   }
 
   getDocumentSettings(): Observable<DocumentSettingsResponse> {

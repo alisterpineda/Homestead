@@ -38,6 +38,9 @@ public class DocumentVersionConfiguration : IEntityTypeConfiguration<DocumentVer
         builder.Property(r => r.ExtractedText)
             .HasColumnType("text");
 
+        builder.Property(r => r.TextExtractionMetadata)
+            .HasColumnType("jsonb");
+
         builder.Property(r => r.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

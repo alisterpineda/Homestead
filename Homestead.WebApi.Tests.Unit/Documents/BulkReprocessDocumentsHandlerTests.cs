@@ -7,11 +7,15 @@ using Homestead.WebApi.Modules.Documents.Features.Documents.BulkReprocessDocumen
 using Homestead.WebApi.Processing;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class BulkReprocessDocumentsHandlerTests : IDisposable
 {
+    private readonly TextExtractionEngineResolver _resolver;
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IDocumentQueryService _queryService;
@@ -30,7 +34,8 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
             .Returns(_ => Guid.NewGuid());
 
-        _sut = new BulkReprocessDocumentsHandler(_db, _currentUser, _queryService, _jobQueue);
+        _resolver = new TextExtractionEngineResolver(_db, TestTextExtraction.Engines());
+        _sut = new BulkReprocessDocumentsHandler(_db, _currentUser, _queryService, _resolver, _jobQueue);
     }
 
     public void Dispose() => _db.Dispose();
@@ -122,6 +127,42 @@ public class BulkReprocessDocumentsHandlerTests : IDisposable
         Assert.Single(capturedPayloads);
         Assert.Contains(docId1.ToString(), capturedPayloads[0]);
         Assert.Contains(docId2.ToString(), capturedPayloads[0]);
+    }
+
+    [Fact]
+    public async Task Handle_EngineKeyIsResolvedOnceIntoTheParentPayload()
+    {
+        var (docId, _) = SeedDocument("Doc1.pdf");
+
+        var capturedPayloads = new List<string>();
+        _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var req = new EnqueueJobRequest();
+                callInfo.Arg<Action<EnqueueJobRequest>?>()?.Invoke(req);
+                capturedPayloads.Add(req.Payload!);
+                return Guid.NewGuid();
+            });
+
+        await _sut.Handle(
+            new BulkReprocessDocumentsCommand([docId], TestTextExtraction.DefaultKey),
+            CancellationToken.None);
+
+        Assert.Contains($"\"EngineKey\":\"{TestTextExtraction.DefaultKey}\"", Assert.Single(capturedPayloads));
+    }
+
+    // 400 before a job row exists — the alternative is a batch of N children silently running the engine
+    // the caller explicitly rejected.
+    [Fact]
+    public async Task Handle_UnavailableExplicitEngineKey_ThrowsAndEnqueuesNothing()
+    {
+        var (docId, _) = SeedDocument("Doc1.pdf");
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => _sut.Handle(
+            new BulkReprocessDocumentsCommand([docId], "azure-layout"), CancellationToken.None));
+
+        await _jobQueue.DidNotReceive().EnqueueAsync(
+            Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

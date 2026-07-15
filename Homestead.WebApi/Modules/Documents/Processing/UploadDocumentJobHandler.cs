@@ -26,6 +26,7 @@ public class UploadDocumentJobHandler(
     AiPageRenderService aiPageRenderService,
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
+    ITextExtractionEngineResolver engineResolver,
     ISender sender) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocument;
@@ -44,9 +45,12 @@ public class UploadDocumentJobHandler(
             if (!File.Exists(stagingPath))
                 throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
-            // Text extraction
+            // Text extraction. Uploads have no explicit pick — nobody is at a dialog choosing an engine —
+            // so they take the household default, which falls back to the built-in engine if it has gone
+            // stale (recorded in the version's provenance metadata).
+            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-                stagingPath, payload.ContentType, ct);
+                stagingPath, payload.ContentType, engineKey, ct);
 
             if (!extractionResult.Succeeded)
             {
@@ -56,6 +60,7 @@ public class UploadDocumentJobHandler(
             }
 
             var extractedText = extractionResult.Text;
+            var textExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata);
 
             // Compute SHA256 hash
             string fileHash;
@@ -139,6 +144,7 @@ public class UploadDocumentJobHandler(
                     FileExtension = payload.FileExtension,
                     Label = payload.Label,
                     ExtractedText = extractedText,
+                    TextExtractionMetadata = textExtractionMetadata,
                     Classification = classification,
                     ActorUserId = job.CreatedByUserId
                 }, ct);

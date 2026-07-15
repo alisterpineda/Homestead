@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
@@ -20,6 +21,7 @@ public class UploadDocumentVersionJobHandler(
     IProcessingNotifier notifier,
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
+    ITextExtractionEngineResolver engineResolver,
     ISender sender) : IJobHandler
 {
     public ProcessingJobType Type => ProcessingJobType.UploadDocumentVersion;
@@ -43,9 +45,10 @@ public class UploadDocumentVersionJobHandler(
             if (!File.Exists(stagingPath))
                 throw new FileNotFoundException($"Staged file not found: {stagingPath}");
 
-            // Text extraction
+            // Text extraction on the household default — see UploadDocumentJobHandler.
+            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
             var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-                stagingPath, payload.ContentType, ct);
+                stagingPath, payload.ContentType, engineKey, ct);
 
             if (!extractionResult.Succeeded)
             {
@@ -55,6 +58,7 @@ public class UploadDocumentVersionJobHandler(
             }
 
             var extractedText = extractionResult.Text;
+            var textExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata);
 
             // Compute SHA256 hash
             string fileHash;
@@ -112,6 +116,7 @@ public class UploadDocumentVersionJobHandler(
                     FileExtension = payload.FileExtension,
                     Label = payload.Label,
                     ExtractedText = extractedText,
+                    TextExtractionMetadata = textExtractionMetadata,
                     ActorUserId = job.CreatedByUserId
                 }, ct);
             }

@@ -25,6 +25,9 @@ public record CreateDocumentFromUploadCommand : ICommand<CreateDocumentFromUploa
     public string? Label { get; init; }
     public string? ExtractedText { get; init; }
 
+    /// <summary>Serialized TextExtractionMetadata describing how ExtractedText was produced.</summary>
+    public string? TextExtractionMetadata { get; init; }
+
     /// <summary>Optional AI classification produced in-memory during the job (null when auto-classify is off).</summary>
     public ClassificationResult? Classification { get; init; }
 
@@ -62,7 +65,8 @@ public class CreateDocumentFromUploadHandler(
             FileExtension = request.FileExtension,
             CreatedAt = DateTimeOffset.UtcNow,
             DocumentId = documentId,
-            ExtractedText = request.ExtractedText
+            ExtractedText = request.ExtractedText,
+            TextExtractionMetadata = request.TextExtractionMetadata
         };
 
         db.Documents.Add(document);

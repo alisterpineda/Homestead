@@ -203,6 +203,7 @@ builder.Services.AddScoped<ISearchSource, InventorySearchSource>();
 builder.Services.AddScoped<ISearchSource, DocumentSearchSource>();
 builder.Services.AddScoped<IDocumentMetadataService, DocumentMetadataService>();
 builder.Services.AddScoped<IDocumentClassifier, DocumentClassifier>();
+builder.Services.AddScoped<ITextExtractionEngineResolver, TextExtractionEngineResolver>();
 builder.Services.AddScoped<ITransactionValidator, TransactionValidator>();
 builder.Services.AddScoped<ISystemAccountProvider, SystemAccountProvider>();
 builder.Services.AddScoped<ILinkedPriceManager, LinkedPriceManager>();

@@ -9,22 +9,43 @@ public class GetDocumentVersionHandler(AppDbContext db)
 {
     public async Task<GetDocumentVersionResponse?> Handle(GetDocumentVersionQuery request, CancellationToken ct)
     {
-        return await db.DocumentVersions
+        // Projected to an intermediate first: the provenance blob has to be deserialized and flattened in
+        // memory, which EF cannot translate into the query.
+        var row = await db.DocumentVersions
             .AsNoTracking()
             .Where(r => r.DocumentId == request.DocumentId && r.Id == request.Id)
-            .Select(r => new GetDocumentVersionResponse
+            .Select(r => new
             {
-                Id = r.Id,
-                VersionNumber = r.VersionNumber,
-                Label = r.Label,
-                ContentType = r.ContentType,
-                FileSize = r.FileSize,
-                FileHash = r.FileHash,
-                FileExtension = r.FileExtension,
-                ExtractedText = r.ExtractedText,
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt
+                r.Id,
+                r.VersionNumber,
+                r.Label,
+                r.ContentType,
+                r.FileSize,
+                r.FileHash,
+                r.FileExtension,
+                r.ExtractedText,
+                r.TextExtractionMetadata,
+                r.CreatedAt,
+                r.UpdatedAt
             })
             .FirstOrDefaultAsync(ct);
+
+        if (row is null)
+            return null;
+
+        return new GetDocumentVersionResponse
+        {
+            Id = row.Id,
+            VersionNumber = row.VersionNumber,
+            Label = row.Label,
+            ContentType = row.ContentType,
+            FileSize = row.FileSize,
+            FileHash = row.FileHash,
+            FileExtension = row.FileExtension,
+            ExtractedText = row.ExtractedText,
+            TextExtraction = TextExtractionProvenanceResponse.From(row.TextExtractionMetadata),
+            CreatedAt = row.CreatedAt,
+            UpdatedAt = row.UpdatedAt
+        };
     }
 }

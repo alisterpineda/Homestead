@@ -50,7 +50,7 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     env:
-      Ocr__Tesseract__TessDataPath: /usr/share/tessdata
+      Ocr__Engines__tesseract__TessDataPath: /usr/share/tessdata
 
     steps:
       - name: Checkout

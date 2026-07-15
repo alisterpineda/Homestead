@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Persistence;
@@ -35,9 +36,11 @@ public class ReprocessDocumentVersionJobHandler(
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        // Re-extract text (the failure-prone step stays in the job handler)
+        // Re-extract text (the failure-prone step stays in the job handler). The engine key was resolved
+        // and stamped into the payload at enqueue, so a bulk run cannot split across engines if the
+        // household default flips mid-run, and this path needs no settings read.
         var extractionResult = await textExtractionHelper.ExtractTextSafeAsync(
-            filePath, version.ContentType, ct);
+            filePath, version.ContentType, payload.EngineKey, ct);
 
         if (!extractionResult.Succeeded)
         {
@@ -52,6 +55,7 @@ public class ReprocessDocumentVersionJobHandler(
             DocumentId = payload.DocumentId,
             VersionId = payload.VersionId,
             ExtractedText = extractionResult.Text,
+            TextExtractionMetadata = TextExtractionMetadata.Serialize(extractionResult.Metadata),
             ActorUserId = job.CreatedByUserId
         }, ct);
 

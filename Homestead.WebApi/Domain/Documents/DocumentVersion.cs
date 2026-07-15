@@ -25,6 +25,11 @@ public class DocumentVersion
     public required string FileExtension { get; set; }
     public string? ExtractedText { get; set; }
 
+    // Provenance for ExtractedText, as a serialized TextExtractionMetadata (jsonb). Held as a string and
+    // mapped with HasColumnType("jsonb"), the same idiom AppSetting.Value uses: the shape is polymorphic
+    // over engine type, so EF owns the column, not the shape.
+    public string? TextExtractionMetadata { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public Guid DocumentId { get; set; }

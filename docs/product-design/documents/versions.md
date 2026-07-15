@@ -76,18 +76,43 @@ The asymmetry is deliberate. Uploads prioritise capturing the file safely; repro
 
 Two reprocess paths:
 
-- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline. It may optionally pin a specific extraction engine for that one run — the reprocess dialog exposes an engine selector (`ReprocessDocumentVersionBody.TextExtractionEngineId`); when none is chosen it uses the household-wide default.
-- **Bulk reprocess.** Enqueues a parent job that fans out to one child reprocess job per selected document, targeting each document's *latest* version. Older versions of a selected document are not reprocessed in bulk. Optionally pins an extraction engine for the entire run; otherwise each child uses the household-wide default. Progress is observable through the standard processing UI; the user is not blocked on completion.
+- **Single-version reprocess.** Reruns extraction against a specific version's file. Updates the version's `ExtractedText`, refreshes the document's `SearchVector`, and surfaces failures inline. It may optionally pin a specific extraction engine for that one run — the reprocess dialog exposes an engine selector (`ReprocessDocumentVersionBody.EngineKey`); when none is chosen it uses the household-wide default.
+- **Bulk reprocess.** Enqueues a parent job that fans out to one child reprocess job per selected document, targeting each document's *latest* version. Older versions of a selected document are not reprocessed in bulk. Optionally pins an extraction engine for the entire run; otherwise the household-wide default is used. Progress is observable through the standard processing UI; the user is not blocked on completion.
 
 Bulk reprocess is the recovery path when the extraction engine has been swapped, the previous engine had a defect, or a batch of uploads failed extraction silently.
 
 ## Text-extraction engine
 
-The Documents module has a household-wide `DefaultTextExtractionEngineId` setting, persisted as a single row in `AppSettings` keyed by module name. This is the engine used for upload extraction and for reprocess actions that do not pin a specific engine. The setting is editable from the Documents settings page (`/documents/settings`); the dropdown lists every engine the system advertises.
+Two different kinds of fact are deliberately kept apart:
 
-A built-in fallback engine always exists and is used when no preference has been set. The setting is shared by the entire household — there is no per-user override.
+- **Which engines exist is deployment configuration**, not data. Engines are defined in config under `Ocr:Engines:{key}`, where `{key}` is an arbitrary instance name. Endpoints and API keys are deployment facts that belong in env vars / user-secrets, where the existing secret tooling already works — so there is no engines table, no admin CRUD, no secret masking, and no API keys in a `pg_dump`.
+- **Which engine to use is product data.** The household default lives in the Documents `AppSettings` row as `DefaultEngineKey` (a config instance key, e.g. `azure-layout`); a per-run override can be pinned on either reprocess path.
 
-Engines are an extensibility point at the model layer (new engines can be registered without touching the upload or reprocess paths), but in v1 the user-facing surface is intentionally small: a single household-wide preference, plus an optional one-shot engine override on a reprocess run — available on both single-version and bulk reprocess.
+Engines are *named instances* selected by string key, not one-per-type: a single Azure resource serves several meaningfully different models, so `azure-layout` (`prebuilt-layout`) and `azure-read` (`prebuilt-read`) are both legitimate engines over the same credentials.
+
+Two engine types ship:
+
+- **`tesseract`** — local, free, always present. For PDFs it takes a hybrid path: pages with an embedded text layer are read directly; only text-less pages are rasterized and OCR'd.
+- **Azure Document Intelligence** — metered per page, off unless configured. Sends the whole file regardless of text layer. With `prebuilt-layout` it returns Markdown containing **HTML table syntax** (`<table>/<tr>/<td>`, `rowspan`/`colspan` preserved), which is why it exists: born-digital documents like bank statements *have* a text layer, so Tesseract takes the text-layer branch and returns badly-spaced prose that loses the table structure entirely.
+
+A built-in `tesseract` instance always exists, seeded with defaults even when config defines no engines at all. It is the terminus of the resolution chain: **explicit per-run key → household `DefaultEngineKey` → built-in `tesseract`**. The default is shared by the entire household — there is no per-user override.
+
+### Availability and failure
+
+An engine can be *configured as an instance* yet not *usable* (e.g. an Azure instance with no endpoint, or `prebuilt-read` asked for Markdown, which Azure rejects). Each engine reports `IsConfigured` plus a `ConfigurationError`, and the picker (`GET /api/v1/documents/text-extraction-engines`, Contributor) shows unusable engines disabled with the reason rather than hiding them. Config is not validated at startup, so an invalid combination surfaces in the picker rather than preventing the app from booting.
+
+Failure handling is deliberately asymmetric:
+
+- **On the default path** (uploads, statement parsing — nobody is watching), an unavailable or dangling engine key falls back to the built-in `tesseract`, logs, and records the substitution in the version's provenance metadata. The fall-back is never silent.
+- **On an explicit pick**, an unknown or unavailable key is rejected with a **400 at enqueue**, before a job row exists. Silently running Tesseract for a user who chose `azure-layout` would deliver precisely the output they rejected.
+
+The engine is resolved **once, at enqueue**, and the concrete key is stamped into the job payload; a bulk fan-out copies the parent's key into every child. This makes a run deterministic — changing the household default mid-run cannot split a batch across two engines — and makes the 400-at-enqueue possible at all.
+
+### Provenance
+
+Every extraction records how it was produced, on `DocumentVersion.TextExtractionMetadata` (jsonb), surfaced read-only under the extracted text. It carries the engine type, the instance key that ran, when, and — only when a fall-back happened — the key that was requested and why it could not run. Per type: Tesseract records language/DPI/PSM/OEM plus **how many pages came from the embedded text layer versus were OCR'd** (which branch of the hybrid path each page took is otherwise unknowable after the fact); Azure records the model, output format, and **how many pages it actually analyzed** — the only durable signal that a free-tier (F0) resource silently analyzed just the first 2 pages of a 30-page statement.
+
+Versions extracted before provenance existed simply show nothing.
 
 ## Version delete
 

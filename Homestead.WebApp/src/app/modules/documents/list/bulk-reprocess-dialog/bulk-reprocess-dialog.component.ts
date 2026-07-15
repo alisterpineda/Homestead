@@ -3,12 +3,16 @@ import { BrnDialog } from '@spartan-ng/brain/dialog';
 
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideRefreshCw } from '@ng-icons/lucide';
+import { lucideRefreshCw, lucideTriangleAlert } from '@ng-icons/lucide';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { persistedSignal } from '@/shared/utils/persisted-signal';
+import { EngineSelectComponent } from '@/modules/documents/shared/engine-select/engine-select.component';
+import { TextExtractionEnginesService } from '@/modules/documents/shared/text-extraction-engines.service';
 
 @Component({
   selector: 'app-bulk-reprocess-dialog',
@@ -16,10 +20,12 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   imports: [
     HlmDialogImports,
     HlmButton,
+    HlmLabel,
     HlmIconImports,
     NgIcon,
+    EngineSelectComponent,
   ],
-  providers: [provideIcons({ lucideRefreshCw })],
+  providers: [provideIcons({ lucideRefreshCw, lucideTriangleAlert })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn variant="outline" hlmDialogTrigger [disabled]="disabled()">
@@ -34,6 +40,22 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
             This will re-extract text from the latest version of {{ documentCount() }}
             selected document{{ documentCount() > 1 ? 's' : '' }}. The existing extracted text will be replaced.
           </p>
+        </div>
+
+        <div class="flex flex-col gap-2 py-4">
+          <label hlmLabel>Text extraction engine</label>
+          <app-engine-select [value]="engineKey()" (valueChange)="engineKey.set($event)" />
+
+          @if (showCostWarning()) {
+            <div class="mt-2 flex items-start gap-2 rounded-md border border-border bg-muted p-3 text-sm">
+              <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0 text-muted-foreground" />
+              <span>
+                <strong>{{ engineKey() }}</strong> is billed per page. This run sends
+                {{ documentCount() }} document{{ documentCount() > 1 ? 's' : '' }} — every page of each — to
+                the provider.
+              </span>
+            </div>
+          }
         </div>
 
         <div hlmDialogFooter>
@@ -55,6 +77,20 @@ export class BulkReprocessDialogComponent {
 
   documentCount = computed(() => this.documentIds().size);
 
+  // Shares the single-document dialog's key on purpose: the engine you are evaluating is the same one
+  // either way.
+  engineKey = persistedSignal<string>({
+    key: 'homestead-reprocess-engine-key',
+    defaultValue: '',
+    validate: (v): v is string => typeof v === 'string',
+  });
+
+  private enginesService = inject(TextExtractionEnginesService);
+
+  // There is no page or document cap on a bulk reprocess, so a metered engine over a large selection can
+  // spend real money on one click. Naming the count next to the engine is the cheap half of the mitigation.
+  showCostWarning = computed(() => this.enginesService.isMetered(this.engineKey()));
+
   private dialog = viewChild(BrnDialog);
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
@@ -72,7 +108,8 @@ export class BulkReprocessDialogComponent {
     this.reprocessing.set(true);
 
     this.documentApi.bulkReprocessDocuments({
-      body: { ids },
+      // Empty means no explicit pick, which the backend resolves to the household default.
+      body: { ids, engineKey: this.engineKey() || null },
     }).pipe(
       handleMutationError(this.errorHandler, this.reprocessing, 'Failed to start text extraction reprocessing.'),
     ).subscribe({

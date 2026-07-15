@@ -45,6 +45,13 @@ public class PatchDocumentVersionHandler(AppDbContext db,
 
         // Update entity from patched model
         version.Label = model.Label;
+
+        // Hand-editing the text invalidates its provenance: the metadata describes an extraction that
+        // produced text this row no longer holds. Clearing it makes the version read as "no engine
+        // provenance" rather than attributing a human's edit to Tesseract or Azure, page counts and all.
+        if (model.ExtractedText != version.ExtractedText)
+            version.TextExtractionMetadata = null;
+
         version.ExtractedText = model.ExtractedText;
         version.UpdatedAt = DateTimeOffset.UtcNow;
 

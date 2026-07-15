@@ -47,6 +47,7 @@ using Homestead.WebApi.Modules.Documents.Features.Download;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Modules.Documents.Features.Settings.GetDocumentSettings;
 using Homestead.WebApi.Modules.Documents.Features.Settings.PatchDocumentSettings;
+using Homestead.WebApi.Modules.Documents.Features.TextExtractionEngines.GetTextExtractionEngines;
 
 namespace Homestead.WebApi.Modules.Documents;
 
@@ -79,6 +80,7 @@ public static class DocumentsModule
 
         ClassifyPreviewEndpoint.Map(v1);
         SummarizeDocumentEndpoint.Map(v1);
+        GetTextExtractionEnginesEndpoint.Map(v1);
 
         var versions = v1.MapGroup("/{documentId:guid}/versions");
         CreateDocumentVersionEndpoint.Map(versions);

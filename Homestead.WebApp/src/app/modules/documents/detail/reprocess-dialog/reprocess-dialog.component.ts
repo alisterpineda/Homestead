@@ -3,9 +3,12 @@ import { BrnDialog } from '@spartan-ng/brain/dialog';
 
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmLabel } from '@/shared/components/spartan/label';
 import { DocumentVersionApiService } from '@/api/services/document-version-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
+import { persistedSignal } from '@/shared/utils/persisted-signal';
+import { EngineSelectComponent } from '@/modules/documents/shared/engine-select/engine-select.component';
 
 @Component({
   selector: 'app-reprocess-dialog',
@@ -13,6 +16,8 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
   imports: [
     HlmDialogImports,
     HlmButton,
+    HlmLabel,
+    EngineSelectComponent,
   ],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
@@ -24,6 +29,11 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
           <p hlmDialogDescription>
             This will re-extract text from the current version's file. The existing extracted text will be replaced.
           </p>
+        </div>
+
+        <div class="flex flex-col gap-2 py-4">
+          <label hlmLabel>Text extraction engine</label>
+          <app-engine-select [value]="engineKey()" (valueChange)="engineKey.set($event)" />
         </div>
 
         <div hlmDialogFooter>
@@ -42,6 +52,14 @@ export class ReprocessDialogComponent {
   reprocessStarted = output<string>();
 
   reprocessing = signal(false);
+
+  // Sticky across surfaces and sessions, like the classify field selection: comparing engines means
+  // reprocessing the same way several times in a row.
+  engineKey = persistedSignal<string>({
+    key: 'homestead-reprocess-engine-key',
+    defaultValue: '',
+    validate: (v): v is string => typeof v === 'string',
+  });
 
   private dialog = viewChild(BrnDialog);
   private versionApi = inject(DocumentVersionApiService);
@@ -67,7 +85,8 @@ export class ReprocessDialogComponent {
     this.versionApi.reprocessDocumentVersion({
       documentId: docId,
       versionId: verId,
-      body: {},
+      // Empty means no explicit pick, which the backend resolves to the household default.
+      body: { engineKey: this.engineKey() || null },
     }).pipe(
       handleMutationError(this.errorHandler, this.reprocessing, 'Failed to start text extraction reprocessing.'),
     ).subscribe({

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Modules.Documents.Features.Suggestions;
+using Homestead.WebApi.Modules.Documents.Features.Versions;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 
@@ -25,6 +26,11 @@ public record GetDocumentResponse
     public string? GroupName { get; init; }
     public string? Summary { get; init; }
     public string? ExtractedText { get; init; }
+
+    /// <summary>How the latest version's ExtractedText was produced. Null for versions extracted before
+    /// provenance existed.</summary>
+    public TextExtractionProvenanceResponse? TextExtraction { get; init; }
+
     public int VersionCount { get; init; }
     public required IReadOnlyList<GetDocumentVersionDto> Versions { get; init; }
     public required IReadOnlyList<GetDocumentTagDto> Tags { get; init; }

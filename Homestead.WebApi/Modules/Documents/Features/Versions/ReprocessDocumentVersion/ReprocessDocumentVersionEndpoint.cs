@@ -14,7 +14,10 @@ public static class ReprocessDocumentVersionEndpoint
             var request = new ReprocessDocumentVersionCommand
             {
                 DocumentId = documentId,
-                VersionId = versionId
+                VersionId = versionId,
+                // body?. — an omitted body has always been legal here and must keep meaning
+                // "use the household default", not "no engine".
+                EngineKey = body?.EngineKey
             };
             var response = await sender.Send(request, ct);
             return Results.Accepted(null, response);

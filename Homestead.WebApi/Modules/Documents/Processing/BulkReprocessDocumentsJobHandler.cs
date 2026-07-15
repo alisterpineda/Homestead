@@ -37,8 +37,9 @@ public class BulkReprocessDocumentsJobHandler(
 
         foreach (var item in latestVersions)
         {
+            // The parent's already-resolved key, copied verbatim — children must not re-resolve.
             var childPayload = new ReprocessDocumentVersionPayload(
-                item.DocumentId, item.VersionId);
+                item.DocumentId, item.VersionId, payload.EngineKey);
 
             db.ProcessingJobs.Add(new ProcessingJob
             {

@@ -53,6 +53,19 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
             if (!string.IsNullOrWhiteSpace(aiImageRenderMaxEdge))
                 context.EnvironmentVariables["AI_IMAGE_RENDER_MAX_EDGE"] = aiImageRenderMaxEdge;
         }
+
+        // Optional extra OCR engines (off by default). Sourced from AppHost user-secrets so no endpoint
+        // or key is committed, e.g.
+        //   dotnet user-secrets set "Ocr:Engines:azure-layout:Type" "AzureDocumentIntelligence"
+        //   dotnet user-secrets set "Ocr:Engines:azure-layout:Endpoint" "https://<res>.cognitiveservices.azure.com"
+        //   dotnet user-secrets set "Ocr:Engines:azure-layout:ApiKey" "<key>"
+        //
+        // Forwarded verbatim as stock Ocr__Engines__{key}__{field} env vars — the same names a Docker
+        // deployment sets — rather than through a bespoke mapping like AI_*. Engine instance names are
+        // arbitrary, so the section is walked rather than enumerated field by field. The WebApi's own
+        // appsettings.json still defines the built-in "tesseract" instance; these only add to it.
+        foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Ocr:Engines")))
+            context.EnvironmentVariables[path.Replace(":", "__")] = value;
     })
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })
     .WithUrlForEndpoint("https", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" });
@@ -63,3 +76,18 @@ builder.AddJavaScriptApp("homestead-webapp", "../Homestead.WebApp", "start")
     .WaitFor(webapi);
 
 builder.Build().Run();
+
+// Every leaf key under a config section, with its full path. Used to forward Ocr:Engines verbatim:
+// engine instance names are arbitrary, so the section has to be walked rather than read field by field.
+static IEnumerable<(string Path, string Value)> LeafSettings(
+    Microsoft.Extensions.Configuration.IConfigurationSection section)
+{
+    foreach (var child in section.GetChildren())
+    {
+        if (child.Value is not null)
+            yield return (child.Path, child.Value);
+
+        foreach (var leaf in LeafSettings(child))
+            yield return leaf;
+    }
+}

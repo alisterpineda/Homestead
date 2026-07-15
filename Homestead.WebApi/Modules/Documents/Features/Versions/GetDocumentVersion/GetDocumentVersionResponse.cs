@@ -10,6 +10,10 @@ public record GetDocumentVersionResponse
     public required string FileHash { get; init; }
     public required string FileExtension { get; init; }
     public string? ExtractedText { get; init; }
+
+    /// <summary>How ExtractedText was produced. Null for versions extracted before provenance existed.</summary>
+    public TextExtractionProvenanceResponse? TextExtraction { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }

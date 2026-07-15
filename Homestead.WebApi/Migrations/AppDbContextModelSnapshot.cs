@@ -287,6 +287,9 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("TextExtractionMetadata")
+                        .HasColumnType("jsonb");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

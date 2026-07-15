@@ -8,6 +8,7 @@ using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -33,10 +34,10 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _mediaPath = Path.Combine(Path.GetTempPath(), $"upload-ver-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot));
 
-        _textExtractionEngine = Substitute.For<ITextExtractionEngine>();
+        _textExtractionEngine = TestTextExtraction.Engine();
         _textExtractionEngine.ExtractTextAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
+            .Returns(TestTextExtraction.Output(null));
 
         _notifier = Substitute.For<IProcessingNotifier>();
 
@@ -50,7 +51,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), storage,
             Substitute.For<ILogger<ThumbnailService>>());
-        var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
+        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _sender = Substitute.For<ISender>();
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
@@ -58,7 +59,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
 
         _handler = new UploadDocumentVersionJobHandler(
             _db, storage, logger,
-            _notifier, _thumbnailService, textExtractionHelper, _sender);
+            _notifier, _thumbnailService, textExtractionHelper, TestTextExtraction.Resolver(), _sender);
     }
 
     public void Dispose()
@@ -119,7 +120,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("extracted text");
+            .Returns(TestTextExtraction.Output("extracted text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -141,7 +142,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, _) = CreateVersionUploadJob(doc.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new AddDocumentVersionResult(Guid.NewGuid(), "Stored Doc Name"));
@@ -180,7 +181,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, _) = CreateVersionUploadJob(doc.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns<string?>(x => throw new Exception("OCR failed"));
+            .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -197,7 +198,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -216,7 +217,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, stagingPath) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _sender.Send(Arg.Any<AddDocumentVersionCommand>(), Arg.Any<CancellationToken>())
             .Returns<Task<AddDocumentVersionResult>>(_ => throw new Exception("commit failed"));
@@ -237,7 +238,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, _) = CreateVersionUploadJob(doc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         SeedExistingVersion(doc, HashOf(content));
 
@@ -270,7 +271,7 @@ public class UploadDocumentVersionJobHandlerTests : IDisposable
         var (job, _) = CreateVersionUploadJob(targetDoc.Id, content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         var ex = await Assert.ThrowsAsync<DuplicateDocumentException>(
             () => _handler.HandleAsync(job, ct));

@@ -21,6 +21,10 @@ public record AddDocumentVersionCommand : ICommand<AddDocumentVersionResult>, IA
     public required string FileExtension { get; init; }
     public string? Label { get; init; }
     public string? ExtractedText { get; init; }
+
+    /// <summary>Serialized TextExtractionMetadata describing how ExtractedText was produced.</summary>
+    public string? TextExtractionMetadata { get; init; }
+
     public Guid? ActorUserId { get; init; }
 }
 
@@ -53,7 +57,8 @@ public class AddDocumentVersionHandler(AppDbContext db, IAuditContext audit)
             FileExtension = request.FileExtension,
             CreatedAt = DateTimeOffset.UtcNow,
             DocumentId = request.DocumentId,
-            ExtractedText = request.ExtractedText
+            ExtractedText = request.ExtractedText,
+            TextExtractionMetadata = request.TextExtractionMetadata
         };
 
         db.DocumentVersions.Add(version);

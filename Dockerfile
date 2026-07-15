@@ -48,7 +48,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 ENV FileStorage__MediaPath=/media
 ENV FileStorage__CachePath=/cache
-ENV Ocr__Tesseract__TessDataPath=/usr/share/tessdata
+ENV Ocr__Engines__tesseract__TessDataPath=/usr/share/tessdata
 
 EXPOSE 8080
 

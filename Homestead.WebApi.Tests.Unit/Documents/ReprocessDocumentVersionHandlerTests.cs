@@ -5,11 +5,15 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocumentVersion;
 using Homestead.WebApi.Processing;
 using NSubstitute;
+using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class ReprocessDocumentVersionHandlerTests : IDisposable
 {
+    private readonly TextExtractionEngineResolver _resolver;
     private readonly TestAppDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IJobQueue _jobQueue;
@@ -28,7 +32,8 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
         _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
             .Returns(Guid.NewGuid());
 
-        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _jobQueue);
+        _resolver = new TextExtractionEngineResolver(_db, TestTextExtraction.Engines());
+        _sut = new ReprocessDocumentVersionHandler(_db, _currentUser, _resolver, _jobQueue);
 
         SeedDocumentAndVersion();
     }
@@ -96,5 +101,70 @@ public class ReprocessDocumentVersionHandlerTests : IDisposable
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(request, TestContext.Current.CancellationToken));
+    }
+
+    // Captures the payload the handler enqueues.
+    private List<string> CapturePayloads()
+    {
+        var payloads = new List<string>();
+        _jobQueue.EnqueueAsync(Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var req = new EnqueueJobRequest();
+                callInfo.Arg<Action<EnqueueJobRequest>?>()?.Invoke(req);
+                payloads.Add(req.Payload!);
+                return Guid.NewGuid();
+            });
+        return payloads;
+    }
+
+    // The key is resolved once here and stamped, so the job path needs no settings read and the run is
+    // deterministic regardless of what the household default does afterwards.
+    [Fact]
+    public async Task Handle_ExplicitEngineKey_IsStampedIntoThePayload()
+    {
+        var payloads = CapturePayloads();
+
+        await _sut.Handle(new ReprocessDocumentVersionCommand
+        {
+            DocumentId = _docId,
+            VersionId = _versionId,
+            EngineKey = TestTextExtraction.DefaultKey
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Contains($"\"EngineKey\":\"{TestTextExtraction.DefaultKey}\"", Assert.Single(payloads));
+    }
+
+    [Fact]
+    public async Task Handle_NoEngineKey_StampsTheHouseholdDefault()
+    {
+        var payloads = CapturePayloads();
+
+        await _sut.Handle(new ReprocessDocumentVersionCommand
+        {
+            DocumentId = _docId,
+            VersionId = _versionId
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Contains($"\"EngineKey\":\"{TestTextExtraction.DefaultKey}\"", Assert.Single(payloads));
+    }
+
+    // Rejected synchronously, before a job row exists: a user who picked azure-layout must not get
+    // Tesseract's output back under a completed job.
+    [Fact]
+    public async Task Handle_UnavailableExplicitEngineKey_ThrowsAndEnqueuesNothing()
+    {
+        var request = new ReprocessDocumentVersionCommand
+        {
+            DocumentId = _docId,
+            VersionId = _versionId,
+            EngineKey = "azure-layout"
+        };
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => _sut.Handle(request, TestContext.Current.CancellationToken));
+
+        await _jobQueue.DidNotReceive().EnqueueAsync(
+            Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>());
     }
 }

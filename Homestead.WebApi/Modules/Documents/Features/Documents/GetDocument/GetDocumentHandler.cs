@@ -3,6 +3,7 @@ using Homestead.WebApi.Modules.Documents.Features.Suggestions;
 using MediatR;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Homestead.WebApi.Modules.Documents.Features.Versions;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.GetDocument;
 
@@ -11,7 +12,7 @@ public class GetDocumentHandler(AppDbContext db)
 {
     public async Task<GetDocumentResponse?> Handle(GetDocumentQuery request, CancellationToken ct)
     {
-        return await db.Documents
+        var d = await db.Documents
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
             .Select(d => new
@@ -40,7 +41,8 @@ public class GetDocumentHandler(AppDbContext db)
                         r.FileSize,
                         r.FileHash,
                         r.FileExtension,
-                        r.ExtractedText
+                        r.ExtractedText,
+                        r.TextExtractionMetadata
                     })
                     .FirstOrDefault(),
                 Versions = d.Versions
@@ -86,35 +88,42 @@ public class GetDocumentHandler(AppDbContext db)
                         ResolvedAt = s.ResolvedAt,
                     }).ToList()
             })
-            .Select(d => d.LatestVersion == null ? null : new GetDocumentResponse
-            {
-                Id = d.Id,
-                Name = d.Name,
-                ContentType = d.LatestVersion.ContentType,
-                FileSize = d.LatestVersion.FileSize,
-                FileHash = d.LatestVersion.FileHash,
-                FileExtension = d.LatestVersion.FileExtension,
-                CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt,
-                UpdatedByUserId = d.UpdatedByUserId,
-                UpdatedByUserName = d.UpdatedByUserName,
-                DocumentDate = d.DocumentDate,
-                ExpiryDate = d.ExpiryDate,
-                Notes = d.Notes,
-                CreatedByUserId = d.CreatedByUserId,
-                CreatedByUserName = d.CreatedByUserName,
-                OwnerUserId = d.OwnerUserId,
-                OwnerUserName = d.OwnerUserName,
-                GroupId = d.GroupId,
-                GroupName = d.GroupName,
-                Summary = d.Summary,
-                ExtractedText = d.LatestVersion.ExtractedText,
-                VersionCount = d.VersionCount,
-                Versions = d.Versions,
-                Tags = d.Tags,
-                Parties = d.Parties,
-                Suggestions = d.Suggestions,
-            })
             .FirstOrDefaultAsync(ct);
+
+        // Materialized before the final map (rather than projecting straight into the response in SQL):
+        // the provenance blob has to be deserialized and flattened in memory. Same columns, same query.
+        if (d?.LatestVersion is null)
+            return null;
+
+        return new GetDocumentResponse
+        {
+            Id = d.Id,
+            Name = d.Name,
+            ContentType = d.LatestVersion.ContentType,
+            FileSize = d.LatestVersion.FileSize,
+            FileHash = d.LatestVersion.FileHash,
+            FileExtension = d.LatestVersion.FileExtension,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.UpdatedAt,
+            UpdatedByUserId = d.UpdatedByUserId,
+            UpdatedByUserName = d.UpdatedByUserName,
+            DocumentDate = d.DocumentDate,
+            ExpiryDate = d.ExpiryDate,
+            Notes = d.Notes,
+            CreatedByUserId = d.CreatedByUserId,
+            CreatedByUserName = d.CreatedByUserName,
+            OwnerUserId = d.OwnerUserId,
+            OwnerUserName = d.OwnerUserName,
+            GroupId = d.GroupId,
+            GroupName = d.GroupName,
+            Summary = d.Summary,
+            ExtractedText = d.LatestVersion.ExtractedText,
+            TextExtraction = TextExtractionProvenanceResponse.From(d.LatestVersion.TextExtractionMetadata),
+            VersionCount = d.VersionCount,
+            Versions = d.Versions,
+            Tags = d.Tags,
+            Parties = d.Parties,
+            Suggestions = d.Suggestions,
+        };
     }
 }

@@ -60,7 +60,7 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
         builder.UseSetting("Processing:Scheduling:Enabled", "false");
 
-        // Tesseract's tessdata path comes from the Ocr__Tesseract__TessDataPath env var
+        // Tesseract's tessdata path comes from the Ocr__Engines__tesseract__TessDataPath env var
         // (devcontainer remoteEnv / CI job env), provisioned by scripts/fetch-tessdata.sh.
         // The WebApi runs in-process here, so .NET's env-var config provider picks it up —
         // no OS path-guessing needed.

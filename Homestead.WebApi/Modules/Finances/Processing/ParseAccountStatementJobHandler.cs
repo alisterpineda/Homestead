@@ -3,6 +3,7 @@ using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
@@ -26,6 +27,9 @@ public class ParseAccountStatementJobHandler(
     StatementMappingBuilder mappingBuilder,
     AiPageRenderService aiPageRenderService,
     TextExtractionHelper textExtraction,
+    // Cross-module by necessity: the engine preference is a Documents setting, and a statement is a
+    // DocumentVersion. This handler already reads Documents' entities directly for the same reason.
+    ITextExtractionEngineResolver engineResolver,
     IProcessingNotifier notifier,
     IOptions<FileStorageOptions> storageOptions,
     IOptions<AiOptions> aiOptions,
@@ -77,8 +81,11 @@ public class ParseAccountStatementJobHandler(
         var text = version.ExtractedText;
         if (string.IsNullOrWhiteSpace(text))
         {
+            // The household default, same as the upload path that normally populates ExtractedText — a
+            // defensive re-extract must not silently use a different engine than the original.
+            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
             var extractionResult = await textExtraction.ExtractTextSafeAsync(
-                physicalPath, version.ContentType, ct);
+                physicalPath, version.ContentType, engineKey, ct);
             if (!extractionResult.Succeeded)
                 logger.LogWarning(extractionResult.Error,
                     "Text extraction failed for statement version {VersionId}; extracting from image only.",

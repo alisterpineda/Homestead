@@ -45,6 +45,8 @@ export type { ClassifyPreview$Params as ClassifyPreview$Params } from './fn/docu
 export { classifyPreview as classifyPreview } from './fn/documents/classify-preview';
 export type { SummarizeDocument$Params as SummarizeDocument$Params } from './fn/documents/summarize-document';
 export { summarizeDocument as summarizeDocument } from './fn/documents/summarize-document';
+export type { GetTextExtractionEngines$Params as GetTextExtractionEngines$Params } from './fn/documents/get-text-extraction-engines';
+export { getTextExtractionEngines as getTextExtractionEngines } from './fn/documents/get-text-extraction-engines';
 export type { GetDocumentVersions$Params as GetDocumentVersions$Params } from './fn/documents/get-document-versions';
 export { getDocumentVersions as getDocumentVersions } from './fn/documents/get-document-versions';
 export type { CreateDocumentVersion$Params as CreateDocumentVersion$Params } from './fn/documents/create-document-version';

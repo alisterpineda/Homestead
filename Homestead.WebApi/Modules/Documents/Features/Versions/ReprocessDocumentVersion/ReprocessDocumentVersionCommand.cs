@@ -10,5 +10,9 @@ public class ReprocessDocumentVersionCommand : ICommand<ReprocessDocumentVersion
     public Guid DocumentId { get; set; }
     public Guid VersionId { get; set; }
 
+    // Null means "household default". A non-null key is validated at enqueue and rejected with a 400 if
+    // it is unknown or unavailable — see ITextExtractionEngineResolver.
+    public string? EngineKey { get; set; }
+
     public OperationAuthorizationRequirement RequiredOperation => DocumentOperations.Write;
 }

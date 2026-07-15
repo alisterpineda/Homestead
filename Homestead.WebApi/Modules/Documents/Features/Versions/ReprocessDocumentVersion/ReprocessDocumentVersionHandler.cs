@@ -3,6 +3,7 @@ using Homestead.WebApi.Common;
 using MediatR;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Documents.Processing;
+using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace Homestead.WebApi.Modules.Documents.Features.Versions.ReprocessDocument
 public class ReprocessDocumentVersionHandler(
     AppDbContext db,
     ICurrentUserAccessor currentUser,
+    ITextExtractionEngineResolver engineResolver,
     IJobQueue jobQueue)
     : IRequestHandler<ReprocessDocumentVersionCommand, ReprocessDocumentVersionResponse>
 {
@@ -28,7 +30,13 @@ public class ReprocessDocumentVersionHandler(
 
         var userId = currentUser.UserId;
 
-        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId);
+        // Resolved before the first write, so an unusable explicit pick throws BusinessRuleException ->
+        // 400 synchronously, before a job row exists. Ordering is legal: the two AnyAsync reads above are
+        // deliberately not hooked by CommandTransactionInterceptor, so nothing has opened the transaction
+        // yet — jobQueue.EnqueueAsync below is still the first write.
+        var engineKey = await engineResolver.ResolveKeyAsync(request.EngineKey, ct);
+
+        var payload = new ReprocessDocumentVersionPayload(request.DocumentId, request.VersionId, engineKey);
 
         var jobId = await jobQueue.EnqueueAsync(ProcessingJobType.ReprocessDocumentVersion, opts =>
         {

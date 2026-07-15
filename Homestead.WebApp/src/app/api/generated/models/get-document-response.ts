@@ -5,6 +5,7 @@ import { DocumentSuggestionDto } from '../models/document-suggestion-dto';
 import { GetDocumentPartyDto } from '../models/get-document-party-dto';
 import { GetDocumentTagDto } from '../models/get-document-tag-dto';
 import { GetDocumentVersionDto } from '../models/get-document-version-dto';
+import { TextExtractionProvenanceResponse } from '../models/text-extraction-provenance-response';
 export interface GetDocumentResponse {
   contentType: string;
   createdAt: string;
@@ -27,6 +28,7 @@ export interface GetDocumentResponse {
   suggestions: Array<DocumentSuggestionDto>;
   summary?: (string | null);
   tags: Array<GetDocumentTagDto>;
+  textExtraction?: (null | TextExtractionProvenanceResponse);
   updatedAt: string;
   updatedByUserId?: (string | null);
   updatedByUserName?: (string | null);

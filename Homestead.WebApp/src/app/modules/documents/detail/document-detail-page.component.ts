@@ -66,6 +66,7 @@ import { PartyInputComponent } from '../parties/party-input/party-input.componen
 import type { PartyOption } from '../parties/party-input/party-input.component';
 import { AddVersionDialogComponent } from './add-version-dialog/add-version-dialog.component';
 import { ReprocessDialogComponent } from './reprocess-dialog/reprocess-dialog.component';
+import { TextExtractionProvenanceComponent } from './text-extraction-provenance/text-extraction-provenance.component';
 import { ClassifyOptionsDialogComponent } from '../shared/classify-options-dialog/classify-options-dialog.component';
 import { formatBytes, parseDate, toIsoDateString, datesEqual, triggerDownload } from '@/shared/utils';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -113,6 +114,7 @@ import { toast } from '@spartan-ng/brain/sonner';
     NgScrollbar,
     AddVersionDialogComponent,
     ReprocessDialogComponent,
+    TextExtractionProvenanceComponent,
     ClassifyOptionsDialogComponent,
     HlmBadge,
     HlmEmptyImports,
@@ -616,6 +618,7 @@ import { toast } from '@spartan-ng/brain/sonner';
               [value]="editExtractedText()"
               (input)="editExtractedText.set(asInputValue($event))"
             ></textarea>
+            <app-text-extraction-provenance [provenance]="displayTextExtraction()" />
           </div>
         </div>
       </ng-template>
@@ -966,6 +969,15 @@ export class DocumentDetailPageComponent implements OnDestroy {
     }
     // Viewing latest — use document-level extractedText
     return this.document()?.extractedText ?? null;
+  });
+
+  // Provenance follows the same version/latest split as the text it describes.
+  displayTextExtraction = computed(() => {
+    const verId = this.versionId();
+    if (verId) {
+      return this.versionDetail()?.textExtraction ?? null;
+    }
+    return this.document()?.textExtraction ?? null;
   });
 
   private fileSub: Subscription | null = null;

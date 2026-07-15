@@ -1,15 +1,10 @@
 using System.Diagnostics;
 using System.Globalization;
-using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Infrastructure.TextExtraction;
 
-public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<TesseractRunner> logger) : ITesseractRunner
+public class TesseractRunner(ILogger<TesseractRunner> logger) : ITesseractRunner
 {
-    private readonly string _tessDataPath = options.Value.TessDataPath;
-    private readonly int _psm = options.Value.Psm;
-    private readonly int _oem = options.Value.Oem;
-
     internal static IReadOnlyList<string> BuildArguments(
         string language, string tessDataPath, int? dpi, int psm, int oem)
     {
@@ -29,10 +24,10 @@ public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<Tessera
         return args;
     }
 
-    public async Task<string?> OcrAsync(Stream imageStream, string language, int? dpi, CancellationToken ct)
+    public async Task<string?> OcrAsync(Stream imageStream, TesseractRunOptions options, CancellationToken ct)
     {
         logger.LogDebug("Running tesseract OCR with tessdata={TessDataPath}, lang={Language}",
-            _tessDataPath, language);
+            options.TessDataPath, options.Language);
 
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
@@ -45,7 +40,9 @@ public class TesseractRunner(IOptions<TesseractOptions> options, ILogger<Tessera
             CreateNoWindow = true
         };
 
-        foreach (var arg in BuildArguments(language, _tessDataPath, dpi, _psm, _oem))
+        var args = BuildArguments(
+            options.Language, options.TessDataPath, options.Dpi, options.Psm, options.Oem);
+        foreach (var arg in args)
             process.StartInfo.ArgumentList.Add(arg);
 
         process.Start();

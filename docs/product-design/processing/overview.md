@@ -215,7 +215,9 @@ Triggered when a new version of an existing document is uploaded. Same shape as 
 
 ### `ReprocessDocumentVersion`
 
-Re-runs text extraction on an existing document version (e.g., after the user changes the OCR engine). The handler reads the file from its hash-addressed location, re-extracts text, and writes the diff to the audit log via `auditLogger.ForUser(job.CreatedByUserId)`. Persisting the new extracted text fires the database trigger that refreshes the parent document's search vector (when the reprocessed version is the latest) — there is no app-side vector update.
+Re-runs text extraction on an existing document version (e.g., after the user changes the OCR engine, or to re-extract one document with a different engine). The handler reads the file from its hash-addressed location, re-extracts text, and writes the diff to the audit log via `auditLogger.ForUser(job.CreatedByUserId)`. Persisting the new extracted text fires the database trigger that refreshes the parent document's search vector (when the reprocessed version is the latest) — there is no app-side vector update.
+
+The engine is **not** resolved here: the payload carries an already-resolved, non-nullable `EngineKey`, stamped at enqueue (see [Documents › versions](../documents/versions.md)). A bulk fan-out copies the parent's key into every child, so one batch can never split across engines if the household default changes mid-run. Reprocess also records extraction provenance onto the version alongside the text.
 
 Failures here are loud: text extraction failure throws `TextExtractionFailedException` (no graceful "proceed without text" path, unlike upload). When run as a child of a `BulkReprocessDocuments` parent, this handler suppresses its own success notification — the parent's progress updates are the sole channel.
 

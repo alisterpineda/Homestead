@@ -6,6 +6,7 @@ using Homestead.WebApi.Modules.Documents.Processing.Commands;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 using MediatR;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -27,16 +28,16 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         _mediaPath = Path.Combine(Path.GetTempPath(), $"reprocess-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(_mediaPath);
 
-        _textExtractionEngine = Substitute.For<ITextExtractionEngine>();
+        _textExtractionEngine = TestTextExtraction.Engine();
         _textExtractionEngine.ExtractTextAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
+            .Returns(TestTextExtraction.Output(null));
 
         _notifier = Substitute.For<IProcessingNotifier>();
 
         var storage = Options.Create(new FileStorageOptions { MediaPath = _mediaPath });
 
-        var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
+        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _sender = Substitute.For<ISender>();
         _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
@@ -96,7 +97,8 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
 
     private ProcessingJob CreateJob(Guid documentId, Guid versionId)
     {
-        var payload = new ReprocessDocumentVersionPayload(documentId, versionId);
+        var payload = new ReprocessDocumentVersionPayload(
+            documentId, versionId, TestTextExtraction.DefaultKey);
         return new ProcessingJob
         {
             Id = Guid.NewGuid(),
@@ -116,7 +118,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("new extracted text");
+            .Returns(TestTextExtraction.Output("new extracted text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -137,7 +139,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _sender.Send(Arg.Any<ReprocessVersionTextCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => new ReprocessVersionTextResult("Stored Doc Name"));
@@ -164,7 +166,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         job.ParentJobId = Guid.NewGuid();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -200,7 +202,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns<string?>(x => throw new Exception("OCR failed"));
+            .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         await Assert.ThrowsAsync<TextExtractionFailedException>(
             () => _handler.HandleAsync(job, ct));
@@ -217,7 +219,7 @@ public class ReprocessDocumentVersionJobHandlerTests : IDisposable
         var job = CreateJob(doc.Id, version.Id);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns<string?>(x => throw new Exception("OCR failed"));
+            .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         var ex = await Assert.ThrowsAsync<TextExtractionFailedException>(
             () => _handler.HandleAsync(job, ct));

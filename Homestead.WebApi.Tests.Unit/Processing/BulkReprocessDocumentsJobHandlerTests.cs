@@ -5,6 +5,7 @@ using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 
 namespace Homestead.WebApi.Tests.Unit.Processing;
 
@@ -56,7 +57,7 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
 
     private ProcessingJob CreateParentJob(List<Guid> documentIds)
     {
-        var payload = new BulkReprocessPayload(documentIds);
+        var payload = new BulkReprocessPayload(documentIds, TestTextExtraction.DefaultKey);
         return new ProcessingJob
         {
             Id = Guid.NewGuid(),
@@ -114,6 +115,27 @@ public class BulkReprocessDocumentsJobHandlerTests : IDisposable
 
         var child = await _db.ProcessingJobs.SingleAsync(j => j.ParentJobId == job.Id, ct);
         Assert.Contains(latestVersion.Id.ToString(), child.Payload!);
+    }
+
+    // The fan-out copies the parent's already-resolved key rather than re-resolving per child. Without
+    // this, flipping the household default mid-run would split one batch across two engines, with no
+    // record of which document got which.
+    [Fact]
+    public async Task HandleAsync_CopiesTheParentEngineKeyIntoEveryChild()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var docIds = new List<Guid> { SeedDocument("A.pdf"), SeedDocument("B.pdf") };
+        var job = CreateParentJob(docIds);
+
+        await _handler.HandleAsync(job, ct);
+
+        var children = await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync(ct);
+        Assert.Equal(2, children.Count);
+        Assert.All(children, child =>
+        {
+            var payload = JsonSerializer.Deserialize<ReprocessDocumentVersionPayload>(child.Payload!);
+            Assert.Equal(TestTextExtraction.DefaultKey, payload!.EngineKey);
+        });
     }
 
     [Fact]

@@ -10,6 +10,7 @@ using Homestead.WebApi.Processing;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
+using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -37,10 +38,10 @@ public class UploadDocumentJobHandlerTests : IDisposable
         _mediaPath = Path.Combine(Path.GetTempPath(), $"upload-doc-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(Path.Combine(_mediaPath, DocumentVersion.UploadsSubroot));
 
-        _textExtractionEngine = Substitute.For<ITextExtractionEngine>();
+        _textExtractionEngine = TestTextExtraction.Engine();
         _textExtractionEngine.ExtractTextAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((string?)null);
+            .Returns(TestTextExtraction.Output(null));
 
         _notifier = Substitute.For<IProcessingNotifier>();
 
@@ -64,7 +65,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), storage,
             Substitute.For<ILogger<ThumbnailService>>());
-        var textExtractionHelper = new TextExtractionHelper(_textExtractionEngine);
+        var textExtractionHelper = TestTextExtraction.Helper(_textExtractionEngine);
 
         _sender = Substitute.For<ISender>();
         _sender.Send(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
@@ -73,7 +74,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         _handler = new UploadDocumentJobHandler(
             _db, storage, Options.Create(new AiOptions()), logger,
             _notifier, _classifier, _aiClientFactory, _aiPageRenderService, _thumbnailService,
-            textExtractionHelper, _sender);
+            textExtractionHelper, TestTextExtraction.Resolver(), _sender);
     }
 
     public void Dispose()
@@ -121,7 +122,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob(content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("extracted text");
+            .Returns(TestTextExtraction.Output("extracted text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -142,7 +143,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         var resultDocumentId = Guid.NewGuid();
         _sender.Send(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
@@ -180,7 +181,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns<string?>(x => throw new Exception("OCR failed"));
+            .Returns<TextExtractionOutput>(x => throw new Exception("OCR failed"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -196,7 +197,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, stagingPath) = CreateUploadJob(content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -229,7 +230,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         File.WriteAllText(stagingPath, $"unique content {Guid.NewGuid()}");
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         await _handler.HandleAsync(job, ct);
 
@@ -245,7 +246,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, stagingPath) = CreateUploadJob(content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _sender.Send(Arg.Any<CreateDocumentFromUploadCommand>(), Arg.Any<CancellationToken>())
             .Returns<Task<CreateDocumentFromUploadResult>>(_ => throw new Exception("commit failed"));
@@ -265,7 +266,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob(content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         var existing = SeedExistingDocumentWithHash(HashOf(content), trashed: false);
 
@@ -290,7 +291,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob(content: content);
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         var existing = SeedExistingDocumentWithHash(HashOf(content), trashed: true);
 
@@ -309,7 +310,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("extracted text");
+            .Returns(TestTextExtraction.Output("extracted text"));
 
         var renderBytes = new byte[] { 1, 2, 3 };
         _aiPageRenderService.GetOrCreateAsync(
@@ -341,7 +342,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("extracted text");
+            .Returns(TestTextExtraction.Output("extracted text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _aiClientFactory.IsConfigured.Returns(false);
@@ -363,7 +364,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(false);
 
@@ -385,7 +386,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _classifier.ClassifyAsync(
@@ -415,7 +416,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var (job, _) = CreateUploadJob();
 
         _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
-            .Returns("text");
+            .Returns(TestTextExtraction.Output("text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
         _classifier.ClassifyAsync(
