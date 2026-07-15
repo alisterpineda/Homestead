@@ -121,7 +121,11 @@ public class StatementExtractionService(
 
             try
             {
-                return await client.GetResponseAsync(messages, chatOptions, ct);
+                // Streamed to defeat a timeout, not to consume tokens incrementally: line-item output grows
+                // with the transaction count, and the buffered path downloads the whole body under a single
+                // 100s NetworkTimeout. Streaming makes that timeout per-read, so a long parse survives.
+                return await client.GetStreamingResponseAsync(messages, chatOptions, ct)
+                    .ToChatResponseAsync(ct);
             }
             catch (ClientResultException ex) when (ex.Status == 400)
             {
