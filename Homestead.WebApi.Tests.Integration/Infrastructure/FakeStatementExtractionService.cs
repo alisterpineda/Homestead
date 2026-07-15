@@ -6,13 +6,21 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// <summary>
 /// Deterministic stand-in for <see cref="IStatementExtractionService"/> so the import spine runs without a
 /// live model. Returns a fixed bank-statement header (masked account hint <c>••••1234</c>, closing balance
-/// 1500 on 2026-06-30) — enough to exercise the mapping proposal, mis-binding guard, and commit path.
+/// 1500 on 2026-06-30) plus two transaction lines — enough to exercise the mapping proposal, mis-binding
+/// guard, itemized-flow commit, and mixed-set rollback.
 /// </summary>
 public sealed class FakeStatementExtractionService : IStatementExtractionService
 {
     public const string MaskedHint = "••••1234";
     public const decimal ClosingBalance = 1500m;
     public static readonly DateOnly PeriodEnd = new(2026, 6, 30);
+
+    // One Out (→Expense) and one In (→Income) line, both fully mappable.
+    public static readonly IReadOnlyList<StatementLineItemIr> LineItems =
+    [
+        new(new DateOnly(2026, 6, 3), "GROCERY MART", 42.10m, StatementLineDirection.Out, null, null),
+        new(new DateOnly(2026, 6, 15), "PAYROLL DEPOSIT", 2000m, StatementLineDirection.In, null, null),
+    ];
 
     public Task<StatementIr> ExtractAsync(string extractedText, byte[]? pageImage, CancellationToken ct)
     {
@@ -29,6 +37,7 @@ public sealed class FakeStatementExtractionService : IStatementExtractionService
                 OpeningBalance = new MoneyIr(1000m, "Previous Balance $1,000.00"),
                 ClosingBalance = new MoneyIr(ClosingBalance, "New Balance $1,500.00"),
             },
+            LineItems = LineItems,
         };
         return Task.FromResult(ir);
     }

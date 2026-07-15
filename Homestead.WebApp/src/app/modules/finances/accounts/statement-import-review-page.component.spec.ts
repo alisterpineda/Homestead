@@ -5,10 +5,16 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of, NEVER } from 'rxjs';
 import { StatementImportReviewPageComponent } from './statement-import-review-page.component';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
+import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
+import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import type { StatementImportResponse } from '@/api/generated/models/statement-import-response';
+import type { AccountResponse } from '@/api/generated/models/account-response';
+import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
+// Header opening 1000 → closing 1500. The two mappable lines (Expense 100, Income 600) net +500 on an asset
+// account, so the default selection reconciles exactly (checksum 'balanced'). The third line is un-mappable.
 const RESPONSE: StatementImportResponse = {
   jobId: 'job1',
   status: 'Completed',
@@ -31,8 +37,24 @@ const RESPONSE: StatementImportResponse = {
     sourceAnchor: 'New Balance',
     accepted: true,
   },
+  lineItems: [
+    { index: 0, date: '2026-06-03', description: 'GROCERY', amount: 100, direction: 'Expense', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true },
+    { index: 1, date: '2026-06-15', description: 'PAYROLL', amount: 600, direction: 'Income', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true },
+    { index: 2, date: null, description: 'MYSTERY', amount: 0, direction: 'Expense', runningBalance: null, mappable: false, duplicateSuspected: false, accepted: true },
+  ],
   accountNumberMatch: 'Mismatch',
   duplicateAssertionExists: false,
+  textTruncated: false,
+};
+
+const ASSET_ACCOUNT: AccountResponse = {
+  id: 'acc1', name: 'Chequing', accountType: 'Asset', kind: 'Cash', reportingCurrencyId: 'cad',
+  createdAt: '2026-01-01', updatedAt: '2026-01-01', hasTransactions: true, isArchived: false, isSystem: false,
+};
+const LIABILITY_ACCOUNT: AccountResponse = { ...ASSET_ACCOUNT, accountType: 'Liability', kind: 'CreditCard' };
+const CAD: CommodityResponse = {
+  id: 'cad', symbol: 'CAD', name: 'Canadian Dollar', kind: 'Currency', displayPrecision: 2,
+  canDelete: false, exchange: null, isSystemManaged: true, latestPriceAt: null, priceCount: 0,
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -45,18 +67,28 @@ class StubStatementApi {
     return NEVER; // never resolves → toast/navigate success path is not reached
   };
 }
+class StubAccountApi {
+  account: AccountResponse = ASSET_ACCOUNT;
+  getAccount = () => of(this.account);
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('StatementImportReviewPageComponent', () => {
   let api: StubStatementApi;
+  let accountApi: StubAccountApi;
 
-  function configure(): void {
+  function configure(response: StatementImportResponse = RESPONSE, account: AccountResponse = ASSET_ACCOUNT): void {
     api = new StubStatementApi();
+    api.response = response;
+    accountApi = new StubAccountApi();
+    accountApi.account = account;
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(),
         { provide: FinancesStatementApiService, useValue: api },
+        { provide: FinancesAccountApiService, useValue: accountApi },
+        { provide: FinancesCommodityApiService, useValue: { getCommodity: () => of(CAD) } },
         { provide: DocumentApiService, useValue: { getDocumentFile: () => of(null) } },
         { provide: HlmSidebarService, useValue: { isMobile: signal(false) } },
         { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
@@ -92,7 +124,105 @@ describe('StatementImportReviewPageComponent', () => {
     expect(text).toContain("doesn't match this account");
   });
 
-  it('commit() calls the API with the edited amount, date, and accepted=true', async () => {
+  it('seeds line-item edit state, leaving un-mappable rows unchecked', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    const rows = c.lineItems();
+    expect(rows.length).toBe(3);
+    expect(rows[0].accepted).toBe(true);   // mappable, default-accepted
+    expect(rows[1].accepted).toBe(true);
+    expect(rows[2].accepted).toBe(false);  // un-mappable → seeded unchecked
+    expect(c.rowCommittable(rows[2])).toBe(false);
+    expect(c.acceptedLines().length).toBe(2);
+  });
+
+  it('renders a row per line item in the table', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Transactions (3)');
+  });
+
+  it('select-all toggles acceptance of all committable rows', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.allSelected()).toBe(true);
+
+    c.toggleAll(false);
+    expect(c.acceptedLines().length).toBe(0);
+    expect(c.allSelected()).toBe(false);
+
+    c.toggleAll(true);
+    expect(c.acceptedLines().length).toBe(2);   // the un-mappable row stays out
+    expect(c.lineItems()[2].accepted).toBe(false);
+  });
+
+  it('checksum is balanced with the default selection on an asset account', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.checksum().state).toBe('balanced');
+  });
+
+  it('checksum goes off-by when a reconciling line is deselected', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    c.setRowAccepted(1, false); // drop the +600 income → expected 900 vs closing 1500
+    const ck = c.checksum();
+    expect(ck.state).toBe('off');
+    expect(c.offAmount()).toContain('600');
+  });
+
+  it('checksum flips on a liability account (Out increases owed)', async () => {
+    configure(RESPONSE, LIABILITY_ACCOUNT);
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Liability: Expense +100, Income −600 → 1000 − 500 = 500 vs closing 1500 → off.
+    expect(c.checksum().state).toBe('off');
+  });
+
+  it('checksum is unavailable without both opening and closing balances', async () => {
+    const noClosing: StatementImportResponse = {
+      ...RESPONSE,
+      header: { ...RESPONSE.header!, closingBalance: null },
+    };
+    configure(noClosing);
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.checksum().state).toBe('unavailable');
+  });
+
+  it('shows the truncation note when the statement text was clipped', async () => {
+    configure({ ...RESPONSE, textTruncated: true });
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('may have been truncated');
+  });
+
+  it('commit() sends the balance entry and the accepted, edited line items', async () => {
     configure();
     const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
     await fixture.whenStable();
@@ -104,10 +234,14 @@ describe('StatementImportReviewPageComponent', () => {
     expect(api.lastCommit).not.toBeNull();
     expect(api.lastCommit.jobId).toBe('job1');
     expect(api.lastCommit.body).toEqual({
+      accepted: true,
       assertedAmount: 1500,
       date: '2026-06-30',
       memo: 'June statement',
-      accepted: true,
+      lineItems: [
+        { direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY' },
+        { direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL' },
+      ],
     });
   });
 });

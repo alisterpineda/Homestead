@@ -5,4 +5,5 @@ export interface CommitStatementImportResponse {
   accountId: string;
   committed: boolean;
   entryId?: (string | null);
+  flowsCreated: number;
 }

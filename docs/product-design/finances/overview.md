@@ -166,7 +166,7 @@ Cash dividend received into an investment account. UI asks for the investment ac
 
 ### Expense / Income
 
-Everyday spending or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund". One shared editor with an Expense/Income toggle (mirrors Buy/Sell). UI asks for the account (read-only), direction, amount, date, an optional **category** (C-1; default Uncategorised), and an optional free-text description; the currency is inferred from the account's reporting currency (no picker). Produces a two-split transaction posting the non-account leg to the chosen category or, if none, the hidden `Expense`/`Income` Uncategorised bucket. Available on all non-Investment kinds — Investment income is a Dividend instead. On a liability account an expense reads as a positive charge and income/refund as a negative (red) credit, the statement convention, with no per-account-type sign flip. Net worth is unaffected (the counterpart — bucket or category — never enters net worth). This is also the prerequisite for statement line-item import (a later epic).
+Everyday spending or income on a non-Investment account — the shape for "I spent $50" or "I got a $30 refund". One shared editor with an Expense/Income toggle (mirrors Buy/Sell). UI asks for the account (read-only), direction, amount, date, an optional **category** (C-1; default Uncategorised), and an optional free-text description; the currency is inferred from the account's reporting currency (no picker). Produces a two-split transaction posting the non-account leg to the chosen category or, if none, the hidden `Expense`/`Income` Uncategorised bucket. Available on all non-Investment kinds — Investment income is a Dividend instead. On a liability account an expense reads as a positive charge and income/refund as a negative (red) credit, the statement convention, with no per-account-type sign flip. Net worth is unaffected (the counterpart — bucket or category — never enters net worth). This is also the shape produced by statement line-item import (see *Statement import* in [transactions.md](transactions.md#statement-import)).
 
 ### DRIP / reinvestment
 
@@ -186,6 +186,8 @@ All derived from splits and prices at read time. None are cached at the data lay
 - **Equity:Adjustments balance** (in display currency): intended to surface in the UI as *"Unrecorded wealth changes"* — useful both as a running total and as a tracking-quality signal (a growing balance relative to explicit transactions means the user is relying more on reconciliation and less on itemisation). _**Planned, not yet built in v1:** the Adjustments account is maintained internally by the reconciler, but no read endpoint returns its balance and no UI surfaces it yet._
 
 See [valuation.md](valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
+
+**Itemized statement import** is now available for bank/credit-card accounts: an uploaded statement is parsed and, on one atomic review-and-commit, becomes a closing-balance assertion **and** an itemized set of uncategorised Expense/Income flows (with an advisory reconciliation checksum). See *Statement import* in [transactions.md](transactions.md#statement-import). Brokerage **holdings → balance-entries** import stays deferred; investment statements are gated off at initiate.
 
 ## Distinctive UX decisions worth preserving
 

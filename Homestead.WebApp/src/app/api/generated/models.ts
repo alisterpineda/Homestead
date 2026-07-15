@@ -37,6 +37,7 @@ export type { ClassifyPreviewPartyDto } from './models/classify-preview-party-dt
 export type { ClassifyPreviewResponse } from './models/classify-preview-response';
 export type { ClassifyPreviewTagDto } from './models/classify-preview-tag-dto';
 export type { CollapseDurablesRequest } from './models/collapse-durables-request';
+export type { CommitLineItem } from './models/commit-line-item';
 export type { CommitStatementImportCommand } from './models/commit-statement-import-command';
 export type { CommitStatementImportResponse } from './models/commit-statement-import-response';
 export type { CommodityKind } from './models/commodity-kind';
@@ -223,6 +224,7 @@ export type { SortDirection } from './models/sort-direction';
 export type { StatementHeaderResponse } from './models/statement-header-response';
 export type { StatementImportResponse } from './models/statement-import-response';
 export type { StatementKind } from './models/statement-kind';
+export type { StatementLineItemResponse } from './models/statement-line-item-response';
 export type { StockEntryResponse } from './models/stock-entry-response';
 export type { StockMovementResponse } from './models/stock-movement-response';
 export type { SummarizeDocumentBody } from './models/summarize-document-body';

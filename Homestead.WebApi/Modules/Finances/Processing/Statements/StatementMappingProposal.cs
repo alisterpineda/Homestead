@@ -1,3 +1,5 @@
+using Homestead.WebApi.Domain.Finances;
+
 namespace Homestead.WebApi.Modules.Finances.Processing.Statements;
 
 /// <summary>
@@ -9,6 +11,12 @@ public record StatementMappingProposal
     /// <summary>The proposed closing-balance assertion, or null when the statement carried no closing balance.</summary>
     public ProposedBalanceEntry? BalanceEntry { get; init; }
 
+    /// <summary>
+    /// The itemized transaction lines proposed as Expense/Income flows (Feature B), in statement order.
+    /// Empty when the statement carried no transaction table.
+    /// </summary>
+    public IReadOnlyList<ProposedFlow> LineItems { get; init; } = [];
+
     /// <summary>Whether the statement's masked account hint matches the target account's stored number.</summary>
     public AccountNumberMatch AccountNumberMatch { get; init; }
 
@@ -18,6 +26,23 @@ public record StatementMappingProposal
     /// </summary>
     public bool DuplicateAssertionExists { get; init; }
 }
+
+/// <summary>
+/// A proposed Expense/Income flow deterministically derived from one transcribed statement line
+/// (<c>Out → Expense</c>, <c>In → Income</c>). The reviewer curates these (accept/reject/edit) before the
+/// atomic commit; un-mappable rows (missing amount or direction) are surfaced greyed and can't be committed
+/// as-is.
+/// </summary>
+public record ProposedFlow(
+    int Index,
+    FlowDirection Direction,           // Out→Expense, In→Income
+    decimal Amount,                    // positive magnitude
+    DateOnly? Date,
+    string? Description,
+    decimal? RunningBalance,
+    bool Mappable,                     // false when Amount/Direction missing → shown greyed, not committable
+    bool DuplicateSuspected = false,   // forward-compat dedup flag (§8); default false
+    bool Accepted = true);
 
 /// <summary>
 /// A proposed <c>BalanceEntry</c> assertion for the account's reporting currency. The reviewer can edit the

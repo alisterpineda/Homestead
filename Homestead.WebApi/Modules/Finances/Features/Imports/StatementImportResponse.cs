@@ -1,3 +1,4 @@
+using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 
@@ -5,8 +6,8 @@ namespace Homestead.WebApi.Modules.Finances.Features.Imports;
 
 /// <summary>
 /// The reviewable state of a statement-import job: its status plus (once parsed) the transcribed header, the
-/// proposed closing-balance assertion, and the guard/dedup signals. The full account number is never
-/// included — only the server-computed <see cref="AccountNumberMatch"/> verdict.
+/// proposed closing-balance assertion, the proposed itemized flows, and the guard/dedup signals. The full
+/// account number is never included — only the server-computed <see cref="AccountNumberMatch"/> verdict.
 /// </summary>
 public record StatementImportResponse
 {
@@ -20,8 +21,18 @@ public record StatementImportResponse
     public StatementHeaderResponse? Header { get; init; }
     public ProposedBalanceEntryResponse? ProposedBalanceEntry { get; init; }
 
+    /// <summary>
+    /// Proposed Expense/Income flows (Feature B), in statement order. Empty until the job is parsed or when
+    /// the statement had no transaction table. Non-nullable so the generated client always sees an array —
+    /// and so ng-openapi-gen's usage scan discovers the item <c>$ref</c> (a nullable-array union hides it).
+    /// </summary>
+    public IReadOnlyList<StatementLineItemResponse> LineItems { get; init; } = [];
+
     public AccountNumberMatch AccountNumberMatch { get; init; } = AccountNumberMatch.Unknown;
     public bool DuplicateAssertionExists { get; init; }
+
+    /// <summary>True when the statement text was clipped before extraction — some trailing lines may be missing.</summary>
+    public bool TextTruncated { get; init; }
 
     /// <summary>Populated when <see cref="Status"/> is Failed.</summary>
     public string? Error { get; init; }
@@ -70,8 +81,14 @@ public record StatementImportResponse
                     Accepted = be.Accepted,
                 }
                 : null,
+            LineItems = staged.Proposal.LineItems
+                .Select(f => new StatementLineItemResponse(
+                    f.Index, f.Date, f.Description, f.Amount, f.Direction,
+                    f.RunningBalance, f.Mappable, f.DuplicateSuspected, f.Accepted))
+                .ToList(),
             AccountNumberMatch = staged.Proposal.AccountNumberMatch,
             DuplicateAssertionExists = staged.Proposal.DuplicateAssertionExists,
+            TextTruncated = staged.TextTruncated,
             Error = job.Status == ProcessingJobStatus.Failed ? job.Error : null,
         };
     }
@@ -98,3 +115,19 @@ public record ProposedBalanceEntryResponse
     public string? SourceAnchor { get; init; }
     public required bool Accepted { get; init; }
 }
+
+/// <summary>
+/// A proposed itemized flow surfaced for review. <see cref="Direction"/> is Expense/Income;
+/// <see cref="Mappable"/> is false when the line lacked an amount or direction (shown greyed, not
+/// committable as-is). The reviewer curates these client-side before the atomic commit.
+/// </summary>
+public record StatementLineItemResponse(
+    int Index,
+    DateOnly? Date,
+    string? Description,
+    decimal Amount,
+    FlowDirection Direction,
+    decimal? RunningBalance,
+    bool Mappable,
+    bool DuplicateSuspected,
+    bool Accepted);

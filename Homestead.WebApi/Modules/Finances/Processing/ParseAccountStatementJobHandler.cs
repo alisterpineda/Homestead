@@ -98,6 +98,10 @@ public class ParseAccountStatementJobHandler(
         var ir = await extraction.ExtractAsync(text, pageImage, ct);
         var proposal = await mappingBuilder.BuildAsync(ir, account, ct);
 
+        // Completeness safety-net: if the raw text overflowed the extraction budget it was clipped before the
+        // model saw it (ClampText), so trailing lines may be missing. Surfaced to the reviewer as a warning.
+        var textTruncated = (text?.Length ?? 0) > _aiOptions.ResolveStatementMaxInputChars();
+
         var staged = new StagedStatementImport
         {
             AccountId = payload.AccountId,
@@ -105,6 +109,7 @@ public class ParseAccountStatementJobHandler(
             DocumentVersionId = version.Id,
             Ir = ir,
             Proposal = proposal,
+            TextTruncated = textTruncated,
         };
 
         // Persist the staged result BEFORE notifying so the review GET (which reads from a separate scope)

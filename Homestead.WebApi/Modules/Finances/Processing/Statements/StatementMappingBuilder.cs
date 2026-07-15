@@ -38,9 +38,44 @@ public class StatementMappingBuilder(AppDbContext db)
         return new StatementMappingProposal
         {
             BalanceEntry = proposal,
+            LineItems = ProposeFlows(ir),
             AccountNumberMatch = match,
             DuplicateAssertionExists = duplicateExists,
         };
+    }
+
+    /// <summary>
+    /// Tier-1 deterministic line-item mapping (no AI, no account-list lookup — transfer detection stays
+    /// deferred): each transcribed line becomes one <see cref="ProposedFlow"/> with <c>Out → Expense</c> /
+    /// <c>In → Income</c>. A row is <c>Mappable</c> only when it carries a positive amount AND a direction;
+    /// rows missing either are surfaced (flagged un-mappable) rather than dropped.
+    /// </summary>
+    public static IReadOnlyList<ProposedFlow> ProposeFlows(StatementIr ir)
+    {
+        if (ir.LineItems is not { Count: > 0 } lines)
+            return [];
+
+        var flows = new List<ProposedFlow>(lines.Count);
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            var mappable = line.Amount is > 0m && line.Direction is not null;
+
+            flows.Add(new ProposedFlow(
+                Index: i,
+                // Out → Expense, In → Income. A missing direction (un-mappable) seeds an Expense placeholder;
+                // the reviewer must set a direction before such a row can be committed.
+                Direction: line.Direction == StatementLineDirection.In
+                    ? FlowDirection.Income
+                    : FlowDirection.Expense,
+                Amount: line.Amount ?? 0m,
+                Date: line.Date,
+                Description: line.Description,
+                RunningBalance: line.RunningBalance,
+                Mappable: mappable));
+        }
+
+        return flows;
     }
 
     /// <summary>

@@ -167,8 +167,9 @@ public class StatementExtractionService(
     private static string BuildSystemPrompt() =>
         """
         You are a bank/credit-card/brokerage statement parser. Given a statement's extracted text (and
-        optionally a rendered page image), transcribe ONLY its summary header. Report exactly what the
-        document states — do not compute, infer, or reconcile values. If a field is not present, use null.
+        optionally a rendered page image), transcribe its summary header AND every transaction line. Report
+        exactly what the document states — do not compute, infer, or reconcile values. If a field is not
+        present, use null.
 
         Extract:
         1. kind — the statement type: "Bank", "CreditCard", "Brokerage", or "Unknown".
@@ -181,6 +182,15 @@ public class StatementExtractionService(
            object { "amount": number, "sourceAnchor": string|null }, or null if the statement does not show it.
            amount is the numeric value as printed (negative if the statement shows it negative). sourceAnchor
            is the short source snippet the value was read from (e.g. "New Balance $1,234.56"), or null.
+        7. lineItems — every transaction ROW in the statement's activity/transaction table, in the order they
+           appear. Each row is an object:
+           - date — the transaction/posting date in ISO 8601 (YYYY-MM-DD), or null.
+           - description — the row's merchant/description text as printed, or null.
+           - amount — the POSITIVE magnitude of the row (never signed, never negative), or null.
+           - direction — "out" for money spent (a charge, purchase, debit, withdrawal, fee, or interest) or
+             "in" for money received (a payment, credit, refund, deposit, or interest earned). Judge from the
+             account-holder's perspective; if the row is ambiguous, use null.
+           - runningBalance — the running/ledger balance printed on that row, or null if none is printed.
 
         Respond with a JSON object in exactly this shape:
         {
@@ -191,13 +201,21 @@ public class StatementExtractionService(
           "periodStart": "2026-06-01",
           "periodEnd": "2026-06-30",
           "openingBalance": { "amount": 1000.00, "sourceAnchor": "Previous Balance $1,000.00" },
-          "closingBalance": { "amount": 1234.56, "sourceAnchor": "New Balance $1,234.56" }
+          "closingBalance": { "amount": 1234.56, "sourceAnchor": "New Balance $1,234.56" },
+          "lineItems": [
+            { "date": "2026-06-03", "description": "GROCERY MART", "amount": 42.10, "direction": "out", "runningBalance": 957.90 },
+            { "date": "2026-06-15", "description": "PAYROLL DEPOSIT", "amount": 2000.00, "direction": "in", "runningBalance": 2957.90 }
+          ]
         }
 
         Rules:
         - Always respond with valid JSON only, no additional text.
         - Use null for any field the statement does not state; never guess.
         - Do not sum, net, or otherwise derive balances — transcribe the printed values only.
+        - Transcribe EVERY transaction row faithfully; do not skip, merge, or deduplicate lines. amount is
+          always the positive magnitude — the sign lives in direction, not in amount. Only fill runningBalance
+          when the statement actually prints a per-row running balance.
+        - If the statement has no transaction table (e.g. a summary-only page), lineItems is an empty array [].
         """;
 
     private string BuildUserMessage(string? extractedText)
@@ -230,8 +248,9 @@ public class StatementExtractionService(
         return text[..cut];
     }
 
-    // Header-only strict schema: an object with additionalProperties:false and every property in "required"
-    // (nullability expressed as a ["type","null"] union so strict mode is satisfied while values stay optional).
+    // Strict schema: an object with additionalProperties:false and every property in "required" (nullability
+    // expressed as a ["type","null"] union so strict mode is satisfied while values stay optional). Same
+    // posture for the line-item array elements — every field required, null-union where optional.
     private static JsonElement BuildResponseSchema()
     {
         static JsonObject Nullable(string type) => new()
@@ -251,6 +270,29 @@ public class StatementExtractionService(
             ["additionalProperties"] = false,
         };
 
+        static JsonObject LineItemsSchema() => new()
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["date"] = Nullable("string"),
+                    ["description"] = Nullable("string"),
+                    ["amount"] = Nullable("number"),
+                    ["direction"] = new JsonObject
+                    {
+                        ["type"] = new JsonArray("string", "null"),
+                        ["enum"] = new JsonArray("out", "in", null),
+                    },
+                    ["runningBalance"] = Nullable("number"),
+                },
+                ["required"] = new JsonArray("date", "description", "amount", "direction", "runningBalance"),
+                ["additionalProperties"] = false,
+            },
+        };
+
         var schema = new JsonObject
         {
             ["type"] = "object",
@@ -268,10 +310,11 @@ public class StatementExtractionService(
                 ["periodEnd"] = Nullable("string"),
                 ["openingBalance"] = MoneySchema(),
                 ["closingBalance"] = MoneySchema(),
+                ["lineItems"] = LineItemsSchema(),
             },
             ["required"] = new JsonArray(
                 "kind", "institution", "accountNumberMasked", "currency",
-                "periodStart", "periodEnd", "openingBalance", "closingBalance"),
+                "periodStart", "periodEnd", "openingBalance", "closingBalance", "lineItems"),
             ["additionalProperties"] = false,
         };
 
@@ -291,6 +334,32 @@ public class StatementExtractionService(
             OpeningBalance = ToMoney(parsed.OpeningBalance),
             ClosingBalance = ToMoney(parsed.ClosingBalance),
         },
+        LineItems = MapLineItems(parsed.LineItems),
+    };
+
+    // Faithful transcription — nulls are preserved (a row missing amount/direction still maps to a line item
+    // and is later flagged un-mappable, never silently dropped). CategoryHint is always null this cut.
+    private static IReadOnlyList<StatementLineItemIr>? MapLineItems(IReadOnlyList<LineItemDto>? items)
+    {
+        if (items is null)
+            return null;
+
+        return items
+            .Select(li => new StatementLineItemIr(
+                Date: ParseDate(li.Date),
+                Description: NullIfBlank(li.Description),
+                Amount: li.Amount,
+                Direction: ParseDirection(li.Direction),
+                RunningBalance: li.RunningBalance,
+                CategoryHint: null))
+            .ToList();
+    }
+
+    private static StatementLineDirection? ParseDirection(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "out" => StatementLineDirection.Out,
+        "in" => StatementLineDirection.In,
+        _ => null,
     };
 
     private static StatementIr EmptyIr() => new()
@@ -323,11 +392,21 @@ public class StatementExtractionService(
         public string? PeriodEnd { get; set; }
         public MoneyDto? OpeningBalance { get; set; }
         public MoneyDto? ClosingBalance { get; set; }
+        public List<LineItemDto>? LineItems { get; set; }
     }
 
     private sealed class MoneyDto
     {
         public decimal Amount { get; set; }
         public string? SourceAnchor { get; set; }
+    }
+
+    private sealed class LineItemDto
+    {
+        public string? Date { get; set; }
+        public string? Description { get; set; }
+        public decimal? Amount { get; set; }
+        public string? Direction { get; set; }
+        public decimal? RunningBalance { get; set; }
     }
 }

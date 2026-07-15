@@ -77,16 +77,36 @@ public class StatementImportPipelineTests : IntegrationTestBase
         Assert.Equal("Match", staged.AccountNumberMatch);
         Assert.False(staged.DuplicateAssertionExists);
 
-        // 3. Commit → balance entry created, stamped with the source version.
+        // 2b. Review GET surfaces the proposed itemized flows (Feature B).
+        Assert.NotNull(staged.LineItems);
+        Assert.Equal(2, staged.LineItems!.Count);
+        Assert.Equal("Expense", staged.LineItems[0].Direction);
+        Assert.True(staged.LineItems[0].Mappable);
+        Assert.Equal("Income", staged.LineItems[1].Direction);
+
+        // 3. Commit → balance entry AND two flows created, each stamped with the source version.
         var commitResp = await client.PostAsJsonAsync(
             $"/api/v1/finances/imports/{initiate.JobId}/commit",
-            new { assertedAmount = 1500m, date = "2026-06-30", memo = "June statement", accepted = true }, CT);
+            new
+            {
+                assertedAmount = 1500m,
+                date = "2026-06-30",
+                memo = "June statement",
+                accepted = true,
+                lineItems = new[]
+                {
+                    new { direction = "Expense", amount = 42.10m, date = "2026-06-03", description = "GROCERY MART" },
+                    new { direction = "Income", amount = 2000m, date = "2026-06-15", description = "PAYROLL DEPOSIT" },
+                },
+            }, CT);
         Assert.Equal(HttpStatusCode.OK, commitResp.StatusCode);
         var commit = await commitResp.Content.ReadFromJsonAsync<CommitItem>(CT);
         Assert.True(commit!.Committed);
         Assert.NotNull(commit.EntryId);
+        Assert.Equal(2, commit.FlowsCreated);
 
-        await AssertSourceStampedAsync(versionId, expectedCount: 1);
+        // Balance entry + 2 flows all carry the version stamp.
+        await AssertSourceStampedAsync(versionId, expectedCount: 3);
 
         // 4. Re-commit is rejected (already imported this version).
         var recommitResp = await client.PostAsJsonAsync(
@@ -94,11 +114,11 @@ public class StatementImportPipelineTests : IntegrationTestBase
             new { assertedAmount = 1500m, date = "2026-06-30", memo = (string?)null, accepted = true }, CT);
         Assert.Equal(HttpStatusCode.BadRequest, recommitResp.StatusCode);
 
-        // 5. Rollback removes the imported entry.
+        // 5. Rollback removes the whole mixed set (entry + both flows).
         var rollbackResp = await client.DeleteAsync($"/api/v1/finances/imports/{versionId}", CT);
         Assert.Equal(HttpStatusCode.OK, rollbackResp.StatusCode);
         var rollback = await rollbackResp.Content.ReadFromJsonAsync<RollbackItem>(CT);
-        Assert.Equal(1, rollback!.DeletedCount);
+        Assert.Equal(3, rollback!.DeletedCount);
 
         await AssertSourceStampedAsync(versionId, expectedCount: 0);
     }
@@ -145,9 +165,13 @@ public class StatementImportPipelineTests : IntegrationTestBase
 
     private record ImportInitiateItem(Guid JobId);
     private record ProposedItem(decimal AssertedAmount, DateOnly? Date, string? SourceAnchor, bool Accepted);
+    private record LineItemItem(
+        int Index, DateOnly? Date, string? Description, decimal Amount, string Direction,
+        decimal? RunningBalance, bool Mappable, bool DuplicateSuspected, bool Accepted);
     private record StatementImportItem(
         Guid JobId, string Status, Guid AccountId, Guid? DocumentId, Guid? DocumentVersionId,
-        ProposedItem? ProposedBalanceEntry, string AccountNumberMatch, bool DuplicateAssertionExists, string? Error);
-    private record CommitItem(bool Committed, Guid? EntryId, Guid AccountId);
+        ProposedItem? ProposedBalanceEntry, IReadOnlyList<LineItemItem>? LineItems,
+        string AccountNumberMatch, bool DuplicateAssertionExists, bool TextTruncated, string? Error);
+    private record CommitItem(bool Committed, Guid? EntryId, int FlowsCreated, Guid AccountId);
     private record RollbackItem(int DeletedCount);
 }

@@ -5,6 +5,7 @@ import { AccountNumberMatch } from '../models/account-number-match';
 import { ProcessingJobStatus } from '../models/processing-job-status';
 import { ProposedBalanceEntryResponse } from '../models/proposed-balance-entry-response';
 import { StatementHeaderResponse } from '../models/statement-header-response';
+import { StatementLineItemResponse } from '../models/statement-line-item-response';
 export interface StatementImportResponse {
   accountId: string;
   accountNumberMatch?: AccountNumberMatch;
@@ -14,6 +15,8 @@ export interface StatementImportResponse {
   error?: (string | null);
   header?: (null | StatementHeaderResponse);
   jobId: string;
+  lineItems?: Array<StatementLineItemResponse>;
   proposedBalanceEntry?: (null | ProposedBalanceEntryResponse);
   status: ProcessingJobStatus;
+  textTruncated?: boolean;
 }

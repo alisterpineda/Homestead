@@ -25,6 +25,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
+import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
@@ -34,12 +35,37 @@ import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
+import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
+import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
+import { formatCurrency } from '../shared/format-currency';
 import { todayIso } from '../shared/date';
 import type { StatementImportResponse } from '@/api/generated/models/statement-import-response';
+import type { AccountResponse } from '@/api/generated/models/account-response';
+import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+import type { FlowDirection } from '@/api/generated/models/flow-direction';
+
+// Client-side edit state for one proposed line — the review page owns this until commit. `mappable` echoes
+// the server's un-mappable flag (missing amount/direction); `date`/`amount` are strings for uncontrolled inputs.
+interface LineItemEdit {
+  index: number;
+  accepted: boolean;
+  amount: string;
+  description: string;
+  direction: FlowDirection;
+  date: string;
+  mappable: boolean;
+  runningBalance: number | null;
+  duplicateSuspected: boolean;
+}
+
+type Checksum =
+  | { state: 'balanced' }
+  | { state: 'off'; amount: string }
+  | { state: 'unavailable' };
 
 @Component({
   selector: 'app-statement-import-review-page',
@@ -51,6 +77,7 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
     HlmSpinner,
     HlmInput,
     HlmLabel,
+    HlmCheckboxImports,
     HlmIconImports,
     HlmResizableImports,
     HlmTabsImports,
@@ -164,7 +191,7 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
           <div class="flex flex-col gap-1">
             <h2 class="text-lg font-semibold">Review statement</h2>
             <p class="text-sm text-muted-foreground">
-              Confirm the closing balance below. It'll be recorded as a balance assertion on this account.
+              Confirm the closing balance and review the itemized transactions below before importing.
             </p>
           </div>
 
@@ -212,6 +239,13 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
             }
           </div>
 
+          @if (d.textTruncated) {
+            <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
+              <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+              <span>This statement's text was long and may have been truncated — verify no lines are missing.</span>
+            </div>
+          }
+
           @if (d.duplicateAssertionExists) {
             <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
               <ng-icon hlm name="lucideTriangleAlert" size="sm" />
@@ -219,6 +253,7 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
             </div>
           }
 
+          <!-- Feature A: closing-balance assertion -->
           @if (d.proposedBalanceEntry) {
             <div class="flex flex-col gap-4">
               <div class="flex flex-col gap-1.5">
@@ -260,26 +295,147 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
                   (input)="memo.set(asValue($event))"
                 />
               </div>
-
-              <div class="flex items-center justify-end gap-2 pt-2">
-                <button hlmBtn variant="ghost" (click)="backToAccount()" [disabled]="committing()">
-                  Cancel
-                </button>
-                <button hlmBtn (click)="commit()" [disabled]="!canCommit() || committing()">
-                  {{ committing() ? 'Committing…' : 'Commit balance' }}
-                </button>
-              </div>
-            </div>
-          } @else {
-            <div class="flex flex-col gap-3">
-              <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                No closing balance was found in this statement. There's nothing to import.
-              </div>
-              <div class="flex justify-end">
-                <button hlmBtn variant="outline" (click)="backToAccount()">Back to account</button>
-              </div>
             </div>
           }
+
+          <!-- Feature B: itemized transactions -->
+          @if (lineItems().length > 0) {
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-medium">Transactions ({{ lineItems().length }})</h3>
+                <span class="text-xs text-muted-foreground">{{ acceptedLines().length }} selected</span>
+              </div>
+
+              <!-- Advisory checksum banner -->
+              @switch (checksum().state) {
+                @case ('balanced') {
+                  <div class="flex items-center gap-2 rounded-md border border-emerald-500/40 px-3 py-2 text-sm text-emerald-600">
+                    <ng-icon hlm name="lucideCircleCheck" size="sm" />
+                    <span>Balanced — the selected lines reconcile to the closing balance.</span>
+                  </div>
+                }
+                @case ('off') {
+                  <div class="flex items-center gap-2 rounded-md border border-amber-500/50 px-3 py-2 text-sm text-amber-600">
+                    <ng-icon hlm name="lucideTriangleAlert" size="sm" />
+                    <span>Off by {{ offAmount() }} — some lines may be missing or need editing.</span>
+                  </div>
+                }
+                @default {
+                  <div class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                    <ng-icon hlm name="lucideCircleHelp" size="sm" />
+                    <span>Checksum unavailable — the statement didn't show both an opening and closing balance.</span>
+                  </div>
+                }
+              }
+
+              <div class="overflow-x-auto rounded-md border">
+                <table class="w-full border-collapse text-sm">
+                  <thead>
+                    <tr class="border-b bg-muted/40 text-xs text-muted-foreground">
+                      <th class="w-9 p-2 text-center">
+                        <hlm-checkbox
+                          [checked]="allSelected()"
+                          [indeterminate]="someSelected()"
+                          (checkedChange)="toggleAll($event === true)"
+                          [aria-label]="'Select all lines'"
+                        />
+                      </th>
+                      <th class="p-2 text-left font-medium">Date</th>
+                      <th class="p-2 text-left font-medium">Description</th>
+                      <th class="p-2 text-left font-medium">Type</th>
+                      <th class="p-2 text-right font-medium">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of lineItems(); track row.index; let i = $index) {
+                      <tr class="border-b last:border-0 align-middle" [class.opacity-50]="!rowCommittable(row)">
+                        <td class="p-2 text-center">
+                          <hlm-checkbox
+                            [checked]="row.accepted"
+                            [disabled]="!rowCommittable(row)"
+                            (checkedChange)="setRowAccepted(i, $event === true)"
+                            [aria-label]="'Accept transaction line'"
+                          />
+                        </td>
+                        <td class="p-2">
+                          <input
+                            hlmInput
+                            type="date"
+                            class="w-36"
+                            [value]="row.date"
+                            (input)="patchRow(i, { date: asValue($event) })"
+                          />
+                        </td>
+                        <td class="p-2">
+                          <input
+                            hlmInput
+                            class="w-40"
+                            maxlength="512"
+                            [value]="row.description"
+                            (input)="patchRow(i, { description: asValue($event) })"
+                          />
+                        </td>
+                        <td class="p-2">
+                          <button
+                            type="button"
+                            (click)="toggleRowDirection(i)"
+                            title="Click to switch between Expense and Income"
+                            class="rounded-md border px-2 py-0.5 text-xs font-medium"
+                            [class.text-emerald-600]="row.direction === 'Income'"
+                            [class.border-emerald-500/40]="row.direction === 'Income'"
+                            [class.text-muted-foreground]="row.direction === 'Expense'"
+                          >
+                            {{ row.direction }}
+                          </button>
+                        </td>
+                        <td class="p-2 text-right">
+                          <input
+                            hlmInput
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="w-24 text-right"
+                            [value]="row.amount"
+                            (input)="patchRow(i, { amount: asValue($event) })"
+                          />
+                        </td>
+                      </tr>
+                      @if (row.duplicateSuspected) {
+                        <tr class="border-b last:border-0">
+                          <td></td>
+                          <td colspan="4" class="px-2 pb-2 text-xs text-amber-600">
+                            <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Lines import as uncategorised Expense/Income. Greyed rows are missing an amount or date and can't be selected until fixed.
+              </p>
+            </div>
+          }
+
+          <!-- Nothing to import -->
+          @if (!d.proposedBalanceEntry && lineItems().length === 0) {
+            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              No closing balance or transactions were found in this statement. There's nothing to import.
+            </div>
+          }
+
+          <!-- Footer actions -->
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button hlmBtn variant="ghost" (click)="backToAccount()" [disabled]="committing()">
+              Cancel
+            </button>
+            @if (d.proposedBalanceEntry || lineItems().length > 0) {
+              <button hlmBtn (click)="commit()" [disabled]="!canCommit() || committing()">
+                {{ committing() ? 'Committing…' : 'Commit import' }}
+              </button>
+            }
+          </div>
         </div>
       }
     </ng-template>
@@ -289,6 +445,8 @@ export class StatementImportReviewPageComponent {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private statementApi = inject(FinancesStatementApiService);
+  private accountApi = inject(FinancesAccountApiService);
+  private commodityApi = inject(FinancesCommodityApiService);
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
   private sanitizer = inject(DomSanitizer);
@@ -326,6 +484,24 @@ export class StatementImportReviewPageComponent {
     { initialValue: null as StatementImportResponse | null },
   );
 
+  // The account (for accountType → sign convention) and its reporting currency (for the checksum's money
+  // formatting). Fetched lazily off the loaded import; failures degrade to a plain-number checksum.
+  private accountIdForLoad = computed(() => this.data()?.accountId ?? null);
+  account = toSignal(
+    toObservable(this.accountIdForLoad).pipe(
+      switchMap((id) =>
+        id ? this.accountApi.getAccount({ id }).pipe(catchError(() => of(null))) : of(null)),
+    ),
+    { initialValue: null as AccountResponse | null },
+  );
+  reportingCurrency = toSignal(
+    toObservable(this.account).pipe(
+      switchMap((a) =>
+        a ? this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).pipe(catchError(() => of(null))) : of(null)),
+    ),
+    { initialValue: null as CommodityResponse | null },
+  );
+
   // ─── Editable commit fields, seeded once per import ───────────────────────
   private seedKey = computed(() => `${this.jobId() ?? ''}|${this.data() ? '1' : '0'}`);
 
@@ -341,12 +517,97 @@ export class StatementImportReviewPageComponent {
 
   protected readonly datePicker = isoDateBinding(this.date);
 
-  canCommit = computed(() => {
+  // Per-row line-item edit state. Un-mappable rows (server flag) seed unchecked so the reviewer must
+  // deliberately opt them in after editing; mappable rows keep the server's default-accepted.
+  lineItems = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () =>
+    (this.data()?.lineItems ?? []).map((r) => ({
+      index: r.index,
+      accepted: r.mappable ? r.accepted : false,
+      amount: String(r.amount),
+      description: r.description ?? '',
+      direction: r.direction,
+      date: r.date ?? '',
+      mappable: r.mappable,
+      runningBalance: r.runningBalance ?? null,
+      duplicateSuspected: r.duplicateSuspected,
+    })),
+  );
+
+  // A row can be committed once it carries a positive amount and a date (direction always has a value).
+  rowCommittable = (row: LineItemEdit): boolean => {
+    const amt = Number(row.amount);
+    return row.amount !== '' && Number.isFinite(amt) && amt > 0 && !!row.date;
+  };
+
+  acceptedLines = computed(() => this.lineItems().filter((r) => r.accepted && this.rowCommittable(r)));
+
+  allSelected = computed(() => {
+    const committable = this.lineItems().filter((r) => this.rowCommittable(r));
+    return committable.length > 0 && committable.every((r) => r.accepted);
+  });
+  someSelected = computed(() => this.lineItems().some((r) => r.accepted) && !this.allSelected());
+
+  patchRow(i: number, patch: Partial<LineItemEdit>): void {
+    this.lineItems.update((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  setRowAccepted(i: number, accepted: boolean): void {
+    this.patchRow(i, { accepted });
+  }
+
+  toggleRowDirection(i: number): void {
+    this.lineItems.update((rows) =>
+      rows.map((r, idx) =>
+        idx === i ? { ...r, direction: r.direction === 'Expense' ? 'Income' : 'Expense' } : r));
+  }
+
+  toggleAll(checked: boolean): void {
+    this.lineItems.update((rows) =>
+      rows.map((r) => ({ ...r, accepted: checked && this.rowCommittable(r) })));
+  }
+
+  // ─── Advisory closing-balance checksum (never blocks commit) ──────────────
+  // expected = opening + Σ(sign · amount) over selected lines; sign follows the account-type convention
+  // (asset: In +1 / Out −1; liability: Out +1 / In −1). Compared to the printed closing balance.
+  checksum = computed<Checksum>(() => {
+    const h = this.data()?.header;
+    const opening = h?.openingBalance;
+    const closing = h?.closingBalance;
+    if (opening == null || closing == null) return { state: 'unavailable' };
+
+    const isLiability = this.account()?.accountType === 'Liability';
+    let sum = 0;
+    for (const row of this.acceptedLines()) {
+      const isOut = row.direction === 'Expense';
+      const sign = isLiability ? (isOut ? 1 : -1) : (isOut ? -1 : 1);
+      sum += sign * Number(row.amount);
+    }
+
+    const diff = (opening + sum) - closing;
+    if (Math.abs(diff) < 0.005) return { state: 'balanced' };
+
+    const currency = this.reportingCurrency();
+    const magnitude = Math.abs(diff);
+    return {
+      state: 'off',
+      amount: currency ? formatCurrency(magnitude, currency) : magnitude.toFixed(2),
+    };
+  });
+
+  offAmount = computed(() => {
+    const ck = this.checksum();
+    return ck.state === 'off' ? ck.amount : '';
+  });
+
+  // The balance assertion is committable when one was proposed and its amount/date are valid.
+  balanceCommittable = computed(() => {
     if (!this.data()?.proposedBalanceEntry) return false;
     if (!this.date()) return false;
     const amt = Number(this.amount());
     return this.amount() !== '' && Number.isFinite(amt) && amt >= 0;
   });
+
+  canCommit = computed(() => this.balanceCommittable() || this.acceptedLines().length > 0);
 
   // ─── Document preview (blob) ──────────────────────────────────────────────
   blobUrl = signal<string | null>(null);
@@ -413,22 +674,32 @@ export class StatementImportReviewPageComponent {
     const jobId = this.jobId();
     if (!jobId || !this.canCommit()) return;
 
+    // Feature A (balance entry) and Feature B (lines) commit together, atomically. The server ignores the
+    // amount/date when accepted=false, so we still send valid placeholders.
+    const acceptBalance = this.balanceCommittable();
+
     this.committing.set(true);
     this.statementApi.commit({
       jobId,
       body: {
-        assertedAmount: Number(this.amount()),
-        date: this.date(),
+        accepted: acceptBalance,
+        assertedAmount: acceptBalance ? Number(this.amount()) : 0,
+        date: this.date() || todayIso(),
         memo: this.memo().trim() ? this.memo().trim() : null,
-        accepted: true,
+        lineItems: this.acceptedLines().map((r) => ({
+          direction: r.direction,
+          amount: Number(r.amount),
+          date: r.date,
+          description: r.description.trim() ? r.description.trim() : null,
+        })),
       },
     }).pipe(
       takeUntilDestroyed(this.destroyRef),
-      handleMutationError(this.errorHandler, this.committing, 'Failed to commit balance.'),
+      handleMutationError(this.errorHandler, this.committing, 'Failed to commit import.'),
     ).subscribe({
       next: (result) => {
         this.committing.set(false);
-        toast.success('Balance recorded.');
+        toast.success('Statement imported.');
         void this.router.navigate(['/finances/accounts', result.accountId]);
       },
     });

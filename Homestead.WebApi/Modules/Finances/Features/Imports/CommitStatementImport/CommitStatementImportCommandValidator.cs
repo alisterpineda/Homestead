@@ -16,5 +16,15 @@ public class CommitStatementImportCommandValidator : AbstractValidator<CommitSta
                 .WithMessage("AssertedAmount must be non-negative (use 0 for emptied accounts).");
             RuleFor(x => x.Date).NotInFuture();
         });
+
+        // Every curated line becomes a real flow — validate each as strictly as the flow endpoints do.
+        RuleForEach(x => x.LineItems).ChildRules(line =>
+        {
+            line.RuleFor(l => l.Amount).GreaterThan(0m)
+                .WithMessage("Line amount must be greater than zero.");
+            line.RuleFor(l => l.Date).NotInFuture();
+            line.RuleFor(l => l.Description).MaximumLength(512);
+            line.RuleFor(l => l.Direction).IsInEnum();
+        });
     }
 }

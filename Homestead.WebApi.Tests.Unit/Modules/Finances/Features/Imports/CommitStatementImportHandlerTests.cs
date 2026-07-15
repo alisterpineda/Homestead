@@ -21,6 +21,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     private IBalanceEntryReconciler _reconciler = null!;
     private IUnitOfWork _unitOfWork = null!;
     private BalanceEntryService _balanceEntries = null!;
+    private FlowService _flows = null!;
     private CommitStatementImportHandler _sut = null!;
 
     private readonly Guid _userId = Guid.NewGuid();
@@ -38,16 +39,30 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             Id = Guid.NewGuid(), Name = "Equity:Adjustments", AccountType = AccountType.Equity,
             ReportingCurrencyId = _cad.Id, IsSystem = true,
         };
+        var expense = new Account
+        {
+            Id = Guid.NewGuid(), Name = "Expense", AccountType = AccountType.Expense,
+            ReportingCurrencyId = _cad.Id, IsSystem = true,
+        };
+        var income = new Account
+        {
+            Id = Guid.NewGuid(), Name = "Income", AccountType = AccountType.Income,
+            ReportingCurrencyId = _cad.Id, IsSystem = true,
+        };
         _account = new Account
         {
             Id = Guid.NewGuid(), Name = "Chequing", AccountType = AccountType.Asset, Kind = AccountKind.Cash,
             ReportingCurrencyId = _cad.Id, IsSystem = false, IsArchived = false,
         };
-        _db.Accounts.AddRange(adjustments, _account);
+        _db.Accounts.AddRange(adjustments, expense, income, _account);
         await _db.SaveChangesAsync();
 
         var systemAccounts = Substitute.For<ISystemAccountProvider>();
         systemAccounts.GetAdjustmentsAsync(Arg.Any<CancellationToken>()).Returns(adjustments);
+
+        var counterparts = Substitute.For<IFlowCounterpartResolver>();
+        counterparts.ResolveAsync(FlowDirection.Expense, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(expense);
+        counterparts.ResolveAsync(FlowDirection.Income, Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(income);
 
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(_userId);
@@ -60,8 +75,11 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
 
         _balanceEntries = new BalanceEntryService(
             _db, systemAccounts, new TransactionValidator(_db), Substitute.For<IAuditContext>());
+        _flows = new FlowService(
+            _db, counterparts, new TransactionValidator(_db), Substitute.For<IAuditContext>());
 
-        _sut = new CommitStatementImportHandler(_db, _currentUser, _balanceEntries, _reconciler, _unitOfWork);
+        _sut = new CommitStatementImportHandler(
+            _db, _currentUser, _balanceEntries, _flows, _reconciler, _unitOfWork);
     }
 
     public ValueTask DisposeAsync()
@@ -119,6 +137,66 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         Assert.Equal(versionId, entry.SourceDocumentVersionId);
         Assert.Equal(_account.Id, entry.AccountId);
         Assert.Equal(_cad.Id, entry.AssertedCommodityId);
+
+        await _reconciler.Received(1).ReconcileAsync(
+            Arg.Any<IEnumerable<TouchedPair>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_Accepted_WithLines_CreatesEntryAndFlows_AllStamped_OneReconcile()
+    {
+        var (job, versionId) = await SeedJobAsync();
+
+        var command = Command(job.Id) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(FlowDirection.Expense, 42.10m, new DateOnly(2026, 6, 3), "GROCERY"),
+                new CommitLineItem(FlowDirection.Income, 2000m, new DateOnly(2026, 6, 15), "PAYROLL"),
+            ],
+        };
+
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Committed);
+        Assert.NotNull(result.EntryId);
+        Assert.Equal(2, result.FlowsCreated);
+
+        // Balance entry + 2 flows, each stamped with the source version.
+        var stamped = await _db.AccountTransactions
+            .Where(t => t.SourceDocumentVersionId == versionId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(3, stamped.Count);
+        Assert.Single(stamped.OfType<BalanceEntryTransaction>());
+        Assert.Equal(2, stamped.OfType<NormalTransaction>().Count());
+
+        // One combined reconcile pass over the whole batch's touched pairs.
+        await _reconciler.Received(1).ReconcileAsync(
+            Arg.Any<IEnumerable<TouchedPair>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_RejectedBalanceEntry_StillCommitsLines()
+    {
+        var (job, versionId) = await SeedJobAsync();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems = [new CommitLineItem(FlowDirection.Expense, 15m, new DateOnly(2026, 6, 3), "COFFEE")],
+        };
+
+        var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Committed);   // reviewer declined the assertion
+        Assert.Null(result.EntryId);
+        Assert.Equal(1, result.FlowsCreated);
+
+        var stamped = await _db.AccountTransactions
+            .Where(t => t.SourceDocumentVersionId == versionId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.IsType<NormalTransaction>(Assert.Single(stamped));
+        Assert.False(await _db.AccountTransactions.OfType<BalanceEntryTransaction>()
+            .AnyAsync(TestContext.Current.CancellationToken));
 
         await _reconciler.Received(1).ReconcileAsync(
             Arg.Any<IEnumerable<TouchedPair>>(), Arg.Any<CancellationToken>());
