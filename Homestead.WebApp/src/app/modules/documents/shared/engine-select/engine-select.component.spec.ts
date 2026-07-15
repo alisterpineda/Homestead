@@ -49,8 +49,26 @@ describe('EngineSelectComponent', () => {
     expect(setup().componentInstance.engineToString('deleted-engine')).toBe('deleted-engine');
   });
 
-  // Unavailable engines are shown with their reason rather than hidden: "azure-layout needs an endpoint"
-  // is more useful than the option silently not existing.
+  // The reason has to live on the option row: an unavailable engine is [disabled], so it can never become
+  // the selection and selectedError() can never fire for it in the reprocess dialogs.
+  it('surfaces why an unavailable engine cannot run on its own row, unselected', () => {
+    const [tesseract, azure] = setup().componentInstance.engines();
+
+    expect(setup().componentInstance.unavailableReason(azure)).toBe('Endpoint is required.');
+    expect(setup().componentInstance.unavailableReason(tesseract)).toBeNull();
+  });
+
+  // The backend always sends a reason alongside isConfigured: false, but an empty "()" would be worse than
+  // a bare marker if it ever stopped.
+  it('falls back to a bare marker when an unavailable engine has no reason', () => {
+    const fixture = setup(() => of([
+      { key: 'broken', name: 'Broken', type: 'Tesseract', isConfigured: false, configurationError: null },
+    ]));
+
+    expect(fixture.componentInstance.unavailableReason(fixture.componentInstance.engines()[0]))
+      .toBe('unavailable');
+  });
+
   it('surfaces why the selected engine cannot run', () => {
     const fixture = setup();
     fixture.componentRef.setInput('value', 'azure-layout');
