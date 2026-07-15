@@ -11,6 +11,7 @@ const cashAccount: AccountResponse = {
   kind: 'Cash',
   reportingCurrencyId: 'cad',
   institution: 'Bank A',
+  accountNumber: '1234567890',
   isSystem: false,
   isArchived: false,
   createdAt: '',
@@ -44,7 +45,19 @@ describe('EditAccountSheetComponent', () => {
 
     expect(c.editName()).toBe('Chequing');
     expect(c.editInstitution()).toBe('Bank A');
+    expect(c.editAccountNumber()).toBe('1234567890');
     expect(c.editArchived()).toBe(false);
+  });
+
+  it('reports a change when the account number is edited', () => {
+    const fixture = TestBed.createComponent(EditAccountSheetComponent);
+    fixture.componentRef.setInput('state', 'open');
+    fixture.componentRef.setInput('account', cashAccount);
+    const c = fixture.componentInstance;
+
+    expect(c.hasChanges()).toBe(false);
+    c.editAccountNumber.set('9999995678');
+    expect(c.hasChanges()).toBe(true);
   });
 
   it('preserves user input when account input re-emits with same id', () => {

@@ -21,6 +21,9 @@ public class CreateAccountCommandValidator : AbstractValidator<CreateAccountComm
         RuleFor(x => x.Institution)
             .MaximumLength(128).WithMessage("Institution must be 128 characters or fewer.");
 
+        RuleFor(x => x.AccountNumber)
+            .MaximumLength(64).WithMessage("Account number must be 64 characters or fewer.");
+
         RuleFor(x => x.InitialBalance)
             .NotNull().WithMessage("InitialBalance is required for non-Investment account kinds.")
             .When(x => x.Kind != AccountKind.Investment);

@@ -37,6 +37,7 @@ public class PatchAccountHandler(
         {
             Name = account.Name,
             Institution = account.Institution,
+            AccountNumber = account.AccountNumber,
             IsArchived = account.IsArchived,
         };
 
@@ -48,9 +49,12 @@ public class PatchAccountHandler(
             throw new BusinessRuleException("Name must be 256 characters or fewer.");
         if (model.Institution is not null && model.Institution.Length > 128)
             throw new BusinessRuleException("Institution must be 128 characters or fewer.");
+        if (model.AccountNumber is not null && model.AccountNumber.Length > 64)
+            throw new BusinessRuleException("Account number must be 64 characters or fewer.");
 
         account.Name = model.Name.Trim();
         account.Institution = string.IsNullOrWhiteSpace(model.Institution) ? null : model.Institution.Trim();
+        account.AccountNumber = string.IsNullOrWhiteSpace(model.AccountNumber) ? null : model.AccountNumber.Trim();
         account.IsArchived = model.IsArchived;
         account.UpdatedAt = DateTimeOffset.UtcNow;
         account.UpdatedByUserId = currentUser.UserId;
@@ -62,6 +66,7 @@ public class PatchAccountHandler(
         var hasTransactions = await db.AccountTransactionSplits
             .AsNoTracking()
             .AnyAsync(s => s.AccountId == account.Id, ct);
-        return AccountResponseMapper.ToResponse(account, valuation, hasTransactions);
+        return AccountResponseMapper.ToResponse(
+            account, valuation, hasTransactions, includeFullAccountNumber: true);
     }
 }

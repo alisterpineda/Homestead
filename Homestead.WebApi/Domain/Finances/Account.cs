@@ -19,6 +19,12 @@ public class Account
     public Commodity ReportingCurrency { get; set; } = null!;
 
     public string? Institution { get; set; }
+
+    // Full, user-typed account/card/IBAN number. Optional, free-form, no checksum, no encryption
+    // (the self-hosted DB is the trust boundary). Masked to last-4 on list/summary reads via
+    // AccountNumberMasking; the full value is only returned to the owner on detail/edit.
+    public string? AccountNumber { get; set; }
+
     public bool IsSystem { get; set; }
     public bool IsArchived { get; set; }
 

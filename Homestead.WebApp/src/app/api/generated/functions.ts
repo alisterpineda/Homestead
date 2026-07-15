@@ -255,6 +255,14 @@ export type { RunPriceSourceImportNow$Params as RunPriceSourceImportNow$Params }
 export { runPriceSourceImportNow as runPriceSourceImportNow } from './fn/finances/run-price-source-import-now';
 export type { GetNetWorthHistory$Params as GetNetWorthHistory$Params } from './fn/finances/get-net-worth-history';
 export { getNetWorthHistory as getNetWorthHistory } from './fn/finances/get-net-worth-history';
+export type { InitiateStatementImport$Params as InitiateStatementImport$Params } from './fn/finances/initiate-statement-import';
+export { initiateStatementImport as initiateStatementImport } from './fn/finances/initiate-statement-import';
+export type { GetStatementImport$Params as GetStatementImport$Params } from './fn/finances/get-statement-import';
+export { getStatementImport as getStatementImport } from './fn/finances/get-statement-import';
+export type { CommitStatementImport$Params as CommitStatementImport$Params } from './fn/finances/commit-statement-import';
+export { commitStatementImport as commitStatementImport } from './fn/finances/commit-statement-import';
+export type { RollbackStatementImport$Params as RollbackStatementImport$Params } from './fn/finances/rollback-statement-import';
+export { rollbackStatementImport as rollbackStatementImport } from './fn/finances/rollback-statement-import';
 export type { GetInventoryOverview$Params as GetInventoryOverview$Params } from './fn/inventory/get-inventory-overview';
 export { getInventoryOverview as getInventoryOverview } from './fn/inventory/get-inventory-overview';
 export type { GetItem$Params as GetItem$Params } from './fn/inventory/get-item';

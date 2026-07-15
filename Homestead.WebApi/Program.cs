@@ -12,6 +12,7 @@ using Homestead.WebApi.Modules.Documents.Features.Search;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Seeding;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Modules.Inventory;
@@ -217,6 +218,8 @@ builder.Services.AddScoped<IDripService, DripService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddScoped<IPriceSourceScheduleStore, PriceSourceScheduleStore>();
+builder.Services.AddScoped<IStatementExtractionService, StatementExtractionService>();
+builder.Services.AddScoped<StatementMappingBuilder>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddMediatR(cfg =>

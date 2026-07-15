@@ -26,6 +26,7 @@ public class GetAccountHandler(AppDbContext db, IValuationService valuations)
         var hasTransactions = await db.AccountTransactionSplits
             .AsNoTracking()
             .AnyAsync(s => s.AccountId == account.Id, ct);
-        return AccountResponseMapper.ToResponse(account, valuation, hasTransactions);
+        return AccountResponseMapper.ToResponse(
+            account, valuation, hasTransactions, includeFullAccountNumber: true);
     }
 }

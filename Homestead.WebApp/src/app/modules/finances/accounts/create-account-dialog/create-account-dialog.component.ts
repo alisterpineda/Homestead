@@ -96,6 +96,18 @@ import { todayIso, tomorrowDate } from '../../shared/date';
             />
           </div>
 
+          <div class="flex flex-col gap-1.5">
+            <label hlmLabel for="create-account-number">Account number (optional)</label>
+            <input
+              hlmInput
+              id="create-account-number"
+              maxlength="64"
+              placeholder="e.g. 1234567890"
+              [value]="accountNumber()"
+              (input)="accountNumber.set(asValue($event))"
+            />
+          </div>
+
           @if (showInitialBalance()) {
             <fieldset class="flex flex-col gap-3 rounded-md border border-input p-3">
               <legend class="px-1 text-sm font-medium">Initial balance</legend>
@@ -156,6 +168,7 @@ export class CreateAccountDialogComponent {
   currencyId = signal<string | null>(null);
   pickedCurrency = signal<CommodityResponse | null>(null);
   institution = signal('');
+  accountNumber = signal('');
   initialAmount = signal('');
   initialAsOfDate = signal(todayIso());
   creating = signal(false);
@@ -205,6 +218,7 @@ export class CreateAccountDialogComponent {
       this.currencyId.set(display?.id ?? null);
       this.pickedCurrency.set(display ?? null);
       this.institution.set('');
+      this.accountNumber.set('');
       this.initialAmount.set('');
       this.initialAsOfDate.set(todayIso());
       this.creating.set(false);
@@ -232,6 +246,7 @@ export class CreateAccountDialogComponent {
         name: this.name().trim(),
         reportingCurrencyId: currencyId,
         institution: this.institution().trim() ? this.institution().trim() : null,
+        accountNumber: this.accountNumber().trim() ? this.accountNumber().trim() : null,
         initialBalance,
       },
     }).subscribe({

@@ -1,4 +1,5 @@
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 
 namespace Homestead.WebApi.Domain.Auditing.Snapshots;
 
@@ -6,6 +7,11 @@ public record AccountSnapshot : IAuditSnapshot<AccountSnapshot, Account>
 {
     public required string Name { get; init; }
     public string? Institution { get; init; }
+
+    // Masked, deliberately — the audit log records that the number changed (••••1234 → ••••5678) without
+    // ever persisting a raw account number in auditing.audit_logs.
+    public string? AccountNumberMasked { get; init; }
+
     public required bool IsArchived { get; init; }
     public Guid? ParentAccountId { get; init; }
 
@@ -13,6 +19,7 @@ public record AccountSnapshot : IAuditSnapshot<AccountSnapshot, Account>
     {
         Name = source.Name,
         Institution = source.Institution,
+        AccountNumberMasked = AccountNumberMasking.Mask(source.AccountNumber),
         IsArchived = source.IsArchived,
         ParentAccountId = source.ParentAccountId,
     };
@@ -25,6 +32,8 @@ public record AccountSnapshot : IAuditSnapshot<AccountSnapshot, Account>
             changes.Add(new ScalarFieldChange("Name", Name, other.Name));
         if (Institution != other.Institution)
             changes.Add(new ScalarFieldChange("Institution", Institution, other.Institution));
+        if (AccountNumberMasked != other.AccountNumberMasked)
+            changes.Add(new ScalarFieldChange("AccountNumber", AccountNumberMasked, other.AccountNumberMasked));
         if (IsArchived != other.IsArchived)
             changes.Add(new ScalarFieldChange("IsArchived", IsArchived.ToString(), other.IsArchived.ToString()));
         if (ParentAccountId != other.ParentAccountId)

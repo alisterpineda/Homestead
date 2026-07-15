@@ -23,6 +23,10 @@ using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.CreateCommodity
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.DeleteCommodityPrices;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.GetCommodityPrices;
 using Homestead.WebApi.Modules.Finances.Features.CommodityPrices.PatchCommodityPrice;
+using Homestead.WebApi.Modules.Finances.Features.Imports.CommitStatementImport;
+using Homestead.WebApi.Modules.Finances.Features.Imports.GetStatementImport;
+using Homestead.WebApi.Modules.Finances.Features.Imports.InitiateStatementImport;
+using Homestead.WebApi.Modules.Finances.Features.Imports.RollbackStatementImport;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.CreateOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
@@ -159,6 +163,13 @@ public static class FinancesModule
 
         var reports = v1.MapGroup("/reports");
         GetNetWorthHistoryEndpoint.Map(reports);
+
+        // Statement parsing → finance import spine (upload/parse → review → commit → rollback).
+        var imports = v1.MapGroup("/imports");
+        InitiateStatementImportEndpoint.Map(imports);
+        GetStatementImportEndpoint.Map(imports);
+        CommitStatementImportEndpoint.Map(imports);
+        RollbackStatementImportEndpoint.Map(imports);
 
         return app;
     }

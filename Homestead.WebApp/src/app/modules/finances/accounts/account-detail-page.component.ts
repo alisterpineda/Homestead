@@ -28,6 +28,7 @@ import {
   lucideBanknoteArrowDown,
   lucideBanknoteArrowUp,
   lucideRepeat,
+  lucideFileUp,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
@@ -52,6 +53,7 @@ import { FlowSheetComponent, type FlowSheetMode, type FlowDirection } from './fl
 import { DripSheetComponent, type DripSheetMode } from './drip-sheet/drip-sheet.component';
 import { OpeningBalanceSheetComponent, type OpeningBalanceSheetMode } from './opening-balance-sheet/opening-balance-sheet.component';
 import { AddPositionSheetComponent } from './add-position-sheet/add-position-sheet.component';
+import { StatementImportDialogComponent } from './statement-import-dialog/statement-import-dialog.component';
 import { formatAccountBalance, formatNativeBalance } from '../shared/sign';
 import { toDateOnly } from '../shared/date';
 import { PageHeaderService } from '@/shared/services/page-header.service';
@@ -89,12 +91,13 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
     DripSheetComponent,
     OpeningBalanceSheetComponent,
     AddPositionSheetComponent,
+    StatementImportDialogComponent,
   ],
   providers: [provideIcons({
     lucidePencil, lucideCircleAlert, lucidePlus, lucideScale, lucideArrowRightLeft,
     lucideChevronDown, lucidePackagePlus,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote, lucideRepeat,
-    lucideBanknoteArrowDown, lucideBanknoteArrowUp,
+    lucideBanknoteArrowDown, lucideBanknoteArrowUp, lucideFileUp,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -173,6 +176,13 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
               New transaction
               <ng-icon hlm name="lucideChevronDown" size="sm" />
             </button>
+
+            @if (a.kind !== 'Investment') {
+              <app-statement-import-dialog [accountId]="a.id" triggerSize="sm" triggerVariant="outline">
+                <ng-icon hlm name="lucideFileUp" size="sm" />
+                Import statement
+              </app-statement-import-dialog>
+            }
             <ng-template #newTxMenu>
               <hlm-dropdown-menu class="w-52">
                 @if (a.kind !== 'Investment') {

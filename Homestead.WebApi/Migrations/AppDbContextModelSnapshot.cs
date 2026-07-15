@@ -380,6 +380,10 @@ namespace Homestead.WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("AccountType")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -471,6 +475,9 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("RelatedTransactionId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SourceDocumentVersionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -491,6 +498,8 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("OccurredAt");
 
                     b.HasIndex("RelatedTransactionId");
+
+                    b.HasIndex("SourceDocumentVersionId");
 
                     b.HasIndex("UpdatedByUserId");
 
@@ -1368,6 +1377,9 @@ namespace Homestead.WebApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
+
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb");
 
                     b.Property<Guid?>("ScheduleId")
                         .HasColumnType("uuid");

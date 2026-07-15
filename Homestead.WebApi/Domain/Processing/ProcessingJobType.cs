@@ -11,4 +11,5 @@ public enum ProcessingJobType
     ImportCommodityPrices,
     ClassifyDocument,
     BulkClassifyDocuments,
+    ParseAccountStatement,
 }

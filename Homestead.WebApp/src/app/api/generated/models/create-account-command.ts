@@ -4,6 +4,7 @@
 import { AccountKind } from '../models/account-kind';
 import { InitialBalanceInput } from '../models/initial-balance-input';
 export interface CreateAccountCommand {
+  accountNumber?: (string | null);
   initialBalance?: (null | InitialBalanceInput);
   institution?: (string | null);
   kind: AccountKind;

@@ -2,6 +2,7 @@ using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
+using Homestead.WebApi.Modules.Finances.Services;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -110,6 +111,11 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // so this doesn't classify uploads that don't ask for it.)
             services.RemoveAll<IAiClientFactory>();
             services.AddSingleton<IAiClientFactory, FakeAiClientFactory>();
+
+            // Substitute the statement extractor so the import spine is deterministic and never calls a live
+            // model — the ParseAccountStatement job handler resolves this fake and gets a canned StatementIr.
+            services.RemoveAll<IStatementExtractionService>();
+            services.AddScoped<IStatementExtractionService, FakeStatementExtractionService>();
 
             // Swap the Bank of Canada price provider for a network-free fake so the import-pipeline tests
             // exercise the real DB queries + unique-index enforcement without hitting the live Valet API.

@@ -72,6 +72,19 @@ import { KIND_LABELS, isUserAccountKind, type UserAccountKind } from '../../shar
             </div>
 
             <div class="space-y-2">
+              <label hlmLabel for="account-number">Account number</label>
+              <input
+                hlmInput
+                id="account-number"
+                class="w-full"
+                maxlength="64"
+                placeholder="(none)"
+                [value]="editAccountNumber()"
+                (input)="editAccountNumber.set(asValue($event))"
+              />
+            </div>
+
+            <div class="space-y-2">
               <label hlmLabel>Kind</label>
               <p class="text-sm text-muted-foreground">{{ kindLabel() }}</p>
             </div>
@@ -121,6 +134,11 @@ export class EditAccountSheetComponent {
     if (!a || this.state() !== 'open') return '';
     return a.institution ?? '';
   });
+  editAccountNumber = seededLinkedSignal(this.seedKey, () => {
+    const a = this.account();
+    if (!a || this.state() !== 'open') return '';
+    return a.accountNumber ?? '';
+  });
   editArchived = seededLinkedSignal(this.seedKey, () => {
     const a = this.account();
     if (!a || this.state() !== 'open') return false;
@@ -144,6 +162,7 @@ export class EditAccountSheetComponent {
     if (!a) return false;
     if (this.editName() !== a.name) return true;
     if ((this.editInstitution() || null) !== (a.institution ?? null)) return true;
+    if ((this.editAccountNumber() || null) !== (a.accountNumber ?? null)) return true;
     if (this.editArchived() !== a.isArchived) return true;
     return false;
   });
@@ -170,6 +189,8 @@ export class EditAccountSheetComponent {
     if (this.editName() !== a.name) ops.push(replace('/name', this.editName().trim()));
     const newInst = this.editInstitution().trim() ? this.editInstitution().trim() : null;
     if (newInst !== (a.institution ?? null)) ops.push(replace('/institution', newInst));
+    const newAcctNum = this.editAccountNumber().trim() ? this.editAccountNumber().trim() : null;
+    if (newAcctNum !== (a.accountNumber ?? null)) ops.push(replace('/accountNumber', newAcctNum));
     if (this.editArchived() !== a.isArchived) ops.push(replace('/isArchived', this.editArchived()));
 
     this.accountApi.patchAccount({ id: a.id, body: ops }).pipe(

@@ -14,6 +14,7 @@ public class AccountSnapshotTests
         Kind = AccountKind.Cash,
         ReportingCurrencyId = Guid.NewGuid(),
         Institution = "Big Bank",
+        AccountNumber = "1234567890",
         IsSystem = false,
         IsArchived = false,
     };
@@ -28,6 +29,38 @@ public class AccountSnapshotTests
         Assert.Equal(account.Name, snapshot.Name);
         Assert.Equal(account.Institution, snapshot.Institution);
         Assert.Equal(account.IsArchived, snapshot.IsArchived);
+    }
+
+    [Fact]
+    public void From_CapturesMaskedAccountNumber_NotRaw()
+    {
+        var snapshot = AccountSnapshot.From(CreateAccount());
+
+        // The audit snapshot must never persist a raw account number.
+        Assert.Equal("••••7890", snapshot.AccountNumberMasked);
+    }
+
+    [Fact]
+    public void Diff_DetectsAccountNumberChange_ReportedMasked()
+    {
+        var before = AccountSnapshot.From(CreateAccount());
+        var after = AccountSnapshot.From(new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "Chequing",
+            AccountType = AccountType.Asset,
+            Kind = AccountKind.Cash,
+            ReportingCurrencyId = Guid.NewGuid(),
+            Institution = "Big Bank",
+            AccountNumber = "9999995678",
+            IsSystem = false,
+            IsArchived = false,
+        });
+
+        var change = Assert.IsType<ScalarFieldChange>(Assert.Single(before.Diff(after)));
+        Assert.Equal("AccountNumber", change.Field);
+        Assert.Equal("••••7890", change.OldValue);
+        Assert.Equal("••••5678", change.NewValue);
     }
 
     [Fact]

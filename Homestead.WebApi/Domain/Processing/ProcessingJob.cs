@@ -10,6 +10,12 @@ public class ProcessingJob
     public ProcessingEntityType? EntityType { get; set; }
     public Guid? EntityId { get; set; }
     public string? Payload { get; set; }
+
+    // Staged handler output (JSON). Written by handlers that produce a durable result for a follow-up
+    // read (e.g. statement-parse staging, read back by GET /finances/imports/{jobId}). Nothing here
+    // touches the ledger until an explicit commit. Distinct from Error (failure detail).
+    public string? Result { get; set; }
+
     public string? Error { get; set; }
     public int Priority { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -26,4 +32,7 @@ public class ProcessingJob
 
     public T? GetPayload<T>() => Payload is null ? default : JsonSerializer.Deserialize<T>(Payload);
     public void SetPayload<T>(T value) => Payload = JsonSerializer.Serialize(value);
+
+    public T? GetResult<T>() => Result is null ? default : JsonSerializer.Deserialize<T>(Result);
+    public void SetResult<T>(T value) => Result = JsonSerializer.Serialize(value);
 }

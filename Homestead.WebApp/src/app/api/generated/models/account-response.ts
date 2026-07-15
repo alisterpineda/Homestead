@@ -4,6 +4,8 @@
 import { AccountKind } from '../models/account-kind';
 import { AccountType } from '../models/account-type';
 export interface AccountResponse {
+  accountNumber?: (string | null);
+  accountNumberMasked?: (string | null);
   accountType: AccountType;
   createdAt: string;
   displayValue?: (number | null);

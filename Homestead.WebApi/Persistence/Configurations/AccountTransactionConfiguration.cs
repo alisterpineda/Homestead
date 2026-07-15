@@ -53,5 +53,9 @@ public class AccountTransactionConfiguration : IEntityTypeConfiguration<AccountT
 
         builder.HasIndex(t => t.OccurredAt);
         builder.HasIndex(t => t.RelatedTransactionId);
+
+        // Soft provenance — index only, deliberately NO FK/navigation (cross-schema decoupling; the column
+        // may dangle after the source document is deleted). Supports "delete rows imported from version X".
+        builder.HasIndex(t => t.SourceDocumentVersionId);
     }
 }

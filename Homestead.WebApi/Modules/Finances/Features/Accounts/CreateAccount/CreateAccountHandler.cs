@@ -35,6 +35,7 @@ public class CreateAccountHandler(
             Kind = request.Kind,
             ReportingCurrencyId = request.ReportingCurrencyId,
             Institution = string.IsNullOrWhiteSpace(request.Institution) ? null : request.Institution.Trim(),
+            AccountNumber = string.IsNullOrWhiteSpace(request.AccountNumber) ? null : request.AccountNumber.Trim(),
             IsSystem = false,
             IsArchived = false,
             CreatedAt = DateTimeOffset.UtcNow,
@@ -62,6 +63,7 @@ public class CreateAccountHandler(
         var hasTransactions = await db.AccountTransactionSplits
             .AsNoTracking()
             .AnyAsync(s => s.AccountId == account.Id, ct);
-        return AccountResponseMapper.ToResponse(account, valuation, hasTransactions);
+        return AccountResponseMapper.ToResponse(
+            account, valuation, hasTransactions, includeFullAccountNumber: true);
     }
 }

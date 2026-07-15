@@ -3,6 +3,7 @@ import { adminGuard } from '@/shared/guards/admin.guard';
 import { FinancesLayoutComponent } from './layout/finances-layout.component';
 import { AccountListPageComponent } from './accounts/account-list-page.component';
 import { AccountDetailPageComponent } from './accounts/account-detail-page.component';
+import { StatementImportReviewPageComponent } from './accounts/statement-import-review-page.component';
 import { CommodityListPageComponent } from './commodities/commodity-list-page.component';
 import { CommodityDetailPageComponent } from './commodities/commodity-detail-page.component';
 import { CategoryListPageComponent } from './categories/category-list-page.component';
@@ -19,6 +20,11 @@ export const FINANCES_ROUTES: Routes = [
       { path: '', redirectTo: 'accounts', pathMatch: 'full' },
       { path: 'accounts', component: AccountListPageComponent, data: { title: 'Accounts' } },
       { path: 'accounts/:id', component: AccountDetailPageComponent, data: { title: 'Account' } },
+      {
+        path: 'accounts/:id/statement-import/:jobId',
+        component: StatementImportReviewPageComponent,
+        data: { title: 'Import statement' },
+      },
       { path: 'commodities', component: CommodityListPageComponent, data: { title: 'Commodities' } },
       { path: 'commodities/:id', component: CommodityDetailPageComponent, data: { title: 'Commodity' } },
       { path: 'categories', component: CategoryListPageComponent, data: { title: 'Categories' } },

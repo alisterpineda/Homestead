@@ -26,6 +26,10 @@ public class ProcessingJobConfiguration : IEntityTypeConfiguration<ProcessingJob
         builder.Property(j => j.Payload)
             .HasColumnType("jsonb");
 
+        // Staged handler output. jsonb like Payload — it holds serialized JSON (e.g. StagedStatementImport).
+        builder.Property(j => j.Result)
+            .HasColumnType("jsonb");
+
         builder.Property(j => j.Priority)
             .IsRequired()
             .HasDefaultValue(0);

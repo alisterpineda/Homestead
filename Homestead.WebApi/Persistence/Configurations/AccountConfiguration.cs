@@ -28,6 +28,9 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(a => a.Institution)
             .HasMaxLength(128);
 
+        builder.Property(a => a.AccountNumber)
+            .HasMaxLength(64);
+
         builder.Property(a => a.IsSystem).IsRequired();
         builder.Property(a => a.IsArchived).IsRequired();
 

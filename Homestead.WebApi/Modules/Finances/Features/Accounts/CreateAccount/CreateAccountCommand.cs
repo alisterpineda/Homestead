@@ -15,5 +15,6 @@ public record CreateAccountCommand : ICommand<AccountResponse>
     public required AccountKind Kind { get; init; }
     public required Guid ReportingCurrencyId { get; init; }
     public string? Institution { get; init; }
+    public string? AccountNumber { get; init; }
     public InitialBalanceInput? InitialBalance { get; init; }
 }

@@ -33,6 +33,21 @@ public class AiOptions
     public int ResolveMaxInputChars() =>
         MaxInputChars is int n && n >= MinInputChars ? n : DefaultMaxInputChars;
 
+    // Optional override for the statement-extraction character budget. Statement parsing must see the FULL
+    // text (the closing balance can sit anywhere in the document), so it does NOT use the classification
+    // head+tail sampler — the text is sent whole and only hard-truncated at this cap (which is logged).
+    public int? StatementMaxInputChars { get; set; }
+
+    // Default statement-extraction budget. Deliberately an order of magnitude larger than the
+    // classification budget so a full multi-page statement fits without sampling. Page-chunking for
+    // statements longer than this is a deferred follow-up.
+    public const int DefaultStatementMaxInputChars = 120_000;
+
+    // Resolves the effective statement budget: the configured value when it clears the shared floor, else
+    // the statement default.
+    public int ResolveStatementMaxInputChars() =>
+        StatementMaxInputChars is int n && n >= MinInputChars ? n : DefaultStatementMaxInputChars;
+
     // Kill-switch for attaching a rendered page-1 image to the classify call (in addition to OCR text +
     // catalogs). Defaults on; flip to false to fall back to text-only classification even when AI is
     // configured (e.g. to skip the slow vision prefill, or while debugging).
