@@ -94,8 +94,8 @@ public class OcrEngineConfigurationTests
         Assert.Equal(expected, error);
     }
 
-    // Markdown is a layout-family feature; Azure rejects it for prebuilt-read. Caught in config so it
-    // shows in the picker as unavailable-with-reason rather than as a 400 from a background job.
+    // Only prebuilt-layout supports Markdown. Caught in config so it shows in the picker as
+    // unavailable-with-reason rather than as a 400 from a background job.
     [Fact]
     public void Validate_PrebuiltReadWithMarkdown_ReportsUnsupportedCombination()
     {
@@ -128,10 +128,53 @@ public class OcrEngineConfigurationTests
         Assert.Null(error);
     }
 
+    // The accept-set is exactly one id, not everything starting with it — an id that merely begins with
+    // prebuilt-layout is a typo, and Azure has no such model.
+    [Fact]
+    public void Validate_PrebuiltLayoutPrefixedTypoWithMarkdown_ReportsUnsupportedCombination()
+    {
+        var error = OcrEngineConfiguration.Validate("some-engine", new OcrEngineOptions
+        {
+            Type = TextExtractionEngineType.AzureDocumentIntelligence,
+            Endpoint = "https://x.cognitiveservices.azure.com",
+            ApiKey = "k",
+            ModelId = "prebuilt-layout-v2",
+            OutputContentFormat = AzureOutputContentFormat.Markdown
+        });
+
+        Assert.NotNull(error);
+        Assert.Contains("Markdown", error);
+        Assert.Contains("prebuilt-layout-v2", error);
+    }
+
+    // Only an explicit Markdown pairing is caught. Nothing here knows Azure's model list, so a typo on
+    // its own stays "configured" and fails at the Azure call — the limit of what config can validate.
+    [Fact]
+    public void Validate_PrebuiltLayoutPrefixedTypoWithoutMarkdown_IsNotCaughtHere()
+    {
+        var error = OcrEngineConfiguration.Validate("some-engine", new OcrEngineOptions
+        {
+            Type = TextExtractionEngineType.AzureDocumentIntelligence,
+            Endpoint = "https://x.cognitiveservices.azure.com",
+            ApiKey = "k",
+            ModelId = "prebuilt-layout-v2",
+            OutputContentFormat = null
+        });
+
+        Assert.Null(error);
+    }
+
+    // The signature accepts null and the guard is implicit in string.Equals's static overload — the
+    // instance form (modelId.Equals(...)) compiles identically and NREs.
+    [Fact]
+    public void SupportsMarkdown_NullModelId_IsFalse() => Assert.False(AzureModels.SupportsMarkdown(null));
+
     [Theory]
     [InlineData(AzureModels.PrebuiltLayout, AzureOutputContentFormat.Markdown)]
     [InlineData(AzureModels.PrebuiltRead, AzureOutputContentFormat.Text)]
-    public void ResolveOutputContentFormat_Unset_DefaultsByModelFamily(
+    // An unrecognized id falls back to Text rather than being assumed layout-like.
+    [InlineData("prebuilt-layout-v2", AzureOutputContentFormat.Text)]
+    public void ResolveOutputContentFormat_Unset_DefaultsByModelId(
         string modelId, AzureOutputContentFormat expected)
     {
         var options = new OcrEngineOptions

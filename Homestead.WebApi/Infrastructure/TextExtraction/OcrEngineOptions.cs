@@ -65,7 +65,7 @@ public class OcrEngineOptions
     // both legitimate engines over the same credentials.
     public string ModelId { get; set; } = AzureModels.PrebuiltLayout;
 
-    // Unset resolves to Markdown for the layout family (its whole point — HTML tables survive) and Text
+    // Unset resolves to Markdown for prebuilt-layout (its whole point — HTML tables survive) and Text
     // for everything else, which is the only format those models support.
     public AzureOutputContentFormat? OutputContentFormat { get; set; }
 
@@ -80,8 +80,15 @@ public static class AzureModels
     public const string PrebuiltLayout = "prebuilt-layout";
     public const string PrebuiltRead = "prebuilt-read";
 
-    // Markdown output is a layout-family feature: it is what emits the <table>/<tr>/<td> syntax that makes
-    // statement parsing work. prebuilt-read has no table model at all and rejects the format outright.
+    // Markdown is what emits the <table>/<tr>/<td> syntax that makes statement parsing work, and only
+    // prebuilt-layout produces it. Matched exactly, not by prefix: Azure nests real ids under a shared
+    // prefix elsewhere (prebuilt-tax.us, prebuilt-tax.us.w2), so a prefix would accept ids that are not
+    // layout at all.
+    //
+    // That markdown is layout-only is INFERRED from where Microsoft's docs place the feature, not stated
+    // by them: outputContentFormat is documented on the generic Analyze operation with no per-model note,
+    // and they did document the equivalent exclusivity for output=pdf. ValidateAzure enforces the
+    // inference. A single curl (prebuilt-read + outputContentFormat=markdown) would settle it.
     public static bool SupportsMarkdown(string? modelId) =>
-        modelId is not null && modelId.StartsWith(PrebuiltLayout, StringComparison.OrdinalIgnoreCase);
+        string.Equals(modelId, PrebuiltLayout, StringComparison.OrdinalIgnoreCase);
 }

@@ -207,10 +207,13 @@ model:
 
 As env vars, each leaf is a stock double-underscore key, e.g.
 `Ocr__Engines__azure-layout__Endpoint`. A `tesseract` instance is always present with the defaults
-above even if you configure nothing at all. `OutputContentFormat` defaults to `Markdown` for the
-layout family and `Text` otherwise; `Markdown` with a non-layout model (e.g. `prebuilt-read`) is
+above even if you configure nothing at all. `OutputContentFormat` defaults to `Markdown` for
+`prebuilt-layout` and `Text` otherwise; `Markdown` with any other model (e.g. `prebuilt-read`) is
 invalid and the engine will report itself unavailable with that reason rather than failing at
-extraction time.
+extraction time. The model id is matched exactly, so a near-miss like `prebuilt-layout-v2` counts as
+"any other model": it defaults to `Text`, and asking it for `Markdown` is rejected. Only that explicit
+pairing is caught — nothing here knows Azure's model list, so a mistyped id on its own still reports
+as configured and fails at the Azure call.
 
 **`Type` is required for every engine except `tesseract`** (whose type is implied by its name, so the
 image can override only its `TessDataPath`). An engine with no `Type` is reported as unavailable
