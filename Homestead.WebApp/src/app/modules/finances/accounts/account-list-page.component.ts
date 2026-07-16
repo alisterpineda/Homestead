@@ -128,7 +128,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 Pick a display currency on the Settings page so balances render correctly.
               </p>
             </div>
-            <a hlmBtn variant="outline" size="sm" routerLink="/finances/settings">Open settings</a>
+            <a hlmBtn variant="outline" routerLink="/finances/settings">Open settings</a>
           </div>
         }
 
@@ -153,7 +153,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
             <div class="flex items-center gap-2">
               @if (archivedCount() > 0) {
                 <div hlmPopover>
-                  <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+                  <button hlmPopoverTrigger hlmBtn variant="outline">
                     <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
                     {{ showArchived() ? 'Filter: Archived' : 'Filter' }}
                   </button>
@@ -165,7 +165,6 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                           hlmBtn
                           variant="ghost"
                           size="sm"
-                          class="h-auto px-2 py-0.5 text-xs"
                           (click)="showArchived.set(false)"
                         >Reset</button>
                       }
@@ -185,7 +184,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 </div>
               }
 
-              <button hlmBtn variant="outline" size="sm" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
+              <button hlmBtn variant="outline" class="hidden sm:inline-flex" [hlmDropdownMenuTrigger]="sortMenu">
                 <ng-icon hlm [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
                 {{ sortFieldLabel() }}
               </button>
@@ -234,7 +233,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <button
                   hlmBtn
                   [variant]="viewMode() === 'card' ? 'secondary' : 'outline'"
-                  size="icon-sm"
+                  size="icon"
                   (click)="setViewMode('card')"
                   aria-label="Card view"
                 >
@@ -243,7 +242,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 <button
                   hlmBtn
                   [variant]="viewMode() === 'table' ? 'secondary' : 'outline'"
-                  size="icon-sm"
+                  size="icon"
                   (click)="setViewMode('table')"
                   aria-label="Table view"
                 >
@@ -251,7 +250,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 </button>
               </div>
 
-              <button hlmBtn variant="outline" size="icon-sm" class="sm:hidden"
+              <button hlmBtn variant="outline" size="icon" class="sm:hidden"
                       [hlmDropdownMenuTrigger]="overflowMenu" aria-label="More options">
                 <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
               </button>
@@ -283,7 +282,7 @@ function compareNullable<T>(av: T | null, bv: T | null, dir: 1 | -1, lt: (a: T, 
                 </hlm-dropdown-menu>
               </ng-template>
             </div>
-            <app-create-account-dialog triggerSize="sm" (created)="onChanged()">
+            <app-create-account-dialog (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New account
             </app-create-account-dialog>

@@ -99,7 +99,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           [attr.inert]="hasSelection() ? '' : null"
         >
         <div hlmPopover>
-          <button hlmPopoverTrigger hlmBtn variant="outline" size="sm">
+          <button hlmPopoverTrigger hlmBtn variant="outline">
             <ng-icon hlm name="lucideListFilter" size="sm" class="text-muted-foreground" />
             {{ filterTriggerLabel() }}
           </button>
@@ -111,7 +111,6 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
                   hlmBtn
                   variant="ghost"
                   size="sm"
-                  class="h-auto px-2 py-0.5 text-xs"
                   (click)="resetFilters()"
                 >Reset</button>
               }
@@ -152,7 +151,7 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
                   hlmBtn
                   variant="ghost"
                   size="sm"
-                  class="h-auto px-2 py-0.5 text-xs mt-1"
+                  class="mt-1"
                   (click)="onQuoteCurrencyChange(null)"
                 >Clear</button>
               }
@@ -215,7 +214,6 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
             <button
               hlmBtn
               variant="ghost"
-              size="sm"
               class="text-destructive hover:bg-destructive/10 hover:text-destructive"
               hlmAlertDialogTrigger
             >
@@ -247,7 +245,6 @@ type DatePreset = 'last30' | 'thisMonth' | 'ytd' | 'lastYear';
           <button
             hlmBtn
             variant="outline"
-            size="sm"
             class="ml-auto"
             (click)="clearSelection()"
           >

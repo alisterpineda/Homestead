@@ -78,6 +78,7 @@ type EntryKind = 'durable' | 'consumable';
         <form (submit)="handleSubmit($event)" class="flex flex-col gap-4">
           <hlm-toggle-group
             type="single"
+            nullable="false"
             variant="outline"
             [value]="kind()"
             (valueChange)="onKindChange($event)"
@@ -324,7 +325,7 @@ export class CreateEntryDialogComponent {
     return (event.target as HTMLInputElement | HTMLTextAreaElement).value;
   }
 
-  /** The toggle-group emits `unknown` (it's non-nullable, but the value type is wide) — narrow it. */
+  /** The toggle-group emits `unknown` — narrow it. */
   onKindChange(value: unknown): void {
     if (value === 'durable' || value === 'consumable') this.kind.set(value);
   }

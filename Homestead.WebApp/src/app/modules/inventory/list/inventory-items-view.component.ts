@@ -102,6 +102,7 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
         <ng-content select="[toolbarStart]" />
         <hlm-toggle-group
           type="single"
+          nullable="false"
           variant="outline"
           aria-label="Kind filter"
           [value]="kind()"
@@ -125,7 +126,6 @@ export const kindFilterFromParam = (v: string | null): KindFilter => (isKindFilt
                   hlmBtn
                   variant="ghost"
                   size="sm"
-                  class="h-auto px-2 py-0.5 text-xs"
                   (click)="onReset()"
                 >Reset</button>
               }

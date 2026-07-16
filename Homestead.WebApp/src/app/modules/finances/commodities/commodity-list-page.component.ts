@@ -81,7 +81,6 @@ const COMMODITY_TOTAL_GUARD = 1000;
                     hlmBtn
                     variant="ghost"
                     size="sm"
-                    class="h-auto px-2 py-0.5 text-xs"
                     (click)="resetKindFilter()"
                   >Reset</button>
                 }

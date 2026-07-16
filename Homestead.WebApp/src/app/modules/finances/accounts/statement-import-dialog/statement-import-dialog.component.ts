@@ -165,7 +165,7 @@ const IMPORT_FAILED = 'Statement import failed.';
 })
 export class StatementImportDialogComponent {
   accountId = input.required<string>();
-  triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('sm');
+  triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
   triggerVariant = input<'default' | 'secondary' | 'outline' | 'ghost'>('outline');
 
   file = signal<File | null>(null);

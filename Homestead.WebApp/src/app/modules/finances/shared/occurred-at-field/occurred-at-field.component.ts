@@ -51,14 +51,14 @@ import { tomorrowIso } from '../date';
             type="button"
             hlmBtn
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             aria-label="Clear time"
             (click)="clearTime()"
           >
             <ng-icon hlm name="lucideX" size="sm" />
           </button>
         } @else {
-          <button type="button" hlmBtn variant="ghost" size="sm" (click)="addTime()">
+          <button type="button" hlmBtn variant="ghost" (click)="addTime()">
             <ng-icon hlm name="lucideClock" size="sm" />
             Add time
           </button>

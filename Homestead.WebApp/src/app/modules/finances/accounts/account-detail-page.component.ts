@@ -124,7 +124,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         @if (loadError()) {
           <div class="flex items-center justify-between gap-3 rounded-md border border-dashed border-destructive/50 p-3 text-sm text-destructive">
             <span>Couldn't refresh. Showing the last loaded version.</span>
-            <button type="button" hlmBtn variant="outline" size="sm" (click)="retry()">Retry</button>
+            <button type="button" hlmBtn variant="outline" (click)="retry()">Retry</button>
           </div>
         }
         <header class="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground">
@@ -141,7 +141,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 <p class="text-sm text-muted-foreground">{{ a.institution }}</p>
               }
             </div>
-            <button hlmBtn variant="outline" size="sm" class="shrink-0" (click)="openEdit()">
+            <button hlmBtn variant="outline" class="shrink-0" (click)="openEdit()">
               <ng-icon hlm name="lucidePencil" size="sm" />
               Edit
             </button>
@@ -160,25 +160,25 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         @if (!a.isArchived) {
           <div class="flex flex-wrap items-center justify-end gap-2">
             @if (a.kind === 'Investment') {
-              <button hlmBtn size="sm" (click)="openAddPosition()">
+              <button hlmBtn (click)="openAddPosition()">
                 <ng-icon hlm name="lucidePackagePlus" size="sm" />
                 Add position
               </button>
             } @else if (openingBalanceExists() === false) {
-              <button hlmBtn variant="outline" size="sm" (click)="openAddOpeningBalance()">
+              <button hlmBtn variant="outline" (click)="openAddOpeningBalance()">
                 <ng-icon hlm name="lucidePlus" size="sm" />
                 Add opening balance
               </button>
             }
 
-            <button hlmBtn size="sm" [hlmDropdownMenuTrigger]="newTxMenu">
+            <button hlmBtn [hlmDropdownMenuTrigger]="newTxMenu">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New transaction
               <ng-icon hlm name="lucideChevronDown" size="sm" />
             </button>
 
             @if (a.kind !== 'Investment') {
-              <app-statement-import-dialog [accountId]="a.id" triggerSize="sm" triggerVariant="outline">
+              <app-statement-import-dialog [accountId]="a.id">
                 <ng-icon hlm name="lucideFileUp" size="sm" />
                 Import statement
               </app-statement-import-dialog>

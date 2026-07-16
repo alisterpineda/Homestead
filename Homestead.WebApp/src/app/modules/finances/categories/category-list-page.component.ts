@@ -11,7 +11,7 @@ import { switchMap, map, firstValueFrom } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePlus, lucideCircleAlert, lucideFolderTree } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
@@ -22,7 +22,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { CreateCategoryDialogComponent } from './create-category-dialog/create-category-dialog.component';
 import { EditCategorySheetComponent } from './edit-category-sheet/edit-category-sheet.component';
 import { CategoryTreeComponent } from './category-tree.component';
-import { CategoryListStateService, type CategoryTypeFilter } from './category-list-state.service';
+import { CategoryListStateService, isCategoryTypeFilter } from './category-list-state.service';
 import { buildCategoryTree } from './category-tree.util';
 import type { CategoryResponse } from '@/api/generated/models/category-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -33,7 +33,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   imports: [
     NgIcon,
     HlmIconImports,
-    HlmButton,
+    HlmToggleGroupImports,
     HlmSpinner,
     HlmEmptyImports,
     HlmAlertDialogImports,
@@ -46,11 +46,18 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
   template: `
     <div class="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
       <div class="flex items-center justify-between gap-2">
-        <div class="inline-flex rounded-md border p-0.5">
-          <button hlmBtn size="sm" [variant]="typeFilter() === 'all' ? 'secondary' : 'ghost'" (click)="setFilter('all')">All</button>
-          <button hlmBtn size="sm" [variant]="typeFilter() === 'Expense' ? 'secondary' : 'ghost'" (click)="setFilter('Expense')">Expense</button>
-          <button hlmBtn size="sm" [variant]="typeFilter() === 'Income' ? 'secondary' : 'ghost'" (click)="setFilter('Income')">Income</button>
-        </div>
+        <hlm-toggle-group
+          type="single"
+          nullable="false"
+          variant="outline"
+          aria-label="Type filter"
+          [value]="typeFilter()"
+          (valueChange)="onTypeFilterChange($event)"
+        >
+          <button hlmToggleGroupItem value="all">All</button>
+          <button hlmToggleGroupItem value="Expense">Expense</button>
+          <button hlmToggleGroupItem value="Income">Income</button>
+        </hlm-toggle-group>
         <app-create-category-dialog (created)="onChanged()">
           <ng-icon hlm name="lucidePlus" size="sm" />
           New category
@@ -198,8 +205,8 @@ export class CategoryListPageComponent {
     this.deleteState.set('open');
   };
 
-  setFilter(filter: CategoryTypeFilter): void {
-    this.typeFilter.set(filter);
+  onTypeFilterChange(value: unknown): void {
+    if (isCategoryTypeFilter(value)) this.typeFilter.set(value);
   }
 
   onChanged(): void {

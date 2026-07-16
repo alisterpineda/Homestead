@@ -77,7 +77,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
         @if (loadError()) {
           <div class="flex items-center justify-between gap-3 rounded-md border border-dashed border-destructive/50 p-3 text-sm text-destructive">
             <span>Couldn't refresh. Showing the last loaded version.</span>
-            <button type="button" hlmBtn variant="outline" size="sm" (click)="retry()">Retry</button>
+            <button type="button" hlmBtn variant="outline" (click)="retry()">Retry</button>
           </div>
         }
         <header class="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground">

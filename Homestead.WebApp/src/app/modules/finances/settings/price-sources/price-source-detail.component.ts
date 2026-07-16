@@ -85,7 +85,7 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
                 (checkedChange)="setEnabled($event)"
               />
               <label hlmLabel for="enabled">Enabled</label>
-              <button hlmBtn size="sm" class="ml-auto" (click)="saveEnabled()" [disabled]="!enabledDirty() || saving()">
+              <button hlmBtn class="ml-auto" (click)="saveEnabled()" [disabled]="!enabledDirty() || saving()">
                 {{ saving() ? 'Saving...' : 'Save' }}
               </button>
             </div>
@@ -213,13 +213,12 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
                 (keydown.enter)="addPair(); $event.preventDefault()"
                 aria-label="Symbol to watch"
               />
-              <button hlmBtn variant="outline" size="sm" (click)="addPair()" [disabled]="!canAddPair()">
+              <button hlmBtn variant="outline" (click)="addPair()" [disabled]="!canAddPair()">
                 <ng-icon hlm name="lucidePlus" size="sm" />
                 Add
               </button>
               <button
                 hlmBtn
-                size="sm"
                 class="ml-auto"
                 (click)="savePairAllowList()"
                 [disabled]="!pairAllowDirty() || savingPairs()"
@@ -243,11 +242,11 @@ import { PriceSourceConfigFormComponent } from './price-source-config-form.compo
                 <p class="text-xs text-muted-foreground">Next run: {{ s.nextRunAt | date:'medium' }}</p>
               }
               <div class="flex items-center gap-2">
-                <button hlmBtn size="sm" (click)="saveSchedule()" [disabled]="!cronExpression() || savingSchedule()">
+                <button hlmBtn (click)="saveSchedule()" [disabled]="!cronExpression() || savingSchedule()">
                   {{ savingSchedule() ? 'Saving...' : 'Save schedule' }}
                 </button>
                 @if (d.schedule) {
-                  <button hlmBtn variant="destructive" size="sm" (click)="deleteSchedule()" [disabled]="savingSchedule()">
+                  <button hlmBtn variant="destructive" (click)="deleteSchedule()" [disabled]="savingSchedule()">
                     Delete schedule
                   </button>
                 }

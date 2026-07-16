@@ -126,7 +126,7 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
 })
 export class NewPriceDialogComponent {
   commodity = input.required<CommodityResponse>();
-  triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('sm');
+  triggerSize = input<'default' | 'sm' | 'lg' | 'icon' | 'icon-sm' | 'icon-lg'>('default');
   triggerVariant = input<'default' | 'outline' | 'secondary' | 'ghost'>('default');
   created = output<CommodityPriceResponse>();
 

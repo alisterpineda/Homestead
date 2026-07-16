@@ -104,7 +104,7 @@ import { formatNetWorthValue } from './format-net-worth';
                   Add prices for the affected commodities to fill in the gaps.
                 </p>
               </div>
-              <a hlmBtn variant="outline" size="sm" routerLink="/finances/commodities">Open commodities</a>
+              <a hlmBtn variant="outline" routerLink="/finances/commodities">Open commodities</a>
             </div>
           }
           <section class="rounded-lg border border-border bg-card p-4 text-card-foreground">

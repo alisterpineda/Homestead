@@ -100,7 +100,7 @@ interface AreaSortFieldOption {
           </div>
         } @else {
           <div class="flex items-center justify-between gap-2">
-            <button hlmBtn variant="outline" size="sm" [hlmDropdownMenuTrigger]="sortMenu">
+            <button hlmBtn variant="outline" [hlmDropdownMenuTrigger]="sortMenu">
               <ng-icon hlm [name]="sortState().desc ? 'lucideArrowDown' : 'lucideArrowUp'" size="sm" />
               {{ sortFieldLabel() }}
             </button>
@@ -134,7 +134,7 @@ interface AreaSortFieldOption {
               </hlm-dropdown-menu>
             </ng-template>
 
-            <app-create-area-dialog triggerSize="sm" (created)="onChanged()">
+            <app-create-area-dialog (created)="onChanged()">
               <ng-icon hlm name="lucidePlus" size="sm" />
               New area
             </app-create-area-dialog>

@@ -27,7 +27,7 @@ import { FinanceSettingsService } from '../shared/finance-settings.service';
       <button
         hlmBtn
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         [title]="prefs.financesPrivacyMasked() ? 'Show values' : 'Hide values'"
         [attr.aria-label]="prefs.financesPrivacyMasked() ? 'Show values' : 'Hide values'"
         [attr.aria-pressed]="prefs.financesPrivacyMasked()"
