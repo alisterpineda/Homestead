@@ -3,16 +3,13 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Documents.Services;
 
 public class AiClassificationService(
-    IAiClientFactory clientFactory, IOptions<AiOptions> options, ILogger<AiClassificationService> logger)
+    IAiProviderResolver providerResolver, ILogger<AiClassificationService> logger)
     : IAiClassificationService
 {
-    private readonly AiOptions _options = options.Value;
-
     private const int MaxPartyDescriptionLength = 200;
 
     // Head/tail split for the document-text sample. The head gets 2/3, the tail 1/3: a document's type,
@@ -64,11 +61,15 @@ public class AiClassificationService(
         if (!hasText && !hasImage && !tagsUseful && !partiesUseful)
             return null;
 
-        // The factory owns and reuses the client (app-lifetime, connection-pooled), so do not dispose it here.
-        var client = clientFactory.CreateClient();
+        // This service does not gate on availability (callers do); an unresolved or broken provider is a
+        // caller bug and throws with the reason. The provider owns and reuses the client (app-lifetime,
+        // connection-pooled), so do not dispose it here.
+        var provider = providerResolver.Resolve()
+            ?? throw new InvalidOperationException("AI is not configured (no provider under Ai:Providers resolves).");
+        var client = provider.GetChatClient();
 
         var systemPrompt = BuildSystemPrompt(scope);
-        var budget = _options.ResolveMaxInputChars();
+        var budget = provider.MaxInputChars;
         var userMessage = BuildUserMessage(documentName, extractedText, availableTags, availableParties, scope, budget);
 
         // When a page render is supplied, send a multimodal user turn (text + PNG) so the model can read
@@ -371,7 +372,7 @@ public class AiClassificationService(
     // for many household documents the classifying signal (parties, totals, dates, signatures) lives at the
     // end, which a leading-only window never sees. Slice boundaries snap to whitespace for clean word edges
     // and never split a UTF-16 surrogate pair (a raw substring can orphan half a pair → U+FFFD downstream).
-    // Precondition: budget >= a few hundred chars (guaranteed by AiOptions.MinInputChars upstream).
+    // Precondition: budget >= a few hundred chars (guaranteed by AiProviderOptions.MinInputChars upstream).
     internal static string SampleText(string? extractedText, int budget)
     {
         var text = extractedText ?? string.Empty;

@@ -18,11 +18,10 @@ namespace Homestead.WebApi.Modules.Documents.Processing;
 public class UploadDocumentJobHandler(
     AppDbContext db,
     IOptions<FileStorageOptions> storage,
-    IOptions<AiOptions> aiOptions,
     ILogger<UploadDocumentJobHandler> logger,
     IProcessingNotifier notifier,
     IDocumentClassifier classifier,
-    IAiClientFactory aiClientFactory,
+    IAiProviderResolver aiProviderResolver,
     AiPageRenderService aiPageRenderService,
     ThumbnailService thumbnailService,
     TextExtractionHelper textExtractionHelper,
@@ -111,11 +110,14 @@ public class UploadDocumentJobHandler(
                 {
                     // Render page 1 here (scope is All -> ShouldAttachImage) and hand the bytes to the
                     // in-memory classify overload, since the document/version doesn't exist yet. This also
-                    // warms the FileHash-keyed render cache for any later interactive re-classify. Gate on
-                    // AI being configured too: otherwise classify no-ops and the render is wasted CPU + a junk
-                    // cache file (IsAutoClassifyEnabledAsync only reads the setting, not configured-ness).
-                    byte[]? pageImage = aiClientFactory.IsConfigured && aiOptions.Value.ImageInput
-                        ? await aiPageRenderService.GetOrCreateAsync(fileHash, finalPath, payload.ContentType, ct)
+                    // warms the hash+edge-keyed render cache for any later interactive re-classify. Gate on
+                    // the resolved provider being available too: otherwise classify no-ops and the render is
+                    // wasted CPU + a junk cache file (IsAutoClassifyEnabledAsync only reads the setting, not
+                    // configured-ness).
+                    var aiProvider = aiProviderResolver.Resolve();
+                    byte[]? pageImage = aiProvider is { IsConfigured: true, ImageInput: true }
+                        ? await aiPageRenderService.GetOrCreateAsync(
+                            fileHash, finalPath, payload.ContentType, aiProvider.ImageRenderMaxEdge, ct)
                         : null;
 
                     var output = await classifier.ClassifyAsync(

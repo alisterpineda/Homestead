@@ -3,9 +3,9 @@ using System.ClientModel.Primitives;
 using System.Text.Json;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -13,21 +13,19 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 
 public class AiClassificationServiceTests
 {
-    private readonly IAiClientFactory _factory = Substitute.For<IAiClientFactory>();
     private readonly IChatClient _client = Substitute.For<IChatClient>();
     private readonly AiClassificationService _sut;
 
     public AiClassificationServiceTests()
     {
-        _factory.IsConfigured.Returns(true);
-        _factory.CreateClient().Returns(_client);
-        _sut = SutWith(new AiOptions());
+        _sut = SutWith(new AiProviderOptions());
     }
 
     // Builds a service over the shared (capturing) client with a given options budget — used by the
-    // budget tests to set AiOptions.MaxInputChars instead of the old per-provider Configuration JSON.
-    private AiClassificationService SutWith(AiOptions options) =>
-        new(_factory, Options.Create(options), NullLogger<AiClassificationService>.Instance);
+    // budget tests to set AiProviderOptions.MaxInputChars.
+    private AiClassificationService SutWith(AiProviderOptions options) =>
+        new(TestAiProviders.Resolver(TestAiProviders.Provider(_client, options)),
+            NullLogger<AiClassificationService>.Instance);
 
     private List<ChatMessage>? _captured;
     private ChatOptions? _capturedOptions;
@@ -412,7 +410,7 @@ public class AiClassificationServiceTests
     {
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
-        var sut = SutWith(new AiOptions { MaxInputChars = 40_000 });
+        var sut = SutWith(new AiProviderOptions { MaxInputChars = 40_000 });
 
         await sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 
@@ -428,7 +426,7 @@ public class AiClassificationServiceTests
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
 
-        // Default AiOptions — no override, so the default budget applies and the 20k body is sampled.
+        // Default AiProviderOptions — no override, so the default budget applies and the 20k body is sampled.
         await _sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 
         Assert.Contains("[...document text omitted...]", UserMessage);
@@ -441,7 +439,7 @@ public class AiClassificationServiceTests
         // body is still sampled rather than sent at a 10-char budget.
         var ct = TestContext.Current.CancellationToken;
         RespondWith("""{"summary":"S"}""");
-        var sut = SutWith(new AiOptions { MaxInputChars = 10 });
+        var sut = SutWith(new AiProviderOptions { MaxInputChars = 10 });
 
         await sut.ClassifyAsync("Doc", MakeLongText(), null, [], [], ClassificationScope.Summary, ct);
 

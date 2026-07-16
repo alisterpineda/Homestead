@@ -36,7 +36,7 @@ import type { PaginatedResponseOfGetProcessingSchedulesResponse } from '@/api/ge
 import type { CreateProcessingScheduleResponse } from '@/api/generated/models/create-processing-schedule-response';
 import type { SystemSettingsResponse } from '@/api/generated/models/system-settings-response';
 import type { LogLevelsResponse } from '@/api/generated/models/log-levels-response';
-import type { AiStatusResponse } from '@/api/generated/models/ai-status-response';
+import type { AiProviderStatusResponse } from '@/api/generated/models/ai-provider-status-response';
 import type { TestAiConnectionResponse } from '@/api/generated/models/test-ai-connection-response';
 
 export type { GetUsers$Params } from '@/api/generated/fn/admin/get-users';
@@ -142,11 +142,12 @@ export class AdminApiService {
     return getLogLevels(this.http, this.config.rootUrl, category ? { category } : undefined).pipe(map(r => r.body));
   }
 
-  getAiStatus(): Observable<AiStatusResponse> {
+  getAiStatus(): Observable<AiProviderStatusResponse[]> {
     return getAiStatus(this.http, this.config.rootUrl).pipe(map(r => r.body));
   }
 
-  testAiConnection(): Observable<TestAiConnectionResponse> {
-    return testAiConnection(this.http, this.config.rootUrl).pipe(map(r => r.body));
+  testAiConnection(providerKey?: string): Observable<TestAiConnectionResponse> {
+    return testAiConnection(this.http, this.config.rootUrl, providerKey ? { providerKey } : undefined)
+      .pipe(map(r => r.body));
   }
 }

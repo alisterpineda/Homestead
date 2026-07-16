@@ -4,7 +4,6 @@ using System.Text.Json.Nodes;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Finances.Services;
 
@@ -18,13 +17,10 @@ namespace Homestead.WebApi.Modules.Finances.Services;
 /// follow-up.
 /// </summary>
 public class StatementExtractionService(
-    IAiClientFactory clientFactory,
-    IOptions<AiOptions> options,
+    IAiProviderResolver providerResolver,
     ILogger<StatementExtractionService> logger)
     : IStatementExtractionService
 {
-    private readonly AiOptions _options = options.Value;
-
     // Deterministic extraction — pin sampling to 0 so runs are stable and prompt changes are measurable.
     private const float Temperature = 0f;
 
@@ -32,11 +28,15 @@ public class StatementExtractionService(
 
     public async Task<StatementIr> ExtractAsync(string extractedText, byte[]? pageImage, CancellationToken ct)
     {
-        // The factory owns and reuses the client (app-lifetime, connection-pooled), so do not dispose it here.
-        var client = clientFactory.CreateClient();
+        // This service does not gate on availability (callers do); an unresolved or broken provider is a
+        // caller bug and throws with the reason. The provider owns and reuses the client (app-lifetime,
+        // connection-pooled), so do not dispose it here.
+        var provider = providerResolver.Resolve()
+            ?? throw new InvalidOperationException("AI is not configured (no provider under Ai:Providers resolves).");
+        var client = provider.GetChatClient();
 
         var systemPrompt = BuildSystemPrompt();
-        var userMessage = BuildUserMessage(extractedText);
+        var userMessage = BuildUserMessage(extractedText, provider.StatementMaxInputChars);
 
         // When a page render is supplied (scanned statement), send a multimodal user turn so the model can
         // read layout cues OCR flattens (summary boxes, columns). Otherwise keep the plain-text turn.
@@ -222,9 +222,9 @@ public class StatementExtractionService(
         - If the statement has no transaction table (e.g. a summary-only page), lineItems is an empty array [].
         """;
 
-    private string BuildUserMessage(string? extractedText)
+    private string BuildUserMessage(string? extractedText, int budget)
     {
-        var text = ClampText(extractedText);
+        var text = ClampText(extractedText, budget);
         return $"""
             Statement text:
             {text}
@@ -233,10 +233,9 @@ public class StatementExtractionService(
 
     // Statements are sent WHOLE (no head+tail sampling) up to a hard cap — the closing balance may sit
     // anywhere. Truncation past the cap is logged so a silently-clipped long statement is diagnosable.
-    private string ClampText(string? extractedText)
+    private string ClampText(string? extractedText, int budget)
     {
         var text = extractedText ?? string.Empty;
-        var budget = _options.ResolveStatementMaxInputChars();
         if (text.Length <= budget)
             return text;
 

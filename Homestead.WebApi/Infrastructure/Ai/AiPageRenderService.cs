@@ -4,31 +4,35 @@ using Microsoft.Extensions.Options;
 namespace Homestead.WebApi.Infrastructure.Ai;
 
 // Generate-on-demand + cache for the dedicated AI page render, mirroring ThumbnailService. The cache path
-// is derived from the version's FileHash (no DB column, no migration) and the render is an internal asset
-// (no serving endpoint). GetOrCreateAsync is virtual so unit tests can substitute it.
+// is derived from the version's FileHash + the render edge (no DB column, no migration) and the render is
+// an internal asset (no serving endpoint). GetOrCreateAsync is virtual so unit tests can substitute it.
 public class AiPageRenderService(
     IDocumentPageRenderer renderer,
     IOptions<FileStorageOptions> storage,
-    IOptions<AiOptions> aiOptions,
     ILogger<AiPageRenderService> logger)
 {
     private readonly string _cachePath = storage.Value.CachePath;
-    private readonly AiOptions _aiOptions = aiOptions.Value;
 
-    // {CachePath}/ai-renders/{hash[0:4]}/{hash}.png — sibling of GetThumbnailPath, hash-sharded the same way.
-    public string GetRenderPath(string fileHash)
+    // {CachePath}/ai-renders/{hash[0:4]}/{hash}-{maxEdge}.png — sibling of GetThumbnailPath, hash-sharded
+    // the same way. The edge is part of the key: providers can carry different ImageRenderMaxEdge values,
+    // and a hash-only key would hand one provider's cached resolution to another (and would keep serving a
+    // stale resolution after an operator changes the edge config).
+    public string GetRenderPath(string fileHash, int maxEdge)
     {
         var prefix = fileHash[..4];
-        return Path.Combine(_cachePath, "ai-renders", prefix, $"{fileHash}.png");
+        return Path.Combine(_cachePath, "ai-renders", prefix, $"{fileHash}-{maxEdge}.png");
     }
 
-    // Returns the cached render bytes if present, else renders page 1, writes the cache, and returns the
-    // bytes. Returns null for an unsupported content type or a render failure -> caller classifies on text
-    // alone. Never throws on a render failure (best-effort, like thumbnails).
+    // Returns the cached render bytes if present, else renders page 1 at the given long-edge budget, writes
+    // the cache, and returns the bytes. Callers supply maxEdge from their resolved provider's
+    // ImageRenderMaxEdge (a parameter, like the renderer itself — injecting the resolver here would
+    // hard-wire this service to the default provider). Returns null for an unsupported content type or a
+    // render failure -> caller classifies on text alone. Never throws on a render failure (best-effort,
+    // like thumbnails).
     public virtual async Task<byte[]?> GetOrCreateAsync(
-        string fileHash, string sourcePath, string contentType, CancellationToken ct)
+        string fileHash, string sourcePath, string contentType, int maxEdge, CancellationToken ct)
     {
-        var outputPath = GetRenderPath(fileHash);
+        var outputPath = GetRenderPath(fileHash, maxEdge);
 
         if (File.Exists(outputPath))
         {
@@ -48,8 +52,7 @@ public class AiPageRenderService(
 
         try
         {
-            var bytes = await renderer.RenderFirstPagePngAsync(
-                sourcePath, contentType, _aiOptions.ResolveImageRenderMaxEdge(), ct);
+            var bytes = await renderer.RenderFirstPagePngAsync(sourcePath, contentType, maxEdge, ct);
             if (bytes is null)
                 return null;
 

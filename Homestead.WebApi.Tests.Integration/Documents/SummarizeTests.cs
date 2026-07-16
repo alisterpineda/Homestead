@@ -22,7 +22,7 @@ public class SummarizeTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<SummarizeResult>(CT);
-        // Asserting a non-null canned summary is the false-green guard: if the fake IAiClientFactory
+        // Asserting a non-null canned summary is the false-green guard: if the fake IAiProvider
         // registration goes missing, the real factory reports unconfigured, summarize no-ops, and this fails.
         Assert.Equal(FakeAiClassificationService.GeneratedSummary, result!.Summary);
 

@@ -236,7 +236,7 @@ Triggered by the bulk-reprocess action on the documents list. The handler:
 Enqueued as a child of a `BulkClassifyDocuments` parent — one per document. Both interactive bulk classify **and** the detail page's single-document classify run through this path (single-doc classify enqueues a one-item bulk job, so its image-carrying classification stays on the background path). The one classification path that does **not** spawn this job is auto-classify-on-upload, which calls the classifier inline inside `UploadDocument` (see above). The handler:
 
 1. Load the document with its current tags, parties, and any pending suggestions.
-2. Gate on AI being configured (`IAiClientFactory.IsConfigured`). If it is not, skip classification but still send a notification.
+2. Gate on AI being configured (the resolved `IAiProvider` is available). If it is not, skip classification but still send a notification.
 3. Load the latest version's `ExtractedText`, render the first-page image (scope permitting — see the [overview](../documents/overview.md#ai-classification-and-summarization)), and load the available tags and parties.
 4. Call `IAiClassificationService.ClassifyAsync()` — builds a prompt with the document's name, extracted text, and the in-scope tag/party catalogs, attaches the page image when present, and parses the structured JSON response.
 5. Clear any prior pending suggestions: revert AI-applied tags, name, and summary to their pre-AI state. Persist deletes before applying new data (two-save pattern to avoid composite key collisions on the `DocumentTag` join table).

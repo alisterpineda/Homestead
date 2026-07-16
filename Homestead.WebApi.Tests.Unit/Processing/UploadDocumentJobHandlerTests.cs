@@ -11,6 +11,7 @@ using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Infrastructure.TextExtraction;
 using Homestead.WebApi.Tests.Unit.Documents.TextExtraction;
+using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Thumbnails;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -26,7 +27,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
     private readonly ITextExtractionEngine _textExtractionEngine;
     private readonly IProcessingNotifier _notifier;
     private readonly IDocumentClassifier _classifier;
-    private readonly IAiClientFactory _aiClientFactory;
+    private readonly IAiProviderResolver _aiProviderResolver;
     private readonly AiPageRenderService _aiPageRenderService;
     private readonly ThumbnailService _thumbnailService;
     private readonly ISender _sender;
@@ -54,13 +55,11 @@ public class UploadDocumentJobHandlerTests : IDisposable
         var logger = Substitute.For<ILogger<UploadDocumentJobHandler>>();
         _classifier = Substitute.For<IDocumentClassifier>();
         _classifier.IsAutoClassifyEnabledAsync(Arg.Any<CancellationToken>()).Returns(false);
-        _aiClientFactory = Substitute.For<IAiClientFactory>();
-        _aiClientFactory.IsConfigured.Returns(true);
+        _aiProviderResolver = TestAiProviders.Resolver(TestAiProviders.Provider());
         // GetOrCreateAsync is virtual; substitute returns null by default (no image) unless a test stubs it.
         _aiPageRenderService = Substitute.For<AiPageRenderService>(
             Substitute.For<IDocumentPageRenderer>(),
             storage,
-            Options.Create(new AiOptions()),
             Substitute.For<ILogger<AiPageRenderService>>());
         _thumbnailService = new ThumbnailService(
             Enumerable.Empty<IThumbnailGenerator>(), storage,
@@ -72,8 +71,8 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns(_ => new CreateDocumentFromUploadResult(Guid.NewGuid(), "Test Document"));
 
         _handler = new UploadDocumentJobHandler(
-            _db, storage, Options.Create(new AiOptions()), logger,
-            _notifier, _classifier, _aiClientFactory, _aiPageRenderService, _thumbnailService,
+            _db, storage, logger,
+            _notifier, _classifier, _aiProviderResolver, _aiPageRenderService, _thumbnailService,
             textExtractionHelper, TestTextExtraction.Resolver(), _sender);
     }
 
@@ -314,7 +313,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
 
         var renderBytes = new byte[] { 1, 2, 3 };
         _aiPageRenderService.GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), ct)
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct)
             .Returns(renderBytes);
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
@@ -336,7 +335,7 @@ public class UploadDocumentJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_AutoClassifyEnabled_AiNotConfigured_SkipsRender()
+    public async Task HandleAsync_AutoClassifyEnabled_AiUnresolved_SkipsRender()
     {
         var ct = TestContext.Current.CancellationToken;
         var (job, _) = CreateUploadJob();
@@ -345,14 +344,43 @@ public class UploadDocumentJobHandlerTests : IDisposable
             .Returns(TestTextExtraction.Output("extracted text"));
 
         _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
-        _aiClientFactory.IsConfigured.Returns(false);
+        _aiProviderResolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
 
         await _handler.HandleAsync(job, ct);
 
         // AI unconfigured -> classify no-ops anyway, so don't waste a render + cache write.
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         // The classifier is still invoked (it short-circuits internally) with a null page image.
+        await _classifier.Received(1).ClassifyAsync(
+            "Test Document", "extracted text", null, ClassificationScope.All, ct);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AutoClassifyEnabled_ImageInputOff_SkipsRender()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (job, _) = CreateUploadJob();
+
+        _textExtractionEngine.ExtractTextAsync(Arg.Any<string>(), Arg.Any<string>(), ct)
+            .Returns(TestTextExtraction.Output("extracted text"));
+
+        _classifier.IsAutoClassifyEnabledAsync(ct).Returns(true);
+        // Built before .Returns — configuring one substitute inside another's Returns trips NSubstitute.
+        var textOnlyProvider = TestAiProviders.Provider(options: new AiProviderOptions
+        {
+            Type = AiProviderType.OpenAiCompatible,
+            Endpoint = "http://x/v1",
+            Model = "m",
+            ImageInput = false,
+        });
+        _aiProviderResolver.Resolve(Arg.Any<string?>()).Returns(textOnlyProvider);
+
+        await _handler.HandleAsync(job, ct);
+
+        // Provider resolves but has the image kill-switch off -> classify runs text-only, no render.
+        await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classifier.Received(1).ClassifyAsync(
             "Test Document", "extracted text", null, ClassificationScope.All, ct);
     }

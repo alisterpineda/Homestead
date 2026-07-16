@@ -60,6 +60,13 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // by resolving JobSchedulerService and calling TryFireOneDueScheduleAsync.
         builder.UseSetting("Processing:Scheduling:Enabled", "false");
 
+        // Pin the AI default to the fake registered below. Without this the fake would only resolve via
+        // the resolver's sole-provider arm — which silently breaks the moment ANY real Ai:Providers config
+        // leaks in (e.g. Ai__Providers__* env vars exported in a dev/CI shell reach the in-process host via
+        // the stock env-var provider, exactly like the Ocr__ var above). An explicit default keeps the
+        // fake resolving — through the real resolver's explicit-default arm — no matter what else registers.
+        builder.UseSetting("Ai:DefaultProvider", FakeAiProvider.ProviderKey);
+
         // Tesseract's tessdata path comes from the Ocr__Engines__tesseract__TessDataPath env var
         // (devcontainer remoteEnv / CI job env), provisioned by scripts/fetch-tessdata.sh.
         // The WebApi runs in-process here, so .NET's env-var config provider picks it up —
@@ -104,13 +111,13 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IAiClassificationService>();
             services.AddScoped<IAiClassificationService, FakeAiClassificationService>();
 
-            // AI is now gated by IAiClientFactory.IsConfigured (config-driven), not a seeded DB row. The
-            // test host sets no Ai:* config, so the real factory reports unconfigured and classify/summarize
-            // would silently no-op. Register a fake that reports configured so those flows actually run
-            // through FakeAiClassificationService. (Auto-classify on upload still needs its own setting on,
-            // so this doesn't classify uploads that don't ask for it.)
-            services.RemoveAll<IAiClientFactory>();
-            services.AddSingleton<IAiClientFactory, FakeAiClientFactory>();
+            // AI is gated by the resolved IAiProvider being available (config-driven). Deliberately
+            // ADDITIVE, not RemoveAll: the real AiProviderResolver stays under test and resolves this fake
+            // through its explicit-default arm — Ai:DefaultProvider is pinned to the fake's key above, so
+            // stray real providers (leaked env config) can register without stealing resolution or turning
+            // AI off. Auto-classify on upload still needs its own setting on, so this doesn't classify
+            // uploads that don't ask.
+            services.AddSingleton<IAiProvider, FakeAiProvider>();
 
             // Substitute the statement extractor so the import spine is deterministic and never calls a live
             // model — the ParseAccountStatement job handler resolves this fake and gets a canned StatementIr.

@@ -97,26 +97,10 @@ if (!string.IsNullOrEmpty(oidcAuthority))
     MapCsvEnvToConfigArray("OIDC_ADDITIONAL_SCOPES", "Oidc:AdditionalScopes");
 }
 
-// When running outside Aspire (e.g. Docker), map self-hoster-friendly AI env vars into .NET config.
-// AI is optional: gated on AI_ENDPOINT being set, so leaving it unset keeps the feature a graceful no-op.
-var aiEndpoint = Environment.GetEnvironmentVariable("AI_ENDPOINT");
-if (!string.IsNullOrEmpty(aiEndpoint))
-{
-    builder.Configuration["Ai:Endpoint"] = aiEndpoint;
-    builder.Configuration["Ai:Model"] =
-        Environment.GetEnvironmentVariable("AI_MODEL") ?? "";
-    var aiApiKey = Environment.GetEnvironmentVariable("AI_API_KEY");
-    if (!string.IsNullOrEmpty(aiApiKey))
-        builder.Configuration["Ai:ApiKey"] = aiApiKey;
-
-    // Optional page-1 image classification knobs. Unset -> AiOptions defaults (image on, 1024px edge).
-    var aiImageInput = Environment.GetEnvironmentVariable("AI_IMAGE_INPUT");
-    if (!string.IsNullOrEmpty(aiImageInput))
-        builder.Configuration["Ai:ImageInput"] = aiImageInput;
-    var aiImageRenderMaxEdge = Environment.GetEnvironmentVariable("AI_IMAGE_RENDER_MAX_EDGE");
-    if (!string.IsNullOrEmpty(aiImageRenderMaxEdge))
-        builder.Configuration["Ai:ImageRenderMaxEdge"] = aiImageRenderMaxEdge;
-}
+// AI providers need no env-var mapping (contrast the OIDC_* block above): they are configured with stock
+// .NET config env vars — Ai__Providers__{key}__{field} plus Ai__DefaultProvider — exactly like the OCR
+// engines. Leaving them all unset keeps AI a graceful no-op. (Breaking: the old flat AI_ENDPOINT /
+// AI_MODEL / AI_API_KEY / AI_IMAGE_INPUT / AI_IMAGE_RENDER_MAX_EDGE vars are no longer read.)
 
 void MapCsvEnvToConfigArray(string envVar, string configPrefix)
 {

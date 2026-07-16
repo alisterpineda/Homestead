@@ -1,25 +1,42 @@
 using Homestead.WebApi.Infrastructure.Ai;
 using MediatR;
-using Microsoft.Extensions.Options;
 
 namespace Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 
-// Pure read off the static AiOptions — no DB access. A query, not a command, so it never opens the
-// UnitOfWork transaction.
-public class GetAiStatusHandler(IOptions<AiOptions> options)
-    : IRequestHandler<GetAiStatusQuery, AiStatusResponse>
+// Pure read off the static provider registrations — no DB access. A query, not a command, so it never
+// opens the UnitOfWork transaction.
+public class GetAiStatusHandler(IEnumerable<IAiProvider> providers, IAiProviderResolver resolver)
+    : IRequestHandler<GetAiStatusQuery, List<AiProviderStatusResponse>>
 {
-    private readonly AiOptions _options = options.Value;
-
-    public Task<AiStatusResponse> Handle(GetAiStatusQuery request, CancellationToken ct)
+    public Task<List<AiProviderStatusResponse>> Handle(GetAiStatusQuery request, CancellationToken ct)
     {
-        var response = new AiStatusResponse(
-            Configured: _options.IsConfigured,
-            Endpoint: _options.Endpoint,
-            Model: _options.Model,
-            HasApiKey: !string.IsNullOrWhiteSpace(_options.ApiKey),
-            MaxInputChars: _options.ResolveMaxInputChars());
+        // For a DEFINED default the resolver returns the canonical registered instance (the same
+        // singletons DI enumerates here), so default-ness is reference identity — no string re-matching
+        // that could drift from the resolver's own key semantics. A DANGLING Ai:DefaultProvider resolves
+        // to a fresh synthetic instance that is never in the list.
+        var defaultProvider = resolver.Resolve();
+
+        var response = providers
+            .OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(p => ToResponse(p, IsDefault: ReferenceEquals(p, defaultProvider)))
+            .ToList();
+
+        // Append the dangling default as its own row (unavailable, marked default) rather than leaving the
+        // list with no default marked — the admin page is where an operator debugs exactly this typo.
+        if (defaultProvider is not null && !providers.Contains(defaultProvider))
+            response.Add(ToResponse(defaultProvider, IsDefault: true));
 
         return Task.FromResult(response);
     }
+
+    private static AiProviderStatusResponse ToResponse(IAiProvider p, bool IsDefault) => new(
+        Key: p.Key,
+        Type: p.Type,
+        IsConfigured: p.IsConfigured,
+        ConfigurationError: p.ConfigurationError,
+        IsDefault: IsDefault,
+        Endpoint: p.Endpoint,
+        Model: p.Model,
+        HasApiKey: p.HasApiKey,
+        MaxInputChars: p.MaxInputChars);
 }

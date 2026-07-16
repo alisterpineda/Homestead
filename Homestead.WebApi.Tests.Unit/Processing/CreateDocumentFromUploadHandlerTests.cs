@@ -23,16 +23,14 @@ public class CreateDocumentFromUploadHandlerTests : IDisposable
     {
         _db = TestAppDbContext.Create();
         _audit = Substitute.For<IAuditContext>();
-        // ApplyAsync only touches the DbContext; the factory/service/render service are never called on the
-        // apply path.
+        // ApplyAsync only touches the DbContext; the resolver/service/render service are never called on
+        // the apply path.
         var classifier = new DocumentClassifier(
-            _db, Substitute.For<IAiClientFactory>(), Substitute.For<IAiClassificationService>(),
+            _db, Substitute.For<IAiProviderResolver>(), Substitute.For<IAiClassificationService>(),
             Substitute.For<AiPageRenderService>(
                 Substitute.For<IDocumentPageRenderer>(),
                 Options.Create(new FileStorageOptions()),
-                Options.Create(new AiOptions()),
                 Substitute.For<ILogger<AiPageRenderService>>()),
-            Options.Create(new AiOptions()),
             Options.Create(new FileStorageOptions()));
         _sut = new CreateDocumentFromUploadHandler(_db, classifier, _audit);
     }

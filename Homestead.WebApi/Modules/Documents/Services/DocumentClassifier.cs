@@ -53,22 +53,20 @@ public interface IDocumentClassifier
 
 public class DocumentClassifier(
     AppDbContext db,
-    IAiClientFactory clientFactory,
+    IAiProviderResolver providerResolver,
     IAiClassificationService classificationService,
     AiPageRenderService aiPageRenderService,
-    IOptions<AiOptions> aiOptions,
     IOptions<FileStorageOptions> storageOptions) : IDocumentClassifier
 {
-    private readonly AiOptions _aiOptions = aiOptions.Value;
     private readonly FileStorageOptions _storageOptions = storageOptions.Value;
 
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
         Guid documentId, string documentName, ClassificationScope scope, CancellationToken ct,
         bool attachImage = true)
     {
-        // Gate on configured-ness before touching the database so an unconfigured AI integration
-        // short-circuits without loading the latest version.
-        if (!clientFactory.IsConfigured)
+        // Gate on the resolved provider being available before touching the database so an unconfigured
+        // (or broken) AI integration short-circuits without loading the latest version.
+        if (providerResolver.Resolve() is not { IsConfigured: true } provider)
             return null;
 
         var latestVersion = await db.DocumentVersions
@@ -78,15 +76,16 @@ public class DocumentClassifier(
 
         // Attach the page-1 render when the caller allows it (synchronous endpoints opt out — image-carrying
         // classification must stay on the background path), the image is enabled, and the scope benefits
-        // from it (Name/Parties/Summary). GetOrCreateAsync caches by FileHash, so re-classify reuses an
-        // upload-warmed render.
+        // from it (Name/Parties/Summary). GetOrCreateAsync caches by FileHash + edge, so re-classify reuses
+        // an upload-warmed render.
         byte[]? pageImage = null;
-        if (attachImage && latestVersion is not null && _aiOptions.ImageInput && scope.ShouldAttachImage())
+        if (attachImage && latestVersion is not null && provider.ImageInput && scope.ShouldAttachImage())
         {
             pageImage = await aiPageRenderService.GetOrCreateAsync(
                 latestVersion.FileHash,
                 latestVersion.GetPhysicalPath(_storageOptions.MediaPath),
                 latestVersion.ContentType,
+                provider.ImageRenderMaxEdge,
                 ct);
         }
 
@@ -96,7 +95,7 @@ public class DocumentClassifier(
     public async Task<DocumentClassificationOutput?> ClassifyAsync(
         string documentName, string? extractedText, byte[]? pageImage, ClassificationScope scope, CancellationToken ct)
     {
-        if (!clientFactory.IsConfigured)
+        if (providerResolver.Resolve() is not { IsConfigured: true })
             return null;
 
         return await ClassifyCoreAsync(documentName, extractedText, pageImage, scope, ct);

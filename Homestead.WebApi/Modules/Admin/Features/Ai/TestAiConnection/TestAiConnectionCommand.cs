@@ -7,5 +7,6 @@ namespace Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
 // external call (the idle-in-transaction shape the lazy-tx work fights). Matches the precedent
 // of the deleted TestAiProviderConnectionCommand, which was also IRequest-only.
 //
-// No request body — it tests the single static config; nothing to parameterize.
-public record TestAiConnectionCommand : IRequest<TestAiConnectionResponse>;
+// ProviderKey null = probe whatever the resolution chain picks (Ai:DefaultProvider / sole provider);
+// a key probes that specific provider, so a new one can be verified before the default is flipped to it.
+public record TestAiConnectionCommand(string? ProviderKey = null) : IRequest<TestAiConnectionResponse>;

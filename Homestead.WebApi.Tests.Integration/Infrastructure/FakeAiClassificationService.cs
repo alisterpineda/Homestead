@@ -6,7 +6,7 @@ namespace Homestead.WebApi.Tests.Integration.Infrastructure;
 /// Deterministic stand-in for the real AI service so integration tests can exercise the
 /// classify/summarize flows without a live model. Returns only a canned summary (gated by scope)
 /// and an unchanged title — no tag/party matches, keeping results FK-safe regardless of the DB.
-/// Reached whenever classify/summarize runs, since <see cref="FakeAiClientFactory"/> reports AI configured.
+/// Reached whenever classify/summarize runs, since <see cref="FakeAiProvider"/> reports AI configured.
 /// </summary>
 public sealed class FakeAiClassificationService : IAiClassificationService
 {

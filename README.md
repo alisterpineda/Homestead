@@ -119,21 +119,37 @@ All three of `OIDC_AUTHORITY`, `OIDC_CLIENT_ID`, and `OIDC_CLIENT_SECRET` must b
 
 #### AI (optional)
 
-AI-assisted document classification/summarization is optional — leave these unset and the feature is a graceful no-op. The endpoint must be an OpenAI-compatible base URL (e.g. Ollama's `/v1`).
+AI-assisted document classification/summarization and statement parsing are optional — define no providers and the features are a graceful no-op. AI providers are **named config instances** under `Ai:Providers:{name}` (same shape as the OCR engines), selected via `Ai:DefaultProvider`.
+
+> **Breaking (2026-07):** the flat `AI_ENDPOINT` / `AI_MODEL` / `AI_API_KEY` / `AI_IMAGE_INPUT` / `AI_IMAGE_RENDER_MAX_EDGE` env vars are **no longer read**. Because unconfigured AI is a silent no-op, a deployment that misses this rename keeps running but quietly stops classifying/summarizing new documents — migrate to the variables below.
 
 | Variable | Default | Description |
 |---|---|---|
-| `AI_ENDPOINT` | — | OpenAI-compatible base URL, e.g. `http://localhost:11434/v1` (enables AI when set) |
-| `AI_MODEL` | — | Model tag, e.g. `gemma-4-e4b` |
-| `AI_API_KEY` | — | API key; optional (ignored by Ollama) |
+| `Ai__Providers__{name}__Type` | — | **Required** for every provider: `OpenAiCompatible` or `AzureFoundry` |
+| `Ai__Providers__{name}__Endpoint` | — | OpenAI-compatible base URL (e.g. `http://localhost:11434/v1`) or the Azure resource endpoint (e.g. `https://<res>.openai.azure.com`) |
+| `Ai__Providers__{name}__Model` | — | Model tag (e.g. `gemma-4-e4b`) or the Azure **deployment name** |
+| `Ai__Providers__{name}__ApiKey` | — | API key; optional for `OpenAiCompatible` (ignored by Ollama), **required** for `AzureFoundry` |
+| `Ai__Providers__{name}__ImageInput` | `true` | Attach a rendered page-1 image to classify/parse calls (turn off for text-only models) |
+| `Ai__Providers__{name}__ImageRenderMaxEdge` | `1024` | Long-edge pixel budget for that page render (256–4096) |
+| `Ai__Providers__{name}__MaxInputChars` | `12000` | Character budget for document text in the classification prompt |
+| `Ai__Providers__{name}__StatementMaxInputChars` | `120000` | Hard cap for statement text sent whole to statement parsing |
+| `Ai__DefaultProvider` | — | Which provider the app uses. Optional when exactly one provider is defined; required with two or more |
 
-For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards them to the WebApi as the env vars above:
+A misconfigured provider never stops the app from starting — it shows as *unavailable, with the reason* on the admin **AI** page, which also has a per-provider **Test connection** probe.
+
+For local Aspire dev, set these in **AppHost user-secrets** — AppHost forwards the whole `Ai:` section verbatim as the env vars above:
 
 ```bash
 cd Homestead.AppHost
-dotnet user-secrets set "Ai:Endpoint" "http://localhost:11434/v1"
-dotnet user-secrets set "Ai:Model" "gemma-4-e4b"
-# optional: dotnet user-secrets set "Ai:ApiKey" "..."
+dotnet user-secrets set "Ai:Providers:local:Type" "OpenAiCompatible"
+dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
+dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
+# a second provider, e.g. Azure AI Foundry:
+# dotnet user-secrets set "Ai:Providers:foundry:Type" "AzureFoundry"
+# dotnet user-secrets set "Ai:Providers:foundry:Endpoint" "https://<res>.openai.azure.com"
+# dotnet user-secrets set "Ai:Providers:foundry:ApiKey" "<key>"
+# dotnet user-secrets set "Ai:Providers:foundry:Model" "<deployment-name>"
+dotnet user-secrets set "Ai:DefaultProvider" "local"
 ```
 
 #### Other

@@ -7,6 +7,7 @@ using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Modules.Documents.Features.Settings;
 using Homestead.WebApi.Modules.Documents.Services;
+using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,10 +18,11 @@ namespace Homestead.WebApi.Tests.Unit.Documents;
 public class DocumentClassifierTests : IDisposable
 {
     private readonly TestAppDbContext _db;
-    private readonly IAiClientFactory _clientFactory;
+    private readonly IAiProviderResolver _providerResolver;
     private readonly IAiClassificationService _classificationService;
     private readonly AiPageRenderService _aiPageRenderService;
-    private readonly AiOptions _aiOptions = new();
+    // The provider substitute reads this bag lazily, so tests mutate it (ImageInput) after construction.
+    private readonly AiProviderOptions _aiOptions = TestAiProviders.Options();
     private readonly DocumentClassifier _sut;
 
     private const string MediaPath = "/media";
@@ -30,18 +32,16 @@ public class DocumentClassifierTests : IDisposable
     public DocumentClassifierTests()
     {
         _db = TestAppDbContext.Create();
-        _clientFactory = Substitute.For<IAiClientFactory>();
-        _clientFactory.IsConfigured.Returns(true);
+        _providerResolver = TestAiProviders.Resolver(TestAiProviders.Provider(options: _aiOptions));
         _classificationService = Substitute.For<IAiClassificationService>();
         // GetOrCreateAsync is virtual; substitute it to assert the scope/config gate without real I/O.
         _aiPageRenderService = Substitute.For<AiPageRenderService>(
             Substitute.For<IDocumentPageRenderer>(),
             Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }),
-            Options.Create(_aiOptions),
             Substitute.For<ILogger<AiPageRenderService>>());
         _sut = new DocumentClassifier(
-            _db, _clientFactory, _classificationService,
-            _aiPageRenderService, Options.Create(_aiOptions),
+            _db, _providerResolver, _classificationService,
+            _aiPageRenderService,
             Options.Create(new FileStorageOptions { MediaPath = MediaPath, CachePath = "/cache" }));
     }
 
@@ -78,11 +78,30 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAsync_NotConfigured_ReturnsNull()
+    public async Task ClassifyAsync_Unresolved_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
 
-        _clientFactory.IsConfigured.Returns(false);
+        _providerResolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
+
+        var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
+
+        Assert.Null(result);
+        await _classificationService.DidNotReceive().ClassifyAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
+            Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), Arg.Any<CancellationToken>());
+    }
+
+    // A defined-but-broken provider (misconfigured, or a dangling default resolving to the synthetic
+    // unavailable instance) gates exactly like the unconfigured state.
+    [Fact]
+    public async Task ClassifyAsync_UnavailableProvider_ReturnsNull()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Built before .Returns — configuring one substitute inside another's Returns trips NSubstitute.
+        var unavailable = TestAiProviders.UnavailableProvider();
+        _providerResolver.Resolve(Arg.Any<string?>()).Returns(unavailable);
 
         var result = await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
@@ -179,10 +198,10 @@ public class DocumentClassifierTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyAsync_NotConfigured_InMemoryOverload_ReturnsNull()
+    public async Task ClassifyAsync_Unresolved_InMemoryOverload_ReturnsNull()
     {
         var ct = TestContext.Current.CancellationToken;
-        _clientFactory.IsConfigured.Returns(false);
+        _providerResolver.Resolve(Arg.Any<string?>()).Returns((IAiProvider?)null);
 
         var result = await _sut.ClassifyAsync("Upload Name", "in-memory text", null, ClassificationScope.All, ct);
 
@@ -202,7 +221,7 @@ public class DocumentClassifierTests : IDisposable
         var image = new byte[] { 1, 2, 3 };
         _aiOptions.ImageInput = true;
         _aiPageRenderService.GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), ct).Returns(image);
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), ct).Returns(image);
         _classificationService.ClassifyAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<byte[]?>(),
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), Arg.Any<ClassificationScope>(), ct)
@@ -210,9 +229,11 @@ public class DocumentClassifierTests : IDisposable
 
         await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct);
 
-        // Render keyed by the latest version's FileHash + physical path + content type.
+        // Render keyed by the latest version's FileHash + physical path + content type, at the resolved
+        // provider's ImageRenderMaxEdge (default bag -> 1024).
         await _aiPageRenderService.Received(1).GetOrCreateAsync(
-            "abc123", Path.Combine(MediaPath, "test/file.pdf"), "application/pdf", ct);
+            "abc123", Path.Combine(MediaPath, "test/file.pdf"), "application/pdf",
+            AiProviderOptions.DefaultImageRenderMaxEdge, ct);
         // The rendered bytes reach the AI service.
         await _classificationService.Received(1).ClassifyAsync(
             "Test Doc", "text", image,
@@ -234,7 +255,7 @@ public class DocumentClassifierTests : IDisposable
 
         // Tags-only does not satisfy ShouldAttachImage -> no render, null page image.
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
             "Test Doc", "text", null,
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.Tags, ct);
@@ -255,7 +276,7 @@ public class DocumentClassifierTests : IDisposable
 
         // Kill-switch off -> no render even though the scope (All) would otherwise attach an image.
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
             "Test Doc", "text", null,
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
@@ -277,7 +298,7 @@ public class DocumentClassifierTests : IDisposable
         await _sut.ClassifyAsync(_documentId, "Test Doc", ClassificationScope.All, ct, attachImage: false);
 
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
             "Test Doc", "text", null,
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);
@@ -297,7 +318,7 @@ public class DocumentClassifierTests : IDisposable
 
         // The in-memory overload renders nothing; it forwards the caller-provided bytes verbatim.
         await _aiPageRenderService.DidNotReceive().GetOrCreateAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _classificationService.Received(1).ClassifyAsync(
             "Upload Name", "in-memory text", image,
             Arg.Any<List<TagInfo>>(), Arg.Any<List<PartyInfo>>(), ClassificationScope.All, ct);

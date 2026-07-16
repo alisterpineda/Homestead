@@ -1,5 +1,6 @@
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
+using Homestead.WebApi.Tests.Unit.Infrastructure.Ai;
 using Microsoft.Extensions.AI;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -8,29 +9,58 @@ namespace Homestead.WebApi.Tests.Unit.Admin.Ai;
 
 public class TestAiConnectionHandlerTests
 {
-    private readonly IAiClientFactory _factory = Substitute.For<IAiClientFactory>();
     private readonly IChatClient _client = Substitute.For<IChatClient>();
+    private readonly IAiProvider _provider;
+    private readonly IAiProviderResolver _resolver;
 
     public TestAiConnectionHandlerTests()
     {
-        _factory.IsConfigured.Returns(true);
-        _factory.CreateClient().Returns(_client);
+        _provider = TestAiProviders.Provider(_client);
+        _resolver = TestAiProviders.Resolver(_provider);
     }
 
-    private TestAiConnectionHandler Sut() => new(_factory);
+    private TestAiConnectionHandler Sut() => new(_resolver);
 
     [Fact]
-    public async Task NotConfigured_ReturnsFailure_WithoutCreatingClient()
+    public async Task Unresolved_ReturnsFailure_WithoutBuildingClient()
     {
         var ct = TestContext.Current.CancellationToken;
-        _factory.IsConfigured.Returns(false);
 
-        var result = await Sut().Handle(new TestAiConnectionCommand(), ct);
+        var result = await new TestAiConnectionHandler(TestAiProviders.Unresolved())
+            .Handle(new TestAiConnectionCommand(), ct);
 
         Assert.False(result.Success);
         Assert.Equal("AI is not configured.", result.Message);
         Assert.Null(result.LatencyMs);
-        _factory.DidNotReceive().CreateClient();
+    }
+
+    // Covers both a misconfigured provider and (via the resolver's synthetic instance) an undefined key —
+    // the probe reports the reason instead of building a client that would throw.
+    [Fact]
+    public async Task UnavailableProvider_ReturnsFailureWithReason_WithoutBuildingClient()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var broken = TestAiProviders.UnavailableProvider("foundry", "ApiKey is required.");
+
+        var result = await new TestAiConnectionHandler(TestAiProviders.Resolver(broken))
+            .Handle(new TestAiConnectionCommand(), ct);
+
+        Assert.False(result.Success);
+        Assert.Equal("AI provider 'foundry' is unavailable: ApiKey is required.", result.Message);
+        Assert.Null(result.LatencyMs);
+        broken.DidNotReceive().GetChatClient();
+    }
+
+    [Fact]
+    public async Task ExplicitProviderKey_IsForwardedToTheResolver()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "pong"))));
+
+        await Sut().Handle(new TestAiConnectionCommand("foundry"), ct);
+
+        _resolver.Received(1).Resolve("foundry");
     }
 
     [Fact]
@@ -63,14 +93,16 @@ public class TestAiConnectionHandlerTests
     }
 
     [Fact]
-    public async Task CreateClientThrows_ReturnsFailure_NoExceptionEscapes()
+    public async Task GetChatClientThrows_ReturnsFailure_NoExceptionEscapes()
     {
-        // A malformed Ai:Endpoint still passes IsConfigured but throws when the factory lazily builds the
-        // client (new Uri). That build runs inside the try, so it must surface as Success=false, not a 500.
+        // Validation pre-checks the endpoint URI now, but a client-build failure must still surface as
+        // Success=false rather than escaping as an unhandled 500 — the build runs inside the try.
         var ct = TestContext.Current.CancellationToken;
-        _factory.CreateClient().Throws(new UriFormatException("Invalid URI."));
+        var provider = TestAiProviders.Provider(_client);
+        provider.GetChatClient().Throws(new UriFormatException("Invalid URI."));
 
-        var result = await Sut().Handle(new TestAiConnectionCommand(), ct);
+        var result = await new TestAiConnectionHandler(TestAiProviders.Resolver(provider))
+            .Handle(new TestAiConnectionCommand(), ct);
 
         Assert.False(result.Success);
         Assert.Equal("Invalid URI.", result.Message);
@@ -94,7 +126,7 @@ public class TestAiConnectionHandlerTests
     }
 
     [Fact]
-    public async Task DoesNotDisposeClient_FactoryOwnsIt()
+    public async Task DoesNotDisposeClient_ProviderOwnsIt()
     {
         var ct = TestContext.Current.CancellationToken;
         _client.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<ChatOptions>(), Arg.Any<CancellationToken>())
@@ -102,7 +134,7 @@ public class TestAiConnectionHandlerTests
 
         await Sut().Handle(new TestAiConnectionCommand(), ct);
 
-        // The factory returns a singleton it owns for the app lifetime — the handler must never dispose it.
+        // The provider returns a singleton it owns for the app lifetime — the handler must never dispose it.
         _client.DidNotReceive().Dispose();
     }
 }

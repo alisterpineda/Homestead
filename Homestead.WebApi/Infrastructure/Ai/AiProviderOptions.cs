@@ -1,20 +1,31 @@
 namespace Homestead.WebApi.Infrastructure.Ai;
 
-// Static configuration for the single, optional AI integration. Mirrors Authentication/OidcOptions —
-// a plain POCO bound from the "Ai" config section with an IsConfigured probe and no startup validator:
-// AI is optional, so an unconfigured app degrades to a graceful no-op rather than failing to start.
-public class AiOptions
+// One options bag for every configured provider instance, discriminated by Type — the config binder needs
+// a single concrete type to bind each "Ai:Providers:{key}" section onto (same shape as OcrEngineOptions).
+// Per-type required fields are validated in AiProviderConfiguration rather than split into subclasses.
+public class AiProviderOptions
 {
-    public const string SectionName = "Ai";
+    public const string SectionName = "Ai:Providers";
 
-    // Ollama's OpenAI-compatible base, e.g. http://homeserver:11434/v1.
+    // Nullable so "not configured" is distinguishable from OpenAiCompatible, and — unlike the OCR bag —
+    // required for EVERY key: there is no built-in provider whose type its name could imply. A non-nullable
+    // enum would bind an omitted Type to default(0) = OpenAiCompatible, so an operator who configures an
+    // Azure endpoint but forgets Type would get a provider that quietly speaks the wrong protocol under the
+    // name they chose — the silent substitution this design refuses to make.
+    public AiProviderType? Type { get; set; }
+
+    // OpenAiCompatible: the API base URL, e.g. http://homeserver:11434/v1.
+    // AzureFoundry: the resource endpoint, e.g. https://my-resource.openai.azure.com.
     public string? Endpoint { get; set; }
 
-    // The Ollama model tag, e.g. "gemma-4-e4b".
+    // OpenAiCompatible: the model tag, e.g. "gemma-4-e4b". AzureFoundry: the DEPLOYMENT name.
     public string? Model { get; set; }
 
-    // Optional; Ollama ignores it. A dummy key is substituted when this is blank.
+    // Optional for OpenAiCompatible (Ollama ignores it; a dummy key is substituted when blank).
+    // Required for AzureFoundry.
     public string? ApiKey { get; set; }
+
+    // --- Per-call knobs. Model/endpoint traits, so they live on the provider, not the app. ---
 
     // Optional override for the document-text character budget embedded in the classification prompt.
     public int? MaxInputChars { get; set; }
@@ -31,7 +42,7 @@ public class AiOptions
     // Resolves the effective character budget: the configured value when it clears the floor, else the
     // default.
     public int ResolveMaxInputChars() =>
-        MaxInputChars is int n && n >= MinInputChars ? n : DefaultMaxInputChars;
+        ResolveWithFloor(MaxInputChars, MinInputChars, DefaultMaxInputChars);
 
     // Optional override for the statement-extraction character budget. Statement parsing must see the FULL
     // text (the closing balance can sit anywhere in the document), so it does NOT use the classification
@@ -46,16 +57,15 @@ public class AiOptions
     // Resolves the effective statement budget: the configured value when it clears the shared floor, else
     // the statement default.
     public int ResolveStatementMaxInputChars() =>
-        StatementMaxInputChars is int n && n >= MinInputChars ? n : DefaultStatementMaxInputChars;
+        ResolveWithFloor(StatementMaxInputChars, MinInputChars, DefaultStatementMaxInputChars);
 
     // Kill-switch for attaching a rendered page-1 image to the classify call (in addition to OCR text +
-    // catalogs). Defaults on; flip to false to fall back to text-only classification even when AI is
-    // configured (e.g. to skip the slow vision prefill, or while debugging).
+    // catalogs). Defaults on; flip to false for a text-only model, or to skip the slow vision prefill.
     public bool ImageInput { get; set; } = true;
 
-    // Long-edge pixel budget for the dedicated AI page render. The image cost flattens at ~1024px on the
-    // target endpoint and larger renders don't add tokens, so this is the only fidelity lever — exposed
-    // for future tuning once an eval set exists. Clamped by ResolveImageRenderMaxEdge.
+    // Long-edge pixel budget for the dedicated AI page render. The image cost typically flattens around
+    // ~1024px and larger renders don't add tokens, so this is the only fidelity lever — exposed for future
+    // tuning once an eval set exists. Clamped by ResolveImageRenderMaxEdge.
     public int ImageRenderMaxEdge { get; set; } = DefaultImageRenderMaxEdge;
 
     // Default long-edge budget, applied when ImageRenderMaxEdge is below the floor (treated as "unset").
@@ -69,12 +79,15 @@ public class AiOptions
     public const int MaxImageRenderMaxEdge = 4096;
 
     // Resolves the effective render long-edge: a sub-floor value falls back to the default, anything else
-    // is clamped to the ceiling. Mirrors ResolveMaxInputChars's "below floor => default" posture.
+    // is clamped to the ceiling.
     public int ResolveImageRenderMaxEdge() =>
-        ImageRenderMaxEdge < MinImageRenderMaxEdge
-            ? DefaultImageRenderMaxEdge
-            : Math.Min(ImageRenderMaxEdge, MaxImageRenderMaxEdge);
+        ResolveWithFloor(ImageRenderMaxEdge, MinImageRenderMaxEdge, DefaultImageRenderMaxEdge,
+            MaxImageRenderMaxEdge);
 
-    public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(Endpoint) && !string.IsNullOrWhiteSpace(Model);
+    // The one floor policy every knob shares: unset or below the floor is "unset" and falls back to the
+    // default (so a degenerate tiny value never starves the feature); a ceiling, when given, clamps down.
+    private static int ResolveWithFloor(int? value, int floor, int fallback, int? ceiling = null) =>
+        value is int n && n >= floor
+            ? Math.Min(n, ceiling ?? n)
+            : fallback;
 }

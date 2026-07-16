@@ -11,6 +11,6 @@ public static class GetAiStatusEndpoint
             return Results.Ok(await sender.Send(new GetAiStatusQuery(), ct));
         })
         .WithName("GetAiStatus")
-        .Produces<AiStatusResponse>();
+        .Produces<List<AiProviderStatusResponse>>();
     }
 }

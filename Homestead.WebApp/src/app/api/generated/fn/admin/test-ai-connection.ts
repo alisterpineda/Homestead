@@ -10,11 +10,13 @@ import { RequestBuilder } from '../../request-builder';
 import { TestAiConnectionResponse } from '../../models/test-ai-connection-response';
 
 export interface TestAiConnection$Params {
+  providerKey?: string;
 }
 
 export function testAiConnection(http: HttpClient, rootUrl: string, params?: TestAiConnection$Params, context?: HttpContext): Observable<StrictHttpResponse<TestAiConnectionResponse>> {
   const rb = new RequestBuilder(rootUrl, testAiConnection.PATH, 'post');
   if (params) {
+    rb.query('providerKey', params.providerKey, {});
   }
 
   return http.request(

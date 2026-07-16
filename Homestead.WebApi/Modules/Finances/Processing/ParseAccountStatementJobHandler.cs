@@ -20,16 +20,14 @@ namespace Homestead.WebApi.Modules.Finances.Processing;
 /// </summary>
 public class ParseAccountStatementJobHandler(
     AppDbContext db,
-    IAiClientFactory aiClientFactory,
+    IAiProviderResolver aiProviderResolver,
     IStatementExtractionService extraction,
     StatementMappingBuilder mappingBuilder,
     AiPageRenderService aiPageRenderService,
     IProcessingNotifier notifier,
-    IOptions<FileStorageOptions> storageOptions,
-    IOptions<AiOptions> aiOptions) : IJobHandler
+    IOptions<FileStorageOptions> storageOptions) : IJobHandler
 {
     private readonly FileStorageOptions _storageOptions = storageOptions.Value;
-    private readonly AiOptions _aiOptions = aiOptions.Value;
 
     public ProcessingJobType Type => ProcessingJobType.ParseAccountStatement;
 
@@ -38,11 +36,16 @@ public class ParseAccountStatementJobHandler(
         var payload = job.GetPayload<ParseAccountStatementPayload>()
             ?? throw new InvalidOperationException("ParseAccountStatement payload is missing or invalid.");
 
-        // Hard AI dependency — no non-AI fallback. Surface a stable error code so the UI can explain why.
-        if (!aiClientFactory.IsConfigured)
-            throw new StatementParseException(
+        // Hard AI dependency — no non-AI fallback. Surface a stable error code so the UI can explain why;
+        // a defined-but-broken provider additionally carries its reason.
+        var aiProvider = aiProviderResolver.Resolve()
+            ?? throw new StatementParseException(
                 "ai_unavailable",
                 "AI is not configured; statement parsing is unavailable.");
+        if (!aiProvider.IsConfigured)
+            throw new StatementParseException(
+                "ai_unavailable",
+                $"AI provider '{aiProvider.Key}' is unavailable: {aiProvider.ConfigurationError}");
 
         var version = await db.DocumentVersions
             .AsNoTracking()
@@ -84,14 +87,14 @@ public class ParseAccountStatementJobHandler(
                 + "If it is a PDF or a scan, reprocess it in Documents and try again.");
 
         // Optional vision supplement for scanned statements — same multimodal shape classification uses.
-        // Cached by FileHash, so an upload-warmed render is reused. Supplements the text above; never
-        // substitutes for it — the render is page 1 only, so alone it would silently drop later pages.
+        // Cached by FileHash + edge, so an upload-warmed render is reused. Supplements the text above;
+        // never substitutes for it — the render is page 1 only, so alone it would silently drop later pages.
         byte[]? pageImage = null;
-        if (_aiOptions.ImageInput)
+        if (aiProvider.ImageInput)
         {
             var physicalPath = version.GetPhysicalPath(_storageOptions.MediaPath);
             pageImage = await aiPageRenderService.GetOrCreateAsync(
-                version.FileHash, physicalPath, version.ContentType, ct);
+                version.FileHash, physicalPath, version.ContentType, aiProvider.ImageRenderMaxEdge, ct);
         }
 
         var ir = await extraction.ExtractAsync(text, pageImage, ct);
@@ -99,7 +102,7 @@ public class ParseAccountStatementJobHandler(
 
         // Completeness safety-net: if the raw text overflowed the extraction budget it was clipped before the
         // model saw it (ClampText), so trailing lines may be missing. Surfaced to the reviewer as a warning.
-        var textTruncated = text.Length > _aiOptions.ResolveStatementMaxInputChars();
+        var textTruncated = text.Length > aiProvider.StatementMaxInputChars;
 
         var staged = new StagedStatementImport
         {

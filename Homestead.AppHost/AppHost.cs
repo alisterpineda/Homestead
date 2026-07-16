@@ -33,26 +33,17 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         context.EnvironmentVariables["OIDC_ROLE_CLAIM"] = "groups";
         context.EnvironmentVariables["OIDC_ADMIN_CLAIM_VALUES"] = "homestead-admin";
 
-        // Optional AI config (off by default). Sourced from AppHost user-secrets so nothing is
-        // committed; forwarded as the same AI_* env vars Program.cs maps (shared dev/prod contract).
-        // Unset -> no env -> AiOptions.IsConfigured stays false -> graceful no-op.
-        var aiEndpoint = builder.Configuration["Ai:Endpoint"];
-        if (!string.IsNullOrWhiteSpace(aiEndpoint))
-        {
-            context.EnvironmentVariables["AI_ENDPOINT"] = aiEndpoint;
-            context.EnvironmentVariables["AI_MODEL"] = builder.Configuration["Ai:Model"] ?? "";
-            var aiApiKey = builder.Configuration["Ai:ApiKey"];
-            if (!string.IsNullOrWhiteSpace(aiApiKey))
-                context.EnvironmentVariables["AI_API_KEY"] = aiApiKey;
-
-            // Optional page-1 image classification knobs. Unset -> WebApi falls back to AiOptions defaults.
-            var aiImageInput = builder.Configuration["Ai:ImageInput"];
-            if (!string.IsNullOrWhiteSpace(aiImageInput))
-                context.EnvironmentVariables["AI_IMAGE_INPUT"] = aiImageInput;
-            var aiImageRenderMaxEdge = builder.Configuration["Ai:ImageRenderMaxEdge"];
-            if (!string.IsNullOrWhiteSpace(aiImageRenderMaxEdge))
-                context.EnvironmentVariables["AI_IMAGE_RENDER_MAX_EDGE"] = aiImageRenderMaxEdge;
-        }
+        // Optional AI providers (off by default). Sourced from AppHost user-secrets so no endpoint or
+        // key is committed, e.g.
+        //   dotnet user-secrets set "Ai:Providers:local:Type" "OpenAiCompatible"
+        //   dotnet user-secrets set "Ai:Providers:local:Endpoint" "http://localhost:11434/v1"
+        //   dotnet user-secrets set "Ai:Providers:local:Model" "gemma-4-e4b"
+        //   dotnet user-secrets set "Ai:DefaultProvider" "local"
+        //
+        // Walking "Ai" (not "Ai:Providers") forwards Ai:DefaultProvider and any future Ai:* key in the
+        // same statement. Unset -> no providers -> graceful no-op.
+        foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Ai")))
+            context.EnvironmentVariables[path.Replace(":", "__")] = value;
 
         // Optional extra OCR engines (off by default). Sourced from AppHost user-secrets so no endpoint
         // or key is committed, e.g.
@@ -61,9 +52,9 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         //   dotnet user-secrets set "Ocr:Engines:azure-layout:ApiKey" "<key>"
         //
         // Forwarded verbatim as stock Ocr__Engines__{key}__{field} env vars — the same names a Docker
-        // deployment sets — rather than through a bespoke mapping like AI_*. Engine instance names are
-        // arbitrary, so the section is walked rather than enumerated field by field. The WebApi's own
-        // appsettings.json still defines the built-in "tesseract" instance; these only add to it.
+        // deployment sets. Engine instance names are arbitrary, so the section is walked rather than
+        // enumerated field by field. The WebApi's own appsettings.json still defines the built-in
+        // "tesseract" instance; these only add to it.
         foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Ocr:Engines")))
             context.EnvironmentVariables[path.Replace(":", "__")] = value;
     })
@@ -77,8 +68,9 @@ builder.AddJavaScriptApp("homestead-webapp", "../Homestead.WebApp", "start")
 
 builder.Build().Run();
 
-// Every leaf key under a config section, with its full path. Used to forward Ocr:Engines verbatim:
-// engine instance names are arbitrary, so the section has to be walked rather than read field by field.
+// Every leaf key under a config section, with its full path. Used to forward the Ai and Ocr:Engines
+// sections verbatim: provider/engine instance names are arbitrary, so the sections have to be walked
+// rather than read field by field.
 static IEnumerable<(string Path, string Value)> LeafSettings(
     Microsoft.Extensions.Configuration.IConfigurationSection section)
 {

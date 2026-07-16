@@ -7,12 +7,12 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { AiStatusResponse } from '../../models/ai-status-response';
+import { AiProviderStatusResponse } from '../../models/ai-provider-status-response';
 
 export interface GetAiStatus$Params {
 }
 
-export function getAiStatus(http: HttpClient, rootUrl: string, params?: GetAiStatus$Params, context?: HttpContext): Observable<StrictHttpResponse<AiStatusResponse>> {
+export function getAiStatus(http: HttpClient, rootUrl: string, params?: GetAiStatus$Params, context?: HttpContext): Observable<StrictHttpResponse<Array<AiProviderStatusResponse>>> {
   const rb = new RequestBuilder(rootUrl, getAiStatus.PATH, 'get');
   if (params) {
   }
@@ -22,7 +22,7 @@ export function getAiStatus(http: HttpClient, rootUrl: string, params?: GetAiSta
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<AiStatusResponse>;
+      return r as StrictHttpResponse<Array<AiProviderStatusResponse>>;
     })
   );
 }

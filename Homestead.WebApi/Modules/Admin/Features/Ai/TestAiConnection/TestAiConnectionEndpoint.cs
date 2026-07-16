@@ -6,9 +6,11 @@ public static class TestAiConnectionEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/test-connection", async (ISender sender, CancellationToken ct) =>
+        // The provider key rides an optional query parameter rather than a body: an optional JSON body
+        // needs EmptyBodyBehavior ceremony, and a bare POST should still probe the default provider.
+        group.MapPost("/test-connection", async (string? providerKey, ISender sender, CancellationToken ct) =>
         {
-            return Results.Ok(await sender.Send(new TestAiConnectionCommand(), ct));
+            return Results.Ok(await sender.Send(new TestAiConnectionCommand(providerKey), ct));
         })
         .WithName("TestAiConnection")
         .Produces<TestAiConnectionResponse>();
