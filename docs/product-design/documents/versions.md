@@ -114,6 +114,8 @@ The engine is resolved **once, at enqueue**, and the concrete key is stamped int
 
 Every extraction records how it was produced, on `DocumentVersion.TextExtractionMetadata` (jsonb), surfaced read-only under the extracted text. It carries the engine type, the instance key that ran, when, and — only when a fall-back happened — the key that was requested and why it could not run. Per type: Tesseract records language/DPI/PSM/OEM plus **how many pages came from the embedded text layer versus were OCR'd** (which branch of the hybrid path each page took is otherwise unknowable after the fact); Azure records the model, output format, and **how many pages it actually analyzed** — the only durable signal that a free-tier (F0) resource silently analyzed just the first 2 pages of a 30-page statement.
 
+**Provenance travels with the text it describes**: any API response that returns `ExtractedText` returns the provenance beside it. Concretely, both the version-detail endpoint and the document endpoint (whose latest-version text feeds the default "Latest" view) carry it — so the detail page never has to fetch text and its provenance separately, and the two can never describe different extractions. A new endpoint that exposes extracted text inherits this rule.
+
 Versions extracted before provenance existed simply show nothing.
 
 ## Version delete
