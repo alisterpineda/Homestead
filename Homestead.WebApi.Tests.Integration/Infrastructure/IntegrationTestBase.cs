@@ -189,6 +189,24 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         return await WaitForJobCompletionAsync(body!.JobId, TimeSpan.FromSeconds(120));
     }
 
+    /// <summary>
+    /// Overwrites the latest version's ExtractedText directly in the DB — the standing pattern for tests
+    /// that need a specific text state without depending on the real extractor.
+    /// </summary>
+    protected async Task SetExtractedTextAsync(Guid documentId, string? extractedText)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.DocumentVersions
+            .Where(v => v.DocumentId == documentId)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstAsync(CT);
+        version.ExtractedText = extractedText;
+        // SearchVector is maintained by a DB trigger on document_versions — persisting the new
+        // ExtractedText recomputes the parent document's vector automatically.
+        await db.SaveChangesAsync(CT);
+    }
+
     protected static async Task<HttpResponseMessage> SendJsonPatchAsync(
         HttpClient client, string url, object patchOperations)
     {

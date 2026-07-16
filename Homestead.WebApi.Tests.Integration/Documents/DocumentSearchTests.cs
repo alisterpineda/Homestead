@@ -608,19 +608,6 @@ public class DocumentSearchTests : IntegrationTestBase
         Assert.All(body!.Items, item => Assert.Null(item.MatchSnippet));
     }
 
-    private async Task SetExtractedTextAsync(Guid documentId, string? extractedText)
-    {
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var version = await db.DocumentVersions
-            .Where(v => v.DocumentId == documentId)
-            .OrderByDescending(v => v.VersionNumber)
-            .FirstAsync(CT);
-        version.ExtractedText = extractedText;
-        // SearchVector is maintained by a DB trigger on document_versions — persisting the new
-        // ExtractedText recomputes the parent document's vector automatically.
-        await db.SaveChangesAsync(CT);
-    }
 
     private record DocumentListItem(Guid Id, string Name, string ContentType, long FileSize, string FileExtension, DateTimeOffset CreatedAt);
     private record DocumentSnippetItem(Guid Id, string Name, string? MatchSnippet);

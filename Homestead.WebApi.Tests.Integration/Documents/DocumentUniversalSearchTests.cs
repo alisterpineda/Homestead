@@ -32,19 +32,6 @@ public class DocumentUniversalSearchTests : IntegrationTestBase
     private static SearchGroupDto? Documents(SearchResponseDto r) =>
         r.Groups.FirstOrDefault(g => g.Source == "documents");
 
-    private async Task SetExtractedTextAsync(Guid documentId, string? extractedText)
-    {
-        using var scope = CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var version = await db.DocumentVersions
-            .Where(v => v.DocumentId == documentId)
-            .OrderByDescending(v => v.VersionNumber)
-            .FirstAsync(CT);
-        version.ExtractedText = extractedText;
-        // SearchVector is maintained by a DB trigger on document_versions — persisting the new
-        // ExtractedText recomputes the parent document's vector automatically.
-        await db.SaveChangesAsync(CT);
-    }
 
     private async Task<(DateOnly? DocumentDate, DateTimeOffset CreatedAt)> GetDocumentDatesAsync(Guid documentId)
     {

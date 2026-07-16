@@ -2,8 +2,6 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Ai;
 using Homestead.WebApi.Infrastructure.Storage;
-using Homestead.WebApi.Infrastructure.TextExtraction;
-using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
@@ -26,14 +24,9 @@ public class ParseAccountStatementJobHandler(
     IStatementExtractionService extraction,
     StatementMappingBuilder mappingBuilder,
     AiPageRenderService aiPageRenderService,
-    TextExtractionHelper textExtraction,
-    // Cross-module by necessity: the engine preference is a Documents setting, and a statement is a
-    // DocumentVersion. This handler already reads Documents' entities directly for the same reason.
-    ITextExtractionEngineResolver engineResolver,
     IProcessingNotifier notifier,
     IOptions<FileStorageOptions> storageOptions,
-    IOptions<AiOptions> aiOptions,
-    ILogger<ParseAccountStatementJobHandler> logger) : IJobHandler
+    IOptions<AiOptions> aiOptions) : IJobHandler
 {
     private readonly FileStorageOptions _storageOptions = storageOptions.Value;
     private readonly AiOptions _aiOptions = aiOptions.Value;
@@ -75,29 +68,28 @@ public class ParseAccountStatementJobHandler(
                 "account_not_found",
                 $"Account {payload.AccountId} was not found.");
 
-        var physicalPath = version.GetPhysicalPath(_storageOptions.MediaPath);
-
-        // ExtractedText is normally populated at upload; extract defensively if it is missing.
+        // Extraction is Documents' job — this handler consumes ExtractedText, it never produces it.
+        // InitiateStatementImportHandler rejects a text-less version at enqueue, so this is a backstop —
+        // but not dead code; two paths reach it. (1) A reprocess landing between enqueue and run can empty
+        // the text: the engine returning nothing is reported as *success* (TextExtractionHelper), and
+        // ReprocessVersionTextCommand assigns that result unconditionally — while a *failed* reprocess
+        // throws before persisting, preserving the old text. (2) The gate's IsNullOrWhiteSpace translates
+        // to btrim over " \t\n\r" only, so text made of other whitespace (NBSP, \f, \v — plausible OCR
+        // output for a blank scan) passes the gate but fails this C# check, with no race involved.
         var text = version.ExtractedText;
         if (string.IsNullOrWhiteSpace(text))
-        {
-            // The household default, same as the upload path that normally populates ExtractedText — a
-            // defensive re-extract must not silently use a different engine than the original.
-            var engineKey = await engineResolver.ResolveDefaultKeyAsync(ct);
-            var extractionResult = await textExtraction.ExtractTextSafeAsync(
-                physicalPath, version.ContentType, engineKey, ct);
-            if (!extractionResult.Succeeded)
-                logger.LogWarning(extractionResult.Error,
-                    "Text extraction failed for statement version {VersionId}; extracting from image only.",
-                    version.Id);
-            text = extractionResult.Text ?? string.Empty;
-        }
+            throw new StatementParseException(
+                "text_unavailable",
+                $"Document version {version.Id} has no extracted text, so there is nothing to import. "
+                + "If it is a PDF or a scan, reprocess it in Documents and try again.");
 
         // Optional vision supplement for scanned statements — same multimodal shape classification uses.
-        // Cached by FileHash, so an upload-warmed render is reused.
+        // Cached by FileHash, so an upload-warmed render is reused. Supplements the text above; never
+        // substitutes for it — the render is page 1 only, so alone it would silently drop later pages.
         byte[]? pageImage = null;
         if (_aiOptions.ImageInput)
         {
+            var physicalPath = version.GetPhysicalPath(_storageOptions.MediaPath);
             pageImage = await aiPageRenderService.GetOrCreateAsync(
                 version.FileHash, physicalPath, version.ContentType, ct);
         }
@@ -107,7 +99,7 @@ public class ParseAccountStatementJobHandler(
 
         // Completeness safety-net: if the raw text overflowed the extraction budget it was clipped before the
         // model saw it (ClampText), so trailing lines may be missing. Surfaced to the reviewer as a warning.
-        var textTruncated = (text?.Length ?? 0) > _aiOptions.ResolveStatementMaxInputChars();
+        var textTruncated = text.Length > _aiOptions.ResolveStatementMaxInputChars();
 
         var staged = new StagedStatementImport
         {

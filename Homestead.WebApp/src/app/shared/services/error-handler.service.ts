@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { toast } from '@spartan-ng/brain/sonner';
+import { JobFailedError } from '@/shared/types/job-failed-error';
 import type { ApiProblemDetails } from '@/shared/types/api-problem-details';
 
 const STATUS_MESSAGES: Record<number, string> = {
@@ -21,7 +22,12 @@ const STATUS_MESSAGES: Record<number, string> = {
 @Injectable({ providedIn: 'root' })
 export class ErrorHandlerService {
   getErrorMessage(err: unknown, fallback: string): string {
-    if (!(err instanceof HttpErrorResponse)) return fallback;
+    // Only JobFailedError (waitForJob's failed-job report) carries a user-appropriate message; every other
+    // non-HTTP Error is internal diagnostics (a TypeError in a pipe, an invariant throw) and gets the
+    // curated fallback rather than leaking verbatim into a toast.
+    if (!(err instanceof HttpErrorResponse)) {
+      return err instanceof JobFailedError && err.message ? err.message : fallback;
+    }
 
     if (err.status === 0) return STATUS_MESSAGES[0];
 

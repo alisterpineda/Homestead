@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -124,6 +125,80 @@ public class StatementImportPipelineTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Initiate_VersionWithoutExtractedText_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var accountId = await CreateCashAccountAsync(client, cad, "Chequing-NoText", "5559991234");
+
+        var documentId = await UploadAndWaitAsync(client, "statement.pdf");
+        var versionId = await LatestVersionIdAsync(documentId);
+
+        // sample.pdf has a real text layer, so the upload populated ExtractedText. Clearing it reproduces
+        // what an upload whose extraction threw leaves behind — those failures are silent by design.
+        await SetExtractedTextAsync(documentId, null);
+
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/imports",
+            new { accountId, documentVersionId = versionId }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        var problem = await resp.Content.ReadFromJsonAsync<ProblemDetailsResponse>(CT);
+        Assert.Contains("reprocess", problem!.Detail!, StringComparison.OrdinalIgnoreCase);
+
+        // The whole point of gating at enqueue: nothing was queued, so nothing can bill or fail later.
+        await AssertNoParseJobAsync();
+    }
+
+    [Fact]
+    public async Task Initiate_VersionWithWhitespaceOnlyText_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var accountId = await CreateCashAccountAsync(client, cad, "Chequing-Whitespace", "5559991234");
+
+        var documentId = await UploadAndWaitAsync(client, "statement.pdf");
+        var versionId = await LatestVersionIdAsync(documentId);
+
+        // ASCII whitespace beyond plain spaces is reachable — Azure returns its content unmodified, so a
+        // blank scan yields "\n". The gate's IsNullOrWhiteSpace translates to btrim over " \t\n\r", which
+        // covers this input (plain btrim() would strip spaces only). It does NOT cover all of C#'s
+        // whitespace — see the NBSP test below for the seam.
+        await SetExtractedTextAsync(documentId, " \t\r\n ");
+
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/imports",
+            new { accountId, documentVersionId = versionId }, CT);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        await AssertNoParseJobAsync();
+    }
+
+    [Fact]
+    public async Task Initiate_VersionWithNbspOnlyText_PassesGateAndJobFails()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var accountId = await CreateCashAccountAsync(client, cad, "Chequing-Nbsp", "5559991234");
+
+        var documentId = await UploadAndWaitAsync(client, "statement.pdf");
+        var versionId = await LatestVersionIdAsync(documentId);
+
+        // NBSP is C# whitespace but sits outside the btrim(" \t\n\r") set the gate's SQL uses, so it passes
+        // the gate and fails at the job handler's C# backstop instead. This pins two things: the known seam
+        // (documented in ParseAccountStatementJobHandler) stays a conscious choice rather than a surprise,
+        // and the projection genuinely translates to SQL — under silent client evaluation C# semantics
+        // would apply and this would 400 at initiate, failing the 201 assertion below.
+        await SetExtractedTextAsync(documentId, "\u00A0");
+
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/imports",
+            new { accountId, documentVersionId = versionId }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+
+        var initiate = await resp.Content.ReadFromJsonAsync<ImportInitiateItem>(CT);
+        var job = await WaitForJobFailureAsync(initiate!.JobId);
+        Assert.Contains("no extracted text", job.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Migration_AddedColumnsAndIndex_Exist()
     {
         using var scope = CreateScope();
@@ -152,6 +227,16 @@ public class StatementImportPipelineTests : IntegrationTestBase
                 WHERE table_schema = {schema} AND table_name = {table} AND column_name = {column}
                 """)
             .AnyAsync(CT);
+    }
+
+    private async Task AssertNoParseJobAsync()
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Asserted on Type, not the version id — that lives inside the job's JSON payload, not a column.
+        // Respawn resets between tests, and the upload's own rows carry a different Type.
+        Assert.False(await db.ProcessingJobs
+            .AnyAsync(j => j.Type == ProcessingJobType.ParseAccountStatement, CT));
     }
 
     private async Task AssertSourceStampedAsync(Guid versionId, int expectedCount)

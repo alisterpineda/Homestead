@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ErrorHandlerService } from './error-handler.service';
+import { JobFailedError } from '@/shared/types/job-failed-error';
 import { toast } from '@spartan-ng/brain/sonner';
 
 describe('ErrorHandlerService', () => {
@@ -42,10 +43,23 @@ describe('ErrorHandlerService', () => {
       expect(service.getErrorMessage(err, 'Something went wrong.')).toBe('Something went wrong.');
     });
 
-    it('should return fallback for non-HttpErrorResponse', () => {
-      expect(service.getErrorMessage(new Error('random'), 'fallback')).toBe('fallback');
+    it('should return fallback for non-HTTP errors, including plain Errors', () => {
       expect(service.getErrorMessage('string error', 'fallback')).toBe('fallback');
       expect(service.getErrorMessage(null, 'fallback')).toBe('fallback');
+      // Internal diagnostics must never reach a toast verbatim — only JobFailedError may.
+      expect(service.getErrorMessage(new Error('Upload did not return a document.'), 'fallback')).toBe(
+        'fallback',
+      );
+    });
+
+    // ProcessingHubService.waitForJob reports a failed job as a JobFailedError carrying the backend's
+    // job Error string, which is user-appropriate by design — discarding it would replace every
+    // job-failure reason with the generic fallback.
+    it('should surface the message of a JobFailedError', () => {
+      expect(
+        service.getErrorMessage(new JobFailedError('AI is not configured.', 'ai_unavailable'), 'fallback'),
+      ).toBe('AI is not configured.');
+      expect(service.getErrorMessage(new JobFailedError(''), 'fallback')).toBe('fallback');
     });
 
     it('should prefer detail over validation errors', () => {

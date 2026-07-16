@@ -103,8 +103,10 @@ An engine can be *configured as an instance* yet not *usable* (e.g. an Azure ins
 
 Failure handling is deliberately asymmetric:
 
-- **On the default path** (uploads, statement parsing — nobody is watching), an unavailable or dangling engine key falls back to the built-in `tesseract`, logs, and records the substitution in the version's provenance metadata. The fall-back is never silent.
+- **On the default path** (uploads — nobody is watching), an unavailable or dangling engine key falls back to the built-in `tesseract`, logs, and records the substitution in the version's provenance metadata. The fall-back is never silent.
 - **On an explicit pick**, an unknown or unavailable key is rejected with a **400 at enqueue**, before a job row exists. Silently running Tesseract for a user who chose `azure-layout` would deliver precisely the output they rejected.
+
+Statement import sits on **neither** path — it does not extract at all. It consumes whatever `ExtractedText` a version already carries, and a version without any is rejected at initiate with a 400 (before a job row exists), pointing the user at reprocess. It was previously counted as a default path, but it never fit: an import is a blocking, user-initiated action with somebody watching a spinner, which the asymmetry above places on the loud side. It also never honoured the default path's provenance promise — its re-extract discarded its own result, writing neither text nor metadata. See [Statement import](../finances/transactions.md#statement-import).
 
 The engine is resolved **once, at enqueue**, and the concrete key is stamped into the job payload; a bulk fan-out copies the parent's key into every child. This makes a run deterministic — changing the household default mid-run cannot split a batch across two engines — and makes the 400-at-enqueue possible at all.
 

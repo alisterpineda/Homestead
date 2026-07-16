@@ -3,6 +3,7 @@ import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signal
 import { firstValueFrom, Subject } from 'rxjs';
 import { filter, map, take } from 'rxjs/operators';
 import { toast } from '@spartan-ng/brain/sonner';
+import { JobFailedError } from '@/shared/types/job-failed-error';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
 
 export interface JobStatusChangedMessage {
@@ -45,7 +46,11 @@ export class ProcessingHubService {
         take(1),
         map(msg => {
           if (msg.status === 'Failed') {
-            throw new Error(msg.error ?? 'An unknown error occurred.');
+            throw new JobFailedError(
+              msg.error ?? 'An unknown error occurred.',
+              msg.errorCode,
+              msg.errorData,
+            );
           }
           return msg;
         }),
