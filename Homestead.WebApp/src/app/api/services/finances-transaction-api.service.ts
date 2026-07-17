@@ -6,6 +6,7 @@ import { ApiConfiguration } from '@/api/generated/api-configuration';
 import { getAccountTransactions } from '@/api/generated/fn/finances/get-account-transactions';
 import { getTransaction } from '@/api/generated/fn/finances/get-transaction';
 import { deleteTransaction } from '@/api/generated/fn/finances/delete-transaction';
+import { bulkDeleteTransactions } from '@/api/generated/fn/finances/bulk-delete-transactions';
 import { createTransfer } from '@/api/generated/fn/finances/create-transfer';
 import { patchTransfer } from '@/api/generated/fn/finances/patch-transfer';
 import { createTrade } from '@/api/generated/fn/finances/create-trade';
@@ -26,6 +27,7 @@ import { patchOpeningBalance } from '@/api/generated/fn/finances/patch-opening-b
 import { deleteOpeningBalance } from '@/api/generated/fn/finances/delete-opening-balance';
 import { getOpeningBalance } from '@/api/generated/fn/finances/get-opening-balance';
 import { getOpeningBalances } from '@/api/generated/fn/finances/get-opening-balances';
+import type { BulkDeleteTransactionsResponse } from '@/api/generated/models/bulk-delete-transactions-response';
 import type { PaginatedResponseOfTransactionResponse } from '@/api/generated/models/paginated-response-of-transaction-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
@@ -34,6 +36,7 @@ import type { OpeningBalanceResponse } from '@/api/generated/models/opening-bala
 export type { GetAccountTransactions$Params } from '@/api/generated/fn/finances/get-account-transactions';
 export type { GetTransaction$Params } from '@/api/generated/fn/finances/get-transaction';
 export type { DeleteTransaction$Params } from '@/api/generated/fn/finances/delete-transaction';
+export type { BulkDeleteTransactions$Params } from '@/api/generated/fn/finances/bulk-delete-transactions';
 export type { CreateTransfer$Params } from '@/api/generated/fn/finances/create-transfer';
 export type { PatchTransfer$Params } from '@/api/generated/fn/finances/patch-transfer';
 export type { CreateTrade$Params } from '@/api/generated/fn/finances/create-trade';
@@ -70,6 +73,10 @@ export class FinancesTransactionApiService {
 
   deleteTransaction(params: Parameters<typeof deleteTransaction>[2]): Observable<void> {
     return deleteTransaction(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  bulkDeleteTransactions(params: Parameters<typeof bulkDeleteTransactions>[2]): Observable<BulkDeleteTransactionsResponse> {
+    return bulkDeleteTransactions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   createTransfer(params: Parameters<typeof createTransfer>[2]): Observable<TransactionResponse> {

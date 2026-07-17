@@ -8,9 +8,12 @@ import {
   signal,
   computed,
   effect,
+  linkedSignal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, map, catchError, combineLatest, EMPTY } from 'rxjs';
+import { switchMap, of, map, catchError, combineLatest, firstValueFrom, EMPTY } from 'rxjs';
+import { toast } from '@spartan-ng/brain/sonner';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideArrowRightLeft,
@@ -26,21 +29,28 @@ import {
   lucideChevronRight,
   lucideCircleAlert,
   lucideListTodo,
+  lucideTrash2,
+  lucideX,
 } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import {
   type CellContext,
   type ColumnDef,
+  type RowSelectionState,
   createAngularTable,
   flexRenderComponent,
   FlexRenderDirective,
   getCoreRowModel,
   injectFlexRenderContext,
 } from '@tanstack/angular-table';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
+import { ErrorHandlerService } from '@/shared/services/error-handler.service';
+import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -127,12 +137,13 @@ class ActivityAmountCell {
 @Component({
   selector: 'app-account-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, FlexRenderDirective],
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmAlertDialogImports, FlexRenderDirective],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
     lucideBanknoteArrowDown, lucideBanknoteArrowUp,
     lucideChevronLeft, lucideChevronRight, lucideCircleAlert, lucideListTodo,
+    lucideTrash2, lucideX,
   })],
   template: `
     @if (loading() && items().length === 0) {
@@ -160,6 +171,58 @@ class ActivityAmountCell {
         </div>
       </div>
     } @else {
+      @if (hasSelection()) {
+        <div class="mb-3 flex items-center gap-2">
+          <span class="text-sm text-muted-foreground">
+            {{ selectionCount() }} transaction{{ selectionCount() === 1 ? '' : 's' }} selected
+          </span>
+          <hlm-alert-dialog>
+            <button
+              hlmBtn
+              variant="ghost"
+              class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              hlmAlertDialogTrigger
+            >
+              <ng-icon hlm name="lucideTrash2" size="sm" />
+              Delete
+            </button>
+            <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+              <div hlmAlertDialogHeader>
+                <h2 hlmAlertDialogTitle>
+                  Delete {{ selectionCount() }} transaction{{ selectionCount() === 1 ? '' : 's' }}?
+                </h2>
+                <p hlmAlertDialogDescription>
+                  This permanently deletes the selected transaction{{ selectionCount() === 1 ? '' : 's' }} and can't be undone.
+                  @if (selectionIncludesDrip()) {
+                    Reinvested dividends are deleted as whole pairs — the paired half is removed even if it isn't selected.
+                  }
+                </p>
+              </div>
+              <div hlmAlertDialogFooter>
+                <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                <button
+                  hlmAlertDialogAction
+                  variant="destructive"
+                  (click)="onBulkDelete(ctx)"
+                  [disabled]="bulkDeleting()"
+                >
+                  {{ bulkDeleting() ? 'Deleting...' : 'Delete' }}
+                </button>
+              </div>
+            </hlm-alert-dialog-content>
+          </hlm-alert-dialog>
+          <button
+            hlmBtn
+            variant="outline"
+            size="icon"
+            class="ml-auto"
+            (click)="clearSelection()"
+            aria-label="Clear selection"
+          >
+            <ng-icon hlm name="lucideX" size="sm" />
+          </button>
+        </div>
+      }
       <div class="overflow-clip rounded-md border">
         <div hlmTableContainer>
           <table hlmTable>
@@ -169,6 +232,8 @@ class ActivityAmountCell {
                 @for (header of headerGroup.headers; track header.id) {
                   <th hlmTh [class]="getThClass(header.column.id)">
                     @if (!header.isPlaceholder) {
+                      <!-- Component headers (select-all) bypass this template; string headers
+                           render through it, so keep interpolation for its auto-escaping. -->
                       <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
                         <span>{{ h }}</span>
                       </ng-container>
@@ -184,11 +249,19 @@ class ActivityAmountCell {
                 hlmTr
                 tabindex="0"
                 class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                [attr.data-state]="row.getIsSelected() ? 'selected' : undefined"
                 (click)="onClick(row.original.tx)"
                 (keydown.enter)="onClick(row.original.tx)"
               >
                 @for (cell of row.getVisibleCells(); track cell.id) {
-                  <td hlmTd [class]="getTdClass(cell.column.id)">
+                  <!-- The select cell self-isolates its checkbox clicks; the td guard widens
+                       the dead zone to the whole cell so near-misses don't open the editor. -->
+                  <td
+                    hlmTd
+                    [class]="getTdClass(cell.column.id)"
+                    (click)="cell.column.id === 'select' ? $event.stopPropagation() : null"
+                    (keydown.enter)="cell.column.id === 'select' ? $event.stopPropagation() : null"
+                  >
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
                       <div [innerHTML]="c"></div>
                     </ng-container>
@@ -224,20 +297,41 @@ export class AccountActivityTabComponent {
   refreshKey = input(0);
 
   transactionClicked = output<TransactionResponse>();
+  transactionsDeleted = output<void>();
 
-  page = signal(1);
+  // Resets to 1 whenever the account changes; still writable (paging, clamp).
+  page = linkedSignal({ source: this.account, computation: () => 1 });
   loading = signal(false);
   error = signal(false);
   totalCount = signal(0);
   rawItems = signal<TransactionResponse[]>([]);
   accountNames = signal<Record<string, string>>({});
   commodities = signal<Record<string, CommodityResponse>>({});
+  bulkDeleting = signal(false);
+  // Selection is page-scoped and only meaningful for the currently rendered rows:
+  // any account/page change or refresh (which can re-paginate the list) discards it.
+  private readonly _rowSelection = linkedSignal<unknown, RowSelectionState>({
+    source: () => [this.account(), this.page(), this.refreshKey()],
+    computation: () => ({}),
+  });
+
+  selectedIds = computed(() => {
+    const selection = this._rowSelection();
+    return Object.keys(selection).filter(k => selection[k]);
+  });
+  selectionCount = computed(() => this.selectedIds().length);
+  hasSelection = computed(() => this.selectionCount() > 0);
+  selectionIncludesDrip = computed(() => {
+    const selected = new Set(this.selectedIds());
+    return this.rawItems().some(tx => selected.has(tx.id) && tx.relatedTransactionId != null);
+  });
 
   private txApi = inject(FinancesTransactionApiService);
   private accountApi = inject(FinancesAccountApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private settingsService = inject(FinanceSettingsService);
   private prefs = inject(UserPreferencesService);
+  private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
 
   totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount() / PAGE_SIZE)));
@@ -249,6 +343,12 @@ export class AccountActivityTabComponent {
   });
 
   private readonly _columns: ColumnDef<ActivityRowViewModel>[] = [
+    {
+      id: 'select',
+      header: () => flexRenderComponent(TableHeadSelection),
+      cell: () => flexRenderComponent(TableRowSelection),
+      enableSorting: false,
+    },
     {
       id: 'date',
       accessorFn: r => r.dateText,
@@ -281,13 +381,25 @@ export class AccountActivityTabComponent {
     columns: this._columns,
     getRowId: r => r.tx.id,
     getCoreRowModel: getCoreRowModel(),
+    // Opening balances delete through their dedicated editors; 'Other' shapes have no
+    // generic delete path. Both stay un-selectable so bulk delete can't target them.
+    enableRowSelection: row =>
+      row.original.tx.shape !== 'OpeningBalance' && row.original.tx.shape !== 'Other',
+    onRowSelectionChange: updater => {
+      this._rowSelection.set(updater instanceof Function ? updater(this._rowSelection()) : updater);
+    },
+    state: {
+      rowSelection: this._rowSelection(),
+    },
   }));
 
   private readonly TH_CLASSES: Record<string, string> = {
+    select: 'w-10',
     amount: 'text-right',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
+    select: 'w-10',
     memo: 'min-w-0',
     amount: 'text-right',
   };
@@ -301,10 +413,14 @@ export class AccountActivityTabComponent {
   }
 
   constructor() {
-    // Reset to page 1 whenever the account changes.
+    // Deleting every row on the last page shrinks totalPages below the current
+    // page; clamp back so the user isn't stranded on an empty page. Skipped
+    // while errored — the error path resets totalCount to 0, and clamping on
+    // that would yank the user to page 1 over a transient fetch failure.
     effect(() => {
-      this.account();
-      this.page.set(1);
+      const totalPages = this.totalPages();
+      if (this.error()) return;
+      if (untracked(this.page) > totalPages) this.page.set(totalPages);
     });
 
     // Pagination + refresh-driven fetch.
@@ -351,6 +467,30 @@ export class AccountActivityTabComponent {
 
   onClick(tx: TransactionResponse): void {
     this.transactionClicked.emit(tx);
+  }
+
+  clearSelection(): void {
+    this._rowSelection.set({});
+  }
+
+  onBulkDelete(ctx: { close: () => void }): void {
+    const ids = this.selectedIds();
+    if (ids.length === 0) return;
+    this.bulkDeleting.set(true);
+    const result$ = this.txApi.bulkDeleteTransactions({ body: { ids } }).pipe(
+      handleMutationError(this.errorHandler, this.bulkDeleting, 'Failed to delete transactions.'),
+    );
+    toast.promise(
+      firstValueFrom(result$).then(response => {
+        this.bulkDeleting.set(false);
+        ctx.close();
+        const count = +response.deletedCount;
+        this.clearSelection();
+        this.transactionsDeleted.emit();
+        return `${count} transaction${count === 1 ? '' : 's'} deleted.`;
+      }),
+      { loading: 'Deleting transactions...', success: m => m },
+    );
   }
 
   private resolveLookups(txs: TransactionResponse[]): void {

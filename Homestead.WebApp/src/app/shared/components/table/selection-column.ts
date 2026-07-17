@@ -2,10 +2,17 @@ import { Component, computed } from '@angular/core';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { type CellContext, type HeaderContext, injectFlexRenderContext } from '@tanstack/angular-table';
 
+// Both cells swallow click/enter at their host so interacting with the checkbox
+// never triggers the enclosing row's click handler — host templates don't need
+// their own per-cell stopPropagation guards.
 @Component({
   selector: 'app-table-head-selection',
   imports: [HlmCheckboxImports],
-  host: { class: 'flex' },
+  host: {
+    class: 'flex',
+    '(click)': '$event.stopPropagation()',
+    '(keydown.enter)': '$event.stopPropagation()',
+  },
   template: `
     <hlm-checkbox
       [checked]="context.table.getIsAllRowsSelected()"
@@ -22,7 +29,11 @@ export class TableHeadSelection<T> {
 @Component({
   selector: 'app-table-row-selection',
   imports: [HlmCheckboxImports],
-  host: { class: 'flex' },
+  host: {
+    class: 'flex',
+    '(click)': '$event.stopPropagation()',
+    '(keydown.enter)': '$event.stopPropagation()',
+  },
   template: `
     <hlm-checkbox
       [checked]="context.row.getIsSelected()"

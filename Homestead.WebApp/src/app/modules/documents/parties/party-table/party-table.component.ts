@@ -15,7 +15,7 @@ import type { GetPartiesResponse } from '@/api/generated/models/get-parties-resp
 import type { PartySortBy } from '@/api/generated/models/party-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from '../../list/document-table/sort-header-button';
-import { TableHeadSelection, TableRowSelection } from '../../list/document-table/selection-column';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import type { HideableColumn } from '../../list/document-table/document-table.component';
 import { PartyDateAddedCell, PartyModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';

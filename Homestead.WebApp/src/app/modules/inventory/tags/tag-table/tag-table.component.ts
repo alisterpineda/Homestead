@@ -14,7 +14,7 @@ import type { GetInventoryTagsResponse } from '@/api/generated/models/get-invent
 import type { InventoryTagSortBy } from '@/api/generated/models/inventory-tag-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from '../../../documents/list/document-table/sort-header-button';
-import { TableHeadSelection, TableRowSelection } from '../../../documents/list/document-table/selection-column';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import type { HideableColumn } from '../../../documents/list/document-table/document-table.component';
 import { TagColorCell, TagNameCell, TagDateAddedCell, TagModifiedCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';

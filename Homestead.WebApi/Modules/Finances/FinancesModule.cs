@@ -41,6 +41,7 @@ using Homestead.WebApi.Modules.Finances.Features.PriceSources.UpsertPriceSourceS
 using Homestead.WebApi.Modules.Finances.Features.Reports.GetNetWorthHistory;
 using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.BulkDeleteTransactions;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.DeleteTransaction;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction;
@@ -122,6 +123,7 @@ public static class FinancesModule
         GetTransactionsEndpoint.Map(transactions);
         GetTransactionEndpoint.Map(transactions);
         DeleteTransactionEndpoint.Map(transactions);
+        BulkDeleteTransactionsEndpoint.Map(transactions);
 
         // Per-shape transaction create/edit endpoints under /transactions/{shape}.
         var transfers = transactions.MapGroup("/transfers");

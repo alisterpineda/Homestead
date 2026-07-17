@@ -25,7 +25,7 @@ import {
   injectFlexRenderContext,
 } from '@tanstack/angular-table';
 import { SortHeaderButton } from '../../documents/list/document-table/sort-header-button';
-import { TableHeadSelection, TableRowSelection } from '../../documents/list/document-table/selection-column';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import type { CommodityPriceResponse } from '@/api/generated/models/commodity-price-response';
 import type { CommodityPriceSource } from '@/api/generated/models/commodity-price-source';
 import type { CommodityPriceSortBy } from '@/api/generated/models/commodity-price-sort-by';

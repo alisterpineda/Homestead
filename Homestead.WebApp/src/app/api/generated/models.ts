@@ -26,6 +26,8 @@ export type { BulkDeletePartiesCommand } from './models/bulk-delete-parties-comm
 export type { BulkDeletePartiesResponse } from './models/bulk-delete-parties-response';
 export type { BulkDeleteTagsCommand } from './models/bulk-delete-tags-command';
 export type { BulkDeleteTagsResponse } from './models/bulk-delete-tags-response';
+export type { BulkDeleteTransactionsCommand } from './models/bulk-delete-transactions-command';
+export type { BulkDeleteTransactionsResponse } from './models/bulk-delete-transactions-response';
 export type { BulkDeleteUsersCommand } from './models/bulk-delete-users-command';
 export type { BulkDeleteUsersResponse } from './models/bulk-delete-users-response';
 export type { BulkReprocessDocumentsCommand } from './models/bulk-reprocess-documents-command';

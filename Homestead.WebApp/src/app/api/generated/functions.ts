@@ -217,6 +217,8 @@ export type { GetTransaction$Params as GetTransaction$Params } from './fn/financ
 export { getTransaction as getTransaction } from './fn/finances/get-transaction';
 export type { DeleteTransaction$Params as DeleteTransaction$Params } from './fn/finances/delete-transaction';
 export { deleteTransaction as deleteTransaction } from './fn/finances/delete-transaction';
+export type { BulkDeleteTransactions$Params as BulkDeleteTransactions$Params } from './fn/finances/bulk-delete-transactions';
+export { bulkDeleteTransactions as bulkDeleteTransactions } from './fn/finances/bulk-delete-transactions';
 export type { CreateTransfer$Params as CreateTransfer$Params } from './fn/finances/create-transfer';
 export { createTransfer as createTransfer } from './fn/finances/create-transfer';
 export type { PatchTransfer$Params as PatchTransfer$Params } from './fn/finances/patch-transfer';

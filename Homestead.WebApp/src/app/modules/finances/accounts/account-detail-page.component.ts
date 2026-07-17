@@ -251,6 +251,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           [account]="a"
           [refreshKey]="refreshTrigger()"
           (transactionClicked)="onTransactionClicked($event)"
+          (transactionsDeleted)="onTransactionsDeleted()"
         />
       } @else if (notFound()) {
         <div hlmEmpty>
@@ -735,6 +736,9 @@ export class AccountDetailPageComponent implements OnDestroy {
   }
   onTransferDeleted(): void {
     this.transferSheetState.set('closed');
+    this.refreshTrigger.update(v => v + 1);
+  }
+  onTransactionsDeleted(): void {
     this.refreshTrigger.update(v => v + 1);
   }
   onTransferSheetClosed(): void {

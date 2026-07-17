@@ -15,7 +15,7 @@ import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-
 import type { DocumentSortBy } from '@/api/generated/models/document-sort-by';
 import type { SortDirection } from '@/api/generated/models/sort-direction';
 import { SortHeaderButton } from './sort-header-button';
-import { TableHeadSelection, TableRowSelection } from './selection-column';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import { TagsCell, PartiesCell, FileSizeCell, DateAddedCell, ModifiedCell, DocumentDateCell, NameCell } from './table-cells';
 import { escapeHtml } from '@/shared/utils';
 
