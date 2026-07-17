@@ -30,6 +30,7 @@ const incomeFlow: TransactionResponse = {
   occurredAt: '2026-04-23T00:00:00.000Z',
   memo: 'Refund',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'flow',
     accountId: 'cash-1',
@@ -44,6 +45,7 @@ const categorizedExpenseFlow: TransactionResponse = {
   occurredAt: '2026-04-23T00:00:00.000Z',
   memo: 'Groceries',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'flow',
     accountId: 'cash-1',

@@ -19,6 +19,7 @@ The module is not a full personal-finance tool. It is not an expense tracker, a 
 - Monthly reconciliation against institutional statements as the primary recurring user action.
 - Historical net-worth computation and display in a user-chosen currency.
 - Commodity prices: manual entry **and** automated import from external sources (e.g. Bank of Canada Valet for FX rates, Alpha Vantage for equity quotes), with per-source scheduling and an admin management UI — see [commodities.md](commodities.md#price-sources--model).
+- Document links on transactions: any transaction can cite any number of Documents-module files (receipts, invoices, statements). Statement import links its source statement automatically; users link everything else manually — see [transactions.md](transactions.md#linked-documents).
 
 ## Out of scope for v1
 

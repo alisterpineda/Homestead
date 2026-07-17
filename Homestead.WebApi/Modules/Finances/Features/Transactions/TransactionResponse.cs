@@ -40,6 +40,9 @@ public record TransactionResponse
     public Guid? RelatedTransactionId { get; init; }
     public required IReadOnlyList<TransactionSplitResponse> Splits { get; init; }
 
+    /// <summary>Number of linked documents (any origin, including trashed/inaccessible ones).</summary>
+    public required int DocumentLinkCount { get; init; }
+
     /// <summary>
     /// Shape-specific fields. Populated only for shapes that need additional metadata beyond the
     /// generic transaction header (e.g., balance entries surface AssertedQuantity here).

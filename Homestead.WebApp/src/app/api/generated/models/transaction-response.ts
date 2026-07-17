@@ -6,6 +6,7 @@ import { TransactionShape } from '../models/transaction-shape';
 import { TransactionSplitResponse } from '../models/transaction-split-response';
 export interface TransactionResponse {
   details?: (null | TransactionDetails);
+  documentLinkCount: number;
   id: string;
   memo: string;
   occurredAt: string;

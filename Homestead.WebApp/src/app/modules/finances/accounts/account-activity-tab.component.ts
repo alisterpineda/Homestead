@@ -28,16 +28,20 @@ import {
   lucideChevronLeft,
   lucideChevronRight,
   lucideCircleAlert,
+  lucideEllipsisVertical,
   lucideListTodo,
+  lucidePaperclip,
   lucideTrash2,
   lucideX,
 } from '@ng-icons/lucide';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import {
   type CellContext,
   type ColumnDef,
@@ -64,6 +68,7 @@ import {  shapeLabel,
   signedAmountForAccount,
   transferCounterparty,
 } from '../transactions/transaction-display';
+import { LinkedDocumentsDialogComponent } from '../transactions/linked-documents-dialog/linked-documents-dialog.component';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
@@ -134,10 +139,70 @@ class ActivityAmountCell {
   protected readonly context = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
 }
 
+/** Callbacks the actions cell reaches through TanStack's table meta (precedent: AccountActionsCell). */
+interface ActivityTableMeta {
+  onLinkedDocuments(tx: TransactionResponse): void;
+}
+
+@Component({
+  selector: 'app-activity-actions-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  providers: [provideIcons({ lucideEllipsisVertical, lucidePaperclip })],
+  template: `
+    <div class="flex items-center justify-end gap-1">
+      @if (tx.documentLinkCount > 0) {
+        <span
+          class="inline-flex items-center gap-0.5 text-xs text-muted-foreground"
+          [attr.aria-label]="tx.documentLinkCount + ' linked document' + (tx.documentLinkCount === 1 ? '' : 's')"
+        >
+          <ng-icon hlm name="lucidePaperclip" size="sm" />
+          {{ tx.documentLinkCount }}
+        </span>
+      }
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        [hlmDropdownMenuTrigger]="menu"
+        aria-label="Transaction actions"
+        (click)="onTriggerClick($event)"
+      >
+        <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+      </button>
+      <ng-template #menu>
+        <hlm-dropdown-menu class="w-48">
+          <hlm-dropdown-menu-group>
+            <button hlmDropdownMenuItem (triggered)="onLinkedDocuments()">
+              <ng-icon hlm name="lucidePaperclip" size="sm" />
+              Linked documents
+            </button>
+          </hlm-dropdown-menu-group>
+        </hlm-dropdown-menu>
+      </ng-template>
+    </div>
+  `,
+})
+class ActivityActionsCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<ActivityRowViewModel, unknown>>();
+  protected get tx(): TransactionResponse { return this.ctx.row.original.tx; }
+
+  protected onLinkedDocuments(): void {
+    (this.ctx.table.options.meta as ActivityTableMeta).onLinkedDocuments(this.tx);
+  }
+
+  // The row click opens the edit sheet; the trigger must not bubble into it.
+  protected onTriggerClick(event: MouseEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+}
+
 @Component({
   selector: 'app-account-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmAlertDialogImports, FlexRenderDirective],
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmSpinner, HlmEmptyImports, HlmTableImports, HlmAlertDialogImports, FlexRenderDirective, LinkedDocumentsDialogComponent],
   providers: [provideIcons({
     lucideArrowRightLeft, lucideScale, lucideFlag, lucideCircleDashed,
     lucideTrendingUp, lucideTrendingDown, lucideBanknote,
@@ -259,8 +324,8 @@ class ActivityAmountCell {
                   <td
                     hlmTd
                     [class]="getTdClass(cell.column.id)"
-                    (click)="cell.column.id === 'select' ? $event.stopPropagation() : null"
-                    (keydown.enter)="cell.column.id === 'select' ? $event.stopPropagation() : null"
+                    (click)="isDeadZone(cell.column.id) ? $event.stopPropagation() : null"
+                    (keydown.enter)="isDeadZone(cell.column.id) ? $event.stopPropagation() : null"
                   >
                     <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
                       <div [innerHTML]="c"></div>
@@ -290,6 +355,13 @@ class ActivityAmountCell {
         </div>
       </div>
     }
+
+    <app-linked-documents-dialog
+      [state]="linkedDocsState()"
+      [transactionId]="linkedDocsTxId()"
+      (closed)="onLinkedDocsClosed()"
+      (linksChanged)="linksChanged.emit()"
+    />
   `,
 })
 export class AccountActivityTabComponent {
@@ -298,6 +370,12 @@ export class AccountActivityTabComponent {
 
   transactionClicked = output<TransactionResponse>();
   transactionsDeleted = output<void>();
+  /** A document link was added/removed — parent bumps refreshTrigger so documentLinkCount re-fetches. */
+  linksChanged = output<void>();
+
+  // Linked-documents dialog state, driven from the actions cell via table meta.
+  linkedDocsState = signal<BrnDialogState>('closed');
+  linkedDocsTxId = signal<string | null>(null);
 
   // Resets to 1 whenever the account changes; still writable (paging, clamp).
   page = linkedSignal({ source: this.account, computation: () => 1 });
@@ -374,6 +452,12 @@ export class AccountActivityTabComponent {
       cell: () => flexRenderComponent(ActivityAmountCell),
       enableSorting: false,
     },
+    {
+      id: 'actions',
+      header: '',
+      cell: () => flexRenderComponent(ActivityActionsCell),
+      enableSorting: false,
+    },
   ];
 
   protected readonly table = createAngularTable<ActivityRowViewModel>(() => ({
@@ -391,17 +475,22 @@ export class AccountActivityTabComponent {
     state: {
       rowSelection: this._rowSelection(),
     },
+    meta: {
+      onLinkedDocuments: (tx: TransactionResponse) => this.openLinkedDocuments(tx),
+    } satisfies ActivityTableMeta,
   }));
 
   private readonly TH_CLASSES: Record<string, string> = {
     select: 'w-10',
     amount: 'text-right',
+    actions: 'w-16 text-right',
   };
 
   private readonly TD_CLASSES: Record<string, string> = {
     select: 'w-10',
     memo: 'min-w-0',
     amount: 'text-right',
+    actions: 'w-16 text-right',
   };
 
   protected getThClass(columnId: string): string {
@@ -410,6 +499,11 @@ export class AccountActivityTabComponent {
 
   protected getTdClass(columnId: string): string {
     return this.TD_CLASSES[columnId] ?? '';
+  }
+
+  // Cells whose clicks must never bubble into the row's open-editor handler.
+  protected isDeadZone(columnId: string): boolean {
+    return columnId === 'select' || columnId === 'actions';
   }
 
   constructor() {
@@ -467,6 +561,18 @@ export class AccountActivityTabComponent {
 
   onClick(tx: TransactionResponse): void {
     this.transactionClicked.emit(tx);
+  }
+
+  openLinkedDocuments(tx: TransactionResponse): void {
+    this.linkedDocsTxId.set(tx.id);
+    this.linkedDocsState.set('open');
+  }
+
+  onLinkedDocsClosed(): void {
+    this.linkedDocsState.set('closed');
+    // Clearing the id makes every open an id change, so the dialog fetches exactly once per open
+    // (including re-opening the same transaction) without an extra on-open refresh signal.
+    this.linkedDocsTxId.set(null);
   }
 
   clearSelection(): void {

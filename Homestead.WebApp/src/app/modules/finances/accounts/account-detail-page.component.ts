@@ -252,6 +252,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
           [refreshKey]="refreshTrigger()"
           (transactionClicked)="onTransactionClicked($event)"
           (transactionsDeleted)="onTransactionsDeleted()"
+          (linksChanged)="refreshTrigger.update(v => v + 1)"
         />
       } @else if (notFound()) {
         <div hlmEmpty>

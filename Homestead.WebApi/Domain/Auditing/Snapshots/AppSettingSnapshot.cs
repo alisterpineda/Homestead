@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Homestead.WebApi.Domain.Settings;
 
 namespace Homestead.WebApi.Domain.Auditing.Snapshots;
@@ -23,6 +21,5 @@ public record AppSettingSnapshot : IAuditSnapshot<AppSettingSnapshot, AppSetting
         return changes;
     }
 
-    public static Guid KeyToGuid(string key) =>
-        new(MD5.HashData(Encoding.UTF8.GetBytes(key)));
+    public static Guid KeyToGuid(string key) => DeterministicGuid.FromKey(key);
 }

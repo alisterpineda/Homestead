@@ -8,9 +8,12 @@ internal static class TransactionMapping
     // categories: user-category path map (keyed by AccountId) from ICategoryPathResolver. Passed by flow-
     // aware read paths so FlowDetails can name/breadcrumb the counterpart leg. Null (the default, and for
     // non-flow mappers) → every flow reads as Uncategorised, exactly as before categorization.
+    // documentLinkCounts: per-transaction link counts (keyed by transaction Id) — same aux-map idiom.
+    // Null / absent key → 0, which is the truth for freshly created transactions.
     public static TransactionResponse ToResponse(
         AccountTransaction transaction,
-        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories = null)
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories = null,
+        IReadOnlyDictionary<Guid, int>? documentLinkCounts = null)
     {
         var shape = ResolveShape(transaction);
         var splits = transaction.Splits
@@ -34,6 +37,7 @@ internal static class TransactionMapping
             Memo = transaction.Memo,
             RelatedTransactionId = transaction.RelatedTransactionId,
             Splits = splits,
+            DocumentLinkCount = documentLinkCounts?.GetValueOrDefault(transaction.Id) ?? 0,
             Details = ResolveDetails(transaction, shape, categories),
         };
     }

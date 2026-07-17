@@ -45,15 +45,17 @@ public class CommitStatementImportHandler(
                 AccountId = staged.AccountId,
             };
 
-        // Re-commit guard: any transaction already provenance-stamped from this exact version means this
-        // statement was already imported (Feature A + B commit together atomically, so a single stamped row
-        // — balance entry or flow — closes the whole version). The per-day balance-entry unique index is the
-        // second backstop inside CreateAsync's EnsureNoExistingEntryAsync, which re-checks the live ledger.
-        var alreadyImported = await db.AccountTransactions
+        // Re-commit guard: any import-origin link to this document means the statement was already imported
+        // (Feature A + B commit together atomically, so a single link row — balance entry or flow — closes
+        // the whole document; one document = one active import). Origin-scoped so a *manual* link to the
+        // statement never blocks importing it. Initiate carries the same cheap pre-check before the metered
+        // AI parse; this one is authoritative. The per-day balance-entry unique index is the second backstop
+        // inside CreateAsync's EnsureNoExistingEntryAsync, which re-checks the live ledger.
+        var alreadyImported = await db.TransactionDocumentLinks
             .AsNoTracking()
-            .AnyAsync(t => t.SourceDocumentVersionId == staged.DocumentVersionId, ct);
+            .AnyAsync(TransactionDocumentLink.IsImportOriginFor(staged.DocumentId), ct);
         if (alreadyImported)
-            throw new BusinessRuleException("This statement version has already been imported.");
+            throw new BusinessRuleException("This statement has already been imported.");
 
         // Accumulate every created transaction (balance entry + flows) and their touched pairs, so a single
         // flush + single reconcile covers the batch (the reconciler collapses overlapping pairs). Mirrors the
@@ -103,9 +105,17 @@ public class CommitStatementImportHandler(
             touched.AddRange(flow.TouchedPairs);
         }
 
-        // Stamp soft provenance on every created (tracked) transaction before the flush.
+        // Import-origin provenance: one document-grained link per created (tracked) transaction, added
+        // before the flush so links land in the same command transaction as the transactions themselves.
         foreach (var transaction in created)
-            transaction.SourceDocumentVersionId = staged.DocumentVersionId;
+            db.TransactionDocumentLinks.Add(new TransactionDocumentLink
+            {
+                AccountTransaction = transaction,
+                DocumentId = staged.DocumentId,
+                Origin = TransactionDocumentLinkOrigin.StatementImport,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedByUserId = currentUser.UserId,
+            });
 
         // Canonical flush-then-reconcile order — one flush, one reconcile over the combined touched set.
         await unitOfWork.SaveChangesAsync(ct);

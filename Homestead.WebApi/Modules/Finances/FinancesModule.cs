@@ -43,6 +43,9 @@ using Homestead.WebApi.Modules.Finances.Features.Settings.GetFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Settings.PatchFinanceSettings;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.BulkDeleteTransactions;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.DeleteTransaction;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.AddTransactionDocumentLink;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.GetTransactionDocuments;
+using Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.RemoveTransactionDocumentLink;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetAccountTransactions;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransaction;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.GetTransactions;
@@ -124,6 +127,11 @@ public static class FinancesModule
         GetTransactionEndpoint.Map(transactions);
         DeleteTransactionEndpoint.Map(transactions);
         BulkDeleteTransactionsEndpoint.Map(transactions);
+
+        // Document links (receipts/invoices/statements) on any transaction shape.
+        GetTransactionDocumentsEndpoint.Map(transactions);
+        AddTransactionDocumentLinkEndpoint.Map(transactions);
+        RemoveTransactionDocumentLinkEndpoint.Map(transactions);
 
         // Per-shape transaction create/edit endpoints under /transactions/{shape}.
         var transfers = transactions.MapGroup("/transfers");

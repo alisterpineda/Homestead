@@ -85,7 +85,7 @@ public class StatementImportPipelineTests : IntegrationTestBase
         Assert.True(staged.LineItems[0].Mappable);
         Assert.Equal("Income", staged.LineItems[1].Direction);
 
-        // 3. Commit → balance entry AND two flows created, each stamped with the source version.
+        // 3. Commit → balance entry AND two flows created, each holding an import-origin document link.
         var commitResp = await client.PostAsJsonAsync(
             $"/api/v1/finances/imports/{initiate.JobId}/commit",
             new
@@ -106,22 +106,27 @@ public class StatementImportPipelineTests : IntegrationTestBase
         Assert.NotNull(commit.EntryId);
         Assert.Equal(2, commit.FlowsCreated);
 
-        // Balance entry + 2 flows all carry the version stamp.
-        await AssertSourceStampedAsync(versionId, expectedCount: 3);
+        // Balance entry + 2 flows all carry an import-origin link to the document.
+        await AssertImportLinkedAsync(documentId, expectedCount: 3);
 
-        // 4. Re-commit is rejected (already imported this version).
+        // 4. Re-commit is rejected (this document already has an active import) — and so is
+        // re-initiate, which now carries the same document-grained pre-check before the AI parse.
         var recommitResp = await client.PostAsJsonAsync(
             $"/api/v1/finances/imports/{initiate.JobId}/commit",
             new { assertedAmount = 1500m, date = "2026-06-30", memo = (string?)null, accepted = true }, CT);
         Assert.Equal(HttpStatusCode.BadRequest, recommitResp.StatusCode);
 
-        // 5. Rollback removes the whole mixed set (entry + both flows).
-        var rollbackResp = await client.DeleteAsync($"/api/v1/finances/imports/{versionId}", CT);
+        var reinitiateResp = await client.PostAsJsonAsync("/api/v1/finances/imports",
+            new { accountId, documentVersionId = versionId }, CT);
+        Assert.Equal(HttpStatusCode.BadRequest, reinitiateResp.StatusCode);
+
+        // 5. Rollback (by document) removes the whole mixed set (entry + both flows).
+        var rollbackResp = await client.DeleteAsync($"/api/v1/finances/imports/{documentId}", CT);
         Assert.Equal(HttpStatusCode.OK, rollbackResp.StatusCode);
         var rollback = await rollbackResp.Content.ReadFromJsonAsync<RollbackItem>(CT);
         Assert.Equal(3, rollback!.DeletedCount);
 
-        await AssertSourceStampedAsync(versionId, expectedCount: 0);
+        await AssertImportLinkedAsync(documentId, expectedCount: 0);
     }
 
     [Fact]
@@ -204,7 +209,10 @@ public class StatementImportPipelineTests : IntegrationTestBase
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Assert.True(await ColumnExistsAsync(db, "finances", "account_transactions", "SourceDocumentVersionId"));
+        // The provenance column was replaced by the link table (ReplaceSourceDocumentVersionWithDocumentLinks).
+        Assert.False(await ColumnExistsAsync(db, "finances", "account_transactions", "SourceDocumentVersionId"));
+        Assert.True(await ColumnExistsAsync(db, "finances", "transaction_document_links", "DocumentId"));
+        Assert.True(await ColumnExistsAsync(db, "finances", "transaction_document_links", "Origin"));
         Assert.True(await ColumnExistsAsync(db, "finances", "accounts", "AccountNumber"));
         Assert.True(await ColumnExistsAsync(db, "processing", "jobs", "Result"));
 
@@ -212,8 +220,8 @@ public class StatementImportPipelineTests : IntegrationTestBase
             .SqlQuery<int>($"""
                 SELECT 1 AS "Value" FROM pg_indexes
                 WHERE schemaname = 'finances'
-                  AND tablename = 'account_transactions'
-                  AND indexname = 'IX_account_transactions_SourceDocumentVersionId'
+                  AND tablename = 'transaction_document_links'
+                  AND indexname = 'IX_transaction_document_links_DocumentId'
                 """)
             .AnyAsync(CT);
         Assert.True(indexExists);
@@ -239,12 +247,13 @@ public class StatementImportPipelineTests : IntegrationTestBase
             .AnyAsync(j => j.Type == ProcessingJobType.ParseAccountStatement, CT));
     }
 
-    private async Task AssertSourceStampedAsync(Guid versionId, int expectedCount)
+    private async Task AssertImportLinkedAsync(Guid documentId, int expectedCount)
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var count = await db.AccountTransactions
-            .CountAsync(t => t.SourceDocumentVersionId == versionId, CT);
+        var count = await db.TransactionDocumentLinks
+            .CountAsync(l => l.DocumentId == documentId
+                          && l.Origin == TransactionDocumentLinkOrigin.StatementImport, CT);
         Assert.Equal(expectedCount, count);
     }
 

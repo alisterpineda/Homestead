@@ -54,6 +54,17 @@ public class InitiateStatementImportHandler(
         if (!documentAccessible)
             throw new EntityNotFoundException("Document not found.");
 
+        // Duplicate-import pre-check (the commit guard is authoritative; this one saves a metered AI parse):
+        // one document = one active import, so any import-origin link to this document rejects re-initiate.
+        // Origin-scoped — a manual link to the statement never blocks importing it. Placed after the access
+        // guard so an inaccessible document cannot be probed for its import state.
+        var alreadyImported = await db.TransactionDocumentLinks
+            .AsNoTracking()
+            .AnyAsync(TransactionDocumentLink.IsImportOriginFor(version.DocumentId), ct);
+        if (alreadyImported)
+            throw new BusinessRuleException(
+                "This statement has already been imported. Roll back the previous import to import it again.");
+
         // Parsing is text-driven, so a version with no extracted text has nothing to import. Reject here —
         // before a job row exists and before any metered AI call — rather than letting the job stage a
         // proposal built from the page-1 image alone, which looks complete and silently drops later pages.

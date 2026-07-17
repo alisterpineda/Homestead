@@ -8,11 +8,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Finances.Features.Imports.RollbackStatementImport;
 
 /// <summary>
-/// Convenience undo: deletes every ledger transaction stamped with the given source document version. After
-/// Feature B a single import can produce a mixed set — one balance-entry assertion plus N Expense/Income
-/// flows — so deletion is dispatched by transaction type (mirroring <c>DeleteTransactionHandler</c>):
-/// <c>BalanceEntry → IBalanceEntryService.DeleteAsync</c>, <c>Normal → ITransferService.DeleteAsync</c>.
-/// Both emit touched pairs; one flush + one reconcile re-derives downstream balance entries.
+/// Convenience undo: deletes every ledger transaction holding an import-origin document link to the given
+/// document. After Feature B a single import can produce a mixed set — one balance-entry assertion plus N
+/// Expense/Income flows — so deletion is dispatched by transaction type (mirroring
+/// <c>DeleteTransactionHandler</c>): <c>BalanceEntry → IBalanceEntryService.DeleteAsync</c>,
+/// <c>Normal → ITransferService.DeleteAsync</c>. The links themselves cascade away with the transactions.
+/// Both services emit touched pairs; one flush + one reconcile re-derives downstream balance entries.
 /// </summary>
 public class RollbackStatementImportHandler(
     AppDbContext db,
@@ -26,14 +27,16 @@ public class RollbackStatementImportHandler(
         RollbackStatementImportCommand request, CancellationToken ct)
     {
         // Project just id + discriminator: the shape services re-load the tracked entity themselves.
-        var rows = await db.AccountTransactions
+        // IsImportOriginFor keeps this scope in lockstep with the initiate/commit guards — manual
+        // links to the same document must not drag their transactions into a rollback.
+        var rows = await db.TransactionDocumentLinks
             .AsNoTracking()
-            .Where(t => t.SourceDocumentVersionId == request.SourceDocumentVersionId)
-            .Select(t => new { t.Id, t.Type })
+            .Where(TransactionDocumentLink.IsImportOriginFor(request.DocumentId))
+            .Select(l => new { Id = l.AccountTransactionId, l.AccountTransaction.Type })
             .ToListAsync(ct);
 
         if (rows.Count == 0)
-            throw new EntityNotFoundException("No imported transactions found for this document version.");
+            throw new EntityNotFoundException("No imported transactions found for this document.");
 
         var touched = new List<TouchedPair>();
         foreach (var row in rows)

@@ -54,6 +54,7 @@ function makeTx(overrides: Partial<TransactionResponse> & { id: string }): Trans
     memo: 'Groceries',
     occurredAt: '2026-04-23T00:00:00Z',
     relatedTransactionId: null,
+    documentLinkCount: 0,
     splits: [
       { id: `${overrides.id}-s1`, accountId: 'acc-1', commodityId: 'cad', quantity: -50 },
       { id: `${overrides.id}-s2`, accountId: 'sys-expense', commodityId: 'cad', quantity: 50 },
@@ -66,12 +67,15 @@ describe('AccountActivityTabComponent', () => {
   let txApiStub: {
     getAccountTransactions: ReturnType<typeof vi.fn>;
     bulkDeleteTransactions: ReturnType<typeof vi.fn>;
+    getTransactionDocuments: ReturnType<typeof vi.fn>;
   };
 
   function setup(items: TransactionResponse[], totalCount = items.length) {
     txApiStub = {
       getAccountTransactions: vi.fn(() => of({ page: 1, pageSize: 25, totalCount, items })),
       bulkDeleteTransactions: vi.fn(() => of({ deletedCount: 2 })),
+      // The hosted linked-documents dialog fetches through this once a transaction is targeted.
+      getTransactionDocuments: vi.fn(() => of([])),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -191,5 +195,44 @@ describe('AccountActivityTabComponent', () => {
 
     c['table'].getRow('div').toggleSelected(true);
     expect(c.selectionIncludesDrip()).toBe(true);
+  });
+
+  it('openLinkedDocuments targets the transaction and opens the dialog', () => {
+    const tx = makeTx({ id: 't1', documentLinkCount: 2 });
+    const fixture = setup([tx]);
+    const c = fixture.componentInstance;
+
+    expect(c.linkedDocsState()).toBe('closed');
+    expect(c.linkedDocsTxId()).toBeNull();
+
+    c.openLinkedDocuments(tx);
+
+    expect(c.linkedDocsTxId()).toBe('t1');
+    expect(c.linkedDocsState()).toBe('open');
+  });
+
+  it('onLinkedDocsClosed resets the dialog state and clears the transaction id', () => {
+    const tx = makeTx({ id: 't1' });
+    const fixture = setup([tx]);
+    const c = fixture.componentInstance;
+
+    c.openLinkedDocuments(tx);
+    c.onLinkedDocsClosed();
+
+    expect(c.linkedDocsState()).toBe('closed');
+    // Cleared so re-opening the same transaction registers as an id change → exactly one fetch.
+    expect(c.linkedDocsTxId()).toBeNull();
+  });
+
+  it('treats only the select and actions columns as row-click dead zones', () => {
+    const fixture = setup([makeTx({ id: 't1' })]);
+    const c = fixture.componentInstance;
+
+    expect(c['isDeadZone']('select')).toBe(true);
+    expect(c['isDeadZone']('actions')).toBe(true);
+    expect(c['isDeadZone']('date')).toBe(false);
+    expect(c['isDeadZone']('type')).toBe(false);
+    expect(c['isDeadZone']('memo')).toBe(false);
+    expect(c['isDeadZone']('amount')).toBe(false);
   });
 });

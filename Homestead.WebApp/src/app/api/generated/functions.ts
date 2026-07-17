@@ -219,6 +219,12 @@ export type { DeleteTransaction$Params as DeleteTransaction$Params } from './fn/
 export { deleteTransaction as deleteTransaction } from './fn/finances/delete-transaction';
 export type { BulkDeleteTransactions$Params as BulkDeleteTransactions$Params } from './fn/finances/bulk-delete-transactions';
 export { bulkDeleteTransactions as bulkDeleteTransactions } from './fn/finances/bulk-delete-transactions';
+export type { GetTransactionDocuments$Params as GetTransactionDocuments$Params } from './fn/finances/get-transaction-documents';
+export { getTransactionDocuments as getTransactionDocuments } from './fn/finances/get-transaction-documents';
+export type { AddTransactionDocumentLink$Params as AddTransactionDocumentLink$Params } from './fn/finances/add-transaction-document-link';
+export { addTransactionDocumentLink as addTransactionDocumentLink } from './fn/finances/add-transaction-document-link';
+export type { RemoveTransactionDocumentLink$Params as RemoveTransactionDocumentLink$Params } from './fn/finances/remove-transaction-document-link';
+export { removeTransactionDocumentLink as removeTransactionDocumentLink } from './fn/finances/remove-transaction-document-link';
 export type { CreateTransfer$Params as CreateTransfer$Params } from './fn/finances/create-transfer';
 export { createTransfer as createTransfer } from './fn/finances/create-transfer';
 export type { PatchTransfer$Params as PatchTransfer$Params } from './fn/finances/patch-transfer';

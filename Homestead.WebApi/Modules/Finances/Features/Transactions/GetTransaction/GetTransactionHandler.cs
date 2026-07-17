@@ -18,6 +18,7 @@ public class GetTransactionHandler(AppDbContext db, ICategoryPathResolver pathRe
             ?? throw new EntityNotFoundException("Transaction not found.");
 
         var categories = await pathResolver.GetPathMapAsync(ct);
-        return TransactionMapping.ToResponse(transaction, categories);
+        return TransactionMapping.ToResponse(
+            transaction, categories, await DocumentLinkCounts.ForAsync(db, transaction.Id, ct));
     }
 }

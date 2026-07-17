@@ -10,13 +10,13 @@ import { RequestBuilder } from '../../request-builder';
 import { RollbackStatementImportResponse } from '../../models/rollback-statement-import-response';
 
 export interface RollbackStatementImport$Params {
-  sourceDocumentVersionId: string;
+  documentId: string;
 }
 
 export function rollbackStatementImport(http: HttpClient, rootUrl: string, params: RollbackStatementImport$Params, context?: HttpContext): Observable<StrictHttpResponse<RollbackStatementImportResponse>> {
   const rb = new RequestBuilder(rootUrl, rollbackStatementImport.PATH, 'delete');
   if (params) {
-    rb.path('sourceDocumentVersionId', params.sourceDocumentVersionId, {});
+    rb.path('documentId', params.documentId, {});
   }
 
   return http.request(
@@ -29,4 +29,4 @@ export function rollbackStatementImport(http: HttpClient, rootUrl: string, param
   );
 }
 
-rollbackStatementImport.PATH = '/api/v1/finances/imports/{sourceDocumentVersionId}';
+rollbackStatementImport.PATH = '/api/v1/finances/imports/{documentId}';

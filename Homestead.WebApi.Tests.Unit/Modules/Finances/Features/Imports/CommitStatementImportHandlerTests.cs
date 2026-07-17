@@ -88,14 +88,14 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         return ValueTask.CompletedTask;
     }
 
-    private async Task<(ProcessingJob job, Guid versionId)> SeedJobAsync(Guid? owner = null)
+    private async Task<(ProcessingJob job, Guid documentId)> SeedJobAsync(Guid? owner = null)
     {
-        var versionId = Guid.NewGuid();
+        var documentId = Guid.NewGuid();
         var staged = new StagedStatementImport
         {
             AccountId = _account.Id,
-            DocumentId = Guid.NewGuid(),
-            DocumentVersionId = versionId,
+            DocumentId = documentId,
+            DocumentVersionId = Guid.NewGuid(),
             Ir = new StatementIr { Kind = StatementKind.Bank, Header = new StatementHeaderIr() },
             Proposal = new StatementMappingProposal { AccountNumberMatch = AccountNumberMatch.Unknown },
         };
@@ -109,7 +109,27 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         job.SetResult(staged);
         _db.ProcessingJobs.Add(job);
         await _db.SaveChangesAsync();
-        return (job, versionId);
+        return (job, documentId);
+    }
+
+    /// <summary>Seeds a prior imported/linked transaction so guard behaviour can be exercised.</summary>
+    private async Task SeedLinkedTransactionAsync(Guid documentId, TransactionDocumentLinkOrigin origin)
+    {
+        var prior = new BalanceEntryTransaction
+        {
+            Id = Guid.NewGuid(), OccurredAt = new DateOnly(2026, 5, 31).ToEndOfDayUtc(), Memo = "prior",
+            Type = TransactionType.BalanceEntry, AccountId = _account.Id, AssertedCommodityId = _cad.Id,
+            AssertedQuantity = 1m,
+        };
+        _db.AccountTransactions.Add(prior);
+        _db.TransactionDocumentLinks.Add(new TransactionDocumentLink
+        {
+            AccountTransactionId = prior.Id,
+            DocumentId = documentId,
+            Origin = origin,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync();
     }
 
     private static CommitStatementImportCommand Command(Guid jobId, bool accepted = true) => new()
@@ -122,9 +142,9 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     };
 
     [Fact]
-    public async Task Commit_Accepted_CreatesEntry_StampsSource_AndReconciles()
+    public async Task Commit_Accepted_CreatesEntry_WritesImportLink_AndReconciles()
     {
-        var (job, versionId) = await SeedJobAsync();
+        var (job, documentId) = await SeedJobAsync();
 
         var result = await _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken);
 
@@ -134,18 +154,23 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
 
         var entry = await _db.AccountTransactions.OfType<BalanceEntryTransaction>()
             .SingleAsync(e => e.Id == result.EntryId);
-        Assert.Equal(versionId, entry.SourceDocumentVersionId);
         Assert.Equal(_account.Id, entry.AccountId);
         Assert.Equal(_cad.Id, entry.AssertedCommodityId);
+
+        var link = await _db.TransactionDocumentLinks
+            .SingleAsync(l => l.AccountTransactionId == entry.Id);
+        Assert.Equal(documentId, link.DocumentId);
+        Assert.Equal(TransactionDocumentLinkOrigin.StatementImport, link.Origin);
+        Assert.Equal(_userId, link.CreatedByUserId);
 
         await _reconciler.Received(1).ReconcileAsync(
             Arg.Any<IEnumerable<TouchedPair>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Commit_Accepted_WithLines_CreatesEntryAndFlows_AllStamped_OneReconcile()
+    public async Task Commit_Accepted_WithLines_CreatesEntryAndFlows_AllLinked_OneReconcile()
     {
-        var (job, versionId) = await SeedJobAsync();
+        var (job, documentId) = await SeedJobAsync();
 
         var command = Command(job.Id) with
         {
@@ -162,13 +187,20 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         Assert.NotNull(result.EntryId);
         Assert.Equal(2, result.FlowsCreated);
 
-        // Balance entry + 2 flows, each stamped with the source version.
-        var stamped = await _db.AccountTransactions
-            .Where(t => t.SourceDocumentVersionId == versionId)
+        // Balance entry + 2 flows, each carrying an import-origin link to the statement's document.
+        var links = await _db.TransactionDocumentLinks
+            .Where(l => l.DocumentId == documentId
+                     && l.Origin == TransactionDocumentLinkOrigin.StatementImport)
             .ToListAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(3, stamped.Count);
-        Assert.Single(stamped.OfType<BalanceEntryTransaction>());
-        Assert.Equal(2, stamped.OfType<NormalTransaction>().Count());
+        Assert.Equal(3, links.Count);
+        Assert.Equal(3, links.Select(l => l.AccountTransactionId).Distinct().Count());
+
+        var linkedIds = links.Select(l => l.AccountTransactionId).ToList();
+        var linked = await _db.AccountTransactions
+            .Where(t => linkedIds.Contains(t.Id))
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Single(linked.OfType<BalanceEntryTransaction>());
+        Assert.Equal(2, linked.OfType<NormalTransaction>().Count());
 
         // One combined reconcile pass over the whole batch's touched pairs.
         await _reconciler.Received(1).ReconcileAsync(
@@ -178,7 +210,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Commit_RejectedBalanceEntry_StillCommitsLines()
     {
-        var (job, versionId) = await SeedJobAsync();
+        var (job, documentId) = await SeedJobAsync();
 
         var command = Command(job.Id, accepted: false) with
         {
@@ -191,10 +223,12 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         Assert.Null(result.EntryId);
         Assert.Equal(1, result.FlowsCreated);
 
-        var stamped = await _db.AccountTransactions
-            .Where(t => t.SourceDocumentVersionId == versionId)
-            .ToListAsync(TestContext.Current.CancellationToken);
-        Assert.IsType<NormalTransaction>(Assert.Single(stamped));
+        var link = Assert.Single(await _db.TransactionDocumentLinks
+            .Where(l => l.DocumentId == documentId)
+            .ToListAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(TransactionDocumentLinkOrigin.StatementImport, link.Origin);
+        Assert.IsType<NormalTransaction>(await _db.AccountTransactions
+            .SingleAsync(t => t.Id == link.AccountTransactionId, TestContext.Current.CancellationToken));
         Assert.False(await _db.AccountTransactions.OfType<BalanceEntryTransaction>()
             .AnyAsync(TestContext.Current.CancellationToken));
 
@@ -217,20 +251,30 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Commit_AlreadyImportedVersion_Throws()
+    public async Task Commit_AlreadyImportedDocument_Throws()
     {
-        var (job, versionId) = await SeedJobAsync();
-        // A prior transaction already carries this source version → re-import must be rejected.
-        _db.AccountTransactions.Add(new BalanceEntryTransaction
-        {
-            Id = Guid.NewGuid(), OccurredAt = new DateOnly(2026, 5, 31).ToEndOfDayUtc(), Memo = "prior",
-            Type = TransactionType.BalanceEntry, AccountId = _account.Id, AssertedCommodityId = _cad.Id,
-            AssertedQuantity = 1m, SourceDocumentVersionId = versionId,
-        });
-        await _db.SaveChangesAsync();
+        var (job, documentId) = await SeedJobAsync();
+        // A prior transaction already carries an import-origin link to this document → rejected.
+        await SeedLinkedTransactionAsync(documentId, TransactionDocumentLinkOrigin.StatementImport);
 
         await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Commit_ManualLinkToDocument_DoesNotBlock()
+    {
+        var (job, documentId) = await SeedJobAsync();
+        // A *manual* link to the statement's document must never trip the origin-scoped guard.
+        await SeedLinkedTransactionAsync(documentId, TransactionDocumentLinkOrigin.Manual);
+
+        var result = await _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Committed);
+        Assert.Single(await _db.TransactionDocumentLinks
+            .Where(l => l.DocumentId == documentId
+                     && l.Origin == TransactionDocumentLinkOrigin.StatementImport)
+            .ToListAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]

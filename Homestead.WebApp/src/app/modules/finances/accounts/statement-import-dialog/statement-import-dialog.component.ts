@@ -8,11 +8,10 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { firstValueFrom, of } from 'rxjs';
-import { filter, map, debounceTime, switchMap, catchError } from 'rxjs/operators';
+import { firstValueFrom } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideFileUp, lucideFileText, lucideSearch } from '@ng-icons/lucide';
+import { lucideFileUp, lucideFileText } from '@ng-icons/lucide';
 import { BrnDialog } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
@@ -20,7 +19,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
-import { SearchInputComponent } from '@/shared/components/search-input/search-input.component';
+import { DocumentPickerComponent } from '../../shared/document-picker/document-picker.component';
 import { UploadDropzoneComponent } from '../../../documents/list/upload-dropzone/upload-dropzone.component';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
@@ -29,7 +28,6 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { JobFailedError } from '@/shared/types/job-failed-error';
 import type { CreateDocumentResponse } from '@/api/generated/models/create-document-response';
 import type { GetDocumentResponse } from '@/api/generated/models/get-document-response';
-import type { GetDocumentsResponse } from '@/api/generated/models/get-documents-response';
 
 const IMPORT_FAILED = 'Statement import failed.';
 
@@ -49,11 +47,11 @@ const IMPORT_FAILED = 'Statement import failed.';
     HlmTabsImports,
     HlmIconImports,
     NgIcon,
-    SearchInputComponent,
+    DocumentPickerComponent,
     UploadDropzoneComponent,
     RouterLink,
   ],
-  providers: [provideIcons({ lucideFileUp, lucideFileText, lucideSearch })],
+  providers: [provideIcons({ lucideFileUp, lucideFileText })],
   template: `
     <hlm-dialog (stateChanged)="onStateChanged($event)">
       <button hlmBtn [size]="triggerSize()" [variant]="triggerVariant()" hlmDialogTrigger>
@@ -130,29 +128,7 @@ const IMPORT_FAILED = 'Statement import failed.';
             </div>
 
             <div hlmTabsContent="existing" class="flex flex-col gap-3 pt-4">
-              <app-search-input [(value)]="search" placeholder="Search documents…" />
-              <div class="max-h-64 overflow-y-auto rounded-md border border-border">
-                @if (results().length === 0) {
-                  <p class="px-3 py-6 text-center text-sm text-muted-foreground">
-                    {{ search().trim() ? 'No documents found.' : 'Type to search documents.' }}
-                  </p>
-                } @else {
-                  <ul class="divide-y divide-border">
-                    @for (doc of results(); track doc.id) {
-                      <li>
-                        <button
-                          type="button"
-                          class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-                          (click)="startExisting(doc.id)"
-                        >
-                          <ng-icon hlm name="lucideFileText" size="sm" class="text-muted-foreground" />
-                          <span class="truncate">{{ doc.name }}</span>
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </div>
+              <app-document-picker [(search)]="search" (documentSelected)="startExisting($event.id)" />
               <div hlmDialogFooter>
                 <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
               </div>
@@ -198,21 +174,6 @@ export class StatementImportDialogComponent {
   private processingHub = inject(ProcessingHubService);
   private errorHandler = inject(ErrorHandlerService);
   private router = inject(Router);
-
-  readonly results = toSignal(
-    toObservable(this.search).pipe(
-      debounceTime(300),
-      switchMap((term) =>
-        term.trim()
-          ? this.documentApi.getDocuments({ Search: term, PageSize: 10, IncludeChildTags: false }).pipe(
-              map((r) => r.items),
-              catchError(() => of([] as GetDocumentsResponse[])),
-            )
-          : of([] as GetDocumentsResponse[]),
-      ),
-    ),
-    { initialValue: [] as GetDocumentsResponse[] },
-  );
 
   onStateChanged(state: 'open' | 'closed'): void {
     this.dialogOpen = state === 'open';

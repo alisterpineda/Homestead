@@ -478,9 +478,6 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("RelatedTransactionId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("SourceDocumentVersionId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -501,8 +498,6 @@ namespace Homestead.WebApi.Migrations
                     b.HasIndex("OccurredAt");
 
                     b.HasIndex("RelatedTransactionId");
-
-                    b.HasIndex("SourceDocumentVersionId");
 
                     b.HasIndex("UpdatedByUserId");
 
@@ -764,6 +759,32 @@ namespace Homestead.WebApi.Migrations
                         {
                             t.HasCheckConstraint("CK_commodity_price_source_settings_source_kind", "\"Source\" NOT IN ('Transaction', 'Manual')");
                         });
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.TransactionDocumentLink", b =>
+                {
+                    b.Property<Guid>("AccountTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("AccountTransactionId", "DocumentId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("transaction_document_links", "finances");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Groups.Group", b =>
@@ -1880,6 +1901,23 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.TransactionDocumentLink", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Finances.AccountTransaction", "AccountTransaction")
+                        .WithMany()
+                        .HasForeignKey("AccountTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Documents.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AccountTransaction");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Groups.Group", b =>

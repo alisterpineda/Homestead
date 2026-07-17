@@ -28,6 +28,7 @@ const buyTrade: TransactionResponse = {
   occurredAt: '2026-04-23T12:00:00.000Z',
   memo: 'monthly buy',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'trade',
     accountId: 'inv-1',

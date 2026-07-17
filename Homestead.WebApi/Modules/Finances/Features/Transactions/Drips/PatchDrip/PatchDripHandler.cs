@@ -1,10 +1,12 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Persistence;
 using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Drips.PatchDrip;
 
 public class PatchDripHandler(
+    AppDbContext db,
     IDripService drips,
     IBalanceEntryReconciler reconciler,
     IUnitOfWork unitOfWork)
@@ -28,6 +30,8 @@ public class PatchDripHandler(
 
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 
-        return TransactionMapping.ToResponse(result.DividendHalf!);
+        return TransactionMapping.ToResponse(
+            result.DividendHalf!,
+            documentLinkCounts: await DocumentLinkCounts.ForAsync(db, result.DividendHalf!.Id, ct));
     }
 }

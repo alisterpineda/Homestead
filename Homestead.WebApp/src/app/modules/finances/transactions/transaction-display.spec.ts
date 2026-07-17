@@ -7,6 +7,7 @@ function tx(splits: Array<{ accountId: string; quantity: number; commodityId?: s
     memo: '',
     occurredAt: '2026-04-23T00:00:00Z',
     shape: 'Transfer',
+    documentLinkCount: 0,
     splits: splits.map((s, i) => ({
       id: `s-${i}`,
       accountId: s.accountId,

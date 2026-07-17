@@ -43,9 +43,13 @@ public class GetAccountTransactionsHandler(AppDbContext db, ICategoryPathResolve
         var page = await orderedQuery.ToPaginatedAsync(request, ct);
         var categories = await pathResolver.GetPathMapAsync(ct);
 
+        // Feeds DocumentLinkCount — same aux-map idiom as the category path map above.
+        var linkCounts = await DocumentLinkCounts.ForPageAsync(
+            db, page.Items.Select(t => t.Id).ToList(), ct);
+
         return new PaginatedResponse<TransactionResponse>
         {
-            Items = page.Items.Select(t => TransactionMapping.ToResponse(t, categories)).ToList(),
+            Items = page.Items.Select(t => TransactionMapping.ToResponse(t, categories, linkCounts)).ToList(),
             Page = page.Page,
             PageSize = page.PageSize,
             TotalCount = page.TotalCount,

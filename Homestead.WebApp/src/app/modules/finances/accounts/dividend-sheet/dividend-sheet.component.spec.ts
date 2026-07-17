@@ -28,6 +28,7 @@ const dividend: TransactionResponse = {
   occurredAt: '2026-04-23T12:00:00.000Z',
   memo: 'VEQT distribution',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'dividend',
     accountId: 'inv-1',

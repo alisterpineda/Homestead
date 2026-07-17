@@ -293,11 +293,53 @@ An uploaded bank/credit-card statement (a `Document` version) is parsed by AI in
 - **Feature A — closing balance → balance entry (shipped Phase 1).** The statement's closing balance and period-end become one proposed `BalanceEntryTransaction` assertion in the account's reporting currency (see *Balance entry* / *Balance-entry reconciliation*). The reviewer edits amount/date/memo before committing.
 - **Feature B — line items → Expense/Income flows (shipped Phase 2).** Every transaction *row* on the statement is transcribed and proposed as an itemized Expense/Income flow. Each row carries a direction from the account-holder's perspective — **Out** (spend / charge / debit / withdrawal → **Expense**) or **In** (payment / credit / refund / deposit → **Income**) — plus a positive magnitude, an optional date, description, and printed running balance. The deterministic Tier-1 mapping is `Out → Expense`, `In → Income`; a row missing an amount or direction is surfaced greyed as **un-mappable** (never dropped) and can't be committed until the reviewer fixes it. All lines post **uncategorised** (the system Expense/Income bucket via `CategoryId: null`, reusing the `IFlowCounterpartResolver` seam); recategorise later through the normal flow editor. There is no per-line category picker on import. (Internal-transfer detection is deferred — a transfer line imports as an ordinary flow and is individually editable.)
 
-**Two-panel review, atomic A+B commit.** The review page shows the rendered statement beside the extracted data: the Feature-A balance-entry form and a Feature-B line-items table (accept/reject per row + select-all, inline edit of amount/description/direction/date). The client sends the **final curated line list** (accepted rows with edits applied); every committed row is server-validated and provenance-stamped. The commit creates the balance entry (if accepted) and all accepted flows in a single command transaction, then runs **one** flush + **one** reconcile over the combined touched set (the reconciler collapses overlapping `(account, commodity)` pairs).
+**Two-panel review, atomic A+B commit.** The review page shows the rendered statement beside the extracted data: the Feature-A balance-entry form and a Feature-B line-items table (accept/reject per row + select-all, inline edit of amount/description/direction/date). The client sends the **final curated line list** (accepted rows with edits applied); every committed row is server-validated and receives an import-origin document link (see *Linked documents*). The commit creates the balance entry (if accepted) and all accepted flows in a single command transaction, then runs **one** flush + **one** reconcile over the combined touched set (the reconciler collapses overlapping `(account, commodity)` pairs).
 
 **Advisory checksum.** A client-side banner tests `opening + Σ(sign · amount)` over the selected lines against the printed closing balance (sign follows the account-type convention: asset `In +1 / Out −1`, liability `Out +1 / In −1`). It renders ✓ balanced / ⚠ off by $X / unavailable — a completeness cue only; it **never gates the commit**. A companion amber note warns when the statement text was long enough to be clipped before extraction (`TextTruncated`), so trailing lines may be missing.
 
-**Provenance & rollback.** Every created transaction (balance entry + flows) is stamped `SourceDocumentVersionId`. A re-import guard blocks committing the same version twice, so a single stamped row closes the whole version. Rollback (`DELETE /finances/imports/{sourceDocumentVersionId}`) deletes the whole mixed set — dispatching by transaction type (`BalanceEntry → IBalanceEntryService.DeleteAsync`, `Normal → ITransferService.DeleteAsync`) — then re-reconciles downstream balance entries. There is no `ImportBatchId`: because A and B commit together atomically, `SourceDocumentVersionId` alone scopes rollback precisely. (Brokerage **holdings → balance-entries** and the Investment-account unlock remain deferred; investment statements stay gated off at initiate.)
+**Provenance & rollback.** Every created transaction (balance entry + flows) receives an **import-origin document link** to the source statement's document (see *Linked documents* below). The link is **document-grained** even though parsing consumes a specific version's extracted text — the staged job payload keeps the version id for parsing and the review preview, but nothing version-grained persists past commit. A re-import guard blocks committing a statement whose document already carries import-origin links, so **one document = one active import**: importing a corrected re-upload (new version of the same document) requires rolling back the old import first. Rollback (`DELETE /finances/imports/{documentId}`) deletes every transaction holding an import-origin link to that document — dispatching by transaction type (`BalanceEntry → IBalanceEntryService.DeleteAsync`, `Normal → ITransferService.DeleteAsync`) — then re-reconciles downstream balance entries. There is no `ImportBatchId`: because A and B commit together atomically, the import-origin link alone scopes rollback precisely. (Brokerage **holdings → balance-entries** and the Investment-account unlock remain deferred; investment statements stay gated off at initiate.)
+
+## Linked documents
+
+Any transaction can be linked to any number of Documents-module files — a receipt on an expense, an invoice on a transfer, a contract note on a trade. Statement import creates links automatically; users create the rest manually. One mechanism, two origins.
+
+### Model
+
+Links live in a dedicated join table, `finances.transaction_document_links`:
+
+- `AccountTransactionId` — real FK to the transaction, `OnDelete(Cascade)`.
+- `DocumentId` — **real cross-schema FK** to `documents.documents` with `ON DELETE CASCADE` (link rows die with the document), but **no navigation property**: `Document` carries a global `DeletedAt == null` query filter, and a required navigation to a filtered principal silently drops links to trashed documents from any nav join. Reads instead resolve documents explicitly through the Documents module's access-filtered query service (`IDocumentQueryService.FilterByAccess`) over an `IgnoreQueryFilters()` query. The column is indexed.
+- `Origin` — `Manual | StatementImport`, stored as a string.
+- `CreatedAt`, `CreatedByUserId` — who linked, when; every link mutation is also audited via `IAuditLogger`.
+
+Composite PK `(AccountTransactionId, DocumentId)` — a document links to a given transaction at most once, regardless of origin. Links are **document-grained**, never version-grained: users think in documents ("this receipt"), and a re-uploaded version must not orphan or stale-pin the link. Nothing in Finances persists a `DocumentVersionId`.
+
+### Rules per origin
+
+- **Manual links** are freely created and removed. Creating one requires the document to be accessible to the caller and not in the trash (the same guard statement-import initiate applies); a duplicate link is a conflict.
+- **Import-origin links** are created only by statement-import commit (one per created transaction, all pointing at the statement's document) and **cannot be removed individually** — they are the rollback scope. The only way they disappear is import rollback (which deletes the transactions themselves) or deleting a transaction. The re-import guard tests specifically for *import-origin* links to a document — a manual link to a statement never blocks importing it.
+
+### Deletion semantics across the module boundary
+
+- **Transaction deleted** → its links go with it (FK cascade). No Documents-side residue: nothing in the Documents schema references transactions.
+- **Document trashed** → links survive untouched; the UI renders them greyed with an "In trash" label and no deep link. Restoring from trash revives them with no data change.
+- **Document permanently deleted** → link rows are removed by the DB `ON DELETE CASCADE` on the FK, exactly like the document's versions/tags/parties — no cleanup hook, and dangling links are unrepresentable. A link can therefore render as **unavailable** only when its document exists but is outside the caller's access (deliberately indistinguishable from "gone", so links never leak the existence of inaccessible documents).
+
+### API
+
+- `GET /finances/transactions/{id}/documents` — the transaction's links with resolved document name, `origin`, and availability (`available | trashed | unavailable`), access-filtered.
+- `POST /finances/transactions/{id}/documents` with `{documentId}` — add a manual link. 409 on duplicate; 400/404 on trashed or inaccessible documents.
+- `DELETE /finances/transactions/{id}/documents/{documentId}` — remove a **manual** link; removing an import-origin link is rejected (400) pointing the user at import rollback.
+- `TransactionResponse` (list + detail) carries `documentLinkCount` only — an integer computed without joining into the `documents` schema, so the hot activity-list query stays inside Finances. Link details are fetched on demand when the dialog opens.
+
+### UI
+
+- Account-activity rows show a paperclip + count when `documentLinkCount > 0`. The count includes trashed/unavailable links, so the indicator never disagrees with the dialog.
+- A **"Linked documents"** entry on the row's ⋮ menu opens one shape-agnostic dialog (no per-shape edit-sheet changes; it works identically for flows, transfers, trades, dividends, DRIPs, balance entries, and opening balances). It lists links — document name deep-linking to `/documents/{id}`, an origin badge ("From statement import") on import links with remove disabled, greyed rows for unavailable documents — and adds links via a document search picker (the same pick-existing-document pattern as the statement-import dialog).
+
+### Migration from `SourceDocumentVersionId`
+
+The link table **replaces** the previous soft-provenance column `AccountTransaction.SourceDocumentVersionId`. The migration backfills one import-origin link per stamped transaction by resolving the stamped version to its parent `DocumentId`; stamps whose version no longer exists are dropped (a deleted version can be neither re-imported nor rolled back meaningfully). One accepted edge: under the old per-version guard, two versions of the same document could each have been imported — their backfilled links merge under one document, so a rollback of that document removes both imports together. After backfill the column and its index are dropped.
 
 ## Shape availability per account kind
 
@@ -341,6 +383,7 @@ The date/time of these investment shapes is set via a native date picker plus a 
 ## Deleting transactions
 
 - **Splits** cascade via FK (`OnDelete(Cascade)`).
+- **Document links** cascade via FK (`OnDelete(Cascade)` on `TransactionDocumentLink.AccountTransactionId`) — see *Linked documents*.
 - **Linked price rows** cascade via FK (`OnDelete(Cascade)` on `CommodityPrice.CreatedByTransactionId`). The handler emits an explicit `audit.Deleted("CommodityPrice", ...)` so the FK cascade isn't silent in the audit log (matching the pattern in `OpeningBalanceService.DeleteAsync`).
 - **Related transactions** (DRIP) — see *DRIP*.
 - **Opening balances** — delete is **always allowed** (no guard against other transactions referencing the `(account, commodity)` pair). Deletion retroactively shifts the running balance by the removed quantity and triggers re-reconciliation of any downstream balance entries on that pair, with the difference absorbed into `Equity:Adjustments` — see [accounts.md](accounts.md#editing-opening-balances). `OpeningBalanceService.DeleteAsync` returns the touched `(account, commodity)` pairs so the caller re-reconciles.

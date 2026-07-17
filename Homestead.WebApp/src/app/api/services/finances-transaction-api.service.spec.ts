@@ -32,6 +32,36 @@ describe('FinancesTransactionApiService', () => {
     req.flush(mockBody);
   });
 
+  it('getTransactionDocuments sends GET under the transaction', () => {
+    const mockBody = [
+      { documentId: 'doc-1', documentName: 'Receipt', availability: 'Available', origin: 'Manual', createdAt: '2026-01-01T00:00:00Z' },
+    ];
+    service.getTransactionDocuments({ transactionId: 'tx-1' }).subscribe(r => {
+      expect(r).toEqual(mockBody);
+    });
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/tx-1/documents');
+    expect(req.request.method).toBe('GET');
+    req.flush(mockBody);
+  });
+
+  it('addTransactionDocumentLink sends POST with the document id body', () => {
+    const mockBody = { documentId: 'doc-1', documentName: 'Receipt', availability: 'Available', origin: 'Manual', createdAt: '2026-01-01T00:00:00Z' };
+    service.addTransactionDocumentLink({ transactionId: 'tx-1', body: { documentId: 'doc-1' } }).subscribe(r => {
+      expect(r).toEqual(mockBody);
+    });
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/tx-1/documents');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ documentId: 'doc-1' });
+    req.flush(mockBody);
+  });
+
+  it('removeTransactionDocumentLink sends DELETE on (transaction, document)', () => {
+    service.removeTransactionDocumentLink({ transactionId: 'tx-1', documentId: 'doc-1' }).subscribe();
+    const req = httpTesting.expectOne('/api/v1/finances/transactions/tx-1/documents/doc-1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
   it('createTransfer sends POST', () => {
     const mockBody = { id: 'tx-1', shape: 'Transfer', splits: [], memo: '', occurredAt: '' };
     service.createTransfer({

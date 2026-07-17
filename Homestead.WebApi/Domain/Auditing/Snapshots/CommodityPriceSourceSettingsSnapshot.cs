@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 
@@ -39,5 +37,5 @@ public record CommodityPriceSourceSettingsSnapshot
     }
 
     public static Guid SourceToGuid(CommodityPriceSource source) =>
-        new(MD5.HashData(Encoding.UTF8.GetBytes($"CommodityPriceSourceSettings:{source}")));
+        DeterministicGuid.FromKey($"CommodityPriceSourceSettings:{source}");
 }

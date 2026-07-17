@@ -27,11 +27,15 @@ import { patchOpeningBalance } from '@/api/generated/fn/finances/patch-opening-b
 import { deleteOpeningBalance } from '@/api/generated/fn/finances/delete-opening-balance';
 import { getOpeningBalance } from '@/api/generated/fn/finances/get-opening-balance';
 import { getOpeningBalances } from '@/api/generated/fn/finances/get-opening-balances';
+import { getTransactionDocuments } from '@/api/generated/fn/finances/get-transaction-documents';
+import { addTransactionDocumentLink } from '@/api/generated/fn/finances/add-transaction-document-link';
+import { removeTransactionDocumentLink } from '@/api/generated/fn/finances/remove-transaction-document-link';
 import type { BulkDeleteTransactionsResponse } from '@/api/generated/models/bulk-delete-transactions-response';
 import type { PaginatedResponseOfTransactionResponse } from '@/api/generated/models/paginated-response-of-transaction-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
 import type { BalanceEntryResponse } from '@/api/generated/models/balance-entry-response';
 import type { OpeningBalanceResponse } from '@/api/generated/models/opening-balance-response';
+import type { TransactionDocumentLinkResponse } from '@/api/generated/models/transaction-document-link-response';
 
 export type { GetAccountTransactions$Params } from '@/api/generated/fn/finances/get-account-transactions';
 export type { GetTransaction$Params } from '@/api/generated/fn/finances/get-transaction';
@@ -57,6 +61,9 @@ export type { PatchOpeningBalance$Params } from '@/api/generated/fn/finances/pat
 export type { DeleteOpeningBalance$Params } from '@/api/generated/fn/finances/delete-opening-balance';
 export type { GetOpeningBalance$Params } from '@/api/generated/fn/finances/get-opening-balance';
 export type { GetOpeningBalances$Params } from '@/api/generated/fn/finances/get-opening-balances';
+export type { GetTransactionDocuments$Params } from '@/api/generated/fn/finances/get-transaction-documents';
+export type { AddTransactionDocumentLink$Params } from '@/api/generated/fn/finances/add-transaction-document-link';
+export type { RemoveTransactionDocumentLink$Params } from '@/api/generated/fn/finances/remove-transaction-document-link';
 
 @Injectable({ providedIn: 'root' })
 export class FinancesTransactionApiService {
@@ -77,6 +84,18 @@ export class FinancesTransactionApiService {
 
   bulkDeleteTransactions(params: Parameters<typeof bulkDeleteTransactions>[2]): Observable<BulkDeleteTransactionsResponse> {
     return bulkDeleteTransactions(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  getTransactionDocuments(params: Parameters<typeof getTransactionDocuments>[2]): Observable<TransactionDocumentLinkResponse[]> {
+    return getTransactionDocuments(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  addTransactionDocumentLink(params: Parameters<typeof addTransactionDocumentLink>[2]): Observable<TransactionDocumentLinkResponse> {
+    return addTransactionDocumentLink(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  removeTransactionDocumentLink(params: Parameters<typeof removeTransactionDocumentLink>[2]): Observable<void> {
+    return removeTransactionDocumentLink(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 
   createTransfer(params: Parameters<typeof createTransfer>[2]): Observable<TransactionResponse> {

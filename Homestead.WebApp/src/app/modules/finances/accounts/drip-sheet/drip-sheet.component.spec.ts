@@ -32,6 +32,7 @@ const buyHalf: TransactionResponse = {
   memo: 'Reinvest VFV dividend',
   relatedTransactionId: 'tx-div',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'trade',
     accountId: 'inv-1',
@@ -49,6 +50,7 @@ const dividendHalf: TransactionResponse = {
   memo: 'Dividend',
   relatedTransactionId: 'tx-buy',
   splits: [],
+  documentLinkCount: 0,
   details: {
     kind: 'dividend',
     accountId: 'inv-1',
