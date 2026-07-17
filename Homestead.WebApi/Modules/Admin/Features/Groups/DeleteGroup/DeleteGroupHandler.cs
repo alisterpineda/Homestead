@@ -1,5 +1,6 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ public class DeleteGroupHandler(AppDbContext db, IAuditContext audit, IUnitOfWor
         // below reaches the database, so the two are atomic without any manual call.
 
         // Set GroupId to null on affected documents (including soft-deleted ones)
-        await db.Documents.IgnoreQueryFilters()
+        await db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
             .Where(d => d.GroupId == request.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.GroupId, (Guid?)null), ct);
 

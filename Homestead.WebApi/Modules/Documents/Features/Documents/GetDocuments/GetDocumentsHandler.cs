@@ -166,17 +166,9 @@ public class GetDocumentsHandler(AppDbContext db, IDocumentQueryService accessSe
     private async Task<IQueryable<Domain.Documents.Document>> BuildScopedQueryAsync(
         GetDocumentsQuery request, CancellationToken ct)
     {
-        IQueryable<Domain.Documents.Document> query;
-
-        if (request.Deleted == true)
-        {
-            query = accessService.FilterByAccess(
-                db.Documents.IgnoreQueryFilters().AsNoTracking().Where(d => d.DeletedAt != null));
-        }
-        else
-        {
-            query = accessService.FilterByAccess(db.Documents.AsNoTracking());
-        }
+        var query = accessService
+            .AccessibleDocuments(request.Deleted == true ? TrashFilter.TrashedOnly : TrashFilter.ActiveOnly)
+            .AsNoTracking();
 
         if (request.GroupId.HasValue)
         {

@@ -58,8 +58,8 @@ public class InitiateStatementImportHandlerTests : IAsyncLifetime
         _currentUser.UserId.Returns(_userId);
 
         _documentQuery = Substitute.For<IDocumentQueryService>();
-        _documentQuery.FilterByAccess(Arg.Any<IQueryable<Document>>())
-            .Returns(ci => ci.Arg<IQueryable<Document>>());
+        _documentQuery.AccessibleDocuments()
+            .Returns(_ => _db.Documents);
 
         _jobQueue = Substitute.For<IJobQueue>();
         _jobQueue.EnqueueAsync(

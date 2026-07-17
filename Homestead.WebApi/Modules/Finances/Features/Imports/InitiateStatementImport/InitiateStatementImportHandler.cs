@@ -49,8 +49,9 @@ public class InitiateStatementImportHandler(
             ?? throw new EntityNotFoundException("Document version not found.");
 
         var documentAccessible = await documentQuery
-            .FilterByAccess(db.Documents.AsNoTracking())
-            .AnyAsync(d => d.Id == version.DocumentId && d.DeletedAt == null, ct);
+            .AccessibleDocuments()
+            .AsNoTracking()
+            .AnyAsync(d => d.Id == version.DocumentId, ct);
         if (!documentAccessible)
             throw new EntityNotFoundException("Document not found.");
 

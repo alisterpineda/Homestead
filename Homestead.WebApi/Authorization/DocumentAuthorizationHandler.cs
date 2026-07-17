@@ -1,4 +1,5 @@
 using Homestead.WebApi.Authentication;
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Groups;
 using Homestead.WebApi.Domain.Identity;
 using Homestead.WebApi.Persistence;
@@ -30,7 +31,7 @@ public class DocumentAuthorizationHandler(AppDbContext db, IHttpContextAccessor 
         var userId = CurrentUserAccessor.ParseUserId(context.User);
 
         var document = await db.Documents
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(d => d.Id == documentId)
             .Select(d => new { d.GroupId })

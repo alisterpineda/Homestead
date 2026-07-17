@@ -68,28 +68,22 @@ public class UploadDocumentVersionJobHandler(
                 fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
 
-            // Duplicate check against all versions globally (IgnoreQueryFilters so trashed documents'
-            // versions are still detected — matching the unique index IX_document_versions_FileHash)
-            var existingMatch = await db.DocumentVersions
-                .IgnoreQueryFilters()
-                .Where(v => v.FileHash == fileHash)
-                .Select(v => new { v.VersionNumber, v.Document.Id, v.Document.Name, v.Document.DeletedAt })
-                .FirstOrDefaultAsync(ct);
+            var existingMatch = await VersionDuplicateCheck.FindByHashAsync(db, fileHash, ct);
 
             if (existingMatch is not null)
             {
-                var isSameDocument = existingMatch.Id == payload.DocumentId;
+                var isSameDocument = existingMatch.DocumentId == payload.DocumentId;
                 var message = isSameDocument
                     ? $"This file is identical to v{existingMatch.VersionNumber} of the document — nothing has changed."
                     : "A document with the same content already exists.";
 
                 throw new DuplicateDocumentException(
                     message,
-                    existingMatch.Id,
-                    existingMatch.Name,
+                    existingMatch.DocumentId,
+                    existingMatch.DocumentName,
                     existingVersionNumber: existingMatch.VersionNumber,
                     isSameDocument: isSameDocument,
-                    isTrashed: existingMatch.DeletedAt != null);
+                    isTrashed: existingMatch.IsTrashed);
             }
 
             // Move file to final location FIRST (Copy+Delete for cross-filesystem safety)

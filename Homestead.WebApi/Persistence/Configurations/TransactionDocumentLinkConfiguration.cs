@@ -27,7 +27,8 @@ public class TransactionDocumentLinkConfiguration : IEntityTypeConfiguration<Tra
 
         // FK without a navigation: link rows cascade away with the document (no purge-time cleanup
         // hook needed), but no C# navigation exists because Document's global DeletedAt filter would
-        // silently drop trashed documents from any nav join (see comment on the entity).
+        // silently drop trashed documents from any nav join. Reads resolve documents via
+        // IDocumentQueryService.AccessibleDocuments(TrashFilter.IncludeTrashed) — see the entity.
         builder.HasOne<Document>()
             .WithMany()
             .HasForeignKey(l => l.DocumentId)

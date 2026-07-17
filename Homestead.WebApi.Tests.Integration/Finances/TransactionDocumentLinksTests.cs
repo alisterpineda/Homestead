@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -53,7 +54,7 @@ public class TransactionDocumentLinksTests : IntegrationTestBase
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Documents.IgnoreQueryFilters()
+        await db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
             .Where(d => d.Id == documentId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(d => d.DeletedAt, (DateTimeOffset?)null)

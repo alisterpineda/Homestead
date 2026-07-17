@@ -35,7 +35,7 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
         builder.Property(d => d.ExpiryDate);
         builder.Property(d => d.Notes);
 
-        builder.HasQueryFilter(d => d.DeletedAt == null);
+        builder.HasQueryFilter(DocumentQueryFilters.SoftDelete, d => d.DeletedAt == null);
 
         builder.HasOne(d => d.DeletedByUser)
             .WithMany()

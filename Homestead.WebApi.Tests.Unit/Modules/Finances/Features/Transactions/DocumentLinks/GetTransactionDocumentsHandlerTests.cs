@@ -4,6 +4,7 @@ using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks;
 using Homestead.WebApi.Modules.Finances.Features.Transactions.DocumentLinks.GetTransactionDocuments;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Finances.Features.Transactions.DocumentLinks;
@@ -30,8 +31,8 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync();
 
         _documentQuery = Substitute.For<IDocumentQueryService>();
-        _documentQuery.FilterByAccess(Arg.Any<IQueryable<Document>>())
-            .Returns(ci => ci.Arg<IQueryable<Document>>());
+        _documentQuery.AccessibleDocuments(TrashFilter.IncludeTrashed)
+            .Returns(_ => _db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete]));
 
         _sut = new GetTransactionDocumentsHandler(_db, _documentQuery);
     }
@@ -84,8 +85,8 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
     {
         var now = DateTimeOffset.UtcNow;
         var live = await SeedDocumentAsync("Receipt");
-        // Trashed: only reachable because the handler lifts Document's global DeletedAt filter
-        // with IgnoreQueryFilters — without it this link would come back Unavailable.
+        // Trashed: only reachable because the handler asks for TrashFilter.IncludeTrashed —
+        // under ActiveOnly this link would come back Unavailable.
         var trashed = await SeedDocumentAsync("Old statement", deletedAt: now);
         var inaccessible = await SeedDocumentAsync("Someone else's");
 
@@ -93,8 +94,9 @@ public class GetTransactionDocumentsHandlerTests : IAsyncLifetime
         await SeedLinkAsync(trashed.Id, TransactionDocumentLinkOrigin.StatementImport, now.AddMinutes(-2));
         await SeedLinkAsync(inaccessible.Id, TransactionDocumentLinkOrigin.Manual, now.AddMinutes(-1));
 
-        _documentQuery.FilterByAccess(Arg.Any<IQueryable<Document>>())
-            .Returns(ci => ci.Arg<IQueryable<Document>>().Where(d => d.Id != inaccessible.Id));
+        _documentQuery.AccessibleDocuments(TrashFilter.IncludeTrashed)
+            .Returns(_ => _db.Documents.IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
+                .Where(d => d.Id != inaccessible.Id));
 
         var result = await _sut.Handle(
             new GetTransactionDocumentsQuery(_transaction.Id), TestContext.Current.CancellationToken);

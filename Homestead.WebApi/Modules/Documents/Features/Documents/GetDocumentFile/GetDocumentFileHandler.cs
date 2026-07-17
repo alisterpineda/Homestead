@@ -1,4 +1,5 @@
 using MediatR;
+using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Infrastructure.Storage;
 using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,7 @@ public class GetDocumentFileHandler(AppDbContext db, IOptions<FileStorageOptions
     public async Task<IResult> Handle(GetDocumentFileQuery request, CancellationToken ct)
     {
         var documentName = await db.Documents
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(d => d.Id == request.Id)
             .Select(d => d.Name)

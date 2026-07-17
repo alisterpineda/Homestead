@@ -17,11 +17,10 @@ public class PermanentlyDeleteDocumentsHandler(AppDbContext db, IOptions<FileSto
 {
     public async Task<PermanentlyDeleteDocumentsResponse> Handle(PermanentlyDeleteDocumentsCommand request, CancellationToken ct)
     {
-        var query = db.Documents.IgnoreQueryFilters()
+        var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
             .Include(d => d.Versions)
-            .Where(d => d.DeletedAt != null && request.Ids.Contains(d.Id));
-
-        var documents = await accessService.FilterByWriteAccess(query).ToListAsync(ct);
+            .Where(d => request.Ids.Contains(d.Id))
+            .ToListAsync(ct);
 
         if (documents.Count != request.Ids.Count)
             throw new AccessDeniedException();

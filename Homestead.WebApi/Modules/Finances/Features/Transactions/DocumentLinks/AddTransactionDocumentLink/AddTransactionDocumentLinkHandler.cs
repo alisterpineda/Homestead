@@ -26,12 +26,13 @@ public class AddTransactionDocumentLinkHandler(
         if (!exists)
             throw new EntityNotFoundException("Transaction not found.");
 
-        // Accessible and not trashed — mirrors the statement-import initiate guard. 404 (not 403) so
-        // an inaccessible document cannot be distinguished from a nonexistent one. The DeletedAt
-        // predicate is redundant with Document's global query filter but kept explicit for parity.
+        // Accessible and not trashed (ActiveOnly default) — mirrors the statement-import initiate
+        // guard. 404 (not 403) so an inaccessible document cannot be distinguished from a
+        // nonexistent one.
         var docName = await documentQuery
-            .FilterByAccess(db.Documents.AsNoTracking())
-            .Where(d => d.Id == request.DocumentId && d.DeletedAt == null)
+            .AccessibleDocuments()
+            .AsNoTracking()
+            .Where(d => d.Id == request.DocumentId)
             .Select(d => d.Name)
             .FirstOrDefaultAsync(ct)
             ?? throw new EntityNotFoundException("Document not found.");

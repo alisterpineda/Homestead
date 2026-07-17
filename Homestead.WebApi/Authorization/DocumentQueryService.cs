@@ -73,7 +73,24 @@ public class DocumentQueryService(
     }
 
     public IQueryable<Guid> AccessibleDocumentIds()
-        => FilterByAccess(db.Documents).Select(d => d.Id);
+        => AccessibleDocuments().Select(d => d.Id);
+
+    public IQueryable<Document> AccessibleDocuments(TrashFilter trash = TrashFilter.ActiveOnly)
+        => FilterByAccess(DocumentSource(trash));
+
+    public IQueryable<Document> WritableDocuments(TrashFilter trash = TrashFilter.ActiveOnly)
+        => FilterByWriteAccess(DocumentSource(trash));
+
+    private IQueryable<Document> DocumentSource(TrashFilter trash) => trash switch
+    {
+        TrashFilter.ActiveOnly => db.Documents,
+        TrashFilter.TrashedOnly => db.Documents
+            .IgnoreQueryFilters([DocumentQueryFilters.SoftDelete])
+            .Where(d => d.DeletedAt != null),
+        TrashFilter.IncludeTrashed => db.Documents
+            .IgnoreQueryFilters([DocumentQueryFilters.SoftDelete]),
+        _ => throw new ArgumentOutOfRangeException(nameof(trash)),
+    };
 
     public async Task EnsureAllDocumentsAccessibleAsync(
         IQueryable<Guid> relatedDocumentIds, CancellationToken ct)
@@ -104,7 +121,7 @@ public class DocumentQueryService(
 
     private IQueryable<Guid> WritableDocumentIds()
     {
-        return FilterByWriteAccess(db.Documents).Select(d => d.Id);
+        return WritableDocuments().Select(d => d.Id);
     }
 
     private async Task EnsureAllDocumentsInSetAsync(

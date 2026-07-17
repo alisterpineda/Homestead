@@ -3,19 +3,18 @@ using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common.Search;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Modules.Documents.Features.Documents.GetDocuments;
-using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Search;
 
 /// <summary>
 /// Universal-search source for documents. Mirrors the document list page exactly — same access
-/// scoping (<see cref="IDocumentQueryService.FilterByAccess"/>), same five-mode predicate
+/// scoping (<see cref="IDocumentQueryService.AccessibleDocuments"/>), same five-mode predicate
 /// (<see cref="DocumentSearchPredicate"/>), and the same FTS <c>ts_headline</c> snippet — so palette
-/// results equal list results for the same query. Soft-deleted documents are excluded for free: the
-/// query does not call <c>IgnoreQueryFilters()</c>, so the global <c>DeletedAt == null</c> filter stays on.
+/// results equal list results for the same query. Soft-deleted documents are excluded by the default
+/// <see cref="TrashFilter.ActiveOnly"/> scope.
 /// </summary>
-public class DocumentSearchSource(AppDbContext db, IDocumentQueryService accessService) : ISearchSource
+public class DocumentSearchSource(IDocumentQueryService accessService) : ISearchSource
 {
     private const string TsLanguage = DocumentSearchPredicate.TsLanguage;
 
@@ -28,7 +27,7 @@ public class DocumentSearchSource(AppDbContext db, IDocumentQueryService accessS
         var tsQueryString = SearchTsQueryBuilder.Build(query);
 
         var filtered = DocumentSearchPredicate.ApplyTextSearch(
-            accessService.FilterByAccess(db.Documents.AsNoTracking()), query, tsQueryString);
+            accessService.AccessibleDocuments().AsNoTracking(), query, tsQueryString);
 
         // Full (uncapped) match count drives "View all (N)".
         var total = await filtered.CountAsync(ct);

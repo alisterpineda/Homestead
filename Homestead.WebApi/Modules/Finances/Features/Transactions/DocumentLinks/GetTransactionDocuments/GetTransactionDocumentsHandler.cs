@@ -30,12 +30,12 @@ public class GetTransactionDocumentsHandler(AppDbContext db, IDocumentQueryServi
             return [];
         }
 
-        // IgnoreQueryFilters lifts Document's global DeletedAt filter so a trashed document can be
-        // told apart from an inaccessible one (without it, trashed docs vanish from the join and
-        // render as Unavailable). Access filtering still applies on top.
+        // IncludeTrashed is what lets a trashed document be told apart from an inaccessible one
+        // (under ActiveOnly, trashed docs would vanish and render as Unavailable).
         var docIds = links.Select(l => l.DocumentId).ToList();
         var docs = await documentQuery
-            .FilterByAccess(db.Documents.IgnoreQueryFilters().AsNoTracking())
+            .AccessibleDocuments(TrashFilter.IncludeTrashed)
+            .AsNoTracking()
             .Where(d => docIds.Contains(d.Id))
             .Select(d => new { d.Id, d.Name, d.DeletedAt })
             .ToDictionaryAsync(d => d.Id, ct);

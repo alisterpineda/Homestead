@@ -24,7 +24,7 @@ public class TransactionDocumentLink
     // Real FK to documents.documents (ON DELETE CASCADE — link rows die with the document), but
     // deliberately NO navigation property: Document carries a global DeletedAt query filter, and a
     // required nav to a filtered principal silently drops trashed documents from joins. Reads must
-    // resolve documents via IDocumentQueryService.FilterByAccess over an IgnoreQueryFilters() query.
+    // resolve documents via IDocumentQueryService.AccessibleDocuments(TrashFilter.IncludeTrashed).
     public Guid DocumentId { get; set; }
 
     public TransactionDocumentLinkOrigin Origin { get; set; }

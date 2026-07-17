@@ -41,8 +41,8 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
         await _db.SaveChangesAsync();
 
         _documentQuery = Substitute.For<IDocumentQueryService>();
-        _documentQuery.FilterByAccess(Arg.Any<IQueryable<Document>>())
-            .Returns(ci => ci.Arg<IQueryable<Document>>());
+        _documentQuery.AccessibleDocuments()
+            .Returns(_ => _db.Documents);
 
         _currentUser = Substitute.For<ICurrentUserAccessor>();
         _currentUser.UserId.Returns(_userId);
@@ -96,8 +96,8 @@ public class AddTransactionDocumentLinkHandlerTests : IAsyncLifetime
     [Fact]
     public async Task Add_InaccessibleDocument_ThrowsNotFound()
     {
-        _documentQuery.FilterByAccess(Arg.Any<IQueryable<Document>>())
-            .Returns(ci => ci.Arg<IQueryable<Document>>().Where(d => d.Id != _document.Id));
+        _documentQuery.AccessibleDocuments()
+            .Returns(_ => _db.Documents.Where(d => d.Id != _document.Id));
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(Command(), TestContext.Current.CancellationToken));

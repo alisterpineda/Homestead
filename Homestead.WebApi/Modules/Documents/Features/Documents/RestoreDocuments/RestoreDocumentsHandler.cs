@@ -3,22 +3,20 @@ using Homestead.WebApi.Authorization;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Auditing;
 using MediatR;
-using Homestead.WebApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Documents.RestoreDocuments;
 
-public class RestoreDocumentsHandler(AppDbContext db,
+public class RestoreDocumentsHandler(
     IAuditContext audit, IDocumentQueryService accessService,
     ICurrentUserAccessor currentUser, IUnitOfWork unitOfWork)
     : IRequestHandler<RestoreDocumentsCommand, RestoreDocumentsResponse>
 {
     public async Task<RestoreDocumentsResponse> Handle(RestoreDocumentsCommand request, CancellationToken ct)
     {
-        var query = db.Documents.IgnoreQueryFilters()
-            .Where(d => d.DeletedAt != null && request.Ids.Contains(d.Id));
-
-        var documents = await accessService.FilterByWriteAccess(query).ToListAsync(ct);
+        var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
+            .Where(d => request.Ids.Contains(d.Id))
+            .ToListAsync(ct);
 
         if (documents.Count != request.Ids.Count)
             throw new AccessDeniedException();

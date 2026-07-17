@@ -17,11 +17,9 @@ public class EmptyTrashHandler(AppDbContext db, IOptions<FileStorageOptions> sto
 {
     public async Task<EmptyTrashResponse> Handle(EmptyTrashCommand request, CancellationToken ct)
     {
-        var query = db.Documents.IgnoreQueryFilters()
+        var documents = await accessService.WritableDocuments(TrashFilter.TrashedOnly)
             .Include(d => d.Versions)
-            .Where(d => d.DeletedAt != null);
-
-        var documents = await accessService.FilterByWriteAccess(query).ToListAsync(ct);
+            .ToListAsync(ct);
 
         if (documents.Count == 0)
             return new EmptyTrashResponse(0);
