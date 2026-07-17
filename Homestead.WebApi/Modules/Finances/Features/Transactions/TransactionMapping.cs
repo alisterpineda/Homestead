@@ -10,10 +10,13 @@ internal static class TransactionMapping
     // non-flow mappers) → every flow reads as Uncategorised, exactly as before categorization.
     // documentLinkCounts: per-transaction link counts (keyed by transaction Id) — same aux-map idiom.
     // Null / absent key → 0, which is the truth for freshly created transactions.
+    // payeeNames: payee-id → name map (keyed by PayeeId) from PayeeNames. Passed by flow-aware read paths
+    // so FlowDetails can name the counterparty. Null / absent key → no payee name, as before payees.
     public static TransactionResponse ToResponse(
         AccountTransaction transaction,
         IReadOnlyDictionary<Guid, CategoryPathInfo>? categories = null,
-        IReadOnlyDictionary<Guid, int>? documentLinkCounts = null)
+        IReadOnlyDictionary<Guid, int>? documentLinkCounts = null,
+        IReadOnlyDictionary<Guid, string>? payeeNames = null)
     {
         var shape = ResolveShape(transaction);
         var splits = transaction.Splits
@@ -38,7 +41,7 @@ internal static class TransactionMapping
             RelatedTransactionId = transaction.RelatedTransactionId,
             Splits = splits,
             DocumentLinkCount = documentLinkCounts?.GetValueOrDefault(transaction.Id) ?? 0,
-            Details = ResolveDetails(transaction, shape, categories),
+            Details = ResolveDetails(transaction, shape, categories, payeeNames),
         };
     }
 
@@ -61,7 +64,8 @@ internal static class TransactionMapping
 
     private static TransactionDetails? ResolveDetails(
         AccountTransaction transaction, TransactionShape shape,
-        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories)
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories,
+        IReadOnlyDictionary<Guid, string>? payeeNames)
         => transaction switch
         {
             BalanceEntryTransaction be => new BalanceEntryDetails(
@@ -77,7 +81,7 @@ internal static class TransactionMapping
                 BuildDividendDetails(normal),
             NormalTransaction normal when shape is TransactionShape.Expense
                                               or TransactionShape.Income =>
-                BuildFlowDetails(normal, shape, categories),
+                BuildFlowDetails(normal, shape, categories, payeeNames),
             _ => null,
         };
 
@@ -141,7 +145,8 @@ internal static class TransactionMapping
 
     private static FlowDetails? BuildFlowDetails(
         NormalTransaction flow, TransactionShape shape,
-        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories)
+        IReadOnlyDictionary<Guid, CategoryPathInfo>? categories,
+        IReadOnlyDictionary<Guid, string>? payeeNames)
     {
         // Both legs are in the account's reporting currency. FlowService writes the user-account leg
         // as −amount for an Expense and +amount for an Income (the system counterpart carries the
@@ -167,12 +172,18 @@ internal static class TransactionMapping
             categoryPath = info.Path;
         }
 
+        // The payee is stored on the transaction itself; its name is looked up from the batch map (absent
+        // map or unknown id → no name, e.g. a freshly written flow whose map wasn't supplied).
+        var payeeName = flow.PayeeId is Guid pid ? payeeNames?.GetValueOrDefault(pid) : null;
+
         return new FlowDetails(
             account.AccountId,
             account.CommodityId,
             Math.Abs(account.Quantity),
             categoryId,
             categoryName,
-            categoryPath);
+            categoryPath,
+            flow.PayeeId,
+            payeeName);
     }
 }

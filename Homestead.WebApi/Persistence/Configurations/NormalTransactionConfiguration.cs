@@ -13,5 +13,14 @@ public class NormalTransactionConfiguration : IEntityTypeConfiguration<NormalTra
         builder.Property(t => t.NormalShape)
             .HasConversion<string>()
             .HasMaxLength(32);
+
+        // Optional counterparty for flows. Restrict delete: an in-use payee cannot be removed
+        // (the delete slice guards this with a friendlier 409 + archive suggestion).
+        builder.HasOne<Payee>()
+            .WithMany()
+            .HasForeignKey(t => t.PayeeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(t => t.PayeeId);
     }
 }

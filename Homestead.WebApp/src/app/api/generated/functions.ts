@@ -201,6 +201,14 @@ export type { DeleteCategory$Params as DeleteCategory$Params } from './fn/financ
 export { deleteCategory as deleteCategory } from './fn/finances/delete-category';
 export type { PatchCategory$Params as PatchCategory$Params } from './fn/finances/patch-category';
 export { patchCategory as patchCategory } from './fn/finances/patch-category';
+export type { GetPayees$Params as GetPayees$Params } from './fn/finances/get-payees';
+export { getPayees as getPayees } from './fn/finances/get-payees';
+export type { CreatePayee$Params as CreatePayee$Params } from './fn/finances/create-payee';
+export { createPayee as createPayee } from './fn/finances/create-payee';
+export type { DeletePayee$Params as DeletePayee$Params } from './fn/finances/delete-payee';
+export { deletePayee as deletePayee } from './fn/finances/delete-payee';
+export type { PatchPayee$Params as PatchPayee$Params } from './fn/finances/patch-payee';
+export { patchPayee as patchPayee } from './fn/finances/patch-payee';
 export type { GetCommodityPrices$Params as GetCommodityPrices$Params } from './fn/finances/get-commodity-prices';
 export { getCommodityPrices as getCommodityPrices } from './fn/finances/get-commodity-prices';
 export type { CreateCommodityPrice$Params as CreateCommodityPrice$Params } from './fn/finances/create-commodity-price';

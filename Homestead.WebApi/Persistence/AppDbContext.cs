@@ -39,6 +39,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<TransactionDocumentLink> TransactionDocumentLinks { get; set; }
     public DbSet<CommodityPrice> CommodityPrices { get; set; }
     public DbSet<CommodityPriceSourceSettings> CommodityPriceSourceSettings { get; set; }
+    public DbSet<Payee> Payees { get; set; }
 
     public DbSet<Area> Areas { get; set; }
     public DbSet<Brand> Brands { get; set; }

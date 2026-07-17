@@ -224,6 +224,35 @@ describe('AccountActivityTabComponent', () => {
     expect(c.linkedDocsTxId()).toBeNull();
   });
 
+  it('renders the payee as the primary memo line with the memo as muted secondary', () => {
+    const fixture = setup([
+      makeTx({
+        id: 'flow-payee',
+        memo: 'Weekly shop',
+        details: {
+          kind: 'flow', accountId: 'acc-1', currencyId: 'cad', amount: 50,
+          categoryId: null, categoryName: null, categoryPath: null,
+          payeeId: 'p1', payeeName: 'Costco',
+        } as never,
+      }),
+    ]);
+    const c = fixture.componentInstance;
+    const vm = c.items().find(v => v.tx.id === 'flow-payee');
+    expect(vm?.payeeName).toBe('Costco');
+
+    const memoCell = fixture.nativeElement.querySelector('app-activity-memo-cell') as HTMLElement;
+    expect(memoCell.textContent).toContain('Costco');
+    expect(memoCell.textContent).toContain('Weekly shop');
+    // The memo renders in the muted secondary class; the payee does not.
+    expect(memoCell.querySelector('.text-muted-foreground')?.textContent).toContain('Weekly shop');
+  });
+
+  it('renders a single memo line when a flow has no payee', () => {
+    const fixture = setup([makeTx({ id: 'flow-nopayee', memo: 'Groceries' })]);
+    const vm = fixture.componentInstance.items().find(v => v.tx.id === 'flow-nopayee');
+    expect(vm?.payeeName).toBeNull();
+  });
+
   it('treats only the select and actions columns as row-click dead zones', () => {
     const fixture = setup([makeTx({ id: 't1' })]);
     const c = fixture.componentInstance;

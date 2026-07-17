@@ -7,6 +7,7 @@ import { StatementImportReviewPageComponent } from './accounts/statement-import-
 import { CommodityListPageComponent } from './commodities/commodity-list-page.component';
 import { CommodityDetailPageComponent } from './commodities/commodity-detail-page.component';
 import { CategoryListPageComponent } from './categories/category-list-page.component';
+import { PayeeListComponent } from './payees/payee-list.component';
 import { ReportsPageComponent } from './reports/reports-page.component';
 import { GeneralSettingsComponent } from './settings/general/general-settings.component';
 import { PriceSourceListComponent } from './settings/price-sources/price-source-list.component';
@@ -28,6 +29,7 @@ export const FINANCES_ROUTES: Routes = [
       { path: 'commodities', component: CommodityListPageComponent, data: { title: 'Commodities' } },
       { path: 'commodities/:id', component: CommodityDetailPageComponent, data: { title: 'Commodity' } },
       { path: 'categories', component: CategoryListPageComponent, data: { title: 'Categories' } },
+      { path: 'payees', component: PayeeListComponent, data: { title: 'Payees' } },
       { path: 'reports', component: ReportsPageComponent, data: { title: 'Reports' } },
       { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
       { path: 'settings/general', component: GeneralSettingsComponent, data: { title: 'General' } },

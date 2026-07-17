@@ -6,6 +6,7 @@ import { FlowSheetComponent } from './flow-sheet.component';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
+import type { PayeeResponse } from '@/api/generated/models/payee-response';
 
 const cashAccount: AccountResponse = {
   id: 'cash-1',
@@ -56,6 +57,33 @@ const categorizedExpenseFlow: TransactionResponse = {
     categoryPath: 'Food › Groceries',
   } as never,
 };
+
+const payeeFlow: TransactionResponse = {
+  id: 'tx-payee',
+  shape: 'Expense',
+  occurredAt: '2026-04-23T00:00:00.000Z',
+  memo: 'Groceries',
+  splits: [],
+  documentLinkCount: 0,
+  details: {
+    kind: 'flow',
+    accountId: 'cash-1',
+    currencyId: 'cad',
+    amount: 40,
+    payeeId: 'payee-costco',
+    payeeName: 'Costco',
+  } as never,
+};
+
+const payee = (overrides: Partial<PayeeResponse>): PayeeResponse => ({
+  id: 'payee-1',
+  name: 'Costco',
+  isArchived: false,
+  transactionCount: 0,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  ...overrides,
+});
 
 function makeFixture() {
   const fixture = TestBed.createComponent(FlowSheetComponent);
@@ -153,6 +181,66 @@ describe('FlowSheetComponent', () => {
     expect(c.selectedDirection()).toBe('Income');
     expect(c.categoryId()).toBeNull();
   });
+
+  it('defaults payee to null in create mode', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    expect(fixture.componentInstance.payee()).toBeNull();
+  });
+
+  it('seeds payee from an existing flow in edit mode', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('existing', payeeFlow);
+    expect(fixture.componentInstance.payee()).toEqual({ id: 'payee-costco', name: 'Costco' });
+  });
+
+  it('autofills the category from the payee default when the direction matches and category is empty', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('direction', 'Expense');
+    const c = fixture.componentInstance;
+
+    c.onPayeeChange(payee({ defaultCategoryId: 'cat-groceries', defaultCategoryType: 'Expense' }));
+
+    expect(c.payee()).toEqual(payee({ defaultCategoryId: 'cat-groceries', defaultCategoryType: 'Expense' }));
+    expect(c.categoryId()).toBe('cat-groceries');
+  });
+
+  it('does NOT autofill when the payee default direction mismatches the flow', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('direction', 'Expense');
+    const c = fixture.componentInstance;
+
+    c.onPayeeChange(payee({ defaultCategoryId: 'cat-salary', defaultCategoryType: 'Income' }));
+
+    expect(c.categoryId()).toBeNull();
+  });
+
+  it('does NOT autofill when a category is already chosen', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    fixture.componentRef.setInput('direction', 'Expense');
+    const c = fixture.componentInstance;
+    c.categoryId.set('cat-existing');
+
+    c.onPayeeChange(payee({ defaultCategoryId: 'cat-groceries', defaultCategoryType: 'Expense' }));
+
+    expect(c.categoryId()).toBe('cat-existing');
+  });
+
+  it('clearing the payee (null) leaves the category untouched', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    const c = fixture.componentInstance;
+    c.categoryId.set('cat-x');
+
+    c.onPayeeChange(null);
+
+    expect(c.payee()).toBeNull();
+    expect(c.categoryId()).toBe('cat-x');
+  });
 });
 
 describe('FlowSheetComponent categoryId payload', () => {
@@ -196,5 +284,29 @@ describe('FlowSheetComponent categoryId payload', () => {
 
     expect(patchFlow).toHaveBeenCalledTimes(1);
     expect(patchFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ categoryId: null }));
+  });
+
+  it('sends the selected payeeId in the create payload (null when none)', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'create');
+    const c = fixture.componentInstance;
+    c.amount.set('50');
+    c.handleSave();
+    expect(createFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ payeeId: null }));
+
+    createFlow.mockClear();
+    c.onPayeeChange(payee({ id: 'payee-costco' }));
+    c.handleSave();
+    expect(createFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ payeeId: 'payee-costco' }));
+  });
+
+  it('sends payeeId in the edit (patch) payload', () => {
+    const fixture = makeFixture();
+    fixture.componentRef.setInput('mode', 'edit');
+    fixture.componentRef.setInput('existing', payeeFlow);
+    const c = fixture.componentInstance;
+    c.handleSave();
+
+    expect(patchFlow.mock.calls[0][0].body).toEqual(expect.objectContaining({ payeeId: 'payee-costco' }));
   });
 });

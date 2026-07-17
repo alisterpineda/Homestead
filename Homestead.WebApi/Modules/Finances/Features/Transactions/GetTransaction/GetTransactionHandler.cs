@@ -19,6 +19,7 @@ public class GetTransactionHandler(AppDbContext db, ICategoryPathResolver pathRe
 
         var categories = await pathResolver.GetPathMapAsync(ct);
         return TransactionMapping.ToResponse(
-            transaction, categories, await DocumentLinkCounts.ForAsync(db, transaction.Id, ct));
+            transaction, categories, await DocumentLinkCounts.ForAsync(db, transaction.Id, ct),
+            await PayeeNames.ForAsync(db, transaction, ct));
     }
 }

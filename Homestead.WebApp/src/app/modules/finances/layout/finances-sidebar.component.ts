@@ -3,7 +3,7 @@ import { Router, RouterLink, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight, lucideFolderTree } from '@ng-icons/lucide';
+import { lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight, lucideFolderTree, lucideContact } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmSidebarImports } from '@/shared/components/spartan/sidebar';
 import { HlmCollapsibleImports } from '@/shared/components/spartan/collapsible';
@@ -14,7 +14,7 @@ import { isNavItemActive } from '@/shared/utils';
   selector: 'app-finances-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, NgIcon, HlmIconImports, HlmSidebarImports, HlmCollapsibleImports],
-  providers: [provideIcons({ lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight, lucideFolderTree })],
+  providers: [provideIcons({ lucideWallet, lucideSettings, lucideCoins, lucideTrendingUp, lucideChevronRight, lucideFolderTree, lucideContact })],
   template: `
     <div hlmSidebarGroup>
       <div hlmSidebarGroupLabel>Finances</div>
@@ -36,6 +36,12 @@ import { isNavItemActive } from '@/shared/utils';
             <a hlmSidebarMenuButton routerLink="/finances/categories" [isActive]="isActive('/finances/categories')">
               <ng-icon hlm name="lucideFolderTree" size="sm" />
               <span>Categories</span>
+            </a>
+          </li>
+          <li hlmSidebarMenuItem>
+            <a hlmSidebarMenuButton routerLink="/finances/payees" [isActive]="isActive('/finances/payees')">
+              <ng-icon hlm name="lucideContact" size="sm" />
+              <span>Payees</span>
             </a>
           </li>
           <li hlmSidebarMenuItem>
@@ -106,6 +112,7 @@ export class FinancesSidebarComponent {
     '/finances/accounts',
     '/finances/commodities',
     '/finances/categories',
+    '/finances/payees',
     '/finances/reports',
     '/finances/settings/general',
     '/finances/settings/price-sources',

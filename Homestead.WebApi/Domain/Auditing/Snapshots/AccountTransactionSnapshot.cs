@@ -8,6 +8,7 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
     public required DateTimeOffset OccurredAt { get; init; }
     public required string Memo { get; init; }
     public required TransactionType Type { get; init; }
+    public Guid? PayeeId { get; init; }
     public required List<string> Splits { get; init; }
 
     public static AccountTransactionSnapshot From(AccountTransaction source) => new()
@@ -15,6 +16,7 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
         OccurredAt = source.OccurredAt,
         Memo = source.Memo,
         Type = source.Type,
+        PayeeId = (source as NormalTransaction)?.PayeeId,
         Splits = source.Splits
             .OrderBy(s => s.AccountId)
             .ThenBy(s => s.CommodityId)
@@ -34,6 +36,8 @@ public record AccountTransactionSnapshot : IAuditSnapshot<AccountTransactionSnap
             changes.Add(new ScalarFieldChange("Memo", Memo, other.Memo));
         if (Type != other.Type)
             changes.Add(new ScalarFieldChange("Type", Type.ToString(), other.Type.ToString()));
+        if (PayeeId != other.PayeeId)
+            changes.Add(new ScalarFieldChange("PayeeId", PayeeId?.ToString(), other.PayeeId?.ToString()));
         if (!Splits.SequenceEqual(other.Splits))
             changes.Add(new ArrayFieldChange("Splits", Splits, other.Splits));
 

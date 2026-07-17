@@ -14,4 +14,7 @@ public record CreateFlowCommand : ICommand<TransactionResponse>
 
     // null → Uncategorised (posts to the system Expense/Income bucket).
     public Guid? CategoryId { get; init; }
+
+    // null → no payee. Archived payees are accepted (archiving only hides from pickers).
+    public Guid? PayeeId { get; init; }
 }

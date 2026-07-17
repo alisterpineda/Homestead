@@ -308,6 +308,83 @@ public class FlowServiceTests : IAsyncLifetime
                 TestContext.Current.CancellationToken));
     }
 
+    // ---- Payee ----
+
+    private async Task<Payee> AddPayee(string name = "Costco", bool archived = false)
+    {
+        var payee = new Payee { Id = Guid.NewGuid(), Name = name, IsArchived = archived };
+        _db.Payees.Add(payee);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return payee;
+    }
+
+    [Fact]
+    public async Task Create_WithPayee_PersistsPayeeId()
+    {
+        var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
+        var payee = await AddPayee();
+
+        var result = await _sut.CreateAsync(
+            new CreateFlowRequest(FlowDirection.Expense, account.Id, 50m, new DateOnly(2026, 4, 23), null,
+                CategoryId: null, PayeeId: payee.Id),
+            TestContext.Current.CancellationToken);
+
+        var txn = (NormalTransaction)result.Transaction!;
+        Assert.Equal(payee.Id, txn.PayeeId);
+    }
+
+    [Fact]
+    public async Task Create_NonexistentPayee_Throws()
+    {
+        var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            _sut.CreateAsync(
+                new CreateFlowRequest(FlowDirection.Expense, account.Id, 50m, new DateOnly(2026, 4, 23), null,
+                    CategoryId: null, PayeeId: Guid.NewGuid()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Create_ArchivedPayee_IsAccepted()
+    {
+        // Archiving only hides a payee from pickers — referencing it (e.g. an old flow) is still allowed.
+        var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
+        var payee = await AddPayee(archived: true);
+
+        var result = await _sut.CreateAsync(
+            new CreateFlowRequest(FlowDirection.Expense, account.Id, 50m, new DateOnly(2026, 4, 23), null,
+                CategoryId: null, PayeeId: payee.Id),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(payee.Id, ((NormalTransaction)result.Transaction!).PayeeId);
+    }
+
+    [Fact]
+    public async Task Update_SetsAndClearsPayeeId()
+    {
+        var account = await AddAccount(AccountKind.Cash, _cad.Id, "Chequing");
+        var payee = await AddPayee();
+
+        var created = await _sut.CreateAsync(
+            Create(FlowDirection.Expense, account.Id, 50m), TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // Set the payee on the existing flow.
+        var withPayee = await _sut.UpdateAsync(created.Transaction!.Id,
+            new UpdateFlowRequest(account.Id, 50m, new DateOnly(2026, 4, 23), null, CategoryId: null, PayeeId: payee.Id),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(payee.Id, ((NormalTransaction)withPayee.Transaction!).PayeeId);
+
+        // Clear it again.
+        var cleared = await _sut.UpdateAsync(created.Transaction!.Id,
+            new UpdateFlowRequest(account.Id, 50m, new DateOnly(2026, 4, 23), null, CategoryId: null, PayeeId: null),
+            TestContext.Current.CancellationToken);
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        Assert.Null(((NormalTransaction)cleared.Transaction!).PayeeId);
+    }
+
     [Fact]
     public async Task Update_OnNonFlowTransaction_Throws()
     {

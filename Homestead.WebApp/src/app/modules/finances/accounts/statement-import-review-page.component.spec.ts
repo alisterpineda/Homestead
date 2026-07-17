@@ -239,9 +239,27 @@ describe('StatementImportReviewPageComponent', () => {
       date: '2026-06-30',
       memo: 'June statement',
       lineItems: [
-        { direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY' },
-        { direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL' },
+        { direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY', payeeId: null },
+        { direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL', payeeId: null },
       ],
     });
+  });
+
+  it('commit() carries a per-line payee pick through to the request', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Pick a payee on the first accepted line (index 0).
+    c.onRowPayeeChange(0, {
+      id: 'payee-costco', name: 'Costco', isArchived: false, transactionCount: 0,
+      createdAt: '', updatedAt: '',
+    });
+    c.commit();
+
+    expect(api.lastCommit.body.lineItems[0]).toEqual(
+      expect.objectContaining({ description: 'GROCERY', payeeId: 'payee-costco' }));
+    expect(api.lastCommit.body.lineItems[1].payeeId).toBeNull();
   });
 });

@@ -62,9 +62,12 @@ public class GetTransactionsHandler(AppDbContext db, ICategoryPathResolver pathR
         var linkCounts = await DocumentLinkCounts.ForPageAsync(
             db, page.Items.Select(t => t.Id).ToList(), ct);
 
+        // Feeds FlowDetails.PayeeName — same aux-map idiom.
+        var payeeNames = await PayeeNames.ForPageAsync(db, page.Items, ct);
+
         return new PaginatedResponse<TransactionResponse>
         {
-            Items = page.Items.Select(t => TransactionMapping.ToResponse(t, categories, linkCounts)).ToList(),
+            Items = page.Items.Select(t => TransactionMapping.ToResponse(t, categories, linkCounts, payeeNames)).ToList(),
             Page = page.Page,
             PageSize = page.PageSize,
             TotalCount = page.TotalCount,

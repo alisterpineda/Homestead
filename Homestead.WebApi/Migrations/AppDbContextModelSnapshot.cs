@@ -761,6 +761,56 @@ namespace Homestead.WebApi.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.Payee", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DefaultCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsArchived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DefaultCategoryId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("payees", "finances");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.TransactionDocumentLink", b =>
                 {
                     b.Property<Guid>("AccountTransactionId")
@@ -1594,6 +1644,11 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid?>("PayeeId")
+                        .HasColumnType("uuid");
+
+                    b.HasIndex("PayeeId");
+
                     b.HasDiscriminator().HasValue("Normal");
                 });
 
@@ -1899,6 +1954,30 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("CreatedByUser");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.Payee", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Account", "DefaultCategory")
+                        .WithMany()
+                        .HasForeignKey("DefaultCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("DefaultCategory");
 
                     b.Navigation("UpdatedByUser");
                 });
@@ -2220,6 +2299,14 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("Account");
 
                     b.Navigation("AssertedCommodity");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.NormalTransaction", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Payee", null)
+                        .WithMany()
+                        .HasForeignKey("PayeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Documents.Document", b =>

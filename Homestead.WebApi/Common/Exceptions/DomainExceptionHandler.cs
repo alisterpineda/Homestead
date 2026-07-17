@@ -19,6 +19,8 @@ public class DomainExceptionHandler : IExceptionHandler
                 ProblemDetailsFactory.Create(StatusCodes.Status404NotFound, "Not Found", e.Message),
             DuplicateEntityException e =>
                 ProblemDetailsFactory.Create(StatusCodes.Status409Conflict, "Conflict", e.Message),
+            EntityInUseException e =>
+                ProblemDetailsFactory.Create(StatusCodes.Status409Conflict, "Conflict", e.Message),
             BusinessRuleException { Errors: not null } e =>
                 ProblemDetailsFactory.ValidationErrors(e.Errors, e.Message),
             BusinessRuleException e =>

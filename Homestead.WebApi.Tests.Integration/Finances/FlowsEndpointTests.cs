@@ -295,6 +295,103 @@ public class FlowsEndpointTests : IntegrationTestBase
         Assert.Contains(items, i => i.GetProperty("id").GetGuid() == expenseId);
     }
 
+    // ----- Payee threading -----
+
+    private static async Task<Guid> CreatePayeeAsync(HttpClient client, string name)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/payees", new { name }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        return (await resp.Content.ReadFromJsonAsync<JsonElement>(CT)).GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task Create_WithPayee_RoundTrips_AndCarriesPayeeNameOnReads()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var account = await CreateAccountAsync(client, cad, "Flow-Payee");
+        var payee = await CreatePayeeAsync(client, "Costco");
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/transactions/flows", new
+        {
+            direction = "Expense",
+            accountId = account,
+            amount = 50m,
+            date = "2026-04-23",
+            payeeId = payee,
+        }, CT);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var created = await createResp.Content.ReadFromJsonAsync<JsonElement>(CT);
+        var id = created.GetProperty("id").GetGuid();
+        var createdDetails = created.GetProperty("details");
+        Assert.Equal(payee, createdDetails.GetProperty("payeeId").GetGuid());
+        Assert.Equal("Costco", createdDetails.GetProperty("payeeName").GetString());
+
+        // GET single carries the payee name.
+        var single = await (await client.GetAsync($"/api/v1/finances/transactions/{id}", CT))
+            .Content.ReadFromJsonAsync<JsonElement>(CT);
+        Assert.Equal("Costco", single.GetProperty("details").GetProperty("payeeName").GetString());
+
+        // Account activity list carries the payee name too.
+        var list = await (await client.GetAsync(
+                $"/api/v1/finances/accounts/{account}/transactions?page=1&pageSize=25", CT))
+            .Content.ReadFromJsonAsync<JsonElement>(CT);
+        var row = list.GetProperty("items").EnumerateArray()
+            .Single(i => i.GetProperty("id").GetGuid() == id);
+        Assert.Equal("Costco", row.GetProperty("details").GetProperty("payeeName").GetString());
+    }
+
+    [Fact]
+    public async Task Patch_ClearsPayee()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var account = await CreateAccountAsync(client, cad, "Flow-Payee-Clear");
+        var payee = await CreatePayeeAsync(client, "Costco");
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/finances/transactions/flows", new
+        {
+            direction = "Expense",
+            accountId = account,
+            amount = 50m,
+            date = "2026-04-23",
+            payeeId = payee,
+        }, CT);
+        var id = (await createResp.Content.ReadFromJsonAsync<JsonElement>(CT)).GetProperty("id").GetGuid();
+
+        // Patch without a payeeId (null) clears the attachment.
+        var patchResp = await client.PatchAsJsonAsync($"/api/v1/finances/transactions/flows/{id}", new
+        {
+            accountId = account,
+            amount = 50m,
+            date = "2026-04-23",
+            payeeId = (Guid?)null,
+        }, CT);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+        var patched = await patchResp.Content.ReadFromJsonAsync<JsonElement>(CT);
+        var details = patched.GetProperty("details");
+        Assert.Equal(JsonValueKind.Null, details.GetProperty("payeeId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, details.GetProperty("payeeName").ValueKind);
+    }
+
+    [Fact]
+    public async Task Create_WithNonexistentPayee_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var account = await CreateAccountAsync(client, cad, "Flow-Payee-Bad");
+
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/transactions/flows", new
+        {
+            direction = "Expense",
+            accountId = account,
+            amount = 50m,
+            date = "2026-04-23",
+            payeeId = Guid.NewGuid(),
+        }, CT);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
     private record BalanceEntryItem(
         Guid TransactionId, Guid AccountId, Guid CommodityId,
         decimal AssertedAmount, DateOnly Date, string Memo);

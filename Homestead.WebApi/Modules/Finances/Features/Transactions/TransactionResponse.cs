@@ -98,6 +98,10 @@ public record DividendDetails(
 /// The category triple describes the counterpart leg: a flow posted to a user category carries its id,
 /// leaf <see cref="CategoryName"/>, and full breadcrumb <see cref="CategoryPath"/>. A flow left on the
 /// system Uncategorised bucket leaves all three null.
+///
+/// The payee pair describes the optional counterparty: a flow attached to a payee carries its
+/// <see cref="PayeeId"/> and resolved <see cref="PayeeName"/> (batch-loaded); a flow with no payee leaves
+/// both null.
 /// </summary>
 public record FlowDetails(
     Guid AccountId,
@@ -105,4 +109,6 @@ public record FlowDetails(
     decimal Amount,
     Guid? CategoryId,
     string? CategoryName,
-    string? CategoryPath) : TransactionDetails;
+    string? CategoryPath,
+    Guid? PayeeId,
+    string? PayeeName) : TransactionDetails;

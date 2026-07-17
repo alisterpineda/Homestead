@@ -25,6 +25,8 @@ public class CommitStatementImportCommandValidator : AbstractValidator<CommitSta
             line.RuleFor(l => l.Date).NotInFuture();
             line.RuleFor(l => l.Description).MaximumLength(512);
             line.RuleFor(l => l.Direction).IsInEnum();
+            // null = no payee; a supplied payee must be a real id (FlowService validates existence).
+            line.RuleFor(l => l.PayeeId).NotEqual(Guid.Empty).When(l => l.PayeeId is not null);
         });
     }
 }

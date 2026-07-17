@@ -17,5 +17,8 @@ public class CreateFlowCommandValidator : AbstractValidator<CreateFlowCommand>
         // null = Uncategorised; a supplied category must be a real id (the resolver validates the rest).
         RuleFor(x => x.CategoryId).NotEqual(Guid.Empty)
             .When(x => x.CategoryId is not null);
+        // null = no payee; a supplied payee must be a real id (FlowService validates existence).
+        RuleFor(x => x.PayeeId).NotEqual(Guid.Empty)
+            .When(x => x.PayeeId is not null);
     }
 }

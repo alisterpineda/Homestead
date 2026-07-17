@@ -9,4 +9,6 @@ export interface TransactionDetailsFlowDetails {
   categoryPath: (string | null);
   currencyId: string;
   kind: 'flow';
+  payeeId: (string | null);
+  payeeName: (string | null);
 }

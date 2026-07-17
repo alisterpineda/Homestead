@@ -12,6 +12,7 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { CategoryPickerComponent } from '../../shared/category-picker/category-picker.component';
+import { PayeePickerComponent } from '../../shared/payee-picker/payee-picker.component';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesTransactionApiService } from '@/api/services/finances-transaction-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
@@ -25,6 +26,7 @@ import { commodityStep } from '../../shared/format-currency';
 import { commodityResource } from '../../shared/commodity-resource';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
+import type { PayeeResponse } from '@/api/generated/models/payee-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 
 export type FlowSheetMode = 'create' | 'edit';
@@ -33,7 +35,7 @@ export type FlowDirection = 'Expense' | 'Income';
 @Component({
   selector: 'app-flow-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CategoryPickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CategoryPickerComponent, PayeePickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -72,6 +74,15 @@ export type FlowDirection = 'Expense' | 'Income';
                   <div class="text-xs text-muted-foreground">Money in</div>
                 </button>
               </div>
+            </div>
+
+            <div class="space-y-2">
+              <label hlmLabel>Payee (optional)</label>
+              <app-payee-picker
+                [value]="payee()"
+                ariaLabel="Select payee"
+                (valueChange)="onPayeeChange($event)"
+              />
             </div>
 
             <div class="space-y-2">
@@ -197,6 +208,9 @@ export class FlowSheetComponent {
         date: toDateOnly(ex.occurredAt),
         description: ex.memo ?? '',
         categoryId: details.categoryId ?? null,
+        payee: details.payeeId
+          ? { id: details.payeeId, name: details.payeeName ?? '' }
+          : null,
       };
     }
     return { kind: 'create' as const };
@@ -221,6 +235,10 @@ export class FlowSheetComponent {
   categoryId = seededLinkedSignal<string, string | null>(this.seedKey, () => {
     const seed = this.seed();
     return seed.kind === 'edit' ? seed.categoryId : null;
+  });
+  payee = seededLinkedSignal<string, { id: string; name: string } | null>(this.seedKey, () => {
+    const seed = this.seed();
+    return seed.kind === 'edit' ? seed.payee : null;
   });
   saving = seededLinkedSignal(this.seedKey, () => false);
   deleting = seededLinkedSignal(this.seedKey, () => false);
@@ -285,6 +303,15 @@ export class FlowSheetComponent {
     this.categoryId.set(null);
   }
 
+  // Selecting a payee optionally autofills the category from its default — but only when the default's
+  // direction matches the flow's and the user hasn't already chosen a category (never overrides a pick).
+  onPayeeChange(p: PayeeResponse | null): void {
+    this.payee.set(p);
+    if (p?.defaultCategoryId && p.defaultCategoryType === this.selectedDirection() && this.categoryId() === null) {
+      this.categoryId.set(p.defaultCategoryId);
+    }
+  }
+
   handleSave(): void {
     const a = this.account();
     if (!a || !this.canSubmit()) return;
@@ -297,14 +324,15 @@ export class FlowSheetComponent {
     const description = trimToNull(this.description());
 
     const categoryId = this.categoryId();
+    const payeeId = this.payee()?.id ?? null;
     const ex = this.existing();
     const obs = this.mode() === 'edit' && ex
       ? this.txApi.patchFlow({
           transactionId: ex.id,
-          body: { accountId: a.id, amount, date, description, categoryId },
+          body: { accountId: a.id, amount, date, description, categoryId, payeeId },
         })
       : this.txApi.createFlow({
-          body: { direction: this.selectedDirection(), accountId: a.id, amount, date, description, categoryId },
+          body: { direction: this.selectedDirection(), accountId: a.id, amount, date, description, categoryId, payeeId },
         });
 
     obs.pipe(

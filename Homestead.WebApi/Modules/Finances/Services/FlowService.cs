@@ -20,6 +20,9 @@ public class FlowService(
         var currency = await LoadCurrencyAsync(account.ReportingCurrencyId, ct);
         ValidateInputs(request.Amount);
 
+        if (request.PayeeId is Guid payeeId)
+            await EnsurePayeeExistsAsync(payeeId, ct);
+
         // Counterpart (Expense/Income) — the system bucket when CategoryId is null (uncategorised), or
         // the chosen category otherwise. Not writability-checked (mirrors BalanceEntryService posting to
         // Equity:Adjustments and DividendService posting to Income); the resolver validates the category.
@@ -38,6 +41,7 @@ public class FlowService(
             NormalShape = request.Direction == FlowDirection.Expense
                 ? NormalShape.Expense
                 : NormalShape.Income,
+            PayeeId = request.PayeeId,
             Splits =
             [
                 new AccountTransactionSplit
@@ -95,6 +99,9 @@ public class FlowService(
         var currency = await LoadCurrencyAsync(account.ReportingCurrencyId, ct);
         ValidateInputs(request.Amount);
 
+        if (request.PayeeId is Guid payeeId)
+            await EnsurePayeeExistsAsync(payeeId, ct);
+
         // Resolve the (possibly changed) counterpart. Recategorising moves ONLY the counterpart leg's
         // AccountId — the user leg and its balance are untouched, so no balance-entry re-reconciliation
         // beyond the amount/date edit this patch already makes.
@@ -107,6 +114,8 @@ public class FlowService(
 
         transaction.OccurredAt = request.Date.ToStartOfDayUtc();
         transaction.Memo = NormalizeMemo(request.Description);
+        // Assigned after audit.Track so the snapshot diff records the payee change.
+        transaction.PayeeId = request.PayeeId;
 
         var accountQuantity = SignedAccountQuantity(direction, request.Amount);
 
@@ -173,6 +182,14 @@ public class FlowService(
     {
         if (amount <= 0m)
             throw new BusinessRuleException("Flow amount must be greater than zero.");
+    }
+
+    // Existence-only guard. Archived payees are deliberately accepted — archiving only hides a payee from
+    // pickers; it never blocks referencing it (e.g. editing an old flow whose payee was later archived).
+    private async Task EnsurePayeeExistsAsync(Guid payeeId, CancellationToken ct)
+    {
+        if (!await db.Payees.AnyAsync(p => p.Id == payeeId, ct))
+            throw new BusinessRuleException("Payee not found.");
     }
 
     private static decimal SignedAccountQuantity(FlowDirection direction, decimal amount) =>

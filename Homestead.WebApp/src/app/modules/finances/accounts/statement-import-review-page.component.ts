@@ -33,6 +33,7 @@ import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
+import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
@@ -47,6 +48,7 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { FlowDirection } from '@/api/generated/models/flow-direction';
+import type { PayeeResponse } from '@/api/generated/models/payee-response';
 
 // Client-side edit state for one proposed line — the review page owns this until commit. `mappable` echoes
 // the server's un-mappable flag (missing amount/direction); `date`/`amount` are strings for uncontrolled inputs.
@@ -60,6 +62,9 @@ interface LineItemEdit {
   mappable: boolean;
   runningBalance: number | null;
   duplicateSuspected: boolean;
+  // Client-side payee pick, lost on reload (not staged server-side) — accepted per the plan. Held as a
+  // single stable object so the per-row picker's [value] doesn't get a new identity every change detection.
+  payee: { id: string; name: string } | null;
 }
 
 type Checksum =
@@ -84,6 +89,7 @@ type Checksum =
     HlmEmptyImports,
     HlmDatePicker,
     HlmDatePickerInput,
+    PayeePickerComponent,
   ],
   providers: [provideIcons({
     lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion,
@@ -343,6 +349,7 @@ type Checksum =
                       <th class="p-2 text-left font-medium">Date</th>
                       <th class="p-2 text-left font-medium">Description</th>
                       <th class="p-2 text-left font-medium">Type</th>
+                      <th class="p-2 text-left font-medium">Payee</th>
                       <th class="p-2 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
@@ -388,6 +395,13 @@ type Checksum =
                             {{ row.direction }}
                           </button>
                         </td>
+                        <td class="p-2">
+                          <app-payee-picker
+                            [value]="row.payee"
+                            ariaLabel="Select payee for this line"
+                            (valueChange)="onRowPayeeChange(i, $event)"
+                          />
+                        </td>
                         <td class="p-2 text-right">
                           <input
                             hlmInput
@@ -403,7 +417,7 @@ type Checksum =
                       @if (row.duplicateSuspected) {
                         <tr class="border-b last:border-0">
                           <td></td>
-                          <td colspan="4" class="px-2 pb-2 text-xs text-amber-600">
+                          <td colspan="5" class="px-2 pb-2 text-xs text-amber-600">
                             <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
                           </td>
                         </tr>
@@ -530,6 +544,7 @@ export class StatementImportReviewPageComponent {
       mappable: r.mappable,
       runningBalance: r.runningBalance ?? null,
       duplicateSuspected: r.duplicateSuspected,
+      payee: null,
     })),
   );
 
@@ -559,6 +574,10 @@ export class StatementImportReviewPageComponent {
     this.lineItems.update((rows) =>
       rows.map((r, idx) =>
         idx === i ? { ...r, direction: r.direction === 'Expense' ? 'Income' : 'Expense' } : r));
+  }
+
+  onRowPayeeChange(i: number, p: PayeeResponse | null): void {
+    this.patchRow(i, { payee: p ? { id: p.id, name: p.name } : null });
   }
 
   toggleAll(checked: boolean): void {
@@ -691,6 +710,7 @@ export class StatementImportReviewPageComponent {
           amount: Number(r.amount),
           date: r.date,
           description: r.description.trim() ? r.description.trim() : null,
+          payeeId: r.payee?.id ?? null,
         })),
       },
     }).pipe(

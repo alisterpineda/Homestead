@@ -22,7 +22,8 @@ public class PatchFlowHandler(
                 request.Amount,
                 request.Date,
                 request.Description,
-                request.CategoryId),
+                request.CategoryId,
+                request.PayeeId),
             ct);
 
         await unitOfWork.SaveChangesAsync(ct);
@@ -32,6 +33,7 @@ public class PatchFlowHandler(
         var categories = await pathResolver.GetPathMapAsync(ct);
         return TransactionMapping.ToResponse(
             result.Transaction!, categories,
-            await DocumentLinkCounts.ForAsync(db, result.Transaction!.Id, ct));
+            await DocumentLinkCounts.ForAsync(db, result.Transaction!.Id, ct),
+            await PayeeNames.ForAsync(db, result.Transaction!, ct));
     }
 }

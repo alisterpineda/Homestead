@@ -83,6 +83,8 @@ interface ActivityRowViewModel {
   signed: number;
   amountText: string | null;
   dateText: string;
+  // The flow's payee name, when attached — rendered above the memo. Null for non-flow rows.
+  payeeName: string | null;
 }
 
 @Component({
@@ -116,7 +118,16 @@ class ActivityShapeCell {
   selector: 'app-activity-memo-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span class="block truncate text-sm">{{ context.row.original.tx.memo }}</span>
+    @if (context.row.original.payeeName; as payee) {
+      <div class="flex min-w-0 flex-col">
+        <span class="truncate text-sm">{{ payee }}</span>
+        @if (context.row.original.tx.memo) {
+          <span class="truncate text-xs text-muted-foreground">{{ context.row.original.tx.memo }}</span>
+        }
+      </div>
+    } @else {
+      <span class="block truncate text-sm">{{ context.row.original.tx.memo }}</span>
+    }
   `,
 })
 class ActivityMemoCell {
@@ -682,6 +693,8 @@ export class AccountActivityTabComponent {
       typeSubtitle = tx.details.categoryName ?? '';
     }
 
+    const payeeName = tx.details?.kind === 'flow' ? (tx.details.payeeName ?? null) : null;
+
     return {
       tx,
       iconName: shapeIconName(tx.shape),
@@ -690,6 +703,7 @@ export class AccountActivityTabComponent {
       signed,
       amountText,
       dateText,
+      payeeName,
     };
   }
 
@@ -729,6 +743,7 @@ export class AccountActivityTabComponent {
       signed,
       amountText,
       dateText: toDateOnly(tx.occurredAt),
+      payeeName: null,
     };
   }
 }

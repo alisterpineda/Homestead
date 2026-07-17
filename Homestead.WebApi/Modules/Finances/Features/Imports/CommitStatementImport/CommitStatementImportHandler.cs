@@ -98,7 +98,8 @@ public class CommitStatementImportHandler(
                     line.Amount,
                     line.Date,
                     line.Description,
-                    CategoryId: null),
+                    CategoryId: null,
+                    PayeeId: line.PayeeId),
                 ct);
 
             created.Add(flow.Transaction!);

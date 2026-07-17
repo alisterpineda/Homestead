@@ -9,4 +9,5 @@ export interface CreateFlowCommand {
   date: string;
   description?: (string | null);
   direction: FlowDirection;
+  payeeId?: (string | null);
 }

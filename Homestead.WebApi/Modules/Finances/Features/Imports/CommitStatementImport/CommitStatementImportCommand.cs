@@ -25,7 +25,8 @@ public record CommitStatementImportCommand : ICommand<CommitStatementImportRespo
 }
 
 /// <summary>One curated line to materialize as an Expense/Income flow, in the account's reporting currency.</summary>
-public record CommitLineItem(FlowDirection Direction, decimal Amount, DateOnly Date, string? Description);
+public record CommitLineItem(
+    FlowDirection Direction, decimal Amount, DateOnly Date, string? Description, Guid? PayeeId = null);
 
 public record CommitStatementImportResponse
 {

@@ -1,10 +1,12 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Modules.Finances.Services;
+using Homestead.WebApi.Persistence;
 using MediatR;
 
 namespace Homestead.WebApi.Modules.Finances.Features.Transactions.Flows.CreateFlow;
 
 public class CreateFlowHandler(
+    AppDbContext db,
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
     ICategoryPathResolver pathResolver,
@@ -20,7 +22,8 @@ public class CreateFlowHandler(
                 request.Amount,
                 request.Date,
                 request.Description,
-                request.CategoryId),
+                request.CategoryId,
+                request.PayeeId),
             ct);
 
         // Flush the primary change so the reconciler's DB queries see the new flow.
@@ -29,6 +32,8 @@ public class CreateFlowHandler(
         await reconciler.ReconcileAsync(result.TouchedPairs, ct);
 
         var categories = await pathResolver.GetPathMapAsync(ct);
-        return TransactionMapping.ToResponse(result.Transaction!, categories);
+        return TransactionMapping.ToResponse(
+            result.Transaction!, categories,
+            payeeNames: await PayeeNames.ForAsync(db, result.Transaction!, ct));
     }
 }

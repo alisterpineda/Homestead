@@ -8,4 +8,11 @@ public class NormalTransaction : AccountTransaction
     /// but always set in code for normal transactions. Defaults to <see cref="NormalShape.Transfer"/>.
     /// </summary>
     public NormalShape NormalShape { get; set; }
+
+    /// <summary>
+    /// Optional counterparty for this flow (Expense/Income). Nullable TPH column on the shared
+    /// transaction table — NULL on transfers/trades/dividends and on OB/BE rows. No nav property;
+    /// payee names are batch-loaded via <c>PayeeNames</c>.
+    /// </summary>
+    public Guid? PayeeId { get; set; }
 }

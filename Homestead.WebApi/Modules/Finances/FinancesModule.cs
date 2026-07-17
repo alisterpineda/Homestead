@@ -32,6 +32,10 @@ using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.DeleteOpeningBa
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalances;
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
+using Homestead.WebApi.Modules.Finances.Features.Payees.CreatePayee;
+using Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayee;
+using Homestead.WebApi.Modules.Finances.Features.Payees.GetPayees;
+using Homestead.WebApi.Modules.Finances.Features.Payees.PatchPayee;
 using Homestead.WebApi.Modules.Finances.Features.PriceSources.DeletePriceSourceSchedule;
 using Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSource;
 using Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSources;
@@ -114,6 +118,13 @@ public static class FinancesModule
         CreateCategoryEndpoint.Map(categories);
         PatchCategoryEndpoint.Map(categories);
         DeleteCategoryEndpoint.Map(categories);
+
+        // Household payees (counterparties for flows). Global lookup, mirrors the categories group.
+        var payees = v1.MapGroup("/payees");
+        GetPayeesEndpoint.Map(payees);
+        CreatePayeeEndpoint.Map(payees);
+        PatchPayeeEndpoint.Map(payees);
+        DeletePayeeEndpoint.Map(payees);
 
         var prices = v1.MapGroup("/commodity-prices");
         GetCommodityPricesEndpoint.Map(prices);
