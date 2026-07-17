@@ -20,20 +20,41 @@ import {
   lucideTriangleAlert,
   lucideCircleHelp,
   lucideFileQuestion,
+  lucideX,
 } from '@ng-icons/lucide';
+import {
+  type ColumnDef,
+  type RowSelectionState,
+  createAngularTable,
+  flexRenderComponent,
+  FlexRenderDirective,
+  getCoreRowModel,
+} from '@tanstack/angular-table';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmResizableImports } from '@/shared/components/spartan/resizable';
 import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
+import { HlmTableImports } from '@/shared/components/spartan/table';
+import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
+import { parseDate } from '@/shared/utils';
 import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
+import {
+  type LineItemEdit,
+  type StatementLineTableMeta,
+  LineDateCell,
+  LineDescriptionCell,
+  LineTypeCell,
+  LinePayeeCell,
+  LineAmountCell,
+} from './statement-import-review-cells';
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
@@ -50,23 +71,6 @@ import type { CommodityResponse } from '@/api/generated/models/commodity-respons
 import type { FlowDirection } from '@/api/generated/models/flow-direction';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
 
-// Client-side edit state for one proposed line — the review page owns this until commit. `mappable` echoes
-// the server's un-mappable flag (missing amount/direction); `date`/`amount` are strings for uncontrolled inputs.
-interface LineItemEdit {
-  index: number;
-  accepted: boolean;
-  amount: string;
-  description: string;
-  direction: FlowDirection;
-  date: string;
-  mappable: boolean;
-  runningBalance: number | null;
-  duplicateSuspected: boolean;
-  // Client-side payee pick, lost on reload (not staged server-side) — accepted per the plan. Held as a
-  // single stable object so the per-row picker's [value] doesn't get a new identity every change detection.
-  payee: { id: string; name: string } | null;
-}
-
 type Checksum =
   | { state: 'balanced' }
   | { state: 'off'; amount: string }
@@ -82,17 +86,19 @@ type Checksum =
     HlmSpinner,
     HlmInput,
     HlmLabel,
-    HlmCheckboxImports,
     HlmIconImports,
     HlmResizableImports,
     HlmTabsImports,
     HlmEmptyImports,
+    HlmTableImports,
+    HlmToggleGroupImports,
     HlmDatePicker,
     HlmDatePickerInput,
+    FlexRenderDirective,
     PayeePickerComponent,
   ],
   providers: [provideIcons({
-    lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion,
+    lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion, lucideX,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -307,9 +313,23 @@ type Checksum =
           <!-- Feature B: itemized transactions -->
           @if (lineItems().length > 0) {
             <div class="flex flex-col gap-2">
-              <div class="flex items-center justify-between">
+              <div class="flex flex-wrap items-center justify-between gap-2">
                 <h3 class="text-sm font-medium">Transactions ({{ lineItems().length }})</h3>
-                <span class="text-xs text-muted-foreground">{{ acceptedLines().length }} selected</span>
+                <div class="flex items-center gap-2">
+                  <hlm-toggle-group
+                    type="single"
+                    nullable="false"
+                    variant="outline"
+                    aria-label="Filter transactions"
+                    [value]="filterMode()"
+                    (valueChange)="onFilterChange($event)"
+                  >
+                    <button hlmToggleGroupItem value="all">All</button>
+                    <button hlmToggleGroupItem value="duplicates">Duplicates</button>
+                    <button hlmToggleGroupItem value="unmappable">Needs fix</button>
+                  </hlm-toggle-group>
+                  <span class="text-xs text-muted-foreground">{{ acceptedLines().length }} selected</span>
+                </div>
               </div>
 
               <!-- Advisory checksum banner -->
@@ -334,98 +354,81 @@ type Checksum =
                 }
               }
 
-              <div class="overflow-x-auto rounded-md border">
-                <table class="w-full border-collapse text-sm">
-                  <thead>
-                    <tr class="border-b bg-muted/40 text-xs text-muted-foreground">
-                      <th class="w-9 p-2 text-center">
-                        <hlm-checkbox
-                          [checked]="allSelected()"
-                          [indeterminate]="someSelected()"
-                          (checkedChange)="toggleAll($event === true)"
-                          [aria-label]="'Select all lines'"
-                        />
-                      </th>
-                      <th class="p-2 text-left font-medium">Date</th>
-                      <th class="p-2 text-left font-medium">Description</th>
-                      <th class="p-2 text-left font-medium">Type</th>
-                      <th class="p-2 text-left font-medium">Payee</th>
-                      <th class="p-2 text-right font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (row of lineItems(); track row.index; let i = $index) {
-                      <tr class="border-b last:border-0 align-middle" [class.opacity-50]="!rowCommittable(row)">
-                        <td class="p-2 text-center">
-                          <hlm-checkbox
-                            [checked]="row.accepted"
-                            [disabled]="!rowCommittable(row)"
-                            (checkedChange)="setRowAccepted(i, $event === true)"
-                            [aria-label]="'Accept transaction line'"
-                          />
-                        </td>
-                        <td class="p-2">
-                          <input
-                            hlmInput
-                            type="date"
-                            class="w-36"
-                            [value]="row.date"
-                            (input)="patchRow(i, { date: asValue($event) })"
-                          />
-                        </td>
-                        <td class="p-2">
-                          <input
-                            hlmInput
-                            class="w-40"
-                            maxlength="512"
-                            [value]="row.description"
-                            (input)="patchRow(i, { description: asValue($event) })"
-                          />
-                        </td>
-                        <td class="p-2">
-                          <button
-                            type="button"
-                            (click)="toggleRowDirection(i)"
-                            title="Click to switch between Expense and Income"
-                            class="rounded-md border px-2 py-0.5 text-xs font-medium"
-                            [class.text-emerald-600]="row.direction === 'Income'"
-                            [class.border-emerald-500/40]="row.direction === 'Income'"
-                            [class.text-muted-foreground]="row.direction === 'Expense'"
-                          >
-                            {{ row.direction }}
-                          </button>
-                        </td>
-                        <td class="p-2">
-                          <app-payee-picker
-                            [value]="row.payee"
-                            ariaLabel="Select payee for this line"
-                            (valueChange)="onRowPayeeChange(i, $event)"
-                          />
-                        </td>
-                        <td class="p-2 text-right">
-                          <input
-                            hlmInput
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            class="w-24 text-right"
-                            [value]="row.amount"
-                            (input)="patchRow(i, { amount: asValue($event) })"
-                          />
-                        </td>
-                      </tr>
-                      @if (row.duplicateSuspected) {
-                        <tr class="border-b last:border-0">
-                          <td></td>
-                          <td colspan="5" class="px-2 pb-2 text-xs text-amber-600">
-                            <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
-                          </td>
+              <!-- Bulk actions for the current selection -->
+              @if (hasSelection()) {
+                <div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+                  <span class="text-sm text-muted-foreground">{{ selectionCount() }} selected</span>
+                  <button hlmBtn variant="outline" (click)="bulkSetDirection('Expense')">Set Expense</button>
+                  <button hlmBtn variant="outline" (click)="bulkSetDirection('Income')">Set Income</button>
+                  <app-payee-picker
+                    class="w-44"
+                    ariaLabel="Assign payee to selected lines"
+                    placeholder="Assign payee…"
+                    [value]="null"
+                    (valueChange)="bulkAssignPayee($event)"
+                  />
+                  <button hlmBtn variant="ghost" (click)="bulkClearPayee()">Clear payee</button>
+                  <button
+                    hlmBtn
+                    variant="outline"
+                    size="icon"
+                    class="ml-auto"
+                    (click)="clearSelection()"
+                    aria-label="Clear selection"
+                  >
+                    <ng-icon hlm name="lucideX" size="sm" />
+                  </button>
+                </div>
+              }
+
+              <!-- Transactions table -->
+              <div class="overflow-clip rounded-md border">
+                <div hlmTableContainer>
+                  <table hlmTable class="w-full">
+                    <thead hlmTHead class="bg-background">
+                      @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
+                        <tr hlmTr>
+                          @for (header of headerGroup.headers; track header.id) {
+                            <th hlmTh [class]="getThClass(header.column.id)">
+                              @if (!header.isPlaceholder) {
+                                <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
+                                  <span>{{ h }}</span>
+                                </ng-container>
+                              }
+                            </th>
+                          }
                         </tr>
                       }
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody hlmTBody>
+                      @for (row of table.getRowModel().rows; track row.id) {
+                        <tr hlmTr [class.opacity-50]="!rowCommittable(row.original)">
+                          @for (cell of row.getVisibleCells(); track cell.id) {
+                            <td hlmTd [class]="getTdClass(cell.column.id)">
+                              <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
+                                <div [innerHTML]="c"></div>
+                              </ng-container>
+                            </td>
+                          }
+                        </tr>
+                        @if (row.original.duplicateSuspected) {
+                          <tr hlmTr>
+                            <td hlmTd></td>
+                            <td hlmTd [attr.colspan]="5" class="px-2 pb-2 text-xs text-amber-600">
+                              <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
+                            </td>
+                          </tr>
+                        }
+                      }
+                    </tbody>
+                  </table>
+                </div>
               </div>
+              @if (visibleLineItems().length === 0) {
+                <p class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
+                  No transactions match this filter.
+                </p>
+              }
               <p class="text-xs text-muted-foreground">
                 Lines import as uncategorised Expense/Income. Greyed rows are missing an amount or date and can't be selected until fixed.
               </p>
@@ -531,22 +534,46 @@ export class StatementImportReviewPageComponent {
 
   protected readonly datePicker = isoDateBinding(this.date);
 
-  // Per-row line-item edit state. Un-mappable rows (server flag) seed unchecked so the reviewer must
-  // deliberately opt them in after editing; mappable rows keep the server's default-accepted.
+  // Per-row line-item edit state. `accepted` is NOT held here — acceptance lives in the table's
+  // rowSelection map. `dateObj` memoizes the parsed Date so the picker binding keeps a stable reference
+  // (a fresh Date every change detection would snap an open calendar back — see LineDateCell).
   lineItems = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () =>
     (this.data()?.lineItems ?? []).map((r) => ({
       index: r.index,
-      accepted: r.mappable ? r.accepted : false,
       amount: String(r.amount),
       description: r.description ?? '',
       direction: r.direction,
       date: r.date ?? '',
+      dateObj: parseDate(r.date) ?? undefined,
       mappable: r.mappable,
-      runningBalance: r.runningBalance ?? null,
       duplicateSuspected: r.duplicateSuspected,
       payee: null,
     })),
   );
+
+  // Selection = acceptance. Seeded (keyed on the same seedKey) from the staged proposal's own accepted
+  // flags — mappable-and-accepted rows start checked; un-mappable rows start unchecked and stay
+  // un-selectable via enableRowSelection until the reviewer fixes them. Read from data() directly, not
+  // from the lineItems signal, so there's no inter-signal seeding order to reason about.
+  rowSelection = seededLinkedSignal<string, RowSelectionState>(this.seedKey, () => {
+    const selection: RowSelectionState = {};
+    for (const r of this.data()?.lineItems ?? []) {
+      if (r.mappable && r.accepted) selection[String(r.index)] = true;
+    }
+    return selection;
+  });
+
+  // Client-side triage filter — display only. Selection/edit state stay in the untouched lineItems
+  // signal, so a row hidden by the filter but still selected commits.
+  filterMode = signal<'all' | 'duplicates' | 'unmappable'>('all');
+  visibleLineItems = computed(() => {
+    const rows = this.lineItems();
+    switch (this.filterMode()) {
+      case 'duplicates': return rows.filter((r) => r.duplicateSuspected);
+      case 'unmappable': return rows.filter((r) => !r.mappable);
+      default: return rows;
+    }
+  });
 
   // A row can be committed once it carries a positive amount and a date (direction always has a value).
   rowCommittable = (row: LineItemEdit): boolean => {
@@ -554,35 +581,148 @@ export class StatementImportReviewPageComponent {
     return row.amount !== '' && Number.isFinite(amt) && amt > 0 && !!row.date;
   };
 
-  acceptedLines = computed(() => this.lineItems().filter((r) => r.accepted && this.rowCommittable(r)));
+  private isSelected(index: number): boolean {
+    return this.rowSelection()[String(index)] === true;
+  }
+
+  // Test-facing helper — asserts acceptance without coupling to the rowSelection map shape.
+  isAccepted(index: number): boolean {
+    return this.isSelected(index);
+  }
+
+  acceptedLines = computed(() =>
+    this.lineItems().filter((r) => this.isSelected(r.index) && this.rowCommittable(r)));
 
   allSelected = computed(() => {
     const committable = this.lineItems().filter((r) => this.rowCommittable(r));
-    return committable.length > 0 && committable.every((r) => r.accepted);
+    return committable.length > 0 && committable.every((r) => this.isSelected(r.index));
   });
-  someSelected = computed(() => this.lineItems().some((r) => r.accepted) && !this.allSelected());
 
-  patchRow(i: number, patch: Partial<LineItemEdit>): void {
-    this.lineItems.update((rows) => rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  selectionCount = computed(() => this.acceptedLines().length);
+  hasSelection = computed(() => this.selectionCount() > 0);
+
+  private readonly _meta: StatementLineTableMeta = {
+    patchRow: (index, patch) => this.patchRow(index, patch),
+    setDirection: (index, direction) => this.setDirection(index, direction),
+    onPayeeChange: (index, payee) => this.onRowPayeeChange(index, payee),
+  };
+
+  private readonly _columns: ColumnDef<LineItemEdit>[] = [
+    {
+      id: 'select',
+      header: () => flexRenderComponent(TableHeadSelection),
+      cell: () => flexRenderComponent(TableRowSelection),
+      enableSorting: false,
+    },
+    { id: 'date', header: 'Date', cell: () => flexRenderComponent(LineDateCell), enableSorting: false },
+    { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
+    { id: 'type', header: 'Type', cell: () => flexRenderComponent(LineTypeCell), enableSorting: false },
+    { id: 'payee', header: 'Payee', cell: () => flexRenderComponent(LinePayeeCell), enableSorting: false },
+    { id: 'amount', header: 'Amount', cell: () => flexRenderComponent(LineAmountCell), enableSorting: false },
+  ];
+
+  // Statement order is load-bearing (reconciliation / running-balance reading), so sorting stays off —
+  // which also sidesteps any edit-vs-reorder hazard. The options factory re-runs on visibleLineItems()/
+  // rowSelection() change, so enableRowSelection re-evaluates as edits change committability.
+  protected readonly table = createAngularTable<LineItemEdit>(() => ({
+    data: this.visibleLineItems(),
+    columns: this._columns,
+    getRowId: (row) => String(row.index),
+    enableSorting: false,
+    enableRowSelection: (row) => this.rowCommittable(row.original),
+    onRowSelectionChange: (updater) => {
+      this.rowSelection.set(updater instanceof Function ? updater(this.rowSelection()) : updater);
+    },
+    getCoreRowModel: getCoreRowModel(),
+    state: { rowSelection: this.rowSelection() },
+    meta: this._meta,
+  }));
+
+  private readonly TH_CLASSES: Record<string, string> = {
+    select: 'w-9',
+    amount: 'text-right',
+  };
+  private readonly TD_CLASSES: Record<string, string> = {
+    select: 'w-9 text-center align-middle',
+    amount: 'text-right align-middle',
+  };
+  protected getThClass(columnId: string): string {
+    return this.TH_CLASSES[columnId] ?? '';
+  }
+  protected getTdClass(columnId: string): string {
+    return this.TD_CLASSES[columnId] ?? 'align-middle';
   }
 
-  setRowAccepted(i: number, accepted: boolean): void {
-    this.patchRow(i, { accepted });
-  }
-
-  toggleRowDirection(i: number): void {
+  patchRow(index: number, patch: Partial<LineItemEdit>): void {
     this.lineItems.update((rows) =>
-      rows.map((r, idx) =>
-        idx === i ? { ...r, direction: r.direction === 'Expense' ? 'Income' : 'Expense' } : r));
+      rows.map((r) =>
+        r.index === index
+          ? {
+              ...r,
+              ...patch,
+              // Keep the memoized Date in lockstep, but only touch it when `date` actually changed.
+              ...(patch.date !== undefined ? { dateObj: parseDate(patch.date) ?? undefined } : {}),
+            }
+          : r));
   }
 
-  onRowPayeeChange(i: number, p: PayeeResponse | null): void {
-    this.patchRow(i, { payee: p ? { id: p.id, name: p.name } : null });
+  setDirection(index: number, direction: FlowDirection): void {
+    this.patchRow(index, { direction });
+  }
+
+  onRowPayeeChange(index: number, p: PayeeResponse | null): void {
+    this.patchRow(index, { payee: p ? { id: p.id, name: p.name } : null });
+  }
+
+  // Retained selection adapters (used by the row/header checkboxes flow through TanStack; these keep the
+  // component's public API stable for callers and tests). Writes go straight to the rowSelection signal.
+  setRowAccepted(index: number, accepted: boolean): void {
+    this.rowSelection.update((sel) => {
+      const next = { ...sel };
+      if (accepted) next[String(index)] = true;
+      else delete next[String(index)];
+      return next;
+    });
   }
 
   toggleAll(checked: boolean): void {
+    if (!checked) {
+      this.rowSelection.set({});
+      return;
+    }
+    const next: RowSelectionState = {};
+    for (const r of this.lineItems()) {
+      if (this.rowCommittable(r)) next[String(r.index)] = true;
+    }
+    this.rowSelection.set(next);
+  }
+
+  clearSelection(): void {
+    this.rowSelection.set({});
+  }
+
+  onFilterChange(value: unknown): void {
+    if (value === 'all' || value === 'duplicates' || value === 'unmappable') this.filterMode.set(value);
+  }
+
+  // ─── Bulk actions over the current selection (accepted ∩ committable) ──────
+  private updateSelected(patch: (r: LineItemEdit) => Partial<LineItemEdit>): void {
     this.lineItems.update((rows) =>
-      rows.map((r) => ({ ...r, accepted: checked && this.rowCommittable(r) })));
+      rows.map((r) =>
+        this.isSelected(r.index) && this.rowCommittable(r) ? { ...r, ...patch(r) } : r));
+  }
+
+  bulkSetDirection(direction: FlowDirection): void {
+    this.updateSelected(() => ({ direction }));
+  }
+
+  bulkAssignPayee(p: PayeeResponse | null): void {
+    if (!p) return;
+    this.updateSelected(() => ({ payee: { id: p.id, name: p.name } }));
+  }
+
+  bulkClearPayee(): void {
+    this.updateSelected(() => ({ payee: null }));
   }
 
   // ─── Advisory closing-balance checksum (never blocks commit) ──────────────

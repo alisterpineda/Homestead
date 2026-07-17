@@ -13,6 +13,15 @@ import type { StatementImportResponse } from '@/api/generated/models/statement-i
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 
+// The line-item table's hlm-select cells measure their trigger width via ResizeObserver, absent in jsdom.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 // Header opening 1000 → closing 1500. The two mappable lines (Expense 100, Income 600) net +500 on an asset
 // account, so the default selection reconciles exactly (checksum 'balanced'). The third line is un-mappable.
 const RESPONSE: StatementImportResponse = {
@@ -132,9 +141,9 @@ describe('StatementImportReviewPageComponent', () => {
 
     const rows = c.lineItems();
     expect(rows.length).toBe(3);
-    expect(rows[0].accepted).toBe(true);   // mappable, default-accepted
-    expect(rows[1].accepted).toBe(true);
-    expect(rows[2].accepted).toBe(false);  // un-mappable → seeded unchecked
+    expect(c.isAccepted(0)).toBe(true);   // mappable, default-accepted
+    expect(c.isAccepted(1)).toBe(true);
+    expect(c.isAccepted(2)).toBe(false);  // un-mappable → seeded unchecked
     expect(c.rowCommittable(rows[2])).toBe(false);
     expect(c.acceptedLines().length).toBe(2);
   });
@@ -164,7 +173,7 @@ describe('StatementImportReviewPageComponent', () => {
 
     c.toggleAll(true);
     expect(c.acceptedLines().length).toBe(2);   // the un-mappable row stays out
-    expect(c.lineItems()[2].accepted).toBe(false);
+    expect(c.isAccepted(2)).toBe(false);
   });
 
   it('checksum is balanced with the default selection on an asset account', async () => {
@@ -261,5 +270,65 @@ describe('StatementImportReviewPageComponent', () => {
     expect(api.lastCommit.body.lineItems[0]).toEqual(
       expect.objectContaining({ description: 'GROCERY', payeeId: 'payee-costco' }));
     expect(api.lastCommit.body.lineItems[1].payeeId).toBeNull();
+  });
+
+  it('bulk-sets direction across the current selection, skipping unselected rows', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Default selection = the two mappable rows (0, 1). Flip both to Income.
+    c.bulkSetDirection('Income');
+    const rows = c.lineItems();
+    expect(rows[0].direction).toBe('Income');
+    expect(rows[1].direction).toBe('Income');
+    expect(rows[2].direction).toBe('Expense'); // un-mappable + unselected → untouched
+  });
+
+  it('bulk-assigns then clears the payee across the selection', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    c.bulkAssignPayee({
+      id: 'payee-hydro', name: 'Hydro', isArchived: false, transactionCount: 0,
+      createdAt: '', updatedAt: '',
+    });
+    expect(c.lineItems()[0].payee).toEqual({ id: 'payee-hydro', name: 'Hydro' });
+    expect(c.lineItems()[1].payee).toEqual({ id: 'payee-hydro', name: 'Hydro' });
+    expect(c.lineItems()[2].payee).toBeNull(); // unselected
+
+    c.bulkClearPayee();
+    expect(c.lineItems()[0].payee).toBeNull();
+    expect(c.lineItems()[1].payee).toBeNull();
+  });
+
+  it('filters visible rows while hidden-but-selected rows still commit', async () => {
+    const withDup: StatementImportResponse = {
+      ...RESPONSE,
+      lineItems: [
+        RESPONSE.lineItems![0],
+        { ...RESPONSE.lineItems![1], duplicateSuspected: true },
+        RESPONSE.lineItems![2],
+      ],
+    };
+    configure(withDup);
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.visibleLineItems().length).toBe(3);
+    expect(c.acceptedLines().length).toBe(2);
+
+    // Filter to duplicates → only row 1 visible, but row 0 stays selected and commit-bound.
+    c.filterMode.set('duplicates');
+    expect(c.visibleLineItems().map((r) => r.index)).toEqual([1]);
+    expect(c.acceptedLines().map((r) => r.index)).toEqual([0, 1]);
+
+    // 'unmappable' → only the un-mappable row 2.
+    c.filterMode.set('unmappable');
+    expect(c.visibleLineItems().map((r) => r.index)).toEqual([2]);
   });
 });
