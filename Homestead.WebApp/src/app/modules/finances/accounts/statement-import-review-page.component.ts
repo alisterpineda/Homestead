@@ -124,11 +124,11 @@ type Checksum =
           <!-- Desktop: two-panel resizable -->
           @if (!isMobile()) {
             <div hlmResizableGroup direction="horizontal" class="min-h-0 flex-1 rounded-md border">
-              <div hlmResizablePanel [defaultSize]="60" [minSize]="35" class="overflow-hidden">
+              <div hlmResizablePanel [defaultSize]="40" [minSize]="35" class="overflow-hidden">
                 <ng-container [ngTemplateOutlet]="previewPanel" />
               </div>
               <hlm-resizable-handle withHandle />
-              <div hlmResizablePanel [defaultSize]="40" [minSize]="30" class="flex flex-col overflow-hidden">
+              <div hlmResizablePanel [defaultSize]="60" [minSize]="30" class="flex flex-col overflow-hidden">
                 <div class="min-h-0 flex-1 overflow-y-auto">
                   <ng-container [ngTemplateOutlet]="dataPanel" />
                 </div>
