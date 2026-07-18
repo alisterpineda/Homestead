@@ -2,6 +2,7 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Services;
@@ -17,6 +18,7 @@ public class CommitStatementImportHandler(
     IBalanceEntryService balanceEntries,
     IFlowService flows,
     IBalanceEntryReconciler reconciler,
+    IPayeeMappingService payeeMappings,
     IUnitOfWork unitOfWork)
     : IRequestHandler<CommitStatementImportCommand, CommitStatementImportResponse>
 {
@@ -86,11 +88,31 @@ public class CommitStatementImportHandler(
             entryId = result.Entry!.Id;
         }
 
-        // Materialize each curated line as an Expense/Income flow, uncategorised (CategoryId: null → the
-        // system Uncategorised bucket). CreateAsync is save-free and per-transaction, so the whole set lands
-        // in one flush below.
+        // Auto-category pre-filter: a payee's default category rides along to also categorise the line, but
+        // only when the whole path is valid. FlowCounterpartResolver THROWS on an archived / wrong-direction
+        // category, which inside this atomic loop would detonate the entire commit — so we pre-validate and
+        // pass CategoryId only when the category exists, is a category account, isn't archived, and its type
+        // matches the line's direction; otherwise null (Uncategorised). Gated by the AutoCategoriseFromPayee
+        // setting (default on).
+        var categoryByPayee = await LoadAutoCategoriesAsync(request.LineItems, ct);
+
+        // Staged raw description per line (keyed by the stable ProposedFlow.Index). This — NOT the editable
+        // Description memo — is the learning key, so editing the memo never corrupts what's learned.
+        var stagedRawByIndex = staged.Proposal.LineItems
+            .GroupBy(f => f.Index)
+            .ToDictionary(g => g.Key, g => g.First().Description);
+
+        // Materialize each curated line as an Expense/Income flow. Memo is the (possibly edited) Description;
+        // category is the pre-validated auto-category or null. CreateAsync is save-free and per-transaction,
+        // so the whole set lands in one flush below.
         foreach (var line in request.LineItems)
         {
+            Guid? categoryId = null;
+            if (line.PayeeId is Guid pid
+                && categoryByPayee.TryGetValue(pid, out var category)
+                && IsUsableCategory(category, line.Direction))
+                categoryId = category.Id;
+
             var flow = await flows.CreateAsync(
                 new CreateFlowRequest(
                     line.Direction,
@@ -98,13 +120,35 @@ public class CommitStatementImportHandler(
                     line.Amount,
                     line.Date,
                     line.Description,
-                    CategoryId: null,
+                    CategoryId: categoryId,
                     PayeeId: line.PayeeId),
                 ct);
 
             created.Add(flow.Transaction!);
             touched.AddRange(flow.TouchedPairs);
         }
+
+        // Learn only on an explicit signal (Learn && a payee was set): a rubber-stamped tier-① pre-fill or a
+        // warning-dialog auto-apply arrives with Learn=false and is applied but not taught. Key on the staged
+        // raw text; a null-normalizing line (boilerplate / degenerate) is silently skipped. De-dupe within
+        // the batch (last-wins per key) so an intra-commit repeat bumps TimesConfirmed exactly once.
+        var learnByKey = new Dictionary<string, (Guid PayeeId, string SampleRaw)>();
+        foreach (var line in request.LineItems)
+        {
+            if (!line.Learn || line.PayeeId is not Guid learnPayeeId)
+                continue;
+            if (!stagedRawByIndex.TryGetValue(line.Index, out var stagedRaw))
+                continue;
+            var key = PayeeDescriptionNormalizer.Normalize(stagedRaw);
+            if (key is null)
+                continue;
+            learnByKey[key] = (learnPayeeId, stagedRaw!);
+        }
+
+        // Upsert BEFORE the flush so the learning writes are atomic with the flows (the interceptor enrolls
+        // each raw ON CONFLICT into the same command transaction; any rollback retracts both).
+        foreach (var (key, entry) in learnByKey)
+            await payeeMappings.UpsertAsync(key, entry.PayeeId, entry.SampleRaw, staged.DocumentId, ct);
 
         // Import-origin provenance: one document-grained link per created (tracked) transaction, added
         // before the flush so links land in the same command transaction as the transactions themselves.
@@ -129,5 +173,45 @@ public class CommitStatementImportHandler(
             FlowsCreated = request.LineItems.Count,
             AccountId = staged.AccountId,
         };
+    }
+
+    /// <summary>
+    /// Batch-load the default-category <see cref="Account"/> of each payee referenced by a line, keyed by
+    /// payee id. Empty when auto-categorise is off or no line carries a payee — so the per-line decision is a
+    /// dictionary lookup, not a query. Only payees that actually have a default category appear.
+    /// </summary>
+    private async Task<Dictionary<Guid, Account>> LoadAutoCategoriesAsync(
+        IReadOnlyList<CommitLineItem> lines, CancellationToken ct)
+    {
+        var payeeIds = lines
+            .Where(l => l.PayeeId is not null)
+            .Select(l => l.PayeeId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (payeeIds.Count == 0)
+            return new Dictionary<Guid, Account>();
+
+        var settings = await FinanceSettings.LoadAsync(db, ct);
+        if (!settings.AutoCategoriseFromPayeeEnabled)
+            return new Dictionary<Guid, Account>();
+
+        return await db.Payees
+            .AsNoTracking()
+            .Where(p => payeeIds.Contains(p.Id) && p.DefaultCategoryId != null)
+            .Select(p => new { p.Id, Category = p.DefaultCategory! })
+            .ToDictionaryAsync(x => x.Id, x => x.Category, ct);
+    }
+
+    // A payee's default category is only applied when it's a live category account whose type matches the
+    // line's direction. Mirrors FlowCounterpartResolver's own checks — pre-filtered here so an archived /
+    // mismatched category degrades to Uncategorised instead of throwing inside the atomic commit.
+    private static bool IsUsableCategory(Account category, FlowDirection direction)
+    {
+        if (category.IsArchived || !category.AccountType.IsCategory())
+            return false;
+
+        var expected = direction == FlowDirection.Expense ? AccountType.Expense : AccountType.Income;
+        return category.AccountType == expected;
     }
 }

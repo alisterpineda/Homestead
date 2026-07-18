@@ -20,6 +20,7 @@ public class RollbackStatementImportHandler(
     IBalanceEntryService balanceEntries,
     ITransferService transfers,
     IBalanceEntryReconciler reconciler,
+    IPayeeMappingService payeeMappings,
     IUnitOfWork unitOfWork)
     : IRequestHandler<RollbackStatementImportCommand, RollbackStatementImportResponse>
 {
@@ -50,6 +51,11 @@ public class RollbackStatementImportHandler(
             };
             touched.AddRange(result);
         }
+
+        // Retract exactly the mappings this document's import taught (precise last-writer match) — a key later
+        // overwritten by a different import carries a different LastWriterDocumentId and is left intact. Same
+        // command transaction as the deletes above (the interceptor enrolls the bulk ExecuteDelete).
+        await payeeMappings.RetractByDocumentAsync(request.DocumentId, ct);
 
         await unitOfWork.SaveChangesAsync(ct);
         await reconciler.ReconcileAsync(touched, ct);

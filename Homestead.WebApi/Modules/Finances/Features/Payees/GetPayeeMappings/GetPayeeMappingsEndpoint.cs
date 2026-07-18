@@ -1,0 +1,16 @@
+using MediatR;
+
+namespace Homestead.WebApi.Modules.Finances.Features.Payees.GetPayeeMappings;
+
+public static class GetPayeeMappingsEndpoint
+{
+    public static void Map(RouteGroupBuilder group)
+    {
+        group.MapGet("/{id:guid}/mappings", async (Guid id, ISender sender, CancellationToken ct) =>
+        {
+            return Results.Ok(await sender.Send(new GetPayeeMappingsQuery(id), ct));
+        })
+        .WithName("GetPayeeMappings")
+        .Produces<IReadOnlyList<PayeeMappingResponse>>();
+    }
+}

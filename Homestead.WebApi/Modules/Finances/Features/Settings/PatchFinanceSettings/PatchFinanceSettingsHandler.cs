@@ -70,7 +70,8 @@ public class PatchFinanceSettingsHandler(
 
         return new FinanceSettingsResponse
         {
-            DisplayCurrencyId = settings.DisplayCurrencyId
+            DisplayCurrencyId = settings.DisplayCurrencyId,
+            AutoCategoriseFromPayee = settings.AutoCategoriseFromPayeeEnabled,
         };
     }
 }

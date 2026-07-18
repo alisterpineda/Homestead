@@ -23,10 +23,16 @@ public class ParseAccountStatementJobHandler(
     IAiProviderResolver aiProviderResolver,
     IStatementExtractionService extraction,
     StatementMappingBuilder mappingBuilder,
+    IPayeeResolutionService payeeResolution,
     AiPageRenderService aiPageRenderService,
     IProcessingNotifier notifier,
+    ILogger<ParseAccountStatementJobHandler> logger,
     IOptions<FileStorageOptions> storageOptions) : IJobHandler
 {
+    // Upper bound on the payee catalog sent to the AI resolver — index-referenced, so a household's full
+    // payee list fits comfortably; the cap only bounds a pathological catalog.
+    private const int PayeeCatalogCap = 500;
+
     private readonly FileStorageOptions _storageOptions = storageOptions.Value;
 
     public ProcessingJobType Type => ProcessingJobType.ParseAccountStatement;
@@ -100,6 +106,11 @@ public class ParseAccountStatementJobHandler(
         var ir = await extraction.ExtractAsync(text, pageImage, ct);
         var proposal = await mappingBuilder.BuildAsync(ir, account, ct);
 
+        // AI second pass (tiers ②/③): resolve payees for lines the deterministic learning table left at
+        // SuggestionSource.None. A separate, small, non-streaming call — isolated from the streaming
+        // extraction above. AI is a hard prerequisite for parse, so it's configured by construction here.
+        proposal = await ApplyAiPayeeSuggestionsAsync(proposal, ct);
+
         // Completeness safety-net: if the raw text overflowed the extraction budget it was clipped before the
         // model saw it (ClampText), so trailing lines may be missing. Surfaced to the reviewer as a warning.
         var textTruncated = text.Length > aiProvider.StatementMaxInputChars;
@@ -136,5 +147,75 @@ public class ParseAccountStatementJobHandler(
                 job.CreatedByUserId,
                 ct);
         }
+    }
+
+    /// <summary>
+    /// Merge AI tier-②/③ payee suggestions into the lines the learning table left at
+    /// <see cref="PayeeSuggestionSource.None"/>. Best-effort: a resolution failure logs and returns the
+    /// proposal untouched (tier-① learned suggestions survive), never failing the import.
+    /// </summary>
+    private async Task<StatementMappingProposal> ApplyAiPayeeSuggestionsAsync(
+        StatementMappingProposal proposal, CancellationToken ct)
+    {
+        var pending = proposal.LineItems
+            .Where(f => f.SuggestionSource == PayeeSuggestionSource.None
+                        && !string.IsNullOrWhiteSpace(f.Description))
+            .Select(f => new PayeeResolutionInput(f.Index, f.Description!))
+            .ToList();
+
+        if (pending.Count == 0)
+            return proposal;
+
+        var catalog = await db.Payees
+            .AsNoTracking()
+            .Where(p => !p.IsArchived)
+            .OrderBy(p => p.Name)
+            .Take(PayeeCatalogCap)
+            .Select(p => new PayeeCatalogEntry(p.Id, p.Name))
+            .ToListAsync(ct);
+
+        IReadOnlyDictionary<int, PayeeResolution> resolutions;
+        try
+        {
+            resolutions = await payeeResolution.ResolveAsync(pending, catalog, ct);
+        }
+        // Best-effort only: a genuine resolution failure keeps tier-① and never fails the import. A
+        // cancellation is NOT a failure — let it propagate so a shutdown actually cancels the job.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "AI payee resolution failed; continuing with learned suggestions only.");
+            return proposal;
+        }
+
+        if (resolutions.Count == 0)
+            return proposal;
+
+        var merged = proposal.LineItems
+            .Select(f => resolutions.TryGetValue(f.Index, out var r) ? ApplyResolution(f, r) : f)
+            .ToList();
+
+        return proposal with { LineItems = merged };
+    }
+
+    // Existing-payee match → tier ②; a proposed new name → tier ③; nothing → the line is left as-is.
+    private static ProposedFlow ApplyResolution(ProposedFlow flow, PayeeResolution resolution)
+    {
+        if (resolution.ExistingPayeeId is Guid existingId)
+            return flow with
+            {
+                SuggestedPayeeId = existingId,
+                SuggestedPayeeName = null,
+                SuggestionSource = PayeeSuggestionSource.AiExistingPayee,
+            };
+
+        if (!string.IsNullOrWhiteSpace(resolution.NewPayeeName))
+            return flow with
+            {
+                SuggestedPayeeId = null,
+                SuggestedPayeeName = resolution.NewPayeeName,
+                SuggestionSource = PayeeSuggestionSource.AiNewPayee,
+            };
+
+        return flow;
     }
 }

@@ -188,7 +188,7 @@ All derived from splits and prices at read time. None are cached at the data lay
 
 See [valuation.md](valuation.md) for the API contract: which valuations are inline on the account resource, which live on sub-resources, the `null` vs `0` rule for unpriced holdings, and what is deliberately excluded from v1.
 
-**Itemized statement import** is now available for bank/credit-card accounts: an uploaded statement is parsed and, on one atomic review-and-commit, becomes a closing-balance assertion **and** an itemized set of uncategorised Expense/Income flows (with an advisory reconciliation checksum). See *Statement import* in [transactions.md](transactions.md#statement-import). Brokerage **holdings → balance-entries** import stays deferred; investment statements are gated off at initiate.
+**Itemized statement import** is now available for bank/credit-card accounts: an uploaded statement is parsed and, on one atomic review-and-commit, becomes a closing-balance assertion **and** an itemized set of Expense/Income flows (with an advisory reconciliation checksum). Import is **payee-primary**: each line gets a payee suggestion (learned → AI → manual) that the system **remembers** for next time and, via the payee's default category, auto-categorises the flow. See *Statement import* in [transactions.md](transactions.md#statement-import) and the learning subsystem in [payees.md](payees.md). Brokerage **holdings → balance-entries** import stays deferred; investment statements are gated off at initiate.
 
 ## Distinctive UX decisions worth preserving
 

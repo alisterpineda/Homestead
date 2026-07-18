@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,58 @@ public class StatementImportPipelineTests : IntegrationTestBase
             .OrderByDescending(v => v.VersionNumber)
             .Select(v => v.Id)
             .FirstAsync(CT);
+    }
+
+    private async Task<Guid> CreatePayeeAsync(HttpClient client, string name, Guid? defaultCategoryId = null)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/payees", new { name, defaultCategoryId }, CT);
+        resp.EnsureSuccessStatusCode();
+        var body = await resp.Content.ReadFromJsonAsync<PayeeItem>(CT);
+        return body!.Id;
+    }
+
+    private static async Task<Guid> CreateExpenseCategoryAsync(HttpClient client, string name)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/categories",
+            new { name, type = "Expense", parentId = (Guid?)null }, CT);
+        resp.EnsureSuccessStatusCode();
+        var body = await resp.Content.ReadFromJsonAsync<CategoryItem>(CT);
+        return body!.Id;
+    }
+
+    private async Task<Guid> InitiateAndWaitAsync(HttpClient client, Guid accountId, Guid versionId)
+    {
+        var resp = await client.PostAsJsonAsync("/api/v1/finances/imports",
+            new { accountId, documentVersionId = versionId }, CT);
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var initiate = await resp.Content.ReadFromJsonAsync<ImportInitiateItem>(CT);
+        await WaitForJobCompletionAsync(initiate!.JobId);
+        return initiate.JobId;
+    }
+
+    private async Task<PayeeMapping> SingleMappingAsync(string normalizedKey)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.PayeeMappings.AsNoTracking().SingleAsync(m => m.NormalizedKey == normalizedKey, CT);
+    }
+
+    private async Task<int> MappingCountAsync(string normalizedKey)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.PayeeMappings.CountAsync(m => m.NormalizedKey == normalizedKey, CT);
+    }
+
+    // True when a flow attributed to the payee has a split posting to the given category (its counterpart leg).
+    private async Task<bool> FlowHasCounterpartAccountAsync(Guid payeeId, Guid categoryId)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.AccountTransactions.OfType<NormalTransaction>()
+            .Where(t => t.PayeeId == payeeId)
+            .SelectMany(t => t.Splits)
+            .AnyAsync(s => s.AccountId == categoryId, CT);
     }
 
     [Fact]
@@ -127,6 +180,74 @@ public class StatementImportPipelineTests : IntegrationTestBase
         Assert.Equal(3, rollback!.DeletedCount);
 
         await AssertImportLinkedAsync(documentId, expectedCount: 0);
+    }
+
+    [Fact]
+    public async Task Learning_Commit_TeachesMapping_ReParse_SuggestsTier1_Rollback_Retracts()
+    {
+        var client = await CreateAdminClientAsync();
+        var cad = await GetCurrencyIdAsync("CAD");
+        var accountId = await CreateCashAccountAsync(client, cad, "Chequing-Learn", "5559991234");
+        // Give the payee a default Expense category so the tier-① suggestion also carries the auto-category
+        // chip data — resolved at READ time on the review GET (not snapshotted at parse time).
+        var categoryId = await CreateExpenseCategoryAsync(client, "Groceries-Learn");
+        var payeeId = await CreatePayeeAsync(client, "Grocery Mart", categoryId);
+
+        var expectedKey = PayeeDescriptionNormalizer.Normalize("GROCERY MART")!;
+
+        // ── Import #1: commit with an explicit (Learn=true) payee pick on the GROCERY MART line. ──
+        var doc1 = await UploadAndWaitAsync(client, "statement.pdf");
+        var ver1 = await LatestVersionIdAsync(doc1);
+        var job1 = await InitiateAndWaitAsync(client, accountId, ver1);
+
+        var commitResp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/imports/{job1}/commit",
+            new
+            {
+                assertedAmount = 1500m,
+                date = "2026-06-30",
+                memo = (string?)null,
+                accepted = true,
+                lineItems = new object[]
+                {
+                    new { index = 0, direction = "Expense", amount = 42.10m, date = "2026-06-03", description = "edited memo", payeeId, learn = true },
+                    new { index = 1, direction = "Income", amount = 2000m, date = "2026-06-15", description = "PAYROLL DEPOSIT" },
+                },
+            }, CT);
+        Assert.Equal(HttpStatusCode.OK, commitResp.StatusCode);
+
+        // The GROCERY MART line taught a mapping keyed on the STAGED raw (not the edited memo).
+        var mapping = await SingleMappingAsync(expectedKey);
+        Assert.Equal(payeeId, mapping.PayeeId);
+        Assert.Equal(doc1, mapping.LastWriterDocumentId);
+        Assert.Equal("GROCERY MART", mapping.SampleRawDescription);
+
+        // Auto-categorise landed: the payee's default (direction-matched) category posts as the flow's
+        // counterpart leg. Exercises LoadAutoCategoriesAsync's EF projection against real Postgres.
+        Assert.True(await FlowHasCounterpartAccountAsync(payeeId, categoryId));
+
+        // ── Import #2: a fresh upload of the same statement now pre-fills the learned payee (tier ①). ──
+        var doc2 = await UploadAndWaitAsync(client, "statement.pdf");
+        var ver2 = await LatestVersionIdAsync(doc2);
+        var job2 = await InitiateAndWaitAsync(client, accountId, ver2);
+
+        var getResp = await client.GetAsync($"/api/v1/finances/imports/{job2}", CT);
+        var staged = await getResp.Content.ReadFromJsonAsync<StatementImportItem>(CT);
+        var grocery = staged!.LineItems!.Single(l => l.Description == "GROCERY MART");
+        Assert.Equal(payeeId, grocery.SuggestedPayeeId);
+        Assert.Equal("Learned", grocery.SuggestionSource);
+        // The suggested payee's default category is resolved onto the response (drives the auto-cat chip).
+        Assert.Equal("Groceries-Learn", grocery.SuggestedPayeeDefaultCategoryName);
+        Assert.Equal("Expense", grocery.SuggestedPayeeDefaultCategoryType);
+        // The un-learned line carries no suggestion.
+        var payroll = staged.LineItems!.Single(l => l.Description == "PAYROLL DEPOSIT");
+        Assert.Null(payroll.SuggestedPayeeId);
+        Assert.Equal("None", payroll.SuggestionSource);
+
+        // ── Rollback import #1 retracts exactly what it taught. ──
+        var rollbackResp = await client.DeleteAsync($"/api/v1/finances/imports/{doc1}", CT);
+        Assert.Equal(HttpStatusCode.OK, rollbackResp.StatusCode);
+        Assert.Equal(0, await MappingCountAsync(expectedKey));
     }
 
     [Fact]
@@ -258,10 +379,14 @@ public class StatementImportPipelineTests : IntegrationTestBase
     }
 
     private record ImportInitiateItem(Guid JobId);
+    private record PayeeItem(Guid Id, string Name);
+    private record CategoryItem(Guid Id);
     private record ProposedItem(decimal AssertedAmount, DateOnly? Date, string? SourceAnchor, bool Accepted);
     private record LineItemItem(
         int Index, DateOnly? Date, string? Description, decimal Amount, string Direction,
-        decimal? RunningBalance, bool Mappable, bool DuplicateSuspected, bool Accepted);
+        decimal? RunningBalance, bool Mappable, bool DuplicateSuspected, bool Accepted,
+        Guid? SuggestedPayeeId, string? SuggestedPayeeName, string SuggestionSource,
+        string? SuggestedPayeeDefaultCategoryName, string? SuggestedPayeeDefaultCategoryType);
     private record StatementImportItem(
         Guid JobId, string Status, Guid AccountId, Guid? DocumentId, Guid? DocumentVersionId,
         ProposedItem? ProposedBalanceEntry, IReadOnlyList<LineItemItem>? LineItems,

@@ -124,6 +124,11 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IStatementExtractionService>();
             services.AddScoped<IStatementExtractionService, FakeStatementExtractionService>();
 
+            // Substitute the AI payee resolver (tier ②/③) so the import spine's second pass is a no-op and
+            // never calls a live model — the deterministic tier-① learning path is what these tests exercise.
+            services.RemoveAll<IPayeeResolutionService>();
+            services.AddScoped<IPayeeResolutionService, FakePayeeResolutionService>();
+
             // Swap the Bank of Canada price provider for a network-free fake so the import-pipeline tests
             // exercise the real DB queries + unique-index enforcement without hitting the live Valet API.
             // Keyed registrations are additive and GetKeyedService returns the LAST registered for a key, so

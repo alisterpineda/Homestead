@@ -38,10 +38,56 @@ public class StatementMappingBuilder(AppDbContext db)
         return new StatementMappingProposal
         {
             BalanceEntry = proposal,
-            LineItems = ProposeFlows(ir),
+            LineItems = await ApplyLearnedPayeesAsync(ProposeFlows(ir), ct),
             AccountNumberMatch = match,
             DuplicateAssertionExists = duplicateExists,
         };
+    }
+
+    /// <summary>
+    /// Tier-① enrichment: normalize each proposed flow's raw description to a learning key and, on a hit in
+    /// the <c>payee_mappings</c> table, stamp <see cref="ProposedFlow.SuggestedPayeeId"/> with
+    /// <see cref="PayeeSuggestionSource.Learned"/>. Deterministic and AI-free — this is what makes the feature
+    /// useful with zero AI once manual picks have taught the table. Null-normalizing lines (boilerplate /
+    /// degenerate) never match. Queried inline against the ambient <see cref="AppDbContext"/>, mirroring the
+    /// dedup query above (no extra dependency on <c>IPayeeMappingService</c>).
+    /// </summary>
+    private async Task<IReadOnlyList<ProposedFlow>> ApplyLearnedPayeesAsync(
+        IReadOnlyList<ProposedFlow> flows, CancellationToken ct)
+    {
+        if (flows.Count == 0)
+            return flows;
+
+        var keyByIndex = new Dictionary<int, string>();
+        foreach (var flow in flows)
+        {
+            var key = PayeeDescriptionNormalizer.Normalize(flow.Description);
+            if (key is not null)
+                keyByIndex[flow.Index] = key;
+        }
+
+        if (keyByIndex.Count == 0)
+            return flows;
+
+        var distinctKeys = keyByIndex.Values.Distinct().ToList();
+        var learned = await db.PayeeMappings
+            .AsNoTracking()
+            .Where(m => distinctKeys.Contains(m.NormalizedKey))
+            .ToDictionaryAsync(m => m.NormalizedKey, m => m.PayeeId, ct);
+
+        if (learned.Count == 0)
+            return flows;
+
+        return flows
+            .Select(flow =>
+                keyByIndex.TryGetValue(flow.Index, out var key) && learned.TryGetValue(key, out var payeeId)
+                    ? flow with
+                    {
+                        SuggestedPayeeId = payeeId,
+                        SuggestionSource = PayeeSuggestionSource.Learned,
+                    }
+                    : flow)
+            .ToList();
     }
 
     /// <summary>

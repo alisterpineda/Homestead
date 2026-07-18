@@ -34,7 +34,10 @@ using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.GetOpeningBalan
 using Homestead.WebApi.Modules.Finances.Features.OpeningBalances.PatchOpeningBalance;
 using Homestead.WebApi.Modules.Finances.Features.Payees.CreatePayee;
 using Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayee;
+using Homestead.WebApi.Modules.Finances.Features.Payees.DeletePayeeMapping;
+using Homestead.WebApi.Modules.Finances.Features.Payees.GetPayeeMappings;
 using Homestead.WebApi.Modules.Finances.Features.Payees.GetPayees;
+using Homestead.WebApi.Modules.Finances.Features.Payees.MergePayee;
 using Homestead.WebApi.Modules.Finances.Features.Payees.PatchPayee;
 using Homestead.WebApi.Modules.Finances.Features.PriceSources.DeletePriceSourceSchedule;
 using Homestead.WebApi.Modules.Finances.Features.PriceSources.GetPriceSource;
@@ -125,6 +128,13 @@ public static class FinancesModule
         CreatePayeeEndpoint.Map(payees);
         PatchPayeeEndpoint.Map(payees);
         DeletePayeeEndpoint.Map(payees);
+        MergePayeeEndpoint.Map(payees);
+        // Learned raw-description → payee mappings, surfaced on the payee edit dialog.
+        GetPayeeMappingsEndpoint.Map(payees);
+
+        // Learned mappings addressed by their own id (prune a wrong/stale fingerprint).
+        var payeeMappings = v1.MapGroup("/payee-mappings");
+        DeletePayeeMappingEndpoint.Map(payeeMappings);
 
         var prices = v1.MapGroup("/commodity-prices");
         GetCommodityPricesEndpoint.Map(prices);

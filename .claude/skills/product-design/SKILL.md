@@ -35,7 +35,8 @@ Homestead is a self-hosted suite for a single household. Each user signs in once
 - **Working in `Homestead.WebApi/Modules/Finances/`, `Homestead.WebApi/Domain/Finances/`, or `Homestead.WebApp/src/app/modules/finances/`** — load [docs/product-design/finances/overview.md](../../../docs/product-design/finances/overview.md) plus the relevant deep-dive:
   - [accounts.md](../../../docs/product-design/finances/accounts.md) for account kinds, creation, opening balances, archive/delete, list/detail UI.
   - [commodities.md](../../../docs/product-design/finances/commodities.md) for currency/security modelling, prices, carry-forward, FX chaining.
-  - [transactions.md](../../../docs/product-design/finances/transactions.md) for transaction shapes, splits, balance entries, validation, edit/delete.
+  - [transactions.md](../../../docs/product-design/finances/transactions.md) for transaction shapes, splits, balance entries, validation, edit/delete, and statement import.
+  - [payees.md](../../../docs/product-design/finances/payees.md) for payees, the picker, default-category autofill, and the statement-import learning/suggestion/merge subsystem.
   - [valuation.md](../../../docs/product-design/finances/valuation.md) for the read-side API contract — balances, positions, display-currency rendering, `null` vs `0` rules.
 - **Working in `Homestead.WebApi/Modules/Documents/`, `Homestead.WebApi/Domain/Documents/`, or `Homestead.WebApp/src/app/modules/documents/`** — load [docs/product-design/documents/overview.md](../../../docs/product-design/documents/overview.md) plus the relevant deep-dive:
   - [tags.md](../../../docs/product-design/documents/tags.md) for the path-delimited hierarchy, colour inheritance, descendant cascades on edit/delete, search expansion through child tags, and the role of tags in ZIP downloads.

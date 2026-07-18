@@ -20,6 +20,8 @@ public class CommitStatementImportCommandValidator : AbstractValidator<CommitSta
         // Every curated line becomes a real flow — validate each as strictly as the flow endpoints do.
         RuleForEach(x => x.LineItems).ChildRules(line =>
         {
+            // Index recovers the staged raw text for learning; a negative index can't match any staged line.
+            line.RuleFor(l => l.Index).GreaterThanOrEqualTo(0);
             line.RuleFor(l => l.Amount).GreaterThan(0m)
                 .WithMessage("Line amount must be greater than zero.");
             line.RuleFor(l => l.Date).NotInFuture();

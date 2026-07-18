@@ -5,9 +5,14 @@ import {
   output,
   computed,
   inject,
+  signal,
   DestroyRef,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { switchMap, of, catchError, combineLatest } from 'rxjs';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideX } from '@ng-icons/lucide';
+import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
@@ -15,17 +20,23 @@ import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { CategoryPickerComponent, type CategoryDirection } from '../../shared/category-picker/category-picker.component';
 import { FinancesPayeeApiService } from '@/api/services/finances-payee-api.service';
+import { FinancesPayeeMappingApiService } from '@/api/services/finances-payee-mapping-api.service';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { openGeneration } from '@/shared/utils/open-generation';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
+import type { PayeeMappingResponse } from '@/api/generated/models/payee-mapping-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { toast } from '@spartan-ng/brain/sonner';
 
 @Component({
   selector: 'app-edit-payee-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports, CategoryPickerComponent],
+  imports: [
+    NgIcon, HlmIconImports, HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmCheckboxImports,
+    CategoryPickerComponent,
+  ],
+  providers: [provideIcons({ lucideX })],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[420px]">
@@ -98,8 +109,49 @@ import { toast } from '@spartan-ng/brain/sonner';
           </label>
           <p class="-mt-2 text-xs text-muted-foreground">Archived payees stay on old transactions but are hidden from pickers.</p>
 
+          <!-- Learned raw-description → payee mappings (Phase 7). Prune any wrong/stale fingerprint. -->
+          @if (mappings().length > 0) {
+            <div class="flex flex-col gap-1.5">
+              <label hlmLabel>Learned from these descriptions</label>
+              <p class="text-xs text-muted-foreground">
+                Statement lines that auto-fill this payee on import. Remove any that are wrong.
+              </p>
+              <ul class="flex max-h-40 flex-col gap-0.5 overflow-y-auto rounded-md border p-1">
+                @for (m of mappings(); track m.id) {
+                  <li class="flex items-center gap-2 rounded-sm px-2 py-1 text-sm">
+                    <span class="min-w-0 flex-1 truncate" [title]="m.sampleRawDescription">{{ m.sampleRawDescription }}</span>
+                    <span class="shrink-0 text-xs tabular-nums text-muted-foreground" title="Times confirmed">×{{ m.timesConfirmed }}</span>
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon-xs"
+                      type="button"
+                      aria-label="Remove learned description"
+                      [disabled]="removingId() === m.id"
+                      (click)="removeMapping(m.id)"
+                    >
+                      <ng-icon hlm name="lucideX" size="xs" />
+                    </button>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
           @if (duplicateError()) {
-            <p class="text-sm text-destructive">A payee with this name already exists.</p>
+            <div class="flex flex-col items-start gap-1.5">
+              <p class="text-sm text-destructive">A payee named "{{ editName().trim() }}" already exists.</p>
+              <button
+                hlmBtn
+                variant="outline"
+                size="sm"
+                type="button"
+                [disabled]="merging()"
+                (click)="mergeIntoExisting()"
+              >
+                {{ merging() ? 'Merging…' : 'Merge this payee into it' }}
+              </button>
+            </div>
           }
 
           <div hlmDialogFooter>
@@ -134,12 +186,87 @@ export class EditPayeeDialogComponent {
   saving = seededLinkedSignal(this.seedKey, () => false);
   /** Set to true on a 409; cleared on reseed (reopen) or when the name is edited. */
   duplicateError = seededLinkedSignal<string, boolean>(this.seedKey, () => false);
+  /** In-flight merge (rename→409→merge handoff). */
+  merging = seededLinkedSignal(this.seedKey, () => false);
 
   private payeeApi = inject(FinancesPayeeApiService);
+  private mappingApi = inject(FinancesPayeeMappingApiService);
   private errorHandler = inject(ErrorHandlerService);
   private destroyRef = inject(DestroyRef);
 
   canSubmit = computed(() => !!this.payee() && this.editName().trim().length > 0);
+
+  // ─── Learned mappings (Phase 7) ─────────────────────────────────────────────
+  private payeeIdWhenOpen = computed(() => (this.seedActive() ? this.payee()!.id : null));
+  private mappingsRefresh = signal(0);
+  removingId = signal<string | null>(null);
+
+  // Fetched when the dialog is open for a payee; empty otherwise. Re-fetched after a delete.
+  mappings = toSignal(
+    combineLatest([toObservable(this.payeeIdWhenOpen), toObservable(this.mappingsRefresh)]).pipe(
+      switchMap(([id]) =>
+        id
+          ? this.mappingApi.getPayeeMappings({ id }).pipe(catchError(() => of([] as PayeeMappingResponse[])))
+          : of([] as PayeeMappingResponse[])),
+    ),
+    { initialValue: [] as PayeeMappingResponse[] },
+  );
+
+  removeMapping(id: string): void {
+    this.removingId.set(id);
+    this.mappingApi.deletePayeeMapping({ id }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.removingId.set(null);
+        this.mappingsRefresh.update((v) => v + 1);
+        toast.success('Learned description removed.');
+      },
+      error: (err: unknown) => {
+        this.removingId.set(null);
+        this.errorHandler.handleError(err, 'Failed to remove learned description.');
+      },
+    });
+  }
+
+  // ─── Rename→409→merge handoff (Phase 6) ─────────────────────────────────────
+  // The typed name collides with an existing payee; offer to merge THIS payee into that one. We look the
+  // target up by its (now-known) name to get its id, then POST the merge.
+  mergeIntoExisting(): void {
+    const source = this.payee();
+    const name = this.editName().trim();
+    if (!source || !name) return;
+
+    this.merging.set(true);
+    this.payeeApi.getPayees({ Search: name, IncludeArchived: true, Page: 1, PageSize: 50 }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (res) => {
+        const target = (res.items ?? []).find(
+          (x) => x.id !== source.id && x.name.toLowerCase() === name.toLowerCase());
+        if (!target) {
+          this.merging.set(false);
+          this.errorHandler.handleError(new Error('not found'), 'Could not find the payee to merge into.');
+          return;
+        }
+        this.payeeApi.mergePayee({ id: source.id, body: { targetId: target.id } }).pipe(
+          takeUntilDestroyed(this.destroyRef),
+        ).subscribe({
+          next: (merged) => {
+            this.merging.set(false);
+            toast.success('Payees merged.');
+            this.saved.emit(merged);
+          },
+          error: (err: unknown) => {
+            this.merging.set(false);
+            this.errorHandler.handleError(err, 'Failed to merge payees.');
+          },
+        });
+      },
+      error: (err: unknown) => {
+        this.merging.set(false);
+        this.errorHandler.handleError(err, 'Failed to merge payees.');
+      },
+    });
+  }
 
   asValue(event: Event): string {
     return (event.target as HTMLTextAreaElement).value;

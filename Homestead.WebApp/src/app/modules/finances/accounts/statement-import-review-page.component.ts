@@ -12,7 +12,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer } from '@angular/platform-browser';
 import { toSignal, toObservable, takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { switchMap, of, catchError, map, combineLatest, Subscription } from 'rxjs';
+import { switchMap, of, catchError, map, combineLatest, forkJoin, Subscription } from 'rxjs';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideCircleAlert,
@@ -20,6 +20,7 @@ import {
   lucideTriangleAlert,
   lucideCircleHelp,
   lucideFileQuestion,
+  lucideSparkles,
   lucideX,
 } from '@ng-icons/lucide';
 import {
@@ -40,14 +41,17 @@ import { HlmTabsImports } from '@/shared/components/spartan/tabs';
 import { HlmEmptyImports } from '@/shared/components/spartan/empty';
 import { HlmTableImports } from '@/shared/components/spartan/table';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
+import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
+import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { TableHeadSelection, TableRowSelection } from '@/shared/components/table/selection-column';
 import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { parseDate } from '@/shared/utils';
 import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
 import {
   type LineItemEdit,
+  type LineCategory,
   type StatementLineTableMeta,
   LineDateCell,
   LineDescriptionCell,
@@ -58,6 +62,8 @@ import {
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
+import { FinancesPayeeApiService } from '@/api/services/finances-payee-api.service';
+import { FinancesSettingsApiService } from '@/api/services/finances-settings-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -70,11 +76,28 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { FlowDirection } from '@/api/generated/models/flow-direction';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
+import type { AccountType } from '@/api/generated/models/account-type';
+import type { StatementLineItemResponse } from '@/api/generated/models/statement-line-item-response';
 
 type Checksum =
   | { state: 'balanced' }
   | { state: 'off'; amount: string }
   | { state: 'unavailable' };
+
+// The suggested existing-payee's default category as a chip value — only when auto-cat is on and the payee
+// carries a category. A tier-③ new payee has none.
+function suggestedCategoryOf(r: StatementLineItemResponse, autoCategoriseEnabled: boolean): LineCategory | null {
+  if (!autoCategoriseEnabled) return null;
+  if (!r.suggestedPayeeDefaultCategoryName || !r.suggestedPayeeDefaultCategoryType) return null;
+  return { name: r.suggestedPayeeDefaultCategoryName, type: r.suggestedPayeeDefaultCategoryType };
+}
+
+// A picked/created payee's default category as a chip value (gated by the same setting).
+function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): LineCategory | null {
+  if (!autoCategoriseEnabled) return null;
+  if (!p.defaultCategoryName || !p.defaultCategoryType) return null;
+  return { name: p.defaultCategoryName, type: p.defaultCategoryType };
+}
 
 @Component({
   selector: 'app-statement-import-review-page',
@@ -92,13 +115,15 @@ type Checksum =
     HlmEmptyImports,
     HlmTableImports,
     HlmToggleGroupImports,
+    HlmAlertDialogImports,
     HlmDatePicker,
     HlmDatePickerInput,
     FlexRenderDirective,
     PayeePickerComponent,
   ],
   providers: [provideIcons({
-    lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion, lucideX,
+    lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion,
+    lucideSparkles, lucideX,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -316,6 +341,12 @@ type Checksum =
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h3 class="text-sm font-medium">Transactions ({{ lineItems().length }})</h3>
                 <div class="flex items-center gap-2">
+                  @if (hasSuggestions()) {
+                    <button hlmBtn size="sm" variant="outline" (click)="acceptAllSuggestions()">
+                      <ng-icon hlm name="lucideSparkles" size="sm" class="mr-1 text-violet-500" />
+                      Accept all suggestions ({{ suggestionCount() }})
+                    </button>
+                  }
                   <hlm-toggle-group
                     type="single"
                     nullable="false"
@@ -327,6 +358,9 @@ type Checksum =
                     <button hlmToggleGroupItem value="all">All</button>
                     <button hlmToggleGroupItem value="duplicates">Duplicates</button>
                     <button hlmToggleGroupItem value="unmappable">Needs fix</button>
+                    @if (hasSuggestions()) {
+                      <button hlmToggleGroupItem value="suggestions">Suggestions</button>
+                    }
                   </hlm-toggle-group>
                   <span class="text-xs text-muted-foreground">{{ acceptedLines().length }} selected</span>
                 </div>
@@ -430,7 +464,9 @@ type Checksum =
                 </p>
               }
               <p class="text-xs text-muted-foreground">
-                Lines import as uncategorised Expense/Income. Greyed rows are missing an amount or date and can't be selected until fixed.
+                Pick a payee per line — a learned payee (or one you confirm) is remembered for next time, and
+                its default category is applied automatically. Lines without a payee import as uncategorised.
+                Greyed rows are missing an amount or date and can't be selected until fixed.
               </p>
             </div>
           }
@@ -456,6 +492,23 @@ type Checksum =
         </div>
       }
     </ng-template>
+
+    <!-- Import-gate warning: un-reviewed AI suggestions would otherwise commit un-attributed -->
+    <hlm-alert-dialog [state]="warnState()" (stateChanged)="warnState.set($event)">
+      <hlm-alert-dialog-content *hlmAlertDialogPortal>
+        <div hlmAlertDialogHeader>
+          <h2 hlmAlertDialogTitle>Import {{ pendingGhostCount() }} unreviewed suggestion(s)?</h2>
+          <p hlmAlertDialogDescription>
+            Some selected lines have an AI-suggested payee you haven't accepted. You can review them first, or
+            apply the suggestions and import now — applied-this-way payees are used but not remembered.
+          </p>
+        </div>
+        <div hlmAlertDialogFooter>
+          <button hlmAlertDialogCancel (click)="reviewSuggestions()">Review them</button>
+          <button hlmAlertDialogAction (click)="applyAllAndImport()">Apply all &amp; import</button>
+        </div>
+      </hlm-alert-dialog-content>
+    </hlm-alert-dialog>
   `,
 })
 export class StatementImportReviewPageComponent {
@@ -463,12 +516,25 @@ export class StatementImportReviewPageComponent {
   private router = inject(Router);
   private statementApi = inject(FinancesStatementApiService);
   private accountApi = inject(FinancesAccountApiService);
+  private payeeApi = inject(FinancesPayeeApiService);
+  private settingsApi = inject(FinancesSettingsApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private documentApi = inject(DocumentApiService);
   private errorHandler = inject(ErrorHandlerService);
   private sanitizer = inject(DomSanitizer);
   private sidebarService = inject(HlmSidebarService);
   private destroyRef = inject(DestroyRef);
+
+  // Whether the auto-category chip is shown (mirrors the server's AutoCategoriseFromPayee, default on). Only
+  // gates the read-only preview chip — the server independently decides what to apply at commit.
+  private autoCategoriseEnabled = toSignal(
+    this.settingsApi.getFinanceSettings().pipe(
+      // Effective value defaults on (the server also treats absent as on).
+      map((s) => s.autoCategoriseFromPayee ?? true),
+      catchError(() => of(true)),
+    ),
+    { initialValue: true },
+  );
 
   isMobile = this.sidebarService.isMobile;
 
@@ -477,6 +543,8 @@ export class StatementImportReviewPageComponent {
   notFound = signal(false);
   loadError = signal(false);
   committing = signal(false);
+  // Warning dialog shown on Import when un-reviewed AI ghosts would otherwise commit un-attributed.
+  warnState = signal<BrnDialogState>('closed');
 
   private jobId = toSignal(this.route.paramMap.pipe(map((p) => p.get('jobId'))), { initialValue: null });
   private accountRouteId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), { initialValue: null });
@@ -520,7 +588,10 @@ export class StatementImportReviewPageComponent {
   );
 
   // ─── Editable commit fields, seeded once per import ───────────────────────
-  private seedKey = computed(() => `${this.jobId() ?? ''}|${this.data() ? '1' : '0'}`);
+  // The auto-cat flag is folded into the key so a late settings load re-seeds the category chips. It defaults
+  // to true (the common case), so a true→true resolution never re-seeds and never clobbers pending edits.
+  private seedKey = computed(
+    () => `${this.jobId() ?? ''}|${this.data() ? '1' : '0'}|${this.autoCategoriseEnabled() ? '1' : '0'}`);
 
   amount = seededLinkedSignal(this.seedKey, () => {
     const be = this.data()?.proposedBalanceEntry;
@@ -537,19 +608,32 @@ export class StatementImportReviewPageComponent {
   // Per-row line-item edit state. `accepted` is NOT held here — acceptance lives in the table's
   // rowSelection map. `dateObj` memoizes the parsed Date so the picker binding keeps a stable reference
   // (a fresh Date every change detection would snap an open calendar back — see LineDateCell).
-  lineItems = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () =>
-    (this.data()?.lineItems ?? []).map((r) => ({
-      index: r.index,
-      amount: String(r.amount),
-      description: r.description ?? '',
-      direction: r.direction,
-      date: r.date ?? '',
-      dateObj: parseDate(r.date) ?? undefined,
-      mappable: r.mappable,
-      duplicateSuspected: r.duplicateSuspected,
-      payee: null,
-    })),
-  );
+  lineItems = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () => {
+    const autoCat = this.autoCategoriseEnabled();
+    return (this.data()?.lineItems ?? []).map((r) => {
+      // Tier-① learned hits are pre-applied (the payee is set, marked "learned", learn=false → apply but
+      // don't re-teach). AI ghosts (tier ②/③) stay unapplied (payee=null) until explicitly accepted.
+      const isLearned = r.suggestionSource === 'Learned' && !!r.suggestedPayeeId;
+      const suggestedCategory = suggestedCategoryOf(r, autoCat);
+      return {
+        index: r.index,
+        amount: String(r.amount),
+        description: r.description ?? '',
+        direction: r.direction,
+        date: r.date ?? '',
+        dateObj: parseDate(r.date) ?? undefined,
+        mappable: r.mappable,
+        duplicateSuspected: r.duplicateSuspected,
+        payee: isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null,
+        suggestionSource: r.suggestionSource,
+        suggestedPayeeId: r.suggestedPayeeId ?? null,
+        suggestedPayeeName: r.suggestedPayeeName ?? null,
+        suggestedCategory,
+        learn: false,
+        category: isLearned ? suggestedCategory : null,
+      } satisfies LineItemEdit;
+    });
+  });
 
   // Selection = acceptance. Seeded (keyed on the same seedKey) from the staged proposal's own accepted
   // flags — mappable-and-accepted rows start checked; un-mappable rows start unchecked and stay
@@ -564,13 +648,15 @@ export class StatementImportReviewPageComponent {
   });
 
   // Client-side triage filter — display only. Selection/edit state stay in the untouched lineItems
-  // signal, so a row hidden by the filter but still selected commits.
-  filterMode = signal<'all' | 'duplicates' | 'unmappable'>('all');
+  // signal, so a row hidden by the filter but still selected commits. 'suggestions' surfaces the rows the
+  // warning dialog gates on (un-accepted AI ghosts), reached via "Review them".
+  filterMode = signal<'all' | 'duplicates' | 'unmappable' | 'suggestions'>('all');
   visibleLineItems = computed(() => {
     const rows = this.lineItems();
     switch (this.filterMode()) {
       case 'duplicates': return rows.filter((r) => r.duplicateSuspected);
       case 'unmappable': return rows.filter((r) => !r.mappable);
+      case 'suggestions': return rows.filter((r) => this.isGhost(r));
       default: return rows;
     }
   });
@@ -601,10 +687,26 @@ export class StatementImportReviewPageComponent {
   selectionCount = computed(() => this.acceptedLines().length);
   hasSelection = computed(() => this.selectionCount() > 0);
 
+  // ─── AI-suggestion (ghost) state ───────────────────────────────────────────
+  // A ghost = an un-accepted AI suggestion (tier ②/③). It is never auto-applied and never learned; the
+  // reviewer must accept it (per-row or "Accept all"), or the warning dialog gates the import.
+  isGhost = (r: LineItemEdit): boolean =>
+    r.payee === null && (r.suggestionSource === 'AiExistingPayee' || r.suggestionSource === 'AiNewPayee');
+
+  suggestionCount = computed(() => this.lineItems().filter((r) => this.isGhost(r)).length);
+  hasSuggestions = computed(() => this.suggestionCount() > 0);
+
+  // Ghosts that would import un-reviewed — only those on lines actually being committed (selected +
+  // committable). These are what the warning dialog counts and gates on.
+  private pendingGhosts = computed(() =>
+    this.acceptedLines().filter((r) => this.isGhost(r)));
+  pendingGhostCount = computed(() => this.pendingGhosts().length);
+
   private readonly _meta: StatementLineTableMeta = {
     patchRow: (index, patch) => this.patchRow(index, patch),
     setDirection: (index, direction) => this.setDirection(index, direction),
     onPayeeChange: (index, payee) => this.onRowPayeeChange(index, payee),
+    acceptSuggestion: (index) => this.acceptSuggestion(index),
   };
 
   private readonly _columns: ColumnDef<LineItemEdit>[] = [
@@ -672,8 +774,107 @@ export class StatementImportReviewPageComponent {
     this.patchRow(index, { direction });
   }
 
+  // A manual pick / clear is an explicit gesture: set the payee, carry its default category chip, and flag
+  // learn (so a picked payee teaches the mapping table). Clearing resets learn and the chip.
   onRowPayeeChange(index: number, p: PayeeResponse | null): void {
-    this.patchRow(index, { payee: p ? { id: p.id, name: p.name } : null });
+    this.patchRow(index, {
+      payee: p ? { id: p.id, name: p.name } : null,
+      category: p ? categoryOfPayee(p, this.autoCategoriseEnabled()) : null,
+      learn: p !== null,
+    });
+  }
+
+  // Accept one AI ghost (per-row). Existing-payee suggestions apply immediately; a new-payee suggestion
+  // (tier ③) is created first, then applied. Either way it becomes an explicit, learned pick.
+  acceptSuggestion(index: number): void {
+    const row = this.lineItems().find((r) => r.index === index);
+    if (!row || !this.isGhost(row)) return;
+
+    if (row.suggestionSource === 'AiExistingPayee' && row.suggestedPayeeId) {
+      this.patchRow(index, {
+        payee: { id: row.suggestedPayeeId, name: row.suggestedPayeeName ?? '' },
+        category: row.suggestedCategory,
+        learn: true,
+      });
+      return;
+    }
+
+    if (row.suggestionSource === 'AiNewPayee' && row.suggestedPayeeName) {
+      this.createPayeeAndApply(row.suggestedPayeeName.trim(), [index], true);
+    }
+  }
+
+  // "Accept all suggestions (N)" — promote every ghost to a confirmed, learned pick. Existing-payee ghosts
+  // apply synchronously; new-payee ghosts are created once per distinct name, then applied to every row that
+  // proposed it (avoids minting duplicates within the batch).
+  acceptAllSuggestions(): void {
+    this.applyGhosts(this.lineItems().filter((r) => this.isGhost(r)), true);
+  }
+
+  // Apply a set of ghosts. learn=true for explicit accepts; learn=false for the warning-dialog
+  // apply-but-don't-learn path. onDone fires after any async payee creations settle.
+  private applyGhosts(ghosts: LineItemEdit[], learn: boolean, onDone?: () => void): void {
+    for (const r of ghosts) {
+      if (r.suggestionSource === 'AiExistingPayee' && r.suggestedPayeeId) {
+        this.patchRow(r.index, {
+          payee: { id: r.suggestedPayeeId, name: r.suggestedPayeeName ?? '' },
+          category: r.suggestedCategory,
+          learn,
+        });
+      }
+    }
+
+    const newOnes = ghosts.filter((r) => r.suggestionSource === 'AiNewPayee' && !!r.suggestedPayeeName);
+    const byName = new Map<string, number[]>();
+    for (const r of newOnes) {
+      const name = r.suggestedPayeeName!.trim();
+      if (!name) continue;
+      (byName.get(name) ?? byName.set(name, []).get(name)!).push(r.index);
+    }
+
+    if (byName.size === 0) {
+      onDone?.();
+      return;
+    }
+
+    const creations = [...byName.entries()].map(([name, indexes]) =>
+      this.payeeApi.createPayee({ body: { name } }).pipe(
+        map((payee) => ({ payee, indexes })),
+        catchError(() => of(null)),
+      ));
+
+    forkJoin(creations).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((results) => {
+      for (const res of results) {
+        if (!res) continue;
+        for (const idx of res.indexes) {
+          this.patchRow(idx, {
+            payee: { id: res.payee.id, name: res.payee.name },
+            category: categoryOfPayee(res.payee, this.autoCategoriseEnabled()),
+            learn,
+          });
+        }
+      }
+      onDone?.();
+    });
+  }
+
+  // Create a new payee then apply it to the given rows (used by per-row "Create & use").
+  private createPayeeAndApply(name: string, indexes: number[], learn: boolean): void {
+    if (!name) return;
+    this.payeeApi.createPayee({ body: { name } }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (payee) => {
+        for (const idx of indexes) {
+          this.patchRow(idx, {
+            payee: { id: payee.id, name: payee.name },
+            category: categoryOfPayee(payee, this.autoCategoriseEnabled()),
+            learn,
+          });
+        }
+      },
+      error: (err: unknown) => this.errorHandler.handleError(err, 'Failed to create payee.'),
+    });
   }
 
   // Retained selection adapters (used by the row/header checkboxes flow through TanStack; these keep the
@@ -704,7 +905,8 @@ export class StatementImportReviewPageComponent {
   }
 
   onFilterChange(value: unknown): void {
-    if (value === 'all' || value === 'duplicates' || value === 'unmappable') this.filterMode.set(value);
+    if (value === 'all' || value === 'duplicates' || value === 'unmappable' || value === 'suggestions')
+      this.filterMode.set(value);
   }
 
   // ─── Bulk actions over the current selection (accepted ∩ committable) ──────
@@ -718,13 +920,25 @@ export class StatementImportReviewPageComponent {
     this.updateSelected(() => ({ direction }));
   }
 
+  // Bulk-assign is scoped to selected lines that don't already have a confirmed payee — it fills the gaps
+  // rather than overwriting deliberate picks / learned hits. An explicit gesture, so it learns and carries
+  // the payee's category chip.
   bulkAssignPayee(p: PayeeResponse | null): void {
     if (!p) return;
-    this.updateSelected(() => ({ payee: { id: p.id, name: p.name } }));
+    const category = categoryOfPayee(p, this.autoCategoriseEnabled());
+    let skipped = 0;
+    this.lineItems.update((rows) =>
+      rows.map((r) => {
+        if (!(this.isSelected(r.index) && this.rowCommittable(r))) return r;
+        if (r.payee !== null) { skipped++; return r; }
+        return { ...r, payee: { id: p.id, name: p.name }, category, learn: true };
+      }));
+    if (skipped > 0)
+      toast.info(`Assigned to lines without a payee; ${skipped} with an existing payee were left unchanged.`);
   }
 
   bulkClearPayee(): void {
-    this.updateSelected(() => ({ payee: null }));
+    this.updateSelected(() => ({ payee: null, category: null, learn: false }));
   }
 
   // ─── Advisory closing-balance checksum (never blocks commit) ──────────────
@@ -831,7 +1045,31 @@ export class StatementImportReviewPageComponent {
     else void this.router.navigate(['/finances/accounts']);
   }
 
+  // Import entry point: if any un-reviewed AI ghost would be committed, gate with the warning dialog; the
+  // reviewer either goes back to review them or applies-without-learning. Otherwise commit straight through.
   commit(): void {
+    if (!this.jobId() || !this.canCommit()) return;
+    if (this.pendingGhostCount() > 0) {
+      this.warnState.set('open');
+      return;
+    }
+    this.doCommit();
+  }
+
+  // "Review them" — filter the table to the un-accepted ghosts so the reviewer can act on them.
+  reviewSuggestions(): void {
+    this.warnState.set('closed');
+    this.filterMode.set('suggestions');
+  }
+
+  // "Apply all & import" — apply the pending ghosts WITHOUT learning (rubber-stamped, so not taught), then
+  // commit once any new-payee creations settle.
+  applyAllAndImport(): void {
+    this.warnState.set('closed');
+    this.applyGhosts(this.pendingGhosts(), false, () => this.doCommit());
+  }
+
+  private doCommit(): void {
     const jobId = this.jobId();
     if (!jobId || !this.canCommit()) return;
 
@@ -848,11 +1086,15 @@ export class StatementImportReviewPageComponent {
         date: this.date() || todayIso(),
         memo: this.memo().trim() ? this.memo().trim() : null,
         lineItems: this.acceptedLines().map((r) => ({
+          index: r.index,
           direction: r.direction,
           amount: Number(r.amount),
           date: r.date,
           description: r.description.trim() ? r.description.trim() : null,
           payeeId: r.payee?.id ?? null,
+          // Teach the mapping table only for explicit picks (never for a rubber-stamped tier-① pre-fill or
+          // an apply-but-don't-learn). Guard on a payee actually being set.
+          learn: r.payee !== null && r.learn,
         })),
       },
     }).pipe(

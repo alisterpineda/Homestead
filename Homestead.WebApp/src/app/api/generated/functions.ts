@@ -209,6 +209,12 @@ export type { DeletePayee$Params as DeletePayee$Params } from './fn/finances/del
 export { deletePayee as deletePayee } from './fn/finances/delete-payee';
 export type { PatchPayee$Params as PatchPayee$Params } from './fn/finances/patch-payee';
 export { patchPayee as patchPayee } from './fn/finances/patch-payee';
+export type { MergePayee$Params as MergePayee$Params } from './fn/finances/merge-payee';
+export { mergePayee as mergePayee } from './fn/finances/merge-payee';
+export type { GetPayeeMappings$Params as GetPayeeMappings$Params } from './fn/finances/get-payee-mappings';
+export { getPayeeMappings as getPayeeMappings } from './fn/finances/get-payee-mappings';
+export type { DeletePayeeMapping$Params as DeletePayeeMapping$Params } from './fn/finances/delete-payee-mapping';
+export { deletePayeeMapping as deletePayeeMapping } from './fn/finances/delete-payee-mapping';
 export type { GetCommodityPrices$Params as GetCommodityPrices$Params } from './fn/finances/get-commodity-prices';
 export { getCommodityPrices as getCommodityPrices } from './fn/finances/get-commodity-prices';
 export type { CreateCommodityPrice$Params as CreateCommodityPrice$Params } from './fn/finances/create-commodity-price';

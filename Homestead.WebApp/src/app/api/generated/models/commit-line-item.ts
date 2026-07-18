@@ -7,5 +7,7 @@ export interface CommitLineItem {
   date: string;
   description: (string | null);
   direction: FlowDirection;
+  index: number;
+  learn?: boolean;
   payeeId?: (string | null);
 }

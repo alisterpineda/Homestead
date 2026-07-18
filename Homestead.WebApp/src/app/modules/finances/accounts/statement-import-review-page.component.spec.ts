@@ -6,6 +6,8 @@ import { of, NEVER } from 'rxjs';
 import { StatementImportReviewPageComponent } from './statement-import-review-page.component';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
+import { FinancesPayeeApiService } from '@/api/services/finances-payee-api.service';
+import { FinancesSettingsApiService } from '@/api/services/finances-settings-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
 import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
@@ -47,9 +49,9 @@ const RESPONSE: StatementImportResponse = {
     accepted: true,
   },
   lineItems: [
-    { index: 0, date: '2026-06-03', description: 'GROCERY', amount: 100, direction: 'Expense', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true },
-    { index: 1, date: '2026-06-15', description: 'PAYROLL', amount: 600, direction: 'Income', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true },
-    { index: 2, date: null, description: 'MYSTERY', amount: 0, direction: 'Expense', runningBalance: null, mappable: false, duplicateSuspected: false, accepted: true },
+    { index: 0, date: '2026-06-03', description: 'GROCERY', amount: 100, direction: 'Expense', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
+    { index: 1, date: '2026-06-15', description: 'PAYROLL', amount: 600, direction: 'Income', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
+    { index: 2, date: null, description: 'MYSTERY', amount: 0, direction: 'Expense', runningBalance: null, mappable: false, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
   ],
   accountNumberMatch: 'Mismatch',
   duplicateAssertionExists: false,
@@ -80,23 +82,37 @@ class StubAccountApi {
   account: AccountResponse = ASSET_ACCOUNT;
   getAccount = () => of(this.account);
 }
+class StubPayeeApi {
+  created: any[] = [];
+  createPayee = (params: any) => {
+    this.created.push(params);
+    return of({
+      id: `new-${params.body.name}`, name: params.body.name, isArchived: false,
+      transactionCount: 0, createdAt: '', updatedAt: '',
+    });
+  };
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('StatementImportReviewPageComponent', () => {
   let api: StubStatementApi;
   let accountApi: StubAccountApi;
+  let payeeApi: StubPayeeApi;
 
   function configure(response: StatementImportResponse = RESPONSE, account: AccountResponse = ASSET_ACCOUNT): void {
     api = new StubStatementApi();
     api.response = response;
     accountApi = new StubAccountApi();
     accountApi.account = account;
+    payeeApi = new StubPayeeApi();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(),
         { provide: FinancesStatementApiService, useValue: api },
         { provide: FinancesAccountApiService, useValue: accountApi },
+        { provide: FinancesPayeeApiService, useValue: payeeApi },
+        { provide: FinancesSettingsApiService, useValue: { getFinanceSettings: () => of({ autoCategoriseFromPayee: true }) } },
         { provide: FinancesCommodityApiService, useValue: { getCommodity: () => of(CAD) } },
         { provide: DocumentApiService, useValue: { getDocumentFile: () => of(null) } },
         { provide: HlmSidebarService, useValue: { isMobile: signal(false) } },
@@ -248,8 +264,8 @@ describe('StatementImportReviewPageComponent', () => {
       date: '2026-06-30',
       memo: 'June statement',
       lineItems: [
-        { direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY', payeeId: null },
-        { direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL', payeeId: null },
+        { index: 0, direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY', payeeId: null, learn: false },
+        { index: 1, direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL', payeeId: null, learn: false },
       ],
     });
   });
@@ -330,5 +346,106 @@ describe('StatementImportReviewPageComponent', () => {
     // 'unmappable' → only the un-mappable row 2.
     c.filterMode.set('unmappable');
     expect(c.visibleLineItems().map((r) => r.index)).toEqual([2]);
+  });
+
+  // ─── Payee suggestions (learned / ghost / learn flag / warning dialog) ─────
+
+  function withSuggestions(): StatementImportResponse {
+    return {
+      ...RESPONSE,
+      lineItems: [
+        // Tier-① learned → pre-applied, not a ghost.
+        { ...RESPONSE.lineItems![0], suggestedPayeeId: 'p-learned', suggestedPayeeName: 'Costco', suggestionSource: 'Learned' },
+        // Tier-② AI existing-payee ghost.
+        { ...RESPONSE.lineItems![1], suggestedPayeeId: 'p-ai', suggestedPayeeName: 'Acme Payroll', suggestionSource: 'AiExistingPayee' },
+        RESPONSE.lineItems![2],
+      ],
+    };
+  }
+
+  it('pre-applies a learned suggestion (not a ghost, learn=false) and leaves AI ghosts unapplied', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    const rows = c.lineItems();
+    // Learned line 0: applied, not a ghost, not (yet) learned.
+    expect(rows[0].payee).toEqual({ id: 'p-learned', name: 'Costco' });
+    expect(c.isGhost(rows[0])).toBe(false);
+    expect(rows[0].learn).toBe(false);
+    // AI line 1: a ghost — unapplied until accepted.
+    expect(rows[1].payee).toBeNull();
+    expect(c.isGhost(rows[1])).toBe(true);
+    expect(c.suggestionCount()).toBe(1);
+  });
+
+  it('accepting an AI ghost applies it and flags learn=true', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    c.acceptSuggestion(1);
+    const row = c.lineItems()[1];
+    expect(row.payee).toEqual({ id: 'p-ai', name: 'Acme Payroll' });
+    expect(row.learn).toBe(true);
+    expect(c.suggestionCount()).toBe(0);
+  });
+
+  it('a manual pick flags learn=true; an untouched learned pre-fill commits with learn=false', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Accept the ghost so commit isn't gated, then commit.
+    c.acceptSuggestion(1);
+    c.commit();
+
+    const lines = api.lastCommit.body.lineItems;
+    // Line 0 (learned, untouched) → applied but not taught.
+    expect(lines.find((l: any) => l.index === 0)).toEqual(
+      expect.objectContaining({ payeeId: 'p-learned', learn: false }));
+    // Line 1 (accepted ghost) → taught.
+    expect(lines.find((l: any) => l.index === 1)).toEqual(
+      expect.objectContaining({ payeeId: 'p-ai', learn: true }));
+  });
+
+  it('Import gates on un-reviewed ghosts; "apply all & import" applies without learning', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // A ghost on a committable line remains → commit() opens the warning dialog, does NOT commit.
+    expect(c.pendingGhostCount()).toBe(1);
+    c.commit();
+    expect(c.warnState()).toBe('open');
+    expect(api.lastCommit).toBeNull();
+
+    // Apply all & import → applies the ghost with learn=false, then commits.
+    c.applyAllAndImport();
+    await fixture.whenStable();
+    expect(c.warnState()).toBe('closed');
+    expect(api.lastCommit.body.lineItems.find((l: any) => l.index === 1)).toEqual(
+      expect.objectContaining({ payeeId: 'p-ai', learn: false }));
+  });
+
+  it('bulk-assign fills only lines without a confirmed payee', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Line 0 already has the learned payee; line 1 is an unapplied ghost (payee null).
+    c.bulkAssignPayee({
+      id: 'p-bulk', name: 'Bulk', isArchived: false, transactionCount: 0, createdAt: '', updatedAt: '',
+    });
+
+    const rows = c.lineItems();
+    expect(rows[0].payee).toEqual({ id: 'p-learned', name: 'Costco' }); // untouched — already has a payee
+    expect(rows[1].payee).toEqual({ id: 'p-bulk', name: 'Bulk' });       // gap filled
+    expect(rows[1].learn).toBe(true);
   });
 });

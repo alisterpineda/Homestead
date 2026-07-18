@@ -154,6 +154,7 @@ export type { LogLevelSource } from './models/log-level-source';
 export type { LogLevelsResponse } from './models/log-levels-response';
 export type { LowStockConsumablePreview } from './models/low-stock-consumable-preview';
 export type { MergeBrandRequest } from './models/merge-brand-request';
+export type { MergePayeeRequest } from './models/merge-payee-request';
 export type { MovementKind } from './models/movement-kind';
 export type { NetWorthGranularity } from './models/net-worth-granularity';
 export type { NetWorthHistoryPoint } from './models/net-worth-history-point';
@@ -198,7 +199,9 @@ export type { PatchSystemSettingsCommand } from './models/patch-system-settings-
 export type { PatchTagResponse } from './models/patch-tag-response';
 export type { PatchTradeCommand } from './models/patch-trade-command';
 export type { PatchTransferCommand } from './models/patch-transfer-command';
+export type { PayeeMappingResponse } from './models/payee-mapping-response';
 export type { PayeeResponse } from './models/payee-response';
+export type { PayeeSuggestionSource } from './models/payee-suggestion-source';
 export type { PermanentlyDeleteDocumentsCommand } from './models/permanently-delete-documents-command';
 export type { PermanentlyDeleteDocumentsResponse } from './models/permanently-delete-documents-response';
 export type { PlaceChildAreaSummary } from './models/place-child-area-summary';

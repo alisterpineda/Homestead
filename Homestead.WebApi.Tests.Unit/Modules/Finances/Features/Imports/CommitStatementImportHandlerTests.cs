@@ -20,6 +20,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     private ICurrentUserAccessor _currentUser = null!;
     private IBalanceEntryReconciler _reconciler = null!;
     private IUnitOfWork _unitOfWork = null!;
+    private IPayeeMappingService _payeeMappings = null!;
     private BalanceEntryService _balanceEntries = null!;
     private FlowService _flows = null!;
     private CommitStatementImportHandler _sut = null!;
@@ -73,13 +74,18 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
 
+        _payeeMappings = Substitute.For<IPayeeMappingService>();
+        _payeeMappings.UpsertAsync(
+            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
         _balanceEntries = new BalanceEntryService(
             _db, systemAccounts, new TransactionValidator(_db), Substitute.For<IAuditContext>());
         _flows = new FlowService(
             _db, counterparts, new TransactionValidator(_db), Substitute.For<IAuditContext>());
 
         _sut = new CommitStatementImportHandler(
-            _db, _currentUser, _balanceEntries, _flows, _reconciler, _unitOfWork);
+            _db, _currentUser, _balanceEntries, _flows, _reconciler, _payeeMappings, _unitOfWork);
     }
 
     public ValueTask DisposeAsync()
@@ -176,8 +182,8 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         {
             LineItems =
             [
-                new CommitLineItem(FlowDirection.Expense, 42.10m, new DateOnly(2026, 6, 3), "GROCERY"),
-                new CommitLineItem(FlowDirection.Income, 2000m, new DateOnly(2026, 6, 15), "PAYROLL"),
+                new CommitLineItem(0, FlowDirection.Expense, 42.10m, new DateOnly(2026, 6, 3), "GROCERY"),
+                new CommitLineItem(1, FlowDirection.Income, 2000m, new DateOnly(2026, 6, 15), "PAYROLL"),
             ],
         };
 
@@ -214,7 +220,7 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
 
         var command = Command(job.Id, accepted: false) with
         {
-            LineItems = [new CommitLineItem(FlowDirection.Expense, 15m, new DateOnly(2026, 6, 3), "COFFEE")],
+            LineItems = [new CommitLineItem(0, FlowDirection.Expense, 15m, new DateOnly(2026, 6, 3), "COFFEE")],
         };
 
         var result = await _sut.Handle(command, TestContext.Current.CancellationToken);
@@ -284,5 +290,204 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<EntityNotFoundException>(
             () => _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken));
+    }
+
+    // ─── Learning + auto-category (Phase 2) ─────────────────────────────────────
+    // These use a SPY IFlowService so the handler's category decision and its learning upserts can be
+    // asserted directly (the real FlowService/resolver would obscure the CategoryId the handler passes).
+
+    private (CommitStatementImportHandler sut, IFlowService flows) BuildWithSpyFlows()
+    {
+        var flows = Substitute.For<IFlowService>();
+        flows.CreateAsync(Arg.Any<CreateFlowRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => new FlowMutationResult(
+                new NormalTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    Type = TransactionType.Normal,
+                    NormalShape = NormalShape.Expense,
+                    OccurredAt = DateTimeOffset.UtcNow,
+                    Memo = "spy",
+                },
+                Array.Empty<TouchedPair>()));
+        var sut = new CommitStatementImportHandler(
+            _db, _currentUser, _balanceEntries, flows, _reconciler, _payeeMappings, _unitOfWork);
+        return (sut, flows);
+    }
+
+    private async Task<(ProcessingJob job, Guid documentId)> SeedJobWithLinesAsync(
+        params (int index, string? desc)[] lines)
+    {
+        var documentId = Guid.NewGuid();
+        var proposal = new StatementMappingProposal
+        {
+            AccountNumberMatch = AccountNumberMatch.Unknown,
+            LineItems = lines
+                .Select(l => new ProposedFlow(
+                    l.index, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), l.desc, null, Mappable: true))
+                .ToList(),
+        };
+        var staged = new StagedStatementImport
+        {
+            AccountId = _account.Id,
+            DocumentId = documentId,
+            DocumentVersionId = Guid.NewGuid(),
+            Ir = new StatementIr { Kind = StatementKind.Bank, Header = new StatementHeaderIr() },
+            Proposal = proposal,
+        };
+        var job = new ProcessingJob
+        {
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.ParseAccountStatement,
+            Status = ProcessingJobStatus.Completed,
+            CreatedByUserId = _userId,
+        };
+        job.SetResult(staged);
+        _db.ProcessingJobs.Add(job);
+        await _db.SaveChangesAsync();
+        return (job, documentId);
+    }
+
+    private async Task<Guid> SeedPayeeAsync(string name, Guid? defaultCategoryId = null)
+    {
+        var payee = new Payee { Id = Guid.NewGuid(), Name = name, DefaultCategoryId = defaultCategoryId };
+        _db.Payees.Add(payee);
+        await _db.SaveChangesAsync();
+        return payee.Id;
+    }
+
+    private async Task<Account> SeedCategoryAsync(string name, AccountType type, bool isArchived = false)
+    {
+        var account = new Account
+        {
+            Id = Guid.NewGuid(), Name = name, AccountType = type,
+            ReportingCurrencyId = _cad.Id, IsArchived = isArchived,
+        };
+        _db.Accounts.Add(account);
+        await _db.SaveChangesAsync();
+        return account;
+    }
+
+    [Fact]
+    public async Task Commit_LearnsPayee_OnlyForExplicitLearnLines_KeyedOnStagedRaw_NotEditedMemo()
+    {
+        var (job, documentId) = await SeedJobWithLinesAsync((0, "SQ *BLUE BOTTLE"), (1, "WALMART"));
+        var payeeA = await SeedPayeeAsync("Blue Bottle");
+        var payeeB = await SeedPayeeAsync("Walmart");
+        var (sut, _) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                // Learn=true → taught; memo edited to prove the key comes from the STAGED raw, not the memo.
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "edited memo", payeeA, Learn: true),
+                // Learn=false → applied but not taught.
+                new CommitLineItem(1, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "WALMART", payeeB, Learn: false),
+            ],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        var expectedKey = PayeeDescriptionNormalizer.Normalize("SQ *BLUE BOTTLE")!;
+        await _payeeMappings.Received(1).UpsertAsync(
+            expectedKey, payeeA, "SQ *BLUE BOTTLE", documentId, Arg.Any<CancellationToken>());
+        await _payeeMappings.DidNotReceive().UpsertAsync(
+            Arg.Any<string>(), payeeB, Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_DoesNotLearn_WhenPayeeNull_OrKeyDegenerate()
+    {
+        // "A" normalizes to null (below the min-alphabetic floor); a null payee can't learn either.
+        var (job, _) = await SeedJobWithLinesAsync((0, "A"), (1, "REAL MERCHANT"));
+        var (sut, _) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "A", await SeedPayeeAsync("P"), Learn: true),
+                new CommitLineItem(1, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "REAL MERCHANT", null, Learn: true),
+            ],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        await _payeeMappings.DidNotReceive().UpsertAsync(
+            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_DeDupesLearningWithinBatch_LastWinsPerKey()
+    {
+        // "SQ *BLUE BOTTLE" and "TST*BLUE BOTTLE" both normalize to "BLUE BOTTLE".
+        var (job, documentId) = await SeedJobWithLinesAsync((0, "SQ *BLUE BOTTLE"), (1, "TST*BLUE BOTTLE"));
+        var payeeA = await SeedPayeeAsync("Blue Bottle A");
+        var payeeB = await SeedPayeeAsync("Blue Bottle B");
+        var (sut, _) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), null, payeeA, Learn: true),
+                new CommitLineItem(1, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), null, payeeB, Learn: true),
+            ],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        // One upsert for the shared key; last-wins → payeeB.
+        await _payeeMappings.Received(1).UpsertAsync(
+            "BLUE BOTTLE", Arg.Any<Guid>(), Arg.Any<string>(), documentId, Arg.Any<CancellationToken>());
+        await _payeeMappings.Received(1).UpsertAsync(
+            "BLUE BOTTLE", payeeB, Arg.Any<string>(), documentId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_AutoCategorises_FromPayeeDefault_WhenDirectionMatches()
+    {
+        var category = await SeedCategoryAsync("Groceries", AccountType.Expense);
+        var payee = await SeedPayeeAsync("Grocer", category.Id);
+        var (job, _) = await SeedJobWithLinesAsync((0, "GROCER"));
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems = [new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "GROCER", payee)],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        await flows.Received(1).CreateAsync(
+            Arg.Is<CreateFlowRequest>(r => r.CategoryId == category.Id && r.PayeeId == payee),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_AutoCategory_FallsBackToUncategorised_OnArchivedOrDirectionMismatch()
+    {
+        var archived = await SeedCategoryAsync("Old", AccountType.Expense, isArchived: true);
+        var incomeCat = await SeedCategoryAsync("Salary", AccountType.Income);
+        var payeeArchived = await SeedPayeeAsync("P1", archived.Id);
+        var payeeMismatch = await SeedPayeeAsync("P2", incomeCat.Id); // Income category on an Expense line
+        var (job, _) = await SeedJobWithLinesAsync((0, "A"), (1, "B"));
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "A", payeeArchived),
+                new CommitLineItem(1, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "B", payeeMismatch),
+            ],
+        };
+
+        // Never throws — both archived and wrong-direction categories degrade to Uncategorised (null).
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        await flows.Received(2).CreateAsync(
+            Arg.Is<CreateFlowRequest>(r => r.CategoryId == null), Arg.Any<CancellationToken>());
     }
 }

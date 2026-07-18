@@ -12,6 +12,7 @@ public class RollbackStatementImportHandlerTests : IAsyncLifetime
     private IBalanceEntryService _balanceEntries = null!;
     private ITransferService _transfers = null!;
     private IBalanceEntryReconciler _reconciler = null!;
+    private IPayeeMappingService _payeeMappings = null!;
     private IUnitOfWork _unitOfWork = null!;
     private RollbackStatementImportHandler _sut = null!;
 
@@ -31,11 +32,15 @@ public class RollbackStatementImportHandlerTests : IAsyncLifetime
 
         _reconciler = Substitute.For<IBalanceEntryReconciler>();
 
+        _payeeMappings = Substitute.For<IPayeeMappingService>();
+        _payeeMappings.RetractByDocumentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(0);
+
         _unitOfWork = Substitute.For<IUnitOfWork>();
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .Returns(ci => _db.SaveChangesAsync(ci.Arg<CancellationToken>()));
 
-        _sut = new RollbackStatementImportHandler(_db, _balanceEntries, _transfers, _reconciler, _unitOfWork);
+        _sut = new RollbackStatementImportHandler(
+            _db, _balanceEntries, _transfers, _reconciler, _payeeMappings, _unitOfWork);
         return ValueTask.CompletedTask;
     }
 
@@ -98,6 +103,9 @@ public class RollbackStatementImportHandlerTests : IAsyncLifetime
 
         await _reconciler.Received(1).ReconcileAsync(
             Arg.Any<IEnumerable<TouchedPair>>(), Arg.Any<CancellationToken>());
+
+        // Learning taught by this import is retracted, scoped to the same document.
+        await _payeeMappings.Received(1).RetractByDocumentAsync(documentId, Arg.Any<CancellationToken>());
     }
 
     [Fact]

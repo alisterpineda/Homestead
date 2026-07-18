@@ -7,6 +7,7 @@ import type { PayeeResponse } from '@/api/generated/models/payee-response';
 /** Table meta contract — the list page supplies the row-action handlers. */
 export interface PayeeTableMeta {
   onEdit: (payee: PayeeResponse) => void;
+  onMerge: (payee: PayeeResponse) => void;
   onDelete: (payee: PayeeResponse) => void;
 }
 
@@ -49,6 +50,7 @@ export class PayeeUpdatedCell {
     <app-payee-row-actions
       [payee]="payee"
       (edit)="meta.onEdit($event)"
+      (merge)="meta.onMerge($event)"
       (delete)="meta.onDelete($event)"
     />
   `,

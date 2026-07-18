@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Homestead.WebApi.Domain.Finances;
+using Homestead.WebApi.Modules.Finances.Services;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,9 @@ internal record PayeeItem(
     Guid Id, string Name, Guid? DefaultCategoryId, string? DefaultCategoryName,
     string? DefaultCategoryType, string? Notes, bool IsArchived, int TransactionCount,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
+internal record MappingItem(
+    Guid Id, string NormalizedKey, string SampleRawDescription, int TimesConfirmed, DateTimeOffset UpdatedAt);
 
 [Collection("Integration")]
 public class PayeesEndpointTests : IntegrationTestBase
@@ -73,6 +78,92 @@ public class PayeesEndpointTests : IntegrationTestBase
         }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<JsonElement>(CT)).GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> SeedMappingAsync(Guid payeeId, string normalizedKey, string sampleRaw)
+    {
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var mapping = new PayeeMapping
+        {
+            Id = Guid.NewGuid(),
+            NormalizedKey = normalizedKey,
+            NormalizationVersion = PayeeDescriptionNormalizer.Version,
+            PayeeId = payeeId,
+            SampleRawDescription = sampleRaw,
+            TimesConfirmed = 1,
+        };
+        db.PayeeMappings.Add(mapping);
+        await db.SaveChangesAsync(CT);
+        return mapping.Id;
+    }
+
+    // ----- Merge -----
+
+    [Fact]
+    public async Task MergePayee_ReassignsTransactionsAndMappings_RemovesSource()
+    {
+        var client = await CreateAdminClientAsync();
+        var source = await CreatePayeeAsync(client, "Blue Bottle");
+        var target = await CreatePayeeAsync(client, "Blue Bottle Coffee");
+        var account = await CreateCashAccountAsync(client, "Merge-Cash");
+        var flowId = await CreateFlowWithPayeeAsync(client, account, source.Id);
+        var mappingId = await SeedMappingAsync(source.Id, "BLUE BOTTLE", "SQ *BLUE BOTTLE");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/payees/{source.Id}/merge", new { targetId = target.Id }, CT);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var merged = (await resp.Content.ReadFromJsonAsync<PayeeItem>(CT))!;
+        Assert.Equal(target.Id, merged.Id);
+        Assert.Equal(1, merged.TransactionCount);
+
+        using var scope = CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Source removed.
+        Assert.False(await db.Payees.AsNoTracking().AnyAsync(p => p.Id == source.Id, CT));
+        // The flow's payee re-pointed to target — verifies the TPH OfType<NormalTransaction> ExecuteUpdate
+        // composes on real Postgres (the risk flagged in the plan).
+        var flowPayee = await db.AccountTransactions.OfType<NormalTransaction>().AsNoTracking()
+            .Where(t => t.Id == flowId).Select(t => t.PayeeId).SingleAsync(CT);
+        Assert.Equal(target.Id, flowPayee);
+        // The learned mapping re-pointed to target (survives the source's cascade delete).
+        var mappingPayee = await db.PayeeMappings.AsNoTracking()
+            .Where(m => m.Id == mappingId).Select(m => m.PayeeId).SingleAsync(CT);
+        Assert.Equal(target.Id, mappingPayee);
+    }
+
+    [Fact]
+    public async Task MergePayee_IntoItself_Returns400()
+    {
+        var client = await CreateAdminClientAsync();
+        var payee = await CreatePayeeAsync(client, "Costco");
+
+        var resp = await client.PostAsJsonAsync(
+            $"/api/v1/finances/payees/{payee.Id}/merge", new { targetId = payee.Id }, CT);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    // ----- Learned mappings management -----
+
+    [Fact]
+    public async Task PayeeMappings_ListAndDelete()
+    {
+        var client = await CreateAdminClientAsync();
+        var payee = await CreatePayeeAsync(client, "Costco");
+        var mappingId = await SeedMappingAsync(payee.Id, "COSTCO", "COSTCO #123");
+
+        var list = await (await client.GetAsync($"/api/v1/finances/payees/{payee.Id}/mappings", CT))
+            .Content.ReadFromJsonAsync<List<MappingItem>>(CT);
+        Assert.Single(list!);
+        Assert.Equal("COSTCO #123", list![0].SampleRawDescription);
+
+        var del = await client.DeleteAsync($"/api/v1/finances/payee-mappings/{mappingId}", CT);
+        Assert.Equal(HttpStatusCode.NoContent, del.StatusCode);
+
+        var after = await (await client.GetAsync($"/api/v1/finances/payees/{payee.Id}/mappings", CT))
+            .Content.ReadFromJsonAsync<List<MappingItem>>(CT);
+        Assert.Empty(after!);
     }
 
     // ----- CRUD roundtrip -----

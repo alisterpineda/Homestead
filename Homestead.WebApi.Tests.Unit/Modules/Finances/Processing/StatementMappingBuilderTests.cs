@@ -1,6 +1,7 @@
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
+using Homestead.WebApi.Modules.Finances.Services;
 
 namespace Homestead.WebApi.Tests.Unit.Modules.Finances.Processing;
 
@@ -190,5 +191,36 @@ public class StatementMappingBuilderTests : IAsyncLifetime
 
         Assert.Single(proposal.LineItems);
         Assert.Equal(FlowDirection.Expense, proposal.LineItems[0].Direction);
+    }
+
+    [Fact]
+    public async Task BuildAsync_AppliesLearnedSuggestion_OnNormalizedKeyMatch()
+    {
+        var payee = new Payee { Id = Guid.NewGuid(), Name = "Grocery Mart" };
+        _db.Payees.Add(payee);
+        _db.PayeeMappings.Add(new PayeeMapping
+        {
+            Id = Guid.NewGuid(),
+            NormalizedKey = PayeeDescriptionNormalizer.Normalize("GROCERY MART")!,
+            NormalizationVersion = PayeeDescriptionNormalizer.Version,
+            PayeeId = payee.Id,
+            SampleRawDescription = "GROCERY MART",
+            TimesConfirmed = 1,
+        });
+        await _db.SaveChangesAsync();
+
+        // First line matches the learned key (even through a per-swipe processor prefix); second doesn't.
+        var ir = IrWithLines(
+            new StatementLineItemIr(new DateOnly(2026, 6, 3), "SQ *GROCERY MART", 42.10m, StatementLineDirection.Out, null, null),
+            new StatementLineItemIr(new DateOnly(2026, 6, 4), "UNKNOWN SHOP", 10m, StatementLineDirection.Out, null, null));
+
+        var sut = new StatementMappingBuilder(_db);
+        var proposal = await sut.BuildAsync(ir, _account, TestContext.Current.CancellationToken);
+
+        Assert.Equal(payee.Id, proposal.LineItems[0].SuggestedPayeeId);
+        Assert.Equal(PayeeSuggestionSource.Learned, proposal.LineItems[0].SuggestionSource);
+
+        Assert.Null(proposal.LineItems[1].SuggestedPayeeId);
+        Assert.Equal(PayeeSuggestionSource.None, proposal.LineItems[1].SuggestionSource);
     }
 }

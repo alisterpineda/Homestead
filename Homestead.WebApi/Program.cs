@@ -198,6 +198,8 @@ builder.Services.AddScoped<ITradeService, TradeService>();
 builder.Services.AddScoped<IDividendService, DividendService>();
 builder.Services.AddScoped<IFlowService, FlowService>();
 builder.Services.AddScoped<IFlowCounterpartResolver, FlowCounterpartResolver>();
+builder.Services.AddScoped<IPayeeMappingService, PayeeMappingService>();
+builder.Services.AddScoped<IPayeeResolutionService, PayeeResolutionService>();
 builder.Services.AddScoped<ICategoryPathResolver, CategoryPathResolver>();
 builder.Services.AddScoped<IDripService, DripService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();

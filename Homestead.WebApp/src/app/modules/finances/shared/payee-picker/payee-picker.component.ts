@@ -108,6 +108,18 @@ export type PayeePickerValue = Pick<PayeeResponse, 'id' | 'name'>;
                 </span>
                 <span class="truncate">Create "{{ searchTerm().trim() }}"</span>
               </button>
+              <!-- Dedupe nudge: a near-duplicate already exists (case-insensitive substring). Surface it so
+                   AI-named lookalikes ("Blue Bottle" vs "Blue Bottle Coffee") get caught before minting. -->
+              @if (didYouMean(); as dym) {
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-accent cursor-pointer min-w-0"
+                  (click)="onSelect(dym)"
+                >
+                  <span class="size-4 shrink-0"></span>
+                  <span class="truncate">Did you mean <strong class="font-medium text-foreground">{{ dym.name }}</strong>?</span>
+                </button>
+              }
             } @else if (results().length === 0) {
               <p class="py-4 text-center text-sm text-muted-foreground">No payees found.</p>
             }
@@ -177,6 +189,18 @@ export class PayeePickerComponent {
     if (!text || this.loading()) return false;
     const lower = text.toLowerCase();
     return !this.results().some(p => p.name.toLowerCase() === lower);
+  });
+
+  // A near-duplicate of the typed name (case-insensitive substring either way, but not an exact match) —
+  // the "did you mean …?" nudge shown beneath the create row.
+  didYouMean = computed(() => {
+    if (!this.showCreateRow()) return null;
+    const lower = this.searchTerm().trim().toLowerCase();
+    if (!lower) return null;
+    return this.results().find(p => {
+      const name = p.name.toLowerCase();
+      return name !== lower && (name.includes(lower) || lower.includes(name));
+    }) ?? null;
   });
 
   onSelect(payee: PayeeResponse): void {

@@ -7,6 +7,7 @@ import { getPayees } from '@/api/generated/fn/finances/get-payees';
 import { createPayee } from '@/api/generated/fn/finances/create-payee';
 import { patchPayee } from '@/api/generated/fn/finances/patch-payee';
 import { deletePayee } from '@/api/generated/fn/finances/delete-payee';
+import { mergePayee } from '@/api/generated/fn/finances/merge-payee';
 import type { PaginatedResponseOfPayeeResponse } from '@/api/generated/models/paginated-response-of-payee-response';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
 
@@ -14,6 +15,7 @@ export type { GetPayees$Params } from '@/api/generated/fn/finances/get-payees';
 export type { CreatePayee$Params } from '@/api/generated/fn/finances/create-payee';
 export type { PatchPayee$Params } from '@/api/generated/fn/finances/patch-payee';
 export type { DeletePayee$Params } from '@/api/generated/fn/finances/delete-payee';
+export type { MergePayee$Params } from '@/api/generated/fn/finances/merge-payee';
 
 @Injectable({ providedIn: 'root' })
 export class FinancesPayeeApiService {
@@ -34,5 +36,9 @@ export class FinancesPayeeApiService {
 
   deletePayee(params: Parameters<typeof deletePayee>[2]): Observable<void> {
     return deletePayee(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
+  }
+
+  mergePayee(params: Parameters<typeof mergePayee>[2]): Observable<PayeeResponse> {
+    return mergePayee(this.http, this.config.rootUrl, params).pipe(map(r => r.body));
   }
 }

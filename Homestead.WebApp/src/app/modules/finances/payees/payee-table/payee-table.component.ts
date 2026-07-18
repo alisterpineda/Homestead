@@ -85,6 +85,7 @@ export class PayeeTableComponent {
   sortDir = input<string | null | undefined>(null);
 
   edit = output<PayeeResponse>();
+  merge = output<PayeeResponse>();
   delete = output<PayeeResponse>();
   sortChange = output<PayeeSortChange | null>();
 
@@ -92,6 +93,7 @@ export class PayeeTableComponent {
 
   private readonly _meta: PayeeTableMeta = {
     onEdit: (p) => this.edit.emit(p),
+    onMerge: (p) => this.merge.emit(p),
     onDelete: (p) => this.delete.emit(p),
   };
 

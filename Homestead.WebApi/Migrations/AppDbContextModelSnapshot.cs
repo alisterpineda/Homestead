@@ -811,6 +811,66 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("payees", "finances");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.PayeeMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LastWriterDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<short>("NormalizationVersion")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("NormalizedKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("PayeeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SampleRawDescription")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<int>("TimesConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("NormalizedKey")
+                        .IsUnique();
+
+                    b.HasIndex("PayeeId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("payee_mappings", "finances");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Finances.TransactionDocumentLink", b =>
                 {
                     b.Property<Guid>("AccountTransactionId")
@@ -1978,6 +2038,31 @@ namespace Homestead.WebApi.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("DefaultCategory");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Finances.PayeeMapping", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Homestead.WebApi.Domain.Finances.Payee", "Payee")
+                        .WithMany()
+                        .HasForeignKey("PayeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homestead.WebApi.Domain.Identity.AppUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Payee");
 
                     b.Navigation("UpdatedByUser");
                 });

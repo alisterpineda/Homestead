@@ -42,7 +42,27 @@ public record ProposedFlow(
     decimal? RunningBalance,
     bool Mappable,                     // false when Amount/Direction missing → shown greyed, not committable
     bool DuplicateSuspected = false,   // forward-compat dedup flag (§8); default false
-    bool Accepted = true);
+    bool Accepted = true,
+    // Payee suggestion (a *hint* until the reviewer accepts it). Appended with defaults so already-staged
+    // JSON blobs (positional System.Text.Json) still deserialize. Tiers ①/② carry SuggestedPayeeId (an
+    // existing payee); tier ③ carries SuggestedPayeeName (a proposed new payee, no id yet). SuggestionSource
+    // records which tier produced it, in precedence order.
+    Guid? SuggestedPayeeId = null,
+    string? SuggestedPayeeName = null,
+    PayeeSuggestionSource SuggestionSource = PayeeSuggestionSource.None);
+
+/// <summary>
+/// Provenance of a line's payee suggestion, in precedence order. <c>Learned</c> is a deterministic,
+/// high-trust hit from the learning table (pre-applied client-side); the two <c>Ai*</c> tiers are hint-only
+/// ghosts that require an explicit accept before they apply or teach.
+/// </summary>
+public enum PayeeSuggestionSource
+{
+    None,
+    Learned,
+    AiExistingPayee,
+    AiNewPayee,
+}
 
 /// <summary>
 /// A proposed <c>BalanceEntry</c> assertion for the account's reporting currency. The reviewer can edit the

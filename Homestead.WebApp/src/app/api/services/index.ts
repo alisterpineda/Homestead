@@ -8,6 +8,7 @@ export { DownloadApiService } from './download-api.service';
 export { FinancesAccountApiService } from './finances-account-api.service';
 export { FinancesCategoryApiService } from './finances-category-api.service';
 export { FinancesPayeeApiService } from './finances-payee-api.service';
+export { FinancesPayeeMappingApiService } from './finances-payee-mapping-api.service';
 export { FinancesCommodityApiService } from './finances-commodity-api.service';
 export { FinancesCommodityPriceApiService } from './finances-commodity-price-api.service';
 export { FinancesReportsApiService } from './finances-reports-api.service';

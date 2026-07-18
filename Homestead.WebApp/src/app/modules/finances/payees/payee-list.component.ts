@@ -26,6 +26,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmCheckboxImports } from '@/shared/components/spartan/checkbox';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmAlertDialogImports } from '@/shared/components/spartan/alert-dialog';
+import { HlmDialogImports } from '@/shared/components/spartan/dialog';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { PaginationComponent } from '@/shared/components/pagination/pagination.component';
 import { UserPreferencesService } from '@/shared/services/user-preferences.service';
@@ -36,6 +37,7 @@ import { PayeeListStateService } from './payee-list-state.service';
 import { PayeeTableComponent, type PayeeSortChange } from './payee-table/payee-table.component';
 import { CreatePayeeDialogComponent } from './create-payee-dialog/create-payee-dialog.component';
 import { EditPayeeDialogComponent } from './edit-payee-dialog/edit-payee-dialog.component';
+import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
 import type { PaginatedResponseOfPayeeResponse } from '@/api/generated/models/paginated-response-of-payee-response';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
@@ -60,11 +62,13 @@ interface PayeeSortFieldOption {
     HlmCheckboxImports,
     HlmLabel,
     HlmAlertDialogImports,
+    HlmDialogImports,
     HlmDropdownMenuImports,
     PaginationComponent,
     PayeeTableComponent,
     CreatePayeeDialogComponent,
     EditPayeeDialogComponent,
+    PayeePickerComponent,
   ],
   providers: [provideIcons({
     lucidePlus,
@@ -177,6 +181,7 @@ interface PayeeSortFieldOption {
             [sortDir]="effectiveSortDir()"
             (sortChange)="onSortChange($event)"
             (edit)="onEdit($event)"
+            (merge)="onMergeRequest($event)"
             (delete)="onDeleteRequest($event)"
           />
         </div>
@@ -199,6 +204,34 @@ interface PayeeSortFieldOption {
       (saved)="onEditSaved()"
       (closed)="onEditClosed()"
     />
+
+    <!-- Merge: consolidate the chosen source payee into a target the reviewer keeps. -->
+    <hlm-dialog [state]="mergeState()" (stateChanged)="onMergeStateChanged($event)">
+      <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[420px]">
+        <div hlmDialogHeader>
+          <h2 hlmDialogTitle>Merge {{ mergeSource()?.name ?? 'payee' }}</h2>
+          <p hlmDialogDescription>
+            Move this payee's transactions and learned mappings into another payee, then delete it. This can't
+            be undone.
+          </p>
+        </div>
+        <div class="flex flex-col gap-1.5 py-2">
+          <label hlmLabel>Merge into</label>
+          <app-payee-picker
+            [value]="mergeTarget()"
+            placeholder="Choose the payee to keep…"
+            ariaLabel="Choose the payee to keep"
+            (valueChange)="mergeTarget.set($event)"
+          />
+        </div>
+        <div hlmDialogFooter>
+          <button hlmBtn variant="secondary" type="button" hlmDialogClose>Cancel</button>
+          <button hlmBtn type="button" [disabled]="!canMerge() || merging()" (click)="confirmMerge()">
+            {{ merging() ? 'Merging…' : 'Merge' }}
+          </button>
+        </div>
+      </hlm-dialog-content>
+    </hlm-dialog>
 
     <hlm-alert-dialog [state]="deleteState()" (stateChanged)="deleteState.set($event)">
       <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
@@ -257,6 +290,17 @@ export class PayeeListComponent {
   deleteState = signal<BrnDialogState>('closed');
   deleting = signal(false);
   deleteError = signal('');
+
+  // Merge
+  mergeSource = signal<PayeeResponse | null>(null);
+  mergeTarget = signal<PayeeResponse | null>(null);
+  mergeState = signal<BrnDialogState>('closed');
+  merging = signal(false);
+  canMerge = computed(() => {
+    const source = this.mergeSource();
+    const target = this.mergeTarget();
+    return !!source && !!target && source.id !== target.id;
+  });
 
   // Search
   searchInput = signal(this.route.snapshot.queryParamMap.get('search') ?? '');
@@ -474,6 +518,46 @@ export class PayeeListComponent {
       error: (err: unknown) => {
         this.deleting.set(false);
         this.deleteError.set(this.errorHandler.getErrorMessage(err, 'Failed to delete payee.'));
+      },
+    });
+  }
+
+  // ----- Merge -----
+
+  onMergeRequest(payee: PayeeResponse): void {
+    this.mergeSource.set(payee);
+    this.mergeTarget.set(null);
+    this.mergeState.set('open');
+  }
+
+  onMergeStateChanged(state: BrnDialogState): void {
+    this.mergeState.set(state);
+    if (state === 'closed') {
+      this.mergeSource.set(null);
+      this.mergeTarget.set(null);
+    }
+  }
+
+  confirmMerge(): void {
+    const source = this.mergeSource();
+    const target = this.mergeTarget();
+    if (!source || !target || source.id === target.id) return;
+
+    this.merging.set(true);
+    this.payeeApi.mergePayee({ id: source.id, body: { targetId: target.id } }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.merging.set(false);
+        this.mergeState.set('closed');
+        this.mergeSource.set(null);
+        this.mergeTarget.set(null);
+        this.onRefresh();
+        toast.success('Payees merged.');
+      },
+      error: (err: unknown) => {
+        this.merging.set(false);
+        this.errorHandler.handleError(err, 'Failed to merge payees.');
       },
     });
   }

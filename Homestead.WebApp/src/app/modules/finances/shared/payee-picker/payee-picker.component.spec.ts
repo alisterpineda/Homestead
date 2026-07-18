@@ -95,6 +95,40 @@ describe('PayeePickerComponent', () => {
     expect(createPayee).not.toHaveBeenCalled();
   });
 
+  it('offers a dedupe nudge for a case-insensitive near-duplicate', async () => {
+    vi.useFakeTimers();
+    try {
+      getPayees.mockReturnValue(of({ items: [payee('p1', 'Blue Bottle Coffee')], totalCount: 1 }));
+      const fixture = setupFixture();
+      const c = fixture.componentInstance;
+      // Typed name is a substring of an existing payee → nudge, but still offer create (not an exact match).
+      c.searchTerm.set('blue bottle');
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(c.showCreateRow()).toBe(true);
+      expect(c.didYouMean()?.id).toBe('p1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not nudge when the typed name exactly matches an existing payee', async () => {
+    vi.useFakeTimers();
+    try {
+      getPayees.mockReturnValue(of({ items: [payee('p1', 'Costco')], totalCount: 1 }));
+      const fixture = setupFixture();
+      const c = fixture.componentInstance;
+      c.searchTerm.set('Costco');
+      await vi.advanceTimersByTimeAsync(250);
+
+      // Exact match → no create row, hence no nudge.
+      expect(c.showCreateRow()).toBe(false);
+      expect(c.didYouMean()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('surfaces search results (archived excluded server-side by default)', async () => {
     vi.useFakeTimers();
     try {

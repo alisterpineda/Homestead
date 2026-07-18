@@ -38,7 +38,8 @@ public record StatementImportResponse
     public string? Error { get; init; }
 
     public static StatementImportResponse FromJob(
-        ProcessingJob job, Guid accountId, StagedStatementImport? staged)
+        ProcessingJob job, Guid accountId, StagedStatementImport? staged,
+        IReadOnlyDictionary<Guid, SuggestedPayeeInfo> suggestedPayees)
     {
         if (staged is null)
         {
@@ -82,9 +83,23 @@ public record StatementImportResponse
                 }
                 : null,
             LineItems = staged.Proposal.LineItems
-                .Select(f => new StatementLineItemResponse(
-                    f.Index, f.Date, f.Description, f.Amount, f.Direction,
-                    f.RunningBalance, f.Mappable, f.DuplicateSuspected, f.Accepted))
+                .Select(f =>
+                {
+                    // Existing-payee suggestions (tier ①/②) resolve against the live catalog by id — for the
+                    // display name AND the read-only auto-category chip. A new-payee suggestion (tier ③) has
+                    // no id and carries its proposed name inline, with no category (the payee doesn't exist yet).
+                    var info = f.SuggestedPayeeId is { } pid && suggestedPayees.TryGetValue(pid, out var i)
+                        ? i
+                        : null;
+                    return new StatementLineItemResponse(
+                        f.Index, f.Date, f.Description, f.Amount, f.Direction,
+                        f.RunningBalance, f.Mappable, f.DuplicateSuspected, f.Accepted,
+                        f.SuggestedPayeeId,
+                        info?.Name ?? f.SuggestedPayeeName,
+                        f.SuggestionSource,
+                        info?.DefaultCategoryName,
+                        info?.DefaultCategoryType);
+                })
                 .ToList(),
             AccountNumberMatch = staged.Proposal.AccountNumberMatch,
             DuplicateAssertionExists = staged.Proposal.DuplicateAssertionExists,
@@ -130,4 +145,17 @@ public record StatementLineItemResponse(
     decimal? RunningBalance,
     bool Mappable,
     bool DuplicateSuspected,
-    bool Accepted);
+    bool Accepted,
+    // Payee suggestion surfaced for review. SuggestedPayeeId is an existing payee (tiers ①/②); for a
+    // new-payee proposal (tier ③) it is null and SuggestedPayeeName carries the proposed name. The client
+    // treats an unaccepted Ai* suggestion as a ghost — never auto-applied, never learned.
+    Guid? SuggestedPayeeId,
+    string? SuggestedPayeeName,
+    PayeeSuggestionSource SuggestionSource,
+    // The suggested existing payee's default category (name + type), for the read-only auto-category chip.
+    // Null for a tier-③ new-payee suggestion or a payee with no default category.
+    string? SuggestedPayeeDefaultCategoryName,
+    AccountType? SuggestedPayeeDefaultCategoryType);
+
+/// <summary>Resolved detail for a suggested existing payee — its current name and default category.</summary>
+public record SuggestedPayeeInfo(string Name, string? DefaultCategoryName, AccountType? DefaultCategoryType);
