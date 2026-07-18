@@ -615,9 +615,9 @@ export class StatementImportReviewPageComponent {
       enableSorting: false,
     },
     { id: 'date', header: 'Date', cell: () => flexRenderComponent(LineDateCell), enableSorting: false },
-    { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
-    { id: 'type', header: 'Type', cell: () => flexRenderComponent(LineTypeCell), enableSorting: false },
     { id: 'payee', header: 'Payee', cell: () => flexRenderComponent(LinePayeeCell), enableSorting: false },
+    { id: 'type', header: 'Type', cell: () => flexRenderComponent(LineTypeCell), enableSorting: false },
+    { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
     { id: 'amount', header: 'Amount', cell: () => flexRenderComponent(LineAmountCell), enableSorting: false },
   ];
 
@@ -640,10 +640,12 @@ export class StatementImportReviewPageComponent {
 
   private readonly TH_CLASSES: Record<string, string> = {
     select: 'w-9',
+    date: 'w-48',
     amount: 'text-right',
   };
   private readonly TD_CLASSES: Record<string, string> = {
     select: 'w-9 text-center align-middle',
+    date: 'w-48 align-middle',
     amount: 'text-right align-middle',
   };
   protected getThClass(columnId: string): string {

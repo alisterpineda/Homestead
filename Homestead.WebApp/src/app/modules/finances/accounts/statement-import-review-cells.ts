@@ -41,7 +41,6 @@ export interface StatementLineTableMeta {
   imports: [HlmDatePicker, HlmDatePickerInput],
   template: `
     <hlm-date-picker
-      class="w-full"
       captionLayout="dropdown"
       [date]="row.dateObj"
       (dateChange)="onDateChange($event)"
