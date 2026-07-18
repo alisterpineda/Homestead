@@ -1,9 +1,10 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSparkles } from '@ng-icons/lucide';
+import { lucideSparkles, lucideCheck, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
@@ -34,6 +35,10 @@ export interface LineItemEdit {
   dateObj: Date | undefined;
   mappable: boolean;
   duplicateSuspected: boolean;
+  // True once the reviewer explicitly dismisses (rejects) an AI ghost. A dismissed suggestion stops being
+  // a ghost (drops from the suggestion count / import-gate) and the line imports as a normal unattributed
+  // one, unless the reviewer then picks a payee manually.
+  dismissed: boolean;
   // The APPLIED payee (what commits), or null when unattributed. A Learned tier-① hit is pre-filled here;
   // an AI ghost (tier ②/③) stays null until the reviewer accepts it. Held as a single stable object so the
   // per-row picker's [value] doesn't get a new identity every change detection.
@@ -59,6 +64,7 @@ export interface StatementLineTableMeta {
   setDirection(index: number, direction: FlowDirection): void;
   onPayeeChange(index: number, payee: PayeeResponse | null): void;
   acceptSuggestion(index: number): void;
+  dismissSuggestion(index: number): void;
 }
 
 @Component({
@@ -142,8 +148,8 @@ export class LineTypeCell {
 @Component({
   selector: 'app-line-payee-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton],
-  providers: [provideIcons({ lucideSparkles })],
+  imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton, HlmButtonGroup],
+  providers: [provideIcons({ lucideSparkles, lucideCheck, lucideX })],
   template: `
     <div class="flex min-w-[12rem] flex-col gap-1">
       <app-payee-picker
@@ -159,15 +165,13 @@ export class LineTypeCell {
           <span class="min-w-0 truncate text-xs italic text-muted-foreground" [title]="row.suggestedPayeeName ?? ''">
             {{ row.suggestedPayeeName }}
           </span>
-          <button
-            hlmBtn
-            size="sm"
-            variant="ghost"
-            class="ml-auto h-6 shrink-0 px-2 text-xs"
-            (click)="onAccept()"
-          >
-            {{ isNew ? 'Create & use' : 'Accept' }}
-          </button>
+          <div hlmButtonGroup class="ml-auto shrink-0">
+            <button hlmBtn size="sm" variant="outline" (click)="onAccept()">
+              <ng-icon hlm name="lucideCheck" size="xs" class="mr-1" />
+              {{ isNew ? 'Create & use' : 'Accept' }}
+            </button>
+            <button hlmBtn size="sm" variant="outline" (click)="onDismiss()">Dismiss</button>
+          </div>
         </div>
         @if (row.suggestedCategory) {
           <span class="truncate text-xs italic text-muted-foreground/60">→ {{ row.suggestedCategory.name }}</span>
@@ -188,9 +192,10 @@ export class LinePayeeCell {
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
-  // An un-accepted AI suggestion (tier ②/③): nothing applied yet, but a suggestion is waiting.
+  // An un-accepted, un-dismissed AI suggestion (tier ②/③): nothing applied yet, but a suggestion is waiting.
   protected get isGhost(): boolean {
     return this.row.payee === null
+      && !this.row.dismissed
       && (this.row.suggestionSource === 'AiExistingPayee' || this.row.suggestionSource === 'AiNewPayee');
   }
   protected get isNew(): boolean {
@@ -210,6 +215,10 @@ export class LinePayeeCell {
 
   protected onAccept(): void {
     this.meta.acceptSuggestion(this.row.index);
+  }
+
+  protected onDismiss(): void {
+    this.meta.dismissSuggestion(this.row.index);
   }
 }
 

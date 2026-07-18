@@ -393,6 +393,31 @@ describe('StatementImportReviewPageComponent', () => {
     expect(c.suggestionCount()).toBe(0);
   });
 
+  it('dismissing an AI ghost drops it from the count and imports the line unattributed', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Line 1 is an un-accepted AI ghost that would otherwise gate the import.
+    expect(c.suggestionCount()).toBe(1);
+    expect(c.pendingGhostCount()).toBe(1);
+
+    c.dismissSuggestion(1);
+
+    // No longer a ghost → not counted, no import-gate.
+    expect(c.lineItems()[1].dismissed).toBe(true);
+    expect(c.isGhost(c.lineItems()[1])).toBe(false);
+    expect(c.suggestionCount()).toBe(0);
+    expect(c.pendingGhostCount()).toBe(0);
+
+    // Commit goes straight through (no warning dialog) and the line imports unattributed.
+    c.commit();
+    expect(c.warnState()).toBe('closed');
+    expect(api.lastCommit.body.lineItems.find((l: any) => l.index === 1)).toEqual(
+      expect.objectContaining({ payeeId: null, learn: false }));
+  });
+
   it('a manual pick flags learn=true; an untouched learned pre-fill commits with learn=false', async () => {
     configure(withSuggestions());
     const fixture = TestBed.createComponent(StatementImportReviewPageComponent);

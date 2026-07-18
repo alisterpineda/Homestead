@@ -32,6 +32,7 @@ import {
   getCoreRowModel,
 } from '@tanstack/angular-table';
 import { HlmButton } from '@/shared/components/spartan/button';
+import { HlmButtonGroupImports } from '@/shared/components/spartan/button-group';
 import { HlmSpinner } from '@/shared/components/spartan/spinner';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
@@ -106,6 +107,7 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
     NgTemplateOutlet,
     NgIcon,
     HlmButton,
+    HlmButtonGroupImports,
     HlmSpinner,
     HlmInput,
     HlmLabel,
@@ -342,10 +344,13 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
                 <h3 class="text-sm font-medium">Transactions ({{ lineItems().length }})</h3>
                 <div class="flex items-center gap-2">
                   @if (hasSuggestions()) {
-                    <button hlmBtn size="sm" variant="outline" (click)="acceptAllSuggestions()">
-                      <ng-icon hlm name="lucideSparkles" size="sm" class="mr-1 text-violet-500" />
-                      Accept all suggestions ({{ suggestionCount() }})
-                    </button>
+                    <div hlmButtonGroup>
+                      <button hlmBtn size="sm" variant="outline" (click)="acceptAllSuggestions()">
+                        <ng-icon hlm name="lucideSparkles" size="sm" class="mr-1 text-violet-500" />
+                        Accept all ({{ suggestionCount() }})
+                      </button>
+                      <button hlmBtn size="sm" variant="outline" (click)="showSuggestions()">Review</button>
+                    </div>
                   }
                   <hlm-toggle-group
                     type="single"
@@ -392,8 +397,10 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
               @if (hasSelection()) {
                 <div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
                   <span class="text-sm text-muted-foreground">{{ selectionCount() }} selected</span>
-                  <button hlmBtn variant="outline" (click)="bulkSetDirection('Expense')">Set Expense</button>
-                  <button hlmBtn variant="outline" (click)="bulkSetDirection('Income')">Set Income</button>
+                  <div hlmButtonGroup>
+                    <button hlmBtn variant="outline" (click)="bulkSetDirection('Expense')">Set Expense</button>
+                    <button hlmBtn variant="outline" (click)="bulkSetDirection('Income')">Set Income</button>
+                  </div>
                   <app-payee-picker
                     class="w-44"
                     ariaLabel="Assign payee to selected lines"
@@ -624,6 +631,7 @@ export class StatementImportReviewPageComponent {
         dateObj: parseDate(r.date) ?? undefined,
         mappable: r.mappable,
         duplicateSuspected: r.duplicateSuspected,
+        dismissed: false,
         payee: isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null,
         suggestionSource: r.suggestionSource,
         suggestedPayeeId: r.suggestedPayeeId ?? null,
@@ -691,7 +699,8 @@ export class StatementImportReviewPageComponent {
   // A ghost = an un-accepted AI suggestion (tier ②/③). It is never auto-applied and never learned; the
   // reviewer must accept it (per-row or "Accept all"), or the warning dialog gates the import.
   isGhost = (r: LineItemEdit): boolean =>
-    r.payee === null && (r.suggestionSource === 'AiExistingPayee' || r.suggestionSource === 'AiNewPayee');
+    r.payee === null && !r.dismissed
+    && (r.suggestionSource === 'AiExistingPayee' || r.suggestionSource === 'AiNewPayee');
 
   suggestionCount = computed(() => this.lineItems().filter((r) => this.isGhost(r)).length);
   hasSuggestions = computed(() => this.suggestionCount() > 0);
@@ -707,6 +716,7 @@ export class StatementImportReviewPageComponent {
     setDirection: (index, direction) => this.setDirection(index, direction),
     onPayeeChange: (index, payee) => this.onRowPayeeChange(index, payee),
     acceptSuggestion: (index) => this.acceptSuggestion(index),
+    dismissSuggestion: (index) => this.dismissSuggestion(index),
   };
 
   private readonly _columns: ColumnDef<LineItemEdit>[] = [
@@ -802,6 +812,14 @@ export class StatementImportReviewPageComponent {
     if (row.suggestionSource === 'AiNewPayee' && row.suggestedPayeeName) {
       this.createPayeeAndApply(row.suggestedPayeeName.trim(), [index], true);
     }
+  }
+
+  // Dismiss (reject) one AI ghost: it stops being a ghost, drops out of the suggestion count / import-gate,
+  // and the line imports unattributed (the reviewer can still pick a payee manually afterwards).
+  dismissSuggestion(index: number): void {
+    const row = this.lineItems().find((r) => r.index === index);
+    if (!row || !this.isGhost(row)) return;
+    this.patchRow(index, { dismissed: true });
   }
 
   // "Accept all suggestions (N)" — promote every ghost to a confirmed, learned pick. Existing-payee ghosts
@@ -907,6 +925,12 @@ export class StatementImportReviewPageComponent {
   onFilterChange(value: unknown): void {
     if (value === 'all' || value === 'duplicates' || value === 'unmappable' || value === 'suggestions')
       this.filterMode.set(value);
+  }
+
+  // Page-level "Review" — filter the table to the un-accepted ghosts. Distinct from the import-gate
+  // dialog's reviewSuggestions(), which also closes that dialog.
+  showSuggestions(): void {
+    this.filterMode.set('suggestions');
   }
 
   // ─── Bulk actions over the current selection (accepted ∩ committable) ──────
