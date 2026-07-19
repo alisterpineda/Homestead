@@ -1,10 +1,10 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSparkles, lucideCheck, lucideX } from '@ng-icons/lucide';
+import { lucideSparkles, lucideCheck, lucidePlus, lucideX } from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
-import { HlmButtonGroup } from '@/shared/components/spartan/button-group';
+import { HlmButtonGroup, HlmButtonGroupText } from '@/shared/components/spartan/button-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
@@ -148,41 +148,68 @@ export class LineTypeCell {
 @Component({
   selector: 'app-line-payee-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton, HlmButtonGroup],
-  providers: [provideIcons({ lucideSparkles, lucideCheck, lucideX })],
+  imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton, HlmButtonGroup, HlmButtonGroupText],
+  providers: [provideIcons({ lucideSparkles, lucideCheck, lucidePlus, lucideX })],
   template: `
     <div class="flex min-w-[12rem] flex-col gap-1">
-      <app-payee-picker
-        [value]="row.payee"
-        ariaLabel="Select payee for this line"
-        (valueChange)="onChange($event)"
-      />
-
-      @if (isGhost) {
-        <!-- Hint-only AI suggestion: NOT applied until accepted. -->
-        <div class="flex items-center gap-1">
-          <ng-icon hlm name="lucideSparkles" size="xs" class="shrink-0 text-violet-500" />
-          <span class="min-w-0 truncate text-xs italic text-muted-foreground" [title]="row.suggestedPayeeName ?? ''">
-            {{ row.suggestedPayeeName }}
-          </span>
-          <div hlmButtonGroup class="ml-auto shrink-0">
-            <button hlmBtn size="sm" variant="outline" (click)="onAccept()">
-              <ng-icon hlm name="lucideCheck" size="xs" class="mr-1" />
-              {{ isNew ? 'Create & use' : 'Accept' }}
-            </button>
-            <button hlmBtn size="sm" variant="outline" (click)="onDismiss()">Dismiss</button>
-          </div>
+      @if (isGhost && !overriding()) {
+        <!-- Un-accepted AI suggestion rendered as ONE inline control so it sits level with the other cells
+             in the row: [✨ suggested name (click to change)] · [accept] · [dismiss]. The name segment is a
+             button — clicking it swaps in the live picker (seeded with the name) to override. -->
+        <div hlmButtonGroup class="w-full">
+          <button
+            type="button"
+            hlmButtonGroupText
+            class="min-w-0 flex-1 cursor-pointer justify-start gap-1.5 hover:bg-accent"
+            [attr.aria-label]="'Change payee, suggested: ' + (row.suggestedPayeeName ?? '')"
+            [title]="'Change payee (suggested: ' + (row.suggestedPayeeName ?? '') + ')'"
+            (click)="startOverride()"
+          >
+            <ng-icon hlm name="lucideSparkles" size="xs" class="shrink-0 text-violet-500" />
+            <span class="min-w-0 truncate font-normal italic text-muted-foreground">{{ row.suggestedPayeeName }}</span>
+          </button>
+          <button
+            hlmBtn
+            size="icon"
+            variant="outline"
+            [attr.aria-label]="acceptLabel"
+            [title]="acceptLabel"
+            (click)="onAccept()"
+          >
+            <ng-icon hlm [name]="isNew ? 'lucidePlus' : 'lucideCheck'" size="sm" />
+          </button>
+          <button
+            hlmBtn
+            size="icon"
+            variant="outline"
+            aria-label="Dismiss suggestion"
+            title="Dismiss suggestion"
+            (click)="onDismiss()"
+          >
+            <ng-icon hlm name="lucideX" size="sm" />
+          </button>
         </div>
         @if (row.suggestedCategory) {
           <span class="truncate text-xs italic text-muted-foreground/60">→ {{ row.suggestedCategory.name }}</span>
         }
-      } @else if (isLearned) {
-        <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide">Learned</span>
-          @if (row.category) { <span class="min-w-0 truncate">→ {{ row.category.name }}</span> }
-        </div>
-      } @else if (row.category) {
-        <span class="truncate text-xs text-muted-foreground">→ {{ row.category.name }}</span>
+      } @else {
+        <app-payee-picker
+          [value]="row.payee"
+          ariaLabel="Select payee for this line"
+          [autoOpen]="overriding()"
+          [initialQuery]="row.suggestedPayeeName"
+          (valueChange)="onChange($event)"
+          (closed)="onPickerClosed()"
+        />
+
+        @if (isLearned) {
+          <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide">Learned</span>
+            @if (row.category) { <span class="min-w-0 truncate">→ {{ row.category.name }}</span> }
+          </div>
+        } @else if (row.category) {
+          <span class="truncate text-xs text-muted-foreground">→ {{ row.category.name }}</span>
+        }
       }
     </div>
   `,
@@ -192,14 +219,21 @@ export class LinePayeeCell {
   protected get row(): LineItemEdit { return this.ctx.row.original; }
   private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
+  // The reviewer clicked the suggestion name to pick a different payee: swap the segment for the live picker.
+  // Cleared again if they back out without committing (onPickerClosed).
+  protected readonly overriding = signal(false);
+
   // An un-accepted, un-dismissed AI suggestion (tier ②/③): nothing applied yet, but a suggestion is waiting.
   protected get isGhost(): boolean {
     return this.row.payee === null
       && !this.row.dismissed
-      && (this.row.suggestionSource === 'AiExistingPayee' || this.row.suggestionSource === 'AiNewPayee');
+      && this.isAiSource;
   }
   protected get isNew(): boolean {
     return this.row.suggestionSource === 'AiNewPayee';
+  }
+  private get isAiSource(): boolean {
+    return this.row.suggestionSource === 'AiExistingPayee' || this.row.suggestionSource === 'AiNewPayee';
   }
   // A deterministic learned tier-① hit, pre-applied and not yet overridden.
   protected get isLearned(): boolean {
@@ -208,9 +242,37 @@ export class LinePayeeCell {
       && this.row.suggestionSource === 'Learned'
       && this.row.payee.id === this.row.suggestedPayeeId;
   }
+  protected get acceptLabel(): string {
+    return this.isNew ? 'Create & use suggested payee' : 'Accept suggested payee';
+  }
+
+  // Enter override: reveal the picker, auto-opened and seeded with the suggested name (see the picker's
+  // [autoOpen]/[initialQuery]).
+  protected startOverride(): void {
+    this.overriding.set(true);
+  }
 
   protected onChange(payee: PayeeResponse | null): void {
-    this.meta.onPayeeChange(this.row.index, payee);
+    this.overriding.set(false);
+    if (payee) {
+      this.meta.onPayeeChange(this.row.index, payee);
+      return;
+    }
+    if (this.isAiSource) {
+      // Clearing an AI-suggested line = reviewed → no payee. Record it as dismissed rather than leaving it
+      // null, which (for an AI source) would re-surface it as an un-reviewed ghost that gates the import.
+      this.meta.patchRow(this.row.index, { payee: null, category: null, learn: false, dismissed: true });
+      return;
+    }
+    this.meta.onPayeeChange(this.row.index, null);
+  }
+
+  // The picker closed without committing anything → the reviewer backed out of an override, so restore the
+  // suggestion segment (a value pick / clear already flipped `overriding` off in onChange first).
+  protected onPickerClosed(): void {
+    if (this.overriding() && this.row.payee === null && !this.row.dismissed) {
+      this.overriding.set(false);
+    }
   }
 
   protected onAccept(): void {

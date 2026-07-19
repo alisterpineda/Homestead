@@ -10,6 +10,7 @@ import {
   viewChild,
   ElementRef,
   effect,
+  afterNextRender,
   DOCUMENT,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
@@ -229,10 +230,26 @@ export class PayeePickerComponent {
   ariaLabel = input<string | null>(null);
 
   /**
+   * Opt-in: mount the picker already open, so a host can swap it in as an inline "override" of some other
+   * affordance (the statement-import AI-suggestion cell). Acts once, on first render. Off for every normal
+   * host, which keeps the closed-until-clicked behavior.
+   */
+  autoOpen = input(false);
+  /** The query to seed the search box with when {@link autoOpen} opens it (e.g. an AI-suggested name). */
+  initialQuery = input<string | null>(null);
+
+  /**
    * Emits the full selected payee (so the flow sheet can read defaultCategoryId/defaultCategoryType for
    * client-side autofill), or null when cleared.
    */
   valueChange = output<PayeeResponse | null>();
+
+  /**
+   * Fires whenever the panel closes (including a dismiss without a pick). Lets a host distinguish "the
+   * reviewer backed out" from "the reviewer chose something" — the statement-import cell uses it to restore
+   * its suggestion chip when an override is abandoned.
+   */
+  closed = output<void>();
 
   popoverState = signal<'open' | 'closed'>('closed');
   searchTerm = signal('');
@@ -269,6 +286,24 @@ export class PayeePickerComponent {
         doc.removeEventListener('scroll', reposition, { capture: true });
         if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
       });
+    });
+
+    // Override entry point: a host that mounts us with [autoOpen] wants the picker live and pre-seeded the
+    // instant it appears. Runs once after first render (the input can't change afterward without a remount).
+    afterNextRender(() => {
+      if (!this.autoOpen() || this.disabled()) return;
+      const seed = this.initialQuery()?.trim() || undefined;
+      this.openPicker(seed);
+      const el = this.inputEl().nativeElement;
+      el.focus();
+      // openPicker sets searchTerm (→ the [value] binding), but that only reaches the DOM on the next change
+      // detection — so at this point the field is still empty. Reflect the seed imperatively before select(),
+      // otherwise it selects nothing and the first keystroke wouldn't replace the suggested name. The binding
+      // re-affirms the same value on the next CD, so there's no desync.
+      if (seed) {
+        el.value = seed;
+        el.select();
+      }
     });
   }
 
@@ -395,9 +430,10 @@ export class PayeePickerComponent {
     this.openPicker();
   }
 
-  private openPicker(): void {
+  // Opens seeded with `seed` when given (the override path), else with the committed name.
+  private openPicker(seed?: string): void {
     if (this.disabled()) return;
-    this.searchTerm.set(this.value()?.name ?? '');
+    this.searchTerm.set(seed ?? this.value()?.name ?? '');
     // Eager loading suppresses a create-row flash during the pre-debounce window (see onSearch).
     this.loading.set(true);
     this.popoverState.set('open');
@@ -406,12 +442,16 @@ export class PayeePickerComponent {
   private closePicker(): void {
     this.popoverState.set('closed');
     this.searchTerm.set('');
+    this.closed.emit();
   }
 
   // Outside-pointer dismissal (and any overlay-driven state change) lands here.
   protected onStateChanged(state: 'open' | 'closed'): void {
     this.popoverState.set(state);
-    if (state === 'closed') this.searchTerm.set('');
+    if (state === 'closed') {
+      this.searchTerm.set('');
+      this.closed.emit();
+    }
   }
 
   protected onKeydown(event: KeyboardEvent): void {

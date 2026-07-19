@@ -190,6 +190,37 @@ describe('PayeePickerComponent', () => {
     expect(c.searchTerm()).toBe('Costco');
   });
 
+  it('autoOpen mounts the picker open and seeded with initialQuery (override entry point)', async () => {
+    const fixture = TestBed.createComponent(PayeePickerComponent);
+    fixture.componentRef.setInput('autoOpen', true);
+    fixture.componentRef.setInput('initialQuery', 'Blue Bottle Coffee');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.popoverState()).toBe('open');
+    expect(c.searchTerm()).toBe('Blue Bottle Coffee');
+  });
+
+  it('does not auto-open for a normal (autoOpen=false) host', async () => {
+    const fixture = setupFixture();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.popoverState()).toBe('closed');
+  });
+
+  it('emits (closed) when the panel is dismissed without a pick', () => {
+    const fixture = setupFixture();
+    const c = fixture.componentInstance;
+    let closedCount = 0;
+    c.closed.subscribe(() => closedCount++);
+
+    c.popoverState.set('open');
+    internals(c).onKeydown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(closedCount).toBeGreaterThanOrEqual(1);
+    expect(c.popoverState()).toBe('closed');
+  });
+
   it('gates the fetch on being open: closed never fetches, open does', async () => {
     vi.useFakeTimers();
     try {
