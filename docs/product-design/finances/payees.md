@@ -27,7 +27,7 @@ On statement import the **payee is the primary attribution**, and each confirmed
 
 1. **Learned** — a deterministic, high-trust hit from the learning table (`finances.payee_mappings`). Pre-applied client-side, marked "learned".
 2. **AI → existing payee** — the AI second-pass resolved the line to a payee already in the catalog. A **hint-only ghost** (sparkle + *Accept*), not applied until accepted.
-3. **AI → new payee** — the AI proposed a *new* payee name. A ghost with **Create & use** (one click mints it), plus the picker's dedupe nudge.
+3. **AI → new payee** — the AI proposed a *new* payee name. A ghost with **Create & use** (one click mints it), plus the picker's dedupe nudge. Unlike everything else on the review page — which stages client-side and only reaches the server at commit — *Create & use* (and "Accept all" over a new-payee ghost) **persists immediately**: it `POST`s the new payee to the catalog on click, before any commit. This is the one write the review page makes early; see the orphan caveat under [Rollback](#rollback-retracts-what-it-taught) below.
 4. **Manual** — the reviewer picks (or clears) a payee themselves.
 
 A payee's default category rides along to also **auto-categorise** the line (below).
@@ -63,6 +63,8 @@ When a line carries a payee, the payee's **default category** is applied to also
 ### Rollback retracts what it taught
 
 Rollback of an import (`DELETE /finances/imports/{documentId}`) also **retracts the mappings that import taught**, matched precisely on `LastWriterDocumentId`. A key later overwritten by a *different* import carries a different id and is left intact — so rollback never un-learns another statement's confirmation.
+
+Rollback (and simply abandoning a review before commit) does **not** delete payees minted by *Create & use* — those are persisted independently of the commit (see tier 3 above), so a mistakenly-created or later-dismissed new payee **outlives** both an abandoned review and a rolled-back import. It survives as an ordinary catalog payee, to be **archived** or **merged** away if unwanted.
 
 ### AI as a separate second pass
 
