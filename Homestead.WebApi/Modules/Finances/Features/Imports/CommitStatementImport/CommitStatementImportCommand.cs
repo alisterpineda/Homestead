@@ -28,14 +28,16 @@ public record CommitStatementImportCommand : ICommand<CommitStatementImportRespo
 /// One curated line to materialize as an Expense/Income flow, in the account's reporting currency.
 /// <para>
 /// <see cref="Index"/> is the stable <c>ProposedFlow.Index</c> — it lets the server recover the *staged* raw
-/// description (independent of the editable <see cref="Description"/> memo) as the learning key.
+/// description (independent of the editable <see cref="Description"/> memo) as the learning key. It is
+/// <c>null</c> for a **manual** line the reviewer added (no staged origin), which therefore has no raw text
+/// to learn against and is never taught, regardless of <see cref="Learn"/>.
 /// <see cref="Learn"/> is the explicit-signal flag: true only when the reviewer set this payee this session
 /// (pick / create / accept / override). It is false for an untouched tier-① pre-fill and for the
 /// warning-dialog auto-apply, both of which apply the payee but must *not* teach the learning table.
 /// </para>
 /// </summary>
 public record CommitLineItem(
-    int Index, FlowDirection Direction, decimal Amount, DateOnly Date,
+    int? Index, FlowDirection Direction, decimal Amount, DateOnly Date,
     string? Description, Guid? PayeeId = null, bool Learn = false);
 
 public record CommitStatementImportResponse

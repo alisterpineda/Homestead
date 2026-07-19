@@ -1,10 +1,14 @@
 import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideSparkles, lucideCheck, lucidePlus, lucideX } from '@ng-icons/lucide';
+import {
+  lucideSparkles, lucideCheck, lucidePlus, lucideX,
+  lucideEllipsisVertical, lucideBan, lucideCircleCheck, lucideRotateCcw, lucideTrash2,
+} from '@ng-icons/lucide';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
 import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup, HlmButtonGroupText } from '@/shared/components/spartan/button-group';
+import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { HlmSelectImports } from '@/shared/components/spartan/select';
@@ -21,10 +25,33 @@ export interface LineCategory {
   type: AccountType;
 }
 
-// Client-side edit state for one proposed line — the review page owns this until commit. `mappable` echoes
-// the server's un-mappable flag (missing amount/direction); `amount`/`date` are raw strings for uncontrolled
-// inputs (never reformatted while typing). Acceptance is NOT held here — it lives in the table's rowSelection.
+// An immutable snapshot of a parsed row's reset-able fields, captured at seed time. "Reset to original"
+// splats this back over the row (leaving the orthogonal `excluded` axis untouched). Manual rows have no
+// snapshot (`original: undefined`) — there is nothing to reset to.
+export interface LineItemOriginal {
+  amount: string;
+  description: string;
+  direction: FlowDirection;
+  date: string;
+  payee: PayeePickerValue | null;
+  suggestionSource: PayeeSuggestionSource;
+  suggestedPayeeId: string | null;
+  suggestedPayeeName: string | null;
+  suggestedCategory: LineCategory | null;
+  category: LineCategory | null;
+  learn: boolean;
+  dismissed: boolean;
+}
+
+// Client-side edit state for one row — the review page owns this until commit. `mappable` echoes the
+// server's un-mappable flag (missing amount/direction); `amount`/`date` are raw strings for uncontrolled
+// inputs (never reformatted while typing). Three orthogonal axes ride here alongside the edit fields:
+// `excluded` (the include/exclude manifest axis), `manual` (user-added rows with no staged origin), and
+// selection — which is NOT held here (it lives in the table's rowSelection map, purely transient).
 export interface LineItemEdit {
+  // Client row key: parsed rows keep their staged index (≥ 0); manual rows get a negative key from a
+  // decrementing counter. The staged-vs-manual distinction at commit is `manual ? null : index`, so the
+  // negative key never leaves the browser.
   index: number;
   amount: string;
   description: string;
@@ -35,6 +62,15 @@ export interface LineItemEdit {
   dateObj: Date | undefined;
   mappable: boolean;
   duplicateSuspected: boolean;
+  // True for a user-added row the parser missed. Drives commit `index: null`, `learn: false`, the "Manual"
+  // badge, and Delete-instead-of-Exclude. Manual rows are always `excluded: false` and carry no `original`.
+  manual: boolean;
+  // The include/exclude axis (default false = included). An excluded row stays in the manifest greyed +
+  // struck-through and does NOT commit. Recoverable via the ⋮ menu. Always false for manual rows.
+  excluded: boolean;
+  // Immutable snapshot of the reset-able fields at seed time; `undefined` for manual rows. Powers "Reset
+  // to original" and the isDirty check.
+  original?: LineItemOriginal;
   // True once the reviewer explicitly dismisses (rejects) an AI ghost. A dismissed suggestion stops being
   // a ghost (drops from the suggestion count / import-gate) and the line imports as a normal unattributed
   // one, unless the reviewer then picks a payee manually.
@@ -58,13 +94,20 @@ export interface LineItemEdit {
 }
 
 // Table meta contract — the review page supplies the row-edit handlers, reached via ctx.table.options.meta.
-// All handlers key by the STABLE server line index (row.original.index), never array position.
+// All handlers key by the STABLE client row key (row.original.index), never array position.
 export interface StatementLineTableMeta {
   patchRow(index: number, patch: Partial<LineItemEdit>): void;
   setDirection(index: number, direction: FlowDirection): void;
   onPayeeChange(index: number, payee: PayeeResponse | null): void;
   acceptSuggestion(index: number): void;
   dismissSuggestion(index: number): void;
+  // Manifest axis: toggle a parsed row's included/excluded state; reset its edits; delete a manual row.
+  toggleExcluded(index: number): void;
+  resetRow(index: number): void;
+  deleteManualRow(index: number): void;
+  // Whether a parsed row differs from its captured original (gates the "Reset to original" action).
+  // Takes the row directly — the cell already holds it, so no re-lookup is needed.
+  isDirty(row: LineItemEdit): boolean;
 }
 
 @Component({
@@ -72,13 +115,20 @@ export interface StatementLineTableMeta {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmDatePicker, HlmDatePickerInput],
   template: `
-    <hlm-date-picker
-      captionLayout="dropdown"
-      [date]="row.dateObj"
-      (dateChange)="onDateChange($event)"
-    >
-      <hlm-date-picker-input [inputId]="inputId" placeholder="Select date" />
-    </hlm-date-picker>
+    <div class="flex flex-col gap-1">
+      @if (row.manual) {
+        <span class="w-fit rounded bg-muted px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Manual
+        </span>
+      }
+      <hlm-date-picker
+        captionLayout="dropdown"
+        [date]="row.dateObj"
+        (dateChange)="onDateChange($event)"
+      >
+        <hlm-date-picker-input [inputId]="inputId" placeholder="Select date" />
+      </hlm-date-picker>
+    </div>
   `,
 })
 export class LineDateCell {
@@ -295,6 +345,7 @@ export class LinePayeeCell {
       step="0.01"
       min="0"
       class="w-24 text-right"
+      [class.line-through]="row.excluded"
       [value]="row.amount"
       (input)="onInput($event)"
       aria-label="Transaction amount"
@@ -310,4 +361,64 @@ export class LineAmountCell {
   protected onInput(event: Event): void {
     this.meta.patchRow(this.row.index, { amount: (event.target as HTMLInputElement).value });
   }
+}
+
+// Trailing ⋮ overflow menu — the per-row manifest controls, orthogonal to selection. A parsed row toggles
+// Exclude/Include and (when edited) offers Reset to original; a manual row offers Delete instead.
+@Component({
+  selector: 'app-line-actions-cell',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgIcon, HlmIconImports, HlmButton, HlmDropdownMenuImports],
+  providers: [provideIcons({ lucideEllipsisVertical, lucideBan, lucideCircleCheck, lucideRotateCcw, lucideTrash2 })],
+  template: `
+    <button
+      hlmBtn
+      variant="ghost"
+      size="icon-sm"
+      type="button"
+      [hlmDropdownMenuTrigger]="menu"
+      aria-label="Line actions"
+    >
+      <ng-icon hlm name="lucideEllipsisVertical" size="sm" />
+    </button>
+    <ng-template #menu>
+      <hlm-dropdown-menu class="w-48">
+        <hlm-dropdown-menu-group>
+          @if (row.manual) {
+            <button hlmDropdownMenuItem variant="destructive" (triggered)="onDelete()">
+              <ng-icon hlm name="lucideTrash2" size="sm" />
+              Delete row
+            </button>
+          } @else {
+            <button hlmDropdownMenuItem (triggered)="onToggleExcluded()">
+              @if (row.excluded) {
+                <ng-icon hlm name="lucideCircleCheck" size="sm" />
+                Include
+              } @else {
+                <ng-icon hlm name="lucideBan" size="sm" />
+                Exclude
+              }
+            </button>
+            @if (isDirty) {
+              <button hlmDropdownMenuItem (triggered)="onReset()">
+                <ng-icon hlm name="lucideRotateCcw" size="sm" />
+                Reset to original
+              </button>
+            }
+          }
+        </hlm-dropdown-menu-group>
+      </hlm-dropdown-menu>
+    </ng-template>
+  `,
+})
+export class LineActionsCell {
+  private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
+  protected get row(): LineItemEdit { return this.ctx.row.original; }
+  private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
+
+  protected get isDirty(): boolean { return this.meta.isDirty(this.row); }
+
+  protected onToggleExcluded(): void { this.meta.toggleExcluded(this.row.index); }
+  protected onReset(): void { this.meta.resetRow(this.row.index); }
+  protected onDelete(): void { this.meta.deleteManualRow(this.row.index); }
 }

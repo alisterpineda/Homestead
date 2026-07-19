@@ -45,6 +45,8 @@ Tier-1 learned pre-fills and manual picks never trigger the gate.
 
 This is the anti-entrenchment guardrail. A mapping is written (upserted) **only** when the reviewer explicitly set the payee this session — a **pick, create, accept, or override** (the per-line `Learn` flag on commit). A rubber-stamped tier-1 pre-fill, a bulk-assigned gap-fill that matched an existing pick, or a dialog-forced "Apply all & import" is **applied but not taught**. So a wrong guess that was silently carried through never entrenches itself.
 
+**Manual (index-less) lines are never learned.** A row the reviewer *added* during review (the manifest's "+ Add row") has no staged origin — it commits with `CommitLineItem.Index = null`, so there is no server-side staged raw text to key on. The commit handler skips it before the learning lookup regardless of the `Learn` flag (and the client never even sets `Learn` on a manual row). This also closes a latent collision hazard: a manual line can never default to a real index and mislearn against a staged line.
+
 ### The normalizer (the learning key)
 
 `PayeeDescriptionNormalizer` is a pure, deterministic, **versioned** function turning a raw description into a fingerprint key:

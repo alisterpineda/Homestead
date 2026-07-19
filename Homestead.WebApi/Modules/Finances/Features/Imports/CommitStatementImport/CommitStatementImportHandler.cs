@@ -137,7 +137,10 @@ public class CommitStatementImportHandler(
         {
             if (!line.Learn || line.PayeeId is not Guid learnPayeeId)
                 continue;
-            if (!stagedRawByIndex.TryGetValue(line.Index, out var stagedRaw))
+            // A manual line has no staged origin (null index) → no raw text to key on, so it never learns.
+            if (line.Index is not int idx)
+                continue;
+            if (!stagedRawByIndex.TryGetValue(idx, out var stagedRaw))
                 continue;
             var key = PayeeDescriptionNormalizer.Normalize(stagedRaw);
             if (key is null)

@@ -6,6 +6,7 @@ import {
   computed,
   effect,
   untracked,
+  linkedSignal,
   DestroyRef,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -22,6 +23,7 @@ import {
   lucideFileQuestion,
   lucideSparkles,
   lucideX,
+  lucidePlus,
 } from '@ng-icons/lucide';
 import {
   type ColumnDef,
@@ -52,6 +54,7 @@ import { parseDate } from '@/shared/utils';
 import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
 import {
   type LineItemEdit,
+  type LineItemOriginal,
   type LineCategory,
   type StatementLineTableMeta,
   LineDateCell,
@@ -59,6 +62,7 @@ import {
   LineTypeCell,
   LinePayeeCell,
   LineAmountCell,
+  LineActionsCell,
 } from './statement-import-review-cells';
 import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
@@ -100,6 +104,13 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
   return { name: p.defaultCategoryName, type: p.defaultCategoryType };
 }
 
+// Value-equality for the reset-able category chip (used by the isDirty check).
+function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.name === b.name && a.type === b.type;
+}
+
 @Component({
   selector: 'app-statement-import-review-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -125,7 +136,7 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
   ],
   providers: [provideIcons({
     lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion,
-    lucideSparkles, lucideX,
+    lucideSparkles, lucideX, lucidePlus,
   })],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
@@ -337,11 +348,12 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
             </div>
           }
 
-          <!-- Feature B: itemized transactions -->
-          @if (lineItems().length > 0) {
+          <!-- Feature B: itemized transactions — the import manifest. Shown whenever the import loaded, even
+               with zero parsed lines, so a user can build manual rows on a balance-only statement. -->
+          @if (d.header) {
             <div class="flex flex-col gap-2">
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-sm font-medium">Transactions ({{ lineItems().length }})</h3>
+                <h3 class="text-sm font-medium">Transactions ({{ allRows().length }})</h3>
                 <div class="flex items-center gap-2">
                   @if (hasSuggestions()) {
                     <div hlmButtonGroup>
@@ -361,13 +373,14 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
                     (valueChange)="onFilterChange($event)"
                   >
                     <button hlmToggleGroupItem value="all">All</button>
+                    <button hlmToggleGroupItem value="excluded">Excluded</button>
                     <button hlmToggleGroupItem value="duplicates">Duplicates</button>
-                    <button hlmToggleGroupItem value="unmappable">Needs fix</button>
+                    <button hlmToggleGroupItem value="needsfix">Needs fix</button>
                     @if (hasSuggestions()) {
                       <button hlmToggleGroupItem value="suggestions">Suggestions</button>
                     }
                   </hlm-toggle-group>
-                  <span class="text-xs text-muted-foreground">{{ acceptedLines().length }} selected</span>
+                  <span class="text-xs text-muted-foreground">{{ linesToImport().length }} importing</span>
                 </div>
               </div>
 
@@ -376,7 +389,7 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
                 @case ('balanced') {
                   <div class="flex items-center gap-2 rounded-md border border-emerald-500/40 px-3 py-2 text-sm text-emerald-600">
                     <ng-icon hlm name="lucideCircleCheck" size="sm" />
-                    <span>Balanced — the selected lines reconcile to the closing balance.</span>
+                    <span>Balanced — the included lines reconcile to the closing balance.</span>
                   </div>
                 }
                 @case ('off') {
@@ -393,13 +406,17 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
                 }
               }
 
-              <!-- Bulk actions for the current selection -->
+              <!-- Bulk actions for the current selection (transient) -->
               @if (hasSelection()) {
                 <div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
                   <span class="text-sm text-muted-foreground">{{ selectionCount() }} selected</span>
                   <div hlmButtonGroup>
                     <button hlmBtn variant="outline" (click)="bulkSetDirection('Expense')">Set Expense</button>
                     <button hlmBtn variant="outline" (click)="bulkSetDirection('Income')">Set Income</button>
+                  </div>
+                  <div hlmButtonGroup>
+                    <button hlmBtn variant="outline" (click)="bulkSetExcluded(true)">Exclude</button>
+                    <button hlmBtn variant="outline" (click)="bulkSetExcluded(false)">Include</button>
                   </div>
                   <app-payee-picker
                     class="w-44"
@@ -423,74 +440,103 @@ function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): Line
               }
 
               <!-- Transactions table -->
-              <div class="overflow-clip rounded-md border">
-                <div hlmTableContainer>
-                  <table hlmTable class="w-full">
-                    <thead hlmTHead class="bg-background">
-                      @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
-                        <tr hlmTr>
-                          @for (header of headerGroup.headers; track header.id) {
-                            <th hlmTh [class]="getThClass(header.column.id)">
-                              @if (!header.isPlaceholder) {
-                                <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
-                                  <span>{{ h }}</span>
-                                </ng-container>
-                              }
-                            </th>
-                          }
-                        </tr>
-                      }
-                    </thead>
-                    <tbody hlmTBody>
-                      @for (row of table.getRowModel().rows; track row.id) {
-                        <tr hlmTr [class.opacity-50]="!rowCommittable(row.original)">
-                          @for (cell of row.getVisibleCells(); track cell.id) {
-                            <td hlmTd [class]="getTdClass(cell.column.id)">
-                              <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
-                                <div [innerHTML]="c"></div>
-                              </ng-container>
-                            </td>
-                          }
-                        </tr>
-                        @if (row.original.duplicateSuspected) {
+              @if (allRows().length > 0) {
+                <div class="overflow-clip rounded-md border">
+                  <div hlmTableContainer>
+                    <table hlmTable class="w-full">
+                      <thead hlmTHead class="bg-background">
+                        @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
                           <tr hlmTr>
-                            <td hlmTd></td>
-                            <td hlmTd [attr.colspan]="5" class="px-2 pb-2 text-xs text-amber-600">
-                              <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
-                            </td>
+                            @for (header of headerGroup.headers; track header.id) {
+                              <th hlmTh [class]="getThClass(header.column.id)">
+                                @if (!header.isPlaceholder) {
+                                  <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
+                                    <span>{{ h }}</span>
+                                  </ng-container>
+                                }
+                              </th>
+                            }
                           </tr>
                         }
-                      }
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody hlmTBody>
+                        @for (row of table.getRowModel().rows; track row.id) {
+                          <tr
+                            hlmTr
+                            [class.opacity-50]="row.original.excluded"
+                          >
+                            @for (cell of row.getVisibleCells(); track cell.id) {
+                              <td hlmTd [class]="getTdClass(cell.column.id)">
+                                <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
+                                  <div [innerHTML]="c"></div>
+                                </ng-container>
+                              </td>
+                            }
+                          </tr>
+                          @if (needsFix(row.original)) {
+                            <tr hlmTr>
+                              <td hlmTd></td>
+                              <td hlmTd [attr.colspan]="6" class="px-2 pb-2 text-xs text-amber-600">
+                                <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Needs an amount and date — fix it or exclude it to import.
+                              </td>
+                            </tr>
+                          }
+                          @if (row.original.duplicateSuspected) {
+                            <tr hlmTr>
+                              <td hlmTd></td>
+                              <td hlmTd [attr.colspan]="6" class="px-2 pb-2 text-xs text-amber-600">
+                                <ng-icon hlm name="lucideTriangleAlert" size="xs" /> Possible duplicate of an existing transaction.
+                              </td>
+                            </tr>
+                          }
+                        }
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-              @if (visibleLineItems().length === 0) {
+                @if (visibleLineItems().length === 0) {
+                  <p class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
+                    No transactions match this filter.
+                  </p>
+                }
+              } @else {
                 <p class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-                  No transactions match this filter.
+                  No transactions were parsed. Add any the statement listed with “+ Add row” below.
                 </p>
               }
+
+              <!-- Add a manual row the parser missed -->
+              <button
+                hlmBtn
+                variant="outline"
+                size="sm"
+                class="w-full border-dashed"
+                (click)="addManualRow()"
+              >
+                <ng-icon hlm name="lucidePlus" size="sm" class="mr-1" />
+                Add row
+              </button>
+
               <p class="text-xs text-muted-foreground">
                 Pick a payee per line — a learned payee (or one you confirm) is remembered for next time, and
                 its default category is applied automatically. Lines without a payee import as uncategorised.
-                Greyed rows are missing an amount or date and can't be selected until fixed.
+                Every included row imports; use the ⋮ menu to exclude a row (it stays, greyed and struck
+                through, and won't import) or reset your edits. Manual rows are never learned.
               </p>
             </div>
           }
 
-          <!-- Nothing to import -->
-          @if (!d.proposedBalanceEntry && lineItems().length === 0) {
-            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              No closing balance or transactions were found in this statement. There's nothing to import.
-            </div>
-          }
-
           <!-- Footer actions -->
-          <div class="flex items-center justify-end gap-2 pt-2">
+          <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+            @if (needsFixCount() > 0) {
+              <p class="mr-auto text-sm text-amber-600">
+                {{ needsFixCount() }} row(s) need fixing — fix or exclude them before importing.
+              </p>
+            }
             <button hlmBtn variant="ghost" (click)="backToAccount()" [disabled]="committing()">
               Cancel
             </button>
-            @if (d.proposedBalanceEntry || lineItems().length > 0) {
+            @if (d.proposedBalanceEntry || allRows().length > 0) {
               <button hlmBtn (click)="commit()" [disabled]="!canCommit() || committing()">
                 {{ committing() ? 'Committing…' : 'Commit import' }}
               </button>
@@ -612,58 +658,87 @@ export class StatementImportReviewPageComponent {
 
   protected readonly datePicker = isoDateBinding(this.date);
 
-  // Per-row line-item edit state. `accepted` is NOT held here — acceptance lives in the table's
-  // rowSelection map. `dateObj` memoizes the parsed Date so the picker binding keeps a stable reference
-  // (a fresh Date every change detection would snap an open calendar back — see LineDateCell).
-  lineItems = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () => {
+  // Parsed rows — the staged proposal turned into editable manifest rows, re-seeded on seedKey change (a
+  // late finance-settings load flips autoCat and re-seeds). Each row starts included (`excluded: false`),
+  // non-manual, and carries an immutable `original` snapshot for Reset. `dateObj` memoizes the parsed Date
+  // so the picker binding keeps a stable reference (a fresh Date every change detection would snap an open
+  // calendar back — see LineDateCell).
+  parsedRows = seededLinkedSignal<string, LineItemEdit[]>(this.seedKey, () => {
     const autoCat = this.autoCategoriseEnabled();
     return (this.data()?.lineItems ?? []).map((r) => {
       // Tier-① learned hits are pre-applied (the payee is set, marked "learned", learn=false → apply but
       // don't re-teach). AI ghosts (tier ②/③) stay unapplied (payee=null) until explicitly accepted.
       const isLearned = r.suggestionSource === 'Learned' && !!r.suggestedPayeeId;
       const suggestedCategory = suggestedCategoryOf(r, autoCat);
-      return {
-        index: r.index,
+      const payee = isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null;
+      const original: LineItemOriginal = {
         amount: String(r.amount),
         description: r.description ?? '',
         direction: r.direction,
         date: r.date ?? '',
+        payee,
+        suggestionSource: r.suggestionSource,
+        suggestedPayeeId: r.suggestedPayeeId ?? null,
+        suggestedPayeeName: r.suggestedPayeeName ?? null,
+        suggestedCategory,
+        category: isLearned ? suggestedCategory : null,
+        learn: false,
+        dismissed: false,
+      };
+      return {
+        index: r.index,
+        amount: original.amount,
+        description: original.description,
+        direction: original.direction,
+        date: original.date,
         dateObj: parseDate(r.date) ?? undefined,
         mappable: r.mappable,
         duplicateSuspected: r.duplicateSuspected,
         dismissed: false,
-        payee: isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null,
+        payee,
         suggestionSource: r.suggestionSource,
         suggestedPayeeId: r.suggestedPayeeId ?? null,
         suggestedPayeeName: r.suggestedPayeeName ?? null,
         suggestedCategory,
         learn: false,
         category: isLearned ? suggestedCategory : null,
+        manual: false,
+        excluded: false,
+        original,
       } satisfies LineItemEdit;
     });
   });
 
-  // Selection = acceptance. Seeded (keyed on the same seedKey) from the staged proposal's own accepted
-  // flags — mappable-and-accepted rows start checked; un-mappable rows start unchecked and stay
-  // un-selectable via enableRowSelection until the reviewer fixes them. Read from data() directly, not
-  // from the lineItems signal, so there's no inter-signal seeding order to reason about.
-  rowSelection = seededLinkedSignal<string, RowSelectionState>(this.seedKey, () => {
-    const selection: RowSelectionState = {};
-    for (const r of this.data()?.lineItems ?? []) {
-      if (r.mappable && r.accepted) selection[String(r.index)] = true;
-    }
-    return selection;
+  // Manual rows the user added — kept OUT of parsedRows so the autoCat re-seed (which fires on a late
+  // settings load, jobId unchanged) never drops them. Resets to [] only when navigating to a different
+  // import (jobId changes). Manual rows carry negative keys from this decrementing counter.
+  manualRows = linkedSignal<string | null, LineItemEdit[]>({
+    source: this.jobId,
+    computation: () => [],
+  });
+  private nextManualKey = -1;
+
+  // The single source every downstream selector, the table data, bulk ops, checksum, and the ghost-gate
+  // read. Parsed rows first (statement order), then manual rows appended.
+  allRows = computed(() => [...this.parsedRows(), ...this.manualRows()]);
+
+  // Selection is now PURELY transient bulk-targeting — no longer seeded from the staged `accepted` flag,
+  // decoupled from both the include/exclude axis and committability. Resets to empty on import change.
+  rowSelection = linkedSignal<string | null, RowSelectionState>({
+    source: this.jobId,
+    computation: () => ({}),
   });
 
-  // Client-side triage filter — display only. Selection/edit state stay in the untouched lineItems
-  // signal, so a row hidden by the filter but still selected commits. 'suggestions' surfaces the rows the
-  // warning dialog gates on (un-accepted AI ghosts), reached via "Review them".
-  filterMode = signal<'all' | 'duplicates' | 'unmappable' | 'suggestions'>('all');
+  // Client-side triage filter — display only. Edit/exclude state stay in the row signals, so a row hidden
+  // by the filter still commits (if included + committable). 'all' shows everything including excluded
+  // rows (greyed in place). 'suggestions' surfaces the rows the warning dialog gates on.
+  filterMode = signal<'all' | 'excluded' | 'duplicates' | 'needsfix' | 'suggestions'>('all');
   visibleLineItems = computed(() => {
-    const rows = this.lineItems();
+    const rows = this.allRows();
     switch (this.filterMode()) {
+      case 'excluded': return rows.filter((r) => r.excluded);
       case 'duplicates': return rows.filter((r) => r.duplicateSuspected);
-      case 'unmappable': return rows.filter((r) => !r.mappable);
+      case 'needsfix': return rows.filter((r) => this.needsFix(r));
       case 'suggestions': return rows.filter((r) => this.isGhost(r));
       default: return rows;
     }
@@ -675,25 +750,25 @@ export class StatementImportReviewPageComponent {
     return row.amount !== '' && Number.isFinite(amt) && amt > 0 && !!row.date;
   };
 
-  private isSelected(index: number): boolean {
+  // An INCLUDED row that can't commit — a parsed un-mappable row or a half-filled manual one. These stay
+  // in the manifest and BLOCK Confirm until fixed or excluded ("fix it or exclude it").
+  needsFix = (row: LineItemEdit): boolean => !row.excluded && !this.rowCommittable(row);
+
+  // ─── Selection (transient bulk-target only) ────────────────────────────────
+  // Coupled to neither the include/exclude axis nor committability — every row is selectable so the user
+  // can bulk-Include an excluded row or bulk-Set-direction a needs-fix one.
+  isSelected(index: number): boolean {
     return this.rowSelection()[String(index)] === true;
   }
 
-  // Test-facing helper — asserts acceptance without coupling to the rowSelection map shape.
-  isAccepted(index: number): boolean {
-    return this.isSelected(index);
-  }
-
-  acceptedLines = computed(() =>
-    this.lineItems().filter((r) => this.isSelected(r.index) && this.rowCommittable(r)));
-
-  allSelected = computed(() => {
-    const committable = this.lineItems().filter((r) => this.rowCommittable(r));
-    return committable.length > 0 && committable.every((r) => this.isSelected(r.index));
-  });
-
-  selectionCount = computed(() => this.acceptedLines().length);
+  private selectedRows = computed(() => this.allRows().filter((r) => this.isSelected(r.index)));
+  selectionCount = computed(() => this.selectedRows().length);
   hasSelection = computed(() => this.selectionCount() > 0);
+
+  // ─── Derived manifest sets ─────────────────────────────────────────────────
+  // The commit set (and the checksum set): every included, committable row — parsed or manual.
+  linesToImport = computed(() => this.allRows().filter((r) => !r.excluded && this.rowCommittable(r)));
+  needsFixCount = computed(() => this.allRows().filter((r) => this.needsFix(r)).length);
 
   // ─── AI-suggestion (ghost) state ───────────────────────────────────────────
   // A ghost = an un-accepted AI suggestion (tier ②/③). It is never auto-applied and never learned; the
@@ -702,13 +777,13 @@ export class StatementImportReviewPageComponent {
     r.payee === null && !r.dismissed
     && (r.suggestionSource === 'AiExistingPayee' || r.suggestionSource === 'AiNewPayee');
 
-  suggestionCount = computed(() => this.lineItems().filter((r) => this.isGhost(r)).length);
+  suggestionCount = computed(() => this.allRows().filter((r) => this.isGhost(r)).length);
   hasSuggestions = computed(() => this.suggestionCount() > 0);
 
-  // Ghosts that would import un-reviewed — only those on lines actually being committed (selected +
+  // Ghosts that would import un-reviewed — only those on lines actually being committed (included +
   // committable). These are what the warning dialog counts and gates on.
   private pendingGhosts = computed(() =>
-    this.acceptedLines().filter((r) => this.isGhost(r)));
+    this.linesToImport().filter((r) => this.isGhost(r)));
   pendingGhostCount = computed(() => this.pendingGhosts().length);
 
   private readonly _meta: StatementLineTableMeta = {
@@ -717,6 +792,11 @@ export class StatementImportReviewPageComponent {
     onPayeeChange: (index, payee) => this.onRowPayeeChange(index, payee),
     acceptSuggestion: (index) => this.acceptSuggestion(index),
     dismissSuggestion: (index) => this.dismissSuggestion(index),
+    toggleExcluded: (index) => this.toggleExcluded(index),
+    resetRow: (index) => this.resetRow(index),
+    deleteManualRow: (index) => this.deleteManualRow(index),
+    // The cell hands us the row it already holds — compare directly, no allRows() scan.
+    isDirty: (row) => this.isRowDirty(row),
   };
 
   private readonly _columns: ColumnDef<LineItemEdit>[] = [
@@ -731,17 +811,18 @@ export class StatementImportReviewPageComponent {
     { id: 'type', header: 'Type', cell: () => flexRenderComponent(LineTypeCell), enableSorting: false },
     { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
     { id: 'amount', header: 'Amount', cell: () => flexRenderComponent(LineAmountCell), enableSorting: false },
+    { id: 'actions', header: '', cell: () => flexRenderComponent(LineActionsCell), enableSorting: false },
   ];
 
   // Statement order is load-bearing (reconciliation / running-balance reading), so sorting stays off —
-  // which also sidesteps any edit-vs-reorder hazard. The options factory re-runs on visibleLineItems()/
-  // rowSelection() change, so enableRowSelection re-evaluates as edits change committability.
+  // which also sidesteps any edit-vs-reorder hazard. Every row is selectable now (selection is transient
+  // bulk-targeting, decoupled from the include/exclude axis and committability), so there's no
+  // enableRowSelection gate — getCanSelect() defaults to true for every row.
   protected readonly table = createAngularTable<LineItemEdit>(() => ({
     data: this.visibleLineItems(),
     columns: this._columns,
     getRowId: (row) => String(row.index),
     enableSorting: false,
-    enableRowSelection: (row) => this.rowCommittable(row.original),
     onRowSelectionChange: (updater) => {
       this.rowSelection.set(updater instanceof Function ? updater(this.rowSelection()) : updater);
     },
@@ -754,11 +835,13 @@ export class StatementImportReviewPageComponent {
     select: 'w-9',
     date: 'w-48',
     amount: 'text-right',
+    actions: 'w-10',
   };
   private readonly TD_CLASSES: Record<string, string> = {
     select: 'w-9 text-center align-middle',
     date: 'w-48 align-middle',
     amount: 'text-right align-middle',
+    actions: 'w-10 text-center align-middle',
   };
   protected getThClass(columnId: string): string {
     return this.TH_CLASSES[columnId] ?? '';
@@ -767,17 +850,39 @@ export class StatementImportReviewPageComponent {
     return this.TD_CLASSES[columnId] ?? 'align-middle';
   }
 
+  // Routes by the client row key's sign: manual rows (negative key) live in manualRows, parsed rows in
+  // parsedRows. The staged-vs-manual split never leaves the browser.
   patchRow(index: number, patch: Partial<LineItemEdit>): void {
-    this.lineItems.update((rows) =>
-      rows.map((r) =>
-        r.index === index
-          ? {
-              ...r,
-              ...patch,
-              // Keep the memoized Date in lockstep, but only touch it when `date` actually changed.
-              ...(patch.date !== undefined ? { dateObj: parseDate(patch.date) ?? undefined } : {}),
-            }
-          : r));
+    const apply = (r: LineItemEdit): LineItemEdit =>
+      r.index === index
+        ? {
+            ...r,
+            ...patch,
+            // Keep the memoized Date in lockstep, but only touch it when `date` actually changed.
+            ...(patch.date !== undefined ? { dateObj: parseDate(patch.date) ?? undefined } : {}),
+          }
+        : r;
+    if (index < 0) this.manualRows.update((rows) => rows.map(apply));
+    else this.parsedRows.update((rows) => rows.map(apply));
+  }
+
+  // Apply a patch to every row (parsed + manual) matching a predicate — the containment point for bulk ops.
+  private updateRows(
+    pred: (r: LineItemEdit) => boolean,
+    patchFn: (r: LineItemEdit) => Partial<LineItemEdit>,
+  ): void {
+    const apply = (rows: LineItemEdit[]) =>
+      rows.map((r) => {
+        if (!pred(r)) return r;
+        const patch = patchFn(r);
+        return {
+          ...r,
+          ...patch,
+          ...(patch.date !== undefined ? { dateObj: parseDate(patch.date) ?? undefined } : {}),
+        };
+      });
+    this.parsedRows.update(apply);
+    this.manualRows.update(apply);
   }
 
   setDirection(index: number, direction: FlowDirection): void {
@@ -797,7 +902,7 @@ export class StatementImportReviewPageComponent {
   // Accept one AI ghost (per-row). Existing-payee suggestions apply immediately; a new-payee suggestion
   // (tier ③) is created first, then applied. Either way it becomes an explicit, learned pick.
   acceptSuggestion(index: number): void {
-    const row = this.lineItems().find((r) => r.index === index);
+    const row = this.allRows().find((r) => r.index === index);
     if (!row || !this.isGhost(row)) return;
 
     if (row.suggestionSource === 'AiExistingPayee' && row.suggestedPayeeId) {
@@ -817,7 +922,7 @@ export class StatementImportReviewPageComponent {
   // Dismiss (reject) one AI ghost: it stops being a ghost, drops out of the suggestion count / import-gate,
   // and the line imports unattributed (the reviewer can still pick a payee manually afterwards).
   dismissSuggestion(index: number): void {
-    const row = this.lineItems().find((r) => r.index === index);
+    const row = this.allRows().find((r) => r.index === index);
     if (!row || !this.isGhost(row)) return;
     this.patchRow(index, { dismissed: true });
   }
@@ -826,7 +931,7 @@ export class StatementImportReviewPageComponent {
   // apply synchronously; new-payee ghosts are created once per distinct name, then applied to every row that
   // proposed it (avoids minting duplicates within the batch).
   acceptAllSuggestions(): void {
-    this.applyGhosts(this.lineItems().filter((r) => this.isGhost(r)), true);
+    this.applyGhosts(this.allRows().filter((r) => this.isGhost(r)), true);
   }
 
   // Apply a set of ghosts. learn=true for explicit accepts; learn=false for the warning-dialog
@@ -895,27 +1000,27 @@ export class StatementImportReviewPageComponent {
     });
   }
 
-  // Retained selection adapters (used by the row/header checkboxes flow through TanStack; these keep the
-  // component's public API stable for callers and tests). Writes go straight to the rowSelection signal.
-  setRowAccepted(index: number, accepted: boolean): void {
+  // Selection writes go straight to the rowSelection signal — purely transient bulk-targeting.
+  setSelected(index: number, selected: boolean): void {
     this.rowSelection.update((sel) => {
       const next = { ...sel };
-      if (accepted) next[String(index)] = true;
+      if (selected) next[String(index)] = true;
       else delete next[String(index)];
       return next;
     });
   }
 
+  // Select / deselect every row in the current filter view (mirrors the header checkbox's scope).
   toggleAll(checked: boolean): void {
-    if (!checked) {
-      this.rowSelection.set({});
-      return;
-    }
-    const next: RowSelectionState = {};
-    for (const r of this.lineItems()) {
-      if (this.rowCommittable(r)) next[String(r.index)] = true;
-    }
-    this.rowSelection.set(next);
+    const visible = this.visibleLineItems();
+    this.rowSelection.update((sel) => {
+      const next = { ...sel };
+      for (const r of visible) {
+        if (checked) next[String(r.index)] = true;
+        else delete next[String(r.index)];
+      }
+      return next;
+    });
   }
 
   clearSelection(): void {
@@ -923,7 +1028,8 @@ export class StatementImportReviewPageComponent {
   }
 
   onFilterChange(value: unknown): void {
-    if (value === 'all' || value === 'duplicates' || value === 'unmappable' || value === 'suggestions')
+    if (value === 'all' || value === 'excluded' || value === 'duplicates'
+      || value === 'needsfix' || value === 'suggestions')
       this.filterMode.set(value);
   }
 
@@ -933,15 +1039,108 @@ export class StatementImportReviewPageComponent {
     this.filterMode.set('suggestions');
   }
 
-  // ─── Bulk actions over the current selection (accepted ∩ committable) ──────
+  // ─── Include / exclude axis ────────────────────────────────────────────────
+  // Toggle a parsed row's excluded flag (manual rows Delete instead, so they never reach here).
+  toggleExcluded(index: number): void {
+    const row = this.parsedRows().find((r) => r.index === index);
+    if (!row) return;
+    this.patchRow(index, { excluded: !row.excluded });
+  }
+
+  // ─── Reset to original ─────────────────────────────────────────────────────
+  private isRowDirty(row: LineItemEdit): boolean {
+    const o = row.original;
+    if (!o) return false;
+    return row.amount !== o.amount
+      || row.description !== o.description
+      || row.direction !== o.direction
+      || row.date !== o.date
+      || (row.payee?.id ?? null) !== (o.payee?.id ?? null)
+      || row.dismissed !== o.dismissed
+      || row.learn !== o.learn
+      || !sameCategory(row.category, o.category);
+  }
+
+  isDirty(index: number): boolean {
+    const row = this.allRows().find((r) => r.index === index);
+    return row ? this.isRowDirty(row) : false;
+  }
+
+  // Splat the captured original back over the row (re-deriving dateObj). Leaves `excluded` untouched — it
+  // is an orthogonal axis. Manual rows have no original → no-op.
+  resetRow(index: number): void {
+    const apply = (rows: LineItemEdit[]) =>
+      rows.map((r) => {
+        const o = r.original;
+        if (r.index !== index || !o) return r;
+        return {
+          ...r,
+          amount: o.amount,
+          description: o.description,
+          direction: o.direction,
+          date: o.date,
+          dateObj: parseDate(o.date) ?? undefined,
+          payee: o.payee,
+          suggestionSource: o.suggestionSource,
+          suggestedPayeeId: o.suggestedPayeeId,
+          suggestedPayeeName: o.suggestedPayeeName,
+          suggestedCategory: o.suggestedCategory,
+          category: o.category,
+          learn: o.learn,
+          dismissed: o.dismissed,
+        };
+      });
+    if (index < 0) this.manualRows.update(apply);
+    else this.parsedRows.update(apply);
+  }
+
+  // ─── Manual rows ───────────────────────────────────────────────────────────
+  // Append a blank manual row (negative key, no staged origin). It starts as a needs-fix row (empty
+  // amount) → blocks Confirm until filled or deleted. Never learned (index null at commit).
+  addManualRow(): void {
+    const today = todayIso();
+    const row: LineItemEdit = {
+      index: this.nextManualKey--,
+      amount: '',
+      description: '',
+      direction: 'Expense',
+      date: today,
+      dateObj: parseDate(today) ?? undefined,
+      mappable: true,
+      duplicateSuspected: false,
+      dismissed: false,
+      payee: null,
+      suggestionSource: 'None',
+      suggestedPayeeId: null,
+      suggestedPayeeName: null,
+      suggestedCategory: null,
+      learn: false,
+      category: null,
+      manual: true,
+      excluded: false,
+      original: undefined,
+    };
+    this.manualRows.update((rows) => [...rows, row]);
+  }
+
+  deleteManualRow(index: number): void {
+    this.manualRows.update((rows) => rows.filter((r) => r.index !== index));
+    // Drop any lingering selection entry so rowSelection doesn't accumulate keys for gone rows.
+    this.setSelected(index, false);
+  }
+
+  // ─── Bulk actions over the current selection (transient) ───────────────────
   private updateSelected(patch: (r: LineItemEdit) => Partial<LineItemEdit>): void {
-    this.lineItems.update((rows) =>
-      rows.map((r) =>
-        this.isSelected(r.index) && this.rowCommittable(r) ? { ...r, ...patch(r) } : r));
+    this.updateRows((r) => this.isSelected(r.index), patch);
   }
 
   bulkSetDirection(direction: FlowDirection): void {
     this.updateSelected(() => ({ direction }));
+  }
+
+  // Bulk exclude / include — sets the flag on selected PARSED rows only (manual rows Delete instead).
+  bulkSetExcluded(excluded: boolean): void {
+    this.updateRows((r) => this.isSelected(r.index) && !r.manual, () => ({ excluded }));
   }
 
   // Bulk-assign is scoped to selected lines that don't already have a confirmed payee — it fills the gaps
@@ -951,12 +1150,15 @@ export class StatementImportReviewPageComponent {
     if (!p) return;
     const category = categoryOfPayee(p, this.autoCategoriseEnabled());
     let skipped = 0;
-    this.lineItems.update((rows) =>
+    const apply = (rows: LineItemEdit[]) =>
       rows.map((r) => {
-        if (!(this.isSelected(r.index) && this.rowCommittable(r))) return r;
+        if (!this.isSelected(r.index)) return r;
         if (r.payee !== null) { skipped++; return r; }
-        return { ...r, payee: { id: p.id, name: p.name }, category, learn: true };
-      }));
+        // Manual rows never learn (index-less at commit), so keep their in-memory learn flag coherent.
+        return { ...r, payee: { id: p.id, name: p.name }, category, learn: !r.manual };
+      });
+    this.parsedRows.update(apply);
+    this.manualRows.update(apply);
     if (skipped > 0)
       toast.info(`Assigned to lines without a payee; ${skipped} with an existing payee were left unchanged.`);
   }
@@ -966,7 +1168,7 @@ export class StatementImportReviewPageComponent {
   }
 
   // ─── Advisory closing-balance checksum (never blocks commit) ──────────────
-  // expected = opening + Σ(sign · amount) over selected lines; sign follows the account-type convention
+  // expected = opening + Σ(sign · amount) over included lines; sign follows the account-type convention
   // (asset: In +1 / Out −1; liability: Out +1 / In −1). Compared to the printed closing balance.
   checksum = computed<Checksum>(() => {
     const h = this.data()?.header;
@@ -976,7 +1178,7 @@ export class StatementImportReviewPageComponent {
 
     const isLiability = this.account()?.accountType === 'Liability';
     let sum = 0;
-    for (const row of this.acceptedLines()) {
+    for (const row of this.linesToImport()) {
       const isOut = row.direction === 'Expense';
       const sign = isLiability ? (isOut ? 1 : -1) : (isOut ? -1 : 1);
       sum += sign * Number(row.amount);
@@ -1006,7 +1208,10 @@ export class StatementImportReviewPageComponent {
     return this.amount() !== '' && Number.isFinite(amt) && amt >= 0;
   });
 
-  canCommit = computed(() => this.balanceCommittable() || this.acceptedLines().length > 0);
+  // Confirm is enabled when there's something to commit AND no included row is still un-committable — a
+  // needs-fix row must be fixed or excluded first.
+  canCommit = computed(() =>
+    (this.balanceCommittable() || this.linesToImport().length > 0) && this.needsFixCount() === 0);
 
   // ─── Document preview (blob) ──────────────────────────────────────────────
   blobUrl = signal<string | null>(null);
@@ -1109,16 +1314,18 @@ export class StatementImportReviewPageComponent {
         assertedAmount: acceptBalance ? Number(this.amount()) : 0,
         date: this.date() || todayIso(),
         memo: this.memo().trim() ? this.memo().trim() : null,
-        lineItems: this.acceptedLines().map((r) => ({
-          index: r.index,
+        lineItems: this.linesToImport().map((r) => ({
+          // A manual row has no staged origin → index null (never learned server-side). Parsed rows send
+          // their staged index; the negative client key never leaves the browser.
+          index: r.manual ? null : r.index,
           direction: r.direction,
           amount: Number(r.amount),
           date: r.date,
           description: r.description.trim() ? r.description.trim() : null,
           payeeId: r.payee?.id ?? null,
-          // Teach the mapping table only for explicit picks (never for a rubber-stamped tier-① pre-fill or
-          // an apply-but-don't-learn). Guard on a payee actually being set.
-          learn: r.payee !== null && r.learn,
+          // Teach the mapping table only for explicit picks on parsed rows (never for a rubber-stamped
+          // tier-① pre-fill, an apply-but-don't-learn, or a manual row). Guard on a payee being set.
+          learn: !r.manual && r.payee !== null && r.learn,
         })),
       },
     }).pipe(

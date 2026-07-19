@@ -214,6 +214,63 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Commit_ManualLine_NullIndex_CreatesFlow_AndIsNeverLearned_EvenWhenLearnTrue()
+    {
+        // A staged line 0 exists, but the reviewer also adds a *manual* line (Index=null) with a payee and
+        // Learn=true. The manual line must materialize as a flow yet never teach the mapping table (no staged
+        // raw text to key on), and must not mislearn against staged line 0.
+        var (job, documentId) = await SeedJobWithLinesAsync((0, "STAGED MERCHANT"));
+        var payee = await SeedPayeeAsync("Manual Payee");
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(null, FlowDirection.Expense, 25m, new DateOnly(2026, 6, 10), "Cash tip", payee, Learn: true),
+            ],
+        };
+
+        var result = await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        // The manual line still became a flow.
+        Assert.Equal(1, result.FlowsCreated);
+        await flows.Received(1).CreateAsync(
+            Arg.Is<CreateFlowRequest>(r => r.PayeeId == payee && r.Amount == 25m), Arg.Any<CancellationToken>());
+
+        // …but nothing was learned — a manual line carries no staged origin.
+        await _payeeMappings.DidNotReceive().UpsertAsync(
+            Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_StrictSubsetOfStagedLines_CreatesExactlyThatManyFlows()
+    {
+        // Three lines staged; the reviewer excludes the middle one, committing only indexes 0 and 2. Excluded
+        // rows are simply not sent — the handler creates exactly the flows it receives, no coverage check.
+        var (job, documentId) = await SeedJobWithLinesAsync((0, "KEEP A"), (1, "DROP"), (2, "KEEP B"));
+        var (sut, _) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "KEEP A"),
+                new CommitLineItem(2, FlowDirection.Income, 30m, new DateOnly(2026, 6, 5), "KEEP B"),
+            ],
+        };
+
+        var result = await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, result.FlowsCreated);
+        var links = await _db.TransactionDocumentLinks
+            .Where(l => l.DocumentId == documentId
+                     && l.Origin == TransactionDocumentLinkOrigin.StatementImport)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(2, links.Count);
+    }
+
+    [Fact]
     public async Task Commit_RejectedBalanceEntry_StillCommitsLines()
     {
         var (job, documentId) = await SeedJobAsync();

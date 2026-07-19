@@ -21,7 +21,8 @@ public class CommitStatementImportCommandValidator : AbstractValidator<CommitSta
         RuleForEach(x => x.LineItems).ChildRules(line =>
         {
             // Index recovers the staged raw text for learning; a negative index can't match any staged line.
-            line.RuleFor(l => l.Index).GreaterThanOrEqualTo(0);
+            // A manual line carries a null index (no staged origin), so the rule only applies when one is set.
+            line.RuleFor(l => l.Index).GreaterThanOrEqualTo(0).When(l => l.Index is not null);
             line.RuleFor(l => l.Amount).GreaterThan(0m)
                 .WithMessage("Line amount must be greater than zero.");
             line.RuleFor(l => l.Date).NotInFuture();

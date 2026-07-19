@@ -29,6 +29,8 @@ Classic Material puts the overflow `⋯` at the absolute right and the primary a
 | Empty (no items, no active filters) | Toolbar hidden entirely; the empty canvas owns the screen with a single centred primary CTA for first-time users. (Zero results *with* filters active keeps the toolbar — the user needs it to un-filter.) Known non-compliant: the commodity-prices section on the commodity detail page predates this rule and keeps its toolbar when empty. |
 | Selection | Toolbar swaps. Bulk actions (`Edit tags`, `Archive`, `Delete`) anchor to the leading edge next to an `N selected` counter; `Clear` sits trailing as the escape hatch. (Mechanism varies: tag/party lists fade the standard controls to inert; the documents list swaps them out structurally.) Destructive actions get red text rather than red buttons — colour signals intent without forcing confirmation emphasis. |
 
+**Selection is transient bulk-targeting — never "commit this."** Selecting rows only scopes the next bulk action; it lives in the in-memory state tier and resets on navigation. Review/import tables may layer an **orthogonal include/exclude row axis** on top of the standard selection — a per-row affordance (⋮ menu / bulk buttons) that governs what actually commits, independent of what's selected. The **statement-import review** manifest table is the reference: its checkbox drives only bulk edits, while a separate Exclude/Include axis (plus Reset-to-original and add-manual-row) decides the committed set (see [finances/transactions.md](../finances/transactions.md#statement-import)).
+
 ## Responsive behaviour
 
 Desktop → mobile transformations:
