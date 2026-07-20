@@ -473,18 +473,37 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
 
               <!-- Transactions table -->
               @if (allRows().length > 0) {
-                <div class="overflow-clip rounded-md border">
+                <div
+                  class="overflow-clip rounded-md border"
+                  [class.select-none]="isResizing()"
+                  [style]="columnSizeVars()"
+                >
                   <div hlmTableContainer>
-                    <table hlmTable class="w-full">
+                    <table hlmTable style="table-layout: fixed; width: 100%">
                       <thead hlmTHead class="bg-background">
                         @for (headerGroup of table.getHeaderGroups(); track headerGroup.id) {
                           <tr hlmTr>
                             @for (header of headerGroup.headers; track header.id) {
-                              <th hlmTh [class]="getThClass(header.column.id)">
+                              <th
+                                hlmTh
+                                class="group/resize relative"
+                                [class]="getThClass(header.column.id)"
+                                [style.width]="'var(--header-' + header.id + '-size)'"
+                              >
                                 @if (!header.isPlaceholder) {
                                   <ng-container *flexRender="header.column.columnDef.header; props: header.getContext(); let h">
                                     <span>{{ h }}</span>
                                   </ng-container>
+                                }
+                                @if (header.column.getCanResize()) {
+                                  <div
+                                    class="absolute top-0 right-0 h-full w-1 cursor-col-resize select-none touch-none
+                                           opacity-0 group-hover/resize:opacity-100 bg-border"
+                                    [class.!opacity-100]="header.column.getIsResizing()"
+                                    [class.!bg-primary]="header.column.getIsResizing()"
+                                    (mousedown)="header.getResizeHandler()($event)"
+                                    (touchstart)="header.getResizeHandler()($event)"
+                                  ></div>
                                 }
                               </th>
                             }
@@ -498,7 +517,11 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                             [class.opacity-50]="row.original.excluded"
                           >
                             @for (cell of row.getVisibleCells(); track cell.id) {
-                              <td hlmTd [class]="getTdClass(cell.column.id)">
+                              <td
+                                hlmTd
+                                [class]="getTdClass(cell.column.id)"
+                                [style.width]="'var(--col-' + cell.column.id + '-size)'"
+                              >
                                 <ng-container *flexRender="cell.column.columnDef.cell; props: cell.getContext(); let c">
                                   <div [innerHTML]="c"></div>
                                 </ng-container>
@@ -900,19 +923,82 @@ export class StatementImportReviewPageComponent {
     amountPrecision: this.amountPrecision,
   };
 
+  // Sizes are authoritative under `table-layout: fixed` — they're the per-column budget, and their sum
+  // (1030px) is the width past which the table stops compressing and hlmTableContainer scrolls instead.
+  // The sizes are measured in-browser against real statement data — each is the width at which that
+  // column's typical value renders whole. minSize is a different thing: the floor below which a drag
+  // would break the control (or, for date, the value itself).
   private readonly _columns: ColumnDef<LineItemEdit>[] = [
     {
       id: 'select',
       header: () => flexRenderComponent(TableHeadSelection),
       cell: () => flexRenderComponent(TableRowSelection),
       enableSorting: false,
+      enableResizing: false,
+      size: 36,
     },
-    { id: 'date', header: 'Date', cell: () => flexRenderComponent(LineDateCell), enableSorting: false },
-    { id: 'payee', header: 'Payee', cell: () => flexRenderComponent(LinePayeeCell), enableSorting: false },
-    { id: 'category', header: 'Category', cell: () => flexRenderComponent(LineCategoryCell), enableSorting: false },
-    { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
-    { id: 'amount', header: 'Amount', cell: () => flexRenderComponent(LineAmountCell), enableSorting: false },
-    { id: 'actions', header: '', cell: () => flexRenderComponent(LineActionsCell), enableSorting: false },
+    {
+      id: 'date',
+      header: 'Date',
+      cell: () => flexRenderComponent(LineDateCell),
+      enableSorting: false,
+      // Measured in-browser: the picker's furniture (16px cell padding + 16px input padding + the clear
+      // and calendar buttons) eats 77px, so `Feb 29, 2024` needs 183px to render whole. That's a hard
+      // floor, not a preference — a date clipped to `Feb 2` is indistinguishable from a different date,
+      // unlike an unbounded payee/description where some truncation is unavoidable. minSize enforces it
+      // so a drag can't reintroduce the bug this column was resized to fix.
+      size: 190,
+      minSize: 183,
+    },
+    {
+      id: 'payee',
+      header: 'Payee',
+      cell: () => flexRenderComponent(LinePayeeCell),
+      enableSorting: false,
+      // minSize is the control's structural floor: 192px input-group (what the cell wrapper used to carry
+      // as min-w-[12rem]) + 16px cell padding. size buys ~120px of name in the AI-ghost variant, which
+      // packs ✨ + name + accept + dismiss into one button group. Payee names are unbounded, so this is a
+      // readability budget rather than a fits-everything guarantee.
+      size: 240,
+      minSize: 208,
+    },
+    {
+      id: 'category',
+      header: 'Category',
+      cell: () => flexRenderComponent(LineCategoryCell),
+      enableSorting: false,
+      // 230 so the column's most common value — the `Uncategorised · Expense` default every un-touched
+      // row shows — renders whole (it needs 227). Category names themselves are unbounded, so past that
+      // default this is a budget, not a guarantee.
+      size: 230,
+      // The shared combobox trigger carries min-w-[11rem] (176px) and is also used outside the table,
+      // so it keeps that floor — this minSize clears it (176 + 16px cell padding) so it never binds here.
+      minSize: 195,
+    },
+    {
+      id: 'description',
+      header: 'Description',
+      cell: () => flexRenderComponent(LineDescriptionCell),
+      enableSorting: false,
+      size: 190,
+      minSize: 140,
+    },
+    {
+      id: 'amount',
+      header: 'Amount',
+      cell: () => flexRenderComponent(LineAmountCell),
+      enableSorting: false,
+      size: 100,
+      minSize: 90,
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: () => flexRenderComponent(LineActionsCell),
+      enableSorting: false,
+      enableResizing: false,
+      size: 44,
+    },
   ];
 
   // Statement order is load-bearing (reconciliation / running-balance reading), so sorting stays off —
@@ -924,6 +1010,9 @@ export class StatementImportReviewPageComponent {
     columns: this._columns,
     getRowId: (row) => String(row.index),
     enableSorting: false,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
+    columnResizeDirection: 'ltr',
     onRowSelectionChange: (updater) => {
       this.rowSelection.set(updater instanceof Function ? updater(this.rowSelection()) : updater);
     },
@@ -932,25 +1021,48 @@ export class StatementImportReviewPageComponent {
     meta: this._meta,
   }));
 
+  /** CSS variable map for column sizes — bound on the container so the CSS engine handles propagation. */
+  protected readonly columnSizeVars = computed(() => {
+    const sizing = this.table.getState().columnSizing;
+    const sizingInfo = this.table.getState().columnSizingInfo;
+    // Read both to establish signal dependencies
+    void sizing;
+    void sizingInfo;
+
+    const headers = untracked(() => this.table.getFlatHeaders());
+    const vars: Record<string, string> = {};
+    for (const header of headers) {
+      vars[`--header-${header.id}-size`] = `${header.getSize()}px`;
+      vars[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`;
+    }
+    return vars;
+  });
+
+  protected readonly isResizing = computed(
+    () => !!this.table.getState().columnSizingInfo.isResizingColumn,
+  );
+
+  // Widths live in the column defs (authoritative under fixed layout) — these carry alignment only.
+  // overflow-hidden keeps a narrowly-dragged cell from bleeding into its neighbour; it's safe on the
+  // picker cells because every popover/dropdown is portaled out, and is omitted on select/actions so
+  // their focus rings aren't clipped. No align-middle here — hlmTd already applies it.
   private readonly TH_CLASSES: Record<string, string> = {
-    select: 'w-9',
-    date: 'w-48',
-    category: 'w-56',
     amount: 'text-right',
-    actions: 'w-10',
   };
   private readonly TD_CLASSES: Record<string, string> = {
-    select: 'w-9 text-center align-middle',
-    date: 'w-48 align-middle',
-    category: 'w-56 align-middle',
-    amount: 'text-right align-middle',
-    actions: 'w-10 text-center align-middle',
+    select: 'text-center',
+    date: 'overflow-hidden',
+    payee: 'overflow-hidden',
+    category: 'overflow-hidden',
+    description: 'overflow-hidden',
+    amount: 'text-right overflow-hidden',
+    actions: 'text-center',
   };
   protected getThClass(columnId: string): string {
     return this.TH_CLASSES[columnId] ?? '';
   }
   protected getTdClass(columnId: string): string {
-    return this.TD_CLASSES[columnId] ?? 'align-middle';
+    return this.TD_CLASSES[columnId] ?? '';
   }
 
   // Routes by the client row key's sign: manual rows (negative key) live in manualRows, parsed rows in

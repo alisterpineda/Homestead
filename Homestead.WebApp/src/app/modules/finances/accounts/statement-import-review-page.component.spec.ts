@@ -868,4 +868,83 @@ describe('StatementImportReviewPageComponent', () => {
       expect.objectContaining({ categoryId: 'e-rent', payeeId: 'p1' }));
     expect(lines.find((l: any) => l.index === 1).categoryId).toBeNull(); // untouched → uncategorised
   });
+
+  // ─── Column sizing ──────────────────────────────────────────────────────────
+  // jsdom reports zero-width layout, so getSize() returns TanStack's configured defaults. Assert on the
+  // CSS-variable map and the table API — never on real pixel geometry.
+
+  describe('column sizing', () => {
+    const COLUMN_IDS = ['select', 'date', 'payee', 'category', 'description', 'amount', 'actions'];
+    const SIZES: Record<string, number> = {
+      select: 36, date: 190, payee: 240, category: 230, description: 190, amount: 100, actions: 44,
+    };
+
+    async function render() {
+      configure();
+      const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('emits a header/col CSS-variable pair per column at the configured width', async () => {
+      const fixture = await render();
+      const vars = fixture.componentInstance['columnSizeVars']();
+
+      for (const id of COLUMN_IDS) {
+        expect(vars[`--header-${id}-size`]).toBe(`${SIZES[id]}px`);
+        expect(vars[`--col-${id}-size`]).toBe(`${SIZES[id]}px`);
+      }
+      expect(Object.keys(vars).length).toBe(COLUMN_IDS.length * 2);
+    });
+
+    it('reports not-resizing on a freshly rendered table', async () => {
+      const fixture = await render();
+      expect(fixture.componentInstance['isResizing']()).toBe(false);
+    });
+
+    it('disables resizing on select and actions only', async () => {
+      const fixture = await render();
+      const table = fixture.componentInstance['table'];
+      const canResize = Object.fromEntries(
+        COLUMN_IDS.map((id) => [id, table.getColumn(id)?.getCanResize()]));
+
+      expect(canResize).toEqual({
+        select: false, date: true, payee: true, category: true, description: true, amount: true, actions: false,
+      });
+    });
+
+    // Regression guard: the shared line-category combobox keeps min-w-[11rem] (176px) because the
+    // bulk-actions bar needs it outside any table. Dropping these minSizes below the control's floor
+    // would let a drag squeeze the cell past what the control can render.
+    it('keeps each minSize clear of its control’s intrinsic floor', async () => {
+      const fixture = await render();
+      const table = fixture.componentInstance['table'];
+      const minSize = (id: string) => table.getColumn(id)?.columnDef.minSize;
+
+      expect(minSize('category')).toBeGreaterThanOrEqual(192); // 176px trigger + 16px cell padding
+      expect(minSize('payee')).toBeGreaterThanOrEqual(208);    // 192px input-group + 16px cell padding
+    });
+
+    // The bug this table was made resizable to fix: at 150px the date picker clipped `Feb 29, 2024` to
+    // `Feb 2` on every row. 183px is the measured width at which it renders whole (77px of that column
+    // is picker furniture — cell padding, input padding, clear + calendar buttons). Both the resting
+    // width and the drag floor must clear it, or a narrow drag re-creates the original bug.
+    it('keeps the date column wide enough to render a full date, at rest and at its drag floor', async () => {
+      const fixture = await render();
+      const date = fixture.componentInstance['table'].getColumn('date');
+
+      expect(date?.columnDef.size).toBeGreaterThanOrEqual(183);
+      expect(date?.columnDef.minSize).toBeGreaterThanOrEqual(183);
+    });
+
+    it('renders the table with fixed layout so column widths are authoritative', async () => {
+      const fixture = await render();
+      const table = (fixture.nativeElement as HTMLElement).querySelector('table');
+
+      expect(table).not.toBeNull();
+      expect(table!.style.tableLayout).toBe('fixed');
+    });
+  });
 });

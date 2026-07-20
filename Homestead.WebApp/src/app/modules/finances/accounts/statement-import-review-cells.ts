@@ -231,7 +231,7 @@ export class LineCategoryCell {
   imports: [PayeePickerComponent, NgIcon, HlmIconImports, HlmButton, HlmButtonGroup, HlmButtonGroupText],
   providers: [provideIcons({ lucideSparkles, lucideCheck, lucidePlus, lucideX })],
   template: `
-    <div class="flex min-w-[12rem] flex-col gap-1">
+    <div class="flex w-full flex-col gap-1">
       @if (isGhost && !overriding()) {
         <!-- Un-accepted AI suggestion rendered as ONE inline control so it sits level with the other cells
              in the row: [✨ suggested name (click to change)] · [accept] · [dismiss]. The name segment is a
@@ -366,8 +366,8 @@ export class LinePayeeCell {
   }
 }
 
-// w-20, not the old w-24: dropping `type="number"` reclaims the ~1.5rem the webkit spin buttons were
-// occupying *inside* the field, so a narrower cell now fits more digits than the wider one did.
+// Fills the cell — the amount column's width (and its floor) is set by its column def, so a resize
+// carries through to the field instead of leaving it pinned at a fixed px width.
 @Component({
   selector: 'app-line-amount-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -376,7 +376,7 @@ export class LinePayeeCell {
     <input
       hlmInput
       [appMoneyInput]="meta.amountPrecision()"
-      class="w-20 text-right"
+      class="w-full text-right"
       [class.line-through]="row.excluded"
       [value]="row.amount"
       (amountInput)="onAmountInput($event)"
