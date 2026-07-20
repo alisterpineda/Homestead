@@ -32,7 +32,7 @@ needed:
 aspire ps --format Json            # is a detached AppHost already running?
 ```
 
-- If an AppHost for this repo is listed → **reuse it**. Do NOT start a second copy. Backend hot reload is on by default (the committed `aspire.config.json` enables Aspire watch), so a reused stack picks up backend C# edits live — you normally do **not** need to rebuild. If a backend change clearly isn't reflected (a watch miss or rude-edit restart race), force it with `aspire resource homestead-webapi restart && aspire wait homestead-webapi --status healthy`, then retry — don't report a "bug" against stale code.
+- If an AppHost for this repo is listed → **reuse it**. Do NOT start a second copy. Both halves rebuild on their own — the WebApi via Aspire watch (the committed `aspire.config.json`), the Angular dev server on its own — so a reused stack normally picks up edits live and you do **not** need to rebuild. When it doesn't, see **Stale builds** below.
 - If none is running → start it detached and wait for readiness:
 
 ```bash
@@ -50,6 +50,19 @@ are ~30–60s. If `aspire wait` times out, diagnose with `aspire logs homestead-
 against a half-started stack (the failures will look like UI bugs and waste time).
 
 App: `http://localhost:4200`. Keycloak: `https://localhost:8080` (self-signed dev cert).
+
+### Stale builds — rule one out before reporting ANY failure
+
+Watch is best-effort on both halves, and a wedged watcher keeps serving the **last good** build. That is
+indistinguishable from the change never landing: the browser shows pre-change markup, and a hard reload
+doesn't help. Neither restart loses data, so when in doubt, restart and re-check.
+
+| Symptom | Confirm with | Clear with |
+|---|---|---|
+| A backend change isn't reflected (watch miss / rude-edit restart race) | `aspire logs homestead-webapi` | `aspire resource homestead-webapi restart && aspire wait homestead-webapi --status healthy` |
+| The page renders pre-change markup and survives a hard reload | `aspire logs homestead-webapp` — compile errors that a standalone `npx ng build` **cannot** reproduce mean the Angular watch cache is poisoned (typically an edit-ordering artifact: call sites saved before the file they depend on) | `aspire resource homestead-webapp restart && aspire wait homestead-webapp --status healthy` |
+
+Re-check after the restart. Never report a "bug" against code the stack was not actually serving.
 
 ## 2. Log in through Keycloak
 
@@ -81,7 +94,9 @@ introduce other credentials. If login fails, stop and report rather than guessin
 
 Prefer `browser_snapshot` (structure) for reasoning; use `browser_take_screenshot` for visual issues
 (spacing/color/alignment). ALWAYS prefix screenshot filenames with `.playwright-mcp/`
-(e.g. `filename: ".playwright-mcp/foo.png"`) so they resolve into that dir and don't litter the repo root.
+(e.g. `filename: ".playwright-mcp/foo.png"`) so they don't litter the repo. That prefix resolves against
+the **repo root**, not your working directory — the file lands in `/workspaces/Homestead/.playwright-mcp/`
+even when you're working from `Homestead.WebApp/`, so report that absolute path back, never a relative one.
 
 ## 4. Finish WITHOUT tearing down the stack
 
@@ -94,7 +109,8 @@ QA. Only stop it on an explicit "tear down / stop the stack" request (`aspire st
 Return a concise, specific summary (not a click-by-click log):
 
 - What you verified, on which screens/flows, as which user.
-- Pass/fail with evidence (console clean? network correct? screenshot path if the issue is visual).
+- Pass/fail with evidence (console clean? network correct? absolute screenshot path if the issue is visual).
+- Before reporting ANY failure, confirm you ruled out a stale build (§1) — say so explicitly.
 - A **"Reference updates"** section if the App reference below is stale/incomplete (so the main agent fixes it).
 - If you couldn't validate, say so explicitly: `UI validation not run: <reason>`.
 
