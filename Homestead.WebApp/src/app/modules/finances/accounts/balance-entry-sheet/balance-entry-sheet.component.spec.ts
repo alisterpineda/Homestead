@@ -84,17 +84,19 @@ describe('BalanceEntrySheetComponent', () => {
     expect(c.canSubmit()).toBe(false);
   });
 
-  it('reflects the selected commodity in the amount step', () => {
+  it('settles the amount at the currency minor unit but leaves a security quantity free-precision', () => {
     const fixture = TestBed.createComponent(BalanceEntrySheetComponent);
     const c = fixture.componentInstance;
 
+    // A security balance is a share count — rounding it to the commodity's *display* precision would
+    // discard real holdings, so nothing is forced.
     c.onCommodityChange(veqt);
     c.commodity.set(veqt);
-    expect(c.amountStep()).toBe('0.0001');
+    expect(c.amountPrecision()).toBeNull();
 
     c.onCommodityChange(cad);
     c.commodity.set(cad);
-    expect(c.amountStep()).toBe('0.01');
+    expect(c.amountPrecision()).toBe(2);
   });
 
   it('updates the active commodity id when a commodity is picked (Investment flow)', () => {

@@ -19,6 +19,8 @@ import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinanceSettingsService } from '../../shared/finance-settings.service';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { KindPickerComponent } from '../../shared/kind-picker.component';
 import type { UserAccountKind } from '../../shared/account-kind-meta';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
@@ -33,6 +35,7 @@ import { todayIso, tomorrowDate } from '../../shared/date';
     HlmDialogImports,
     HlmButton,
     HlmInput,
+    MoneyInputDirective,
     HlmLabel,
     HlmDatePicker,
     HlmDatePickerInput,
@@ -120,12 +123,10 @@ import { todayIso, tomorrowDate } from '../../shared/date';
                   <input
                     hlmInput
                     id="create-account-amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    [appMoneyInput]="initialAmountPrecision()"
                     placeholder="0.00"
                     [value]="initialAmount()"
-                    (input)="initialAmount.set(asValue($event))"
+                    (amountInput)="initialAmount.set($event)"
                   />
                 </div>
                 <div class="flex flex-col gap-1.5">
@@ -167,6 +168,10 @@ export class CreateAccountDialogComponent {
   name = signal('');
   currencyId = signal<string | null>(null);
   pickedCurrency = signal<CommodityResponse | null>(null);
+
+  // Tracks the reporting-currency picker above it: switch USD → JPY and the initial balance settles
+  // at 0 decimals instead of 2. Null until a currency is picked, so nothing is rounded prematurely.
+  initialAmountPrecision = computed(() => currencyInputPrecision(this.pickedCurrency()));
   institution = signal('');
   accountNumber = signal('');
   initialAmount = signal('');

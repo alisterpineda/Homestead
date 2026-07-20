@@ -79,7 +79,8 @@ import { DocumentApiService } from '@/api/services/document-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError, handleDetailLoadError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
-import { formatCurrency } from '../shared/format-currency';
+import { formatCurrency, currencyInputPrecision, formatAmountInput } from '../shared/format-currency';
+import { MoneyInputDirective } from '../shared/money-input.directive';
 import { todayIso } from '../shared/date';
 import type { StatementImportResponse } from '@/api/generated/models/statement-import-response';
 import type { AccountResponse } from '@/api/generated/models/account-response';
@@ -93,6 +94,15 @@ type Checksum =
   | { state: 'balanced' }
   | { state: 'off'; amount: string }
   | { state: 'unavailable' };
+
+// The account + reporting-currency fetch as one unit. `settled` distinguishes "still in flight" from
+// "resolved to nothing" — a distinction the two nullable fields cannot carry on their own, and which
+// the seed key and the render gate both depend on.
+type AccountLoad = {
+  settled: boolean;
+  account: AccountResponse | null;
+  currency: CommodityResponse | null;
+};
 
 // An applied payee's raw default category — the live Suggested source. Gated by the pre-fill setting; a
 // payee with no default (or a tier-③ new payee) has none. Un-filtered by direction on purpose: the combobox
@@ -134,6 +144,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
     HlmButtonGroupImports,
     HlmSpinner,
     HlmInput,
+    MoneyInputDirective,
     HlmLabel,
     HlmIconImports,
     HlmResizableImports,
@@ -172,6 +183,11 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
               <button hlmBtn variant="outline" (click)="backToAccount()">Back to account</button>
             </div>
           </div>
+        } @else if (!currencySettled()) {
+          <!-- Hold the editable panels until the reporting currency resolves. Rendering earlier would
+               show amounts at the wrong precision AND expose an interactive table across the window in
+               which the currency's arrival re-seeds (and would discard) the reviewer's edits. -->
+          <div class="flex justify-center py-16"><hlm-spinner /></div>
         } @else {
           <!-- Desktop: two-panel resizable -->
           @if (!isMobile()) {
@@ -325,11 +341,9 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
                 <input
                   hlmInput
                   id="import-amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  [appMoneyInput]="amountPrecision()"
                   [value]="amount()"
-                  (input)="amount.set(asValue($event))"
+                  (amountInput)="amount.set($event)"
                 />
                 @if (d.proposedBalanceEntry.sourceAnchor; as anchor) {
                   <p class="text-xs text-muted-foreground">Read from: “{{ anchor }}”</p>
@@ -660,32 +674,67 @@ export class StatementImportReviewPageComponent {
   );
 
   // The account (for accountType → sign convention) and its reporting currency (for the checksum's money
-  // formatting). Fetched lazily off the loaded import; failures degrade to a plain-number checksum.
-  private accountIdForLoad = computed(() => this.data()?.accountId ?? null);
-  account = toSignal(
+  // formatting and every amount field's precision). Fetched off the loaded import.
+  //
+  // Both live in ONE chain carrying an explicit `settled` flag, rather than two independent toSignals.
+  // The flag is what makes the seed safe: `reportingCurrency` alone cannot distinguish "not fetched yet"
+  // from "fetched and absent" (both read null), yet the two mean opposite things to the seeding below —
+  // the first says "wait", the second says "this account has no usable currency, proceed unformatted".
+  // Failures at either hop resolve to settled-with-nulls, so a 404 degrades to a plain-number checksum
+  // and unformatted amounts instead of hanging the page on a spinner forever.
+  // null = the import itself hasn't loaded (nothing to render yet); '' = it loaded but carries no
+  // account id, which the contract says cannot happen — treated as settled-with-nothing rather than
+  // left pending, so a malformed response degrades to an unformatted page instead of a forever-spinner.
+  private accountIdForLoad = computed(() => {
+    const d = this.data();
+    if (!d) return null;
+    return d.accountId ?? '';
+  });
+  private accountLoad = toSignal(
     toObservable(this.accountIdForLoad).pipe(
-      switchMap((id) =>
-        id ? this.accountApi.getAccount({ id }).pipe(catchError(() => of(null))) : of(null)),
+      switchMap((id) => {
+        if (id === null) return of({ settled: false, account: null, currency: null } as AccountLoad);
+        if (id === '') return of({ settled: true, account: null, currency: null } as AccountLoad);
+        return this.accountApi.getAccount({ id }).pipe(
+          switchMap((a) =>
+            this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).pipe(
+              catchError(() => of(null)),
+              map((c) => ({ settled: true, account: a, currency: c }) as AccountLoad),
+            )),
+          catchError(() => of({ settled: true, account: null, currency: null } as AccountLoad)),
+        );
+      }),
     ),
-    { initialValue: null as AccountResponse | null },
+    { initialValue: { settled: false, account: null, currency: null } as AccountLoad },
   );
-  reportingCurrency = toSignal(
-    toObservable(this.account).pipe(
-      switchMap((a) =>
-        a ? this.commodityApi.getCommodity({ id: a.reportingCurrencyId }).pipe(catchError(() => of(null))) : of(null)),
-    ),
-    { initialValue: null as CommodityResponse | null },
-  );
+  account = computed(() => this.accountLoad().account);
+  reportingCurrency = computed(() => this.accountLoad().currency);
+  // Gates the editable review UI (see the template). Until it flips, the amount columns would render at
+  // the wrong precision and the checksum would format against a fallback currency.
+  protected currencySettled = computed(() => this.accountLoad().settled);
+
+  // Decimal places every amount on this page settles on — the account's reporting currency. Null
+  // means "don't round" (currency absent or not yet fetched).
+  amountPrecision = computed(() => currencyInputPrecision(this.reportingCurrency()));
 
   // ─── Editable commit fields, seeded once per import ───────────────────────
   // The auto-cat flag is folded into the key so a late settings load re-seeds the category chips. It defaults
   // to true (the common case), so a true→true resolution never re-seeds and never clobbers pending edits.
+  //
+  // `currencySettled` rides along so the amounts seed at the right precision. Unlike the auto-cat flag it
+  // ALWAYS flips false→true, so it always forces exactly one re-seed — which is only safe because the
+  // template refuses to render the editable panels until it is true. Do not drop that gate: the currency
+  // lands two round trips after `data()` (import → account → commodity), so without it the reviewer gets
+  // an interactive table for that whole window and this re-seed silently discards everything they
+  // touched — not just amounts, but every payee, category, exclusion, date and memo edit on the page,
+  // since all of them share this key.
   private seedKey = computed(
-    () => `${this.jobId() ?? ''}|${this.data() ? '1' : '0'}|${this.autoCategoriseEnabled() ? '1' : '0'}`);
+    () => `${this.jobId() ?? ''}|${this.data() ? '1' : '0'}|${this.autoCategoriseEnabled() ? '1' : '0'}`
+      + `|${this.currencySettled() ? '1' : '0'}`);
 
   amount = seededLinkedSignal(this.seedKey, () => {
     const be = this.data()?.proposedBalanceEntry;
-    return be ? String(be.assertedAmount) : '';
+    return be ? formatAmountInput(String(be.assertedAmount), this.amountPrecision()) : '';
   });
   date = seededLinkedSignal(this.seedKey, () => {
     const be = this.data()?.proposedBalanceEntry;
@@ -714,7 +763,10 @@ export class StatementImportReviewPageComponent {
       const category = isLearned ? categoryForDirection(payeeDefaultCategory, r.direction) : null;
       const payee = isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null;
       const original: LineItemOriginal = {
-        amount: String(r.amount),
+        // Formatted at seed so the parsed figures read as money from the first paint. It has to go in
+        // the ORIGINAL, not just the row: "Reset to original" splats this back, and an unformatted
+        // snapshot would restore "1.2" over a displayed "1.20" and light up isDirty on an untouched row.
+        amount: formatAmountInput(String(r.amount), this.amountPrecision()),
         description: r.description ?? '',
         direction: r.direction,
         date: r.date ?? '',
@@ -845,6 +897,7 @@ export class StatementImportReviewPageComponent {
     deleteManualRow: (index) => this.deleteManualRow(index),
     // The cell hands us the row it already holds — compare directly, no allRows() scan.
     isDirty: (row) => this.isRowDirty(row),
+    amountPrecision: this.amountPrecision,
   };
 
   private readonly _columns: ColumnDef<LineItemEdit>[] = [
@@ -1287,6 +1340,8 @@ export class StatementImportReviewPageComponent {
     for (const row of this.linesToImport()) {
       const isOut = row.direction === 'Expense';
       const sign = isLiability ? (isOut ? 1 : -1) : (isOut ? -1 : 1);
+      // Safe to Number() unguarded: linesToImport is filtered by rowCommittable, which already requires
+      // a finite positive amount — so a mid-edit or typo'd row is absent here rather than summing to NaN.
       sum += sign * Number(row.amount);
     }
 

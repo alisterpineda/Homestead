@@ -14,6 +14,10 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { CurrencyPickerComponent } from '../../shared/currency-picker/currency-picker.component';
+// No precision bound: a rate is deliberately free-precision (the old `step="any"`). An FX pair or a
+// security quote routinely carries more decimals than the quote currency displays — 1 USD = 1.3745 CAD
+// must not be settled to 1.37.
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
@@ -33,6 +37,7 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
     HlmDialogImports,
     HlmButton,
     HlmInput,
+    MoneyInputDirective,
     HlmLabel,
     CurrencyPickerComponent,
     HlmDatePicker,
@@ -100,12 +105,10 @@ import type { CommodityPriceResponse } from '@/api/generated/models/commodity-pr
             <input
               hlmInput
               id="new-price-rate"
-              type="number"
-              step="any"
-              min="0"
+              appMoneyInput
               placeholder="e.g. 35.4200"
               [value]="rateInput()"
-              (input)="rateInput.set(asValue($event))"
+              (amountInput)="rateInput.set($event)"
             />
           </div>
 

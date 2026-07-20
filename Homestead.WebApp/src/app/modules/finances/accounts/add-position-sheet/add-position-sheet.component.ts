@@ -19,7 +19,8 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate } from '../../shared/date';
-import { commodityStep } from '../../shared/format-currency';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
 import { trimToNull } from '../../shared/trim-to-null';
 import type { AccountResponse } from '@/api/generated/models/account-response';
@@ -30,7 +31,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-add-position-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CommodityPickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, HlmDatePicker, HlmDatePickerInput, CommodityPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -67,12 +68,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                 hlmInput
                 id="add-position-quantity"
                 class="w-full"
-                type="number"
-                [step]="quantityStep()"
-                min="0"
+                [appMoneyInput]="quantityPrecision()"
                 placeholder="0"
                 [value]="quantity()"
-                (input)="quantity.set(asValue($event))"
+                (amountInput)="quantity.set($event)"
               />
               @if (commodity(); as c) {
                 <p class="text-xs text-muted-foreground">In units of {{ c.symbol }}.</p>
@@ -88,12 +87,10 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
                   hlmInput
                   id="add-position-unit-price"
                   class="w-full"
-                  type="number"
-                  step="0.0001"
-                  min="0"
+                  appMoneyInput
                   placeholder="0.00"
                   [value]="unitPrice()"
-                  (input)="unitPrice.set(asValue($event))"
+                  (amountInput)="unitPrice.set($event)"
                 />
                 <p class="text-xs text-muted-foreground">
                   Records a price observation in the account's reporting currency on the as-of date.
@@ -174,7 +171,11 @@ export class AddPositionSheetComponent {
 
   showUnitPrice = computed(() => this.commodity()?.kind === 'Security');
 
-  quantityStep = computed(() => commodityStep(this.commodity()));
+  // The picker is not kind-filtered — an investment account can hold a cash position alongside its
+  // securities — so this resolves per pick: 2 for a USD position, null (free-precision) for a share
+  // count. The per-unit price beside it stays free-precision unconditionally, and only shows for a
+  // security anyway.
+  quantityPrecision = computed(() => currencyInputPrecision(this.commodity()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;

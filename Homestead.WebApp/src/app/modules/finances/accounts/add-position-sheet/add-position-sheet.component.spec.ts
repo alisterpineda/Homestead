@@ -100,14 +100,14 @@ describe('AddPositionSheetComponent', () => {
     expect(c.canSubmit()).toBe(true);
   });
 
-  it('uses commodity displayPrecision to derive the quantity step', () => {
+  it('settles a cash position at the currency minor unit but leaves a share count free-precision', () => {
     const fixture = TestBed.createComponent(AddPositionSheetComponent);
     const c = fixture.componentInstance;
 
     c.onCommodityChange(veqt);
-    expect(c.quantityStep()).toBe('0.0001');
+    expect(c.quantityPrecision()).toBeNull();
 
     c.onCommodityChange(usd);
-    expect(c.quantityStep()).toBe('0.01');
+    expect(c.quantityPrecision()).toBe(2);
   });
 });

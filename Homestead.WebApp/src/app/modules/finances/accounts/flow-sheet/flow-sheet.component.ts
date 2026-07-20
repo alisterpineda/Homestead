@@ -22,7 +22,8 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep } from '../../shared/format-currency';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { commodityResource } from '../../shared/commodity-resource';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { TransactionResponse } from '@/api/generated/models/transaction-response';
@@ -35,7 +36,7 @@ export type FlowDirection = 'Expense' | 'Income';
 @Component({
   selector: 'app-flow-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CategoryPickerComponent, PayeePickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, HlmDatePicker, HlmDatePickerInput, CategoryPickerComponent, PayeePickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -112,12 +113,10 @@ export type FlowDirection = 'Expense' | 'Income';
                 hlmInput
                 id="flow-amount"
                 class="w-full"
-                type="number"
-                [step]="amountStep()"
-                min="0"
+                [appMoneyInput]="amountPrecision()"
                 placeholder="0.00"
                 [value]="amount()"
-                (input)="amount.set(asValue($event))"
+                (amountInput)="amount.set($event)"
               />
             </div>
 
@@ -256,7 +255,7 @@ export class FlowSheetComponent {
     () => this.state() === 'open',
   );
 
-  amountStep = computed(() => commodityStep(this.reportingCcy.value()));
+  amountPrecision = computed(() => currencyInputPrecision(this.reportingCcy.value()));
 
   readonly maxDate = tomorrowDate();
 

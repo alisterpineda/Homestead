@@ -18,7 +18,8 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep } from '../../shared/format-currency';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
@@ -33,7 +34,7 @@ export type DividendSheetMode = 'create' | 'edit';
 @Component({
   selector: 'app-dividend-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, CommodityPickerComponent, OccurredAtFieldComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, CommodityPickerComponent, OccurredAtFieldComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -74,12 +75,10 @@ export type DividendSheetMode = 'create' | 'edit';
                 hlmInput
                 id="dividend-amount"
                 class="w-full"
-                type="number"
-                [step]="amountStep()"
-                min="0"
+                [appMoneyInput]="amountPrecision()"
                 placeholder="0.00"
                 [value]="amount()"
-                (input)="amount.set(asValue($event))"
+                (amountInput)="amount.set($event)"
               />
             </div>
 
@@ -202,7 +201,7 @@ export class DividendSheetComponent {
     () => this.state() === 'open',
   );
 
-  amountStep = computed(() => commodityStep(this.paymentCcy.value()));
+  amountPrecision = computed(() => currencyInputPrecision(this.paymentCcy.value()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;

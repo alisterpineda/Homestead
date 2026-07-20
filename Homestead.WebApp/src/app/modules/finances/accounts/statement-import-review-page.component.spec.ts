@@ -166,7 +166,8 @@ describe('StatementImportReviewPageComponent', () => {
 
     expect(c.data()?.status).toBe('Completed');
     expect(c.data()?.accountNumberMatch).toBe('Mismatch');
-    expect(c.amount()).toBe('1500');
+    // Seeded through the account currency's precision — the server's 1500 reads as money on arrival.
+    expect(c.amount()).toBe('1500.00');
     expect(c.date()).toBe('2026-06-30');
     // The un-mappable row 2 is included-but-needs-fixing, so Confirm is blocked until it's fixed/excluded.
     expect(c.canCommit()).toBe(false);
@@ -281,7 +282,9 @@ describe('StatementImportReviewPageComponent', () => {
     expect(c.isDirty(0)).toBe(true);
 
     c.resetRow(0);
-    expect(c.allRows()[0].amount).toBe('100');
+    // Restores the FORMATTED original. If the snapshot held a bare '100' while the cell displayed
+    // '100.00', reset would leave the row permanently dirty against its own original.
+    expect(c.allRows()[0].amount).toBe('100.00');
     expect(c.isDirty(0)).toBe(false);
   });
 
@@ -470,6 +473,23 @@ describe('StatementImportReviewPageComponent', () => {
     c.toggleExcluded(1); // drop the +600 income → expected 900 vs closing 1500
     const ck = c.checksum();
     expect(ck.state).toBe('off');
+    expect(c.offAmount()).toContain('600');
+  });
+
+  it('checksum skips a non-numeric amount instead of reporting "Off by NaN"', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Reachable now that the cell is free text: a mid-edit or fat-fingered amount used to poison the
+    // whole sum. Such a row can't commit anyway, so the checksum reports on the rest.
+    c.patchRow(1, { amount: '6oo' });
+
+    const ck = c.checksum();
+    expect(ck.state).toBe('off');
+    expect(c.offAmount()).not.toContain('NaN');
+    // Same arithmetic as dropping the line entirely — the +600 income is simply absent.
     expect(c.offAmount()).toContain('600');
   });
 

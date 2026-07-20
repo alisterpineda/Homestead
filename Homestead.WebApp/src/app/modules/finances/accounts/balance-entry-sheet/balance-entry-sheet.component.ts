@@ -19,7 +19,8 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate } from '../../shared/date';
-import { commodityStep } from '../../shared/format-currency';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
@@ -33,7 +34,7 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
 @Component({
   selector: 'app-balance-entry-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, CommodityPickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, HlmDatePicker, HlmDatePickerInput, CommodityPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -73,12 +74,10 @@ export type BalanceEntrySheetMode = 'create' | 'edit';
                 hlmInput
                 id="balance-entry-amount"
                 class="w-full"
-                type="number"
-                [step]="amountStep()"
-                min="0"
+                [appMoneyInput]="amountPrecision()"
                 placeholder="0.00"
                 [value]="amount()"
-                (input)="amount.set(asValue($event))"
+                (amountInput)="amount.set($event)"
               />
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount currently owed (positive).</p>
@@ -200,7 +199,7 @@ export class BalanceEntrySheetComponent {
     return c ? `${c.symbol} — ${c.name}` : null;
   });
 
-  amountStep = computed(() => commodityStep(this.commodity.value()));
+  amountPrecision = computed(() => currencyInputPrecision(this.commodity.value()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;

@@ -19,7 +19,8 @@ import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate } from '../../shared/date';
-import { commodityStep } from '../../shared/format-currency';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { trimToNull } from '../../shared/trim-to-null';
 import { commodityResource } from '../../shared/commodity-resource';
 import type { AccountResponse } from '@/api/generated/models/account-response';
@@ -31,7 +32,7 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
 @Component({
   selector: 'app-opening-balance-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, HlmDatePicker, HlmDatePickerInput],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -60,12 +61,10 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
                 hlmInput
                 id="opening-balance-quantity"
                 class="w-full"
-                type="number"
-                [step]="quantityStep()"
-                min="0"
+                [appMoneyInput]="quantityPrecision()"
                 placeholder="0.00"
                 [value]="quantity()"
-                (input)="quantity.set(asValue($event))"
+                (amountInput)="quantity.set($event)"
               />
               @if (a.accountType === 'Liability') {
                 <p class="text-xs text-muted-foreground">Enter the amount initially owed (positive).</p>
@@ -83,12 +82,10 @@ export type OpeningBalanceSheetMode = 'edit' | 'create-missing';
                   hlmInput
                   id="opening-balance-unit-price"
                   class="w-full"
-                  type="number"
-                  step="0.0001"
-                  min="0"
+                  appMoneyInput
                   placeholder="0.00"
                   [value]="unitPrice()"
-                  (input)="unitPrice.set(asValue($event))"
+                  (amountInput)="unitPrice.set($event)"
                 />
                 <p class="text-xs text-muted-foreground">
                   Records a price observation in the account's reporting currency on the as-of date.
@@ -221,7 +218,9 @@ export class OpeningBalanceSheetComponent {
 
   isSecurity = computed(() => this.commodity.value()?.kind === 'Security');
 
-  quantityStep = computed(() => commodityStep(this.commodity.value()));
+  // Resolves to null for a security account (free-precision quantity) and to the minor unit for a
+  // cash one, which is exactly the split this field needs — its label flips Quantity/Amount to match.
+  quantityPrecision = computed(() => currencyInputPrecision(this.commodity.value()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;

@@ -22,7 +22,8 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep, formatCurrency } from '../../shared/format-currency';
+import { currencyInputPrecision, formatCurrency } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
@@ -42,6 +43,7 @@ export type DripSheetMode = 'create' | 'edit';
     HlmButton,
     HlmLabel,
     HlmInput,
+    MoneyInputDirective,
     HlmSpinner,
     HlmAlertDialogImports,
     CommodityPickerComponent,
@@ -110,12 +112,10 @@ export type DripSheetMode = 'create' | 'edit';
                 hlmInput
                 id="drip-amount"
                 class="w-full"
-                type="number"
-                [step]="amountStep()"
-                min="0"
+                [appMoneyInput]="amountPrecision()"
                 placeholder="0.00"
                 [value]="amount()"
-                (input)="amount.set(asValue($event))"
+                (amountInput)="amount.set($event)"
               />
             </div>
 
@@ -130,12 +130,10 @@ export type DripSheetMode = 'create' | 'edit';
                 hlmInput
                 id="drip-units"
                 class="w-full"
-                type="number"
-                [step]="unitsStep()"
-                min="0"
+                appMoneyInput
                 placeholder="0"
                 [value]="units()"
-                (input)="units.set(asValue($event))"
+                (amountInput)="units.set($event)"
               />
             </div>
 
@@ -357,8 +355,8 @@ export class DripSheetComponent {
     () => this.state() === 'open',
   );
 
-  unitsStep = computed(() => commodityStep(this.security.value()));
-  amountStep = computed(() => commodityStep(this.paymentCcy.value()));
+  // Units are a share count, not money — left free-precision (no blur rounding); see currencyInputPrecision.
+  amountPrecision = computed(() => currencyInputPrecision(this.paymentCcy.value()));
 
   // Inverse of the trade sheet's total: the per-unit price is derived from amount ÷ units.
   pricePerUnit = computed(() => {

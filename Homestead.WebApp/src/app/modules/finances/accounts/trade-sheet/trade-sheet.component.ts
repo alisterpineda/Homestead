@@ -18,7 +18,8 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
-import { commodityStep, formatCurrency } from '../../shared/format-currency';
+import { formatCurrency } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { composeOccurredAt, decomposeOccurredAt } from '../../shared/occurred-at';
 import { commodityResource } from '../../shared/commodity-resource';
 import { CommodityPickerComponent } from '../../shared/commodity-picker/commodity-picker.component';
@@ -34,7 +35,7 @@ export type TradeSheetMode = 'create' | 'edit';
 @Component({
   selector: 'app-trade-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, CommodityPickerComponent, OccurredAtFieldComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, CommodityPickerComponent, OccurredAtFieldComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -103,12 +104,10 @@ export type TradeSheetMode = 'create' | 'edit';
                 hlmInput
                 id="trade-quantity"
                 class="w-full"
-                type="number"
-                [step]="qtyStep()"
-                min="0"
+                appMoneyInput
                 placeholder="0"
                 [value]="quantity()"
-                (input)="quantity.set(asValue($event))"
+                (amountInput)="quantity.set($event)"
               />
             </div>
 
@@ -123,12 +122,10 @@ export type TradeSheetMode = 'create' | 'edit';
                 hlmInput
                 id="trade-price"
                 class="w-full"
-                type="number"
-                [step]="priceStep()"
-                min="0"
+                appMoneyInput
                 placeholder="0.00"
                 [value]="unitPrice()"
-                (input)="unitPrice.set(asValue($event))"
+                (amountInput)="unitPrice.set($event)"
               />
             </div>
 
@@ -302,8 +299,8 @@ export class TradeSheetComponent {
     () => this.state() === 'open',
   );
 
-  qtyStep = computed(() => commodityStep(this.security.value()));
-  priceStep = computed(() => commodityStep(this.fundingCcy.value()));
+  // Both fields are free-precision (no blur rounding): a share count and a per-unit price can each
+  // carry more decimals than their commodity's *display* precision. See currencyInputPrecision.
 
   total = computed(() => this.num(this.quantity()) * this.num(this.unitPrice()));
   totalText = computed(() => {

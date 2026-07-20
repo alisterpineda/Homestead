@@ -10,6 +10,7 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmButtonGroup, HlmButtonGroupText } from '@/shared/components/spartan/button-group';
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmInput } from '@/shared/components/spartan/input';
+import { MoneyInputDirective } from '../shared/money-input.directive';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { toIsoDateString } from '@/shared/utils';
 import { PayeePickerComponent, type PayeePickerValue } from '../shared/payee-picker/payee-picker.component';
@@ -133,6 +134,9 @@ export interface StatementLineTableMeta {
   // Whether a parsed row differs from its captured original (gates the "Reset to original" action).
   // Takes the row directly — the cell already holds it, so no re-lookup is needed.
   isDirty(row: LineItemEdit): boolean;
+  // Decimal places every amount cell settles on at blur, from the account's reporting currency. Read
+  // reactively so a late currency fetch re-renders the cells (null until it lands = no rounding).
+  amountPrecision: Signal<number | null>;
 }
 
 @Component({
@@ -362,20 +366,20 @@ export class LinePayeeCell {
   }
 }
 
+// w-20, not the old w-24: dropping `type="number"` reclaims the ~1.5rem the webkit spin buttons were
+// occupying *inside* the field, so a narrower cell now fits more digits than the wider one did.
 @Component({
   selector: 'app-line-amount-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmInput],
+  imports: [HlmInput, MoneyInputDirective],
   template: `
     <input
       hlmInput
-      type="number"
-      step="0.01"
-      min="0"
-      class="w-24 text-right"
+      [appMoneyInput]="meta.amountPrecision()"
+      class="w-20 text-right"
       [class.line-through]="row.excluded"
       [value]="row.amount"
-      (input)="onInput($event)"
+      (amountInput)="onAmountInput($event)"
       aria-label="Transaction amount"
     />
   `,
@@ -383,11 +387,11 @@ export class LinePayeeCell {
 export class LineAmountCell {
   private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
-  private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
+  protected get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
-  // Raw string, no Number() normalization — reformatting mid-type eats trailing '.'/'0'.
-  protected onInput(event: Event): void {
-    this.meta.patchRow(this.row.index, { amount: (event.target as HTMLInputElement).value });
+  // Raw string while typing; appMoneyInput settles it to the account currency's precision at blur.
+  protected onAmountInput(value: string): void {
+    this.meta.patchRow(this.row.index, { amount: value });
   }
 }
 

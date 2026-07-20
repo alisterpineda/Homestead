@@ -79,10 +79,41 @@ export function maskDigitPart(part: Intl.NumberFormatPart): string {
   return part.value;
 }
 
-// HTML <input type="number"> step matching a commodity's display precision.
-// CAD (precision 2) → "0.01"; VEQT (precision 4) → "0.0001"; integer → "1".
-export function commodityStep(commodity: CommodityResponse | null): string {
-  if (!commodity) return '0.01';
-  const precision = Math.max(0, commodity.displayPrecision ?? 2);
-  return precision === 0 ? '1' : `0.${'0'.repeat(precision - 1)}1`;
+// Decimal places a money input should settle on when it loses focus (see the appMoneyInput
+// directive) — the commodity's displayPrecision, but ONLY for ISO currencies.
+//
+// Securities deliberately return null (= don't touch the digits). displayPrecision is a *display*
+// concern: it's how many places we render in a table, not how many the value is allowed to carry.
+// Rounding a rendered figure is lossless; rounding what the user typed is not. A currency amount is
+// safe because the minor unit really is the smallest denomination — a CAD figure cannot have a third
+// decimal. A holding of 0.123456789 units of an ETF can, so forcing it to the security's 4-place
+// display precision would silently discard what the reviewer entered.
+//
+// Per-unit prices and FX rates get no precision at all at their call sites, for the same reason —
+// even though their unit IS a currency, a security priced in CAD can legitimately quote more than
+// two decimals.
+export function currencyInputPrecision(commodity: CommodityResponse | null | undefined): number | null {
+  if (!commodity || commodity.kind !== 'Currency') return null;
+  return Math.max(0, commodity.displayPrecision ?? 2);
+}
+
+// Settle a raw money-input string at `precision` decimal places: "1.2" → "1.20" for CAD, "1" for JPY
+// (precision 0), "1.2000" at precision 4.
+//
+// Two deliberate pass-throughs. An empty string stays empty — an untouched optional field must not
+// materialize a "0.00" the user never entered. Anything that doesn't parse as a finite number is
+// returned VERBATIM rather than blanked or zeroed: the typo stays on screen where its owner can see
+// and fix it, and the surrounding validity checks (which already treat a non-numeric amount as
+// incomplete) keep it out of a commit.
+export function formatAmountInput(raw: string, precision: number | null | undefined): string {
+  if (precision == null) return raw;
+  const trimmed = raw.trim();
+  if (trimmed === '') return '';
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return raw;
+  const fixed = parsed.toFixed(precision);
+  // Test the ROUNDED result, not the input: "-0.001" at precision 2 is not === 0, but toFixed renders
+  // it "-0.00". Collapse any such negative zero to plain "0.00" — a signed zero is nonsense in a money
+  // field and would read as a negative amount at a glance.
+  return Number(fixed) === 0 ? (0).toFixed(precision) : fixed;
 }

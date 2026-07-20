@@ -14,6 +14,8 @@ import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
 import { FinancesCommodityPriceApiService } from '@/api/services/finances-commodity-price-api.service';
+// Free-precision, matching new-price-dialog — a rate must keep every decimal it was entered with.
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { handleMutationError } from '@/shared/utils/rxjs-error.utils';
 import { replace } from '@/shared/json-patch';
@@ -30,7 +32,7 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 @Component({
   selector: 'app-edit-price-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDialogImports, HlmButton, HlmInput, HlmLabel, HlmDatePicker, HlmDatePickerInput],
+  imports: [HlmDialogImports, HlmButton, HlmInput, MoneyInputDirective, HlmLabel, HlmDatePicker, HlmDatePickerInput],
   template: `
     <hlm-dialog [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-dialog-content *hlmDialogPortal class="sm:max-w-[480px]">
@@ -71,11 +73,9 @@ import type { BrnDialogState } from '@spartan-ng/brain/dialog';
             <input
               hlmInput
               id="edit-price-rate"
-              type="number"
-              step="any"
-              min="0"
+              appMoneyInput
               [value]="rateInput()"
-              (input)="rateInput.set(asValue($event))"
+              (amountInput)="rateInput.set($event)"
             />
           </div>
 

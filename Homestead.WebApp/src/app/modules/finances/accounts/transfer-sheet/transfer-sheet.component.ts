@@ -23,6 +23,8 @@ import { seededLinkedSignal } from '@/shared/utils/seeded-linked-signal';
 import { toast } from '@spartan-ng/brain/sonner';
 import { todayIso, tomorrowDate, toDateOnly } from '../../shared/date';
 import { trimToNull } from '../../shared/trim-to-null';
+import { currencyInputPrecision } from '../../shared/format-currency';
+import { MoneyInputDirective } from '../../shared/money-input.directive';
 import { commodityResource } from '../../shared/commodity-resource';
 import { AccountPickerComponent } from '../../shared/account-picker/account-picker.component';
 import { of, catchError } from 'rxjs';
@@ -36,7 +38,7 @@ export type TransferDirection = 'outgoing' | 'incoming';
 @Component({
   selector: 'app-transfer-sheet',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, HlmDatePicker, HlmDatePickerInput, AccountPickerComponent],
+  imports: [HlmSheetImports, HlmButton, HlmLabel, HlmInput, MoneyInputDirective, HlmDatePicker, HlmDatePickerInput, AccountPickerComponent],
   template: `
     <hlm-sheet side="right" [state]="state()" (stateChanged)="onStateChanged($event)">
       <hlm-sheet-content *hlmSheetPortal>
@@ -99,12 +101,10 @@ export type TransferDirection = 'outgoing' | 'incoming';
                 hlmInput
                 id="transfer-source-amount"
                 class="w-full"
-                type="number"
-                step="0.01"
-                min="0"
+                [appMoneyInput]="sourceAmountPrecision()"
                 placeholder="0.00"
                 [value]="sourceAmount()"
-                (input)="sourceAmount.set(asValue($event))"
+                (amountInput)="sourceAmount.set($event)"
               />
             </div>
 
@@ -120,12 +120,10 @@ export type TransferDirection = 'outgoing' | 'incoming';
                   hlmInput
                   id="transfer-destination-amount"
                   class="w-full"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  [appMoneyInput]="destinationAmountPrecision()"
                   placeholder="0.00"
                   [value]="destinationAmount()"
-                  (input)="destinationAmount.set(asValue($event))"
+                  (amountInput)="destinationAmount.set($event)"
                 />
                 <p class="text-xs text-muted-foreground">A price record will be saved for this transfer.</p>
               </div>
@@ -294,6 +292,11 @@ export class TransferSheetComponent {
   destinationCurrency = computed(() =>
     this.direction() === 'outgoing' ? this.counterpartyCurrency.value() : this.anchorCurrency.value(),
   );
+
+  // Each side settles at its OWN currency's minor unit — the whole point of a cross-currency transfer
+  // is that the two legs differ (e.g. 100.00 USD out, 137.45 CAD in, or a 0-decimal JPY leg).
+  sourceAmountPrecision = computed(() => currencyInputPrecision(this.sourceCurrency()));
+  destinationAmountPrecision = computed(() => currencyInputPrecision(this.destinationCurrency()));
 
   canSubmit = computed(() => {
     if (!this.account()) return false;
