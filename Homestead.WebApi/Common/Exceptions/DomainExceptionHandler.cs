@@ -24,7 +24,7 @@ public class DomainExceptionHandler : IExceptionHandler
             BusinessRuleException { Errors: not null } e =>
                 ProblemDetailsFactory.ValidationErrors(e.Errors, e.Message),
             BusinessRuleException e =>
-                ProblemDetailsFactory.BusinessRule(e.Message),
+                ProblemDetailsFactory.BusinessRule(e.Message, e.ErrorCode),
             ValidationException e =>
                 ProblemDetailsFactory.ValidationErrors(e.Errors
                     .GroupBy(f => f.PropertyName)
@@ -74,8 +74,13 @@ public static class ProblemDetailsFactory
             Detail = detail
         };
 
-    public static ProblemDetails BusinessRule(string detail)
-        => Create(StatusCodes.Status400BadRequest, "Business rule violation", detail);
+    public static ProblemDetails BusinessRule(string detail, string? errorCode = null)
+    {
+        var pd = Create(StatusCodes.Status400BadRequest, "Business rule violation", detail);
+        if (errorCode is not null)
+            pd.Extensions["errorCode"] = errorCode;
+        return pd;
+    }
 
     public static IResult BusinessRuleResult(string detail)
         => Results.Json(BusinessRule(detail),

@@ -64,7 +64,8 @@ public class InitiateStatementImportHandler(
             .AnyAsync(TransactionDocumentLink.IsImportOriginFor(version.DocumentId), ct);
         if (alreadyImported)
             throw new BusinessRuleException(
-                "This statement has already been imported. Roll back the previous import to import it again.");
+                "This statement has already been imported. Roll back the previous import to import it again.",
+                errorCode: "statement_already_imported");
 
         // Parsing is text-driven, so a version with no extracted text has nothing to import. Reject here —
         // before a job row exists and before any metered AI call — rather than letting the job stage a

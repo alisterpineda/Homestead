@@ -31,6 +31,10 @@ import type { GetDocumentResponse } from '@/api/generated/models/get-document-re
 
 const IMPORT_FAILED = 'Statement import failed.';
 
+// The initiate guard tags a re-import rejection with this stable code (a document is already imported).
+// It is recoverable in place — surfaced as a warning with a Roll back action — unlike every other 400.
+const STATEMENT_ALREADY_IMPORTED = 'statement_already_imported';
+
 /**
  * Entry point for importing a statement into an account. Offers two sources:
  *  - Upload a new document (primary): upload → wait for processing → parse → review.
@@ -76,21 +80,51 @@ const IMPORT_FAILED = 'Statement import failed.';
           </div>
         } @else {
           @if (importError(); as err) {
-            <div
-              class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5"
-              role="alert"
-            >
-              <p class="text-sm text-destructive">{{ err.message }}</p>
-              @if (err.document; as errDoc) {
-                <a
-                  [routerLink]="['/documents', errDoc.id]"
-                  (click)="dialog()?.close()"
-                  class="mt-1.5 inline-block text-sm font-medium text-primary underline underline-offset-4"
-                >
-                  Open {{ errDoc.name }}
-                </a>
-              }
-            </div>
+            @if (err.alreadyImported) {
+              <!-- Recoverable: this document was imported before. Warn (amber, not a red error) and offer the
+                   in-place remedy — roll back the prior import, then proceed with this one. -->
+              <div
+                class="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2.5"
+                role="alert"
+              >
+                <p class="text-sm text-amber-600">{{ err.message }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button
+                    hlmBtn
+                    type="button"
+                    [disabled]="rollingBack()"
+                    (click)="rollbackPreviousImport()"
+                  >
+                    {{ rollingBack() ? 'Rolling back…' : 'Roll back previous import' }}
+                  </button>
+                  @if (err.document; as errDoc) {
+                    <a
+                      [routerLink]="['/documents', errDoc.id]"
+                      (click)="dialog()?.close()"
+                      class="text-sm font-medium text-primary underline underline-offset-4"
+                    >
+                      Open {{ errDoc.name }}
+                    </a>
+                  }
+                </div>
+              </div>
+            } @else {
+              <div
+                class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5"
+                role="alert"
+              >
+                <p class="text-sm text-destructive">{{ err.message }}</p>
+                @if (err.document; as errDoc) {
+                  <a
+                    [routerLink]="['/documents', errDoc.id]"
+                    (click)="dialog()?.close()"
+                    class="mt-1.5 inline-block text-sm font-medium text-primary underline underline-offset-4"
+                  >
+                    Open {{ errDoc.name }}
+                  </a>
+                }
+              </div>
+            }
           }
 
           <!-- The busy branch destroys these tabs, so the active one is tracked here to survive the flip;
@@ -156,13 +190,18 @@ export class StatementImportDialogComponent {
    * long enough to act on. `document` is set only when opening it is the actual remedy — a rejected
    * precondition, or a text_unavailable job failure. Runtime job failures (AI unavailable) get the message
    * without a link, since opening the document would fix nothing. `fromUpload` scopes the Import-button
-   * disable to errors from the Upload flow, whose file genuinely must not be re-uploaded.
+   * disable to errors from the Upload flow, whose file genuinely must not be re-uploaded. `alreadyImported`
+   * flips the presentation to a recoverable warning with a Roll back action (see `rollbackPreviousImport`).
    */
   importError = signal<{
     message: string;
     document: { id: string; name: string } | null;
     fromUpload: boolean;
+    alreadyImported: boolean;
   } | null>(null);
+
+  // A rollback of the prior import is in flight (triggered from the already-imported warning).
+  rollingBack = signal(false);
 
   // Whether the dialog is currently open — an inline alert set after close would render nowhere, and the
   // hub's own failure toast is suppressed for managed jobs, so showImportError falls back to a toast then.
@@ -257,9 +296,11 @@ export class StatementImportDialogComponent {
         this.status.set('');
         return;
       }
-      // A rejected precondition — the document exists but isn't importable (most often it has no extracted
-      // text). Opening it is the remedy, so keep the guidance on screen with a link rather than toasting it.
-      this.showImportError(err, { id: documentId, name: doc.name }, fromUpload);
+      // A rejected precondition — the document exists but isn't importable. "Already imported" is recoverable
+      // in place (roll back, then retry), so it renders as a warning; every other precondition (no extracted
+      // text, …) is a hard error whose remedy is opening the document. Keep both on screen rather than toasting.
+      const alreadyImported = this.errorHandler.getErrorCode(err) === STATEMENT_ALREADY_IMPORTED;
+      this.showImportError(err, { id: documentId, name: doc.name }, fromUpload, alreadyImported);
       return;
     }
 
@@ -292,6 +333,7 @@ export class StatementImportDialogComponent {
     err: unknown,
     document: { id: string; name: string } | null,
     fromUpload: boolean,
+    alreadyImported = false,
   ): void {
     this.busy.set(false);
     this.status.set('');
@@ -302,7 +344,31 @@ export class StatementImportDialogComponent {
       toast.error(message);
       return;
     }
-    this.importError.set({ message, document, fromUpload });
+    this.importError.set({ message, document, fromUpload, alreadyImported });
+  }
+
+  // From the already-imported warning: delete the prior import's transactions (and un-learn the payee
+  // mappings it taught), then — the document now clean — proceed with the import that was blocked. The
+  // document id is the same one the warning links to, and is exactly what the rollback endpoint keys on.
+  async rollbackPreviousImport(): Promise<void> {
+    const documentId = this.importError()?.document?.id;
+    if (!documentId || this.rollingBack()) return;
+    this.rollingBack.set(true);
+    try {
+      await firstValueFrom(this.statementApi.rollback({ documentId }));
+    } catch (err) {
+      this.rollingBack.set(false);
+      // 5xx/network failures are already toasted by the error interceptor; only surface 4xx here, mirroring
+      // parseAndNavigate — otherwise the user sees the failure twice. The warning stays up so they can retry.
+      if (!this.errorHandler.isServerOrNetworkError(err)) {
+        this.errorHandler.handleError(err, 'Failed to roll back the previous import.');
+      }
+      return;
+    }
+    this.rollingBack.set(false);
+    this.importError.set(null);
+    toast.success('Previous import rolled back.');
+    await this.runParse(documentId, this.accountId());
   }
 
   // Toast, not inline: these fail before a document exists to talk about (the upload itself, or fetching

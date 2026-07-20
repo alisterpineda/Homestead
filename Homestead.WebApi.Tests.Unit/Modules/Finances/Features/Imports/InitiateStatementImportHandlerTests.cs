@@ -107,8 +107,12 @@ public class InitiateStatementImportHandlerTests : IAsyncLifetime
     {
         await SeedLinkedTransactionAsync(TransactionDocumentLinkOrigin.StatementImport);
 
-        await Assert.ThrowsAsync<BusinessRuleException>(
+        var ex = await Assert.ThrowsAsync<BusinessRuleException>(
             () => _sut.Handle(Command(), TestContext.Current.CancellationToken));
+
+        // The stable code lets the client recognise this specific rejection (and offer a rollback) without
+        // parsing the human message.
+        Assert.Equal("statement_already_imported", ex.ErrorCode);
 
         await _jobQueue.DidNotReceive().EnqueueAsync(
             Arg.Any<ProcessingJobType>(), Arg.Any<Action<EnqueueJobRequest>?>(), Arg.Any<CancellationToken>());
