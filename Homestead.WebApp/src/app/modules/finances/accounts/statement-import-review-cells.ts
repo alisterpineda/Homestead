@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, type Signal } from '@angular/core';
 import { type CellContext, injectFlexRenderContext } from '@tanstack/angular-table';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -11,16 +11,24 @@ import { HlmButtonGroup, HlmButtonGroupText } from '@/shared/components/spartan/
 import { HlmDropdownMenuImports } from '@/shared/components/spartan/dropdown-menu';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmDatePicker, HlmDatePickerInput } from '@/shared/components/spartan/date-picker';
-import { HlmSelectImports } from '@/shared/components/spartan/select';
 import { toIsoDateString } from '@/shared/utils';
 import { PayeePickerComponent, type PayeePickerValue } from '../shared/payee-picker/payee-picker.component';
+import {
+  LineCategoryComboboxComponent,
+  type LineCategorySelection,
+} from '../shared/line-category-combobox/line-category-combobox.component';
 import type { FlowDirection } from '@/api/generated/models/flow-direction';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
 import type { PayeeSuggestionSource } from '@/api/generated/models/payee-suggestion-source';
 import type { AccountType } from '@/api/generated/models/account-type';
+import type { CategoryResponse } from '@/api/generated/models/category-response';
 
-/** The payee's default category, surfaced as the read-only auto-category chip under the payee. */
+/**
+ * A category as carried on a line — id (picker key + commit payload), plus name/type for display. Sourced
+ * from a payee's default (`PayeeResponse.defaultCategory*`), a suggestion, or an inline pick/create.
+ */
 export interface LineCategory {
+  id: string;
   name: string;
   type: AccountType;
 }
@@ -37,8 +45,13 @@ export interface LineItemOriginal {
   suggestionSource: PayeeSuggestionSource;
   suggestedPayeeId: string | null;
   suggestedPayeeName: string | null;
-  suggestedCategory: LineCategory | null;
+  // The server-suggested/ghost payee's raw default category (used at accept time).
+  suggestedPayeeDefaultCategory: LineCategory | null;
+  // The applied payee's raw default category (feeds the live Suggested group).
+  payeeDefaultCategory: LineCategory | null;
   category: LineCategory | null;
+  // Always false at seed — a fresh parse has no reviewer category edit yet.
+  categoryTouched: boolean;
   learn: boolean;
   dismissed: boolean;
 }
@@ -83,21 +96,33 @@ export interface LineItemEdit {
   suggestionSource: PayeeSuggestionSource;
   suggestedPayeeId: string | null;
   suggestedPayeeName: string | null;
-  // The suggested existing-payee's default category (for the ghosted chip on an unaccepted suggestion).
-  suggestedCategory: LineCategory | null;
+  // The server-suggested/ghost payee's raw default category — used at accept time to pre-fill `category`.
+  suggestedPayeeDefaultCategory: LineCategory | null;
+  // The APPLIED payee's raw (un-filtered) default category — feeds the combobox's live Suggested group.
+  // Held separately from `payee` (narrowed to {id,name}) so Suggested survives a direction flip.
+  payeeDefaultCategory: LineCategory | null;
   // True once the reviewer explicitly set this payee this session (pick / create / accept / override /
   // bulk-assign). Drives the commit `learn` flag. False for an untouched Learned pre-fill and for the
   // warning-dialog apply-but-don't-learn path.
   learn: boolean;
-  // The APPLIED payee's default category chip (solid), null when unattributed or the payee has none.
+  // The APPLIED category (what commits), null when Uncategorised. Tracks the payee default while
+  // pristine; once the reviewer edits it (categoryTouched), it's sticky.
   category: LineCategory | null;
+  // True once the reviewer explicitly edited the category (inline pick, explicit Uncategorised, bulk set).
+  // Auto-derive from the payee fires only while this is false (the pristine/sticky gate).
+  categoryTouched: boolean;
 }
 
 // Table meta contract — the review page supplies the row-edit handlers, reached via ctx.table.options.meta.
 // All handlers key by the STABLE client row key (row.original.index), never array position.
 export interface StatementLineTableMeta {
   patchRow(index: number, patch: Partial<LineItemEdit>): void;
-  setDirection(index: number, direction: FlowDirection): void;
+  // A category pick subsumes direction — sets direction + category + marks categoryTouched.
+  setCategory(index: number, sel: LineCategorySelection): void;
+  // An inline-created category — merged into `categories` so it's reusable on every other row at once.
+  onCategoryCreated(category: CategoryResponse): void;
+  // All categories (both directions), read reactively so a late fetch re-renders the cell's combobox.
+  categories: Signal<CategoryResponse[]>;
   onPayeeChange(index: number, payee: PayeeResponse | null): void;
   acceptSuggestion(index: number): void;
   dismissSuggestion(index: number): void;
@@ -167,31 +192,32 @@ export class LineDescriptionCell {
   }
 }
 
+// The Category cell — one searchable combobox that subsumes the old Expense/Income select. Picking a typed
+// category sets the line's direction too (correct-by-construction); the two Uncategorised entries carry a
+// direction with no category. Bound one-way to the row; edits flow back through meta.setCategory.
 @Component({
-  selector: 'app-line-type-cell',
+  selector: 'app-line-category-cell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSelectImports],
+  imports: [LineCategoryComboboxComponent],
   template: `
-    <hlm-select [value]="row.direction" (valueChange)="onChange($any($event))">
-      <hlm-select-trigger class="w-28" aria-label="Transaction type">
-        <hlm-select-value />
-      </hlm-select-trigger>
-      <hlm-select-content *hlmSelectPortal>
-        <hlm-select-group>
-          <hlm-select-item value="Expense">Expense</hlm-select-item>
-          <hlm-select-item value="Income">Income</hlm-select-item>
-        </hlm-select-group>
-      </hlm-select-content>
-    </hlm-select>
+    <app-line-category-combobox
+      [direction]="row.direction"
+      [category]="row.category"
+      [payeeDefaultCategory]="row.payeeDefaultCategory"
+      [categories]="meta.categories()"
+      ariaLabel="Select category for this line"
+      (categoryChange)="onChange($event)"
+      (categoryCreated)="meta.onCategoryCreated($event)"
+    />
   `,
 })
-export class LineTypeCell {
+export class LineCategoryCell {
   private readonly ctx = injectFlexRenderContext<CellContext<LineItemEdit, unknown>>();
   protected get row(): LineItemEdit { return this.ctx.row.original; }
-  private get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
+  protected get meta(): StatementLineTableMeta { return this.ctx.table.options.meta as StatementLineTableMeta; }
 
-  protected onChange(value: unknown): void {
-    if (value === 'Expense' || value === 'Income') this.meta.setDirection(this.row.index, value);
+  protected onChange(sel: LineCategorySelection): void {
+    this.meta.setCategory(this.row.index, sel);
   }
 }
 
@@ -239,9 +265,6 @@ export class LineTypeCell {
             <ng-icon hlm name="lucideX" size="sm" />
           </button>
         </div>
-        @if (row.suggestedCategory) {
-          <span class="truncate text-xs italic text-muted-foreground/60">→ {{ row.suggestedCategory.name }}</span>
-        }
       } @else {
         <app-payee-picker
           [value]="row.payee"
@@ -255,10 +278,7 @@ export class LineTypeCell {
         @if (isLearned) {
           <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide">Learned</span>
-            @if (row.category) { <span class="min-w-0 truncate">→ {{ row.category.name }}</span> }
           </div>
-        } @else if (row.category) {
-          <span class="truncate text-xs text-muted-foreground">→ {{ row.category.name }}</span>
         }
       }
     </div>
@@ -311,7 +331,15 @@ export class LinePayeeCell {
     if (this.isAiSource) {
       // Clearing an AI-suggested line = reviewed → no payee. Record it as dismissed rather than leaving it
       // null, which (for an AI source) would re-surface it as an un-reviewed ghost that gates the import.
-      this.meta.patchRow(this.row.index, { payee: null, category: null, learn: false, dismissed: true });
+      // Drop the live Suggested source (no payee → no suggestion); only re-derive the category (to null)
+      // while pristine — a sticky reviewer override survives the payee clear.
+      this.meta.patchRow(this.row.index, {
+        payee: null,
+        payeeDefaultCategory: null,
+        learn: false,
+        dismissed: true,
+        ...(this.row.categoryTouched ? {} : { category: null }),
+      });
       return;
     }
     this.meta.onPayeeChange(this.row.index, null);

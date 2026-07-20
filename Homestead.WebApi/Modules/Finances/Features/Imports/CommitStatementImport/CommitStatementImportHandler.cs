@@ -2,7 +2,6 @@ using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Common;
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Domain.Processing;
-using Homestead.WebApi.Modules.Finances.Features.Settings;
 using Homestead.WebApi.Modules.Finances.Processing;
 using Homestead.WebApi.Modules.Finances.Processing.Statements;
 using Homestead.WebApi.Modules.Finances.Services;
@@ -88,13 +87,34 @@ public class CommitStatementImportHandler(
             entryId = result.Entry!.Id;
         }
 
-        // Auto-category pre-filter: a payee's default category rides along to also categorise the line, but
-        // only when the whole path is valid. FlowCounterpartResolver THROWS on an archived / wrong-direction
-        // category, which inside this atomic loop would detonate the entire commit — so we pre-validate and
-        // pass CategoryId only when the category exists, is a category account, isn't archived, and its type
-        // matches the line's direction; otherwise null (Uncategorised). Gated by the AutoCategoriseFromPayee
-        // setting (default on).
-        var categoryByPayee = await LoadAutoCategoriesAsync(request.LineItems, ct);
+        // Client-authoritative category: the review page resolves each line's category (pre-filling from the
+        // payee default when the setting is on, honouring overrides + explicit clears) and sends CategoryId
+        // verbatim. Pre-validate the distinct non-null ids BEFORE the atomic materialize loop —
+        // FlowCounterpartResolver THROWS on an archived / wrong-direction / non-category account, and inside
+        // that loop the throw would detonate the whole commit. Batch-load the referenced accounts AsNoTracking
+        // and assert each is a live category account whose type matches its line's direction; any failure →
+        // 400 (per-line message). This covers non-category, wrong-direction, and archived-mid-review ids.
+        var categoryIds = request.LineItems
+            .Where(l => l.CategoryId is not null)
+            .Select(l => l.CategoryId!.Value)
+            .Distinct()
+            .ToList();
+
+        var categoriesById = categoryIds.Count == 0
+            ? new Dictionary<Guid, Account>()
+            : await db.Accounts.AsNoTracking()
+                .Where(a => categoryIds.Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id, ct);
+
+        foreach (var line in request.LineItems)
+        {
+            if (line.CategoryId is not Guid categoryId)
+                continue;
+            if (!categoriesById.TryGetValue(categoryId, out var category)
+                || !IsUsableCategory(category, line.Direction))
+                throw new BusinessRuleException(
+                    $"Category is not a valid {line.Direction} category for this line.");
+        }
 
         // Staged raw description per line (keyed by the stable ProposedFlow.Index). This — NOT the editable
         // Description memo — is the learning key, so editing the memo never corrupts what's learned.
@@ -103,16 +123,10 @@ public class CommitStatementImportHandler(
             .ToDictionary(g => g.Key, g => g.First().Description);
 
         // Materialize each curated line as an Expense/Income flow. Memo is the (possibly edited) Description;
-        // category is the pre-validated auto-category or null. CreateAsync is save-free and per-transaction,
-        // so the whole set lands in one flush below.
+        // category is the client-supplied, pre-validated CategoryId or null (Uncategorised). CreateAsync is
+        // save-free and per-transaction, so the whole set lands in one flush below.
         foreach (var line in request.LineItems)
         {
-            Guid? categoryId = null;
-            if (line.PayeeId is Guid pid
-                && categoryByPayee.TryGetValue(pid, out var category)
-                && IsUsableCategory(category, line.Direction))
-                categoryId = category.Id;
-
             var flow = await flows.CreateAsync(
                 new CreateFlowRequest(
                     line.Direction,
@@ -120,7 +134,7 @@ public class CommitStatementImportHandler(
                     line.Amount,
                     line.Date,
                     line.Description,
-                    CategoryId: categoryId,
+                    CategoryId: line.CategoryId,
                     PayeeId: line.PayeeId),
                 ct);
 
@@ -178,37 +192,9 @@ public class CommitStatementImportHandler(
         };
     }
 
-    /// <summary>
-    /// Batch-load the default-category <see cref="Account"/> of each payee referenced by a line, keyed by
-    /// payee id. Empty when auto-categorise is off or no line carries a payee — so the per-line decision is a
-    /// dictionary lookup, not a query. Only payees that actually have a default category appear.
-    /// </summary>
-    private async Task<Dictionary<Guid, Account>> LoadAutoCategoriesAsync(
-        IReadOnlyList<CommitLineItem> lines, CancellationToken ct)
-    {
-        var payeeIds = lines
-            .Where(l => l.PayeeId is not null)
-            .Select(l => l.PayeeId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (payeeIds.Count == 0)
-            return new Dictionary<Guid, Account>();
-
-        var settings = await FinanceSettings.LoadAsync(db, ct);
-        if (!settings.AutoCategoriseFromPayeeEnabled)
-            return new Dictionary<Guid, Account>();
-
-        return await db.Payees
-            .AsNoTracking()
-            .Where(p => payeeIds.Contains(p.Id) && p.DefaultCategoryId != null)
-            .Select(p => new { p.Id, Category = p.DefaultCategory! })
-            .ToDictionaryAsync(x => x.Id, x => x.Category, ct);
-    }
-
-    // A payee's default category is only applied when it's a live category account whose type matches the
-    // line's direction. Mirrors FlowCounterpartResolver's own checks — pre-filtered here so an archived /
-    // mismatched category degrades to Uncategorised instead of throwing inside the atomic commit.
+    // A client-supplied category is only accepted when it's a live category account whose type matches the
+    // line's direction. Mirrors FlowCounterpartResolver's own checks — pre-validated here so an archived /
+    // mismatched / non-category id fails with a clean 400 instead of throwing inside the atomic commit.
     private static bool IsUsableCategory(Account category, FlowDirection direction)
     {
         if (category.IsArchived || !category.AccountType.IsCategory())

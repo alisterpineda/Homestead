@@ -86,8 +86,9 @@ public record StatementImportResponse
                 .Select(f =>
                 {
                     // Existing-payee suggestions (tier ①/②) resolve against the live catalog by id — for the
-                    // display name AND the read-only auto-category chip. A new-payee suggestion (tier ③) has
-                    // no id and carries its proposed name inline, with no category (the payee doesn't exist yet).
+                    // display name AND the suggested default category the client surfaces in the combobox's
+                    // Suggested group. A new-payee suggestion (tier ③) has no id and carries its proposed name
+                    // inline, with no category (the payee doesn't exist yet).
                     var info = f.SuggestedPayeeId is { } pid && suggestedPayees.TryGetValue(pid, out var i)
                         ? i
                         : null;
@@ -97,6 +98,7 @@ public record StatementImportResponse
                         f.SuggestedPayeeId,
                         info?.Name ?? f.SuggestedPayeeName,
                         f.SuggestionSource,
+                        info?.DefaultCategoryId,
                         info?.DefaultCategoryName,
                         info?.DefaultCategoryType);
                 })
@@ -152,10 +154,13 @@ public record StatementLineItemResponse(
     Guid? SuggestedPayeeId,
     string? SuggestedPayeeName,
     PayeeSuggestionSource SuggestionSource,
-    // The suggested existing payee's default category (name + type), for the read-only auto-category chip.
-    // Null for a tier-③ new-payee suggestion or a payee with no default category.
+    // The suggested existing payee's default category (id + name + type). The client keys the Suggested
+    // combobox entry on the id; name/type render its label. Null for a tier-③ new-payee suggestion or a
+    // payee with no default category.
+    Guid? SuggestedPayeeDefaultCategoryId,
     string? SuggestedPayeeDefaultCategoryName,
     AccountType? SuggestedPayeeDefaultCategoryType);
 
 /// <summary>Resolved detail for a suggested existing payee — its current name and default category.</summary>
-public record SuggestedPayeeInfo(string Name, string? DefaultCategoryName, AccountType? DefaultCategoryType);
+public record SuggestedPayeeInfo(
+    Guid? DefaultCategoryId, string Name, string? DefaultCategoryName, AccountType? DefaultCategoryType);

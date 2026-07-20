@@ -32,8 +32,8 @@ public class GetStatementImportHandler(AppDbContext db, ICurrentUserAccessor cur
         var staged = job.GetResult<StagedStatementImport>();
 
         // Resolve suggested existing-payee (tier ①/②) detail against the live catalog by id — the current
-        // name (so a rename between parse and review shows through) and the default category for the
-        // read-only auto-category chip. Tier-③ new-payee names live inline on the line.
+        // name (so a rename between parse and review shows through) and the default category (id + name +
+        // type) the client surfaces in the combobox's Suggested group. Tier-③ new-payee names live inline.
         var suggestedPayeeIds = staged?.Proposal.LineItems
             .Where(f => f.SuggestedPayeeId is not null)
             .Select(f => f.SuggestedPayeeId!.Value)
@@ -52,12 +52,13 @@ public class GetStatementImportHandler(AppDbContext db, ICurrentUserAccessor cur
                 {
                     p.Id,
                     p.Name,
+                    p.DefaultCategoryId,
                     CategoryName = p.DefaultCategory != null ? p.DefaultCategory.Name : null,
                     CategoryType = p.DefaultCategory != null ? (AccountType?)p.DefaultCategory.AccountType : null,
                 })
                 .ToDictionaryAsync(
                     x => x.Id,
-                    x => new SuggestedPayeeInfo(x.Name, x.CategoryName, x.CategoryType),
+                    x => new SuggestedPayeeInfo(x.DefaultCategoryId, x.Name, x.CategoryName, x.CategoryType),
                     ct);
 
         return StatementImportResponse.FromJob(job, accountId, staged, suggestedPayees);

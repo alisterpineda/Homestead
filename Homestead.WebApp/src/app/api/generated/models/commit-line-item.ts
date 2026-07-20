@@ -4,6 +4,7 @@
 import { FlowDirection } from '../models/flow-direction';
 export interface CommitLineItem {
   amount: number;
+  categoryId?: (string | null);
   date: string;
   description: (string | null);
   direction: FlowDirection;

@@ -14,6 +14,7 @@ export interface StatementLineItemResponse {
   index: number;
   mappable: boolean;
   runningBalance: (number | null);
+  suggestedPayeeDefaultCategoryId: (string | null);
   suggestedPayeeDefaultCategoryName: (string | null);
   suggestedPayeeDefaultCategoryType: (null | AccountType);
   suggestedPayeeId: (string | null);

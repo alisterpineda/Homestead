@@ -7,6 +7,7 @@ import { StatementImportReviewPageComponent } from './statement-import-review-pa
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesPayeeApiService } from '@/api/services/finances-payee-api.service';
+import { FinancesCategoryApiService } from '@/api/services/finances-category-api.service';
 import { FinancesSettingsApiService } from '@/api/services/finances-settings-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -14,8 +15,10 @@ import { HlmSidebarService } from '@/shared/components/spartan/sidebar';
 import type { StatementImportResponse } from '@/api/generated/models/statement-import-response';
 import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
+import type { CategoryResponse } from '@/api/generated/models/category-response';
+import type { PayeeResponse } from '@/api/generated/models/payee-response';
 
-// The line-item table's hlm-select cells measure their trigger width via ResizeObserver, absent in jsdom.
+// The line-item table's Category combobox cells measure their trigger width via ResizeObserver, absent in jsdom.
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
     observe() {}
@@ -50,9 +53,9 @@ const RESPONSE: StatementImportResponse = {
     accepted: true,
   },
   lineItems: [
-    { index: 0, date: '2026-06-03', description: 'GROCERY', amount: 100, direction: 'Expense', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
-    { index: 1, date: '2026-06-15', description: 'PAYROLL', amount: 600, direction: 'Income', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
-    { index: 2, date: null, description: 'MYSTERY', amount: 0, direction: 'Expense', runningBalance: null, mappable: false, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
+    { index: 0, date: '2026-06-03', description: 'GROCERY', amount: 100, direction: 'Expense', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryId: null, suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
+    { index: 1, date: '2026-06-15', description: 'PAYROLL', amount: 600, direction: 'Income', runningBalance: null, mappable: true, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryId: null, suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
+    { index: 2, date: null, description: 'MYSTERY', amount: 0, direction: 'Expense', runningBalance: null, mappable: false, duplicateSuspected: false, accepted: true, suggestedPayeeId: null, suggestedPayeeName: null, suggestionSource: 'None', suggestedPayeeDefaultCategoryId: null, suggestedPayeeDefaultCategoryName: null, suggestedPayeeDefaultCategoryType: null },
   ],
   accountNumberMatch: 'Mismatch',
   duplicateAssertionExists: false,
@@ -68,6 +71,31 @@ const CAD: CommodityResponse = {
   id: 'cad', symbol: 'CAD', name: 'Canadian Dollar', kind: 'Currency', displayPrecision: 2,
   canDelete: false, exchange: null, isSystemManaged: true, latestPriceAt: null, priceCount: 0,
 };
+
+const cat = (
+  id: string, name: string, type: 'Expense' | 'Income',
+): CategoryResponse => ({
+  id, name, type, parentId: null, depth: 0, path: name, isSystem: false, readOnly: false,
+});
+// Both directions, as the page loads them once and passes into each row's combobox.
+const CATEGORIES: CategoryResponse[] = [
+  cat('e-groceries', 'Groceries', 'Expense'),
+  cat('e-rent', 'Rent', 'Expense'),
+  cat('i-salary', 'Salary', 'Income'),
+];
+const GROCERIES = { id: 'e-groceries', name: 'Groceries', type: 'Expense' as const };
+const RENT = { id: 'e-rent', name: 'Rent', type: 'Expense' as const };
+const SALARY = { id: 'i-salary', name: 'Salary', type: 'Income' as const };
+
+// A PayeeResponse carrying an optional default category (drives the payee → category pre-fill).
+function payee(id: string, name: string, def?: { id: string; name: string; type: 'Expense' | 'Income' }): PayeeResponse {
+  return {
+    id, name, isArchived: false, transactionCount: 0, createdAt: '', updatedAt: '',
+    defaultCategoryId: def?.id ?? null,
+    defaultCategoryName: def?.name ?? null,
+    defaultCategoryType: def?.type ?? null,
+  };
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 class StubStatementApi {
@@ -116,6 +144,7 @@ describe('StatementImportReviewPageComponent', () => {
         { provide: FinancesStatementApiService, useValue: api },
         { provide: FinancesAccountApiService, useValue: accountApi },
         { provide: FinancesPayeeApiService, useValue: payeeApi },
+        { provide: FinancesCategoryApiService, useValue: { getCategories: () => of(CATEGORIES) } },
         { provide: FinancesSettingsApiService, useValue: { getFinanceSettings: () => settings$.asObservable() } },
         { provide: FinancesCommodityApiService, useValue: { getCommodity: () => of(CAD) } },
         { provide: DocumentApiService, useValue: { getDocumentFile: () => of(null) } },
@@ -351,7 +380,8 @@ describe('StatementImportReviewPageComponent', () => {
     c.toggleAll(true); // every row is selectable now (including the un-mappable one)
     expect(c.selectionCount()).toBe(3);
 
-    c.bulkSetDirection('Income');
+    // Picking Uncategorised · Income is how a bulk direction change is expressed now.
+    c.bulkSetCategory({ direction: 'Income', categoryId: null, category: null });
     const rows = c.allRows();
     expect(rows[0].direction).toBe('Income');
     expect(rows[1].direction).toBe('Income');
@@ -364,7 +394,7 @@ describe('StatementImportReviewPageComponent', () => {
     expect(c.selectionCount()).toBe(0);
   });
 
-  it('bulk-sets direction across the current selection, skipping unselected rows', async () => {
+  it('bulk-sets category (and its direction) across the current selection, skipping unselected rows', async () => {
     configure();
     const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
     await fixture.whenStable();
@@ -372,11 +402,14 @@ describe('StatementImportReviewPageComponent', () => {
 
     c.setSelected(0, true);
     c.setSelected(1, true);
-    c.bulkSetDirection('Income');
+    c.bulkSetCategory({ direction: 'Income', categoryId: 'i-salary', category: SALARY });
     const rows = c.allRows();
     expect(rows[0].direction).toBe('Income');
+    expect(rows[0].category).toEqual(SALARY);
+    expect(rows[0].categoryTouched).toBe(true);
     expect(rows[1].direction).toBe('Income');
     expect(rows[2].direction).toBe('Expense'); // unselected → untouched
+    expect(rows[2].category).toBeNull();
   });
 
   it('bulk exclude / include acts on selected parsed rows', async () => {
@@ -483,8 +516,8 @@ describe('StatementImportReviewPageComponent', () => {
       date: '2026-06-30',
       memo: 'June statement',
       lineItems: [
-        { index: 0, direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY', payeeId: null, learn: false },
-        { index: 1, direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL', payeeId: null, learn: false },
+        { index: 0, direction: 'Expense', amount: 100, date: '2026-06-03', description: 'GROCERY', payeeId: null, categoryId: null, learn: false },
+        { index: 1, direction: 'Income', amount: 600, date: '2026-06-15', description: 'PAYROLL', payeeId: null, categoryId: null, learn: false },
       ],
     });
   });
@@ -541,10 +574,18 @@ describe('StatementImportReviewPageComponent', () => {
     return {
       ...RESPONSE,
       lineItems: [
-        // Tier-① learned → pre-applied, not a ghost.
-        { ...RESPONSE.lineItems![0], suggestedPayeeId: 'p-learned', suggestedPayeeName: 'Costco', suggestionSource: 'Learned' },
-        // Tier-② AI existing-payee ghost.
-        { ...RESPONSE.lineItems![1], suggestedPayeeId: 'p-ai', suggestedPayeeName: 'Acme Payroll', suggestionSource: 'AiExistingPayee' },
+        // Tier-① learned → pre-applied, not a ghost. Carries a default Expense category (Groceries) that
+        // pre-fills the line's category on the matching-direction (Expense) line.
+        {
+          ...RESPONSE.lineItems![0], suggestedPayeeId: 'p-learned', suggestedPayeeName: 'Costco', suggestionSource: 'Learned',
+          suggestedPayeeDefaultCategoryId: 'e-groceries', suggestedPayeeDefaultCategoryName: 'Groceries', suggestedPayeeDefaultCategoryType: 'Expense',
+        },
+        // Tier-② AI existing-payee ghost with a default Income category (Salary), matching the line direction
+        // so accept pre-fills it.
+        {
+          ...RESPONSE.lineItems![1], suggestedPayeeId: 'p-ai', suggestedPayeeName: 'Acme Payroll', suggestionSource: 'AiExistingPayee',
+          suggestedPayeeDefaultCategoryId: 'i-salary', suggestedPayeeDefaultCategoryName: 'Salary', suggestedPayeeDefaultCategoryType: 'Income',
+        },
         RESPONSE.lineItems![2],
       ],
     };
@@ -666,5 +707,145 @@ describe('StatementImportReviewPageComponent', () => {
     expect(rows[0].payee).toEqual({ id: 'p-learned', name: 'Costco' }); // untouched — already has a payee
     expect(rows[1].payee).toEqual({ id: 'p-bulk', name: 'Bulk' });       // gap filled
     expect(rows[1].learn).toBe(true);
+  });
+
+  // ─── Category ↔ payee coupling + client-authoritative commit ────────────────
+
+  it('R1: category tracks the payee while pristine, then sticks once the reviewer edits it', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Pristine: applying a payee with an Expense default fills the Expense line's category.
+    c.onRowPayeeChange(0, payee('p1', 'Grocer', GROCERIES));
+    expect(c.allRows()[0].category).toEqual(GROCERIES);
+    expect(c.allRows()[0].categoryTouched).toBe(false);
+
+    // Explicit pick → sticky.
+    c.setCategory(0, { direction: 'Expense', categoryId: 'e-rent', category: RENT });
+    expect(c.allRows()[0].category).toEqual(RENT);
+    expect(c.allRows()[0].categoryTouched).toBe(true);
+
+    // A later payee (different Expense default) no longer overrides the sticky choice.
+    c.onRowPayeeChange(0, payee('p2', 'Other', GROCERIES));
+    expect(c.allRows()[0].category).toEqual(RENT);
+  });
+
+  it('R2: a payee never changes direction and only fills a category matching the current direction', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Row 0 is Expense. A payee whose default is an INCOME category can't fill it (direction filter),
+    // and the payee never flips the line's direction.
+    c.onRowPayeeChange(0, payee('p-inc', 'Employer', SALARY));
+    expect(c.allRows()[0].direction).toBe('Expense');
+    expect(c.allRows()[0].category).toBeNull();
+    expect(c.allRows()[0].payeeDefaultCategory).toEqual(SALARY); // raw default kept (live Suggested source)
+  });
+
+  it('R3: the live Suggested source stays the payee default under a sticky override', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    c.onRowPayeeChange(0, payee('p1', 'Grocer', GROCERIES));
+    c.setCategory(0, { direction: 'Expense', categoryId: 'e-rent', category: RENT }); // sticky override
+    expect(c.allRows()[0].category).toEqual(RENT);
+    // Suggested still reflects the CURRENT payee's default, not the override.
+    expect(c.allRows()[0].payeeDefaultCategory).toEqual(GROCERIES);
+  });
+
+  it('R4: auto-uncategorised is pristine, but an explicit Uncategorised pick is sticky', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Seed: no payee → auto-uncategorised, pristine.
+    expect(c.allRows()[0].category).toBeNull();
+    expect(c.allRows()[0].categoryTouched).toBe(false);
+
+    // Explicit Uncategorised · Expense pick → an edit (sticky).
+    c.setCategory(0, { direction: 'Expense', categoryId: null, category: null });
+    expect(c.allRows()[0].categoryTouched).toBe(true);
+
+    // A later payee with a default no longer re-fills the (sticky) uncategorised choice.
+    c.onRowPayeeChange(0, payee('p1', 'Grocer', GROCERIES));
+    expect(c.allRows()[0].category).toBeNull();
+  });
+
+  it('R5: accept keeps the pristine guard; reset un-sticks the category', async () => {
+    configure(withSuggestions());
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    // Tier-① learned row 0 pre-fills Groceries (Expense), pristine.
+    expect(c.allRows()[0].category).toEqual(GROCERIES);
+    expect(c.allRows()[0].categoryTouched).toBe(false);
+
+    // Accept the AI ghost on Income line 1 → its Income default (Salary) pre-fills (pristine → derives).
+    c.acceptSuggestion(1);
+    expect(c.allRows()[1].category).toEqual(SALARY);
+    expect(c.allRows()[1].categoryTouched).toBe(false);
+
+    // Override row 0 (sticky), then reset → un-sticks back to the learned original.
+    c.setCategory(0, { direction: 'Expense', categoryId: 'e-rent', category: RENT });
+    expect(c.allRows()[0].categoryTouched).toBe(true);
+    c.resetRow(0);
+    expect(c.allRows()[0].category).toEqual(GROCERIES);
+    expect(c.allRows()[0].categoryTouched).toBe(false);
+  });
+
+  it('a category pick flips direction and recomputes the advisory checksum', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    expect(c.checksum().state).toBe('balanced');
+    // Flip the −100 Expense line to Income (+100): 1000 + 700 = 1700 vs closing 1500 → off.
+    c.setCategory(0, { direction: 'Income', categoryId: 'i-salary', category: SALARY });
+    expect(c.allRows()[0].direction).toBe('Income');
+    expect(c.checksum().state).toBe('off');
+  });
+
+  it('onCategoryCreated merges an inline-created category into the shared list (idempotent on id)', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    const before = c.categories().length;
+    const created = cat('e-new', 'Fuel', 'Expense');
+    c.onCategoryCreated(created);
+    expect(c.categories().some((x) => x.id === 'e-new')).toBe(true);
+    expect(c.categories().length).toBe(before + 1);
+
+    c.onCategoryCreated(created); // same id → no duplicate
+    expect(c.categories().length).toBe(before + 1);
+  });
+
+  it('commit sends categoryId per line (null by default; a sticky override survives a later payee change)', async () => {
+    configure();
+    const fixture = TestBed.createComponent(StatementImportReviewPageComponent);
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+
+    c.toggleExcluded(2); // clear the needs-fix row so Confirm is enabled
+
+    // Sticky Rent on line 0; a later payee whose default is Groceries must NOT override the sticky choice.
+    c.setCategory(0, { direction: 'Expense', categoryId: 'e-rent', category: RENT });
+    c.onRowPayeeChange(0, payee('p1', 'Grocer', GROCERIES));
+    c.commit();
+
+    const lines = api.lastCommit.body.lineItems;
+    expect(lines.find((l: any) => l.index === 0)).toEqual(
+      expect.objectContaining({ categoryId: 'e-rent', payeeId: 'p1' }));
+    expect(lines.find((l: any) => l.index === 1).categoryId).toBeNull(); // untouched → uncategorised
   });
 });

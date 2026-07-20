@@ -53,13 +53,17 @@ import { isoDateBinding } from '@/shared/utils/date-picker-config';
 import { parseDate } from '@/shared/utils';
 import { PayeePickerComponent } from '../shared/payee-picker/payee-picker.component';
 import {
+  LineCategoryComboboxComponent,
+  type LineCategorySelection,
+} from '../shared/line-category-combobox/line-category-combobox.component';
+import {
   type LineItemEdit,
   type LineItemOriginal,
   type LineCategory,
   type StatementLineTableMeta,
   LineDateCell,
   LineDescriptionCell,
-  LineTypeCell,
+  LineCategoryCell,
   LinePayeeCell,
   LineAmountCell,
   LineActionsCell,
@@ -68,6 +72,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import { FinancesStatementApiService } from '@/api/services/finances-statement-api.service';
 import { FinancesAccountApiService } from '@/api/services/finances-account-api.service';
 import { FinancesPayeeApiService } from '@/api/services/finances-payee-api.service';
+import { FinancesCategoryApiService } from '@/api/services/finances-category-api.service';
 import { FinancesSettingsApiService } from '@/api/services/finances-settings-api.service';
 import { FinancesCommodityApiService } from '@/api/services/finances-commodity-api.service';
 import { DocumentApiService } from '@/api/services/document-api.service';
@@ -81,7 +86,7 @@ import type { AccountResponse } from '@/api/generated/models/account-response';
 import type { CommodityResponse } from '@/api/generated/models/commodity-response';
 import type { FlowDirection } from '@/api/generated/models/flow-direction';
 import type { PayeeResponse } from '@/api/generated/models/payee-response';
-import type { AccountType } from '@/api/generated/models/account-type';
+import type { CategoryResponse } from '@/api/generated/models/category-response';
 import type { StatementLineItemResponse } from '@/api/generated/models/statement-line-item-response';
 
 type Checksum =
@@ -89,26 +94,34 @@ type Checksum =
   | { state: 'off'; amount: string }
   | { state: 'unavailable' };
 
-// The suggested existing-payee's default category as a chip value — only when auto-cat is on and the payee
-// carries a category. A tier-③ new payee has none.
-function suggestedCategoryOf(r: StatementLineItemResponse, autoCategoriseEnabled: boolean): LineCategory | null {
-  if (!autoCategoriseEnabled) return null;
-  if (!r.suggestedPayeeDefaultCategoryName || !r.suggestedPayeeDefaultCategoryType) return null;
-  return { name: r.suggestedPayeeDefaultCategoryName, type: r.suggestedPayeeDefaultCategoryType };
+// An applied payee's raw default category — the live Suggested source. Gated by the pre-fill setting; a
+// payee with no default (or a tier-③ new payee) has none. Un-filtered by direction on purpose: the combobox
+// filters it to the line's current direction so Suggested stays correct across a direction flip.
+function payeeDefaultCategoryOf(p: PayeeResponse, autoCat: boolean): LineCategory | null {
+  if (!autoCat || !p.defaultCategoryId || !p.defaultCategoryName || !p.defaultCategoryType) return null;
+  return { id: p.defaultCategoryId, name: p.defaultCategoryName, type: p.defaultCategoryType };
 }
 
-// A picked/created payee's default category as a chip value (gated by the same setting).
-function categoryOfPayee(p: PayeeResponse, autoCategoriseEnabled: boolean): LineCategory | null {
-  if (!autoCategoriseEnabled) return null;
-  if (!p.defaultCategoryName || !p.defaultCategoryType) return null;
-  return { name: p.defaultCategoryName, type: p.defaultCategoryType };
+// The server-suggested/ghost payee's raw default category (applied at accept time). Same gating.
+function suggestedPayeeDefaultCategoryOf(r: StatementLineItemResponse, autoCat: boolean): LineCategory | null {
+  if (!autoCat || !r.suggestedPayeeDefaultCategoryId || !r.suggestedPayeeDefaultCategoryName
+    || !r.suggestedPayeeDefaultCategoryType) return null;
+  return {
+    id: r.suggestedPayeeDefaultCategoryId,
+    name: r.suggestedPayeeDefaultCategoryName,
+    type: r.suggestedPayeeDefaultCategoryType,
+  };
 }
 
-// Value-equality for the reset-able category chip (used by the isDirty check).
+// The direction filter the server used to own: a payee default only pre-fills the applied category when its
+// type matches the line's current direction (an Income default never fills an Expense line).
+function categoryForDirection(cat: LineCategory | null, dir: FlowDirection): LineCategory | null {
+  return cat && cat.type === dir ? cat : null;
+}
+
+// Value-equality for the reset-able applied category (used by the isDirty check). Keyed on id now.
 function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.name === b.name && a.type === b.type;
+  return (a?.id ?? null) === (b?.id ?? null);
 }
 
 @Component({
@@ -133,6 +146,7 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
     HlmDatePickerInput,
     FlexRenderDirective,
     PayeePickerComponent,
+    LineCategoryComboboxComponent,
   ],
   providers: [provideIcons({
     lucideCircleAlert, lucideCircleCheck, lucideTriangleAlert, lucideCircleHelp, lucideFileQuestion,
@@ -410,10 +424,14 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
               @if (hasSelection()) {
                 <div class="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
                   <span class="text-sm text-muted-foreground">{{ selectionCount() }} selected</span>
-                  <div hlmButtonGroup>
-                    <button hlmBtn variant="outline" (click)="bulkSetDirection('Expense')">Set Expense</button>
-                    <button hlmBtn variant="outline" (click)="bulkSetDirection('Income')">Set Income</button>
-                  </div>
+                  <app-line-category-combobox
+                    [resetAfterSelect]="true"
+                    [allowCreate]="false"
+                    placeholder="Set category…"
+                    ariaLabel="Set category for selected lines"
+                    [categories]="categories()"
+                    (categoryChange)="bulkSetCategory($event)"
+                  />
                   <div hlmButtonGroup>
                     <button hlmBtn variant="outline" (click)="bulkSetExcluded(true)">Exclude</button>
                     <button hlmBtn variant="outline" (click)="bulkSetExcluded(false)">Include</button>
@@ -518,10 +536,11 @@ function sameCategory(a: LineCategory | null, b: LineCategory | null): boolean {
               </button>
 
               <p class="text-xs text-muted-foreground">
-                Pick a payee per line — a learned payee (or one you confirm) is remembered for next time, and
-                its default category is applied automatically. Lines without a payee import as uncategorised.
-                Every included row imports; use the ⋮ menu to exclude a row (it stays, greyed and struck
-                through, and won't import) or reset your edits. Manual rows are never learned.
+                Pick a payee per line — a learned payee (or one you confirm) is remembered for next time and
+                suggests this line's category. Category is editable per line: pick any category to set it (its
+                direction follows), or leave it Uncategorised. Every included row imports; use the ⋮ menu to
+                exclude a row (it stays, greyed and struck through, and won't import) or reset your edits.
+                Manual rows are never learned.
               </p>
             </div>
           }
@@ -570,6 +589,7 @@ export class StatementImportReviewPageComponent {
   private statementApi = inject(FinancesStatementApiService);
   private accountApi = inject(FinancesAccountApiService);
   private payeeApi = inject(FinancesPayeeApiService);
+  private categoryApi = inject(FinancesCategoryApiService);
   private settingsApi = inject(FinancesSettingsApiService);
   private commodityApi = inject(FinancesCommodityApiService);
   private documentApi = inject(DocumentApiService);
@@ -578,8 +598,9 @@ export class StatementImportReviewPageComponent {
   private sidebarService = inject(HlmSidebarService);
   private destroyRef = inject(DestroyRef);
 
-  // Whether the auto-category chip is shown (mirrors the server's AutoCategoriseFromPayee, default on). Only
-  // gates the read-only preview chip — the server independently decides what to apply at commit.
+  // Whether the payee → category pre-fill is on (mirrors the server's AutoCategoriseFromPayee, default on).
+  // Now purely a client-side pre-fill toggle: it gates whether a payee's default seeds/suggests the line's
+  // category. The server no longer derives category from the payee — the client sends categoryId per line.
   private autoCategoriseEnabled = toSignal(
     this.settingsApi.getFinanceSettings().pipe(
       // Effective value defaults on (the server also treats absent as on).
@@ -588,6 +609,22 @@ export class StatementImportReviewPageComponent {
     ),
     { initialValue: true },
   );
+
+  // Every category, both directions — loaded once and passed into each row's combobox (never fetched per
+  // row). Type omitted → the server returns Expense + Income category accounts. A failure degrades to [].
+  private fetchedCategories = toSignal(
+    this.categoryApi.getCategories({}).pipe(catchError(() => of([] as CategoryResponse[]))),
+    { initialValue: [] as CategoryResponse[] },
+  );
+  // Categories created inline through a row's combobox, kept locally so they're immediately reusable on
+  // every other row (a second row re-creating the same name would otherwise hit a 409). Deduped against the
+  // fetched set in case a later refetch surfaces them too.
+  private localCreatedCategories = signal<CategoryResponse[]>([]);
+  categories = computed(() => {
+    const fetched = this.fetchedCategories();
+    const extra = this.localCreatedCategories().filter((lc) => !fetched.some((c) => c.id === lc.id));
+    return extra.length ? [...fetched, ...extra] : fetched;
+  });
 
   isMobile = this.sidebarService.isMobile;
 
@@ -669,7 +706,12 @@ export class StatementImportReviewPageComponent {
       // Tier-① learned hits are pre-applied (the payee is set, marked "learned", learn=false → apply but
       // don't re-teach). AI ghosts (tier ②/③) stay unapplied (payee=null) until explicitly accepted.
       const isLearned = r.suggestionSource === 'Learned' && !!r.suggestedPayeeId;
-      const suggestedCategory = suggestedCategoryOf(r, autoCat);
+      const suggestedPayeeDefaultCategory = suggestedPayeeDefaultCategoryOf(r, autoCat);
+      // A learned pre-fill applies its payee, so its default becomes the live Suggested source AND the
+      // (direction-filtered) pre-filled category. A ghost applies neither until accepted. Seed is pristine
+      // (categoryTouched=false) either way — an auto-uncategorised line is pristine, not an edit.
+      const payeeDefaultCategory = isLearned ? suggestedPayeeDefaultCategory : null;
+      const category = isLearned ? categoryForDirection(payeeDefaultCategory, r.direction) : null;
       const payee = isLearned ? { id: r.suggestedPayeeId!, name: r.suggestedPayeeName ?? '' } : null;
       const original: LineItemOriginal = {
         amount: String(r.amount),
@@ -680,8 +722,10 @@ export class StatementImportReviewPageComponent {
         suggestionSource: r.suggestionSource,
         suggestedPayeeId: r.suggestedPayeeId ?? null,
         suggestedPayeeName: r.suggestedPayeeName ?? null,
-        suggestedCategory,
-        category: isLearned ? suggestedCategory : null,
+        suggestedPayeeDefaultCategory,
+        payeeDefaultCategory,
+        category,
+        categoryTouched: false,
         learn: false,
         dismissed: false,
       };
@@ -699,9 +743,11 @@ export class StatementImportReviewPageComponent {
         suggestionSource: r.suggestionSource,
         suggestedPayeeId: r.suggestedPayeeId ?? null,
         suggestedPayeeName: r.suggestedPayeeName ?? null,
-        suggestedCategory,
+        suggestedPayeeDefaultCategory,
+        payeeDefaultCategory,
         learn: false,
-        category: isLearned ? suggestedCategory : null,
+        category,
+        categoryTouched: false,
         manual: false,
         excluded: false,
         original,
@@ -788,7 +834,9 @@ export class StatementImportReviewPageComponent {
 
   private readonly _meta: StatementLineTableMeta = {
     patchRow: (index, patch) => this.patchRow(index, patch),
-    setDirection: (index, direction) => this.setDirection(index, direction),
+    setCategory: (index, sel) => this.setCategory(index, sel),
+    onCategoryCreated: (category) => this.onCategoryCreated(category),
+    categories: this.categories,
     onPayeeChange: (index, payee) => this.onRowPayeeChange(index, payee),
     acceptSuggestion: (index) => this.acceptSuggestion(index),
     dismissSuggestion: (index) => this.dismissSuggestion(index),
@@ -808,7 +856,7 @@ export class StatementImportReviewPageComponent {
     },
     { id: 'date', header: 'Date', cell: () => flexRenderComponent(LineDateCell), enableSorting: false },
     { id: 'payee', header: 'Payee', cell: () => flexRenderComponent(LinePayeeCell), enableSorting: false },
-    { id: 'type', header: 'Type', cell: () => flexRenderComponent(LineTypeCell), enableSorting: false },
+    { id: 'category', header: 'Category', cell: () => flexRenderComponent(LineCategoryCell), enableSorting: false },
     { id: 'description', header: 'Description', cell: () => flexRenderComponent(LineDescriptionCell), enableSorting: false },
     { id: 'amount', header: 'Amount', cell: () => flexRenderComponent(LineAmountCell), enableSorting: false },
     { id: 'actions', header: '', cell: () => flexRenderComponent(LineActionsCell), enableSorting: false },
@@ -834,12 +882,14 @@ export class StatementImportReviewPageComponent {
   private readonly TH_CLASSES: Record<string, string> = {
     select: 'w-9',
     date: 'w-48',
+    category: 'w-56',
     amount: 'text-right',
     actions: 'w-10',
   };
   private readonly TD_CLASSES: Record<string, string> = {
     select: 'w-9 text-center align-middle',
     date: 'w-48 align-middle',
+    category: 'w-56 align-middle',
     amount: 'text-right align-middle',
     actions: 'w-10 text-center align-middle',
   };
@@ -885,17 +935,33 @@ export class StatementImportReviewPageComponent {
     this.manualRows.update(apply);
   }
 
-  setDirection(index: number, direction: FlowDirection): void {
-    this.patchRow(index, { direction });
+  // A category pick subsumes direction: it sets both, and marks the category sticky (categoryTouched) so a
+  // later payee change can't re-derive over the reviewer's choice. Direction is only ever written here (via
+  // a matching category) or by resetRow — never edited alone, so direction and category.type can't diverge.
+  setCategory(index: number, sel: LineCategorySelection): void {
+    this.patchRow(index, { direction: sel.direction, category: sel.category, categoryTouched: true });
   }
 
-  // A manual pick / clear is an explicit gesture: set the payee, carry its default category chip, and flag
-  // learn (so a picked payee teaches the mapping table). Clearing resets learn and the chip.
+  // Merge an inline-created category into the shared list so every row's combobox can offer it at once
+  // (without it, a second row re-creating the same name would 409). Idempotent on id.
+  onCategoryCreated(category: CategoryResponse): void {
+    this.localCreatedCategories.update((list) =>
+      list.some((c) => c.id === category.id) ? list : [...list, category]);
+  }
+
+  // A manual pick / clear is an explicit gesture: set the payee, carry its raw default as the live Suggested
+  // source, and flag learn (so a picked payee teaches the mapping table). The direction is never touched —
+  // the payee only re-derives the category (direction-filtered) while pristine; a sticky override survives.
   onRowPayeeChange(index: number, p: PayeeResponse | null): void {
+    const row = this.allRows().find((r) => r.index === index);
+    const payeeDefault = p ? payeeDefaultCategoryOf(p, this.autoCategoriseEnabled()) : null;
     this.patchRow(index, {
       payee: p ? { id: p.id, name: p.name } : null,
-      category: p ? categoryOfPayee(p, this.autoCategoriseEnabled()) : null,
+      payeeDefaultCategory: payeeDefault,
       learn: p !== null,
+      ...(row?.categoryTouched
+        ? {}
+        : { category: categoryForDirection(payeeDefault, row?.direction ?? 'Expense') }),
     });
   }
 
@@ -908,8 +974,11 @@ export class StatementImportReviewPageComponent {
     if (row.suggestionSource === 'AiExistingPayee' && row.suggestedPayeeId) {
       this.patchRow(index, {
         payee: { id: row.suggestedPayeeId, name: row.suggestedPayeeName ?? '' },
-        category: row.suggestedCategory,
+        payeeDefaultCategory: row.suggestedPayeeDefaultCategory,
         learn: true,
+        ...(row.categoryTouched
+          ? {}
+          : { category: categoryForDirection(row.suggestedPayeeDefaultCategory, row.direction) }),
       });
       return;
     }
@@ -941,8 +1010,11 @@ export class StatementImportReviewPageComponent {
       if (r.suggestionSource === 'AiExistingPayee' && r.suggestedPayeeId) {
         this.patchRow(r.index, {
           payee: { id: r.suggestedPayeeId, name: r.suggestedPayeeName ?? '' },
-          category: r.suggestedCategory,
+          payeeDefaultCategory: r.suggestedPayeeDefaultCategory,
           learn,
+          ...(r.categoryTouched
+            ? {}
+            : { category: categoryForDirection(r.suggestedPayeeDefaultCategory, r.direction) }),
         });
       }
     }
@@ -969,11 +1041,17 @@ export class StatementImportReviewPageComponent {
     forkJoin(creations).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((results) => {
       for (const res of results) {
         if (!res) continue;
+        // A freshly created payee has no default category → payeeDefault is null (Suggested stays empty).
+        const payeeDefault = payeeDefaultCategoryOf(res.payee, this.autoCategoriseEnabled());
         for (const idx of res.indexes) {
+          const cur = this.allRows().find((x) => x.index === idx);
           this.patchRow(idx, {
             payee: { id: res.payee.id, name: res.payee.name },
-            category: categoryOfPayee(res.payee, this.autoCategoriseEnabled()),
+            payeeDefaultCategory: payeeDefault,
             learn,
+            ...(cur?.categoryTouched
+              ? {}
+              : { category: categoryForDirection(payeeDefault, cur?.direction ?? 'Expense') }),
           });
         }
       }
@@ -988,11 +1066,17 @@ export class StatementImportReviewPageComponent {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: (payee) => {
+        // Fresh payee → no default category, so payeeDefault is null and the guarded category clears.
+        const payeeDefault = payeeDefaultCategoryOf(payee, this.autoCategoriseEnabled());
         for (const idx of indexes) {
+          const cur = this.allRows().find((x) => x.index === idx);
           this.patchRow(idx, {
             payee: { id: payee.id, name: payee.name },
-            category: categoryOfPayee(payee, this.autoCategoriseEnabled()),
+            payeeDefaultCategory: payeeDefault,
             learn,
+            ...(cur?.categoryTouched
+              ? {}
+              : { category: categoryForDirection(payeeDefault, cur?.direction ?? 'Expense') }),
           });
         }
       },
@@ -1058,7 +1142,8 @@ export class StatementImportReviewPageComponent {
       || (row.payee?.id ?? null) !== (o.payee?.id ?? null)
       || row.dismissed !== o.dismissed
       || row.learn !== o.learn
-      || !sameCategory(row.category, o.category);
+      || !sameCategory(row.category, o.category)
+      || row.categoryTouched !== o.categoryTouched;
   }
 
   isDirty(index: number): boolean {
@@ -1084,8 +1169,11 @@ export class StatementImportReviewPageComponent {
           suggestionSource: o.suggestionSource,
           suggestedPayeeId: o.suggestedPayeeId,
           suggestedPayeeName: o.suggestedPayeeName,
-          suggestedCategory: o.suggestedCategory,
+          suggestedPayeeDefaultCategory: o.suggestedPayeeDefaultCategory,
+          payeeDefaultCategory: o.payeeDefaultCategory,
           category: o.category,
+          // Un-sticks the category (o.categoryTouched is always false at seed) — next import re-derives.
+          categoryTouched: o.categoryTouched,
           learn: o.learn,
           dismissed: o.dismissed,
         };
@@ -1113,9 +1201,11 @@ export class StatementImportReviewPageComponent {
       suggestionSource: 'None',
       suggestedPayeeId: null,
       suggestedPayeeName: null,
-      suggestedCategory: null,
+      suggestedPayeeDefaultCategory: null,
+      payeeDefaultCategory: null,
       learn: false,
       category: null,
+      categoryTouched: false,
       manual: true,
       excluded: false,
       original: undefined,
@@ -1134,8 +1224,11 @@ export class StatementImportReviewPageComponent {
     this.updateRows((r) => this.isSelected(r.index), patch);
   }
 
-  bulkSetDirection(direction: FlowDirection): void {
-    this.updateSelected(() => ({ direction }));
+  // Bulk "Set category…" — picking a category (or an Uncategorised · {dir} entry) overwrites the whole
+  // selection's direction + category and marks it sticky. Picking Uncategorised · {dir} is how you bulk-set
+  // direction now (there's no standalone direction control left).
+  bulkSetCategory(sel: LineCategorySelection): void {
+    this.updateSelected(() => ({ direction: sel.direction, category: sel.category, categoryTouched: true }));
   }
 
   // Bulk exclude / include — sets the flag on selected PARSED rows only (manual rows Delete instead).
@@ -1148,14 +1241,21 @@ export class StatementImportReviewPageComponent {
   // the payee's category chip.
   bulkAssignPayee(p: PayeeResponse | null): void {
     if (!p) return;
-    const category = categoryOfPayee(p, this.autoCategoriseEnabled());
+    const payeeDefault = payeeDefaultCategoryOf(p, this.autoCategoriseEnabled());
     let skipped = 0;
     const apply = (rows: LineItemEdit[]) =>
       rows.map((r) => {
         if (!this.isSelected(r.index)) return r;
         if (r.payee !== null) { skipped++; return r; }
-        // Manual rows never learn (index-less at commit), so keep their in-memory learn flag coherent.
-        return { ...r, payee: { id: p.id, name: p.name }, category, learn: !r.manual };
+        // Manual rows never learn (index-less at commit), so keep their in-memory learn flag coherent. The
+        // payee only re-derives the category (direction-filtered) while pristine — a sticky override stays.
+        return {
+          ...r,
+          payee: { id: p.id, name: p.name },
+          payeeDefaultCategory: payeeDefault,
+          learn: !r.manual,
+          ...(r.categoryTouched ? {} : { category: categoryForDirection(payeeDefault, r.direction) }),
+        };
       });
     this.parsedRows.update(apply);
     this.manualRows.update(apply);
@@ -1164,7 +1264,13 @@ export class StatementImportReviewPageComponent {
   }
 
   bulkClearPayee(): void {
-    this.updateSelected(() => ({ payee: null, category: null, learn: false }));
+    // Drop the payee + its Suggested source; only clear the category while pristine (sticky overrides stay).
+    this.updateSelected((r) => ({
+      payee: null,
+      payeeDefaultCategory: null,
+      learn: false,
+      ...(r.categoryTouched ? {} : { category: null }),
+    }));
   }
 
   // ─── Advisory closing-balance checksum (never blocks commit) ──────────────
@@ -1323,6 +1429,9 @@ export class StatementImportReviewPageComponent {
           date: r.date,
           description: r.description.trim() ? r.description.trim() : null,
           payeeId: r.payee?.id ?? null,
+          // Client-authoritative category: send what the reviewer resolved per line (null = Uncategorised).
+          // Direction and category.type can't diverge — direction is only ever set by a matching category.
+          categoryId: r.category?.id ?? null,
           // Teach the mapping table only for explicit picks on parsed rows (never for a rubber-stamped
           // tier-① pre-fill, an apply-but-don't-learn, or a manual row). Guard on a payee being set.
           learn: !r.manual && r.payee !== null && r.learn,

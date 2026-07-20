@@ -349,9 +349,9 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
             () => _sut.Handle(Command(job.Id), TestContext.Current.CancellationToken));
     }
 
-    // ─── Learning + auto-category (Phase 2) ─────────────────────────────────────
-    // These use a SPY IFlowService so the handler's category decision and its learning upserts can be
-    // asserted directly (the real FlowService/resolver would obscure the CategoryId the handler passes).
+    // ─── Learning + client-authoritative category ───────────────────────────────
+    // These use a SPY IFlowService so the CategoryId the handler passes through and its learning upserts can
+    // be asserted directly (the real FlowService/resolver would obscure the CategoryId the handler passes).
 
     private (CommitStatementImportHandler sut, IFlowService flows) BuildWithSpyFlows()
     {
@@ -503,8 +503,33 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Commit_AutoCategorises_FromPayeeDefault_WhenDirectionMatches()
+    public async Task Commit_AppliesClientCategory_WhenValidAndDirectionMatches()
     {
+        // Client-authoritative: the reviewer's chosen CategoryId is applied verbatim (not derived here).
+        var category = await SeedCategoryAsync("Groceries", AccountType.Expense);
+        var (job, _) = await SeedJobWithLinesAsync((0, "GROCER"));
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(
+                    0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "GROCER", CategoryId: category.Id),
+            ],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        await flows.Received(1).CreateAsync(
+            Arg.Is<CreateFlowRequest>(r => r.CategoryId == category.Id), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_NullCategoryId_IsUncategorised_EvenWhenPayeeHasDefault()
+    {
+        // Regression proving the switch to client-authoritative: the server no longer derives a category from
+        // the payee. A payee WITH a default category, on a line sending CategoryId=null, commits uncategorised.
         var category = await SeedCategoryAsync("Groceries", AccountType.Expense);
         var payee = await SeedPayeeAsync("Grocer", category.Id);
         var (job, _) = await SeedJobWithLinesAsync((0, "GROCER"));
@@ -512,7 +537,87 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
 
         var command = Command(job.Id, accepted: false) with
         {
-            LineItems = [new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "GROCER", payee)],
+            LineItems =
+            [
+                new CommitLineItem(
+                    0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "GROCER", payee, CategoryId: null),
+            ],
+        };
+
+        await sut.Handle(command, TestContext.Current.CancellationToken);
+
+        await flows.Received(1).CreateAsync(
+            Arg.Is<CreateFlowRequest>(r => r.PayeeId == payee && r.CategoryId == null), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("archived")]     // a live-typed but archived category
+    [InlineData("mismatch")]     // an Income category on an Expense line
+    [InlineData("noncategory")]  // a non-category account (the target Asset account)
+    public async Task Commit_InvalidCategory_Throws_NoFlowsCreated(string kind)
+    {
+        var categoryId = kind switch
+        {
+            "archived" => (await SeedCategoryAsync("Old", AccountType.Expense, isArchived: true)).Id,
+            "mismatch" => (await SeedCategoryAsync("Salary", AccountType.Income)).Id,
+            _ => _account.Id,
+        };
+        var (job, _) = await SeedJobWithLinesAsync((0, "A"));
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "A", CategoryId: categoryId),
+            ],
+        };
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => sut.Handle(command, TestContext.Current.CancellationToken));
+
+        // Pre-validated before the atomic materialize loop → nothing was created (atomic rollback).
+        await flows.DidNotReceive().CreateAsync(Arg.Any<CreateFlowRequest>(), Arg.Any<CancellationToken>());
+        Assert.False(await _db.AccountTransactions.AnyAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Commit_NonExistentCategoryId_Throws_NoFlowsCreated()
+    {
+        var (job, _) = await SeedJobWithLinesAsync((0, "A"));
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "A", CategoryId: Guid.NewGuid()),
+            ],
+        };
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => sut.Handle(command, TestContext.Current.CancellationToken));
+        await flows.DidNotReceive().CreateAsync(Arg.Any<CreateFlowRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Commit_LearnsPayee_WhenValidCategoryAlsoPresent()
+    {
+        // Category and learning are independent axes — a line can carry both a valid category and a learn
+        // signal, and both must take effect.
+        var category = await SeedCategoryAsync("Groceries", AccountType.Expense);
+        var (job, documentId) = await SeedJobWithLinesAsync((0, "SQ *BLUE BOTTLE"));
+        var payee = await SeedPayeeAsync("Blue Bottle");
+        var (sut, flows) = BuildWithSpyFlows();
+
+        var command = Command(job.Id, accepted: false) with
+        {
+            LineItems =
+            [
+                new CommitLineItem(
+                    0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "SQ *BLUE BOTTLE",
+                    payee, Learn: true, CategoryId: category.Id),
+            ],
         };
 
         await sut.Handle(command, TestContext.Current.CancellationToken);
@@ -520,31 +625,8 @@ public class CommitStatementImportHandlerTests : IAsyncLifetime
         await flows.Received(1).CreateAsync(
             Arg.Is<CreateFlowRequest>(r => r.CategoryId == category.Id && r.PayeeId == payee),
             Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Commit_AutoCategory_FallsBackToUncategorised_OnArchivedOrDirectionMismatch()
-    {
-        var archived = await SeedCategoryAsync("Old", AccountType.Expense, isArchived: true);
-        var incomeCat = await SeedCategoryAsync("Salary", AccountType.Income);
-        var payeeArchived = await SeedPayeeAsync("P1", archived.Id);
-        var payeeMismatch = await SeedPayeeAsync("P2", incomeCat.Id); // Income category on an Expense line
-        var (job, _) = await SeedJobWithLinesAsync((0, "A"), (1, "B"));
-        var (sut, flows) = BuildWithSpyFlows();
-
-        var command = Command(job.Id, accepted: false) with
-        {
-            LineItems =
-            [
-                new CommitLineItem(0, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "A", payeeArchived),
-                new CommitLineItem(1, FlowDirection.Expense, 10m, new DateOnly(2026, 6, 3), "B", payeeMismatch),
-            ],
-        };
-
-        // Never throws — both archived and wrong-direction categories degrade to Uncategorised (null).
-        await sut.Handle(command, TestContext.Current.CancellationToken);
-
-        await flows.Received(2).CreateAsync(
-            Arg.Is<CreateFlowRequest>(r => r.CategoryId == null), Arg.Any<CancellationToken>());
+        var expectedKey = PayeeDescriptionNormalizer.Normalize("SQ *BLUE BOTTLE")!;
+        await _payeeMappings.Received(1).UpsertAsync(
+            expectedKey, payee, "SQ *BLUE BOTTLE", documentId, Arg.Any<CancellationToken>());
     }
 }

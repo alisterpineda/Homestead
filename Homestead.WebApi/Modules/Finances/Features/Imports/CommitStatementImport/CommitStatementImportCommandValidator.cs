@@ -30,6 +30,9 @@ public class CommitStatementImportCommandValidator : AbstractValidator<CommitSta
             line.RuleFor(l => l.Direction).IsInEnum();
             // null = no payee; a supplied payee must be a real id (FlowService validates existence).
             line.RuleFor(l => l.PayeeId).NotEqual(Guid.Empty).When(l => l.PayeeId is not null);
+            // null = Uncategorised; a supplied category must be a real id. Direction-match / existence /
+            // archived checks need the loaded category type, so they live in the handler's pre-validate.
+            line.RuleFor(l => l.CategoryId).NotEqual(Guid.Empty).When(l => l.CategoryId is not null);
         });
     }
 }

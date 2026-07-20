@@ -210,7 +210,9 @@ public class StatementImportPipelineTests : IntegrationTestBase
                 accepted = true,
                 lineItems = new object[]
                 {
-                    new { index = 0, direction = "Expense", amount = 42.10m, date = "2026-06-03", description = "edited memo", payeeId, learn = true },
+                    // Client-authoritative category: the reviewer's combobox pre-filled the payee's default
+                    // (Groceries-Learn) into categoryId, and it's sent explicitly on the line now.
+                    new { index = 0, direction = "Expense", amount = 42.10m, date = "2026-06-03", description = "edited memo", payeeId, learn = true, categoryId },
                     new { index = 1, direction = "Income", amount = 2000m, date = "2026-06-15", description = "PAYROLL DEPOSIT" },
                 },
             }, CT);
@@ -222,8 +224,8 @@ public class StatementImportPipelineTests : IntegrationTestBase
         Assert.Equal(doc1, mapping.LastWriterDocumentId);
         Assert.Equal("GROCERY MART", mapping.SampleRawDescription);
 
-        // Auto-categorise landed: the payee's default (direction-matched) category posts as the flow's
-        // counterpart leg. Exercises LoadAutoCategoriesAsync's EF projection against real Postgres.
+        // The client-supplied category posts as the flow's counterpart leg. Exercises the handler's
+        // CategoryId pre-validation + the FlowService category path against real Postgres.
         Assert.True(await FlowHasCounterpartAccountAsync(payeeId, categoryId));
 
         // ── Import #2: a fresh upload of the same statement now pre-fills the learned payee (tier ①). ──

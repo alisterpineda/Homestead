@@ -34,11 +34,15 @@ public record CommitStatementImportCommand : ICommand<CommitStatementImportRespo
 /// <see cref="Learn"/> is the explicit-signal flag: true only when the reviewer set this payee this session
 /// (pick / create / accept / override). It is false for an untouched tier-① pre-fill and for the
 /// warning-dialog auto-apply, both of which apply the payee but must *not* teach the learning table.
+/// <see cref="CategoryId"/> is client-authoritative: the review page resolves each line's category
+/// (pre-filling from the payee default when the setting is on, honouring overrides + explicit clears) and
+/// sends it verbatim — <c>null</c> means Uncategorised. The server applies it directly and 400s on an
+/// invalid (non-category / wrong-direction / archived) id; it no longer derives category from the payee.
 /// </para>
 /// </summary>
 public record CommitLineItem(
     int? Index, FlowDirection Direction, decimal Amount, DateOnly Date,
-    string? Description, Guid? PayeeId = null, bool Learn = false);
+    string? Description, Guid? PayeeId = null, bool Learn = false, Guid? CategoryId = null);
 
 public record CommitStatementImportResponse
 {
