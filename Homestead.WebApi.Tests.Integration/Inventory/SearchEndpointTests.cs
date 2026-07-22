@@ -97,7 +97,7 @@ public class SearchEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var areaId = await CreateAreaAsync(client, "Garage");
-        var chest = await CreateDurableAsync(client, new { name = "Tool chest", areaId, durableKind = "Container" });
+        var chest = await CreateDurableAsync(client, new { name = "Tool chest", areaId, isContainer = true });
         var wrench = await CreateDurableAsync(client,
             new { name = "Wrench", parentItemId = chest.Id, compartment = "Top shelf zone" });
 

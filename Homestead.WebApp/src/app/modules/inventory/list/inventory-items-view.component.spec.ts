@@ -26,7 +26,7 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 function makeItem(over: Partial<DurableResponse>): DurableResponse {
   return {
     id: 'x', name: 'Item', fungibility: 'NonFungible', status: 'Active',
-    durableKind: 'Plain', path: [], createdAt: '', updatedAt: '', ...over,
+    isContainer: false, path: [], createdAt: '', updatedAt: '', ...over,
   };
 }
 

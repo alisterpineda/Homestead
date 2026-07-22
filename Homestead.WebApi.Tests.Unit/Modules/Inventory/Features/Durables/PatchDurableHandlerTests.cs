@@ -48,7 +48,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
 
     private async Task<Item> AddItemAsync(
         ItemStatus status = ItemStatus.Active, Guid? areaId = null, string? lentTo = null,
-        Guid? parentItemId = null, DurableKind durableKind = DurableKind.Plain, string? compartment = null)
+        Guid? parentItemId = null, bool isContainer = false, string? compartment = null)
     {
         var item = new Item
         {
@@ -59,7 +59,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
             AreaId = areaId,
             LentTo = lentTo,
             ParentItemId = parentItemId,
-            DurableKind = durableKind,
+            IsContainer = isContainer,
             Compartment = compartment,
         };
         _db.Items.Add(item);
@@ -241,7 +241,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
             Name = "Drill",
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = DurableKind.Plain,
+            IsContainer = false,
             AcquisitionKind = AcquisitionKind.Gift,
             AcquisitionCost = 50m,
             AcquisitionCostCurrencyId = cad.Id,
@@ -293,7 +293,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     private async Task<Item> AddContainerAsync(
-        Guid? areaId = null, Guid? parentItemId = null, DurableKind durableKind = DurableKind.Container)
+        Guid? areaId = null, Guid? parentItemId = null, bool isContainer = true)
     {
         var container = new Item
         {
@@ -301,7 +301,7 @@ public class PatchDurableHandlerTests : IAsyncLifetime
             Name = "Tool chest",
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = durableKind,
+            IsContainer = isContainer,
             AreaId = areaId,
             ParentItemId = parentItemId,
         };
@@ -418,25 +418,34 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_CycleViaAssemblyEdge_Throws()
+    public async Task Handle_CycleViaComponentEdge_Throws()
     {
-        // A cycle can form through an Assembly edge, not just container edges — the cycle guard's
-        // link set spans all holders.
-        var a = await AddContainerAsync(durableKind: DurableKind.Assembly);
-        var b = await AddContainerAsync(parentItemId: a.Id, durableKind: DurableKind.Assembly);
+        // A cycle can form through a component edge (non-container parents), not just container edges —
+        // the cycle guard's link set spans every non-fungible item.
+        var a = await AddContainerAsync(isContainer: false);
+        var b = await AddContainerAsync(parentItemId: a.Id, isContainer: false);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             PatchAsync(a.Id, p => p.Replace(m => m.ParentItemId, b.Id)));
     }
 
     [Fact]
-    public async Task Handle_ParentNotContainer_Throws()
+    public async Task Handle_ParentFungible_Throws()
     {
-        var plain = await AddItemAsync();
+        // A parent must be a non-fungible item; a fungible consumable cannot hold children.
+        var consumable = new Item
+        {
+            Id = Guid.NewGuid(),
+            Name = "Screws",
+            Fungibility = Fungibility.Fungible,
+            Status = ItemStatus.Active,
+        };
+        _db.Items.Add(consumable);
+        await _db.SaveChangesAsync(Ct);
         var item = await AddItemAsync();
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            PatchAsync(item.Id, p => p.Replace(m => m.ParentItemId, plain.Id)));
+            PatchAsync(item.Id, p => p.Replace(m => m.ParentItemId, consumable.Id)));
     }
 
     [Fact]
@@ -449,24 +458,36 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_KindChangeWithTerminalChild_Throws()
+    public async Task Handle_FlipWithTerminalChild_Throws()
     {
-        // Kind-change is blocked while ANY child references the item, terminal records included.
+        // Flipping IsContainer is blocked while ANY child references the item, terminal records included.
         var chest = await AddContainerAsync(areaId: _garage.Id);
         await AddItemAsync(status: ItemStatus.Archived, parentItemId: chest.Id);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            PatchAsync(chest.Id, p => p.Replace(m => m.DurableKind, DurableKind.Plain)));
+            PatchAsync(chest.Id, p => p.Replace(m => m.IsContainer, false)));
     }
 
     [Fact]
-    public async Task Handle_KindChangeWhenEmpty_Succeeds()
+    public async Task Handle_FlipWhenEmpty_Succeeds()
     {
         var chest = await AddContainerAsync(areaId: _garage.Id);
 
-        var resp = await PatchAsync(chest.Id, p => p.Replace(m => m.DurableKind, DurableKind.Plain));
+        var resp = await PatchAsync(chest.Id, p => p.Replace(m => m.IsContainer, false));
 
-        Assert.Equal(DurableKind.Plain, resp.DurableKind);
+        Assert.Equal(false, resp.IsContainer);
+    }
+
+    [Fact]
+    public async Task Handle_FlipToContainerWithComponent_Throws()
+    {
+        // The flip guard is symmetric: a non-container that holds a component can't become a container
+        // either — that would reinterpret the component as stored contents.
+        var pc = await AddContainerAsync(areaId: _garage.Id, isContainer: false);
+        await AddItemAsync(status: ItemStatus.Active, parentItemId: pc.Id, compartment: "CPU");
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            PatchAsync(pc.Id, p => p.Replace(m => m.IsContainer, true)));
     }
 
     [Fact]
@@ -488,29 +509,31 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         var resp = await PatchAsync(chest.Id, p => p.Replace(m => m.Status, ItemStatus.Sold));
 
         Assert.Equal(ItemStatus.Sold, resp.Status);
-        // The container kind stays so the parent-is-holder invariant holds for leftovers.
-        Assert.Equal(DurableKind.Container, resp.DurableKind);
+        // Stays a container so the parent invariant holds for leftovers.
+        Assert.Equal(true, resp.IsContainer);
     }
 
     [Fact]
     public async Task Handle_SellAssemblyWithLiveComponent_Succeeds()
     {
-        // An Assembly's components ride along — selling the assembly as a unit is never blocked by
-        // them, unlike a Container's live stored-in contents.
-        var pc = await AddContainerAsync(areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        // A non-container's components ride along — selling the assembly as a unit is never blocked by
+        // them, unlike a container's live stored-in contents.
+        var pc = await AddContainerAsync(areaId: _garage.Id, isContainer: false);
         await AddItemAsync(status: ItemStatus.Active, parentItemId: pc.Id, compartment: "CPU");
 
         var resp = await PatchAsync(pc.Id, p => p.Replace(m => m.Status, ItemStatus.Sold));
 
         Assert.Equal(ItemStatus.Sold, resp.Status);
-        Assert.Equal(DurableKind.Assembly, resp.DurableKind);
+        Assert.Equal(false, resp.IsContainer);
+        // Its live component still makes it an assembly (derived from the surviving component child).
+        Assert.True(resp.HasComponents);
     }
 
     [Fact]
     public async Task Handle_SealContainerWithLiveStoredChild_StaysBlocked()
     {
-        // The counterpart to the assembly case: a Container with a live stored-in child still blocks.
-        var chest = await AddContainerAsync(areaId: _garage.Id, durableKind: DurableKind.Container);
+        // The counterpart to the assembly case: a container with a live stored-in child still blocks.
+        var chest = await AddContainerAsync(areaId: _garage.Id, isContainer: true);
         await AddItemAsync(status: ItemStatus.Active, parentItemId: chest.Id);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
@@ -578,9 +601,9 @@ public class PatchDurableHandlerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Handle_MoveIntoAssembly_SetsParentAndComponentLabel()
+    public async Task Handle_MoveIntoNonContainer_SetsParentAndComponentLabel()
     {
-        var pc = await AddContainerAsync(areaId: _garage.Id, durableKind: DurableKind.Assembly);
+        var pc = await AddContainerAsync(areaId: _garage.Id, isContainer: false);
         var cpu = await AddItemAsync(areaId: _office.Id);
 
         var resp = await PatchAsync(cpu.Id, p =>
@@ -591,9 +614,9 @@ public class PatchDurableHandlerTests : IAsyncLifetime
         });
 
         Assert.Equal(pc.Id, resp.ParentItemId);
-        Assert.Equal(DurableKind.Assembly, resp.ParentDurableKind);
+        Assert.Equal(false, resp.ParentIsContainer);
         Assert.Equal("CPU", resp.Compartment);
-        // A component resolves its area by walking up through the assembly.
+        // A component resolves its area by walking up through its (non-container) parent.
         Assert.Equal(_garage.Id, resp.ResolvedAreaId);
     }
 }

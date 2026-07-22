@@ -28,7 +28,7 @@ public class PatchDurableModel
     public string? LentTo { get; set; }
     public Guid? AreaId { get; set; }
     public Guid? ParentItemId { get; set; }
-    public DurableKind? DurableKind { get; set; }
+    public bool? IsContainer { get; set; }
     public string? Compartment { get; set; }
 
     /// <summary>

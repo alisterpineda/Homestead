@@ -54,7 +54,7 @@ const DURABLE_ITEM: ItemDetailResponse = {
   fungibility: 'NonFungible',
   durable: {
     id: 'd1', name: 'Cordless Drill', fungibility: 'NonFungible', status: 'Active',
-    durableKind: 'Plain', path: [], createdAt: '', updatedAt: '',
+    isContainer: false, path: [], createdAt: '', updatedAt: '',
   },
 };
 

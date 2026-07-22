@@ -15,15 +15,24 @@ public record DurableResponse
     public string? AreaName { get; init; }
     public Guid? ParentItemId { get; init; }
 
-    /// <summary>Holder-role of this item; null for a fungible consumable.</summary>
-    public DurableKind? DurableKind { get; init; }
+    /// <summary>Whether this item is a storage container; null for a fungible consumable.</summary>
+    public bool? IsContainer { get; init; }
 
     /// <summary>
-    /// The immediate parent's <see cref="Domain.Inventory.DurableKind"/>; null when the item has no
-    /// parent. Drives the client's "Part of X" vs "In X" label/icon without a second fetch — an
-    /// <see cref="Domain.Inventory.DurableKind.Assembly"/> parent means this item is a component.
+    /// The immediate parent's <see cref="IsContainer"/>; null when the item has no parent. Drives the
+    /// client's "Part of X" vs "In X" label/icon without a second fetch — a non-container parent
+    /// (<c>false</c>) means this item is a component.
     /// </summary>
-    public DurableKind? ParentDurableKind { get; init; }
+    public bool? ParentIsContainer { get; init; }
+
+    /// <summary>
+    /// Whether this item has ≥1 live child (derived, never stored). The client reads it two ways:
+    /// gated by <see cref="IsContainer"/> it means "non-container assembly" (component children) —
+    /// driving the assembly icon and the picker's "Part of" group; ungated it means "holds something
+    /// live", which the edit sheet uses to disable the container toggle (a populated item can't be
+    /// flipped either direction). It is <c>true</c> for a container with live stored contents too.
+    /// </summary>
+    public bool HasComponents { get; init; }
 
     public string? Compartment { get; init; }
 

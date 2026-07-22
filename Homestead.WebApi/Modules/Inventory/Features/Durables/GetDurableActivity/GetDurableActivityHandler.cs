@@ -26,10 +26,11 @@ public class GetDurableActivityHandler(AppDbContext db)
         ["Serial"] = "serial",
         ["AcquiredOn"] = "acquired date",
         ["LentTo"] = "lent to",
-        ["DurableKind"] = "type",
-        // Historical rows recorded the old boolean under "IsContainer"; keep mapping it so pre-migration
-        // activity still reads "type" rather than the raw field name.
+        // Current rows record the container flag under "IsContainer"; historical rows recorded the
+        // interim "DurableKind" trichotomy (and, before that, an older "IsContainer" boolean). All map
+        // to "type" so activity reads consistently across the schema's history.
         ["IsContainer"] = "type",
+        ["DurableKind"] = "type",
         ["Notes"] = "notes",
         ["Unit"] = "unit",
         ["RestockThreshold"] = "restock threshold",

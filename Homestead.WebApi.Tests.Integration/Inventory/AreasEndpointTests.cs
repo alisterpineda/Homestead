@@ -14,12 +14,14 @@ internal record PlaceContentsLite(
     IReadOnlyList<LocationSegmentItem> Path, IReadOnlyList<ChildAreaItem> ChildAreas);
 internal record DurableItem(
     Guid Id, string Name, string Fungibility, string Status,
-    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, string? DurableKind,
-    Guid? ParentItemId, string? ParentDurableKind, string? Compartment, Guid? ResolvedAreaId,
+    Guid? AreaId, string? AreaName, string? LentTo, string? Serial, bool? IsContainer,
+    Guid? ParentItemId, bool? ParentIsContainer, string? Compartment, Guid? ResolvedAreaId,
     IReadOnlyList<LocationSegmentItem>? Path,
     // Whole classification-tag set on the item, each badge carrying its resolved effective colour.
     // Trailing + defaulted: an absent `tags` in JSON falls back to null, so tag-agnostic tests bind unchanged.
     IReadOnlyList<ItemTagRef>? Tags = null,
+    // Derived assembly-ness (≥1 live component child); trailing + defaulted for the same reason.
+    bool HasComponents = false,
     // Acquisition cluster — trailing + defaulted for the same reason.
     string? AcquisitionKind = null, decimal? AcquisitionCost = null,
     Guid? AcquisitionCostCurrencyId = null, string? AcquisitionCostCurrencySymbol = null,

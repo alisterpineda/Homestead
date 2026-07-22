@@ -74,9 +74,9 @@ type InlineForm = 'move' | 'lent' | null;
       <hlm-sheet-content *hlmSheetPortal class="md:max-w-md max-md:max-h-[85dvh] max-md:rounded-t-xl">
         <hlm-sheet-header>
           <div class="flex items-center gap-2">
-            @if (view()?.durableKind === 'Container') {
+            @if (view()?.isContainer) {
               <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
-            } @else if (view()?.durableKind === 'Assembly') {
+            } @else if (view()?.hasComponents) {
               <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
             }
             <h3 hlmSheetTitle class="min-w-0 truncate">{{ view()?.name }}</h3>
@@ -300,11 +300,15 @@ export class DurableQuickPanelComponent {
     return it ? formatPath(it) : '';
   });
 
-  protected isAssembly = computed(() => this.view()?.durableKind === 'Assembly');
-  // Both Containers and Assemblies hold children; the count card renders for either.
+  // Assembly-ness is derived: a non-container with live component children.
+  protected isAssembly = computed(() => {
+    const v = this.view();
+    return !!v && v.isContainer !== true && v.hasComponents === true;
+  });
+  // A container holds contents and an assembly holds components; the count card renders for either.
   protected isHolder = computed(() => {
-    const k = this.view()?.durableKind;
-    return k === 'Container' || k === 'Assembly';
+    const v = this.view();
+    return !!v && (v.isContainer === true || v.hasComponents === true);
   });
   protected contentsCountNoun = computed(() => {
     const n = this.contentsCount();

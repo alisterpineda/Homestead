@@ -34,7 +34,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
 
     private async Task<Item> AddContainerAsync(
         string name, Guid? areaId = null, Guid? parentItemId = null,
-        DurableKind durableKind = DurableKind.Container)
+        bool isContainer = true)
     {
         var item = new Item
         {
@@ -42,7 +42,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
             Name = name,
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = durableKind,
+            IsContainer = isContainer,
             AreaId = areaId,
             ParentItemId = parentItemId,
         };
@@ -57,7 +57,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
         Name = "Item",
         Fungibility = Fungibility.NonFungible,
         Status = ItemStatus.Active,
-        DurableKind = DurableKind.Plain,
+        IsContainer = false,
         AreaId = areaId,
         AreaName = areaName,
         ParentItemId = parentItemId,
@@ -103,7 +103,7 @@ public class ItemLocationResolverTests : IAsyncLifetime
         // A component (child of an Assembly) resolves its area by walking up through the assembly,
         // even though the assembly is not a place.
         var garage = await AddAreaAsync("Garage");
-        var pc = await AddContainerAsync("Gaming PC", areaId: garage.Id, durableKind: DurableKind.Assembly);
+        var pc = await AddContainerAsync("Gaming PC", areaId: garage.Id, isContainer: false);
 
         var enriched = await _sut.EnrichAsync(Response(Guid.NewGuid(), parentItemId: pc.Id), Ct);
 

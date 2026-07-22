@@ -10,21 +10,21 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
     private const string LocationNotBothSql =
         "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)";
 
-    // A fungible row carries none of the non-fungible columns and has no durable kind. BrandId is
+    // A fungible row carries none of the non-fungible columns and has no container flag. BrandId is
     // deliberately absent — a brand is legal on both kinds.
     private const string NonFungibleFieldsSql =
         "\"Fungibility\" = 'NonFungible' OR ("
         + "\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL "
         + "AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL "
         + "AND \"Model\" IS NULL "
-        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL "
+        + "AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" IS NULL "
         + "AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL "
         + "AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)";
 
-    // A non-fungible row carries none of the fungible columns and always names a durable kind.
+    // A non-fungible row carries none of the fungible columns and always names its container flag.
     private const string FungibleFieldsSql =
         "\"Fungibility\" = 'Fungible' OR ("
-        + "\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL AND \"DurableKind\" IS NOT NULL)";
+        + "\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL AND \"IsContainer\" IS NOT NULL)";
 
     // Estimated value and its currency are set together or not at all.
     private const string ValueCurrencyPairSql =
@@ -84,10 +84,6 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
         builder.Property(i => i.AcquisitionCost).HasColumnType("numeric");
         builder.Property(i => i.RestockThreshold).HasColumnType("numeric");
 
-        builder.Property(i => i.DurableKind)
-            .HasConversion<string>()
-            .HasMaxLength(16);
-
         builder.Property(i => i.AcquisitionKind)
             .HasConversion<string>()
             .HasMaxLength(16);
@@ -108,7 +104,7 @@ public class ItemConfiguration : IEntityTypeConfiguration<Item>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(i => i.ParentItem)
-            .WithMany()
+            .WithMany(i => i.Children)
             .HasForeignKey(i => i.ParentItemId)
             .OnDelete(DeleteBehavior.Restrict);
 

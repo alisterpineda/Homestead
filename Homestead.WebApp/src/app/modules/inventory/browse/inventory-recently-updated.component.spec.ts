@@ -12,7 +12,7 @@ function makeDurable(over: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    durableKind: 'Plain',
+    isContainer: false,
     path: [],
     createdAt: '',
     updatedAt: '',

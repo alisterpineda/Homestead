@@ -187,10 +187,10 @@ public class CreateDurableCommandValidatorTests
     }
 
     [Fact]
-    public async Task ContainerKindAlone_IsValid()
+    public async Task IsContainerAlone_IsValid()
     {
         var result = await _sut.ValidateAsync(
-            new CreateDurableCommand { Name = "Tool chest", DurableKind = DurableKind.Container }, Ct);
+            new CreateDurableCommand { Name = "Tool chest", IsContainer = true }, Ct);
         Assert.True(result.IsValid);
     }
 }

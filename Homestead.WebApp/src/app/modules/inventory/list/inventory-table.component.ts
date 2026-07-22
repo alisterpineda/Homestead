@@ -260,9 +260,9 @@ export class InventoryTableComponent {
         const row = info.row.original;
         const durable = row.durable;
         if (durable) {
-          // A component (child of an Assembly) reads as composition, not a storage breadcrumb —
-          // formatPath is the single source for the "Part of {assembly}" wording.
-          if (durable.parentDurableKind === 'Assembly') {
+          // A component (child of a non-container) reads as composition, not a storage breadcrumb —
+          // formatPath is the single source for the "Part of {parent}" wording.
+          if (durable.parentIsContainer === false) {
             const partOf = escapeHtml(formatPath(durable));
             return `<span class="block truncate text-sm" title="${partOf}">${partOf}</span>`;
           }

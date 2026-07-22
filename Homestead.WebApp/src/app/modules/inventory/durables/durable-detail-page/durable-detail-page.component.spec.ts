@@ -26,7 +26,7 @@ const LEAF_ITEM: DurableResponse = {
   name: 'Cordless Drill',
   fungibility: 'NonFungible',
   status: 'Active',
-  durableKind: 'Plain',
+  isContainer: false,
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   resolvedAreaId: 'garage',
   areaId: 'garage',
@@ -43,7 +43,7 @@ const CONTAINER_ITEM: DurableResponse = {
   name: 'Tool Chest',
   fungibility: 'NonFungible',
   status: 'Active',
-  durableKind: 'Container',
+  isContainer: true,
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   resolvedAreaId: 'garage',
   createdAt: '2025-01-01T00:00:00Z',
@@ -64,7 +64,7 @@ const CHEST_CONTENTS: PlaceContentsResponse = {
   ],
   items: [{
     id: 'wrench', name: 'Wrench', fungibility: 'NonFungible', status: 'Active',
-    durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
+    isContainer: false, path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
   }],
   consumables: [],
 };
@@ -74,7 +74,8 @@ const ASSEMBLY_ITEM: DurableResponse = {
   name: 'Gaming PC',
   fungibility: 'NonFungible',
   status: 'Active',
-  durableKind: 'Assembly',
+  isContainer: false,
+  hasComponents: true,
   path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
   resolvedAreaId: 'garage',
   areaId: 'garage',
@@ -95,7 +96,7 @@ const PC_CONTENTS: PlaceContentsResponse = {
   containers: [],
   items: [{
     id: 'cpu', name: 'Ryzen 9', fungibility: 'NonFungible', status: 'Active',
-    durableKind: 'Plain', parentItemId: 'pc1', parentDurableKind: 'Assembly', compartment: 'CPU',
+    isContainer: false, parentItemId: 'pc1', parentIsContainer: false, compartment: 'CPU',
     path: [], createdAt: '', updatedAt: '2025-05-01T00:00:00Z',
   }],
   consumables: [],
@@ -219,7 +220,7 @@ describe('DurableDetailPageComponent', () => {
     // A bare leaf durable: placed, but no value/serial/acquired/lent. The common shape in current data.
     durableApi.item = {
       id: 'bare', name: 'Some Container', fungibility: 'NonFungible', status: 'Active',
-      durableKind: 'Plain', path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
+      isContainer: false, path: [{ id: 'garage', name: 'Garage', kind: 'Area' }],
       resolvedAreaId: 'garage', createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
     };
     const { harness } = await navigate('/inventory/items/bare');
@@ -261,7 +262,7 @@ describe('DurableDetailPageComponent', () => {
   it('shows the Details box when only an acquisition field is set', async () => {
     durableApi.item = {
       id: 'bare2', name: 'Gifted Thing', fungibility: 'NonFungible', status: 'Active',
-      durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+      isContainer: false, path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
       acquisitionKind: 'Gift',
     };
     const { harness } = await navigate('/inventory/items/bare2');
@@ -274,7 +275,7 @@ describe('DurableDetailPageComponent', () => {
   it('shows Unplaced as the location headline for an unplaced durable', async () => {
     durableApi.item = {
       id: 'floating', name: 'Floating Thing', fungibility: 'NonFungible', status: 'Active',
-      durableKind: 'Plain', path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
+      isContainer: false, path: [], createdAt: '', updatedAt: '2025-06-01T00:00:00Z',
     };
     const { harness } = await navigate('/inventory/items/floating');
 
@@ -372,15 +373,35 @@ describe('DurableDetailPageComponent', () => {
     expect(content).not.toContain('Contents');
     expect(content).toContain('Ryzen 9'); // the component
     expect(content).toContain('CPU'); // its compartment / slot label
-    expect(content).toContain('Add component');
+    expect(content).toContain('Add part');
+    // An assembly already has components, so it can't be flipped to a container.
+    expect(content).not.toContain('Store items inside');
   });
 
-  it('pre-parents the create dialog under the assembly for "Add component"', async () => {
+  it('pre-parents the create dialog under the item for "Add part"', async () => {
     durableApi.item = ASSEMBLY_ITEM;
     placeApi.contents = PC_CONTENTS;
     const { component } = await navigate('/inventory/items/pc1');
 
     expect(component['addComponentLocation']()).toEqual({ kind: 'container', id: 'pc1' });
+  });
+
+  it('offers "Store items inside" on an empty regular item and PATCHes /isContainer', async () => {
+    // A regular item with no components renders a static Components section — no contents fetch — plus
+    // the "Store items inside" intent action that converts it to a container.
+    durableApi.item = LEAF_ITEM;
+    const { harness, component } = await navigate('/inventory/items/item1');
+
+    const content = text(harness);
+    expect(content).toContain('Components');
+    expect(content).toContain('Store items inside');
+    expect(content).toContain('Add part');
+    expect(placeApi.calls).toEqual([]); // empty regular item never fetches
+
+    component.onStoreItemsInside(LEAF_ITEM);
+    expect(durableApi.patchCalls).toEqual([
+      { id: 'item1', body: [{ op: 'replace', path: '/isContainer', value: true }] },
+    ]);
   });
 
   it('renders the activity history feed with each summary', async () => {

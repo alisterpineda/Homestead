@@ -143,7 +143,7 @@ public class BulkDeleteTagsHandlerTests : IDisposable
             Name = "Drill",
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = DurableKind.Plain,
+            IsContainer = false,
         };
         _db.Items.Add(item);
         await _db.SaveChangesAsync(ct);

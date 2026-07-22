@@ -10,7 +10,7 @@ function makeItem(overrides: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    durableKind: 'Plain',
+    isContainer: false,
     path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -97,7 +97,7 @@ describe('InventoryTableComponent', () => {
 
     it('renders "Part of {assembly}" for a component instead of the storage breadcrumb', () => {
       const row = durableToRow(makeItem({
-        parentDurableKind: 'Assembly',
+        parentIsContainer: false,
         resolvedAreaId: 'garage',
         path: [
           { id: 'garage', name: 'Garage', kind: 'Area' },
@@ -177,7 +177,7 @@ describe('InventoryTableComponent', () => {
     // reads from the On-hand column and the All/Durables/Consumables filter. Guard the removal.
     it('renders no kind icon in the name cell for any row kind', () => {
       fixture.componentRef.setInput('rows', [
-        durableToRow(makeItem({ durableKind: 'Container' })),
+        durableToRow(makeItem({ isContainer: true })),
         consumableToRow(makeConsumable()),
       ]);
       fixture.detectChanges();

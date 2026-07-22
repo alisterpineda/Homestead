@@ -13,11 +13,11 @@ public record CreateDurableCommand : ICommand<DurableResponse>
     public required string Name { get; init; }
     public Guid? AreaId { get; init; }
 
-    /// <summary>Place the new item inside this holder (container or assembly). At most one of this / <see cref="AreaId"/>.</summary>
+    /// <summary>Place the new item inside this parent (a container stores it; a regular item takes it as a component). At most one of this / <see cref="AreaId"/>.</summary>
     public Guid? ParentItemId { get; init; }
 
-    /// <summary>Holder-role of the new item; defaults to <see cref="DurableKind.Plain"/> (holds nothing).</summary>
-    public DurableKind DurableKind { get; init; } = DurableKind.Plain;
+    /// <summary>Whether the new item is a storage container; defaults to <c>false</c> (a regular item).</summary>
+    public bool IsContainer { get; init; } = false;
 
     /// <summary>Free-text sub-position; only allowed when <see cref="ParentItemId"/> is set.</summary>
     public string? Compartment { get; init; }

@@ -312,7 +312,7 @@ public class GetTagsHandlerTests : IDisposable
             Name = name,
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = DurableKind.Plain,
+            IsContainer = false,
         };
         _db.Items.Add(item);
         return await Task.FromResult(item);

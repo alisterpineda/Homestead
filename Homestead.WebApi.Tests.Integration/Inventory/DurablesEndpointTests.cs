@@ -20,7 +20,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
     private static Task<DurableItem> CreateContainerAsync(
         HttpClient client, string name, Guid? areaId = null, Guid? parentItemId = null) =>
-        CreateDurableAsync(client, new { name, areaId, parentItemId, durableKind = "Container" });
+        CreateDurableAsync(client, new { name, areaId, parentItemId, isContainer = true });
 
     private static async Task<DurableItem> GetDurableAsync(HttpClient client, Guid id)
     {
@@ -80,7 +80,7 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal("Cordless drill", item.Name);
         Assert.Equal("NonFungible", item.Fungibility);
         Assert.Equal("Active", item.Status);
-        Assert.Equal("Plain", item.DurableKind);
+        Assert.False(item.IsContainer);
         Assert.Null(item.AreaId);
     }
 
@@ -319,25 +319,6 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task GetDurables_DurableKindsFilter_ReturnsHoldersOnly()
-    {
-        var client = await CreateAdminClientAsync();
-        var garageId = await CreateAreaAsync(client, "Garage");
-        var chest = await CreateContainerAsync(client, "Tool chest", areaId: garageId);
-        var pc = await CreateDurableAsync(client,
-            new { name = "Gaming PC", areaId = garageId, durableKind = "Assembly" });
-        var wrench = await CreateDurableAsync(client, new { name = "Wrench", areaId = garageId });
-
-        var list = await (await client.GetAsync(
-                "/api/v1/inventory/durables?page=1&pageSize=200&durableKinds=Container&durableKinds=Assembly", CT))
-            .Content.ReadFromJsonAsync<PaginatedResult<DurableItem>>(CT);
-
-        Assert.Contains(list!.Items, i => i.Id == chest.Id);
-        Assert.Contains(list.Items, i => i.Id == pc.Id);
-        Assert.DoesNotContain(list.Items, i => i.Id == wrench.Id);
-    }
-
-    [Fact]
     public async Task GetDurable_NestedThreeDeep_ResolvesPathAndKinds()
     {
         var client = await CreateAdminClientAsync();
@@ -433,15 +414,37 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task CreateDurable_ParentNotContainer_Returns400()
+    public async Task CreateDurable_ParentFungibleConsumable_Returns400()
     {
         var client = await CreateAdminClientAsync();
-        var plain = await CreateDurableAsync(client, new { name = "Hammer" });
+        var createResp = await client.PostAsJsonAsync("/api/v1/inventory/consumables", new { name = "Screws" }, CT);
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var consumable = (await createResp.Content.ReadFromJsonAsync<ConsumableItem>(CT))!;
 
+        // A parent must be a non-fungible item; a fungible consumable cannot hold children.
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
-            new { name = "Wrench", parentItemId = plain.Id }, CT);
+            new { name = "Wrench", parentItemId = consumable.Id }, CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateDurable_ComponentUnderRegularItem_ResolvesAsComponent()
+    {
+        var client = await CreateAdminClientAsync();
+        // A regular (non-container) item can be a parent: its child is a component, not stored-in stock.
+        var pc = await CreateDurableAsync(client, new { name = "Gaming PC" });
+        var gpu = await CreateDurableAsync(client, new { name = "GPU", parentItemId = pc.Id });
+
+        // The component's parent is a non-container, so parentIsContainer is false ("Part of X").
+        var fetchedGpu = await GetDurableAsync(client, gpu.Id);
+        Assert.Equal(pc.Id, fetchedGpu.ParentItemId);
+        Assert.False(fetchedGpu.ParentIsContainer);
+
+        // Having a live component makes the parent an assembly (derived HasComponents).
+        var fetchedPc = await GetDurableAsync(client, pc.Id);
+        Assert.False(fetchedPc.IsContainer);
+        Assert.True(fetchedPc.HasComponents);
     }
 
     [Fact]
@@ -501,7 +504,7 @@ public class DurablesEndpointTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task PatchItem_RoleOffWithChildren_Returns400_EvenAfterArchivingChild()
+    public async Task PatchItem_UncontainerWithChildren_Returns400_EvenAfterArchivingChild()
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
@@ -510,10 +513,10 @@ public class DurablesEndpointTests : IntegrationTestBase
 
         var firstAttempt = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
         Assert.Equal(HttpStatusCode.BadRequest, firstAttempt.StatusCode);
 
-        // Archiving the child does not release the role-off block (Rule B: ANY child blocks).
+        // Archiving the child does not release the flip block (ANY child — live or terminal — blocks).
         var archiveResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{wrench.Id}",
             new[] { new { op = "replace", path = "/status", value = (object)"Archived" } });
@@ -521,7 +524,7 @@ public class DurablesEndpointTests : IntegrationTestBase
 
         var retry = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
         Assert.Equal(HttpStatusCode.BadRequest, retry.StatusCode);
     }
 
@@ -558,7 +561,7 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Equal(HttpStatusCode.OK, sellResp.StatusCode);
         var sold = (await sellResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
         Assert.Equal("Sold", sold.Status);
-        Assert.Equal("Container", sold.DurableKind); // kind stays, preserving the invariant for leftovers.
+        Assert.True(sold.IsContainer); // stays a container, preserving the invariant for leftovers.
     }
 
     // ----- Containment: escape hatch -----
@@ -610,13 +613,13 @@ public class DurablesEndpointTests : IntegrationTestBase
         Assert.Null(moved.ParentItemId);
         Assert.Null(moved.Compartment);
 
-        // With the container now empty, role-off succeeds.
+        // With the container now empty, flipping it to a regular item succeeds.
         var roleOffResp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{chest.Id}",
-            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
         Assert.Equal(HttpStatusCode.OK, roleOffResp.StatusCode);
         var noLongerContainer = (await roleOffResp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
-        Assert.Equal("Plain", noLongerContainer.DurableKind);
+        Assert.False(noLongerContainer.IsContainer);
     }
 
     // ----- B3: the durables endpoint is the non-fungible surface -----
@@ -639,19 +642,6 @@ public class DurablesEndpointTests : IntegrationTestBase
     // ----- B2: undefined enum values are rejected, not persisted -----
 
     [Fact]
-    public async Task CreateDurable_WithUndefinedDurableKind_Returns400()
-    {
-        var client = await CreateAdminClientAsync();
-
-        // durableKind:99 binds via JsonStringEnumConverter (allowIntegerValues) to an out-of-range
-        // DurableKind; the IsInEnum() validator must reject it rather than let it persist.
-        var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
-            new { name = "Weird", durableKind = 99 }, CT);
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-    }
-
-    [Fact]
     public async Task PatchDurable_WithUndefinedStatus_Returns400()
     {
         var client = await CreateAdminClientAsync();
@@ -662,19 +652,6 @@ public class DurablesEndpointTests : IntegrationTestBase
         var resp = await SendJsonPatchAsync(client,
             $"/api/v1/inventory/durables/{item.Id}",
             new[] { new { op = "replace", path = "/status", value = 99 } });
-
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
-    }
-
-    [Fact]
-    public async Task PatchDurable_WithUndefinedDurableKind_Returns400()
-    {
-        var client = await CreateAdminClientAsync();
-        var item = await CreateDurableAsync(client, new { name = "Drill" });
-
-        var resp = await SendJsonPatchAsync(client,
-            $"/api/v1/inventory/durables/{item.Id}",
-            new[] { new { op = "replace", path = "/durableKind", value = 99 } });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }

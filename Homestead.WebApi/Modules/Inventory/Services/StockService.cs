@@ -385,8 +385,8 @@ public class StockService(
         var container = await db.Items.AsNoTracking().FirstOrDefaultAsync(i => i.Id == containerId, ct);
         if (container is null)
             throw new BusinessRuleException("ContainerItemId must reference an existing item.");
-        // Loose stock can only sit in a Container — an Assembly holds components, not a place that takes stock.
-        if (container.Fungibility != Fungibility.NonFungible || container.DurableKind != DurableKind.Container)
+        // Loose stock can only sit in a container — a non-container holds components, not a place that takes stock.
+        if (container.Fungibility != Fungibility.NonFungible || container.IsContainer != true)
             throw new BusinessRuleException("ContainerItemId must reference a container item.");
         // A destination must be live: stock moves OUT of a terminal (Sold/Discarded/Archived) container
         // but never INTO one — the complement of the durable sealing gate.

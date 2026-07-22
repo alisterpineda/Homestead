@@ -1094,14 +1094,13 @@ namespace Homestead.WebApi.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("DurableKind")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<string>("Fungibility")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
+
+                    b.Property<bool?>("IsContainer")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("LentTo")
                         .HasMaxLength(256)
@@ -1174,7 +1173,7 @@ namespace Homestead.WebApi.Migrations
                         {
                             t.HasCheckConstraint("CK_items_acquisition_cost_currency_pair", "(\"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL) OR (\"AcquisitionCost\" IS NOT NULL AND \"AcquisitionCostCurrencyId\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_items_fungible_fields", "\"Fungibility\" = 'Fungible' OR (\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL AND \"DurableKind\" IS NOT NULL)");
+                            t.HasCheckConstraint("CK_items_fungible_fields", "\"Fungibility\" = 'Fungible' OR (\"Unit\" IS NULL AND \"RestockThreshold\" IS NULL AND \"IsContainer\" IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_items_fungible_status", "\"Fungibility\" = 'NonFungible' OR \"Status\" IN ('Active', 'Archived')");
 
@@ -1182,7 +1181,7 @@ namespace Homestead.WebApi.Migrations
 
                             t.HasCheckConstraint("CK_items_location_not_both", "NOT (\"AreaId\" IS NOT NULL AND \"ParentItemId\" IS NOT NULL)");
 
-                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"Model\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"DurableKind\" IS NULL AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)");
+                            t.HasCheckConstraint("CK_items_nonfungible_fields", "\"Fungibility\" = 'NonFungible' OR (\"AreaId\" IS NULL AND \"ParentItemId\" IS NULL AND \"Compartment\" IS NULL AND \"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL AND \"Serial\" IS NULL AND \"Model\" IS NULL AND \"AcquiredOn\" IS NULL AND \"LentTo\" IS NULL AND \"IsContainer\" IS NULL AND \"AcquisitionKind\" IS NULL AND \"AcquisitionCost\" IS NULL AND \"AcquisitionCostCurrencyId\" IS NULL AND \"AcquiredFrom\" IS NULL)");
 
                             t.HasCheckConstraint("CK_items_value_currency_pair", "(\"Value\" IS NULL AND \"ValueCurrencyId\" IS NULL) OR (\"Value\" IS NOT NULL AND \"ValueCurrencyId\" IS NOT NULL)");
                         });
@@ -2153,7 +2152,7 @@ namespace Homestead.WebApi.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Homestead.WebApi.Domain.Inventory.Item", "ParentItem")
-                        .WithMany()
+                        .WithMany("Children")
                         .HasForeignKey("ParentItemId")
                         .OnDelete(DeleteBehavior.Restrict);
 
@@ -2431,6 +2430,8 @@ namespace Homestead.WebApi.Migrations
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Inventory.Item", b =>
                 {
+                    b.Navigation("Children");
+
                     b.Navigation("ItemTags");
 
                     b.Navigation("StockEntries");

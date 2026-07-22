@@ -122,7 +122,7 @@ describe('CreateEntryDialogComponent', () => {
     expect(create(null).componentInstance.placedInitialLocation()).toBeNull();
   });
 
-  it('sends durableKind=Plain by default when creating a durable', () => {
+  it('creates a regular durable without sending a type/container flag', () => {
     const fixture = create();
     const component = fixture.componentInstance;
     component.onStateChanged('open');
@@ -131,31 +131,11 @@ describe('CreateEntryDialogComponent', () => {
     component.handleSubmit(new Event('submit'));
 
     expect(createDurable).toHaveBeenCalledTimes(1);
-    expect(submittedDurableBody().durableKind).toBe('Plain');
-  });
-
-  it('sends the chosen durableKind (Assembly) when creating a durable', () => {
-    const fixture = create();
-    const component = fixture.componentInstance;
-    component.onStateChanged('open');
-    component.name.set('Gaming PC');
-    component.durableKind.set('Assembly');
-
-    component.handleSubmit(new Event('submit'));
-
     const body = submittedDurableBody();
-    expect(body.name).toBe('Gaming PC');
-    expect(body.durableKind).toBe('Assembly');
-  });
-
-  it('resets the durable type to Plain on open', () => {
-    const fixture = create();
-    const component = fixture.componentInstance;
-    component.durableKind.set('Container');
-
-    component.onStateChanged('open');
-
-    expect(component.durableKind()).toBe('Plain');
+    expect(body.name).toBe('Cordless drill');
+    // The dialog no longer carries a type selector — container-ness defaults false server-side.
+    expect(body.isContainer).toBeUndefined();
+    expect('durableKind' in body).toBe(false);
   });
 
   it('seeds starting stock when a quantity is entered at a drilled area', () => {

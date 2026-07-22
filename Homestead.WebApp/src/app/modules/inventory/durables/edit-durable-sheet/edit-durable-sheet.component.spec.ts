@@ -20,7 +20,7 @@ function makeItem(overrides: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    durableKind: 'Plain',
+    isContainer: false,
     path: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -94,14 +94,14 @@ describe('EditDurableSheetComponent', () => {
 
     it('seeds the container / parent / compartment fields from the item', () => {
       open(makeItem({
-        parentItemId: 'chest', durableKind: 'Container', compartment: 'Top drawer',
+        parentItemId: 'chest', isContainer: true, compartment: 'Top drawer',
         path: [
           { id: 'garage', name: 'Garage', kind: 'Area' },
           { id: 'chest', name: 'Tool chest', kind: 'Container' },
         ],
       }));
       expect(component.editParentItemId()).toBe('chest');
-      expect(component.editDurableKind()).toBe('Container');
+      expect(component.editIsContainer()).toBe(true);
       expect(component.editCompartment()).toBe('Top drawer');
     });
   });
@@ -143,16 +143,24 @@ describe('EditDurableSheetComponent', () => {
       expect(ops()).toEqual([]);
     });
 
-    it('emits a /durableKind op when the type changes', () => {
-      open(makeItem({ durableKind: 'Plain' }));
-      component.editDurableKind.set('Container');
-      expect(ops()).toEqual([{ op: 'replace', path: '/durableKind', value: 'Container' }]);
+    it('emits a /isContainer op when the container flag is turned on', () => {
+      open(makeItem({ isContainer: false }));
+      component.editIsContainer.set(true);
+      expect(ops()).toEqual([{ op: 'replace', path: '/isContainer', value: true }]);
     });
 
-    it('emits a /durableKind op of Assembly', () => {
-      open(makeItem({ durableKind: 'Plain' }));
-      component.editDurableKind.set('Assembly');
-      expect(ops()).toEqual([{ op: 'replace', path: '/durableKind', value: 'Assembly' }]);
+    it('emits a /isContainer op when the container flag is turned off', () => {
+      open(makeItem({ isContainer: true }));
+      component.editIsContainer.set(false);
+      expect(ops()).toEqual([{ op: 'replace', path: '/isContainer', value: false }]);
+    });
+
+    it('seeds editIsContainer disabled-relevant hasComponents from the item', () => {
+      // The Storage-container checkbox is disabled when the item already holds components (an assembly
+      // can't be flipped to a container); the sheet reads hasComponents straight off the item.
+      open(makeItem({ isContainer: false, hasComponents: true }));
+      expect(component.durable()?.hasComponents).toBe(true);
+      expect(component.editIsContainer()).toBe(false);
     });
   });
 

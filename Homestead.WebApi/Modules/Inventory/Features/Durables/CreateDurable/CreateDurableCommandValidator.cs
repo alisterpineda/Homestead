@@ -11,10 +11,6 @@ public class CreateDurableCommandValidator : AbstractValidator<CreateDurableComm
             .Must(n => !string.IsNullOrWhiteSpace(n)).WithMessage("Name is required.")
             .MaximumLength(256).WithMessage("Name must be 256 characters or fewer.");
 
-        // The default JsonStringEnumConverter binds arbitrary integers to DurableKind; reject an
-        // out-of-range value so it can't persist and later re-serialize as a JSON number.
-        RuleFor(x => x.DurableKind).IsInEnum();
-
         RuleFor(x => x.Serial)
             .MaximumLength(128).WithMessage("Serial must be 128 characters or fewer.");
 
@@ -52,7 +48,8 @@ public class CreateDurableCommandValidator : AbstractValidator<CreateDurableComm
             .NotNull().WithMessage("Value is required when ValueCurrencyId is set.")
             .When(x => x.ValueCurrencyId.HasValue);
 
-        // Same integer-binding hole as DurableKind: reject out-of-range values (null passes).
+        // JsonStringEnumConverter binds arbitrary integers to the enum; reject out-of-range values
+        // (null passes) so they can't persist and later re-serialize as a JSON number.
         RuleFor(x => x.AcquisitionKind).IsInEnum();
 
         RuleFor(x => x.AcquiredFrom)

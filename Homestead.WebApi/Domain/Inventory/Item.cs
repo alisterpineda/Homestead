@@ -31,20 +31,28 @@ public class Item
     public Guid? AreaId { get; set; }
     public Area? Area { get; set; }
 
-    /// <summary>Container placement (self-reference). At most one of this / <see cref="AreaId"/> is set.</summary>
+    /// <summary>
+    /// Parent placement (self-reference). At most one of this / <see cref="AreaId"/> is set. The
+    /// relationship is derived from the parent's <see cref="IsContainer"/>: a child of a container is
+    /// stored in it (loose contents); a child of a non-container is a component of it.
+    /// </summary>
     public Guid? ParentItemId { get; set; }
     public Item? ParentItem { get; set; }
 
+    /// <summary>Inverse of <see cref="ParentItem"/> — direct children (stored-in contents or components).</summary>
+    public ICollection<Item> Children { get; set; } = [];
+
     /// <summary>
-    /// Holder-role; set on every non-fungible item, null on fungible items. A <see cref="DurableKind.Container"/>
-    /// stores children and stock; an <see cref="DurableKind.Assembly"/> holds components; a
-    /// <see cref="DurableKind.Plain"/> item holds nothing and cannot be a parent.
+    /// Whether this item is a storage container; set on every non-fungible item, null on fungible
+    /// items. <c>true</c> = a browsable place holding loose stock and stored-in children; <c>false</c>
+    /// = a regular item whose children (if any) are its components. Assembly-ness (having components)
+    /// is not stored — it is derived from having component children of a non-container.
     /// </summary>
-    public DurableKind? DurableKind { get; set; }
+    public bool? IsContainer { get; set; }
 
     /// <summary>
     /// Free-text sub-position within a parent ("top drawer"); doubles as the component role/slot
-    /// label ("CPU") for a child of an <see cref="DurableKind.Assembly"/>.
+    /// label ("CPU") for a child of a non-container (<see cref="IsContainer"/> = false).
     /// </summary>
     public string? Compartment { get; set; }
 

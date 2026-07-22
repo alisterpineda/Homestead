@@ -17,7 +17,7 @@ function makeItem(over: Partial<DurableResponse> = {}): DurableResponse {
     name: 'Cordless drill',
     fungibility: 'NonFungible',
     status: 'Active',
-    durableKind: 'Plain',
+    isContainer: false,
     path: [],
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
@@ -54,7 +54,7 @@ describe('formatPath', () => {
 
   it('renders "Part of {assembly}" for a component', () => {
     const it = makeItem({
-      parentDurableKind: 'Assembly',
+      parentIsContainer: false,
       resolvedAreaId: 'garage',
       path: [
         { id: 'garage', name: 'Garage', kind: 'Area' },

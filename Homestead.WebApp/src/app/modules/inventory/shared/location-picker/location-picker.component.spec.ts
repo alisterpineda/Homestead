@@ -17,7 +17,7 @@ function container(id: string, name: string, opts: { status?: ItemStatus; parent
     name,
     fungibility: 'NonFungible',
     status: opts.status ?? 'Active',
-    durableKind: 'Container',
+    isContainer: true,
     parentItemId: opts.parentItemId ?? null,
     path: [],
     createdAt: '',
@@ -25,8 +25,9 @@ function container(id: string, name: string, opts: { status?: ItemStatus; parent
   };
 }
 
+// An assembly is a non-container that has components.
 function assembly(id: string, name: string, opts: { status?: ItemStatus; parentItemId?: string | null } = {}): DurableResponse {
-  return { ...container(id, name, opts), durableKind: 'Assembly' };
+  return { ...container(id, name, opts), isContainer: false, hasComponents: true };
 }
 
 describe('LocationPickerComponent', () => {
@@ -91,20 +92,26 @@ describe('LocationPickerComponent', () => {
     expect(ids).toEqual(['e']);
   });
 
-  it('splits holders into Containers and Part-of groups by durableKind', async () => {
-    await openAndLoad([], [container('chest', 'Tool chest'), assembly('pc', 'Gaming PC')]);
+  it('splits holders into Containers (isContainer) and Part-of (non-container with components) groups', async () => {
+    // A regular leaf item (neither a container nor holding components) appears in neither group.
+    const leaf: DurableResponse = {
+      id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active',
+      isContainer: false, path: [], createdAt: '', updatedAt: '',
+    };
+    await openAndLoad([], [container('chest', 'Tool chest'), assembly('pc', 'Gaming PC'), leaf]);
 
     expect(component['filteredContainers']().map(c => c.id)).toEqual(['chest']);
     expect(component['filteredAssemblies']().map(c => c.id)).toEqual(['pc']);
   });
 
-  it('requests both Container and Assembly holders', async () => {
+  it('fetches live durables without a DurableKinds filter (the picker filters client-side)', async () => {
     component['popoverState'].set('open');
     fixture.detectChanges();
     await fixture.whenStable();
     httpMock.expectOne(r => r.url.includes('/inventory/areas')).flush({ items: [], page: 1, pageSize: 200, totalCount: 0 });
     const req = httpMock.expectOne(r => r.url.includes('/inventory/durables'));
-    expect(req.request.params.getAll('DurableKinds')).toEqual(['Container', 'Assembly']);
+    expect(req.request.params.has('DurableKinds')).toBe(false);
+    expect(req.request.params.get('IncludeInactive')).toBe('true');
     req.flush({ items: [], page: 1, pageSize: 200, totalCount: 0 });
   });
 

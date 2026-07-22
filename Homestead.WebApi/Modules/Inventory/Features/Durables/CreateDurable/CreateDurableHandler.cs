@@ -27,20 +27,20 @@ public class CreateDurableHandler(
                 throw new BusinessRuleException("AreaId must reference an existing area.");
         }
 
-        // A parent must be a non-fungible holder (container or assembly). No cycle is possible on
-        // create — the new row has no descendants yet.
+        // Any live non-fungible item can be a parent: a container stores the new item, a regular item
+        // takes it as a component. No cycle is possible on create — the new row has no descendants yet.
         if (request.ParentItemId is { } parentId)
         {
             var parent = await db.Items.AsNoTracking()
                 .FirstOrDefaultAsync(i => i.Id == parentId, ct);
             if (parent is null)
                 throw new BusinessRuleException("ParentItemId must reference an existing item.");
-            if (parent.Fungibility != Fungibility.NonFungible || !parent.DurableKind.IsHolder())
-                throw new BusinessRuleException("ParentItemId must reference a container or assembly item.");
-            // Things move OUT of a terminal (Sold/Discarded/Archived) holder but never INTO one — the
-            // complement of the sealing gate. A new item must be parented into a live holder.
+            if (parent.Fungibility != Fungibility.NonFungible)
+                throw new BusinessRuleException("ParentItemId must reference a non-fungible item.");
+            // Things move OUT of a terminal (Sold/Discarded/Archived) parent but never INTO one — the
+            // complement of the sealing gate. A new item must be parented into a live item.
             if (parent.Status.IsTerminal())
-                throw new BusinessRuleException("ParentItemId must reference a live container or assembly.");
+                throw new BusinessRuleException("ParentItemId must reference a live item.");
         }
 
         // Value and its currency are set together or not at all.
@@ -74,7 +74,7 @@ public class CreateDurableHandler(
             Name = request.Name.Trim(),
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = request.DurableKind,
+            IsContainer = request.IsContainer,
             Notes = Normalize(request.Notes),
             Serial = Normalize(request.Serial),
             BrandId = request.BrandId,

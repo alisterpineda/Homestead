@@ -43,7 +43,7 @@ public class OverviewEndpointTests : IntegrationTestBase
 
     private static Task<DurableItem> CreateContainerAsync(
         HttpClient client, string name, Guid? areaId = null, Guid? parentItemId = null) =>
-        CreateDurableAsync(client, new { name, areaId, parentItemId, durableKind = "Container" });
+        CreateDurableAsync(client, new { name, areaId, parentItemId, isContainer = true });
 
     private static async Task<Guid> CreateAreaAsync(HttpClient client, string name)
     {

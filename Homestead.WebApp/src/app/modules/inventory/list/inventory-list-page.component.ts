@@ -669,21 +669,21 @@ export class InventoryListPageComponent {
   /** A holder's "View contents/components" in the quick panel — Browse owns containment navigation. */
   onQuickPanelViewContents(durable: DurableResponse): void {
     this.onDurableQuickPanelClosed();
-    this.viewHolder(durable.id, durable.durableKind);
+    this.viewHolder(durable.id, durable.isContainer);
   }
 
   /** A holder row's "View contents/components" — drill into it (the list never drills inline). */
   onViewContents(row: InventoryRow): void {
-    this.viewHolder(row.id, row.durable?.durableKind);
+    this.viewHolder(row.id, row.durable?.isContainer);
   }
 
   /**
-   * A Container drills into its Browse place (the list never drills); an Assembly is not a place, so
-   * its components live on its detail page's Components section instead.
+   * A container drills into its Browse place (the list never drills); a non-container (an assembly)
+   * is not a place, so its components live on its detail page's Components section instead.
    */
-  private viewHolder(id: string, kind: DurableResponse['durableKind']): void {
+  private viewHolder(id: string, isContainer: boolean | null | undefined): void {
     void this.router.navigate(
-      kind === 'Assembly' ? ['/inventory/items', id] : ['/inventory/browse/container', id],
+      isContainer ? ['/inventory/browse/container', id] : ['/inventory/items', id],
     );
   }
 }

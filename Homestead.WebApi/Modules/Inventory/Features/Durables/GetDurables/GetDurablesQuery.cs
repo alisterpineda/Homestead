@@ -1,5 +1,4 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domain.Inventory;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +14,7 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     /// </summary>
     public Guid? AreaId { get; init; }
 
-    /// <summary>Restrict to direct children of this holder (container or assembly).</summary>
+    /// <summary>Restrict to direct children of this parent (a container's contents or a regular item's components).</summary>
     public Guid? ParentItemId { get; init; }
 
     /// <summary>Restrict to items attributed to this brand. Backs the Items-list Brand facet.</summary>
@@ -31,14 +30,6 @@ public record GetDurablesQuery : PaginatedRequest, IRequest<PaginatedResponse<Du
     /// <summary>When true, <see cref="TagIds"/> also matches items tagged with any descendant tag.</summary>
     [FromQuery(Name = "IncludeChildTags")]
     public bool? IncludeChildTags { get; init; }
-
-    /// <summary>
-    /// Restrict to items whose holder-role is one of these kinds. Empty/absent ⇒ no kind filter (all
-    /// non-fungible items, components included). The placement picker passes
-    /// <c>[Container, Assembly]</c>; the list can pass a single kind.
-    /// </summary>
-    [FromQuery(Name = "DurableKinds")]
-    public DurableKind[]? DurableKinds { get; init; }
 
     /// <summary>
     /// Restrict to items whose <b>resolved</b> area is null — the container chain reaches no area (or

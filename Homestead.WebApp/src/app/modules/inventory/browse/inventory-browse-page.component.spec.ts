@@ -48,7 +48,7 @@ const GARAGE_CONTENTS: PlaceContentsResponse = {
   ],
   items: [{
     id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active',
-    durableKind: 'Plain', path: [], createdAt: '', updatedAt: '',
+    isContainer: false, path: [], createdAt: '', updatedAt: '',
   }],
   consumables: [],
 };
@@ -260,7 +260,7 @@ describe('InventoryBrowsePageComponent', () => {
       ],
       containerItem: {
         id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
-        durableKind: 'Container', path: [], createdAt: '', updatedAt: '',
+        isContainer: true, path: [], createdAt: '', updatedAt: '',
       },
     };
     const { harness } = await navigate('/inventory/browse/container/chest');
@@ -277,7 +277,7 @@ describe('InventoryBrowsePageComponent', () => {
 
     component.onContainerDetails({
       id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
-      durableKind: 'Container', path: [], createdAt: '', updatedAt: '',
+      isContainer: true, path: [], createdAt: '', updatedAt: '',
     });
 
     expect(navigateSpy).toHaveBeenCalledWith(['/inventory/items', 'chest']);
@@ -356,7 +356,7 @@ describe('InventoryBrowsePageComponent', () => {
       path: [{ id: 'chest', name: 'Tool chest', kind: 'Container' }],
       containerItem: {
         id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
-        durableKind: 'Container', path: [], createdAt: '', updatedAt: '',
+        isContainer: true, path: [], createdAt: '', updatedAt: '',
       },
       scopedLowStockCount: 1,
       scopedLentCount: 3, // 2 lent durables below + 1 lent child container the row recompute couldn't see
@@ -364,9 +364,9 @@ describe('InventoryBrowsePageComponent', () => {
         { id: 'bin', name: 'Lent bin', status: 'Lent', itemCount: 0, lowStockCount: 0, previewNames: [] },
       ],
       items: [
-        { id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
-        { id: 'saw', name: 'Saw', fungibility: 'NonFungible', status: 'Lent', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
-        { id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active', durableKind: 'Plain', path: [], createdAt: '', updatedAt: '' },
+        { id: 'ladder', name: 'Ladder', fungibility: 'NonFungible', status: 'Lent', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+        { id: 'saw', name: 'Saw', fungibility: 'NonFungible', status: 'Lent', isContainer: false, path: [], createdAt: '', updatedAt: '' },
+        { id: 'drill', name: 'Drill', fungibility: 'NonFungible', status: 'Active', isContainer: false, path: [], createdAt: '', updatedAt: '' },
       ],
       consumables: [{
         consumable: {

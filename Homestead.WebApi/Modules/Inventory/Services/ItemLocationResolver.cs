@@ -36,11 +36,11 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
         if (items.All(i => i.ParentItemId is null))
             return items.Select(i => ResolveDirect(i, areaNodes)).ToList();
 
-        // Every valid ancestor is a holder — a container (storage) or an assembly (composition); a
-        // component resolves its area by walking up through its assembly. A chain legitimately passes
-        // through terminal holders, so this is deliberately NOT filtered by status.
+        // Every valid ancestor is a non-fungible parent — a container (storage) or a regular item
+        // (composition); a component resolves its area by walking up through its parent. A chain
+        // legitimately passes through terminal parents, so this is deliberately NOT filtered by status.
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly)
+            .Where(i => i.Fungibility == Fungibility.NonFungible)
             .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
             .ToDictionaryAsync(c => c.Id, ct);
 
@@ -166,15 +166,16 @@ public class ItemLocationResolver(AppDbContext db) : IItemLocationResolver
             return new Dictionary<HoldingLocation, LocationPath>();
 
         // The container ids referenced directly as holding locations — loaded by id as well as by
-        // role so a container whose role was switched off after a historical movement still shows
-        // its own name (its ancestors may then break the chain, which renders gracefully).
+        // fungibility so a referenced holder always resolves to its own name (its ancestors may then
+        // break the chain, which renders gracefully). Fungibility is immutable, so every parent is
+        // already covered; the by-id load is belt-and-suspenders for any stray reference.
         var referencedContainerIds = distinct
             .Where(l => l.ContainerItemId is not null)
             .Select(l => l.ContainerItemId!.Value)
             .ToHashSet();
 
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly
+            .Where(i => i.Fungibility == Fungibility.NonFungible
                 || referencedContainerIds.Contains(i.Id))
             .Select(i => new ContainerNode(i.Id, i.Name, i.AreaId, i.ParentItemId))
             .ToDictionaryAsync(c => c.Id, ct);

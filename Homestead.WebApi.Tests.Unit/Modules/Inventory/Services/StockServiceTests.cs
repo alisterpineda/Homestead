@@ -44,15 +44,15 @@ public class StockServiceTests : IDisposable
         return item;
     }
 
-    private async Task<Item> AddHolderAsync(DurableKind kind)
+    private async Task<Item> AddHolderAsync(bool isContainer)
     {
         var holder = new Item
         {
             Id = Guid.NewGuid(),
-            Name = kind.ToString(),
+            Name = isContainer ? "Container" : "Non-container",
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = kind,
+            IsContainer = isContainer,
         };
         _db.Items.Add(holder);
         await _db.SaveChangesAsync(Ct);
@@ -60,10 +60,12 @@ public class StockServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ReceiveAsync_IntoAssembly_Throws()
+    public async Task ReceiveAsync_IntoNonContainer_Throws()
     {
+        // Loose stock can only sit in a container — a non-container (a plain item or an assembly) holds
+        // components, not a place that takes stock.
         var screws = await AddConsumableAsync();
-        var pc = await AddHolderAsync(DurableKind.Assembly);
+        var pc = await AddHolderAsync(false);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
@@ -71,21 +73,10 @@ public class StockServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ReceiveAsync_IntoPlainItem_Throws()
-    {
-        var screws = await AddConsumableAsync();
-        var plain = await AddHolderAsync(DurableKind.Plain);
-
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
-                StockLocation.InContainer(plain.Id), 5m, null, null, null, null, null), Ct));
-    }
-
-    [Fact]
     public async Task ReceiveAsync_IntoContainer_CreatesStockEntry()
     {
         var screws = await AddConsumableAsync();
-        var bin = await AddHolderAsync(DurableKind.Container);
+        var bin = await AddHolderAsync(true);
 
         await _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
             StockLocation.InContainer(bin.Id), 5m, null, null, null, null, null), Ct);
@@ -101,7 +92,7 @@ public class StockServiceTests : IDisposable
     public async Task ReceiveAsync_WithSource_PersistsTrimmedSource()
     {
         var screws = await AddConsumableAsync();
-        var bin = await AddHolderAsync(DurableKind.Container);
+        var bin = await AddHolderAsync(true);
 
         await _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
             StockLocation.InContainer(bin.Id), 5m, null, null, null, null, "  Costco  "), Ct);
@@ -115,7 +106,7 @@ public class StockServiceTests : IDisposable
     public async Task ReceiveAsync_OverlongSource_Throws()
     {
         var screws = await AddConsumableAsync();
-        var bin = await AddHolderAsync(DurableKind.Container);
+        var bin = await AddHolderAsync(true);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
             _sut.ReceiveAsync(screws.Id, new StockReceiveRequest(
@@ -128,7 +119,7 @@ public class StockServiceTests : IDisposable
         // Adjust-up from nothing takes the InMemory-safe AddNewEntry path; only the deliberate
         // receive writes Source, so a bookkeeping adjustment must leave it null.
         var screws = await AddConsumableAsync();
-        var bin = await AddHolderAsync(DurableKind.Container);
+        var bin = await AddHolderAsync(true);
 
         await _sut.AdjustAsync(screws.Id, new StockAdjustRequest(
             StockLocation.InContainer(bin.Id), 7m, null, "recount"), Ct);

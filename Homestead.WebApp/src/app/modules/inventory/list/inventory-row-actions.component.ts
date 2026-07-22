@@ -47,12 +47,12 @@ import type { InventoryRow } from './inventory-row';
             <ng-icon hlm name="lucidePencil" size="sm" />
             Edit
           </button>
-          @if (row().durable?.durableKind === 'Container') {
+          @if (row().durable?.isContainer) {
             <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
               <ng-icon hlm name="lucidePackageOpen" size="sm" />
               View contents
             </button>
-          } @else if (row().durable?.durableKind === 'Assembly') {
+          } @else if (row().durable?.hasComponents) {
             <button hlmDropdownMenuItem (triggered)="viewContents.emit(row())">
               <ng-icon hlm name="lucidePackageOpen" size="sm" />
               View components

@@ -72,7 +72,7 @@ public class GetConsumablesHandlerTests : IAsyncLifetime
         var container = new Item
         {
             Id = Guid.NewGuid(), Name = name, Fungibility = Fungibility.NonFungible,
-            Status = ItemStatus.Active, DurableKind = DurableKind.Container,
+            Status = ItemStatus.Active, IsContainer = true,
             AreaId = areaId, ParentItemId = parentItemId,
         };
         _db.Items.Add(container);

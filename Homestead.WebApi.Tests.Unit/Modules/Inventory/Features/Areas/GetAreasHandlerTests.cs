@@ -52,13 +52,13 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Areas.Add(garage);
 
         var bin = Item(garage.Id, ItemStatus.Active);
-        bin.DurableKind = DurableKind.Container;
+        bin.IsContainer = true;
         var nested = Item(null, ItemStatus.Active);
         nested.ParentItemId = bin.Id;
 
         // Item inside an unplaced container resolves to no area.
         var floatingBin = Item(null, ItemStatus.Active);
-        floatingBin.DurableKind = DurableKind.Container;
+        floatingBin.IsContainer = true;
         var adrift = Item(null, ItemStatus.Active);
         adrift.ParentItemId = floatingBin.Id;
 
@@ -78,7 +78,7 @@ public class GetAreasHandlerTests : IAsyncLifetime
         _db.Areas.Add(garage);
 
         var bin = Item(garage.Id, ItemStatus.Active);
-        bin.DurableKind = DurableKind.Container;
+        bin.IsContainer = true;
         _db.Items.Add(bin);
 
         // Two entries for the same consumable resolving to the garage (direct + via the bin) ⇒ one type.

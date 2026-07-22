@@ -16,11 +16,11 @@ public class InventoryPlacementService(AppDbContext db) : IInventoryPlacementSer
 {
     public async Task<InventoryPlacement> ComputeAsync(CancellationToken ct = default)
     {
-        // Every valid ancestor is a holder — container (storage) or assembly (composition); a
-        // component resolves and counts through its (non-place) assembly. Deliberately not
-        // status-filtered (a chain may pass through terminal holders), same as the resolver.
+        // Every valid ancestor is a non-fungible parent — a container (storage) or a regular item
+        // (composition); a component resolves and counts through its (non-place) parent. Deliberately
+        // not status-filtered (a chain may pass through terminal parents), same as the resolver.
         var containers = await db.Items.AsNoTracking()
-            .Where(i => i.DurableKind == DurableKind.Container || i.DurableKind == DurableKind.Assembly)
+            .Where(i => i.Fungibility == Fungibility.NonFungible)
             .Select(i => new { i.Id, i.AreaId, i.ParentItemId })
             .ToDictionaryAsync(c => c.Id, c => new ContainerNode(c.AreaId, c.ParentItemId), ct);
 

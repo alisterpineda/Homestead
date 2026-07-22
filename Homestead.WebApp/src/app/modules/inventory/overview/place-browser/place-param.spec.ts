@@ -77,7 +77,7 @@ describe('place-param', () => {
         path: [],
         containerItem: {
           id: 'chest', name: 'Tool chest', fungibility: 'NonFungible', status: 'Active',
-          durableKind: 'Container', path: [], createdAt: '', updatedAt: '',
+          isContainer: true, path: [], createdAt: '', updatedAt: '',
         },
       });
       expect(placeDisplayName({ kind: 'container', id: 'chest' }, contents)).toBe('Tool chest');

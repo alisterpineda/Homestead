@@ -20,8 +20,14 @@ internal static class DurableResponseMapper
         AreaId = i.AreaId,
         AreaName = i.Area != null ? i.Area.Name : null,
         ParentItemId = i.ParentItemId,
-        DurableKind = i.DurableKind,
-        ParentDurableKind = i.ParentItem != null ? i.ParentItem.DurableKind : null,
+        IsContainer = i.IsContainer,
+        ParentIsContainer = i.ParentItem != null ? i.ParentItem.IsContainer : null,
+        // "Holds something live": ≥1 live child, of either relationship. Read gated by IsContainer on
+        // the client it yields assembly-ness (a non-container's live components); ungated it disables
+        // the container flip (see DurableResponse.HasComponents). Non-terminal statuses are spelled
+        // inline — IsTerminal()/LiveStatuses won't translate cleanly inside a projected .Any().
+        HasComponents = i.Children.Any(c =>
+            c.Status == ItemStatus.Active || c.Status == ItemStatus.Lent || c.Status == ItemStatus.InRepair),
         Compartment = i.Compartment,
         Value = i.Value,
         ValueCurrencyId = i.ValueCurrencyId,

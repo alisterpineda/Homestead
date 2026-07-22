@@ -197,7 +197,6 @@ export class LocationPickerComponent {
             .getDurables({
               Page: 1,
               PageSize: 200,
-              DurableKinds: ['Container', 'Assembly'],
               IncludeInactive: true,
             })
             .pipe(
@@ -260,18 +259,20 @@ export class LocationPickerComponent {
     return term ? tree.filter(n => n.area.name.toLowerCase().includes(term)) : tree;
   });
 
-  // Storage places (drillable containers) and assemblies (component holders) render as two distinct
-  // groups; both still emit the same { kind: 'container', id } value (the server derives the
-  // relationship from the parent's kind).
-  protected filteredContainers = computed(() => this.filteredHolders('Container'));
-  protected filteredAssemblies = computed(() => this.filteredHolders('Assembly'));
+  // Storage places (drillable containers) and assemblies (non-containers that hold components) render
+  // as two distinct groups; both still emit the same { kind: 'container', id } value (the server
+  // derives the relationship from the target's IsContainer). A regular leaf item (neither) is offered
+  // in neither group.
+  protected filteredContainers = computed(() => this.filteredHolders(c => c.isContainer === true));
+  protected filteredAssemblies = computed(() =>
+    this.filteredHolders(c => c.isContainer !== true && c.hasComponents === true));
 
-  private filteredHolders(kind: DurableResponse['durableKind']): DurableResponse[] {
+  private filteredHolders(predicate: (c: DurableResponse) => boolean): DurableResponse[] {
     const term = this.searchTerm().trim().toLowerCase();
     const excluded = this.excludedIds();
     // Display live holders only; the exclusion walk above still crosses terminal ones.
     const live = this.allContainers().filter(
-      c => c.durableKind === kind && !excluded.has(c.id) && !isTerminalStatus(c.status),
+      c => predicate(c) && !excluded.has(c.id) && !isTerminalStatus(c.status),
     );
     return term ? live.filter(c => c.name.toLowerCase().includes(term)) : live;
   }

@@ -14,8 +14,6 @@ import { HlmButton } from '@/shared/components/spartan/button';
 import { HlmToggleGroupImports } from '@/shared/components/spartan/toggle-group';
 import { HlmInput } from '@/shared/components/spartan/input';
 import { HlmLabel } from '@/shared/components/spartan/label';
-import { HlmSelectImports } from '@/shared/components/spartan/select';
-import type { DurableKind } from '@/api/generated/models/durable-kind';
 import type { BrandPickerValue } from '../../shared/brand-picker/brand-picker.component';
 import { InventoryDurableApiService } from '@/api/services/inventory-durable-api.service';
 import { InventoryConsumableApiService } from '@/api/services/inventory-consumable-api.service';
@@ -29,7 +27,7 @@ type EntryKind = 'durable' | 'consumable';
 
 /**
  * Unified "New" dialog for the merged inventory list: a kind toggle swaps between the durable fields
- * (location, type) and the consumable fields (unit, restock threshold). The two field sets and
+ * (model, location) and the consumable fields (unit, restock threshold). The two field sets and
  * the two descriptions are grid-stacked into a shared cell, so the dialog reserves max(durable, consumable)
  * height and never reflows on toggle; the inactive variant is `invisible` + `inert`. Title and submit stay
  * kind-neutral — the toggle group is the kind selector. The rest is set later from the Edit sheet.
@@ -43,7 +41,6 @@ type EntryKind = 'durable' | 'consumable';
     HlmToggleGroupImports,
     HlmInput,
     HlmLabel,
-    HlmSelectImports,
     LocationPickerComponent,
     BrandPickerComponent,
     TagInputComponent,
@@ -146,22 +143,6 @@ type EntryKind = 'durable' | 'consumable';
                   ariaLabel="Location"
                 />
               </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label hlmLabel>Type</label>
-                <hlm-select [value]="durableKind()" (valueChange)="durableKind.set($any($event))">
-                  <hlm-select-trigger class="w-full" aria-label="Durable type">
-                    <hlm-select-value />
-                  </hlm-select-trigger>
-                  <hlm-select-content *hlmSelectPortal>
-                    <hlm-select-group>
-                      <hlm-select-item value="Plain">Plain item</hlm-select-item>
-                      <hlm-select-item value="Container">Container</hlm-select-item>
-                      <hlm-select-item value="Assembly">Assembly</hlm-select-item>
-                    </hlm-select-group>
-                  </hlm-select-content>
-                </hlm-select>
-              </div>
             </div>
 
             <div
@@ -261,7 +242,6 @@ export class CreateEntryDialogComponent {
   // Durable fields
   areaId = signal<string | null>(null);
   parentItemId = signal<string | null>(null);
-  durableKind = signal<DurableKind>('Plain');
   model = signal('');
   // Consumable fields
   unit = signal('');
@@ -338,7 +318,6 @@ export class CreateEntryDialogComponent {
       this.brand.set(null);
       this.tags.set([]);
       this.onLocationChange(this.initialLocation() ?? { kind: 'unplaced' });
-      this.durableKind.set('Plain');
       this.model.set('');
       this.unit.set('');
       this.threshold.set('');
@@ -390,7 +369,6 @@ export class CreateEntryDialogComponent {
         name: this.name().trim(),
         areaId: this.areaId(),
         parentItemId: this.parentItemId(),
-        durableKind: this.durableKind(),
         brandId: this.brand()?.id ?? null,
         model: this.model().trim() ? this.model().trim() : null,
         tags: this.tags(),

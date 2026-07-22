@@ -329,13 +329,13 @@ export class InventoryBrowsePageComponent implements OnDestroy {
       }
     });
 
-    // An assembly is not a Browse place. The container drill route still resolves one (a deep link,
-    // or a breadcrumb segment for an assembly an item is nested under — segments carry no Assembly
-    // kind), so when the drilled scope turns out to be an assembly, bounce to its detail page where
-    // its components live.
+    // A non-container (an assembly) is not a Browse place. The container drill route still resolves one
+    // (a deep link, or a breadcrumb segment for a non-container an item is nested under — segments carry
+    // no container flag), so when the drilled scope turns out to be a non-container, bounce to its
+    // detail page where its components live.
     effect(() => {
       const ref = this.placeRef();
-      if (ref?.kind === 'container' && this.placeContents()?.containerItem?.durableKind === 'Assembly') {
+      if (ref?.kind === 'container' && this.placeContents()?.containerItem?.isContainer === false) {
         void this.router.navigate(['/inventory/items', ref.id]);
       }
     });
@@ -364,13 +364,14 @@ export class InventoryBrowsePageComponent implements OnDestroy {
   }
 
   /**
-   * A holder's "View contents/components" from the quick panel. An assembly is not a Browse place, so
-   * it routes out to its detail page (where its components live); a container keeps drilling in Browse.
+   * A holder's "View contents/components" from the quick panel. A non-container (an assembly) is not a
+   * Browse place, so it routes out to its detail page (where its components live); a container keeps
+   * drilling in Browse.
    */
   onQuickPanelViewContents(durable: DurableResponse): void {
     this.onDurableQuickPanelClosed();
     void this.router.navigate(
-      durable.durableKind === 'Assembly'
+      !durable.isContainer
         ? ['/inventory/items', durable.id]
         : ['/inventory/browse/container', durable.id],
     );

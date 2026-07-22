@@ -54,7 +54,7 @@ public class ConsumablesEndpointTests : IntegrationTestBase
     private static async Task<DurableItem> CreateContainerAsync(HttpClient client, string name, Guid? areaId = null)
     {
         var resp = await client.PostAsJsonAsync("/api/v1/inventory/durables",
-            new { name, areaId, durableKind = "Container" }, CT);
+            new { name, areaId, isContainer = true }, CT);
         Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
         return (await resp.Content.ReadFromJsonAsync<DurableItem>(CT))!;
     }
@@ -780,7 +780,7 @@ public class ConsumablesEndpointTests : IntegrationTestBase
         await ReceiveAsync(client, consumable.Id, new { containerItemId = bin.Id, quantity = 5m });
 
         var resp = await SendJsonPatchAsync(client, $"/api/v1/inventory/durables/{bin.Id}",
-            new[] { new { op = "replace", path = "/durableKind", value = (object)"Plain" } });
+            new[] { new { op = "replace", path = "/isContainer", value = (object)false } });
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
     }

@@ -30,7 +30,7 @@ public class CreateDurableHandlerTests : IDisposable
         _sut = new CreateDurableHandler(_db, _currentUser, _audit, new ItemLocationResolver(_db), new InventoryTagPathResolver(_db), _unitOfWork);
     }
 
-    private async Task<Item> AddContainerAsync(Guid? areaId = null, DurableKind durableKind = DurableKind.Container)
+    private async Task<Item> AddContainerAsync(Guid? areaId = null, bool isContainer = true)
     {
         var container = new Item
         {
@@ -38,7 +38,7 @@ public class CreateDurableHandlerTests : IDisposable
             Name = "Tool chest",
             Fungibility = Fungibility.NonFungible,
             Status = ItemStatus.Active,
-            DurableKind = durableKind,
+            IsContainer = isContainer,
             AreaId = areaId,
         };
         _db.Items.Add(container);
@@ -74,13 +74,13 @@ public class CreateDurableHandlerTests : IDisposable
         Assert.Equal("Drill", result.Name);
         Assert.Equal(Fungibility.NonFungible, result.Fungibility);
         Assert.Equal(ItemStatus.Active, result.Status);
-        Assert.Equal(DurableKind.Plain, result.DurableKind);
+        Assert.Equal(false, result.IsContainer);
         Assert.Null(result.AreaId);
 
         var stored = _db.Items.Single();
         Assert.Equal(Fungibility.NonFungible, stored.Fungibility);
         Assert.Equal(ItemStatus.Active, stored.Status);
-        Assert.Equal(DurableKind.Plain, stored.DurableKind);
+        Assert.Equal(false, stored.IsContainer);
     }
 
     [Fact]
@@ -213,40 +213,45 @@ public class CreateDurableHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_WithContainerKind_CreatesContainer()
+    public async Task Handle_WithIsContainer_CreatesContainer()
     {
         var result = await _sut.Handle(
-            new CreateDurableCommand { Name = "Tool chest", DurableKind = DurableKind.Container }, Ct);
+            new CreateDurableCommand { Name = "Tool chest", IsContainer = true }, Ct);
 
-        Assert.Equal(DurableKind.Container, result.DurableKind);
-        Assert.Equal(DurableKind.Container, _db.Items.Single().DurableKind);
+        Assert.Equal(true, result.IsContainer);
+        Assert.Equal(true, _db.Items.Single().IsContainer);
     }
 
     [Fact]
-    public async Task Handle_WithAssemblyKind_CreatesAssembly()
+    public async Task Handle_ComponentUnderRegularParent_ResolvesAsComponent()
     {
-        var result = await _sut.Handle(
-            new CreateDurableCommand { Name = "Gaming PC", DurableKind = DurableKind.Assembly }, Ct);
+        // An assembly is a non-container that has components: create a component under a regular item.
+        var pc = await AddContainerAsync(isContainer: false);
 
-        Assert.Equal(DurableKind.Assembly, result.DurableKind);
-        Assert.Equal(DurableKind.Assembly, _db.Items.Single().DurableKind);
+        var result = await _sut.Handle(
+            new CreateDurableCommand { Name = "GPU", ParentItemId = pc.Id }, Ct);
+
+        Assert.Equal(pc.Id, result.ParentItemId);
+        // A non-container parent means the new item is a component ("Part of X").
+        Assert.Equal(false, result.ParentIsContainer);
+        Assert.Equal(false, result.IsContainer);
     }
 
     [Fact]
-    public async Task Handle_IntoAssemblyWithCompartment_SetsComponentLabelAndParentKind()
+    public async Task Handle_IntoNonContainerWithCompartment_SetsComponentLabelAndParentFlag()
     {
         var area = new Area { Id = Guid.NewGuid(), Name = "Garage" };
         _db.Areas.Add(area);
         await _db.SaveChangesAsync(Ct);
-        var pc = await AddContainerAsync(areaId: area.Id, durableKind: DurableKind.Assembly);
+        var pc = await AddContainerAsync(areaId: area.Id, isContainer: false);
 
         var result = await _sut.Handle(
             new CreateDurableCommand { Name = "CPU", ParentItemId = pc.Id, Compartment = "CPU" }, Ct);
 
         Assert.Equal(pc.Id, result.ParentItemId);
-        Assert.Equal(DurableKind.Assembly, result.ParentDurableKind);
+        Assert.Equal(false, result.ParentIsContainer);
         Assert.Equal("CPU", result.Compartment);
-        // A component resolves its area by walking up through the assembly.
+        // A component resolves its area by walking up through its (non-container) parent.
         Assert.Equal(area.Id, result.ResolvedAreaId);
     }
 
@@ -352,20 +357,20 @@ public class CreateDurableHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_WithParentNotContainer_Throws()
+    public async Task Handle_WithFungibleParent_Throws()
     {
-        var plain = new Item
+        // A parent must be a non-fungible item; a fungible consumable cannot hold children.
+        var consumable = new Item
         {
             Id = Guid.NewGuid(),
-            Name = "Hammer",
-            Fungibility = Fungibility.NonFungible,
+            Name = "Screws",
+            Fungibility = Fungibility.Fungible,
             Status = ItemStatus.Active,
-            DurableKind = DurableKind.Plain,
         };
-        _db.Items.Add(plain);
+        _db.Items.Add(consumable);
         await _db.SaveChangesAsync(Ct);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() =>
-            _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = plain.Id }, Ct));
+            _sut.Handle(new CreateDurableCommand { Name = "Wrench", ParentItemId = consumable.Id }, Ct));
     }
 }

@@ -79,7 +79,7 @@ public class PlacesEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, isContainer = true });
         var drill = await CreateDurableAsync(client, new { name = "Drill", areaId = garageId });
         await CreateDurableAsync(client, new { name = "Nested wrench", parentItemId = chest.Id });
 
@@ -138,8 +138,8 @@ public class PlacesEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
-        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
-        var bin = await CreateDurableAsync(client, new { name = "Bin", parentItemId = chest.Id, durableKind = "Container" });
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, isContainer = true });
+        var bin = await CreateDurableAsync(client, new { name = "Bin", parentItemId = chest.Id, isContainer = true });
 
         var screws = await CreateConsumableAsync(client, "Screws", "screws");
         await ReceiveAsync(client, screws.Id, areaId: null, 10m, containerItemId: bin.Id);
@@ -165,7 +165,7 @@ public class PlacesEndpointTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
-        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, durableKind = "Container" });
+        var chest = await CreateDurableAsync(client, new { name = "Chest", areaId = garageId, isContainer = true });
 
         // A direct low-stock consumable in the chest.
         var lowGlue = await CreateConsumableAsync(client, "Glue", "tubes", threshold: 5m);
@@ -178,7 +178,7 @@ public class PlacesEndpointTests : IntegrationTestBase
         // A direct child CONTAINER that is itself Lent — counted server-side, missed by the old
         // client-side `items.filter` (child containers render as PlaceContainerSummary, not items).
         var lentBin = await CreateDurableAsync(client,
-            new { name = "Lent bin", parentItemId = chest.Id, durableKind = "Container" });
+            new { name = "Lent bin", parentItemId = chest.Id, isContainer = true });
         await LendAsync(client, lentBin.Id, "Sam");
 
         // A DEEPER low consumable nested one level down must NOT count — direct semantics, not subtree.
@@ -199,7 +199,7 @@ public class PlacesEndpointTests : IntegrationTestBase
         var client = await CreateAdminClientAsync();
         var garageId = await CreateAreaAsync(client, "Garage");
 
-        var floatingBin = await CreateDurableAsync(client, new { name = "Floating bin", durableKind = "Container" });
+        var floatingBin = await CreateDurableAsync(client, new { name = "Floating bin", isContainer = true });
         var adrift = await CreateDurableAsync(client, new { name = "Adrift wrench" });
         await CreateDurableAsync(client, new { name = "Nested pliers", parentItemId = floatingBin.Id });
         await CreateDurableAsync(client, new { name = "Placed drill", areaId = garageId });

@@ -46,9 +46,9 @@ public class CollapseDurablesHandler(
             throw new BusinessRuleException("An item being collapsed cannot be the destination container.");
 
         // Sealing-container gate (mirrors PatchDurableHandler's terminal-sealing rule, which only
-        // blocks a Container): a container being collapsed must be empty. An Assembly's components
-        // ride along — collapsing an assembly is not blocked by them — so only Containers are checked.
-        var containers = items.Where(i => i.DurableKind == DurableKind.Container).ToList();
+        // blocks a container): a container being collapsed must be empty. A non-container's components
+        // ride along — collapsing one is not blocked by them — so only containers are checked.
+        var containers = items.Where(i => i.IsContainer == true).ToList();
         if (containers.Count > 0)
         {
             var containerIds = containers.Select(i => i.Id).ToList();

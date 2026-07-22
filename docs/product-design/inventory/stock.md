@@ -29,7 +29,7 @@ A **stock entry** records how much of one fungible item sits at one location.
 
 ### The stock-location rule
 
-Exactly **one** of `AreaId` / `ContainerItemId` is set (enforced by a check constraint in the house "not-both / not-neither" style). A `ContainerItemId` must reference a non-fungible item with `DurableKind = Container` — loose stock sits only in a storage place, never in an assembly — matching the containment typing rules in [locations.md](locations.md#containment-vs-composition).
+Exactly **one** of `AreaId` / `ContainerItemId` is set (enforced by a check constraint in the house "not-both / not-neither" style). A `ContainerItemId` must reference a non-fungible item with `IsContainer = true` — loose stock sits only in a storage place, never in a non-container — matching the containment typing rules in [locations.md](locations.md#containment-vs-composition).
 
 Note the deliberate asymmetry with non-fungible items, which may be **Unplaced** (no location). Stock may not: a stock entry exists *because* there is quantity at a place. "I have some, location unknown" is not a placeless entry — it is simply the total on-hand carried by the entries that do have a place. Removing the last located entry leaves a total of zero, which is the correct representation of "none here."
 

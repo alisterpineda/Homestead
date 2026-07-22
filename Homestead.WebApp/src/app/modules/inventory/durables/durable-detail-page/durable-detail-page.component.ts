@@ -116,9 +116,9 @@ import { toast } from '@spartan-ng/brain/sonner';
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="space-y-1">
             <div class="flex flex-wrap items-center gap-3">
-              @if (it.durableKind === 'Container') {
+              @if (it.isContainer) {
                 <ng-icon hlm name="lucideBox" size="sm" class="shrink-0 text-muted-foreground" aria-label="Container" />
-              } @else if (it.durableKind === 'Assembly') {
+              } @else if (it.hasComponents) {
                 <ng-icon hlm name="lucideCpu" size="sm" class="shrink-0 text-muted-foreground" aria-label="Assembly" />
               }
               <h1 class="text-2xl font-semibold">{{ it.name }}</h1>
@@ -214,22 +214,37 @@ import { toast } from '@spartan-ng/brain/sonner';
           </section>
         }
 
-        <!-- Components (assemblies) -->
-        @if (it.durableKind === 'Assembly') {
+        <!-- Components (a non-container: a regular item or, once it has parts, an assembly) -->
+        @if (!it.isContainer) {
           <section class="space-y-2">
             <div class="flex items-center justify-between gap-2">
               <h2 class="text-sm font-medium text-muted-foreground">Components</h2>
-              <app-create-entry-dialog
-                triggerSize="sm"
-                [initialLocation]="addComponentLocation()"
-                [initialLocationLabel]="it.name"
-                (created)="onChanged()"
-              >
-                <ng-icon hlm name="lucidePlus" size="sm" />
-                Add component
-              </app-create-entry-dialog>
+              <div class="flex items-center gap-2">
+                <!-- Intent action: convert an empty regular item into a browsable container. Hidden once
+                     it has parts (an assembly can't be flipped to a container — the backend guards it too). -->
+                @if (!it.hasComponents) {
+                  <button hlmBtn variant="outline" size="sm" (click)="onStoreItemsInside(it)" [disabled]="storingItems()">
+                    <ng-icon hlm name="lucideBox" size="sm" />
+                    Store items inside
+                  </button>
+                }
+                <app-create-entry-dialog
+                  triggerSize="sm"
+                  [initialLocation]="addComponentLocation()"
+                  [initialLocationLabel]="it.name"
+                  (created)="onChanged()"
+                >
+                  <ng-icon hlm name="lucidePlus" size="sm" />
+                  Add part
+                </app-create-entry-dialog>
+              </div>
             </div>
-            @if (contentsError()) {
+            @if (!it.hasComponents) {
+              <!-- Empty regular item: no components yet, so nothing is fetched. Use "Add part" above. -->
+              <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No components yet.
+              </div>
+            } @else if (contentsError()) {
               <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                 Couldn't load components.
                 <button type="button" class="underline underline-offset-4 hover:text-foreground" (click)="onChanged()">Retry</button>
@@ -265,9 +280,20 @@ import { toast } from '@spartan-ng/brain/sonner';
         }
 
         <!-- Contents (containers only) -->
-        @if (it.durableKind === 'Container') {
+        @if (it.isContainer) {
           <section class="space-y-2">
-            <h2 class="text-sm font-medium text-muted-foreground">Contents</h2>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-sm font-medium text-muted-foreground">Contents</h2>
+              <app-create-entry-dialog
+                triggerSize="sm"
+                [initialLocation]="addComponentLocation()"
+                [initialLocationLabel]="it.name"
+                (created)="onChanged()"
+              >
+                <ng-icon hlm name="lucidePlus" size="sm" />
+                Add item
+              </app-create-entry-dialog>
+            </div>
             @if (contentsError()) {
               <div class="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                 Couldn't load contents.
@@ -494,13 +520,14 @@ export class DurableDetailPageComponent {
     return pre && pre.id === id ? pre : null;
   });
 
-  protected durableKind = computed(() => this.durable()?.durableKind ?? null);
-  protected isContainer = computed(() => this.durableKind() === 'Container');
-  protected isAssembly = computed(() => this.durableKind() === 'Assembly');
-  // Both a Container and an Assembly hold children, so both fetch contents (the assembly's are
-  // its components).
-  protected isHolder = computed(() => this.isContainer() || this.isAssembly());
-  // "Add component" pre-parents the create dialog under this assembly.
+  protected isContainer = computed(() => this.durable()?.isContainer === true);
+  // Assembly-ness is derived server-side: a non-container with ≥1 live component child.
+  protected hasComponents = computed(() => this.durable()?.hasComponents === true);
+  // A container fetches its stored contents; a non-container with components fetches those components.
+  // An empty regular item holds nothing, so it renders a static empty state without fetching.
+  protected isHolder = computed(() => this.isContainer() || this.hasComponents());
+  // "Add item"/"Add part" pre-parents the create dialog under this item; the server derives the
+  // relationship (stored-in vs component) from this item's IsContainer.
   protected addComponentLocation = computed<ItemLocationValue | null>(() => {
     const it = this.durable();
     return it ? { kind: 'container', id: it.id } : null;
@@ -620,9 +647,23 @@ export class DurableDetailPageComponent {
   deleting = signal(false);
   deleteError = signal('');
   archiving = signal(false);
+  storingItems = signal(false);
 
   onChanged(): void {
     this.refreshTrigger.update((v) => v + 1);
+  }
+
+  /** Intent action: convert a regular item into a storage container (PATCH /isContainer = true). */
+  onStoreItemsInside(durable: DurableResponse): void {
+    this.storingItems.set(true);
+    this.durableApi.patchDurable({ id: durable.id, body: [replace('/isContainer', true)] }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      handleMutationError(this.errorHandler, this.storingItems, 'Failed to make this a container.'),
+    ).subscribe(() => {
+      this.storingItems.set(false);
+      toast.success('This item is now a container.');
+      this.onChanged();
+    });
   }
 
   prevPage(): void {
