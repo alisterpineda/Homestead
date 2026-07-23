@@ -1,0 +1,113 @@
+using Homestead.WebApi.Infrastructure.Storage;
+
+namespace Homestead.WebApi.Infrastructure.Backup;
+
+// Reads the "Backup:Targets" section into named target instances and validates each per its Kind.
+//
+// Validation returns an error string rather than throwing: there is deliberately no ValidateOnStart
+// (mirroring AiProviderConfiguration and OcrEngineConfiguration) — a misconfigured target must not stop
+// the app from booting: the build-time OpenAPI generator boots the host with no meaningful config, and
+// backup is optional anyway. The cost is that config errors surface at first use; the mitigation is that
+// ConfigurationError is exposed on /admin/backup, so a target that cannot run reads as "unavailable,
+// because <reason>" before anyone schedules it.
+public static class BackupConfiguration
+{
+    // One entry per "Backup:Targets:{key}" child. No built-in seeding (contrast OCR's tesseract): there
+    // is no zero-config backup destination, so zero children = zero targets = backup off, the graceful
+    // no-op.
+    public static IReadOnlyList<(string Key, BackupTargetOptions Options)> ReadTargets(
+        IConfiguration configuration)
+    {
+        var targets = new List<(string Key, BackupTargetOptions Options)>();
+
+        foreach (var child in configuration.GetSection(BackupTargetOptions.SectionName).GetChildren())
+            targets.Add((child.Key, child.Get<BackupTargetOptions>() ?? new BackupTargetOptions()));
+
+        return targets;
+    }
+
+    /// <summary>
+    /// Returns null when the instance is usable, else a human-readable reason shown on the admin page.
+    /// </summary>
+    public static string? Validate(string key, BackupTargetOptions options, FileStorageOptions storage) =>
+        options.Kind switch
+        {
+            BackupTargetKind.Local => ValidateLocal(options, storage),
+            // Refuse rather than defaulting to Local, which would silently write the mirror somewhere the
+            // operator never named.
+            null => $"Kind is required (one of: {string.Join(", ", Enum.GetNames<BackupTargetKind>())}).",
+            var kind => $"Unknown target kind '{kind}'."
+        };
+
+    private static string? ValidateLocal(BackupTargetOptions options, FileStorageOptions storage)
+    {
+        if (string.IsNullOrWhiteSpace(options.Path))
+            return "Path is required.";
+
+        string root;
+        try
+        {
+            root = Path.GetFullPath(options.Path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return "Path is not a valid filesystem path.";
+        }
+
+        // A mirror root that overlaps live storage is the one misconfiguration that can destroy data
+        // rather than merely fail: nested INSIDE the media root, every backup run copies the library into
+        // itself and the next run mirrors those copies too; wrapped AROUND it, the mirror's own delete
+        // pass is pointed at the originals. Checked in both directions for that reason — the plan only
+        // called for the nested case, but the containing case is the strictly more dangerous one.
+        if (Overlaps(root, storage.MediaPath))
+            return "Path overlaps FileStorage:MediaPath — the backup target must be outside document storage.";
+
+        if (Overlaps(root, storage.CachePath))
+            return "Path overlaps FileStorage:CachePath — the backup target must be outside the cache root.";
+
+        return null;
+    }
+
+    // True when either directory is the other, or one contains the other.
+    private static bool Overlaps(string root, string? other)
+    {
+        if (string.IsNullOrWhiteSpace(other))
+            return false;
+
+        string otherFull;
+        try
+        {
+            otherFull = Path.GetFullPath(other);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            // An unusable storage path can't be overlapped in any meaningful way; the storage layer's own
+            // failure will surface elsewhere.
+            return false;
+        }
+
+        return Contains(root, otherFull) || Contains(otherFull, root);
+    }
+
+    // True when `candidate` is `parent` itself or sits beneath it. Compares with a trailing separator so
+    // "/data/media-backup" is not treated as living inside "/data/media".
+    private static bool Contains(string parent, string candidate)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        var normalizedParent = TrimTrailingSeparator(parent);
+        var normalizedCandidate = TrimTrailingSeparator(candidate);
+
+        if (string.Equals(normalizedParent, normalizedCandidate, comparison))
+            return true;
+
+        return normalizedCandidate.StartsWith(normalizedParent + Path.DirectorySeparatorChar, comparison);
+    }
+
+    private static string TrimTrailingSeparator(string path) =>
+        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) is { Length: > 0 } trimmed
+            ? trimmed
+            : path;
+}

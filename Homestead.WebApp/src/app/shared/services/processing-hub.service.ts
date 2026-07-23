@@ -20,6 +20,20 @@ export interface JobStatusChangedMessage {
   failedChildCount: number | null;
 }
 
+/**
+ * Whether a job opts out of the generic toasts below.
+ *
+ * Those toasts are document-shaped by construction — they name a `documentName` and fall back to the
+ * literal "Document". A backup run has no document: its parent would read as
+ * `"Document" has been processed successfully.`, and its batch children would dump a multi-line
+ * per-file failure report into a toast. The admin backup page reports its own runs (it claims the
+ * parent job and renders batch errors on the target card), so the whole entity type opts out.
+ * Claiming them individually is not possible — the client never learns the children's job ids.
+ */
+export function ownsItsOwnReporting(message: JobStatusChangedMessage): boolean {
+  return message.entityType === 'BackupTarget';
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProcessingHubService {
   private connection: HubConnection | null = null;
@@ -70,7 +84,7 @@ export class ProcessingHubService {
     this.connection.on('JobStatusChanged', (message: JobStatusChangedMessage) => {
       this.jobStatusChangedSubject.next(message);
 
-      const isManaged = this.managedJobIds.has(message.jobId);
+      const isManaged = ownsItsOwnReporting(message) || this.managedJobIds.has(message.jobId);
 
       if (message.status === 'Completed') {
         if (isManaged) {

@@ -24,6 +24,12 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
     .WithReference(keycloak)
     .WithEnvironment("FileStorage__MediaPath", Path.Combine(dataRoot, "media"))
     .WithEnvironment("FileStorage__CachePath", Path.Combine(dataRoot, "cache"))
+    // A local backup mirror so the document-backup feature is exercisable under `aspire run`. Sits
+    // beside (never inside) the media root — BackupConfiguration refuses an overlapping path, since a
+    // mirror nested in document storage would copy the library into itself and a mirror wrapped around
+    // it would point its own delete pass at the originals.
+    .WithEnvironment("Backup__Targets__local__Kind", "Local")
+    .WithEnvironment("Backup__Targets__local__Path", Path.Combine(dataRoot, "backup"))
     .WithEnvironment(context =>
     {
         context.EnvironmentVariables["OIDC_AUTHORITY"] =

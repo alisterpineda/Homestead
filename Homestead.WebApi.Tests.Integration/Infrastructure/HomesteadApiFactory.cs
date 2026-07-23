@@ -16,6 +16,7 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
     private readonly string _connectionString;
     private string _mediaPath = null!;
     private string _cachePath = null!;
+    private string _backupPath = null!;
 
     public HomesteadApiFactory(string connectionString)
     {
@@ -24,6 +25,16 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
 
     public string MediaPath => _mediaPath;
     public string CachePath => _cachePath;
+
+    /// <summary>
+    /// Root of the <c>local</c> backup target configured below. A sibling of the media root, never a
+    /// child — BackupConfiguration refuses an overlapping path, so nesting it would register the target
+    /// as unavailable and every backup test would fail on config rather than on behaviour.
+    /// </summary>
+    public string BackupPath => _backupPath;
+
+    /// <summary>The config key of the backup target the suite mirrors to.</summary>
+    public const string BackupTargetKey = "local";
 
     /// <summary>
     /// The clock the WebApi resolves as <see cref="TimeProvider"/>. Follows system time by default;
@@ -37,8 +48,10 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         var basePath = Path.Combine(Path.GetTempPath(), "homestead-tests", Guid.NewGuid().ToString());
         _mediaPath = Path.Combine(basePath, "media");
         _cachePath = Path.Combine(basePath, "cache");
+        _backupPath = Path.Combine(basePath, "backup");
         Directory.CreateDirectory(_mediaPath);
         Directory.CreateDirectory(_cachePath);
+        Directory.CreateDirectory(_backupPath);
         return ValueTask.CompletedTask;
     }
 
@@ -49,6 +62,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:postgresdb", _connectionString);
         builder.UseSetting("FileStorage:MediaPath", _mediaPath);
         builder.UseSetting("FileStorage:CachePath", _cachePath);
+
+        // One local backup target, so the mirror suite exercises the REAL LocalDirectoryBackupTarget
+        // against a real filesystem rather than a fake. Targets are built at registration time from
+        // config, exactly as in production.
+        builder.UseSetting($"Backup:Targets:{BackupTargetKey}:Kind", "Local");
+        builder.UseSetting($"Backup:Targets:{BackupTargetKey}:Path", _backupPath);
 
         // Satisfy OidcStartupValidator. OIDC is never actually exercised in integration tests
         // (auth happens through /test/force-login), so placeholder values are fine.
@@ -162,6 +181,12 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         if (Directory.Exists(_cachePath))
         {
             try { Directory.Delete(_cachePath, recursive: true); }
+            catch { /* best effort cleanup */ }
+        }
+
+        if (Directory.Exists(_backupPath))
+        {
+            try { Directory.Delete(_backupPath, recursive: true); }
             catch { /* best effort cleanup */ }
         }
     }

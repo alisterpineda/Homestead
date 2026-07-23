@@ -151,6 +151,16 @@ export type { GetAiStatus$Params as GetAiStatus$Params } from './fn/admin/get-ai
 export { getAiStatus as getAiStatus } from './fn/admin/get-ai-status';
 export type { TestAiConnection$Params as TestAiConnection$Params } from './fn/admin/test-ai-connection';
 export { testAiConnection as testAiConnection } from './fn/admin/test-ai-connection';
+export type { GetBackupTargets$Params as GetBackupTargets$Params } from './fn/admin/get-backup-targets';
+export { getBackupTargets as getBackupTargets } from './fn/admin/get-backup-targets';
+export type { PatchBackupTarget$Params as PatchBackupTarget$Params } from './fn/admin/patch-backup-target';
+export { patchBackupTarget as patchBackupTarget } from './fn/admin/patch-backup-target';
+export type { RunBackupNow$Params as RunBackupNow$Params } from './fn/admin/run-backup-now';
+export { runBackupNow as runBackupNow } from './fn/admin/run-backup-now';
+export type { UpsertBackupSchedule$Params as UpsertBackupSchedule$Params } from './fn/admin/upsert-backup-schedule';
+export { upsertBackupSchedule as upsertBackupSchedule } from './fn/admin/upsert-backup-schedule';
+export type { DeleteBackupSchedule$Params as DeleteBackupSchedule$Params } from './fn/admin/delete-backup-schedule';
+export { deleteBackupSchedule as deleteBackupSchedule } from './fn/admin/delete-backup-schedule';
 export type { GetAccounts$Params as GetAccounts$Params } from './fn/finances/get-accounts';
 export { getAccounts as getAccounts } from './fn/finances/get-accounts';
 export type { CreateAccount$Params as CreateAccount$Params } from './fn/finances/create-account';

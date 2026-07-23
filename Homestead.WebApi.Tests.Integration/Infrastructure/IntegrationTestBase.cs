@@ -68,6 +68,11 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         var thumbnailsDir = Path.Combine(Factory.CachePath, "thumbnails");
         try { Directory.Delete(thumbnailsDir, recursive: true); } catch (DirectoryNotFoundException) { }
         Directory.CreateDirectory(thumbnailsDir);
+
+        // Clean the backup mirror. Respawn wipes the state table, so a mirror left populated from a
+        // previous class would look like files that were "never recorded" and skew the next diff.
+        try { Directory.Delete(Factory.BackupPath, recursive: true); } catch (DirectoryNotFoundException) { }
+        Directory.CreateDirectory(Factory.BackupPath);
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

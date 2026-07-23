@@ -1,0 +1,33 @@
+using MediatR;
+
+namespace Homestead.WebApi.Modules.Admin.Features.Backup.RunBackupNow;
+
+public static class RunBackupNowEndpoint
+{
+    public record RunBackupNowBody
+    {
+        public bool DryRun { get; init; }
+        public bool AllowLargePrune { get; init; }
+    }
+
+    public static void Map(RouteGroupBuilder group)
+    {
+        group.MapPost("/targets/{key}/runs", async (
+            string key, RunBackupNowBody? body, ISender sender, CancellationToken ct) =>
+        {
+            var response = await sender.Send(new RunBackupNowCommand
+            {
+                TargetKey = key,
+                DryRun = body?.DryRun ?? false,
+                AllowLargePrune = body?.AllowLargePrune ?? false,
+            }, ct);
+
+            return Results.Ok(response);
+        })
+        .WithName("RunBackupNow")
+        .Produces<RunBackupNowResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status409Conflict);
+    }
+}

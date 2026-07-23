@@ -183,9 +183,11 @@ ancestor trail comes from the API's `PlaceContentsResponse.path`.
 | `/admin/groups/:id` | GroupDetailPageComponent (member dialogs) |
 | `/admin/jobs` | JobListComponent |
 | `/admin/schedules` | ScheduleListComponent |
-| `/admin/text-extraction` | TextExtractionEngineListComponent |
-| `/admin/ai-providers` | AiProviderListComponent |
-| `/admin/settings` | SystemSettingsComponent (runtime log-level controls; sidebar group "Configuration") |
+| `/admin/settings` | SystemSettingsComponent (runtime log-level controls) |
+| `/admin/ai` | AiStatusComponent — read-only status of providers defined under `Ai:Providers` |
+| `/admin/backup` | BackupTargetListComponent — one card per `Backup:Targets:{key}`; Back up now / Dry run / schedule dialog / Enabled toggle. Test ids: `backup-target-{key}`, `back-up-now`, `dry-run`, `remove-schedule`, `enabled-toggle-{key}`, `last-run-badge`, `last-run-summary`, `backed-up-count`, `prune-blocked-banner`, `prune-anyway` |
+
+Sidebar groups: **Manage** (Users / Groups / Jobs / Schedules), **Configuration** (System Settings / AI / Backup).
 
 ### Admin-only surfaces (verify hidden/denied as `user@test.com`)
 
@@ -197,6 +199,8 @@ ancestor trail comes from the API's `PlaceContentsResponse.path`.
 - Base path is `/api/v1/...` (e.g. `/api/v1/documents`, `/api/v1/documents/tags`,
   `/api/v1/admin/settings/system` — `GET`/`PATCH` for System Settings), proxied through `:4200`
   — use it when inspecting `browser_network_requests`.
+- Backup: `/api/v1/admin/backup/targets` (`GET`), `/targets/{key}` (`PATCH`),
+  `/targets/{key}/runs` (`POST`), `/targets/{key}/schedule` (`PUT`/`DELETE`) — all admin-only.
 
 ### Known gotchas
 

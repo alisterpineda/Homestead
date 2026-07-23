@@ -2,6 +2,11 @@ using Asp.Versioning.Builder;
 using Homestead.WebApi.Authentication;
 using Homestead.WebApi.Modules.Admin.Features.Ai.GetAiStatus;
 using Homestead.WebApi.Modules.Admin.Features.Ai.TestAiConnection;
+using Homestead.WebApi.Modules.Admin.Features.Backup.DeleteBackupSchedule;
+using Homestead.WebApi.Modules.Admin.Features.Backup.GetBackupTargets;
+using Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
+using Homestead.WebApi.Modules.Admin.Features.Backup.RunBackupNow;
+using Homestead.WebApi.Modules.Admin.Features.Backup.UpsertBackupSchedule;
 using Homestead.WebApi.Modules.Admin.Features.Groups.AddGroupMember;
 using Homestead.WebApi.Modules.Admin.Features.Users.BulkDeleteUsers;
 using Homestead.WebApi.Modules.Admin.Features.Groups.CreateGroup;
@@ -84,6 +89,18 @@ public static class AdminModule
 
         GetAiStatusEndpoint.Map(ai);
         TestAiConnectionEndpoint.Map(ai);
+
+        var backup = app.MapGroup("/api/v{version:apiVersion}/admin/backup")
+            .HasApiVersion(1, 0)
+            .WithGroupName("v1")
+            .WithTags("Admin")
+            .RequireAuthorization(AuthPolicies.RequireAdmin);
+
+        GetBackupTargetsEndpoint.Map(backup);
+        PatchBackupTargetEndpoint.Map(backup);
+        RunBackupNowEndpoint.Map(backup);
+        UpsertBackupScheduleEndpoint.Map(backup);
+        DeleteBackupScheduleEndpoint.Map(backup);
 
         return app;
     }

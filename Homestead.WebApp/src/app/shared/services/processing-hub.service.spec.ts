@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ProcessingHubService, JobStatusChangedMessage } from './processing-hub.service';
+import { ProcessingHubService, JobStatusChangedMessage, ownsItsOwnReporting } from './processing-hub.service';
 
 describe('ProcessingHubService', () => {
   let service: ProcessingHubService;
@@ -49,6 +49,27 @@ describe('ProcessingHubService', () => {
       ...overrides,
     };
   }
+
+  describe('generic-toast opt-out', () => {
+    // The generic toasts are worded for document uploads. A backup job carries no document name, so
+    // the parent would announce `"Document" has been processed successfully.` and a failed batch would
+    // dump its whole per-file report into a toast. /admin/backup reports its own runs instead.
+    it('opts a backup job out of the generic toasts', () => {
+      expect(ownsItsOwnReporting(msg({ entityType: 'BackupTarget' }))).toBe(true);
+    });
+
+    it('opts out backup jobs regardless of status', () => {
+      for (const status of ['Completed', 'PartiallyCompleted', 'Failed'] as const) {
+        expect(ownsItsOwnReporting(msg({ entityType: 'BackupTarget', status }))).toBe(true);
+      }
+    });
+
+    it('leaves document and download jobs on the generic path', () => {
+      expect(ownsItsOwnReporting(msg({ entityType: 'Document' }))).toBe(false);
+      expect(ownsItsOwnReporting(msg({ entityType: 'Download' }))).toBe(false);
+      expect(ownsItsOwnReporting(msg({ entityType: null }))).toBe(false);
+    });
+  });
 
   describe('managed jobs', () => {
     it('should suppress managed job from being tracked as toast', () => {

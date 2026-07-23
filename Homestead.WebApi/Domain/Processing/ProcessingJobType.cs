@@ -12,4 +12,6 @@ public enum ProcessingJobType
     ClassifyDocument,
     BulkClassifyDocuments,
     ParseAccountStatement,
+    BackupToTarget,
+    BackupBatch,
 }

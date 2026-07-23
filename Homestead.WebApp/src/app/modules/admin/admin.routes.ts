@@ -7,6 +7,7 @@ import { JobListComponent } from './jobs/job-list.component';
 import { ScheduleListComponent } from './schedules/schedule-list.component';
 import { SystemSettingsComponent } from './settings/system-settings.component';
 import { AiStatusComponent } from './ai/ai-status.component';
+import { BackupTargetListComponent } from './backup/backup-target-list.component';
 export const ADMIN_ROUTES: Routes = [
   { path: '', component: AdminIndexComponent, data: { title: 'Admin' } },
   { path: 'users', component: UserListComponent, data: { title: 'Users' } },
@@ -16,4 +17,5 @@ export const ADMIN_ROUTES: Routes = [
   { path: 'schedules', component: ScheduleListComponent, data: { title: 'Schedules' } },
   { path: 'settings', component: SystemSettingsComponent, data: { title: 'System Settings' } },
   { path: 'ai', component: AiStatusComponent, data: { title: 'AI' } },
+  { path: 'backup', component: BackupTargetListComponent, data: { title: 'Backup' } },
 ];

@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using Homestead.WebApi.Common.Files;
 
 namespace Homestead.WebApi.Modules.Documents.Features.Download;
 
@@ -13,9 +13,9 @@ public interface IDownloadPathBuilder
     List<string> BuildPaths(DownloadDocumentMetadata document);
 }
 
-public partial class TagBasedDownloadPathBuilder : IDownloadPathBuilder
+public class TagBasedDownloadPathBuilder : IDownloadPathBuilder
 {
-    private const int MaxFileNameLength = 200;
+    private const int MaxFileNameLength = SafeFileName.MaxFileNameLength;
     private const string UntaggedFolder = "_Untagged";
     private const string FallbackDocumentName = "Untitled";
     private const string FallbackTagSegment = "Unknown Tag";
@@ -60,20 +60,7 @@ public partial class TagBasedDownloadPathBuilder : IDownloadPathBuilder
         return Path.Combine(sanitized.ToArray());
     }
 
-    internal static string SanitizeSegment(string segment)
-    {
-        // Replace illegal OS characters and control chars with underscore
-        var result = IllegalCharsRegex().Replace(segment, "_");
-        // Collapse consecutive whitespace
-        result = ConsecutiveWhitespaceRegex().Replace(result, " ");
-        // Trim leading/trailing dots and spaces (Windows restriction)
-        result = result.Trim('.', ' ');
-        return result;
-    }
-
-    [GeneratedRegex(@"[\\/:*?""<>|\x00-\x1F]")]
-    private static partial Regex IllegalCharsRegex();
-
-    [GeneratedRegex(@"\s{2,}")]
-    private static partial Regex ConsecutiveWhitespaceRegex();
+    // Delegates to the shared sanitizer (Common/Files/SafeFileName.cs), which the backup mirror also
+    // uses so the two file trees can never diverge on what characters are legal.
+    internal static string SanitizeSegment(string segment) => SafeFileName.SanitizeSegment(segment);
 }

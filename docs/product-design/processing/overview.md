@@ -193,6 +193,8 @@ This exists for **tests and for any future operation that needs the queue quiesc
 
 Most v1 domain job types are initiated by the Documents module, with handlers under `Modules/Documents/Processing/`; Finances contributes `ImportCommodityPrices`, with its handler under `Modules/Finances/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
 
+A note on the two hard constraints that shape any new fan-out: the **5-minute per-job timeout** is a compile-time constant, and `MaxConcurrency` defaults to **1**, so a long job does not merely risk timing out — it blocks every upload behind it. Work whose size scales with the library (the backup mirror is the canonical case) must therefore split into fixed-size batches at low priority, with the parent doing only the DB-bound planning. See `BackupToTarget` / `BackupBatch` below.
+
 ### `UploadDocument`
 
 Triggered when a new document is uploaded. The HTTP endpoint stages the file under `media/<UploadsSubroot>/<UploadId><ext>` and enqueues this job. The handler:
@@ -268,6 +270,50 @@ The Finances module's commodity-price import (handler under `Modules/Finances/Pr
 5. Imports observations and applies them via `ApplyCommodityPriceObservationsCommand` through the standard unit-of-work pipeline. Scheduled runs stay system-attributed in the audit log; manual runs are attributed to the initiating user.
 
 It emits no SignalR success notification of its own — import status surfaces on the price-source settings row (`LastImportStatus` / `LastImportMessage`). See [finances/commodities.md](../finances/commodities.md#price-sources--model).
+
+### `BackupToTarget` *(parent)*
+
+The Documents module's one-way backup mirror — the **planner**. Enqueued ad-hoc by the admin *Back up
+now* / *Dry run* actions (`POST /api/v1/admin/backup/targets/{key}/runs`) and recurringly by per-target
+schedules managed via `PUT`/`DELETE /api/v1/admin/backup/targets/{key}/schedule`. The payload names the
+target key plus `dryRun` / `allowLargePrune` flags. The handler:
+
+1. Idempotency check: if children already exist for this parent ID (crash recovery), restore
+   `TotalChildCount` and return.
+2. Stamp `EntityType = BackupTarget`, `EntityId = DeterministicGuid.FromKey(targetKey)` onto itself — a
+   *scheduled* run cannot be stamped at enqueue (the scheduler copies only the schedule's payload), and
+   without it the parent would be invisible to the single-flight query while its children drain.
+3. Resolve the target. Unavailable (misconfigured) **fails loudly** — a mirror that reports success
+   while copying nothing is the worst outcome for a backup. Disabled, or another run already in
+   progress, **skips** with a reason staged into `Result` and zero children.
+4. Project every version in the instance — *including* versions of trashed documents — and diff the
+   stored `FileHash` against the target's state rows. Latch the delete circuit breaker if it trips.
+5. Dry run: stage the change-set summary into `Result` and spawn **zero** children (the processor
+   terminates a childless parent as `Completed`). Otherwise insert one `BackupBatch` child per batch.
+
+**The handler does no file I/O**, deliberately: the diff is a pure comparison of stored hashes against
+stored state rows, so it is bounded by two queries rather than by how many gigabytes need copying, and
+it fits the 5-minute per-job timeout on a library of any size.
+
+Sets `EntityType = BackupTarget`, `EntityId = DeterministicGuid.FromKey(targetKey)`.
+
+### `BackupBatch`
+
+Executes one slice of a backup plan — up to 100 files or 512 MB of copies, or up to 500 metadata-only
+moves/deletes. Enqueued only as a child of `BackupToTarget`. Per action it streams the blob to verify
+its SHA-256 **before** writing, copies it to the target, and persists the state row **only after** the
+write returns. A missing source file is a skip (the version was permanently deleted mid-run); a hash
+mismatch is a failure. Per-action failures are collected, successful state rows are saved, and the batch
+throws once at the end — so one bad file yields `PartiallyCompleted` at the parent instead of costing
+the other ninety-nine their state rows. Suppresses its own success notification as a child.
+
+**Why the fan-out exists:** a single "back up everything" job would blow the 5-minute timeout on the
+first run of any real library and starve the queue behind it (`MaxConcurrency` defaults to 1). Batches
+are enqueued at **negative** priority, descending by batch index — negative so uploads and classification
+preempt the mirror between batches, descending so the claim order preserves the planner's
+delete-then-move-then-put ordering (deletes free the paths that later moves and puts reuse).
+
+See [documents/backup.md](../documents/backup.md) for the product-level contract.
 
 ### `NoOp`
 
