@@ -76,6 +76,7 @@ import { handleQueryError } from '@/shared/utils/rxjs-error.utils';
                 <hlm-select-item value="Completed">Completed</hlm-select-item>
                 <hlm-select-item value="Failed">Failed</hlm-select-item>
                 <hlm-select-item value="PartiallyCompleted">Partially Completed</hlm-select-item>
+                <hlm-select-item value="Cancelled">Cancelled</hlm-select-item>
               </hlm-select-group>
             </hlm-select-content>
           </hlm-select>

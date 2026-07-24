@@ -18,6 +18,8 @@ export type { AzureOutputContentFormat } from './models/azure-output-content-for
 export type { BackupRunStatus } from './models/backup-run-status';
 export type { BackupRunSummary } from './models/backup-run-summary';
 export type { BackupScheduleSummary } from './models/backup-schedule-summary';
+export type { BackupSourceItemResponse } from './models/backup-source-item-response';
+export type { BackupSourceKindResponse } from './models/backup-source-kind-response';
 export type { BackupTargetKind } from './models/backup-target-kind';
 export type { BackupTargetResponse } from './models/backup-target-response';
 export type { BalanceEntryResponse } from './models/balance-entry-response';
@@ -61,6 +63,8 @@ export type { ConsumableResponse } from './models/consumable-response';
 export type { ConsumeStockRequest } from './models/consume-stock-request';
 export type { CreateAccountCommand } from './models/create-account-command';
 export type { CreateAreaCommand } from './models/create-area-command';
+export type { CreateBackupSourceBody } from './models/create-backup-source-body';
+export type { CreateBackupSourceResponse } from './models/create-backup-source-response';
 export type { CreateBalanceEntryCommand } from './models/create-balance-entry-command';
 export type { CreateBrandCommand } from './models/create-brand-command';
 export type { CreateCategoryCommand } from './models/create-category-command';
@@ -188,6 +192,8 @@ export type { PaginatedResponseOfTransactionResponse } from './models/paginated-
 export type { PaginatedResponseOfUserResponse } from './models/paginated-response-of-user-response';
 export type { PartyDto } from './models/party-dto';
 export type { PartySortBy } from './models/party-sort-by';
+export type { PatchBackupSourceBody } from './models/patch-backup-source-body';
+export type { PatchBackupSourceResponse } from './models/patch-backup-source-response';
 export type { PatchBackupTargetBody } from './models/patch-backup-target-body';
 export type { PatchBackupTargetResponse } from './models/patch-backup-target-response';
 export type { PatchBalanceEntryCommand } from './models/patch-balance-entry-command';

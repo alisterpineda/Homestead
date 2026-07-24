@@ -89,6 +89,8 @@ Pending ──┬─► InProgress ──► Completed
           │                  Failed
           │                  PartiallyCompleted   (parent jobs only)
           │
+          ├─► Cancelled                           (out-of-band, never by the processor)
+          │
           └─► (recovered to Pending at startup if InProgress with no children)
 ```
 
@@ -97,8 +99,11 @@ Pending ──┬─► InProgress ──► Completed
 - **Completed** — terminal success. For non-parent jobs, the handler returned without throwing. For parent jobs, every child completed successfully.
 - **Failed** — terminal failure. For non-parent jobs, the handler threw. For parent jobs, every child failed.
 - **PartiallyCompleted** — terminal. **Parent jobs only.** Some children completed, some failed.
+- **Cancelled** — terminal, and the one status the processor never produces. It is written **out of band** by a caller tearing down the thing a run belongs to; today the only such caller is deleting a backup source (see [documents/backup.md](../documents/backup.md#deleting-a-backup)), which flips the parent and its still-`Pending` children in one transaction.
 
 A non-parent job will never enter `PartiallyCompleted`. A parent job that successfully spawned zero children would terminate as `Completed` immediately on the next progress update, since `0 finished ≥ 0 total` and `failed == 0`.
+
+**Cancellation stops what has not started, not what is running.** The claim query picks only `Pending` rows, so a cancelled job is never picked up — but a job already inside its handler is untouched, which is why the delete flow refuses (409) rather than cancelling while a batch is mid-flight. `UpdateParentProgressAsync` tallies only `Completed` and `Failed`, and both of its writes are guarded on the parent still being `InProgress`, so a straggler child completing under a cancelled parent is a natural no-op: it leaves the parent `Cancelled`, its counters untouched, and sends no notification.
 
 `CompletedAt` is set on every terminal transition (success or failure). `StartedAt` is set when the job is claimed, regardless of outcome. Recovered jobs (see *Crash recovery*) have their `StartedAt` cleared when transitioned back to `Pending`.
 
@@ -273,39 +278,55 @@ It emits no SignalR success notification of its own — import status surfaces o
 
 ### `BackupToTarget` *(parent)*
 
-The Documents module's one-way backup mirror — the **planner**. Enqueued ad-hoc by the admin *Back up
-now* / *Dry run* actions (`POST /api/v1/admin/backup/targets/{key}/runs`) and recurringly by per-target
-schedules managed via `PUT`/`DELETE /api/v1/admin/backup/targets/{key}/schedule`. The payload names the
-target key plus `dryRun` / `allowLargePrune` flags. The handler:
+The Documents module's one-way backup mirror — the **planner**. One run mirrors one *backup source*: a
+`backup.sources` row pairing a code-registered source kind with a config-defined target. Enqueued ad-hoc
+by the admin *Back up now* / *Dry run* actions (`POST /api/v1/admin/backup/sources/{id}/runs`) and
+recurringly by per-source schedules managed via `PUT`/`DELETE /api/v1/admin/backup/sources/{id}/schedule`.
+The payload (`BackupRunPayload`, shared by every source kind's planner) names the **source row id** plus
+`dryRun` / `allowLargePrune` flags — everything else is read off the row at wake, so a stale payload can
+never disagree with the pairing it names. The handler:
 
 1. Idempotency check: if children already exist for this parent ID (crash recovery), restore
    `TotalChildCount` and return.
-2. Stamp `EntityType = BackupTarget`, `EntityId = DeterministicGuid.FromKey(targetKey)` onto itself — a
-   *scheduled* run cannot be stamped at enqueue (the scheduler copies only the schedule's payload), and
-   without it the parent would be invisible to the single-flight query while its children drain.
-3. Resolve the target. Unavailable (misconfigured) **fails loudly** — a mirror that reports success
-   while copying nothing is the worst outcome for a backup. Disabled, or another run already in
-   progress, **skips** with a reason staged into `Result` and zero children.
-4. Project every version in the instance — *including* versions of trashed documents — and diff the
-   stored `FileHash` against the target's state rows. Latch the delete circuit breaker if it trips.
-5. Dry run: stage the change-set summary into `Result` and spawn **zero** children (the processor
+2. Stamp `EntityType = BackupSource`, `EntityId = <source row id>` onto itself — a *scheduled* run cannot
+   be stamped at enqueue (the scheduler copies only the schedule's payload), and without it the parent
+   would be invisible to the single-flight query while its children drain.
+3. Walk the wake matrix, in this order: source row gone (deleted while queued, or a legacy payload naming
+   nothing) → **skip**; source disabled → **skip**; target disabled → **skip**; target unresolvable or
+   unavailable → **fail loudly**, because a mirror that reports success while copying nothing is the
+   worst outcome for a backup. The enable flags are checked *before* the destination so an operator who
+   already paused this pairing is not paged about a target they know is broken.
+4. Single-flight: another parent run for this same source (`EntityId == sourceId && ParentJobId == null`)
+   **skips** with a reason. The `ParentJobId` filter is load-bearing — batch children carry their
+   parent's `EntityId`, so without it every run after the first would skip forever.
+5. Project every version in the instance — *including* versions of trashed documents — and diff the
+   stored `FileHash` against this source's state rows. Latch the delete circuit breaker if it trips.
+6. Dry run: stage the change-set summary into `Result` and spawn **zero** children (the processor
    terminates a childless parent as `Completed`). Otherwise insert one `BackupBatch` child per batch.
+
+A skip stages its reason into `Result` and spawns zero children, so it lands as `Completed` with an
+explanation rather than as a red row on a still-armed schedule.
 
 **The handler does no file I/O**, deliberately: the diff is a pure comparison of stored hashes against
 stored state rows, so it is bounded by two queries rather than by how many gigabytes need copying, and
 it fits the 5-minute per-job timeout on a library of any size.
 
-Sets `EntityType = BackupTarget`, `EntityId = DeterministicGuid.FromKey(targetKey)`.
+Sets `EntityType = BackupSource`, `EntityId = <source row id>`. The job type is per source kind (a
+future Finances export registers its own); only the *payload* and the staged `BackupRunSummary` are
+shared, which is what keeps the admin page free of per-kind switches.
 
 ### `BackupBatch`
 
 Executes one slice of a backup plan — up to 100 files or 512 MB of copies, or up to 500 metadata-only
-moves/deletes. Enqueued only as a child of `BackupToTarget`. Per action it streams the blob to verify
-its SHA-256 **before** writing, copies it to the target, and persists the state row **only after** the
-write returns. A missing source file is a skip (the version was permanently deleted mid-run); a hash
-mismatch is a failure. Per-action failures are collected, successful state rows are saved, and the batch
-throws once at the end — so one bad file yields `PartiallyCompleted` at the parent instead of costing
-the other ninety-nine their state rows. Suppresses its own success notification as a child.
+moves/deletes. Enqueued only as a child of `BackupToTarget`, carrying its parent's `EntityType` /
+`EntityId`. It first re-checks that the source row still exists and returns quietly if not (the pairing
+can be deleted while its batches sit queued, and writing state for a deleted source would violate the
+FK). Per action it streams the blob to verify its SHA-256 **before** writing, copies it to the target,
+and persists the state row **only after** the write returns. A missing source file is a skip (the
+version was permanently deleted mid-run); a hash mismatch is a failure. Per-action failures are
+collected, successful state rows are saved, and the batch throws once at the end — so one bad file
+yields `PartiallyCompleted` at the parent instead of costing the other ninety-nine their state rows.
+Suppresses its own success notification as a child.
 
 **Why the fan-out exists:** a single "back up everything" job would blow the 5-minute timeout on the
 first run of any real library and starve the queue behind it (`MaxConcurrency` defaults to 1). Batches

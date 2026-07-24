@@ -25,6 +25,13 @@ public static class BackupServiceExtensions
         services.AddSingleton<IBackupTargetResolver>(sp =>
             new BackupTargetResolver(sp.GetServices<IBackupTarget>()));
 
+        // Enumerates whatever IBackupSourceDescriptor registrations the modules contributed — this
+        // extension deliberately registers none itself, so that Infrastructure never has to know which
+        // modules support being backed up. An instance with zero descriptors is legitimate (no module
+        // offers backup): the picker is simply empty.
+        services.AddSingleton<IBackupSourceCatalog>(sp =>
+            new BackupSourceCatalog(sp.GetServices<IBackupSourceDescriptor>()));
+
         return services;
     }
 

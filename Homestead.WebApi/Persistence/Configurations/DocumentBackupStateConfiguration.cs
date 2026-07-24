@@ -12,10 +12,6 @@ public class DocumentBackupStateConfiguration : IEntityTypeConfiguration<Documen
 
         builder.HasKey(s => s.Id);
 
-        builder.Property(s => s.TargetKey)
-            .IsRequired()
-            .HasMaxLength(128);
-
         builder.Property(s => s.RemoteRelativePath)
             .IsRequired();
 
@@ -30,18 +26,22 @@ public class DocumentBackupStateConfiguration : IEntityTypeConfiguration<Documen
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-        // NO foreign key to document_versions or documents, and none to target_state either. These rows
-        // are tombstones: they must survive the permanent deletion of the version they describe, because
-        // at that moment the row is the only thing that knows a file needs removing from the mirror. See
-        // DocumentBackupState's remarks.
+        // NO foreign key to document_versions or documents. These rows are tombstones: they must survive
+        // the permanent deletion of the version they describe, because at that moment the row is the only
+        // thing that knows a file needs removing from the mirror. See DocumentBackupState's remarks.
+        //
+        // BackupSourceId is the exception and DOES cascade — deleting a pairing is an explicit "forget
+        // this backup", so its bookkeeping goes with it.
+        builder.HasOne<BackupSource>()
+            .WithMany()
+            .HasForeignKey(s => s.BackupSourceId)
+            .OnDelete(DeleteBehavior.Cascade);
 
-        // One copy per (target, version) — the invariant the whole diff rests on.
-        builder.HasIndex(s => new { s.TargetKey, s.DocumentVersionId }).IsUnique();
+        // One copy per (source, version) — the invariant the whole diff rests on. Also serves the
+        // planner's own load (every row for one source) as a leading-column prefix.
+        builder.HasIndex(s => new { s.BackupSourceId, s.DocumentVersionId }).IsUnique();
 
-        // Per-document lookups (all versions of one document in one target).
-        builder.HasIndex(s => new { s.TargetKey, s.DocumentId });
-
-        // The planner's own load: every row for one target.
-        builder.HasIndex(s => s.TargetKey);
+        // Per-document lookups (all versions of one document in one pairing).
+        builder.HasIndex(s => new { s.BackupSourceId, s.DocumentId });
     }
 }

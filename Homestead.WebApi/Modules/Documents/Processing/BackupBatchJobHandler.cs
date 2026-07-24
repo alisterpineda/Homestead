@@ -40,16 +40,33 @@ public class BackupBatchJobHandler(
         var payload = job.GetPayload<BackupBatchPayload>()
             ?? throw new InvalidOperationException("Job payload is missing or invalid.");
 
-        var target = targetResolver.Resolve(payload.TargetKey);
+        // Backstop for the enqueue-vs-delete race: the pairing can be deleted (taking its state rows with
+        // it) while its batches sit queued. Writing state for a source that no longer exists would
+        // violate the FK and fail the batch loudly for something that is not a fault, so re-check and
+        // return quietly instead. Deliberately AsNoTracking — nothing here writes to the source row.
+        var source = await db.BackupSources
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == payload.BackupSourceId, ct);
+
+        if (source is null)
+        {
+            logger.LogInformation(
+                "Backup batch for source {SourceId} skipped: the backup source was deleted after this " +
+                "batch was queued", payload.BackupSourceId);
+            return;
+        }
+
+        var target = targetResolver.Resolve(source.TargetKey);
         if (!target.IsAvailable)
             throw new InvalidOperationException(
-                $"Backup target '{payload.TargetKey}' is unavailable: {target.ConfigurationError}");
+                $"Backup target '{source.TargetKey}' is unavailable: {target.ConfigurationError}");
 
         var mediaPath = storage.Value.MediaPath;
 
         var versionIds = payload.Actions.Select(a => a.VersionId).ToList();
         var stateByVersion = await db.DocumentBackupStates
-            .Where(s => s.TargetKey == payload.TargetKey && versionIds.Contains(s.DocumentVersionId))
+            .Where(s => s.BackupSourceId == payload.BackupSourceId
+                        && versionIds.Contains(s.DocumentVersionId))
             .ToDictionaryAsync(s => s.DocumentVersionId, ct);
 
         var failures = new List<string>();
@@ -61,7 +78,8 @@ public class BackupBatchJobHandler(
             {
                 var didWork = action.Kind switch
                 {
-                    BackupActionKind.Put => await PutAsync(target, payload.TargetKey, mediaPath, action, stateByVersion, ct),
+                    BackupActionKind.Put => await PutAsync(
+                        target, payload.BackupSourceId, mediaPath, action, stateByVersion, ct),
                     BackupActionKind.Move => await MoveAsync(target, action, stateByVersion, ct),
                     BackupActionKind.Delete => await DeleteAsync(target, action, stateByVersion, ct),
                     _ => throw new InvalidOperationException($"Unknown backup action '{action.Kind}'.")
@@ -87,7 +105,7 @@ public class BackupBatchJobHandler(
             {
                 logger.LogError(ex,
                     "Backup {Kind} failed for version {VersionId} on target {TargetKey} at {Path}",
-                    action.Kind, action.VersionId, payload.TargetKey, action.RelativePath);
+                    action.Kind, action.VersionId, source.TargetKey, action.RelativePath);
 
                 failures.Add($"{action.Kind} '{action.RelativePath}': {ex.Message}");
             }
@@ -102,7 +120,7 @@ public class BackupBatchJobHandler(
         {
             await notifier.NotifyJobStatusAsync(
                 job.Id, ProcessingJobStatus.Completed,
-                ProcessingEntityType.BackupTarget, job.EntityId,
+                ProcessingEntityType.BackupSource, job.EntityId,
                 documentName: $"Backup batch ({payload.Actions.Count} action(s))",
                 error: null, job.CreatedByUserId, ct);
         }
@@ -121,7 +139,7 @@ public class BackupBatchJobHandler(
     /// <summary>Copies a blob to the target and records it. Returns false when nothing was written.</summary>
     private async Task<bool> PutAsync(
         IBackupTarget target,
-        string targetKey,
+        Guid backupSourceId,
         string mediaPath,
         BackupAction action,
         Dictionary<Guid, DocumentBackupState> stateByVersion,
@@ -185,7 +203,7 @@ public class BackupBatchJobHandler(
         }
 
         // Only now — after the write returned — does the state row claim the copy exists.
-        Upsert(targetKey, action, handle, stateByVersion);
+        Upsert(backupSourceId, action, handle, stateByVersion);
         return true;
     }
 
@@ -247,7 +265,7 @@ public class BackupBatchJobHandler(
     }
 
     private void Upsert(
-        string targetKey,
+        Guid backupSourceId,
         BackupAction action,
         string handle,
         Dictionary<Guid, DocumentBackupState> stateByVersion)
@@ -267,7 +285,7 @@ public class BackupBatchJobHandler(
         var state = new DocumentBackupState
         {
             Id = Guid.NewGuid(),
-            TargetKey = targetKey,
+            BackupSourceId = backupSourceId,
             DocumentVersionId = action.VersionId,
             DocumentId = action.DocumentId,
             RemoteRelativePath = action.RelativePath,

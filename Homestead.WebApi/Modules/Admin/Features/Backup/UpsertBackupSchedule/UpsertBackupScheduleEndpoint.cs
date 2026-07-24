@@ -13,12 +13,12 @@ public static class UpsertBackupScheduleEndpoint
 
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPut("/targets/{key}/schedule", async (
-            string key, UpsertBackupScheduleBody body, ISender sender, CancellationToken ct) =>
+        group.MapPut("/sources/{id:guid}/schedule", async (
+            Guid id, UpsertBackupScheduleBody body, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(new UpsertBackupScheduleCommand
             {
-                TargetKey = key,
+                BackupSourceId = id,
                 CronExpression = body.CronExpression,
                 IsEnabled = body.IsEnabled,
                 Priority = body.Priority,

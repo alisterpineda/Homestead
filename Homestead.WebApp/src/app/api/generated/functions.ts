@@ -155,6 +155,12 @@ export type { GetBackupTargets$Params as GetBackupTargets$Params } from './fn/ad
 export { getBackupTargets as getBackupTargets } from './fn/admin/get-backup-targets';
 export type { PatchBackupTarget$Params as PatchBackupTarget$Params } from './fn/admin/patch-backup-target';
 export { patchBackupTarget as patchBackupTarget } from './fn/admin/patch-backup-target';
+export type { CreateBackupSource$Params as CreateBackupSource$Params } from './fn/admin/create-backup-source';
+export { createBackupSource as createBackupSource } from './fn/admin/create-backup-source';
+export type { DeleteBackupSource$Params as DeleteBackupSource$Params } from './fn/admin/delete-backup-source';
+export { deleteBackupSource as deleteBackupSource } from './fn/admin/delete-backup-source';
+export type { PatchBackupSource$Params as PatchBackupSource$Params } from './fn/admin/patch-backup-source';
+export { patchBackupSource as patchBackupSource } from './fn/admin/patch-backup-source';
 export type { RunBackupNow$Params as RunBackupNow$Params } from './fn/admin/run-backup-now';
 export { runBackupNow as runBackupNow } from './fn/admin/run-backup-now';
 export type { UpsertBackupSchedule$Params as UpsertBackupSchedule$Params } from './fn/admin/upsert-backup-schedule';

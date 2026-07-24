@@ -278,6 +278,13 @@ public class JobProcessorService(
         }
     }
 
+    // Counts Completed and Failed children ONLY, and both writes below are guarded on the parent still
+    // being InProgress. Do not "fix" the tally to include Cancelled: cancellation (the backup source
+    // delete flow) flips the parent and every Pending child in ONE transaction, so a still-InProgress
+    // parent never has Cancelled children. What CAN happen is the reverse — an already-InProgress child
+    // completes after its parent was cancelled — and the InProgress guards make that a natural no-op,
+    // leaving the Cancelled parent alone and sending no notification. Counting Cancelled children would
+    // instead let that straggler drive the cancelled parent to a terminal Completed/Failed.
     private static async Task UpdateParentProgressAsync(
         AppDbContext db, Guid parentJobId, IServiceProvider sp, CancellationToken ct)
     {

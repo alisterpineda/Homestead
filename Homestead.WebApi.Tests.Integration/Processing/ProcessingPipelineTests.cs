@@ -139,4 +139,81 @@ public class ProcessingPipelineTests : IntegrationTestBase
         Assert.Equal(0, parent.CompletedChildCount);
         Assert.Equal(0, parent.FailedChildCount);
     }
+
+    /// <summary>
+    /// A child already inside its handler when its parent was cancelled (the backup source delete flow)
+    /// finishes and reports progress as usual. Both writes in <c>UpdateParentProgressAsync</c> are guarded
+    /// on the parent still being InProgress, so the straggler is a natural no-op: the Cancelled parent
+    /// keeps its status, its counters, and its completion timestamp.
+    /// </summary>
+    [Fact]
+    public async Task AStragglerChildCompletingUnderACancelledParent_LeavesItCancelled()
+    {
+        var control = Factory.Services.GetRequiredService<IJobProcessorControl>();
+
+        Guid parentId;
+        DateTimeOffset cancelledAt;
+
+        await using (await control.PauseAsync(CT))
+        {
+            using var scope = CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            cancelledAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+            var parent = new ProcessingJob
+            {
+                Id = Guid.NewGuid(),
+                Type = ProcessingJobType.NoOp,
+                Status = ProcessingJobStatus.Cancelled,
+                TotalChildCount = 1,
+                CreatedAt = DateTimeOffset.UtcNow,
+                CompletedAt = cancelledAt,
+            };
+
+            // Pending, so the processor claims and runs it once unpaused — the straggler.
+            db.ProcessingJobs.AddRange(parent, new ProcessingJob
+            {
+                Id = Guid.NewGuid(),
+                Type = ProcessingJobType.NoOp,
+                Status = ProcessingJobStatus.Pending,
+                ParentJobId = parent.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+
+            await db.SaveChangesAsync(CT);
+            parentId = parent.Id;
+        }
+
+        Factory.Services.GetRequiredService<IJobSignal>().Signal();
+
+        // Wait for the child itself to finish; the parent is what we then assert about.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            using var pollScope = CreateScope();
+            var pollDb = pollScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var child = await pollDb.ProcessingJobs.AsNoTracking()
+                .FirstAsync(j => j.ParentJobId == parentId, CT);
+
+            if (child.Status == ProcessingJobStatus.Completed)
+                break;
+
+            await Task.Delay(150, CT);
+        }
+
+        using var assertScope2 = CreateScope();
+        var assertDb = assertScope2.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var child2 = await assertDb.ProcessingJobs.AsNoTracking()
+            .FirstAsync(j => j.ParentJobId == parentId, CT);
+        Assert.Equal(ProcessingJobStatus.Completed, child2.Status);
+
+        var cancelledParent = await assertDb.ProcessingJobs.AsNoTracking()
+            .FirstAsync(j => j.Id == parentId, CT);
+
+        Assert.Equal(ProcessingJobStatus.Cancelled, cancelledParent.Status);
+        Assert.Equal(0, cancelledParent.CompletedChildCount);
+        Assert.Equal(cancelledAt, cancelledParent.CompletedAt!.Value, TimeSpan.FromMilliseconds(1));
+    }
 }

@@ -1,9 +1,9 @@
 using Homestead.WebApi.Common;
-using Homestead.WebApi.Domain.Auditing;
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
+using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
@@ -17,13 +17,15 @@ namespace Homestead.WebApi.Tests.Unit.Processing;
 public class BackupToTargetJobHandlerTests : IDisposable
 {
     private const string TargetKey = "local";
-    private static readonly Guid TargetEntityId = DeterministicGuid.FromKey(TargetKey);
 
     private readonly TestAppDbContext _db;
     private readonly IJobSignal _signal;
     private readonly IBackupTargetResolver _resolver;
-    private readonly BackupOptions _options = new();
+    private readonly DocumentBackupEngineOptions _options = new();
     private readonly BackupToTargetJobHandler _sut;
+
+    /// <summary>The pairing every test runs against, seeded by the constructor.</summary>
+    private readonly Guid _sourceId = Guid.NewGuid();
 
     public BackupToTargetJobHandlerTests()
     {
@@ -31,6 +33,17 @@ public class BackupToTargetJobHandlerTests : IDisposable
         _signal = Substitute.For<IJobSignal>();
         _resolver = Substitute.For<IBackupTargetResolver>();
         _resolver.Resolve(Arg.Any<string>()).Returns(new StubTarget(TargetKey, available: true));
+
+        _db.BackupSources.Add(new BackupSource
+        {
+            Id = _sourceId,
+            SourceKind = DocumentsBackupSourceDescriptor.SourceKey,
+            TargetKey = TargetKey,
+            IsEnabled = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.SaveChanges();
 
         _sut = new BackupToTargetJobHandler(
             _db, _resolver, Options.Create(_options), _signal,
@@ -43,7 +56,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private ProcessingJob CreateJob(bool dryRun = false, bool allowLargePrune = false, string? targetKey = null)
+    private ProcessingJob CreateJob(bool dryRun = false, bool allowLargePrune = false, Guid? sourceId = null)
     {
         var job = new ProcessingJob
         {
@@ -53,7 +66,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
             CreatedByUserId = Guid.NewGuid(),
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        job.SetPayload(new BackupToTargetPayload(targetKey ?? TargetKey, dryRun, allowLargePrune));
+        job.SetPayload(new BackupRunPayload(sourceId ?? _sourceId, dryRun, allowLargePrune));
         return job;
     }
 
@@ -89,8 +102,29 @@ public class BackupToTargetJobHandlerTests : IDisposable
         return docId;
     }
 
+    private void SeedMirroredState(int count, string pathPrefix = "Documents/2025")
+    {
+        for (var i = 0; i < count; i++)
+        {
+            _db.DocumentBackupStates.Add(new DocumentBackupState
+            {
+                Id = Guid.NewGuid(),
+                BackupSourceId = _sourceId,
+                DocumentVersionId = Guid.NewGuid(),
+                DocumentId = Guid.NewGuid(),
+                RemoteRelativePath = $"{pathPrefix}/Gone{i}.pdf",
+                BackedUpHash = Guid.NewGuid().ToString("N"),
+                FileSize = 10,
+                BackedUpAt = DateTimeOffset.UtcNow,
+            });
+        }
+    }
+
     private async Task<List<ProcessingJob>> ChildrenOf(ProcessingJob job, CancellationToken ct) =>
         await _db.ProcessingJobs.Where(j => j.ParentJobId == job.Id).ToListAsync(ct);
+
+    private async Task<BackupSource> ReloadSourceAsync(CancellationToken ct) =>
+        await _db.BackupSources.AsNoTracking().SingleAsync(s => s.Id == _sourceId, ct);
 
     [Fact]
     public async Task HandleAsync_FansOutOneChildPerBatch()
@@ -110,7 +144,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task HandleAsync_StampsTheTargetEntityOnItselfAndItsChildren()
+    public async Task HandleAsync_StampsTheSourceEntityOnItselfAndItsChildren()
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocument();
@@ -118,11 +152,34 @@ public class BackupToTargetJobHandlerTests : IDisposable
 
         await _sut.HandleAsync(job, ct);
 
-        Assert.Equal(ProcessingEntityType.BackupTarget, job.EntityType);
-        Assert.Equal(TargetEntityId, job.EntityId);
+        Assert.Equal(ProcessingEntityType.BackupSource, job.EntityType);
+        Assert.Equal(_sourceId, job.EntityId);
 
         var children = await ChildrenOf(job, ct);
-        Assert.All(children, c => Assert.Equal(TargetEntityId, c.EntityId));
+        Assert.NotEmpty(children);
+        Assert.All(children, c => Assert.Equal(ProcessingEntityType.BackupSource, c.EntityType));
+        Assert.All(children, c => Assert.Equal(_sourceId, c.EntityId));
+        Assert.All(children, c => Assert.Equal(_sourceId, c.GetPayload<BackupBatchPayload>()!.BackupSourceId));
+    }
+
+    // Every path the planner emits sits under the source kind's own root folder, so several kinds can
+    // share one target without their prunes reaching into each other's files.
+    [Fact]
+    public async Task HandleAsync_ChildPathsAreNamespacedUnderTheSourceKindsRootFolder()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocument("A", new DateOnly(2025, 1, 1));
+        var job = CreateJob();
+
+        await _sut.HandleAsync(job, ct);
+
+        var actions = (await ChildrenOf(job, ct))
+            .SelectMany(c => c.GetPayload<BackupBatchPayload>()!.Actions)
+            .ToList();
+
+        Assert.NotEmpty(actions);
+        Assert.All(actions, a => Assert.StartsWith(
+            $"{DocumentsBackupSourceDescriptor.RootFolderName}/", a.RelativePath));
     }
 
     // Negative so uploads and classification preempt the mirror, and descending by index so the worker
@@ -206,7 +263,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         var summary = job.GetResult<BackupRunSummary>();
-        Assert.Equal(1, summary!.PutCount);
+        Assert.Equal(1, summary!.Puts);
     }
 
     [Fact]
@@ -225,7 +282,8 @@ public class BackupToTargetJobHandlerTests : IDisposable
         var summary = job.GetResult<BackupRunSummary>();
         Assert.NotNull(summary);
         Assert.True(summary.DryRun);
-        Assert.Equal(3, summary.PutCount);
+        Assert.Equal(_sourceId, summary.BackupSourceId);
+        Assert.Equal(3, summary.Puts);
         Assert.Equal(0, summary.BatchCount);
         _signal.DidNotReceive().Signal();
     }
@@ -242,12 +300,60 @@ public class BackupToTargetJobHandlerTests : IDisposable
         var summary = job.GetResult<BackupRunSummary>();
         Assert.NotNull(summary);
         Assert.False(summary.DryRun);
-        Assert.Equal(1, summary.PutCount);
+        Assert.Equal(1, summary.Puts);
         Assert.Equal(1, summary.BatchCount);
+    }
+
+    // --- The wake matrix -------------------------------------------------------------------------
+    //
+    // Four ways a run can arrive at a pairing it cannot mirror. Three are operator decisions or expected
+    // races and skip quietly; only a broken destination fails loudly.
+
+    // The pairing was deleted while this run sat queued. Also absorbs a legacy payload that named no
+    // source at all, which deserializes to Guid.Empty and matches nothing.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SourceRowGone_SkipsQuietly(bool emptyPayloadId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocument();
+
+        var missingId = emptyPayloadId ? Guid.Empty : Guid.NewGuid();
+        var job = CreateJob(sourceId: missingId);
+
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Empty(await ChildrenOf(job, ct));
+
+        var summary = job.GetResult<BackupRunSummary>();
+        Assert.True(summary!.Skipped);
+        Assert.Contains("no longer exists", summary.SkipReason);
     }
 
     // Disabled is an operator decision, not a fault — a still-armed schedule must not fill the job list
     // with red rows.
+    [Fact]
+    public async Task DisabledSource_SkipsWithAReasonAndNoChildren()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocument();
+
+        var source = await _db.BackupSources.SingleAsync(s => s.Id == _sourceId, ct);
+        source.IsEnabled = false;
+        await _db.SaveChangesAsync(ct);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Empty(await ChildrenOf(job, ct));
+
+        var summary = job.GetResult<BackupRunSummary>();
+        Assert.True(summary!.Skipped);
+        Assert.Contains("source is disabled", summary.SkipReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Pausing the destination has to stop every pairing writing to it, not just decorate the page.
     [Fact]
     public async Task DisabledTarget_SkipsWithAReasonAndNoChildren()
     {
@@ -268,7 +374,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
 
         var summary = job.GetResult<BackupRunSummary>();
         Assert.True(summary!.Skipped);
-        Assert.Contains("disabled", summary.SkipReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Target is disabled", summary.SkipReason);
     }
 
     // A misconfigured destination is a config error the operator must fix. It fails loudly rather than
@@ -287,8 +393,29 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.Contains("unavailable", ex.Message);
     }
 
+    // The enable flags are checked BEFORE the destination, so an operator who has already paused this
+    // pairing is not paged about a target they know is broken.
     [Fact]
-    public async Task ConcurrentRunForTheSameTarget_IsRefused()
+    public async Task DisabledSourceOnAnUnavailableTarget_SkipsRatherThanThrows()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _resolver.Resolve(Arg.Any<string>()).Returns(new StubTarget(TargetKey, available: false));
+        SeedDocument();
+
+        var source = await _db.BackupSources.SingleAsync(s => s.Id == _sourceId, ct);
+        source.IsEnabled = false;
+        await _db.SaveChangesAsync(ct);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.True(job.GetResult<BackupRunSummary>()!.Skipped);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ConcurrentRunForTheSameSource_IsRefused()
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocument();
@@ -298,8 +425,8 @@ public class BackupToTargetJobHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             Type = ProcessingJobType.BackupToTarget,
             Status = ProcessingJobStatus.InProgress,
-            EntityType = ProcessingEntityType.BackupTarget,
-            EntityId = TargetEntityId,
+            EntityType = ProcessingEntityType.BackupSource,
+            EntityId = _sourceId,
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await _db.SaveChangesAsync(ct);
@@ -314,8 +441,10 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.Contains("already in progress", summary.SkipReason);
     }
 
+    // Children carry their parent's EntityId, so single-flight has to filter them out explicitly —
+    // otherwise the second run after any real run would skip forever.
     [Fact]
-    public async Task AnInProgressRunForADIFFERENTTarget_DoesNotBlock()
+    public async Task AnInProgressBATCHForTheSameSource_DoesNotBlock()
     {
         var ct = TestContext.Current.CancellationToken;
         SeedDocument();
@@ -325,8 +454,9 @@ public class BackupToTargetJobHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             Type = ProcessingJobType.BackupToTarget,
             Status = ProcessingJobStatus.InProgress,
-            EntityType = ProcessingEntityType.BackupTarget,
-            EntityId = DeterministicGuid.FromKey("some-other-target"),
+            EntityType = ProcessingEntityType.BackupSource,
+            EntityId = _sourceId,
+            ParentJobId = Guid.NewGuid(),
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await _db.SaveChangesAsync(ct);
@@ -338,60 +468,57 @@ public class BackupToTargetJobHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task BreakerTrip_LatchesOntoTheTargetStateRow()
+    public async Task AnInProgressRunForADIFFERENTSource_DoesNotBlock()
     {
         var ct = TestContext.Current.CancellationToken;
+        SeedDocument();
 
-        for (var i = 0; i < 40; i++)
+        _db.ProcessingJobs.Add(new ProcessingJob
         {
-            _db.DocumentBackupStates.Add(new DocumentBackupState
-            {
-                Id = Guid.NewGuid(),
-                TargetKey = TargetKey,
-                DocumentVersionId = Guid.NewGuid(),
-                DocumentId = Guid.NewGuid(),
-                RemoteRelativePath = $"2025/Gone{i}.pdf",
-                BackedUpHash = Guid.NewGuid().ToString("N"),
-                FileSize = 10,
-                BackedUpAt = DateTimeOffset.UtcNow,
-            });
-        }
+            Id = Guid.NewGuid(),
+            Type = ProcessingJobType.BackupToTarget,
+            Status = ProcessingJobStatus.InProgress,
+            EntityType = ProcessingEntityType.BackupSource,
+            EntityId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
         await _db.SaveChangesAsync(ct);
 
         var job = CreateJob();
         await _sut.HandleAsync(job, ct);
 
-        var state = await _db.BackupTargetStates.SingleAsync(s => s.TargetKey == TargetKey, ct);
-        Assert.NotNull(state.PruneBlockedAt);
-        Assert.Equal(40, state.PruneBlockedCount);
+        Assert.NotEmpty(await ChildrenOf(job, ct));
+    }
+
+    [Fact]
+    public async Task BreakerTrip_LatchesOntoTheSourceRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedMirroredState(40);
+        await _db.SaveChangesAsync(ct);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        var source = await ReloadSourceAsync(ct);
+        Assert.NotNull(source.PruneBlockedAt);
+        Assert.Equal(40, source.PruneBlockedCount);
 
         var summary = job.GetResult<BackupRunSummary>();
         Assert.True(summary!.PruneBlocked);
         Assert.Equal(40, summary.BlockedDeleteCount);
-        Assert.Equal(0, summary.DeleteCount);
+        Assert.Equal(0, summary.Deletes);
     }
 
     // A dry run reports what WOULD be blocked but must not persist the operator-facing latch — a preview
-    // that leaves a "N deletions were blocked" banner behind (and a state row) has touched something.
+    // that leaves a "N deletions were blocked" banner behind has touched something.
     [Fact]
     public async Task DryRunThatWouldTripTheBreaker_ReportsItButDoesNotLatch()
     {
         var ct = TestContext.Current.CancellationToken;
 
-        for (var i = 0; i < 40; i++)
-        {
-            _db.DocumentBackupStates.Add(new DocumentBackupState
-            {
-                Id = Guid.NewGuid(),
-                TargetKey = TargetKey,
-                DocumentVersionId = Guid.NewGuid(),
-                DocumentId = Guid.NewGuid(),
-                RemoteRelativePath = $"2025/Gone{i}.pdf",
-                BackedUpHash = Guid.NewGuid().ToString("N"),
-                FileSize = 10,
-                BackedUpAt = DateTimeOffset.UtcNow,
-            });
-        }
+        SeedMirroredState(40);
         await _db.SaveChangesAsync(ct);
 
         var job = CreateJob(dryRun: true);
@@ -402,8 +529,8 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.True(summary!.PruneBlocked);
         Assert.Equal(40, summary.BlockedDeleteCount);
 
-        // ...but nothing was persisted: no latch, and no state row created for it.
-        Assert.Null(await _db.BackupTargetStates.FirstOrDefaultAsync(s => s.TargetKey == TargetKey, ct));
+        // ...but nothing was persisted.
+        Assert.Null((await ReloadSourceAsync(ct)).PruneBlockedAt);
     }
 
     [Fact]
@@ -411,20 +538,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
 
-        for (var i = 0; i < 40; i++)
-        {
-            _db.DocumentBackupStates.Add(new DocumentBackupState
-            {
-                Id = Guid.NewGuid(),
-                TargetKey = TargetKey,
-                DocumentVersionId = Guid.NewGuid(),
-                DocumentId = Guid.NewGuid(),
-                RemoteRelativePath = $"2025/Gone{i}.pdf",
-                BackedUpHash = Guid.NewGuid().ToString("N"),
-                FileSize = 10,
-                BackedUpAt = DateTimeOffset.UtcNow,
-            });
-        }
+        SeedMirroredState(40);
         await _db.SaveChangesAsync(ct);
 
         var job = CreateJob(allowLargePrune: true);
@@ -432,8 +546,87 @@ public class BackupToTargetJobHandlerTests : IDisposable
 
         var summary = job.GetResult<BackupRunSummary>();
         Assert.False(summary!.PruneBlocked);
-        Assert.Equal(40, summary.DeleteCount);
-        Assert.Null(await _db.BackupTargetStates.FirstOrDefaultAsync(s => s.TargetKey == TargetKey, ct));
+        Assert.Equal(40, summary.Deletes);
+        Assert.Null((await ReloadSourceAsync(ct)).PruneBlockedAt);
+    }
+
+    // "Prune anyway" is the admin acting ON the warning, so it must take the banner down with it —
+    // otherwise the card reports a block that has already been carried out, and the only way to silence
+    // it is a second, now meaningless, Dismiss.
+    [Fact]
+    public async Task AllowLargePrune_ClearsAnExistingLatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        SeedMirroredState(40);
+        await LatchAsync(blockedCount: 40, ct);
+
+        var job = CreateJob(allowLargePrune: true);
+        await _sut.HandleAsync(job, ct);
+
+        var source = await ReloadSourceAsync(ct);
+        Assert.Null(source.PruneBlockedAt);
+        Assert.Null(source.PruneBlockedCount);
+    }
+
+    // The other half of that rule, and the reason the clear is gated on allowLargePrune rather than on
+    // "the plan came back unblocked": an ORDINARY run that happens to want fewer deletions must leave the
+    // warning up, or it disappears before anyone has seen it.
+    [Fact]
+    public async Task AnOrdinaryRunWithFewDeletions_LeavesAnExistingLatchAlone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // One orphaned state row — well under the breaker's floor, so this run plans a delete and does
+        // not trip.
+        SeedMirroredState(1);
+        await LatchAsync(blockedCount: 40, ct);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.False(job.GetResult<BackupRunSummary>()!.PruneBlocked);
+
+        var source = await ReloadSourceAsync(ct);
+        Assert.NotNull(source.PruneBlockedAt);
+        Assert.Equal(40, source.PruneBlockedCount);
+    }
+
+    /// <summary>Puts the source in the state a previously-tripped breaker would have left it in.</summary>
+    private async Task LatchAsync(int blockedCount, CancellationToken ct)
+    {
+        var source = await _db.BackupSources.SingleAsync(s => s.Id == _sourceId, ct);
+        source.PruneBlockedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        source.PruneBlockedCount = blockedCount;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // State rows belong to a pairing, not a target — another pairing's rows must not show up as
+    // deletions in this one's plan.
+    [Fact]
+    public async Task StateRowsOfAnotherSource_AreNotPlannedAsDeletes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        _db.DocumentBackupStates.Add(new DocumentBackupState
+        {
+            Id = Guid.NewGuid(),
+            BackupSourceId = Guid.NewGuid(),
+            DocumentVersionId = Guid.NewGuid(),
+            DocumentId = Guid.NewGuid(),
+            RemoteRelativePath = "Documents/2025/Elsewhere.pdf",
+            BackedUpHash = Guid.NewGuid().ToString("N"),
+            FileSize = 10,
+            BackedUpAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        var summary = job.GetResult<BackupRunSummary>();
+        Assert.Equal(0, summary!.Deletes);
+        Assert.Equal(0, summary.BlockedDeleteCount);
     }
 
     [Fact]

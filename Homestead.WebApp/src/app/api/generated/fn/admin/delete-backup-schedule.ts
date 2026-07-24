@@ -9,13 +9,13 @@ import { RequestBuilder } from '../../request-builder';
 
 
 export interface DeleteBackupSchedule$Params {
-  key: string;
+  id: string;
 }
 
 export function deleteBackupSchedule(http: HttpClient, rootUrl: string, params: DeleteBackupSchedule$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
   const rb = new RequestBuilder(rootUrl, deleteBackupSchedule.PATH, 'delete');
   if (params) {
-    rb.path('key', params.key, {});
+    rb.path('id', params.id, {});
   }
 
   return http.request(
@@ -28,4 +28,4 @@ export function deleteBackupSchedule(http: HttpClient, rootUrl: string, params: 
   );
 }
 
-deleteBackupSchedule.PATH = '/api/v1/admin/backup/targets/{key}/schedule';
+deleteBackupSchedule.PATH = '/api/v1/admin/backup/sources/{id}/schedule';

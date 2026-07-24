@@ -24,6 +24,9 @@ public class BackupBatchJobHandlerTests : IDisposable
     private readonly IProcessingNotifier _notifier;
     private readonly BackupBatchJobHandler _sut;
 
+    /// <summary>The pairing every batch in these tests belongs to, seeded by the constructor.</summary>
+    private readonly Guid _sourceId = Guid.NewGuid();
+
     public BackupBatchJobHandlerTests()
     {
         _db = TestAppDbContext.Create();
@@ -35,6 +38,17 @@ public class BackupBatchJobHandlerTests : IDisposable
 
         var resolver = Substitute.For<IBackupTargetResolver>();
         resolver.Resolve(Arg.Any<string>()).Returns(_target);
+
+        _db.BackupSources.Add(new BackupSource
+        {
+            Id = _sourceId,
+            SourceKind = DocumentsBackupSourceDescriptor.SourceKey,
+            TargetKey = TargetKey,
+            IsEnabled = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        _db.SaveChanges();
 
         _sut = new BackupBatchJobHandler(
             _db, resolver,
@@ -63,19 +77,21 @@ public class BackupBatchJobHandlerTests : IDisposable
         return (relativePath, hash);
     }
 
-    private ProcessingJob CreateJob(IEnumerable<BackupAction> actions, Guid? parentJobId = null)
+    private ProcessingJob CreateJob(
+        IEnumerable<BackupAction> actions, Guid? parentJobId = null, Guid? sourceId = null)
     {
         var job = new ProcessingJob
         {
             Id = Guid.NewGuid(),
             Type = ProcessingJobType.BackupBatch,
             Status = ProcessingJobStatus.InProgress,
-            EntityType = ProcessingEntityType.BackupTarget,
+            EntityType = ProcessingEntityType.BackupSource,
+            EntityId = sourceId ?? _sourceId,
             CreatedByUserId = Guid.NewGuid(),
             ParentJobId = parentJobId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        job.SetPayload(new BackupBatchPayload(TargetKey, [.. actions]));
+        job.SetPayload(new BackupBatchPayload(sourceId ?? _sourceId, [.. actions]));
         return job;
     }
 
@@ -95,7 +111,7 @@ public class BackupBatchJobHandlerTests : IDisposable
         var state = new DocumentBackupState
         {
             Id = Guid.NewGuid(),
-            TargetKey = TargetKey,
+            BackupSourceId = _sourceId,
             DocumentVersionId = versionId,
             DocumentId = Guid.NewGuid(),
             RemoteRelativePath = path,
@@ -375,11 +391,31 @@ public class BackupBatchJobHandlerTests : IDisposable
         await _sut.HandleAsync(job, ct);
 
         await _notifier.Received(1).NotifyJobStatusAsync(
-            job.Id, ProcessingJobStatus.Completed, ProcessingEntityType.BackupTarget,
+            job.Id, ProcessingJobStatus.Completed, ProcessingEntityType.BackupSource,
             Arg.Any<Guid?>(), Arg.Any<string?>(), Arg.Is<string?>(error => error == null),
             job.CreatedByUserId,
             Arg.Any<CancellationToken>(), Arg.Any<string?>(), Arg.Any<Dictionary<string, string>?>(),
             Arg.Any<int?>(), Arg.Any<int?>(), Arg.Any<int?>());
+    }
+
+    // The enqueue-vs-delete race: the pairing (and its state rows) can be deleted while this batch sits
+    // queued. Writing state for a source that no longer exists would violate the FK and fail the batch
+    // loudly for something that is not a fault, so the handler returns quietly instead.
+    [Fact]
+    public async Task SourceRowGone_ReturnsQuietlyWithoutTouchingTheTarget()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var versionId = Guid.NewGuid();
+
+        var job = CreateJob(
+            [Put(versionId, "Documents/2025/Doc.pdf", sourcePath, hash)],
+            sourceId: Guid.NewGuid());
+
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Empty(_target.Objects);
+        Assert.False(await _db.DocumentBackupStates.AnyAsync(s => s.DocumentVersionId == versionId, ct));
     }
 
     [Fact]

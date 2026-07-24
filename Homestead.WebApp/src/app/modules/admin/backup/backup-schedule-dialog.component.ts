@@ -20,9 +20,9 @@ import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import type { BackupScheduleSummary } from '@/api/generated/models/backup-schedule-summary';
 
 /**
- * Cron editor for one backup target's recurring run. Modelled on the admin create-schedule dialog;
- * upserts through the target-scoped endpoint rather than the generic schedules API, which deliberately
- * accepts only `NoOp`.
+ * Cron editor for one backup pairing's recurring run. Modelled on the admin create-schedule dialog;
+ * upserts through the source-scoped endpoint rather than the generic schedules API, which deliberately
+ * accepts only `NoOp`. The upsert updates in place, so editing a cron keeps the schedule's id.
  */
 @Component({
   selector: 'app-backup-schedule-dialog',
@@ -38,7 +38,8 @@ import type { BackupScheduleSummary } from '@/api/generated/models/backup-schedu
         <div hlmDialogHeader>
           <h2 hlmDialogTitle>{{ schedule() ? 'Edit schedule' : 'Add schedule' }}</h2>
           <p hlmDialogDescription>
-            Run the backup for <span class="font-mono">{{ targetKey() }}</span> on a recurring cron.
+            Run <span class="font-medium">{{ sourceLabel() }}</span> &rarr;
+            <span class="font-mono">{{ targetKey() }}</span> on a recurring cron.
           </p>
         </div>
 
@@ -90,6 +91,8 @@ import type { BackupScheduleSummary } from '@/api/generated/models/backup-schedu
   `,
 })
 export class BackupScheduleDialogComponent {
+  sourceId = input.required<string>();
+  sourceLabel = input.required<string>();
   targetKey = input.required<string>();
   schedule = input<BackupScheduleSummary | null>(null);
   saved = output();
@@ -129,7 +132,7 @@ export class BackupScheduleDialogComponent {
     this.saveError.set('');
 
     this.api
-      .upsertSchedule(this.targetKey(), {
+      .upsertSchedule(this.sourceId(), {
         cronExpression: this.cron().trim(),
         isEnabled: this.enabled(),
         priority: 0,

@@ -12,15 +12,25 @@ describe('ProcessingHubService', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).connection = null;
 
+    // A REPLICA of what connect() does in its on('JobStatusChanged') callback, minus the toasts (the
+    // real handler's only other side effect). It exists because connect() needs a live SignalR socket.
+    //
+    // Keep every terminal branch here in step with the real handler — a replica that lags is worse than
+    // no harness at all, because the tests keep passing while the behaviour they claim to cover drifts.
+    // It has lagged before: PartiallyCompleted and Cancelled were both missing after they shipped.
     signalRHandler = (message: JobStatusChangedMessage) => {
-      // Replicate what connect() does in its on('JobStatusChanged') callback
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const svc = service as any;
       svc.jobStatusChangedSubject.next(message);
 
-      const isManaged = svc.managedJobIds.has(message.jobId);
+      const isManaged = ownsItsOwnReporting(message) || svc.managedJobIds.has(message.jobId);
 
       if (message.status === 'Completed') {
+        if (isManaged) {
+          svc.managedJobIds.delete(message.jobId);
+        }
+        svc.jobCompletedSubject.next(message);
+      } else if (message.status === 'PartiallyCompleted') {
         if (isManaged) {
           svc.managedJobIds.delete(message.jobId);
         }
@@ -29,6 +39,8 @@ describe('ProcessingHubService', () => {
         if (isManaged) {
           svc.managedJobIds.delete(message.jobId);
         }
+      } else if (message.status === 'Cancelled') {
+        svc.managedJobIds.delete(message.jobId);
       }
     };
   });
@@ -55,12 +67,12 @@ describe('ProcessingHubService', () => {
     // the parent would announce `"Document" has been processed successfully.` and a failed batch would
     // dump its whole per-file report into a toast. /admin/backup reports its own runs instead.
     it('opts a backup job out of the generic toasts', () => {
-      expect(ownsItsOwnReporting(msg({ entityType: 'BackupTarget' }))).toBe(true);
+      expect(ownsItsOwnReporting(msg({ entityType: 'BackupSource' }))).toBe(true);
     });
 
     it('opts out backup jobs regardless of status', () => {
-      for (const status of ['Completed', 'PartiallyCompleted', 'Failed'] as const) {
-        expect(ownsItsOwnReporting(msg({ entityType: 'BackupTarget', status }))).toBe(true);
+      for (const status of ['Completed', 'PartiallyCompleted', 'Failed', 'Cancelled'] as const) {
+        expect(ownsItsOwnReporting(msg({ entityType: 'BackupSource', status }))).toBe(true);
       }
     });
 
@@ -149,6 +161,25 @@ describe('ProcessingHubService', () => {
       service.waitForJob('job-1');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((service as any).managedJobIds.has('job-1')).toBe(true);
+    });
+
+    // Cancelled is terminal. Omitting it from the filter would leave the promise pending forever and its
+    // subscription on the root-scoped Subject attached for the life of the app — a caller whose job was
+    // cancelled out from under it (the backup-source delete flow) must be told, not stranded.
+    it('should resolve when the job is cancelled', async () => {
+      const promise = service.waitForJob('job-1');
+      signalRHandler(msg({ status: 'Cancelled' }));
+
+      const result = await promise;
+      expect(result.status).toBe('Cancelled');
+    });
+
+    it('should release the managed claim on a cancelled job', () => {
+      service.waitForJob('job-1');
+      signalRHandler(msg({ status: 'Cancelled' }));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((service as any).managedJobIds.has('job-1')).toBe(false);
     });
 
     it('should ignore status messages for other jobs', async () => {

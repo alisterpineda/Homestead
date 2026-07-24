@@ -1,11 +1,10 @@
-using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Modules.Documents.Backup;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.Backup;
 
 public class BackupPlanBuilderTests
 {
-    private static BackupOptions Options(
+    private static DocumentBackupEngineOptions Options(
         int minAbsoluteDeletes = 25,
         double deleteFraction = 0.10,
         int maxFilesPerBatch = 100,

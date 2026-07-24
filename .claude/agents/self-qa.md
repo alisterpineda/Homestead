@@ -185,7 +185,7 @@ ancestor trail comes from the API's `PlaceContentsResponse.path`.
 | `/admin/schedules` | ScheduleListComponent |
 | `/admin/settings` | SystemSettingsComponent (runtime log-level controls) |
 | `/admin/ai` | AiStatusComponent — read-only status of providers defined under `Ai:Providers` |
-| `/admin/backup` | BackupTargetListComponent — one card per `Backup:Targets:{key}`; Back up now / Dry run / schedule dialog / Enabled toggle. Test ids: `backup-target-{key}`, `back-up-now`, `dry-run`, `remove-schedule`, `enabled-toggle-{key}`, `last-run-badge`, `last-run-summary`, `backed-up-count`, `prune-blocked-banner`, `prune-anyway` |
+| `/admin/backup` | BackupTargetListComponent — one card per `Backup:Targets:{key}`, each nesting zero or more **source rows** (a `backup.sources` row pairing a registered source kind with that target; `documents` is the only kind today). Card level: destination Enabled toggle, Add backup dialog (disabled once every kind is paired). Source level: own Enabled toggle ("Paused" badge when off, "Paused — destination disabled" when the card's toggle is the one off), Back up now / Dry run / schedule add-edit-remove / delete. Card test ids: `backup-target-{key}`, `enabled-toggle-{key}`, `add-backup-{key}`, `no-sources-{key}`, `availability-badge`, `configuration-error`. Per-source test ids are suffixed with the source **guid**: `backup-source-{id}`, `source-enabled-toggle-{id}`, `paused-badge-{id}`, `source-unavailable-{id}`, `back-up-now-{id}`, `dry-run-{id}`, `remove-schedule-{id}`, `schedule-note-{id}`, `delete-source-{id}`, `confirm-delete-source-{id}`, `last-run-badge-{id}`, `last-run-summary-{id}`, `last-run-error-{id}`, `backed-up-count-{id}`, `prune-blocked-banner-{id}`, `prune-anyway-{id}`, `dismiss-prune-{id}`. Several render only conditionally (no schedule → no `remove-schedule`; no latch → no banner) |
 
 Sidebar groups: **Manage** (Users / Groups / Jobs / Schedules), **Configuration** (System Settings / AI / Backup).
 
@@ -199,8 +199,11 @@ Sidebar groups: **Manage** (Users / Groups / Jobs / Schedules), **Configuration*
 - Base path is `/api/v1/...` (e.g. `/api/v1/documents`, `/api/v1/documents/tags`,
   `/api/v1/admin/settings/system` — `GET`/`PATCH` for System Settings), proxied through `:4200`
   — use it when inspecting `browser_network_requests`.
-- Backup: `/api/v1/admin/backup/targets` (`GET`), `/targets/{key}` (`PATCH`),
-  `/targets/{key}/runs` (`POST`), `/targets/{key}/schedule` (`PUT`/`DELETE`) — all admin-only.
+- Backup: `/api/v1/admin/backup/targets` (`GET` — returns the cards *and* the source-kind catalog),
+  `/targets/{key}` (`PATCH` — destination enable only), `/sources` (`POST`), `/sources/{id}`
+  (`PATCH` for enable + `acknowledgePruneBlock`, `DELETE` with optional `?cancelRun=true`),
+  `/sources/{id}/runs` (`POST`), `/sources/{id}/schedule` (`PUT`/`DELETE`) — all admin-only. Runs and
+  schedules are **source**-scoped, not target-scoped.
 
 ### Known gotchas
 

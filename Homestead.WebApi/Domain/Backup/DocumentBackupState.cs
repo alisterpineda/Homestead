@@ -1,9 +1,9 @@
 namespace Homestead.WebApi.Domain.Backup;
 
 /// <summary>
-/// One row per (target, document version) ever copied to a mirror. The planner diffs against these rows
-/// instead of listing the destination, which is what makes an unchanged run cost a single query and zero
-/// file reads.
+/// One row per (backup source, document version) ever copied to a mirror. The planner diffs against
+/// these rows instead of listing the destination, which is what makes an unchanged run cost a single
+/// query and zero file reads.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,17 +15,23 @@ namespace Homestead.WebApi.Domain.Backup;
 /// is why deletions are found by anti-join rather than by cascade.
 /// </para>
 /// <para>
-/// <see cref="RemoteRelativePath"/> and <see cref="RemoteHandle"/> are denormalized for the same reason:
-/// you cannot delete what you cannot name, and after the version row is gone there is nothing left to
-/// recompute the path from.
+/// <b><see cref="BackupSourceId"/> is the deliberate asymmetry: it <i>does</i> cascade.</b> Deleting the
+/// pairing is an explicit admin "forget this backup", so the bookkeeping goes with it. The accepted
+/// consequence is that mirror files are left on disk untouched — the target is one-way and nothing
+/// enumerates it — and that re-creating the same pairing does one full re-put over them.
+/// </para>
+/// <para>
+/// <see cref="RemoteRelativePath"/> and <see cref="RemoteHandle"/> are denormalized for the same reason
+/// as the FK-less version id: you cannot delete what you cannot name, and after the version row is gone
+/// there is nothing left to recompute the path from.
 /// </para>
 /// </remarks>
 public class DocumentBackupState
 {
     public Guid Id { get; set; }
 
-    /// <summary>The <c>Backup:Targets:{key}</c> this copy lives in.</summary>
-    public required string TargetKey { get; set; }
+    /// <summary>The <see cref="BackupSource"/> pairing this copy belongs to. Cascades — see the remarks.</summary>
+    public Guid BackupSourceId { get; set; }
 
     /// <summary>The mirrored version. No FK — see the type remarks.</summary>
     public Guid DocumentVersionId { get; set; }

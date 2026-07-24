@@ -5,6 +5,12 @@ deliberately refuses to do, and the decisions that shape it. It is a Documents-m
 Admin-module control surface (`/admin/backup`) and it runs entirely on the
 [Processing](../processing/overview.md) queue.
 
+The *framework* it plugs into is deliberately not Documents-specific: a **backup source** pairs a
+code-registered source kind with a config-defined target, and the admin surface, the shared run payload,
+and the shared run summary are generic across kinds. Documents is the only kind today. What is
+Documents-specific — the planner, the layout, the change detection, the state table — is what the rest
+of this page is about; see [The source/target model](#the-sourcetarget-model) for the generic half.
+
 ## Purpose
 
 Without this feature there is **no way to get documents out of the deployment**. Blobs live only under
@@ -30,7 +36,9 @@ requirement everything else follows from: the mirror is readable by a person wit
 - **Targets are config instances** under `Backup:Targets:{key}` — the same shape as `Ocr:Engines` and
   `Ai:Providers` — not in-app CRUD. In Phase 1 the only kind is `Local` (a directory the WebApi process
   can write to: local disk, mounted NAS share, bind-mounted volume).
-- **Scheduled or manual runs**, managed per target at `/admin/backup`: a cron schedule, a *Back up now*
+- **What gets mirrored where is an admin decision**, made in-app: an admin adds a *backup* — one source
+  kind paired with one target — at `/admin/backup`. Nothing is backed up until they do.
+- **Scheduled or manual runs**, managed per backup at `/admin/backup`: a cron schedule, a *Back up now*
   action, and a *Dry run* that reports the change set without touching anything. A dry run is a **plan
   preview, not a preflight check** — the planner does no file I/O, so it cannot foresee a failure that
   only the copy itself would hit (a missing or corrupt source blob).
@@ -55,18 +63,71 @@ requirement everything else follows from: the mirror is readable by a person wit
   retained rather than needlessly re-verified or re-copied), but it means the backup page can only ever
   surface a missing blob for a version it has **not yet** copied. It is not a library integrity check.
 
+## The source/target model
+
+Two halves, split along one line: **config states environment-bound facts, the database holds
+operational choices.**
+
+- **Targets** are static config (`Backup:Targets:{key}`) — a filesystem path today, cloud credentials
+  later. They are facts about the deployment, so they are not editable in-app. The only DB state a
+  target carries is an operator enable toggle, created lazily.
+- **Source kinds** are a code registry. Each module that supports being backed up registers a
+  descriptor: its key, display name, planner job type, the folder it owns at the target root, and
+  whether it can prune. A DB row can only name a kind that code offers — the same relationship a
+  `ProcessingSchedule` has with `ProcessingJobType`.
+- **A backup source** (`backup.sources`) pairs one kind with one target. It owns everything
+  operational: whether the pairing is enabled, its schedule, and its delete-breaker latch. Its id is the
+  `EntityId` of every run and batch job it spawns.
+
+**One pairing per kind per target, enforced by a unique index on `(source_kind, lower(target_key))`.**
+This is a correctness invariant, not tidiness: two same-kind pairings on one target would share a root
+folder, each keep its own state rows, and therefore each see the other's files as unknown and prune them
+by anti-join — the two would punch holes in each other's mirrors indefinitely. Target keys compare
+case-insensitively because config keys do, which is why the index is on an expression. (Allowing scoped
+backups later — two rows, same kind, same target — requires a per-row folder/scope column first.)
+
+A pairing whose target vanished from config, or whose kind is no longer registered, is **never hidden**.
+It renders unavailable-with-reason, because a backup that silently stopped is exactly what an admin
+needs to see. Enforcement happens at the entry points: *Back up now* and schedule-upsert refuse with the
+reason, and the planner is the last gate for drift that appears after scheduling.
+
+### Deleting a backup
+
+Deleting a pairing is an explicit "forget this backup": its state rows cascade away, its schedule row is
+deleted with it, and the mirror's files are **left untouched** on the destination (the target is one-way
+and nothing enumerates it, so orphans there are accepted; re-creating the same pairing does one full
+re-put over them).
+
+While a run is live, a plain delete **409s**. The flow then offers *cancel run and remove*, which
+cancels the parent and its still-`Pending` children and deletes the row **in one transaction** — so a
+409 thrown partway rolls the cancellation back too, and a retry starts clean rather than finding a
+half-cancelled run. A batch already inside its handler cannot be cancelled by anything, so that case
+409s again with "a batch is still finishing — retry shortly" rather than tearing the row out from under
+a job that is mid-write. The batch handler re-checks the source row at start as a backstop for the
+narrow race either way.
+
 ## The layout
+
+Each source kind owns a top-level folder at the target root, so several kinds can share one destination
+without their prunes reaching into each other's files:
+
+> **One-time note for pre-release mirrors.** The root folder was introduced after an earlier build wrote
+> straight to `<root>/2024/…`. Because the migration wipes the state table and deletions are found only
+> by anti-join against it, a re-created pairing re-puts the whole library at the new paths and cannot
+> see the old un-prefixed folders — they linger as a second full copy forever. Delete them by hand
+> after the first run of the new layout.
 
 ```
 <root>/
-  2024/
-    Tax Return 2024.pdf                    ← latest version
-    _versions/
-      Tax Return 2024 (v1).pdf             ← superseded
-  2025/
-    Car Insurance.pdf
-  _undated/                                ← Document.DocumentDate is null
-    Misc Receipt.pdf
+  Documents/                               ← the documents kind's root folder
+    2024/
+      Tax Return 2024.pdf                  ← latest version
+      _versions/
+        Tax Return 2024 (v1).pdf           ← superseded
+    2025/
+      Car Insurance.pdf
+    _undated/                              ← Document.DocumentDate is null
+      Misc Receipt.pdf
 ```
 
 - **Year shard.** The folder is `Document.DocumentDate?.Year`, falling back to `_undated` when the date
@@ -86,11 +147,13 @@ requirement everything else follows from: the mirror is readable by a person wit
   archive) would silently rename files between runs and churn the mirror for no content reason.
 - Names differing only in case collide, because the mirror may be read from a case-insensitive
   filesystem where they are one file.
+- **The root folder is charged against the name-trimming budget**, not glued on afterwards — a name
+  trimmed to the target's full path limit and *then* prefixed would overflow it.
 
 ## Change detection
 
-Per `(target, version)` the planner compares desired state against a stored state row and emits at most
-one action:
+Per `(backup source, version)` the planner compares desired state against a stored state row and emits
+at most one action:
 
 | Condition | Action |
 |---|---|
@@ -104,11 +167,14 @@ Because version blobs are immutable and content-addressed (`DocumentVersion.File
 index), **an unchanged version is never re-read or re-uploaded after its first successful copy**. The
 steady-state run costs two queries and zero file I/O.
 
-Deletions are found by **anti-join against the state table**, never by cascade. The state row is
-FK-less and outlives the version it describes, because at the moment a version is permanently deleted
-that row is the only record of what needs removing from the mirror — a cascade would erase the
-instruction along with the reason for it. This follows the cross-cutting rule that provenance-style
-references which must outlive their target stay FK-less, as audit logs do.
+Deletions are found by **anti-join against the state table**, never by cascade. The row's
+`DocumentVersionId` is FK-less and outlives the version it describes, because at the moment a version is
+permanently deleted that row is the only record of what needs removing from the mirror — a cascade would
+erase the instruction along with the reason for it. This follows the cross-cutting rule that
+provenance-style references which must outlive their target stay FK-less, as audit logs do.
+
+The deliberate asymmetry: the row's `BackupSourceId` *does* cascade, because deleting the pairing is an
+explicit instruction to forget the whole backup rather than an incidental loss of one version.
 
 ### Trashed documents stay mirrored
 
@@ -131,26 +197,45 @@ Two thresholds, because either alone is wrong: a pure fraction trips constantly 
 exactly on the threshold proceeds — the guard is against a runaway, not against ordinary housekeeping.
 
 **On trip, the run skips every delete but still performs every put and move.** Blocking prunes protects
-data; blocking puts would lose it. The target's state row latches `PruneBlockedAt` / `PruneBlockedCount`,
-and `/admin/backup` shows a destructive banner naming the count. The admin clears it by acknowledging it
-(any `PATCH` on the target) or overrides it by re-running with *Prune anyway*. A later run with fewer
-deletions does **not** silently un-latch it — the warning has to be seen to be dismissed.
+data; blocking puts would lose it. The **source row** latches `PruneBlockedAt` / `PruneBlockedCount` —
+not the target, because a latch is a fact about one dataset's change set, and clearing it from the
+destination would dismiss every kind's warning there at once. `/admin/backup` shows a destructive banner
+naming the count on that backup's row.
+
+The admin clears it with an **explicit acknowledgement** (`PATCH /sources/{id}` with
+`acknowledgePruneBlock`) or overrides it by re-running with *Prune anyway*. Acknowledgement is its own
+flag rather than a side effect of any `PATCH`: pausing and resuming the backup must not silently dismiss
+the banner, since the banner is the only place a blocked prune is reported. A later run with fewer
+deletions does not silently un-latch it either — the warning has to be seen to be dismissed. (Deleting a
+latched backup discards its un-acknowledged warning; accepted.)
 
 Scheduled runs never carry the override: an unattended run that could prune the mirror wholesale is
 precisely what the breaker exists to stop.
 
 ## The admin surface
 
-`/admin/backup` lists one card per configured target:
+`/admin/backup` lists one card per target — config targets plus any target key that survives only on a
+source row — and nests that target's backups inside it.
+
+The **card** carries what belongs to the destination:
 
 - Config (key, kind, path) and an availability badge. A misconfigured target reads as
   **unavailable, because &lt;reason&gt;** rather than preventing the app from booting — the same
   error-string posture the OCR engines and AI providers use.
-- An enable toggle (a target with no state row reads as enabled: defining it in config *is* the opt-in).
-- Files mirrored and total size.
-- The last run's status and change-set summary, plus its failure message when it failed.
-- The cron schedule, with add / edit / remove.
-- *Back up now*, *Dry run*, and — when latched — *Prune anyway*.
+- A destination enable toggle, which pauses every backup writing here (a target with no state row reads
+  as enabled: defining it in config *is* the opt-in).
+- An *Add backup* picker, fed by the source-kind catalog the list endpoint returns alongside the cards,
+  filtered to kinds not already paired here.
+
+Each **backup row** under it carries what belongs to the pairing:
+
+- Its display name, and its own availability with the reason when the kind or target has gone stale.
+- Files mirrored and total size. An unknown byte total renders as `—`, never `0 B` — a planner that
+  generates its content cannot know sizes at plan time, and "unknown" must not read as "nothing".
+- The last run's status and change-set summary, plus its failure messages when it failed.
+- The cron schedule, with add / edit / remove. Editing updates the schedule **in place**, keeping its id
+  stable — the id is a foreign key on the source row and is referenced by every job the schedule spawned.
+- Its own enable toggle, *Back up now*, *Dry run*, — when latched — *Prune anyway*, and remove.
 
 **Last-run status is derived from `processing.jobs`, not denormalized onto the backup schema.** A parent
 job's terminal transition happens inside the generic processor, which offers no per-type hook, so a
@@ -240,8 +325,19 @@ A `Path` that **overlaps** `FileStorage:MediaPath` or `FileStorage:CachePath` in
 refused. Nested inside media storage, every run copies the library into itself; wrapped around it, the
 mirror's own delete pass is pointed at the originals.
 
-Batching and breaker knobs also live under `Backup:` — `MinAbsoluteDeletes`, `DeleteFraction`,
-`MaxFilesPerBatch`, `MaxBytesPerBatch`, `MaxOpsPerMetadataBatch`.
+Batching and breaker knobs are **per source kind**, under that kind's own section — for documents,
+`Backup:Documents:` — because the right numbers depend on what is being mirrored, not on the
+destination: `MinAbsoluteDeletes`, `DeleteFraction`, `MaxFilesPerBatch`, `MaxBytesPerBatch`,
+`MaxOpsPerMetadataBatch`. (A generated-export kind that replaces files wholesale would count far more
+deletes for the same amount of real change, and needs its own thresholds.)
+
+What is tunable where:
+
+| Level | Database (admin) | Static config |
+|---|---|---|
+| Target | enabled | kind, path (later: credentials) |
+| Backup (source row) | existence of the pairing, enabled, breaker latch/ack, schedule | batch caps, breaker thresholds (`Backup:{Kind}:*`) |
+| Run | nothing stored — dry-run / prune-anyway are flags on that run | — |
 
 ## Future-compatibility
 
@@ -252,8 +348,17 @@ The following must be addable without re-migrating the tables or changing the pl
   relative path locally, a file id on Drive), and `SupportsContentHash` is declared for a target that
   can verify a copy without downloading it back.
 - **Per-target scoping** (by tag, group, or owner) — the planner takes a version set; narrowing that
-  query is the whole change.
+  query is the whole change. Note this also needs a per-row folder/scope column before two same-kind
+  pairings may share one target; see the uniqueness invariant above.
 - **Sidecar metadata export** — a second action kind alongside `Put`/`Move`/`Delete`.
 - **Verify runs** that reconcile against a listing of the destination — needs a read member on
   `IBackupTarget`, which is exactly why one-way is stated as a v1 guarantee rather than assumed forever.
 - **Retention of superseded versions** (e.g. keep only the last N) — a filter in the path planner.
+- **A second source kind** (e.g. a Finances export). It writes: a catalog entry, its own planner + batch
+  handlers, its own state table keyed by `backup_source_id`, and optionally its own `Backup:{Kind}:*`
+  knobs. The planner/plan-builder/batch engine stays in `Modules/Documents` until then, deliberately —
+  documents' change detection leans on immutable content-addressed blobs with a stored hash, whereas a
+  generated export needs watermark-style detection (fingerprint diff, `Put`+`Delete` instead of `Move`),
+  so extracting a shared engine before a second real consumer exists would extract the wrong one.
+- **A liveness marker file** (`.homestead-mirror`) probed before destructive operations, to catch an
+  unmounted NAS mount point that still passes config-shape availability. Recorded, not built.

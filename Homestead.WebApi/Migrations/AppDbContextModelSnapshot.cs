@@ -68,11 +68,11 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("audit_logs", "auditing");
                 });
 
-            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupTargetState", b =>
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupSource", b =>
                 {
-                    b.Property<string>("TargetKey")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -89,6 +89,48 @@ namespace Homestead.WebApi.Migrations
 
                     b.Property<int?>("PruneBlockedCount")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceKind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduleId")
+                        .IsUnique();
+
+                    b.ToTable("sources", "backup");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupTargetState", b =>
+                {
+                    b.Property<string>("TargetKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .ValueGeneratedOnAdd()
@@ -116,6 +158,9 @@ namespace Homestead.WebApi.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<Guid>("BackupSourceId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("DocumentId")
                         .HasColumnType("uuid");
 
@@ -132,18 +177,11 @@ namespace Homestead.WebApi.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("TargetKey")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("TargetKey");
+                    b.HasIndex("BackupSourceId", "DocumentId");
 
-                    b.HasIndex("TargetKey", "DocumentId");
-
-                    b.HasIndex("TargetKey", "DocumentVersionId")
+                    b.HasIndex("BackupSourceId", "DocumentVersionId")
                         .IsUnique();
 
                     b.ToTable("document_backup_state", "backup");
@@ -1797,6 +1835,23 @@ namespace Homestead.WebApi.Migrations
                     b.HasBaseType("Homestead.WebApi.Domain.Finances.AccountTransaction");
 
                     b.HasDiscriminator().HasValue("OpeningBalance");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupSource", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Processing.ProcessingSchedule", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.DocumentBackupState", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Backup.BackupSource", null)
+                        .WithMany()
+                        .HasForeignKey("BackupSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Documents.Document", b =>

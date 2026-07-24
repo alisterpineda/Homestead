@@ -1,6 +1,6 @@
-using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Domain.Documents;
 using Homestead.WebApi.Domain.Processing;
+using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Persistence;
 using Homestead.WebApi.Processing;
 using Homestead.WebApi.Tests.Integration.Infrastructure;
@@ -12,12 +12,16 @@ namespace Homestead.WebApi.Tests.Integration.Documents;
 /// <summary>
 /// End-to-end coverage of the one-way document backup mirror against a real filesystem target: the
 /// planner's layout, the incremental diff (put / move / delete / no-op), the bulk-delete circuit
-/// breaker, and the admin endpoints.
+/// breaker, and the run/schedule endpoints. The pairing itself (creation, deletion, enablement) is
+/// covered by <see cref="Homestead.WebApi.Tests.Integration.Admin.BackupSourceApiTests"/>.
 /// </summary>
 [Collection("Integration")]
 public class BackupMirrorTests : IntegrationTestBase
 {
     private const string TargetKey = HomesteadApiFactory.BackupTargetKey;
+
+    /// <summary>Every mirrored path sits under the source kind's own folder at the target root.</summary>
+    private const string Root = DocumentsBackupSourceDescriptor.RootFolderName;
 
     public BackupMirrorTests(PostgresFixture fixture) : base(fixture) { }
 
@@ -33,12 +37,28 @@ public class BackupMirrorTests : IntegrationTestBase
                 .OrderBy(p => p, StringComparer.Ordinal)]
             : [];
 
-    /// <summary>Runs a full backup and waits for the parent and every batch child to terminate.</summary>
-    private async Task<ProcessingJob> RunBackupAsync(
-        HttpClient client, bool dryRun = false, bool allowLargePrune = false)
+    /// <summary>
+    /// Creates the "mirror Documents to local" pairing every test in this class runs against. Respawn
+    /// wipes it between tests, so it is bootstrapped per test rather than once.
+    /// </summary>
+    private async Task<Guid> CreateSourceAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/runs",
+            "/api/v1/admin/backup/sources",
+            new { sourceKind = DocumentsBackupSourceDescriptor.SourceKey, targetKey = TargetKey }, CT);
+
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<SourceResult>(CT);
+        return body!.Id;
+    }
+
+    /// <summary>Runs a full backup and waits for the parent and every batch child to terminate.</summary>
+    private async Task<ProcessingJob> RunBackupAsync(
+        HttpClient client, Guid sourceId, bool dryRun = false, bool allowLargePrune = false)
+    {
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/admin/backup/sources/{sourceId}/runs",
             new { dryRun, allowLargePrune }, CT);
 
         response.EnsureSuccessStatusCode();
@@ -59,7 +79,8 @@ public class BackupMirrorTests : IntegrationTestBase
             var job = await db.ProcessingJobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, CT);
 
             if (job is not null && job.Status is ProcessingJobStatus.Completed
-                or ProcessingJobStatus.Failed or ProcessingJobStatus.PartiallyCompleted)
+                or ProcessingJobStatus.Failed or ProcessingJobStatus.PartiallyCompleted
+                or ProcessingJobStatus.Cancelled)
             {
                 return job;
             }
@@ -71,9 +92,9 @@ public class BackupMirrorTests : IntegrationTestBase
     }
 
     private async Task<ProcessingJob> RunBackupExpectingSuccessAsync(
-        HttpClient client, bool dryRun = false, bool allowLargePrune = false)
+        HttpClient client, Guid sourceId, bool dryRun = false, bool allowLargePrune = false)
     {
-        var job = await RunBackupAsync(client, dryRun, allowLargePrune);
+        var job = await RunBackupAsync(client, sourceId, dryRun, allowLargePrune);
         Assert.Equal(ProcessingJobStatus.Completed, job.Status);
         return job;
     }
@@ -100,11 +121,17 @@ public class BackupMirrorTests : IntegrationTestBase
         await db.SaveChangesAsync(CT);
     }
 
-    private async Task<int> StateRowCountAsync()
+    private async Task<int> StateRowCountAsync(Guid sourceId)
     {
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.DocumentBackupStates.CountAsync(s => s.TargetKey == TargetKey, CT);
+        return await db.DocumentBackupStates.CountAsync(s => s.BackupSourceId == sourceId, CT);
+    }
+
+    private async Task<SourceItem> GetSourceAsync(HttpClient client, Guid sourceId)
+    {
+        var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
+        return Assert.Single(targets!.Items).Sources.Single(s => s.Id == sourceId);
     }
 
     private async Task AddVersionAndWaitAsync(HttpClient client, Guid documentId)
@@ -128,6 +155,7 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task FirstRun_ReproducesTheExpectedTree()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
 
         var dated = await UploadAndWaitAsync(client, "dated.pdf");
         await RenameDocumentAsync(dated, "Tax Return 2024");
@@ -136,10 +164,10 @@ public class BackupMirrorTests : IntegrationTestBase
         var undated = await UploadAndWaitAsync(client, "undated.pdf");
         await RenameDocumentAsync(undated, "Misc Receipt");
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(
-            ["2024/Tax Return 2024.pdf", "_undated/Misc Receipt.pdf"],
+            [$"{Root}/2024/Tax Return 2024.pdf", $"{Root}/_undated/Misc Receipt.pdf"],
             MirrorFiles());
     }
 
@@ -147,16 +175,17 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task MultipleVersions_LatestAtShardRoot_SupersededUnderVersionsFolder()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
 
         var docId = await UploadAndWaitAsync(client, "lease.pdf");
         await RenameDocumentAsync(docId, "Lease");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
         await AddVersionAndWaitAsync(client, docId);
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(
-            ["2025/Lease.pdf", "2025/_versions/Lease (v1).pdf"],
+            [$"{Root}/2025/Lease.pdf", $"{Root}/2025/_versions/Lease (v1).pdf"],
             MirrorFiles());
     }
 
@@ -164,11 +193,13 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task MirroredBytesMatchTheOriginal()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "payload.pdf");
         await RenameDocumentAsync(docId, "Payload");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         using var scope = CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -177,7 +208,7 @@ public class BackupMirrorTests : IntegrationTestBase
         var original = await File.ReadAllBytesAsync(
             Path.Combine(Factory.MediaPath, version.FilePath), CT);
         var mirrored = await File.ReadAllBytesAsync(
-            Path.Combine(MirrorRoot, "2025", "Payload.pdf"), CT);
+            Path.Combine(MirrorRoot, Root, "2025", "Payload.pdf"), CT);
 
         Assert.Equal(original, mirrored);
     }
@@ -188,57 +219,65 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task SecondRunWithNoChanges_DoesNothing()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "stable.pdf");
         await RenameDocumentAsync(docId, "Stable");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
-        var writtenAt = File.GetLastWriteTimeUtc(Path.Combine(MirrorRoot, "2025", "Stable.pdf"));
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
-        var second = await RunBackupExpectingSuccessAsync(client);
+        var mirrored = Path.Combine(MirrorRoot, Root, "2025", "Stable.pdf");
+        var writtenAt = File.GetLastWriteTimeUtc(mirrored);
+
+        var second = await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(0, second.TotalChildCount);
-        Assert.Equal(["2025/Stable.pdf"], MirrorFiles());
-        Assert.Equal(writtenAt, File.GetLastWriteTimeUtc(Path.Combine(MirrorRoot, "2025", "Stable.pdf")));
+        Assert.Equal([$"{Root}/2025/Stable.pdf"], MirrorFiles());
+        Assert.Equal(writtenAt, File.GetLastWriteTimeUtc(mirrored));
     }
 
     [Fact]
     public async Task RenamingADocument_MovesTheFileRatherThanDuplicatingIt()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "before.pdf");
         await RenameDocumentAsync(docId, "Before");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
-        Assert.Equal(["2025/Before.pdf"], MirrorFiles());
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+        Assert.Equal([$"{Root}/2025/Before.pdf"], MirrorFiles());
 
         await RenameDocumentAsync(docId, "After");
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
-        Assert.Equal(["2025/After.pdf"], MirrorFiles());
-        Assert.Equal(1, await StateRowCountAsync());
+        Assert.Equal([$"{Root}/2025/After.pdf"], MirrorFiles());
+        Assert.Equal(1, await StateRowCountAsync(sourceId));
     }
 
     [Fact]
     public async Task ChangingTheDocumentDate_ReShardsEveryVersion()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "shifting.pdf");
         await RenameDocumentAsync(docId, "Shifting");
         await SetDocumentDateAsync(docId, new DateOnly(2024, 6, 1));
         await AddVersionAndWaitAsync(client, docId);
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
         Assert.Equal(
-            ["2024/Shifting.pdf", "2024/_versions/Shifting (v1).pdf"],
+            [$"{Root}/2024/Shifting.pdf", $"{Root}/2024/_versions/Shifting (v1).pdf"],
             MirrorFiles());
 
         await SetDocumentDateAsync(docId, new DateOnly(2026, 6, 1));
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(
-            ["2026/Shifting.pdf", "2026/_versions/Shifting (v1).pdf"],
+            [$"{Root}/2026/Shifting.pdf", $"{Root}/2026/_versions/Shifting (v1).pdf"],
             MirrorFiles());
     }
 
@@ -246,20 +285,22 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task AddingAVersion_DemotesTheOldLatestIntoTheVersionsFolder()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "growing.pdf");
         await RenameDocumentAsync(docId, "Growing");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
-        Assert.Equal(["2025/Growing.pdf"], MirrorFiles());
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+        Assert.Equal([$"{Root}/2025/Growing.pdf"], MirrorFiles());
 
         await AddVersionAndWaitAsync(client, docId);
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(
-            ["2025/Growing.pdf", "2025/_versions/Growing (v1).pdf"],
+            [$"{Root}/2025/Growing.pdf", $"{Root}/2025/_versions/Growing (v1).pdf"],
             MirrorFiles());
-        Assert.Equal(2, await StateRowCountAsync());
+        Assert.Equal(2, await StateRowCountAsync(sourceId));
     }
 
     // Trash is a restorable state — a backup that evaporated the moment a file hit the trash would be
@@ -268,26 +309,30 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task TrashingADocument_LeavesTheMirrorUntouched()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "doomed.pdf");
         await RenameDocumentAsync(docId, "Doomed");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
-        Assert.Equal(["2025/Doomed.pdf"], MirrorFiles());
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+        Assert.Equal([$"{Root}/2025/Doomed.pdf"], MirrorFiles());
 
         var deleteResponse = await client.DeleteAsync($"/api/v1/documents/{docId}", CT);
         deleteResponse.EnsureSuccessStatusCode();
 
-        var second = await RunBackupExpectingSuccessAsync(client);
+        var second = await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(0, second.TotalChildCount);
-        Assert.Equal(["2025/Doomed.pdf"], MirrorFiles());
+        Assert.Equal([$"{Root}/2025/Doomed.pdf"], MirrorFiles());
     }
 
     [Fact]
     public async Task PermanentlyDeletingADocument_RemovesItFromTheMirror()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var keeper = await UploadAndWaitAsync(client, "keeper.pdf");
         await RenameDocumentAsync(keeper, "Keeper");
         await SetDocumentDateAsync(keeper, new DateOnly(2025, 1, 1));
@@ -296,17 +341,17 @@ public class BackupMirrorTests : IntegrationTestBase
         await RenameDocumentAsync(doomed, "Doomed");
         await SetDocumentDateAsync(doomed, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
-        Assert.Equal(["2025/Doomed.pdf", "2025/Keeper.pdf"], MirrorFiles());
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+        Assert.Equal([$"{Root}/2025/Doomed.pdf", $"{Root}/2025/Keeper.pdf"], MirrorFiles());
 
         (await client.DeleteAsync($"/api/v1/documents/{doomed}", CT)).EnsureSuccessStatusCode();
         (await client.PostAsync($"/api/v1/documents/{doomed}/permanently-delete", null, CT))
             .EnsureSuccessStatusCode();
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
-        Assert.Equal(["2025/Keeper.pdf"], MirrorFiles());
-        Assert.Equal(1, await StateRowCountAsync());
+        Assert.Equal([$"{Root}/2025/Keeper.pdf"], MirrorFiles());
+        Assert.Equal(1, await StateRowCountAsync(sourceId));
     }
 
     // --- the circuit breaker ---
@@ -315,6 +360,7 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task MassDeletion_TripsTheBreaker_SkippingDeletesButStillApplyingPuts()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
 
         var doomed = new List<Guid>();
         for (var i = 0; i < 30; i++)
@@ -325,7 +371,7 @@ public class BackupMirrorTests : IntegrationTestBase
             doomed.Add(id);
         }
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
         Assert.Equal(30, MirrorFiles().Count);
 
         // 30 deletions clears both thresholds: > 25 absolute and > 10% of 30.
@@ -340,25 +386,27 @@ public class BackupMirrorTests : IntegrationTestBase
         await RenameDocumentAsync(survivor, "Survivor");
         await SetDocumentDateAsync(survivor, new DateOnly(2026, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         var files = MirrorFiles();
-        Assert.Contains("2026/Survivor.pdf", files);
+        Assert.Contains($"{Root}/2026/Survivor.pdf", files);
         Assert.Equal(31, files.Count);
 
-        using (var scope = CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var state = await db.BackupTargetStates.AsNoTracking()
-                .SingleAsync(s => s.TargetKey == TargetKey, CT);
-            Assert.NotNull(state.PruneBlockedAt);
-            Assert.Equal(30, state.PruneBlockedCount);
-        }
+        // The latch lives on the pairing, not the destination.
+        var source = await GetSourceAsync(client, sourceId);
+        Assert.NotNull(source.PruneBlockedAt);
+        Assert.Equal(30, source.PruneBlockedCount);
 
         // Prune anyway.
-        await RunBackupExpectingSuccessAsync(client, allowLargePrune: true);
+        await RunBackupExpectingSuccessAsync(client, sourceId, allowLargePrune: true);
 
-        Assert.Equal(["2026/Survivor.pdf"], MirrorFiles());
+        Assert.Equal([$"{Root}/2026/Survivor.pdf"], MirrorFiles());
+
+        // And the banner comes down with it: the override carried out exactly the deletions the latch was
+        // withholding, so leaving it up would report a block that no longer exists.
+        var pruned = await GetSourceAsync(client, sourceId);
+        Assert.Null(pruned.PruneBlockedAt);
+        Assert.Null(pruned.PruneBlockedCount);
     }
 
     // A parent whose CHILDREN failed carries no error string of its own — the generic parent-progress
@@ -368,6 +416,8 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task WhenABatchFails_TheApiSurfacesItsMessage()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "orphan.pdf");
         await RenameDocumentAsync(docId, "Orphan");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
@@ -382,16 +432,15 @@ public class BackupMirrorTests : IntegrationTestBase
             File.Delete(Path.Combine(Factory.MediaPath, version.FilePath));
         }
 
-        var job = await RunBackupAsync(client);
+        var job = await RunBackupAsync(client, sourceId);
         Assert.Equal(ProcessingJobStatus.Failed, job.Status);
 
-        var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        var target = Assert.Single(targets!.Items);
+        var source = await GetSourceAsync(client, sourceId);
 
-        Assert.Null(target.LastRun!.Error);
-        var batchError = Assert.Single(target.LastRun.BatchErrors);
+        Assert.Null(source.LastRun!.Error);
+        var batchError = Assert.Single(source.LastRun.BatchErrors);
         Assert.Contains("missing from storage", batchError);
-        Assert.Equal(0, target.BackedUpFileCount);
+        Assert.Equal(0, source.BackedUpFileCount);
     }
 
     // The other half: a run that copies nothing must not leave a state row claiming it did, or the next
@@ -400,6 +449,8 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task AFailedCopy_WritesNoStateRow()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "orphan.pdf");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
@@ -410,9 +461,9 @@ public class BackupMirrorTests : IntegrationTestBase
             File.Delete(Path.Combine(Factory.MediaPath, version.FilePath));
         }
 
-        await RunBackupAsync(client);
+        await RunBackupAsync(client, sourceId);
 
-        Assert.Equal(0, await StateRowCountAsync());
+        Assert.Equal(0, await StateRowCountAsync(sourceId));
         Assert.Empty(MirrorFiles());
     }
 
@@ -422,55 +473,79 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task DryRun_ReportsThePlanWithoutTouchingTheMirror()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "planned.pdf");
         await RenameDocumentAsync(docId, "Planned");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        var job = await RunBackupExpectingSuccessAsync(client, dryRun: true);
+        var job = await RunBackupExpectingSuccessAsync(client, sourceId, dryRun: true);
 
         Assert.Equal(0, job.TotalChildCount);
         Assert.Empty(MirrorFiles());
-        Assert.Equal(0, await StateRowCountAsync());
+        Assert.Equal(0, await StateRowCountAsync(sourceId));
 
-        var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        var target = Assert.Single(targets!.Items);
+        var source = await GetSourceAsync(client, sourceId);
 
-        Assert.True(target.LastRun!.Summary!.DryRun);
-        Assert.Equal(1, target.LastRun.Summary.PutCount);
-        Assert.Equal(0, target.BackedUpFileCount);
+        Assert.True(source.LastRun!.Summary!.DryRun);
+        Assert.Equal(1, source.LastRun.Summary.Puts);
+        Assert.Equal(0, source.BackedUpFileCount);
     }
 
     [Fact]
     public async Task RunNow_ReturnsAJobId_AndASecondCallIs409()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         await UploadAndWaitAsync(client, "queued.pdf");
 
         // Hold the worker so the first run stays queued and the single-flight guard is observable.
         await using var _ = await Factory.Services.GetRequiredService<IJobProcessorControl>().PauseAsync(CT);
 
         var first = await client.PostAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/runs", new { }, CT);
+            $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
         first.EnsureSuccessStatusCode();
 
         var body = await first.Content.ReadFromJsonAsync<RunResult>(CT);
         Assert.NotEqual(Guid.Empty, body!.JobId);
 
         var second = await client.PostAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/runs", new { }, CT);
+            $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
 
+    // The single-flight filter has to exclude batch CHILDREN, which carry their parent's EntityId —
+    // otherwise the second run after any real run would 409 forever.
     [Fact]
-    public async Task GetTargets_ReportsConfigAndCopyTotals()
+    public async Task RunNow_AfterACompletedRunWithChildren_IsNotBlockedByThem()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var docId = await UploadAndWaitAsync(client, "again.pdf");
+        await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var second = await client.PostAsJsonAsync(
+            $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
+
+        second.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task GetTargets_ReportsConfigAndPerSourceCopyTotals()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var docId = await UploadAndWaitAsync(client, "counted.pdf");
         await RenameDocumentAsync(docId, "Counted");
         await SetDocumentDateAsync(docId, new DateOnly(2025, 1, 1));
 
-        await RunBackupExpectingSuccessAsync(client);
+        await RunBackupExpectingSuccessAsync(client, sourceId);
 
         var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
         var target = Assert.Single(targets!.Items);
@@ -480,44 +555,36 @@ public class BackupMirrorTests : IntegrationTestBase
         Assert.True(target.IsAvailable);
         Assert.Null(target.ConfigurationError);
         Assert.True(target.IsEnabled);
-        Assert.Equal(1, target.BackedUpFileCount);
-        Assert.True(target.BackedUpBytes > 0);
-        Assert.Equal("Completed", target.LastRun!.Status);
+
+        var source = Assert.Single(target.Sources);
+        Assert.Equal(DocumentsBackupSourceDescriptor.SourceKey, source.SourceKind);
+        Assert.Equal("Documents", source.SourceDisplayName);
+        Assert.True(source.IsEnabled);
+        Assert.True(source.IsAvailable);
+        Assert.True(source.SupportsPrune);
+        Assert.Equal(1, source.BackedUpFileCount);
+        Assert.True(source.BackedUpBytes > 0);
+        Assert.Equal("Completed", source.LastRun!.Status);
+
+        // The picker's feed rides along with the list, so "what can I add" needs no second round trip.
+        Assert.Contains(targets.SourceKinds, k => k.Key == DocumentsBackupSourceDescriptor.SourceKey);
     }
 
     [Fact]
-    public async Task PatchTarget_DisablesRunsAndClearsThePruneLatch()
+    public async Task DisablingTheTarget_BlocksRunsForEverySourceOnIt()
     {
         var client = await CreateAdminClientAsync();
-
-        using (var scope = CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.BackupTargetStates.Add(new BackupTargetState
-            {
-                TargetKey = TargetKey,
-                IsEnabled = true,
-                PruneBlockedAt = DateTimeOffset.UtcNow,
-                PruneBlockedCount = 42,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-            });
-            await db.SaveChangesAsync(CT);
-        }
+        var sourceId = await CreateSourceAsync(client);
 
         var patch = await client.PatchAsJsonAsync(
             $"/api/v1/admin/backup/targets/{TargetKey}", new { isEnabled = false }, CT);
         patch.EnsureSuccessStatusCode();
 
         var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        var target = Assert.Single(targets!.Items);
-
-        Assert.False(target.IsEnabled);
-        Assert.Null(target.PruneBlockedAt);
-        Assert.Null(target.PruneBlockedCount);
+        Assert.False(Assert.Single(targets!.Items).IsEnabled);
 
         var run = await client.PostAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/runs", new { }, CT);
+            $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
         Assert.Equal(HttpStatusCode.BadRequest, run.StatusCode);
     }
 
@@ -526,34 +593,47 @@ public class BackupMirrorTests : IntegrationTestBase
     {
         var client = await CreateAdminClientAsync();
 
-        var run = await client.PostAsJsonAsync("/api/v1/admin/backup/targets/nope/runs", new { }, CT);
-        Assert.Equal(HttpStatusCode.NotFound, run.StatusCode);
-
         var patch = await client.PatchAsJsonAsync(
             "/api/v1/admin/backup/targets/nope", new { isEnabled = false }, CT);
         Assert.Equal(HttpStatusCode.NotFound, patch.StatusCode);
     }
 
     [Fact]
-    public async Task ScheduleUpsertAndDelete_RoundTrip()
+    public async Task UnknownSource_Is404()
     {
         var client = await CreateAdminClientAsync();
 
+        var run = await client.PostAsJsonAsync(
+            $"/api/v1/admin/backup/sources/{Guid.NewGuid()}/runs", new { }, CT);
+        Assert.Equal(HttpStatusCode.NotFound, run.StatusCode);
+    }
+
+    [Fact]
+    public async Task ScheduleUpsertAndDelete_RoundTrip()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
         var upsert = await client.PutAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/schedule",
+            $"/api/v1/admin/backup/sources/{sourceId}/schedule",
             new { cronExpression = "0 3 * * *", isEnabled = true, priority = 0 }, CT);
         upsert.EnsureSuccessStatusCode();
 
-        var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        var schedule = Assert.Single(targets!.Items).Schedule;
+        var schedule = (await GetSourceAsync(client, sourceId)).Schedule;
         Assert.NotNull(schedule);
         Assert.Equal("0 3 * * *", schedule.CronExpression);
 
-        // Upsert replaces rather than accumulating.
+        // Upsert updates in place rather than replacing: the id is a foreign key on the source row and is
+        // referenced by every job the schedule spawned.
         var second = await client.PutAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/schedule",
+            $"/api/v1/admin/backup/sources/{sourceId}/schedule",
             new { cronExpression = "30 4 * * *", isEnabled = true, priority = 0 }, CT);
         second.EnsureSuccessStatusCode();
+
+        var updated = (await GetSourceAsync(client, sourceId)).Schedule;
+        Assert.NotNull(updated);
+        Assert.Equal(schedule.Id, updated.Id);
+        Assert.Equal("30 4 * * *", updated.CronExpression);
 
         using (var scope = CreateScope())
         {
@@ -564,11 +644,11 @@ public class BackupMirrorTests : IntegrationTestBase
         }
 
         var delete = await client.DeleteAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/schedule", CT);
+            $"/api/v1/admin/backup/sources/{sourceId}/schedule", CT);
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
 
         var deleteAgain = await client.DeleteAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/schedule", CT);
+            $"/api/v1/admin/backup/sources/{sourceId}/schedule", CT);
         Assert.Equal(HttpStatusCode.NotFound, deleteAgain.StatusCode);
     }
 
@@ -576,9 +656,10 @@ public class BackupMirrorTests : IntegrationTestBase
     public async Task InvalidCron_Is400()
     {
         var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/v1/admin/backup/targets/{TargetKey}/schedule",
+            $"/api/v1/admin/backup/sources/{sourceId}/schedule",
             new { cronExpression = "not a cron", isEnabled = true, priority = 0 }, CT);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -587,6 +668,9 @@ public class BackupMirrorTests : IntegrationTestBase
     [Fact]
     public async Task BackupEndpoints_RequireAdmin()
     {
+        var admin = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(admin);
+
         var contributor = await CreateUserClientAsync();
 
         Assert.Equal(HttpStatusCode.Forbidden,
@@ -594,16 +678,23 @@ public class BackupMirrorTests : IntegrationTestBase
 
         Assert.Equal(HttpStatusCode.Forbidden,
             (await contributor.PostAsJsonAsync(
-                $"/api/v1/admin/backup/targets/{TargetKey}/runs", new { }, CT)).StatusCode);
+                $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await contributor.DeleteAsync($"/api/v1/admin/backup/sources/{sourceId}", CT)).StatusCode);
 
         var anonymous = CreateAnonymousClient();
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await anonymous.GetAsync("/api/v1/admin/backup/targets", CT)).StatusCode);
     }
 
+    private record SourceResult(Guid Id, string SourceKind, string TargetKey);
+
     private record RunResult(Guid JobId);
 
-    private record TargetsResult(List<TargetItem> Items);
+    private record TargetsResult(List<TargetItem> Items, List<SourceKindItem> SourceKinds);
+
+    private record SourceKindItem(string Key, string DisplayName, bool SupportsPrune);
 
     private record TargetItem(
         string Key,
@@ -612,6 +703,16 @@ public class BackupMirrorTests : IntegrationTestBase
         bool IsAvailable,
         string? ConfigurationError,
         bool IsEnabled,
+        List<SourceItem> Sources);
+
+    private record SourceItem(
+        Guid Id,
+        string SourceKind,
+        string? SourceDisplayName,
+        bool IsEnabled,
+        bool IsAvailable,
+        string? UnavailableReason,
+        bool SupportsPrune,
         DateTimeOffset? PruneBlockedAt,
         int? PruneBlockedCount,
         int BackedUpFileCount,
@@ -632,18 +733,18 @@ public class BackupMirrorTests : IntegrationTestBase
         RunSummaryItem? Summary);
 
     private record RunSummaryItem(
-        string TargetKey,
+        Guid BackupSourceId,
         bool DryRun,
         bool Skipped,
         string? SkipReason,
-        int PutCount,
-        int MoveCount,
-        int DeleteCount,
-        int UnchangedCount,
+        int Puts,
+        int Moves,
+        int Deletes,
+        int Unchanged,
         int BatchCount,
-        long TotalBytes,
         bool PruneBlocked,
-        int BlockedDeleteCount);
+        int BlockedDeleteCount,
+        long? TotalBytes);
 
     private record ScheduleItem(
         Guid Id, string CronExpression, bool IsEnabled, int Priority, DateTimeOffset NextRunAt);

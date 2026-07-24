@@ -26,8 +26,10 @@ public class BackupPathPlannerTests
             $"documents/files/abcd/{hash ?? Guid.NewGuid().ToString("N")}{extension}",
             1024);
 
+    private const string RootFolder = DocumentsBackupSourceDescriptor.RootFolderName;
+
     private static IReadOnlyList<BackupDesiredFile> Plan(params BackupVersionSource[] versions) =>
-        BackupPathPlanner.Plan(versions, Capabilities);
+        BackupPathPlanner.Plan(versions, Capabilities, RootFolder);
 
     [Fact]
     public void DatedDocument_LandsInItsYearShard()
@@ -36,7 +38,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "Tax Return 2024", new DateOnly(2024, 4, 15)));
 
-        Assert.Equal("2024/Tax Return 2024.pdf", Assert.Single(result).RelativePath);
+        Assert.Equal("Documents/2024/Tax Return 2024.pdf", Assert.Single(result).RelativePath);
     }
 
     [Fact]
@@ -46,7 +48,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "Misc Receipt", documentDate: null));
 
-        Assert.Equal("_undated/Misc Receipt.pdf", Assert.Single(result).RelativePath);
+        Assert.Equal("Documents/_undated/Misc Receipt.pdf", Assert.Single(result).RelativePath);
     }
 
     [Fact]
@@ -62,9 +64,9 @@ public class BackupPathPlannerTests
 
         var paths = result.Select(f => f.RelativePath).ToList();
 
-        Assert.Contains("2025/Car Insurance.pdf", paths);
-        Assert.Contains("2025/_versions/Car Insurance (v1).pdf", paths);
-        Assert.Contains("2025/_versions/Car Insurance (v2).pdf", paths);
+        Assert.Contains("Documents/2025/Car Insurance.pdf", paths);
+        Assert.Contains("Documents/2025/_versions/Car Insurance (v1).pdf", paths);
+        Assert.Contains("Documents/2025/_versions/Car Insurance (v2).pdf", paths);
         Assert.Equal(3, paths.Count);
     }
 
@@ -75,7 +77,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "Invoice: 3/2025 <draft>", new DateOnly(2025, 6, 1)));
 
-        Assert.Equal("2025/Invoice_ 3_2025 _draft_.pdf", Assert.Single(result).RelativePath);
+        Assert.Equal("Documents/2025/Invoice_ 3_2025 _draft_.pdf", Assert.Single(result).RelativePath);
     }
 
     [Fact]
@@ -85,7 +87,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "///", new DateOnly(2025, 6, 1)));
 
-        Assert.Equal("2025/___.pdf", Assert.Single(result).RelativePath);
+        Assert.Equal("Documents/2025/___.pdf", Assert.Single(result).RelativePath);
     }
 
     [Fact]
@@ -95,7 +97,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "   ", new DateOnly(2025, 6, 1)));
 
-        Assert.Equal($"2025/{BackupPathPlanner.FallbackDocumentName}.pdf", Assert.Single(result).RelativePath);
+        Assert.Equal($"Documents/2025/{BackupPathPlanner.FallbackDocumentName}.pdf", Assert.Single(result).RelativePath);
     }
 
     // The collision rule must be a pure function of the current document set. An order-dependent counter
@@ -114,8 +116,8 @@ public class BackupPathPlannerTests
 
         var paths = result.Select(f => f.RelativePath).ToList();
 
-        Assert.Contains("2025/Statement (11112222).pdf", paths);
-        Assert.Contains("2025/Statement (aaaabbbb).pdf", paths);
+        Assert.Contains("Documents/2025/Statement (11112222).pdf", paths);
+        Assert.Contains("Documents/2025/Statement (aaaabbbb).pdf", paths);
     }
 
     [Fact]
@@ -148,9 +150,9 @@ public class BackupPathPlannerTests
 
         var paths = result.Select(f => f.RelativePath).ToList();
 
-        Assert.Contains("2025/Statement (11112222).pdf", paths);
-        Assert.Contains("2025/_versions/Statement (11112222) (v1).pdf", paths);
-        Assert.Contains("2025/Statement (aaaabbbb).pdf", paths);
+        Assert.Contains("Documents/2025/Statement (11112222).pdf", paths);
+        Assert.Contains("Documents/2025/_versions/Statement (11112222) (v1).pdf", paths);
+        Assert.Contains("Documents/2025/Statement (aaaabbbb).pdf", paths);
     }
 
     // A case-insensitive filesystem (or a mirror hosted on one) treats these as one file; planning them
@@ -181,8 +183,8 @@ public class BackupPathPlannerTests
 
         var paths = result.Select(f => f.RelativePath).ToList();
 
-        Assert.Contains("2024/Statement.pdf", paths);
-        Assert.Contains("2025/Statement.pdf", paths);
+        Assert.Contains("Documents/2024/Statement.pdf", paths);
+        Assert.Contains("Documents/2025/Statement.pdf", paths);
     }
 
     // Editing a document's date re-files the WHOLE version tree, because the shard is document-scoped.
@@ -202,8 +204,8 @@ public class BackupPathPlannerTests
             Version(docId, "Lease", new DateOnly(2026, 8, 1), versionNumber: 1, versionId: versionOne),
             Version(docId, "Lease", new DateOnly(2026, 8, 1), versionNumber: 2, versionId: versionTwo));
 
-        Assert.All(before, f => Assert.StartsWith("2024/", f.RelativePath));
-        Assert.All(after, f => Assert.StartsWith("2026/", f.RelativePath));
+        Assert.All(before, f => Assert.StartsWith("Documents/2024/", f.RelativePath));
+        Assert.All(after, f => Assert.StartsWith("Documents/2026/", f.RelativePath));
 
         // Same version ids either side — the mirror moves files, it does not re-copy them.
         Assert.Equal(
@@ -262,7 +264,8 @@ public class BackupPathPlannerTests
                 Version(first, prefix + "AAAA", date),
                 Version(second, prefix + "BBBB", date),
             ],
-            capabilities);
+            capabilities,
+            RootFolder);
 
         var paths = result.Select(f => Path.GetFileName(f.RelativePath)).ToList();
 
@@ -287,7 +290,8 @@ public class BackupPathPlannerTests
 
         var result = BackupPathPlanner.Plan(
             [Version(first, name, date), Version(second, name, date)],
-            capabilities);
+            capabilities,
+            RootFolder);
 
         var fileNames = result.Select(f => Path.GetFileName(f.RelativePath)).ToList();
 
@@ -298,6 +302,26 @@ public class BackupPathPlannerTests
         Assert.Equal(2, fileNames.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
+    // The root folder is part of every path this planner emits, so it has to be charged against the path
+    // budget — not glued on after a name was already trimmed to the full budget, which would push the
+    // longest paths past what the target accepts.
+    [Fact]
+    public void RootFolderCountsAgainstThePathBudget()
+    {
+        var docId = Guid.NewGuid();
+        var capabilities = Capabilities with { MaxSegmentLength = 255, MaxPathLength = 60 };
+
+        var result = BackupPathPlanner.Plan(
+            [Version(docId, new string('x', 200), new DateOnly(2025, 1, 1))],
+            capabilities,
+            RootFolder);
+
+        var path = Assert.Single(result).RelativePath;
+
+        Assert.StartsWith("Documents/2025/", path);
+        Assert.True(path.Length <= capabilities.MaxPathLength, $"path was {path.Length}");
+    }
+
     [Fact]
     public void TinySegmentBudget_StillProducesANonEmptyName()
     {
@@ -305,7 +329,9 @@ public class BackupPathPlannerTests
         var capabilities = Capabilities with { MaxSegmentLength = 4, MaxPathLength = 12 };
 
         var result = BackupPathPlanner.Plan(
-            [Version(docId, "A Very Long Document Name", new DateOnly(2025, 1, 1))], capabilities);
+            [Version(docId, "A Very Long Document Name", new DateOnly(2025, 1, 1))],
+            capabilities,
+            RootFolder);
 
         var fileName = Path.GetFileName(Assert.Single(result).RelativePath);
         Assert.NotEmpty(Path.GetFileNameWithoutExtension(fileName));
@@ -340,7 +366,7 @@ public class BackupPathPlannerTests
 
         var result = Plan(Version(docId, "Notes", new DateOnly(2025, 1, 1), extension: ""));
 
-        Assert.Equal("2025/Notes", Assert.Single(result).RelativePath);
+        Assert.Equal("Documents/2025/Notes", Assert.Single(result).RelativePath);
     }
 
     [Fact]

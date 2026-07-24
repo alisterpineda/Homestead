@@ -8,9 +8,14 @@ using Microsoft.EntityFrameworkCore;
 namespace Homestead.WebApi.Modules.Admin.Features.Backup.PatchBackupTarget;
 
 /// <summary>
-/// Updates a target's operator state and acknowledges the prune latch. Creates the state row on first
-/// use — a configured-but-never-touched target has no row.
+/// Updates a target's operator state: the target-level enable toggle, and nothing else. Creates the
+/// state row on first use — a configured-but-never-touched target has no row.
 /// </summary>
+/// <remarks>
+/// The prune latch is deliberately NOT here. It lives on the source row, and acknowledging it is an
+/// explicit act on that one pairing (<c>PATCH /sources/{id}</c> with <c>acknowledgePruneBlock</c>):
+/// clearing latches from the target would dismiss every kind's warning on that destination at once.
+/// </remarks>
 public class PatchBackupTargetHandler(
     AppDbContext db, IBackupTargetResolver resolver, IUnitOfWork unitOfWork)
     : IRequestHandler<PatchBackupTargetCommand, PatchBackupTargetResponse>
@@ -22,8 +27,7 @@ public class PatchBackupTargetHandler(
         // written for any string. Without this, a typo would create orphan state the admin page never
         // shows and nothing ever cleans up. A DEFINED but misconfigured target is still patchable —
         // disabling one, or acknowledging its latch, is exactly what an operator does while fixing it.
-        var target = resolver.All()
-            .FirstOrDefault(t => string.Equals(t.Key, request.TargetKey, StringComparison.OrdinalIgnoreCase))
+        var target = resolver.Find(request.TargetKey)
             ?? throw new EntityNotFoundException($"Backup target '{request.TargetKey}' is not configured.");
 
         var now = DateTimeOffset.UtcNow;
@@ -45,11 +49,6 @@ public class PatchBackupTargetHandler(
         if (request.IsEnabled is { } isEnabled)
             state.IsEnabled = isEnabled;
 
-        // Any PATCH acknowledges the prune latch. This is the admin's "I've seen it" action — the banner
-        // it drives is the only place a blocked prune is reported, so it must take a deliberate act to
-        // clear, and a deliberate act must actually clear it.
-        state.PruneBlockedAt = null;
-        state.PruneBlockedCount = null;
         state.UpdatedAt = now;
 
         await unitOfWork.SaveChangesAsync(ct);

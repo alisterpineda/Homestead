@@ -11,14 +11,14 @@ import { RunBackupNowBody } from '../../models/run-backup-now-body';
 import { RunBackupNowResponse } from '../../models/run-backup-now-response';
 
 export interface RunBackupNow$Params {
-  key: string;
+  id: string;
       body?: (null | RunBackupNowBody)
 }
 
 export function runBackupNow(http: HttpClient, rootUrl: string, params: RunBackupNow$Params, context?: HttpContext): Observable<StrictHttpResponse<RunBackupNowResponse>> {
   const rb = new RequestBuilder(rootUrl, runBackupNow.PATH, 'post');
   if (params) {
-    rb.path('key', params.key, {});
+    rb.path('id', params.id, {});
     rb.body(params.body, 'application/json');
   }
 
@@ -32,4 +32,4 @@ export function runBackupNow(http: HttpClient, rootUrl: string, params: RunBacku
   );
 }
 
-runBackupNow.PATH = '/api/v1/admin/backup/targets/{key}/runs';
+runBackupNow.PATH = '/api/v1/admin/backup/sources/{id}/runs';

@@ -18,14 +18,17 @@ public sealed class BackupTargetResolver : IBackupTargetResolver
         if (string.IsNullOrWhiteSpace(key))
             return new UndefinedBackupTarget(key ?? string.Empty);
 
-        return Find(key.Trim()) ?? new UndefinedBackupTarget(key.Trim());
+        return Find(key) ?? new UndefinedBackupTarget(key.Trim());
     }
 
     // SingleOrDefault so a duplicate key is a loud throw, never one instance shadowing the other.
     // Case-insensitive to match config-key semantics (IConfiguration keys are case-insensitive, so config
     // itself can never define two keys differing only in case).
-    private IBackupTarget? Find(string key) =>
-        _targets.SingleOrDefault(t => string.Equals(t.Key, key, StringComparison.OrdinalIgnoreCase));
+    public IBackupTarget? Find(string key) =>
+        string.IsNullOrWhiteSpace(key)
+            ? null
+            : _targets.SingleOrDefault(t =>
+                string.Equals(t.Key, key.Trim(), StringComparison.OrdinalIgnoreCase));
 
     // What a dangling key resolves to: unavailable-with-reason under the REQUESTED key. A backup that
     // silently retargeted to a healthy sibling would mirror the library somewhere nobody asked for and

@@ -11,14 +11,14 @@ import { UpsertBackupScheduleBody } from '../../models/upsert-backup-schedule-bo
 import { UpsertBackupScheduleResponse } from '../../models/upsert-backup-schedule-response';
 
 export interface UpsertBackupSchedule$Params {
-  key: string;
+  id: string;
       body: UpsertBackupScheduleBody
 }
 
 export function upsertBackupSchedule(http: HttpClient, rootUrl: string, params: UpsertBackupSchedule$Params, context?: HttpContext): Observable<StrictHttpResponse<UpsertBackupScheduleResponse>> {
   const rb = new RequestBuilder(rootUrl, upsertBackupSchedule.PATH, 'put');
   if (params) {
-    rb.path('key', params.key, {});
+    rb.path('id', params.id, {});
     rb.body(params.body, 'application/json');
   }
 
@@ -32,4 +32,4 @@ export function upsertBackupSchedule(http: HttpClient, rootUrl: string, params: 
   );
 }
 
-upsertBackupSchedule.PATH = '/api/v1/admin/backup/targets/{key}/schedule';
+upsertBackupSchedule.PATH = '/api/v1/admin/backup/sources/{id}/schedule';

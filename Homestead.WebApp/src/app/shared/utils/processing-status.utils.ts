@@ -8,6 +8,8 @@ export function statusBadgeVariant(status: ProcessingJobStatus): BadgeVariants['
     case 'Completed': return 'secondary';
     case 'Failed': return 'destructive';
     case 'PartiallyCompleted': return 'outline';
+    // Terminal but not a failure — the operator cancelled it. Neutral, like Pending.
+    case 'Cancelled': return 'outline';
   }
 }
 

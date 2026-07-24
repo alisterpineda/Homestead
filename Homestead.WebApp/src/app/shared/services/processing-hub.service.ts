@@ -27,11 +27,11 @@ export interface JobStatusChangedMessage {
  * literal "Document". A backup run has no document: its parent would read as
  * `"Document" has been processed successfully.`, and its batch children would dump a multi-line
  * per-file failure report into a toast. The admin backup page reports its own runs (it claims the
- * parent job and renders batch errors on the target card), so the whole entity type opts out.
+ * parent job and renders batch errors on the source row), so the whole entity type opts out.
  * Claiming them individually is not possible — the client never learns the children's job ids.
  */
 export function ownsItsOwnReporting(message: JobStatusChangedMessage): boolean {
-  return message.entityType === 'BackupTarget';
+  return message.entityType === 'BackupSource';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -56,7 +56,14 @@ export class ProcessingHubService {
     return firstValueFrom(
       this.jobStatusChanged$.pipe(
         filter(msg => msg.jobId === jobId),
-        filter(msg => msg.status === 'Completed' || msg.status === 'Failed' || msg.status === 'PartiallyCompleted'),
+        // Every TERMINAL status, Cancelled included: a caller awaiting a job that was cancelled out from
+        // under it (the backup-source delete flow) must be told, not left with a promise that never
+        // settles and a subscription that never unsubscribes.
+        filter(msg =>
+          msg.status === 'Completed' ||
+          msg.status === 'Failed' ||
+          msg.status === 'PartiallyCompleted' ||
+          msg.status === 'Cancelled'),
         take(1),
         map(msg => {
           if (msg.status === 'Failed') {
@@ -109,6 +116,10 @@ export class ProcessingHubService {
           const errorMsg = message.error ?? 'An unknown error occurred.';
           toast.error(`Processing failed: ${errorMsg}`);
         }
+      } else if (message.status === 'Cancelled') {
+        // Terminal, but never worth announcing: cancellation is always something the operator just did,
+        // so they already know. Release the claim so managedJobIds doesn't grow for the session.
+        this.managedJobIds.delete(message.jobId);
       }
     });
 

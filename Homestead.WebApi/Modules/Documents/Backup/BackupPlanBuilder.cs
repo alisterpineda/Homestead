@@ -1,5 +1,3 @@
-using Homestead.WebApi.Infrastructure.Backup;
-
 namespace Homestead.WebApi.Modules.Documents.Backup;
 
 /// <summary>
@@ -12,7 +10,7 @@ public static class BackupPlanBuilder
     public static BackupPlan Build(
         IReadOnlyList<BackupDesiredFile> desired,
         IReadOnlyList<BackupStateRow> existing,
-        BackupOptions options,
+        DocumentBackupEngineOptions options,
         bool allowLargePrune)
     {
         var existingByVersion = existing.ToDictionary(s => s.VersionId);
@@ -131,7 +129,7 @@ public static class BackupPlanBuilder
     /// 5,000 should stop the run). Strictly-greater, so a run sitting exactly on the threshold proceeds —
     /// the guard is against a runaway, not against ordinary housekeeping.
     /// </remarks>
-    public static bool TripsBreaker(int deleteCount, int alreadyMirroredCount, BackupOptions options)
+    public static bool TripsBreaker(int deleteCount, int alreadyMirroredCount, DocumentBackupEngineOptions options)
     {
         var threshold = Math.Max(
             options.ResolveMinAbsoluteDeletes(),
@@ -144,7 +142,7 @@ public static class BackupPlanBuilder
     // otherwise sit alone in a batch that still blows the 5-minute timeout, and 100 small scans would
     // finish in seconds. Whichever cap binds first wins. A single file larger than the byte cap still
     // gets its own batch rather than being dropped.
-    private static List<BackupActionBatch> PackFiles(List<BackupAction> actions, BackupOptions options)
+    private static List<BackupActionBatch> PackFiles(List<BackupAction> actions, DocumentBackupEngineOptions options)
     {
         var maxFiles = options.ResolveMaxFilesPerBatch();
         var maxBytes = options.ResolveMaxBytesPerBatch();
@@ -175,7 +173,7 @@ public static class BackupPlanBuilder
 
     // Moves and deletes are constant-time per operation — no bytes cross the wire — so they only need a
     // count cap, set an order of magnitude higher than the file cap.
-    private static List<BackupActionBatch> PackMetadata(List<BackupAction> actions, BackupOptions options)
+    private static List<BackupActionBatch> PackMetadata(List<BackupAction> actions, DocumentBackupEngineOptions options)
     {
         var maxOps = options.ResolveMaxOpsPerMetadataBatch();
 

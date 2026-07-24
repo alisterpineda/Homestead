@@ -12,12 +12,12 @@ public static class RunBackupNowEndpoint
 
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapPost("/targets/{key}/runs", async (
-            string key, RunBackupNowBody? body, ISender sender, CancellationToken ct) =>
+        group.MapPost("/sources/{id:guid}/runs", async (
+            Guid id, RunBackupNowBody? body, ISender sender, CancellationToken ct) =>
         {
             var response = await sender.Send(new RunBackupNowCommand
             {
-                TargetKey = key,
+                BackupSourceId = id,
                 DryRun = body?.DryRun ?? false,
                 AllowLargePrune = body?.AllowLargePrune ?? false,
             }, ct);

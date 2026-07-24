@@ -6,9 +6,9 @@ using Homestead.WebApi.Common;
 using Homestead.WebApi.Common.Logging;
 using Homestead.WebApi.Common.Settings;
 using Homestead.WebApi.Modules.Admin;
-using Homestead.WebApi.Modules.Admin.Services;
 using Homestead.WebApi.Modules.Identity;
 using Homestead.WebApi.Modules.Documents;
+using Homestead.WebApi.Modules.Documents.Backup;
 using Homestead.WebApi.Modules.Documents.Features.Search;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances;
@@ -207,7 +207,6 @@ builder.Services.AddScoped<IDripService, DripService>();
 builder.Services.AddScoped<IBalanceEntryService, BalanceEntryService>();
 builder.Services.AddScoped<IValuationService, ValuationService>();
 builder.Services.AddScoped<IPriceSourceScheduleStore, PriceSourceScheduleStore>();
-builder.Services.AddScoped<IBackupScheduleStore, BackupScheduleStore>();
 builder.Services.AddScoped<IStatementExtractionService, StatementExtractionService>();
 builder.Services.AddScoped<StatementMappingBuilder>();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -226,6 +225,13 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(ServiceLifetime.Scoped);
 builder.Services.AddProcessing(builder.Configuration);
 builder.Services.AddBackup(builder.Configuration);
+
+// Documents' contribution to the backup catalog, registered HERE rather than inside AddBackup: the
+// backup infrastructure must not reference a module, or every future kind would edit it.
+builder.Services.AddSingleton<IBackupSourceDescriptor, DocumentsBackupSourceDescriptor>();
+builder.Services.Configure<DocumentBackupEngineOptions>(
+    builder.Configuration.GetSection(DocumentBackupEngineOptions.SectionName));
+
 builder.Services.AddPriceProviders(builder.Configuration);
 builder.Services.AddSingleton<IDownloadPathBuilder, TagBasedDownloadPathBuilder>();
 builder.Services.AddFileStorage(builder.Configuration);

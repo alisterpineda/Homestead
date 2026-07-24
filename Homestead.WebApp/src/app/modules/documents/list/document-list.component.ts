@@ -900,7 +900,11 @@ export class DocumentListComponent {
 
     this.reprocessProgressDialog()?.start(documentCount);
 
-    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+    // Every terminal status, Cancelled included. Nothing cancels these bulk jobs today (only the
+    // backup-source delete flow emits Cancelled), but omitting it is a trap: the moment cancellation
+    // reaches any parent job, takeWhile never releases and the progress toast hangs forever.
+    const isTerminal = (s: string) =>
+      s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed' || s === 'Cancelled';
 
     this.processingHub.jobStatusChanged$.pipe(
       filter(msg => msg.jobId === parentJobId),
@@ -965,7 +969,11 @@ export class DocumentListComponent {
     this.clearSelection();
     this.processingHub.registerManagedJob(parentJobId);
 
-    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+    // Every terminal status, Cancelled included. Nothing cancels these bulk jobs today (only the
+    // backup-source delete flow emits Cancelled), but omitting it is a trap: the moment cancellation
+    // reaches any parent job, takeWhile never releases and the progress toast hangs forever.
+    const isTerminal = (s: string) =>
+      s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed' || s === 'Cancelled';
 
     toast.promise(
       new Promise<string>((resolve, reject) => {
@@ -1003,7 +1011,11 @@ export class DocumentListComponent {
     this.clearSelection();
     this.processingHub.registerManagedJob(parentJobId);
 
-    const isTerminal = (s: string) => s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed';
+    // Every terminal status, Cancelled included. Nothing cancels these bulk jobs today (only the
+    // backup-source delete flow emits Cancelled), but omitting it is a trap: the moment cancellation
+    // reaches any parent job, takeWhile never releases and the progress toast hangs forever.
+    const isTerminal = (s: string) =>
+      s === 'Completed' || s === 'PartiallyCompleted' || s === 'Failed' || s === 'Cancelled';
 
     toast.promise(
       new Promise<string>((resolve, reject) => {

@@ -6,10 +6,10 @@ public static class DeleteBackupScheduleEndpoint
 {
     public static void Map(RouteGroupBuilder group)
     {
-        group.MapDelete("/targets/{key}/schedule", async (
-            string key, ISender sender, CancellationToken ct) =>
+        group.MapDelete("/sources/{id:guid}/schedule", async (
+            Guid id, ISender sender, CancellationToken ct) =>
         {
-            await sender.Send(new DeleteBackupScheduleCommand(key), ct);
+            await sender.Send(new DeleteBackupScheduleCommand(id), ct);
             return Results.NoContent();
         })
         .WithName("DeleteBackupSchedule")

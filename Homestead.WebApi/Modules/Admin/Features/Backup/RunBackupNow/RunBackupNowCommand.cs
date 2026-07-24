@@ -4,7 +4,8 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.RunBackupNow;
 
 public record RunBackupNowCommand : ICommand<RunBackupNowResponse>
 {
-    public required string TargetKey { get; init; }
+    /// <summary>The <c>backup.sources</c> pairing to run.</summary>
+    public required Guid BackupSourceId { get; init; }
 
     /// <summary>Report the change set without copying, moving, or deleting anything.</summary>
     public bool DryRun { get; init; }

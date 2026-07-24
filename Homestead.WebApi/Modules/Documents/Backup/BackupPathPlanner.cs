@@ -8,11 +8,11 @@ namespace Homestead.WebApi.Modules.Documents.Backup;
 /// the layout contract is testable in isolation and identical on every run.
 /// </summary>
 /// <remarks>
-/// <para>The layout the mirror guarantees:</para>
+/// <para>The layout the mirror guarantees, under the source kind's own root folder:</para>
 /// <code>
-/// &lt;root&gt;/2024/Tax Return 2024.pdf                 ← latest version
-///        /2024/_versions/Tax Return 2024 (v1).pdf      ← superseded
-///        /_undated/Misc Receipt.pdf                    ← DocumentDate is null
+/// &lt;root&gt;/Documents/2024/Tax Return 2024.pdf                 ← latest version
+///                  /2024/_versions/Tax Return 2024 (v1).pdf      ← superseded
+///                  /_undated/Misc Receipt.pdf                    ← DocumentDate is null
 /// </code>
 /// <para>
 /// The shard is <b>document</b>-scoped, not version-scoped, so every version of a document shares one
@@ -35,10 +35,19 @@ public static class BackupPathPlanner
     /// Resolves the desired mirror path for every supplied version. Output is ordered by path so batching
     /// is deterministic across runs.
     /// </summary>
+    /// <param name="rootFolder">
+    /// The source kind's top-level folder at the target root (<c>Documents</c>). Prefixed HERE rather
+    /// than by the parent handler, because the prefix also has to be charged against the name-trimming
+    /// budget — a max-length name prefixed after the fact would overflow the target's path limit.
+    /// </param>
     public static IReadOnlyList<BackupDesiredFile> Plan(
         IEnumerable<BackupVersionSource> versions,
-        BackupTargetCapabilities capabilities)
+        BackupTargetCapabilities capabilities,
+        string rootFolder)
     {
+        // "Documents/" — length charged into every trim budget below, not just glued on at the end.
+        var rootPrefix = $"{rootFolder}/";
+
         // Trim each document's base name to fit the target BEFORE detecting collisions, because two
         // distinct long names that share a prefix trim to the SAME stem and land at the same path — a
         // silent overwrite the collision rule exists to prevent. The trim budget reserves room for the
@@ -49,7 +58,7 @@ public static class BackupPathPlanner
             .Select(group =>
             {
                 var doc = BuildDocument(group);
-                return (Doc: doc, TrimmedBase: ComputeTrimmedBase(doc, capabilities));
+                return (Doc: doc, TrimmedBase: ComputeTrimmedBase(doc, capabilities, rootPrefix.Length));
             })
             .ToList();
 
@@ -72,7 +81,7 @@ public static class BackupPathPlanner
                 ? $"{trimmedBase} ({ShortId(doc.DocumentId)})"
                 : trimmedBase;
 
-            foreach (var file in PlanDocument(doc, stem))
+            foreach (var file in PlanDocument(doc, stem, rootPrefix))
                 results.Add(file);
         }
 
@@ -102,7 +111,8 @@ public static class BackupPathPlanner
     // Composes the paths for one document from its already-trimmed, already-disambiguated stem. Does NOT
     // trim — the stem was sized in ComputeTrimmedBase to leave room for every version suffix, the widest
     // extension, and the disambiguation suffix, so appending any of them here always fits.
-    private static IEnumerable<BackupDesiredFile> PlanDocument(DocumentGroup document, string stem)
+    private static IEnumerable<BackupDesiredFile> PlanDocument(
+        DocumentGroup document, string stem, string rootPrefix)
     {
         var latestVersionNumber = document.Versions[^1].VersionNumber;
 
@@ -116,8 +126,8 @@ public static class BackupPathPlanner
                 : $"{stem}{VersionSuffix(version.VersionNumber)}{extension}";
 
             var relativePath = isLatest
-                ? $"{document.Shard}/{fileName}"
-                : $"{document.Shard}/{VersionsFolder}/{fileName}";
+                ? $"{rootPrefix}{document.Shard}/{fileName}"
+                : $"{rootPrefix}{document.Shard}/{VersionsFolder}/{fileName}";
 
             yield return new BackupDesiredFile(
                 version.VersionId,
@@ -131,7 +141,8 @@ public static class BackupPathPlanner
 
     // The trimmed base name every version of a document shares, sized so that appending the widest
     // version suffix, the widest extension, AND a possible disambiguation suffix still fits the target.
-    private static string ComputeTrimmedBase(DocumentGroup document, BackupTargetCapabilities capabilities)
+    private static string ComputeTrimmedBase(
+        DocumentGroup document, BackupTargetCapabilities capabilities, int rootPrefixLength)
     {
         var latestVersionNumber = document.Versions[^1].VersionNumber;
 
@@ -149,8 +160,10 @@ public static class BackupPathPlanner
             .DefaultIfEmpty(0)
             .Max();
 
-        // The deepest directory prefix any version of this document uses.
-        var deepestPrefix = document.Shard.Length + 1 +
+        // The deepest directory prefix any version of this document uses — including the source kind's
+        // root folder, which is part of every path this planner emits and so must be charged against the
+        // path budget rather than added on top of an already-maxed name.
+        var deepestPrefix = rootPrefixLength + document.Shard.Length + 1 +
             (document.Versions.Count > 1 ? VersionsFolder.Length + 1 : 0);
 
         // Always reserve the disambiguation suffix, whether or not this document ends up colliding: the
