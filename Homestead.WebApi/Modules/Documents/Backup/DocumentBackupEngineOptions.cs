@@ -32,8 +32,8 @@ public class DocumentBackupEngineOptions
     // --- Batching ---
     //
     // A single "back up everything" job would blow the processor's hard-coded 5-minute per-job timeout on
-    // first run and starve the queue behind it (MaxConcurrency defaults to 1). The planner therefore fans
-    // out fixed-size children; these are the caps.
+    // first run and hold a worker permit the whole time (the shipped MaxConcurrency is 4), starving
+    // everything queued behind it. The planner therefore fans out fixed-size children; these are the caps.
 
     /// <summary>Max file copies per child batch.</summary>
     public int MaxFilesPerBatch { get; set; } = 100;

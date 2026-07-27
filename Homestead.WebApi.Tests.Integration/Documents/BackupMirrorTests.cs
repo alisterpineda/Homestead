@@ -38,6 +38,13 @@ public class BackupMirrorTests : IntegrationTestBase
             : [];
 
     /// <summary>
+    /// The bytes at one mirror-relative path. Paths alone are not enough for anything about ordering: an
+    /// inverted Move/Put leaves both names present and only the CONTENT under each one wrong.
+    /// </summary>
+    private Task<byte[]> MirrorBytesAsync(string relativePath) => File.ReadAllBytesAsync(
+        Path.Combine(MirrorRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)), CT);
+
+    /// <summary>
     /// Creates the "mirror Documents to local" pairing every test in this class runs against. Respawn
     /// wipes it between tests, so it is bootstrapped per test rather than once.
     /// </summary>
@@ -286,6 +293,11 @@ public class BackupMirrorTests : IntegrationTestBase
             MirrorFiles());
     }
 
+    // The canonical Move-before-Put shape, and the one that used to corrupt the mirror: v1 moves out of
+    // Growing.pdf while v2 is put into it. Paths alone cannot see the bug — a Put that lands before its
+    // Move leaves BOTH names present and only the CONTENT wrong, with both state rows recording the paths
+    // the planner intended, so the next run diffs them as unchanged and never repairs it. Hence the byte
+    // assertions: they are the regression guard for the stage ordering, not decoration.
     [Fact]
     public async Task AddingAVersion_DemotesTheOldLatestIntoTheVersionsFolder()
     {
@@ -299,12 +311,59 @@ public class BackupMirrorTests : IntegrationTestBase
         await RunBackupExpectingSuccessAsync(client, sourceId);
         Assert.Equal([$"{Root}/2025/Growing.pdf"], MirrorFiles());
 
+        var v1Bytes = await MirrorBytesAsync($"{Root}/2025/Growing.pdf");
+
         await AddVersionAndWaitAsync(client, docId);
         await RunBackupExpectingSuccessAsync(client, sourceId);
 
         Assert.Equal(
             [$"{Root}/2025/Growing.pdf", $"{Root}/2025/_versions/Growing (v1).pdf"],
             MirrorFiles());
+        Assert.Equal(2, await StateRowCountAsync(sourceId));
+
+        // v1's bytes followed the move into _versions; the latest name holds the NEW version, not a second
+        // copy of the old one and not the new bytes sitting under the old name.
+        Assert.Equal(v1Bytes, await MirrorBytesAsync($"{Root}/2025/_versions/Growing (v1).pdf"));
+        Assert.NotEqual(v1Bytes, await MirrorBytesAsync($"{Root}/2025/Growing.pdf"));
+    }
+
+    // Two documents trading names is a CYCLE in the move graph — each one's destination is the other's
+    // source — and no ordering scheme resolves a cycle; only the plan can. The planner breaks it by
+    // downgrading one member into a Delete + a fresh Put, which the stage order then sequences: free the
+    // path, move the survivor into it, re-copy the downgraded one. Asserting bytes rather than paths is
+    // the whole point — a broken cycle leaves both names present with the contents swapped the wrong way.
+    [Fact]
+    public async Task SwappingTwoDocumentNames_ConvergesWithTheRightBytesUnderEachName()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        var alpha = await UploadAndWaitAsync(client, "alpha.pdf");
+        await RenameDocumentAsync(alpha, "Alpha");
+        await SetDocumentDateAsync(alpha, new DateOnly(2025, 1, 1));
+
+        var beta = await UploadAndWaitAsync(client, "beta.pdf");
+        await RenameDocumentAsync(beta, "Beta");
+        await SetDocumentDateAsync(beta, new DateOnly(2025, 1, 1));
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+        Assert.Equal([$"{Root}/2025/Alpha.pdf", $"{Root}/2025/Beta.pdf"], MirrorFiles());
+
+        var alphaBytes = await MirrorBytesAsync($"{Root}/2025/Alpha.pdf");
+        var betaBytes = await MirrorBytesAsync($"{Root}/2025/Beta.pdf");
+        Assert.NotEqual(alphaBytes, betaBytes);
+
+        await RenameDocumentAsync(alpha, "Beta");
+        await RenameDocumentAsync(beta, "Alpha");
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        Assert.Equal([$"{Root}/2025/Alpha.pdf", $"{Root}/2025/Beta.pdf"], MirrorFiles());
+        Assert.Equal(alphaBytes, await MirrorBytesAsync($"{Root}/2025/Beta.pdf"));
+        Assert.Equal(betaBytes, await MirrorBytesAsync($"{Root}/2025/Alpha.pdf"));
+
+        // The cycle-break Delete drops one state row and its paired Put writes it back, so the mirror is
+        // still fully accounted for.
         Assert.Equal(2, await StateRowCountAsync(sourceId));
     }
 

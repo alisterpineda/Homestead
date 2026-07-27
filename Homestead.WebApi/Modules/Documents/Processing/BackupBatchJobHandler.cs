@@ -580,10 +580,13 @@ public class BackupBatchJobHandler(
     /// already terminal) the update matches zero rows and no orphan child is inserted.
     /// </para>
     /// <para>
-    /// The continuation carries the <b>same priority</b> as its predecessor rather than a lower one. Claim
-    /// order is priority then CreatedAt, so an equal priority keeps it directly behind the batch it came
-    /// from and — crucially — still ahead of the run's final prune batch, which sits at the lowest
-    /// priority of all.
+    /// The continuation carries the <b>same priority</b> as its predecessor rather than a lower one, which
+    /// under the sibling happens-before rule is exactly right: priority encodes the pipeline STAGE, and a
+    /// continuation belongs to the same stage as the batch it came from. Equal priority imposes no edge,
+    /// so it stays non-blocking against its own stage's other batches — while still blocking every later
+    /// stage, including the run's final prune batch, which sits at the lowest priority of all. A LOWER
+    /// priority would be wrong twice over: it would claim to be a later stage, and it would make the
+    /// continuation cancellable by an unrelated failure in a peer batch of its own stage.
     /// </para>
     /// <para>
     /// An explicit transaction is legal here because a job scope is outside the command pipeline: the

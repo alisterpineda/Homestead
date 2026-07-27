@@ -276,7 +276,12 @@ Job topology is exactly two levels: a `BackupToTarget` planner that diffs stored
 rows (pure database), fanning out to `BackupBatch` children that do all the streaming, hashing, and
 writing. This is what keeps the planner inside the processor's hard-coded 5-minute per-job timeout on a
 library of any size. Children run at negative priority so uploads and classification preempt the mirror
-between batches. See [processing/overview.md](../processing/overview.md) for the job catalog.
+between batches, and that priority also **encodes the batch's pipeline stage** — `Delete`, then `Move`,
+then `Put`, then `Prune`, each one step lower. Among one parent's children the queue treats a strictly
+higher priority as a happens-before edge (it will not claim a job while a higher-priority sibling is
+outstanding, and a failure cancels the siblings below it), so the plan's stage ordering is enforced
+rather than merely hoped for. Batches within a stage share a priority and stay concurrent. See
+[processing/overview.md](../processing/overview.md) for the job catalog.
 
 ### Paths are resolved once, by the planner
 
@@ -516,7 +521,11 @@ unchanged — trash-not-delete is defense in depth under the breaker, not a repl
 each delete/move; on Drive, an inline emptiness check races the eventually-consistent listing against
 the same run's own moves — a folder could be trashed with a just-arrived file inside it, whose state
 row would still read "mirrored" (a silent hole the planner never re-plans). The prune pass therefore
-runs **after every mutation batch in the run has completed**, is trash-only and best-effort, and
+runs **after every mutation batch in the run has completed** — and that is now an enforced barrier, not
+a convention. The sweep is tagged with the lowest stage, so it takes the lowest priority of any child in
+the run, and the queue will not claim a child while a higher-priority sibling is still `Pending` or
+`InProgress`. A continuation batch inherits its predecessor's priority rather than dropping below it, so
+it too still sits above the sweep. The pass is trash-only and best-effort, and
 walks up to the kind root exactly as the local rule does. Residual risk, accepted: a user file stored
 inside the managed tree is invisible to the emptiness check and goes to the trash with a pruned
 folder — recoverable, and the root folder's copy warns against doing this.

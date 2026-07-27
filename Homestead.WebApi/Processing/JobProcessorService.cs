@@ -76,6 +76,11 @@ public class JobProcessorService(
         {
             while (true)
             {
+                // Pruned every pass, not only when the claim comes back empty: a long drain dispatches one
+                // task per job, and a list that only ever grows would make the WhenAny below — and the
+                // WhenAll in the finally — walk every job the drain has ever started.
+                activeTasks.RemoveAll(t => t.IsCompleted);
+
                 await _processingGate.WaitAsync(ct);
 
                 Guid? jobId;
@@ -92,7 +97,23 @@ public class JobProcessorService(
                 if (jobId is null)
                 {
                     _processingGate.Release();
-                    break;
+
+                    // Null no longer means "the queue is empty" — it is also the normal state at a stage
+                    // boundary, where every remaining sibling is blocked behind one that is still running.
+                    // Exiting here would make the `finally` await EVERY dispatched task before the loop
+                    // could re-drain, so an upload arriving mid-run would wait out the longest in-flight
+                    // backup batch instead of preempting at the next freed permit. Wait for the FIRST task
+                    // instead and re-try the claim.
+                    //
+                    // Nothing can be stranded by this: if nothing is in flight and a job is still blocked,
+                    // its blocker is Pending, and following that chain upward always bottoms out at a
+                    // claimable job. WhenAny is safe because dispatched tasks never throw — ProcessJobAsync
+                    // catches everything.
+                    if (activeTasks.Count == 0)
+                        break;
+
+                    await Task.WhenAny(activeTasks);
+                    continue;
                 }
 
                 var capturedJobId = jobId.Value;
@@ -144,9 +165,14 @@ public class JobProcessorService(
     }
 
     /// <summary>
-    /// Finds the highest-priority pending job and atomically claims it.
-    /// Returns the claimed job ID, or null if the queue is empty.
+    /// Finds the highest-priority claimable pending job and atomically claims it.
+    /// Returns the claimed job ID, or null if nothing is currently claimable.
     /// </summary>
+    /// <remarks>
+    /// Among ONE parent's children, a strictly higher <c>Priority</c> means <b>runs before</b>, not merely
+    /// "claimed sooner" — a happens-before edge the queue enforces. Equal priority imposes no edge, so an
+    /// ordinary flat fan-out (every child at the default 0) is unaffected and still runs fully concurrent.
+    /// </remarks>
     private async Task<Guid?> TryClaimNextJobAsync(CancellationToken ct)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -156,6 +182,16 @@ public class JobProcessorService(
         {
             var nextJobId = await db.ProcessingJobs
                 .Where(j => j.Status == ProcessingJobStatus.Pending)
+                // Blocked-sibling predicate: a child waits while any sibling above it has yet to terminate.
+                //
+                // The `j.ParentJobId == null` guard is LOAD-BEARING and must not be simplified away. EF
+                // Core's default C# null-semantics compensation expands `s.ParentJobId == j.ParentJobId`
+                // with an `IS NULL AND IS NULL` arm, so without the guard every ROOT job would land in one
+                // giant sibling group and a single high-priority root job would serialize the whole queue.
+                .Where(j => j.ParentJobId == null || !db.ProcessingJobs.Any(s =>
+                    s.ParentJobId == j.ParentJobId &&
+                    s.Priority > j.Priority &&
+                    (s.Status == ProcessingJobStatus.Pending || s.Status == ProcessingJobStatus.InProgress)))
                 .OrderByDescending(j => j.Priority)
                 .ThenBy(j => j.CreatedAt)
                 .Select(j => (Guid?)j.Id)
@@ -164,6 +200,9 @@ public class JobProcessorService(
             if (nextJobId is null)
                 return null;
 
+            // No need to re-assert the blocked-sibling predicate inside the UPDATE: it is monotone in the
+            // safe direction, because a blocked job can only ever become unblocked. The one path that
+            // restores a job to Pending, RecoverOrphanedJobsAsync, runs once before this loop ever starts.
             var claimed = await db.ProcessingJobs
                 .Where(j => j.Id == nextJobId.Value && j.Status == ProcessingJobStatus.Pending)
                 .ExecuteUpdateAsync(s => s
@@ -190,6 +229,9 @@ public class JobProcessorService(
             var handler = handlers.FirstOrDefault(h => h.Type == job.Type);
             if (handler is null)
             {
+                // Known gap, left alone: this fails the job without touching its parent at all — no
+                // progress update and no dependent-sibling cancellation. Unreachable in practice, since a
+                // job type with no registered handler cannot have been enqueued by this build.
                 logger.LogError("No handler registered for job type {JobType}", job.Type);
                 job.Status = ProcessingJobStatus.Failed;
                 job.Error = $"No handler registered for job type '{job.Type}'";
@@ -246,10 +288,7 @@ public class JobProcessorService(
                 var failedJob = await errorDb.ProcessingJobs.FirstOrDefaultAsync(j => j.Id == jobId, ct);
                 if (failedJob is not null)
                 {
-                    failedJob.Status = ProcessingJobStatus.Failed;
-                    failedJob.Error = ex.Message;
-                    failedJob.CompletedAt = DateTimeOffset.UtcNow;
-                    await errorDb.SaveChangesAsync(ct);
+                    var cancelledSiblings = await FailAndCancelDependentsAsync(errorDb, failedJob, ex);
 
                     string? errorCode = null;
                     Dictionary<string, string>? errorData = null;
@@ -268,7 +307,14 @@ public class JobProcessorService(
                         errorCode: errorCode, errorData: errorData);
 
                     if (failedJob.ParentJobId is not null)
+                    {
+                        if (cancelledSiblings > 0)
+                            logger.LogWarning(
+                                "Job {JobId} failed and cancelled {Count} dependent sibling(s) at lower priority",
+                                failedJob.Id, cancelledSiblings);
+
                         await UpdateParentProgressAsync(errorDb, failedJob.ParentJobId.Value, errorScope.ServiceProvider, ct);
+                    }
                 }
             }
             catch (Exception innerEx)
@@ -278,13 +324,98 @@ public class JobProcessorService(
         }
     }
 
+    /// <summary>
+    /// Marks the job Failed and, in the same transaction, cancels the pending siblings that depended on
+    /// it — the ones at strictly lower priority under the same parent. Returns how many were cancelled.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The transaction is load-bearing, not decoration. Until it commits, other connections still see the
+    /// failed job as <c>InProgress</c>, so the claim predicate keeps its lower-priority siblings
+    /// unclaimable; after it commits they are <c>Cancelled</c>. There is no window in which a dependent
+    /// sibling can be claimed — precisely the failure-then-crash window that would otherwise let a Put run
+    /// after the Move it depended on had failed, aliasing two state rows onto one path.
+    /// </para>
+    /// <para>
+    /// If the transaction never commits, the child stays <c>InProgress</c>, the startup sweep re-pends it
+    /// (children carry <c>TotalChildCount == 0</c>) and it re-runs idempotently.
+    /// </para>
+    /// <para>
+    /// <c>TotalChildCount</c> is DECREMENTED by the cancelled count rather than the tally being taught
+    /// about Cancelled: it already means "children still expected to terminate", which is exactly what
+    /// <c>EnqueueContinuationAsync</c> assumes when it increments. That keeps one code path for parent
+    /// finalization — a cancelled child would otherwise leave <c>finishedCount &lt; TotalChildCount</c>
+    /// forever and the parent would never finalize.
+    /// </para>
+    /// <para>
+    /// An explicit <c>BeginTransactionAsync</c> is legal here because a job scope sits outside the command
+    /// pipeline: the transaction interceptors are scope-gated off and EF execution-strategy retries are
+    /// disabled. <c>CancellationToken.None</c> throughout — once the failure bookkeeping starts it must
+    /// finish, and the caller's token may already be cancelled by shutdown.
+    /// </para>
+    /// </remarks>
+    private static async Task<int> FailAndCancelDependentsAsync(
+        AppDbContext db, ProcessingJob failedJob, Exception ex)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        await using var tx = await db.Database.BeginTransactionAsync(CancellationToken.None);
+
+        failedJob.Status = ProcessingJobStatus.Failed;
+        failedJob.Error = ex.Message;
+        failedJob.CompletedAt = now;
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var cancelled = 0;
+
+        if (failedJob.ParentJobId is { } parentId)
+        {
+            var failedPriority = failedJob.Priority;
+
+            // Equal-priority siblings are untouched, so an ordinary flat fan-out (bulk classify, bulk
+            // reprocess — every child at 0) is byte-identical to before and PartiallyCompleted stays a
+            // first-class outcome.
+            //
+            // Error is stamped alongside the status: a bare Cancelled row is indistinguishable from one
+            // torn down by the delete flow, and the admin looking at a red run needs to see that this
+            // batch never ran BECAUSE of the one above it, not on its own account.
+            var reason = $"Cancelled: a higher-priority sibling job failed ({failedJob.Id}).";
+
+            cancelled = await db.ProcessingJobs
+                .Where(j => j.ParentJobId == parentId &&
+                            j.Status == ProcessingJobStatus.Pending &&
+                            j.Priority < failedPriority)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(j => j.Status, ProcessingJobStatus.Cancelled)
+                    .SetProperty(j => j.Error, reason)
+                    .SetProperty(j => j.CompletedAt, now), CancellationToken.None);
+
+            if (cancelled > 0)
+                await db.ProcessingJobs
+                    .Where(j => j.Id == parentId && j.Status == ProcessingJobStatus.InProgress)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(j => j.TotalChildCount, j => j.TotalChildCount - cancelled),
+                        CancellationToken.None);
+        }
+
+        await tx.CommitAsync(CancellationToken.None);
+
+        return cancelled;
+    }
+
     // Counts Completed and Failed children ONLY, and both writes below are guarded on the parent still
-    // being InProgress. Do not "fix" the tally to include Cancelled: cancellation (the backup source
-    // delete flow) flips the parent and every Pending child in ONE transaction, so a still-InProgress
-    // parent never has Cancelled children. What CAN happen is the reverse — an already-InProgress child
-    // completes after its parent was cancelled — and the InProgress guards make that a natural no-op,
-    // leaving the Cancelled parent alone and sending no notification. Counting Cancelled children would
-    // instead let that straggler drive the cancelled parent to a terminal Completed/Failed.
+    // being InProgress. Do not "fix" the tally to include Cancelled — there are two producers of a
+    // Cancelled child and neither wants one:
+    //   • The backup source delete flow flips the parent and every Pending child in ONE transaction, so a
+    //     still-InProgress parent never has Cancelled children. What CAN happen is the reverse — an
+    //     already-InProgress child completes after its parent was cancelled — and the InProgress guards
+    //     make that a natural no-op, leaving the Cancelled parent alone and sending no notification.
+    //     Counting Cancelled children would instead let that straggler drive the cancelled parent to a
+    //     terminal Completed/Failed.
+    //   • FailAndCancelDependentsAsync cancels a failed child's lower-priority siblings, and in the SAME
+    //     transaction decrements the parent's TotalChildCount by exactly that many. The expectation drops
+    //     instead of the tally growing, so this method needs no knowledge of it: finishedCount still
+    //     reaches TotalChildCount and the parent finalizes, normally as Failed or PartiallyCompleted.
     private static async Task UpdateParentProgressAsync(
         AppDbContext db, Guid parentJobId, IServiceProvider sp, CancellationToken ct)
     {

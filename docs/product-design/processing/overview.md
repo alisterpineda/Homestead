@@ -89,7 +89,8 @@ Pending ──┬─► InProgress ──► Completed
           │                  Failed
           │                  PartiallyCompleted   (parent jobs only)
           │
-          ├─► Cancelled                           (out-of-band, never by the processor)
+          ├─► Cancelled                           (torn down out-of-band, or cancelled by a
+          │                                        higher-priority sibling's failure)
           │
           └─► (recovered to Pending at startup if InProgress with no children)
 ```
@@ -99,11 +100,13 @@ Pending ──┬─► InProgress ──► Completed
 - **Completed** — terminal success. For non-parent jobs, the handler returned without throwing. For parent jobs, every child completed successfully.
 - **Failed** — terminal failure. For non-parent jobs, the handler threw. For parent jobs, every child failed.
 - **PartiallyCompleted** — terminal. **Parent jobs only.** Some children completed, some failed.
-- **Cancelled** — terminal, and the one status the processor never produces. It is written **out of band** by a caller tearing down the thing a run belongs to; today the only such caller is deleting a backup source (see [documents/backup.md](../documents/backup.md#deleting-a-backup)), which flips the parent and its still-`Pending` children in one transaction.
+- **Cancelled** — terminal. Two producers. The first is **out of band**: a caller tearing down the thing a run belongs to, today only deleting a backup source (see [documents/backup.md](../documents/backup.md#deleting-a-backup)), which flips the parent and its still-`Pending` children in one transaction. The second is the **processor itself**: when a child fails, it cancels that parent's still-`Pending` children at *strictly lower* priority — the siblings whose happens-before edge said they depended on it (see *Sibling ordering* below). Both write in one transaction, and neither ever cancels a job that is already `InProgress`.
 
 A non-parent job will never enter `PartiallyCompleted`. A parent job that successfully spawned zero children would terminate as `Completed` immediately on the next progress update, since `0 finished ≥ 0 total` and `failed == 0`.
 
 **Cancellation stops what has not started, not what is running.** The claim query picks only `Pending` rows, so a cancelled job is never picked up — but a job already inside its handler is untouched, which is why the delete flow refuses (409) rather than cancelling while a batch is mid-flight. `UpdateParentProgressAsync` tallies only `Completed` and `Failed`, and both of its writes are guarded on the parent still being `InProgress`, so a straggler child completing under a cancelled parent is a natural no-op: it leaves the parent `Cancelled`, its counters untouched, and sends no notification.
+
+**A cancelled child lowers the expectation rather than raising the tally.** When the processor cancels dependent siblings it decrements the parent's `TotalChildCount` by exactly the number cancelled, in the same transaction. `TotalChildCount` means *"children still expected to terminate"*, not *"children created"* — which is the same reading `BackupBatch` already relies on when a continuation batch **increments** it. So the parent still finalizes on `finished ≥ total` with one code path and no knowledge of cancellation.
 
 `CompletedAt` is set on every terminal transition (success or failure). `StartedAt` is set when the job is claimed, regardless of outcome. Recovered jobs (see *Crash recovery*) have their `StartedAt` cleared when transitioned back to `Pending`.
 
@@ -113,14 +116,15 @@ The worker is a single `BackgroundService` (`JobProcessorService`) that also imp
 
 1. **At startup**, sweep orphaned jobs (see *Crash recovery*).
 2. **Wait** for either a wake-up signal or a 30-second poll timeout.
-3. **Drain pending jobs**: while there is at least one available worker permit and at least one Pending job, atomically claim the highest-priority oldest one and dispatch the handler on a background `Task`.
+3. **Drain pending jobs**: while there is at least one available worker permit and at least one *claimable* Pending job, atomically claim the highest-priority oldest one and dispatch the handler on a background `Task`. When nothing is claimable but work is still in flight — the normal state at a backup stage boundary, where every remaining sibling is blocked behind one still running — the loop waits for the **first** dispatched task to finish and re-tries the claim, rather than exiting and having to await them all. That is what keeps an upload arriving mid-run preempting at the next freed permit instead of waiting out the longest batch.
 4. **Loop.**
 
 A few details that matter:
 
 - **Atomic claim.** The claim is a `WHERE Status = Pending` `ExecuteUpdateAsync` that flips the row to `InProgress` and stamps `StartedAt`. If another path stole it, the update affects 0 rows and the loop tries the next candidate. This is what makes concurrent dispatch safe.
 - **Ordering.** Highest `Priority` first (descending), with `CreatedAt` as a stable FIFO tiebreaker. The default priority is `0` — anything higher jumps the queue.
-- **Bounded concurrency.** A `SemaphoreSlim` of size `JobProcessingOptions.MaxConcurrency` (default `1`) gates dispatch. The default of 1 keeps text-extraction and disk-bound work serialized; raising it is a deliberate, deployment-level choice.
+- **Sibling ordering is a happens-before edge, not a hint.** Among the children of **one** parent, a strictly higher `Priority` means **runs before**: a child is not claimable while any sibling above it is still `Pending` or `InProgress`, and if one of them *fails*, its lower-priority siblings are cancelled outright rather than run against a precondition that never held. Equal priority imposes no edge at all, so an ordinary flat fan-out — every child at the default `0` — is completely unaffected and stays fully concurrent. Two guards make this narrow: the predicate applies only within a parent (root jobs never block each other, whatever their priorities), and only *strictly* higher priorities block. **A new fan-out handler that gives its children differing priorities is opting into serialization between those levels**, so it has to mean it; today only the backup mirror does, where the priority encodes the pipeline stage.
+- **Bounded concurrency.** A `SemaphoreSlim` of size `JobProcessingOptions.MaxConcurrency` gates dispatch. The shipped `appsettings.json` value is **4**. The code default when the key is absent is 1, but nothing runs on that default — reason about the queue as concurrent, because it is. (The gap between the two is where a real ordering bug lived: the backup planner's Delete → Move → Put sequence was expressed as claim order alone and silently corrupted the mirror once adjacent batches overlapped. The happens-before rule above is the fix, and it holds at any concurrency.)
 - **Wake-up channel.** `JobQueue.EnqueueAsync` calls `IJobSignal.Signal()` after committing the row, which releases a permit on a `SemaphoreSlim(0)` the worker awaits. This makes the queue *latency-free for the common case* without polling. The 30-second poll exists as a safety net.
 - **Per-job timeout.** Each handler runs against a linked `CancellationTokenSource` that cancels after 5 minutes. A timed-out job throws `TimeoutException` and lands in `Failed`. The application shutdown token also propagates — but a graceful shutdown awaits dispatched tasks before returning.
 - **Handler resolution.** Handlers are auto-registered as scoped `IJobHandler` instances by assembly scan (`ProcessingServiceExtensions`). A job's `Type` is matched to the first handler with `handler.Type == job.Type`. Missing handler ⇒ the job lands in `Failed` with a "no handler registered" error and never blocks the queue.
@@ -198,7 +202,7 @@ This exists for **tests and for any future operation that needs the queue quiesc
 
 Most v1 domain job types are initiated by the Documents module, with handlers under `Modules/Documents/Processing/`; Finances contributes `ImportCommodityPrices`, with its handler under `Modules/Finances/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
 
-A note on the two hard constraints that shape any new fan-out: the **per-job timeout** is 5 minutes by default (`JobProcessingOptions.JobTimeout` — deployment config, not a runtime knob), and `MaxConcurrency` defaults to **1**, so a long job does not merely risk timing out — it blocks every upload behind it. Work whose size scales with the library (the backup mirror is the canonical case) must therefore split into fixed-size batches at low priority, with the parent doing only the DB-bound planning. See `BackupToTarget` / `BackupBatch` below.
+A note on the two hard constraints that shape any new fan-out: the **per-job timeout** is 5 minutes by default (`JobProcessingOptions.JobTimeout` — deployment config, not a runtime knob), and `MaxConcurrency` ships at **4** (`appsettings.json`), so a long job risks both timing out *and* occupying a quarter of the worker pool while everything else queues behind it. Work whose size scales with the library (the backup mirror is the canonical case) must therefore split into fixed-size batches at low priority, with the parent doing only the DB-bound planning. See `BackupToTarget` / `BackupBatch` below.
 
 A handler may also *read* the timeout and pace itself against it. `BackupBatch` does: it stops starting new work with a safety margin left, persists what finished, and enqueues a continuation batch under the same parent before completing successfully — turning the timeout from a failure mode into a pacing device for work bounded by a slow uplink rather than by the database. That is why the value is bound options rather than a constant: a handler computing its own margin against a hard-coded 5 minutes would silently drift the moment the real timeout changed.
 
@@ -304,7 +308,8 @@ never disagree with the pairing it names. The handler:
 5. Project every version in the instance — *including* versions of trashed documents — and diff the
    stored `FileHash` against this source's state rows. Latch the delete circuit breaker if it trips.
 6. Dry run: stage the change-set summary into `Result` and spawn **zero** children (the processor
-   terminates a childless parent as `Completed`). Otherwise insert one `BackupBatch` child per batch.
+   terminates a childless parent as `Completed`). Otherwise insert one `BackupBatch` child per batch, at
+   a priority keyed to the batch's **stage** (`ChildBasePriority - (int)stage`).
 
 A skip stages its reason into `Result` and spawns zero children, so it lands as `Completed` with an
 explanation rather than as a red row on a still-armed schedule.
@@ -331,10 +336,21 @@ yields `PartiallyCompleted` at the parent instead of costing the other ninety-ni
 Suppresses its own success notification as a child.
 
 **Why the fan-out exists:** a single "back up everything" job would blow the 5-minute timeout on the
-first run of any real library and starve the queue behind it (`MaxConcurrency` defaults to 1). Batches
-are enqueued at **negative** priority, descending by batch index — negative so uploads and classification
-preempt the mirror between batches, descending so the claim order preserves the planner's
-delete-then-move-then-put ordering (deletes free the paths that later moves and puts reuse).
+first run of any real library and occupy a worker permit the whole time, starving everything behind it.
+Batches are enqueued at **negative** priority — so uploads and classification preempt the mirror between
+batches — keyed to the batch's **stage**, not its index: `Delete = 0`, `Move = 1`, `Put = 2`, `Prune = 3`,
+each one step lower than the last.
+
+That is not a cosmetic relabelling. Stage is the plan's dependency structure, and the sibling
+happens-before rule turns it into a guarantee: every delete completes before any move starts, every move
+before any put, every mutation before the folder sweep. Batches *within* a stage share a priority and so
+still run concurrently, which is sound because same-stage batches are independent by construction —
+deletes only free paths and each path is deleted once; puts only occupy paths and desired paths are
+unique per version; and moves, the one kind that does both, are chained by the planner so that
+conflicting moves land in the **same** batch. A gap in the sequence when a stage is empty is harmless.
+And because a failure cancels lower-priority siblings, a failed move batch can no longer be followed by
+the put batch that assumed it had happened. A continuation batch inherits its predecessor's priority
+rather than dropping below it — it belongs to the same stage.
 
 See [documents/backup.md](../documents/backup.md) for the product-level contract.
 
@@ -360,9 +376,11 @@ A failed job stays failed. The user sees the failure message in real time and de
 
 Success notifications come from the handler because only the handler knows when "user-visible done" has happened (e.g., after the DB commit but before optional thumbnail generation). Failure notifications come from the processor because by the time it has caught an exception, the handler is no longer in a position to publish a coherent message. Structured error data (`IStructuredJobError`) bridges the gap so the processor's catch block can still surface domain-specific detail.
 
-### Parent jobs are flat fan-out, not a workflow engine
+### Parent jobs are flat fan-out — independent *at equal priority*
 
-The hierarchy supports exactly one shape: a parent that creates N independent children at once and waits for them all. There is no chain-of-jobs, no DAG, no conditional next-step. If a future feature needs that, it should be built explicitly on top of the queue (a state machine in a domain handler), not by extending the hierarchy depth.
+The hierarchy supports exactly one shape: a parent that creates N children at once and waits for them all. There is no chain-of-jobs, no DAG, no conditional next-step, and the hierarchy is still exactly one level deep. If a future feature needs a real workflow, it should be built explicitly on top of the queue (a state machine in a domain handler), not by extending the hierarchy depth.
+
+The one refinement: children are independent **at equal priority**. Differing sibling priorities express a linear happens-before ordering — higher runs first, and a failure at one level cancels the levels below it. That is a *sequence of concurrent stages*, not a DAG: there is no way to say "C waits on A but not on B". It exists because the backup mirror's plan genuinely has that shape (delete, then move, then put, then prune) and expressing it as claim-order-only was silently corrupting the mirror. Every other fan-out leaves its children at the default `0` and behaves exactly as before. **If you need per-child dependencies rather than per-stage ones, that is the state machine — not more priority levels.**
 
 ### The audit attribution rule
 

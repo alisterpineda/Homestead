@@ -195,25 +195,49 @@ public class BackupToTargetJobHandlerTests : IDisposable
             $"{DocumentsBackupSourceDescriptor.RootFolderName}/", a.RelativePath));
     }
 
-    // Negative so uploads and classification preempt the mirror, and descending by index so the worker
-    // claims batches in the Delete → Move → Put order the plan builder emitted them in.
+    // Negative so uploads and classification preempt the mirror, and keyed to the STAGE rather than to the
+    // batch's position in the list. Batches sharing a stage share a priority and stay concurrent; a lower
+    // stage sits strictly above a higher one, which the processor's claim predicate turns into a real
+    // happens-before edge. This run has one delete batch and three put batches, so the move stage's
+    // priority is simply skipped — a gap, and harmless.
     [Fact]
-    public async Task HandleAsync_EnqueuesChildrenAtDescendingNegativePriority()
+    public async Task HandleAsync_EnqueuesChildrenAtStageKeyedNegativePriority()
     {
         var ct = TestContext.Current.CancellationToken;
         _options.MaxFilesPerBatch = 1;
         SeedDocument("A", new DateOnly(2025, 1, 1), versionCount: 3);
+        SeedMirroredState(1);
+        _db.SaveChanges();
+
         var job = CreateJob();
 
         await _sut.HandleAsync(job, ct);
 
-        var priorities = (await ChildrenOf(job, ct)).Select(c => c.Priority).OrderByDescending(p => p).ToList();
-        Assert.All(priorities, p => Assert.True(p < 0, $"priority {p} was not negative"));
+        var children = await ChildrenOf(job, ct);
+        Assert.Equal(4, children.Count);
+        Assert.All(children, c => Assert.True(c.Priority < 0, $"priority {c.Priority} was not negative"));
+
+        var byPriority = children
+            .GroupBy(c => c.Priority)
+            .OrderByDescending(g => g.Key)
+            .ToList();
+
         Assert.Equal(
-            [BackupToTargetJobHandler.ChildBasePriority,
-             BackupToTargetJobHandler.ChildBasePriority - 1,
-             BackupToTargetJobHandler.ChildBasePriority - 2],
-            priorities);
+            [BackupToTargetJobHandler.ChildBasePriority - (int)BackupStage.Delete,
+             BackupToTargetJobHandler.ChildBasePriority - (int)BackupStage.Put],
+            byPriority.Select(g => g.Key));
+
+        // One delete batch above three put batches, and the three share one priority.
+        Assert.Equal([1, 3], byPriority.Select(g => g.Count()));
+
+        var kindsByPriority = byPriority
+            .Select(g => g.SelectMany(c => c.GetPayload<BackupBatchPayload>()!.Actions)
+                .Select(a => a.Kind)
+                .Distinct()
+                .Single())
+            .ToList();
+
+        Assert.Equal([BackupActionKind.Delete, BackupActionKind.Put], kindsByPriority);
     }
 
     [Fact]
@@ -701,8 +725,9 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.DoesNotContain(actions, a => a.Kind == BackupActionKind.PruneFolder);
     }
 
-    // Appended last, so it takes the lowest child priority and therefore claims after every mutation
-    // batch in the run — which is the entire reason the sweep is a batch rather than an inline step.
+    // Tagged with the lowest stage, so it takes the lowest child priority and therefore cannot start until
+    // every mutation batch in the run has terminated — the entire reason the sweep is a batch rather than
+    // an inline step, and now an enforced barrier rather than a convention.
     [Fact]
     public async Task ADeferredPruneTarget_GetsAFinalLowestPriorityPruneBatch()
     {
@@ -721,7 +746,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.All(actions, a => Assert.Equal(BackupActionKind.PruneFolder, a.Kind));
         Assert.Equal("Documents/2019", Assert.Single(actions).RelativePath);
 
-        // Lowest priority of all its siblings: it claims after every mutation batch.
+        // Lowest priority of all its siblings: the queue holds it until every mutation batch is done.
         Assert.Equal(children.Min(c => c.Priority), last.Priority);
         Assert.Equal(children.Count, job.TotalChildCount);
     }

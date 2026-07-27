@@ -396,4 +396,207 @@ public class BackupPlanBuilderTests
 
         Assert.Empty(plan.Batches);
     }
+
+    // --- Stages and move ordering ---
+
+    // Stage is the ordering contract at the type level. BackupToTargetJobHandler maps it onto child job
+    // priority, and the processor turns a strictly higher sibling priority into a happens-before edge —
+    // so a batch's stage, not its position in the list, is what actually orders the run.
+    [Fact]
+    public void EveryBatchCarriesTheStageMatchingItsActions()
+    {
+        var movedVersion = Guid.NewGuid();
+        var goneVersion = Guid.NewGuid();
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(movedVersion, "2026/Moved.pdf"),
+                Desired(Guid.NewGuid(), "2026/New.pdf"),
+            ],
+            [
+                State(movedVersion, "2025/Moved.pdf"),
+                State(goneVersion, "2025/Gone.pdf"),
+            ],
+            Options(), Caps(Options()), allowLargePrune: false);
+
+        Assert.Equal(
+            [BackupStage.Delete, BackupStage.Move, BackupStage.Put],
+            plan.Batches.Select(b => b.Stage));
+
+        Assert.All(plan.Batches, b => Assert.All(b.Actions, a => Assert.Equal(
+            b.Stage switch
+            {
+                BackupStage.Delete => BackupActionKind.Delete,
+                BackupStage.Move => BackupActionKind.Move,
+                _ => BackupActionKind.Put,
+            },
+            a.Kind)));
+    }
+
+    // Within the move stage the constraint is per-path: whatever VACATES a path runs before whatever FILLS
+    // it. With A→B and B→C that means B→C first, or the A→B lands on a path B still occupies.
+    [Fact]
+    public void AMoveChain_IsEmittedVacateBeforeFill()
+    {
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(first, "2025/B.pdf"),
+                Desired(second, "2025/C.pdf"),
+            ],
+            [
+                State(first, "2025/A.pdf"),
+                State(second, "2025/B.pdf"),
+            ],
+            Options(), Caps(Options()), allowLargePrune: false);
+
+        var moves = Actions(plan);
+        Assert.Equal(2, moves.Count);
+        Assert.All(moves, m => Assert.Equal(BackupActionKind.Move, m.Kind));
+        Assert.Equal(["2025/B.pdf", "2025/A.pdf"], moves.Select(m => m.FromRelativePath));
+    }
+
+    // Same-stage batches are explicitly free to run concurrently, so a chain split across two of them
+    // would lose exactly the ordering the chaining just established. The cap therefore only ever falls on
+    // a chain boundary — a chain longer than the cap gets its own oversized batch instead.
+    [Fact]
+    public void AChain_IsNeverSplitAcrossBatchesEvenWhenTheCapFallsInsideIt()
+    {
+        var loner = Guid.NewGuid();
+        var chainTail = Guid.NewGuid();
+        var chainHead = Guid.NewGuid();
+
+        var options = Options(maxOpsPerMetadataBatch: 2);
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(loner, "2025/A1.pdf"),
+                Desired(chainTail, "2025/N.pdf"),
+                Desired(chainHead, "2025/O.pdf"),
+            ],
+            [
+                State(loner, "2025/A0.pdf"),
+                State(chainTail, "2025/M.pdf"),
+                State(chainHead, "2025/N.pdf"),
+            ],
+            options, Caps(options), allowLargePrune: false);
+
+        // The standalone move is flushed on its own rather than taking one slot and pushing the chain's
+        // second member into the next batch.
+        Assert.Equal([1, 2], plan.Batches.Select(b => b.Actions.Count));
+        Assert.All(plan.Batches, b => Assert.Equal(BackupStage.Move, b.Stage));
+
+        Assert.Equal(["2025/A0.pdf"], plan.Batches[0].Actions.Select(a => a.FromRelativePath));
+        Assert.Equal(["2025/N.pdf", "2025/M.pdf"], plan.Batches[1].Actions.Select(a => a.FromRelativePath));
+    }
+
+    // A rename swap is a cycle, and no ordering fixes a cycle — only the plan can. One member is
+    // downgraded to a Delete + a Put, which the stage order then sequences: free the path, move the
+    // survivor into it, re-copy the downgraded one fresh.
+    [Fact]
+    public void ARenameSwap_BreaksIntoADeleteAndAHandlelessPut()
+    {
+        var alpha = Guid.NewGuid();
+        var beta = Guid.NewGuid();
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(alpha, "2025/Beta.pdf"),
+                Desired(beta, "2025/Alpha.pdf"),
+            ],
+            [
+                State(alpha, "2025/Alpha.pdf"),
+                State(beta, "2025/Beta.pdf"),
+            ],
+            Options(), Caps(Options()), allowLargePrune: false);
+
+        Assert.Equal(
+            [BackupStage.Delete, BackupStage.Move, BackupStage.Put],
+            plan.Batches.Select(b => b.Stage));
+
+        // Broken on the smallest source path, ordinal — deterministic, like everything else the planner
+        // emits.
+        var delete = Assert.Single(plan.Batches[0].Actions);
+        Assert.Equal(BackupActionKind.Delete, delete.Kind);
+        Assert.Equal("2025/Alpha.pdf", delete.RelativePath);
+        Assert.Equal(alpha, delete.VersionId);
+        // Carries the handle, so an id-addressed destination removes the right object rather than leaving
+        // a second file with the same name behind.
+        Assert.Equal("2025/Alpha.pdf", delete.Handle);
+
+        var move = Assert.Single(plan.Batches[1].Actions);
+        Assert.Equal(BackupActionKind.Move, move.Kind);
+        Assert.Equal(beta, move.VersionId);
+        Assert.Equal("2025/Beta.pdf", move.FromRelativePath);
+        Assert.Equal("2025/Alpha.pdf", move.RelativePath);
+
+        var put = Assert.Single(plan.Batches[2].Actions);
+        Assert.Equal(BackupActionKind.Put, put.Kind);
+        Assert.Equal(alpha, put.VersionId);
+        Assert.Equal("2025/Beta.pdf", put.RelativePath);
+        // Handle cleared: reusing it would upload onto the very object the surviving move is relocating.
+        Assert.Null(put.Handle);
+        Assert.NotNull(put.SourceFilePath);
+    }
+
+    // A cycle-break delete is a relocation artifact, not a prune. Counting it would let an ordinary rename
+    // swap latch the operator-facing "N deletions were blocked" banner on a run sitting exactly on the
+    // threshold — a warning about data loss raised by two documents trading names.
+    [Fact]
+    public void ACycleBreakDelete_DoesNotCountTowardTheBreaker()
+    {
+        var alpha = Guid.NewGuid();
+        var beta = Guid.NewGuid();
+
+        var existing = Enumerable.Range(0, 25)
+            .Select(i => State(Guid.NewGuid(), $"2025/Gone{i:D2}.pdf"))
+            .Append(State(alpha, "2025/Alpha.pdf"))
+            .Append(State(beta, "2025/Beta.pdf"))
+            .ToList();
+
+        var options = Options(minAbsoluteDeletes: 25);
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(alpha, "2025/Beta.pdf"),
+                Desired(beta, "2025/Alpha.pdf"),
+            ],
+            existing, options, Caps(options), allowLargePrune: false);
+
+        // 25 real prunes sits exactly on the threshold and proceeds; the swap's 26th delete is emitted but
+        // never counted, so the breaker stays untripped.
+        Assert.False(plan.PruneBlocked);
+        Assert.Equal(25, plan.DeleteCount);
+        Assert.Equal(0, plan.BlockedDeleteCount);
+        Assert.Equal(26, Actions(plan).Count(a => a.Kind == BackupActionKind.Delete));
+    }
+
+    // The summary reports INTENT, the batches report MECHANISM. The mirror really does re-copy the
+    // downgraded version's bytes, so the admin sees a put and its cost; nothing is being pruned, so the
+    // paired delete is invisible.
+    [Fact]
+    public void ADowngradedMove_IsSummarizedAsAPutAndNotAsADelete()
+    {
+        var alpha = Guid.NewGuid();
+        var beta = Guid.NewGuid();
+
+        var plan = BackupPlanBuilder.Build(
+            [
+                Desired(alpha, "2025/Beta.pdf", size: 900),
+                Desired(beta, "2025/Alpha.pdf", size: 100),
+            ],
+            [
+                State(alpha, "2025/Alpha.pdf", size: 900),
+                State(beta, "2025/Beta.pdf", size: 100),
+            ],
+            Options(), Caps(Options()), allowLargePrune: false);
+
+        Assert.Equal(1, plan.PutCount);
+        Assert.Equal(1, plan.MoveCount);
+        Assert.Equal(0, plan.DeleteCount);
+        Assert.Equal(900, plan.TotalBytes);
+        Assert.Equal(2, plan.ActionCount);
+    }
 }

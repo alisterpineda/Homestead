@@ -62,7 +62,8 @@ public enum BackupActionKind
     /// An action rather than an inline step because on an eventually-consistent destination an emptiness
     /// check racing the same run's own moves could trash a folder with a just-arrived file inside it —
     /// whose state row would still read "mirrored", a silent hole nothing would ever re-plan. These are
-    /// packed into one final batch that claims after every mutation batch in the run.
+    /// packed into one final batch, tagged with the lowest stage, that the queue will not start until
+    /// every mutation batch in the run has terminated.
     /// </remarks>
     PruneFolder
 }
@@ -101,8 +102,30 @@ public record BackupAction
     public long FileSize { get; init; }
 }
 
-/// <summary>One child job's worth of actions.</summary>
-public record BackupActionBatch(IReadOnlyList<BackupAction> Actions);
+/// <summary>
+/// The pipeline position of a batch. A lower stage runs strictly before a higher one; batches sharing a
+/// stage are mutually independent and run concurrently.
+/// </summary>
+/// <remarks>
+/// The ordering contract made explicit at the type level rather than inferred from <c>Actions[0].Kind</c>
+/// — which it cannot be anyway, since breaking a rename cycle puts a Delete in the Delete stage and a Put
+/// in the Put stage that both came from a Move. <c>BackupToTargetJobHandler</c> maps this onto child job
+/// priority, and the processor's claim predicate turns that into a real happens-before edge.
+/// </remarks>
+public enum BackupStage
+{
+    Delete = 0,
+    Move = 1,
+    Put = 2,
+    Prune = 3
+}
+
+/// <summary>One child job's worth of actions, plus the pipeline stage that orders it.</summary>
+/// <remarks>
+/// <c>BackupBatchPayload</c> carries only <see cref="Actions"/>, so <see cref="Stage"/> never reaches the
+/// serialized child payload — nothing sitting in the queue across a deploy has to know about it.
+/// </remarks>
+public record BackupActionBatch(BackupStage Stage, IReadOnlyList<BackupAction> Actions);
 
 /// <summary>
 /// The full change set for one run: batched work plus the counts the dry-run summary and the admin page

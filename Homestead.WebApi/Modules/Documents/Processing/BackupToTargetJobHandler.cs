@@ -38,10 +38,25 @@ public class BackupToTargetJobHandler(
 {
     /// <summary>
     /// Base priority for batch children. Negative so every user-facing job — an upload, a classify, a
-    /// download — preempts the mirror between batches. Claim order is Priority descending, so batch N
-    /// sits one step above batch N+1 and the Delete → Move → Put ordering the plan builder relies on
-    /// survives into the queue.
+    /// download — preempts the mirror between batches.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A child's priority is <c>ChildBasePriority - (int)batch.Stage</c>, so priority ENCODES the pipeline
+    /// stage. Among one parent's children the processor treats a strictly higher priority as a
+    /// happens-before edge — it will not claim a job while a higher-priority sibling is still Pending or
+    /// InProgress, and a failed job cancels its lower-priority siblings outright. Batches sharing a stage
+    /// share a priority and so stay fully concurrent; the Delete → Move → Put → Prune ordering the plan
+    /// builder relies on becomes a real ordering guarantee rather than a claim-order hint. Gaps in the
+    /// sequence when a stage is empty are harmless.
+    /// </para>
+    /// <para>
+    /// <b>Warning for future fan-out handlers:</b> giving children DIFFERING priorities is now opting into
+    /// serialization between those priority levels. A handler that only wants "do this one first if there
+    /// is a free worker" should leave every child at the same priority — the flat fan-outs (bulk classify,
+    /// bulk reprocess) all do.
+    /// </para>
+    /// </remarks>
     public const int ChildBasePriority = -100;
 
     public ProcessingJobType Type => ProcessingJobType.BackupToTarget;
@@ -137,10 +152,10 @@ public class BackupToTargetJobHandler(
         if (!payload.DryRun)
             await ReconcilePruneLatchAsync(source, plan, payload.AllowLargePrune, ct);
 
-        // Appended last, so it takes the lowest child priority and therefore claims after every mutation
-        // batch in the run — including any continuation, which inherits its predecessor's priority and so
-        // still sits above this. That ordering is the whole reason the prune is a batch rather than an
-        // inline step.
+        // Tagged with the lowest stage, so it takes the lowest child priority and therefore runs — not
+        // merely claims — after every mutation batch in the run, including any continuation, which
+        // inherits its predecessor's priority and so still sits above this. That ordering is the whole
+        // reason the prune is a batch rather than an inline step, and the queue now enforces it.
         var batches = payload.DryRun
             ? plan.Batches
             : AppendPruneBatch(plan, target);
@@ -182,10 +197,8 @@ public class BackupToTargetJobHandler(
         // job timeout this rule exists to protect. A no-op for a filesystem target.
         await target.EnsureFoldersAsync(PlannedFolders(batches), ct);
 
-        for (var index = 0; index < batches.Count; index++)
+        foreach (var batch in batches)
         {
-            var batch = batches[index];
-
             var child = new ProcessingJob
             {
                 Id = Guid.NewGuid(),
@@ -196,7 +209,7 @@ public class BackupToTargetJobHandler(
                 CreatedByUserId = job.CreatedByUserId,
                 ParentJobId = job.Id,
                 CreatedAt = DateTimeOffset.UtcNow,
-                Priority = ChildBasePriority - index,
+                Priority = ChildBasePriority - (int)batch.Stage,
             };
             child.SetPayload(new BackupBatchPayload(sourceId, [.. batch.Actions]));
 
@@ -246,7 +259,7 @@ public class BackupToTargetJobHandler(
         if (candidates.Count == 0)
             return plan.Batches;
 
-        return [.. plan.Batches, new BackupActionBatch(candidates)];
+        return [.. plan.Batches, new BackupActionBatch(BackupStage.Prune, candidates)];
     }
 
     /// <summary>Every folder a batch is about to write into — what the ensure step has to guarantee.</summary>
