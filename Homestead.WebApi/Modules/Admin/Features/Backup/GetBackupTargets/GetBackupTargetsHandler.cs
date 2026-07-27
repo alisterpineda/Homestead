@@ -16,6 +16,7 @@ namespace Homestead.WebApi.Modules.Admin.Features.Backup.GetBackupTargets;
 public class GetBackupTargetsHandler(
     AppDbContext db,
     IBackupTargetResolver resolver,
+    IBackupTargetGate gate,
     IBackupSourceCatalog catalog)
     : IRequestHandler<GetBackupTargetsQuery, GetBackupTargetsResponse>
 {
@@ -42,6 +43,7 @@ public class GetBackupTargetsHandler(
         var totalsBySource = totals.ToDictionary(t => t.SourceId);
 
         var lastRuns = await LoadLastRunsAsync(sources, ct);
+        var lastSuccesses = await LoadLastSuccessfulRunsAsync(sources, ct);
         var schedules = await LoadSchedulesAsync(sources, ct);
 
         var sourcesByTarget = sources
@@ -59,9 +61,14 @@ public class GetBackupTargetsHandler(
 
             targetStates.TryGetValue(key, out var state);
 
+            // The composed verdict, not the config-shape one: a Drive target with perfect config and no
+            // stored grant is not available, and the card has to say which.
+            var verdict = await gate.CheckAsync(target, ct);
+
             var targetSources = sourcesByTarget.GetValueOrDefault(key, [])
                 .OrderBy(s => s.SourceKind, StringComparer.OrdinalIgnoreCase)
-                .Select(source => BuildSource(source, target, totalsBySource, lastRuns, schedules))
+                .Select(source =>
+                    BuildSource(source, verdict, totalsBySource, lastRuns, lastSuccesses, schedules))
                 .ToList();
 
             items.Add(new BackupTargetResponse
@@ -69,8 +76,9 @@ public class GetBackupTargetsHandler(
                 Key = target.Key,
                 Kind = target.Kind,
                 Location = target.Location,
-                IsAvailable = target.IsAvailable,
-                ConfigurationError = target.ConfigurationError,
+                IsAvailable = verdict.IsAvailable,
+                ConfigurationError = verdict.Reason,
+                Connection = BuildConnection(target, state),
                 // No row means "never configured by an operator", which reads as enabled: defining a
                 // target in config is the opt-in, and requiring a second in-app toggle would make a
                 // freshly-deployed schedule silently do nothing.
@@ -110,11 +118,31 @@ public class GetBackupTargetsHandler(
                 yield return key;
     }
 
+    /// <summary>
+    /// The credential state for a kind that has one. Built from the row alone — the whole point of
+    /// storing the email and issue time as plain columns is that the card renders without decrypting.
+    /// </summary>
+    private static BackupTargetConnection? BuildConnection(IBackupTarget target, BackupTargetState? state)
+    {
+        if (target.Kind is not BackupTargetKind.GoogleDrive)
+            return null;
+
+        return new BackupTargetConnection
+        {
+            IsConnected = state?.EncryptedGrant is { Length: > 0 },
+            ConnectedAccountEmail = state?.ConnectedAccountEmail,
+            GrantIssuedAt = state?.GrantIssuedAt,
+            AuthFailedAt = state?.AuthFailedAt,
+            AuthFailedReason = state?.AuthFailedReason,
+        };
+    }
+
     private BackupSourceItemResponse BuildSource(
         BackupSource source,
-        IBackupTarget target,
+        TargetGateResult verdict,
         Dictionary<Guid, SourceTotals> totalsBySource,
         Dictionary<Guid, BackupRunStatus> lastRuns,
+        Dictionary<Guid, DateTimeOffset> lastSuccesses,
         Dictionary<Guid, BackupScheduleSummary> schedules)
     {
         var descriptor = catalog.Find(source.SourceKind);
@@ -124,9 +152,9 @@ public class GetBackupTargetsHandler(
         // its prune affordances — nothing knows whether this dataset ever deleted anything.
         var unavailableReason = descriptor is null
             ? $"Backup source kind '{source.SourceKind}' is no longer available in this build."
-            : target.IsAvailable
+            : verdict.IsAvailable
                 ? null
-                : target.ConfigurationError;
+                : verdict.Reason;
 
         totalsBySource.TryGetValue(source.Id, out var totals);
 
@@ -144,6 +172,12 @@ public class GetBackupTargetsHandler(
             BackedUpFileCount = totals?.Count ?? 0,
             BackedUpBytes = totals?.Bytes ?? 0,
             LastRun = lastRuns.GetValueOrDefault(source.Id),
+            // TryGetValue, not GetValueOrDefault: the dictionary's value type is non-nullable, so a
+            // missing key would yield DateTimeOffset.MinValue — which widens silently into the nullable
+            // response field and renders as "2055y ago" instead of "never".
+            LastSuccessfulRunAt = lastSuccesses.TryGetValue(source.Id, out var lastSuccess)
+                ? lastSuccess
+                : null,
             Schedule = source.ScheduleId is { } scheduleId
                 ? schedules.GetValueOrDefault(scheduleId)
                 : null,
@@ -201,24 +235,32 @@ public class GetBackupTargetsHandler(
             .Select(r => r.Id)
             .ToList();
 
+        // Result comes back alongside Error: a failed batch stages a typed outcome there, and the card
+        // needs the code rather than the message — an out-of-space run must render as one sentence, not
+        // as a stack of identical fragments, and message strings are never parsed to decide that.
         var childErrors = failedParentIds.Count == 0
             ? []
             : await db.ProcessingJobs
                 .AsNoTracking()
                 .Where(j => j.ParentJobId != null
                             && failedParentIds.Contains(j.ParentJobId.Value)
-                            && j.Status == ProcessingJobStatus.Failed
-                            && j.Error != null)
-                .Select(j => new { ParentJobId = j.ParentJobId!.Value, j.Error })
+                            && j.Status == ProcessingJobStatus.Failed)
+                .Select(j => new { ParentJobId = j.ParentJobId!.Value, j.Error, j.Result })
                 .ToListAsync(ct);
 
         var errorsByParent = childErrors
+            .Where(e => e.Error != null)
             .GroupBy(e => e.ParentJobId)
             .ToDictionary(
                 g => g.Key,
                 // Capped: a large run can fail many batches, and the admin page needs the shape of the
                 // problem, not every line of it. /admin/jobs remains the exhaustive record.
                 g => (IReadOnlyList<string>)g.Select(e => e.Error!).Take(MaxChildErrors).ToList());
+
+        var outOfSpaceParents = childErrors
+            .Where(e => DeserializeOutcome(e.Result)?.ErrorCode == BackupBatchOutcome.OutOfSpaceCode)
+            .Select(e => e.ParentJobId)
+            .ToHashSet();
 
         return rows.ToDictionary(r => r.EntityId, r => new BackupRunStatus
         {
@@ -231,9 +273,45 @@ public class GetBackupTargetsHandler(
             TotalChildCount = r.TotalChildCount,
             CompletedChildCount = r.CompletedChildCount,
             FailedChildCount = r.FailedChildCount,
+            OutOfSpace = outOfSpaceParents.Contains(r.Id),
             BatchErrors = errorsByParent.GetValueOrDefault(r.Id, []),
             Summary = DeserializeSummary(r.Result),
         });
+    }
+
+    /// <summary>
+    /// When each pairing last completed a run cleanly.
+    /// </summary>
+    /// <remarks>
+    /// A separate query from the newest-run one on purpose: the two answer different questions, and the
+    /// gap between them is the signal. "Last run: failed, 4 minutes ago" and "last successful run: 38
+    /// days ago" is a backup that has been quietly broken for over a month, which no single row says.
+    /// </remarks>
+    private async Task<Dictionary<Guid, DateTimeOffset>> LoadLastSuccessfulRunsAsync(
+        List<BackupSource> sources, CancellationToken ct)
+    {
+        var jobTypes = catalog.All().Select(d => d.JobType).Distinct().ToList();
+
+        if (sources.Count == 0 || jobTypes.Count == 0)
+            return [];
+
+        var sourceIds = sources.Select(s => s.Id).ToList();
+
+        var rows = await db.ProcessingJobs
+            .AsNoTracking()
+            .Where(j => jobTypes.Contains(j.Type)
+                        && j.EntityId != null
+                        && sourceIds.Contains(j.EntityId.Value)
+                        && j.ParentJobId == null
+                        && j.Status == ProcessingJobStatus.Completed
+                        && j.CompletedAt != null)
+            .GroupBy(j => j.EntityId!.Value)
+            .Select(g => new { EntityId = g.Key, CompletedAt = g.Max(j => j.CompletedAt) })
+            .ToListAsync(ct);
+
+        return rows
+            .Where(r => r.CompletedAt is not null)
+            .ToDictionary(r => r.EntityId, r => r.CompletedAt!.Value);
     }
 
     // Joined by the source row's own ScheduleId. The old shape had to load every BackupToTarget schedule
@@ -277,6 +355,23 @@ public class GetBackupTargetsHandler(
         try
         {
             return JsonSerializer.Deserialize<BackupRunSummary>(result);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    // Same degrade-don't-fail posture as the summary above: an older row whose shape has since changed
+    // simply reports no outcome rather than taking the whole admin page down.
+    private static BackupBatchOutcome? DeserializeOutcome(string? result)
+    {
+        if (string.IsNullOrWhiteSpace(result))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<BackupBatchOutcome>(result);
         }
         catch (JsonException)
         {

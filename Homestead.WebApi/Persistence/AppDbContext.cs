@@ -36,6 +36,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<BackupTargetState> BackupTargetStates { get; set; }
     public DbSet<BackupSource> BackupSources { get; set; }
     public DbSet<DocumentBackupState> DocumentBackupStates { get; set; }
+    public DbSet<BackupTargetFolder> BackupTargetFolders { get; set; }
+    public DbSet<BackupUploadSession> BackupUploadSessions { get; set; }
 
     public DbSet<Commodity> Commodities { get; set; }
     public DbSet<Account> Accounts { get; set; }

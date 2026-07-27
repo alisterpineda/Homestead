@@ -1,3 +1,5 @@
+using Homestead.WebApi.Infrastructure.Backup;
+
 namespace Homestead.WebApi.Modules.Documents.Backup;
 
 /// <summary>
@@ -11,6 +13,7 @@ public static class BackupPlanBuilder
         IReadOnlyList<BackupDesiredFile> desired,
         IReadOnlyList<BackupStateRow> existing,
         DocumentBackupEngineOptions options,
+        BackupBatchCaps caps,
         bool allowLargePrune)
     {
         var existingByVersion = existing.ToDictionary(s => s.VersionId);
@@ -85,14 +88,24 @@ public static class BackupPlanBuilder
         //   • Moves next, because a move's destination may be a path a delete just freed.
         //   • Puts last, when every destination is guaranteed vacant.
         // Batches inherit descending priority from their index (see BackupToTargetJobHandler), so the
-        // worker CLAIMS them in this order. At the default MaxConcurrency of 1 that is also the order
-        // they run in. Raising MaxConcurrency lets adjacent batches overlap, which reopens the hazard
-        // only for the narrow case of a path vacated and re-claimed within a single run; the next run
-        // reconciles it either way.
+        // worker CLAIMS them in this order. Claim order is only execution order at MaxConcurrency 1.
+        //
+        // KNOWN HAZARD, unfixed and NOT self-healing — the shipped MaxConcurrency is 4, so adjacent
+        // batches of one run do overlap. When a Put's destination is also a Move's SOURCE (the ordinary
+        // "new version demotes the old latest" shape: Move Doc.pdf -> _versions/Doc (v1).pdf, Put the new
+        // Doc.pdf), a Put that lands first has its file relocated by the Move that follows. The result is
+        // the new version's bytes sitting under the old version's name and nothing at all under the new
+        // one — and because both state rows record the paths the planner intended, the next run diffs
+        // them as unchanged and never repairs it. The hole is permanent and silent.
+        //
+        // Left alone here deliberately: the fix belongs to the run topology (serialize a run's batches,
+        // or split the plan so a Move's source is never a Put's destination in the same run), not to the
+        // packing order, and it predates the Drive target. Reproduces intermittently as
+        // BackupMirrorTests.AddingAVersion_DemotesTheOldLatestIntoTheVersionsFolder.
         var batches = new List<BackupActionBatch>();
-        batches.AddRange(PackMetadata(emittedDeletes, options));
-        batches.AddRange(PackMetadata(moves, options));
-        batches.AddRange(PackFiles(puts, options));
+        batches.AddRange(PackMetadata(emittedDeletes, caps));
+        batches.AddRange(PackMetadata(moves, caps));
+        batches.AddRange(PackFiles(puts, caps));
 
         return new BackupPlan
         {
@@ -142,10 +155,10 @@ public static class BackupPlanBuilder
     // otherwise sit alone in a batch that still blows the 5-minute timeout, and 100 small scans would
     // finish in seconds. Whichever cap binds first wins. A single file larger than the byte cap still
     // gets its own batch rather than being dropped.
-    private static List<BackupActionBatch> PackFiles(List<BackupAction> actions, DocumentBackupEngineOptions options)
+    private static List<BackupActionBatch> PackFiles(List<BackupAction> actions, BackupBatchCaps caps)
     {
-        var maxFiles = options.ResolveMaxFilesPerBatch();
-        var maxBytes = options.ResolveMaxBytesPerBatch();
+        var maxFiles = caps.MaxFilesPerBatch;
+        var maxBytes = caps.MaxBytesPerBatch;
 
         var batches = new List<BackupActionBatch>();
         var current = new List<BackupAction>();
@@ -173,9 +186,9 @@ public static class BackupPlanBuilder
 
     // Moves and deletes are constant-time per operation — no bytes cross the wire — so they only need a
     // count cap, set an order of magnitude higher than the file cap.
-    private static List<BackupActionBatch> PackMetadata(List<BackupAction> actions, DocumentBackupEngineOptions options)
+    private static List<BackupActionBatch> PackMetadata(List<BackupAction> actions, BackupBatchCaps caps)
     {
-        var maxOps = options.ResolveMaxOpsPerMetadataBatch();
+        var maxOps = caps.MaxOpsPerMetadataBatch;
 
         return actions
             .Chunk(maxOps)

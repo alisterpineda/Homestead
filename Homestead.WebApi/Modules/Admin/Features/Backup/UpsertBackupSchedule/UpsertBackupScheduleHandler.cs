@@ -18,6 +18,7 @@ public class UpsertBackupScheduleHandler(
     AppDbContext db,
     IBackupSourceCatalog catalog,
     IBackupTargetResolver resolver,
+    IBackupTargetGate gate,
     ICurrentUserAccessor currentUser,
     IAuditContext audit,
     IUnitOfWork unitOfWork)
@@ -47,9 +48,10 @@ public class UpsertBackupScheduleHandler(
                 $"Backup source kind '{source.SourceKind}' is no longer available in this build.");
 
         var target = resolver.Resolve(source.TargetKey);
-        if (!target.IsAvailable)
+        var verdict = await gate.CheckAsync(target, ct);
+        if (!verdict.IsAvailable)
             throw new BusinessRuleException(
-                $"Backup target '{source.TargetKey}' is unavailable: {target.ConfigurationError}");
+                $"Backup target '{source.TargetKey}' is unavailable: {verdict.Reason}");
 
         // A DISABLED pairing may still be scheduled — arming the cron before turning the backup on is a
         // reasonable order to work in, and the planner skips a disabled source quietly rather than

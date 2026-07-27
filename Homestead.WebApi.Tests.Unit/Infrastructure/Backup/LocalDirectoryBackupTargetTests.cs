@@ -30,6 +30,10 @@ public class LocalDirectoryBackupTargetTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    // Every extra on the context is meaningless to a filesystem — it cannot suspend, has no session to
+    // resume, and reports no checksum — so the local tests only ever need the content type.
+    private static BackupPutContext Ctx() => new("application/pdf");
+
     private static Stream Content(string text) => new MemoryStream(Encoding.UTF8.GetBytes(text));
 
     private string Absolute(string relativePath) =>
@@ -50,10 +54,11 @@ public class LocalDirectoryBackupTargetTests : IDisposable
         var handle = await _sut.PutAsync(
             new BackupObjectRef("2025/_versions/Doc (v1).pdf", null),
             Content("hello"),
-            "application/pdf",
+            Ctx(),
             TestContext.Current.CancellationToken);
 
-        Assert.Equal("2025/_versions/Doc (v1).pdf", handle);
+        Assert.Equal(
+            new BackupPutResult.Completed("2025/_versions/Doc (v1).pdf"), handle);
         Assert.Equal("hello", await File.ReadAllTextAsync(
             Absolute("2025/_versions/Doc (v1).pdf"), TestContext.Current.CancellationToken));
     }
@@ -64,8 +69,8 @@ public class LocalDirectoryBackupTargetTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var target = new BackupObjectRef("2025/Doc.pdf", null);
 
-        await _sut.PutAsync(target, Content("first"), "application/pdf", ct);
-        await _sut.PutAsync(target, Content("second"), "application/pdf", ct);
+        await _sut.PutAsync(target, Content("first"), Ctx(), ct);
+        await _sut.PutAsync(target, Content("second"), Ctx(), ct);
 
         Assert.Equal("second", await File.ReadAllTextAsync(Absolute("2025/Doc.pdf"), ct));
     }
@@ -75,7 +80,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task PutAsync_LeavesNoTemporaryFiles()
     {
         await _sut.PutAsync(
-            new BackupObjectRef("2025/Doc.pdf", null), Content("hello"), "application/pdf",
+            new BackupObjectRef("2025/Doc.pdf", null), Content("hello"), Ctx(),
             TestContext.Current.CancellationToken);
 
         var stray = Directory.EnumerateFiles(_root, "*.homestead-tmp-*", SearchOption.AllDirectories);
@@ -86,7 +91,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task MoveAsync_RelocatesTheFile()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), Ctx(), ct);
 
         var handle = await _sut.MoveAsync(
             new BackupObjectRef("2025/Doc.pdf", "2025/Doc.pdf"), "2026/Renamed.pdf", ct);
@@ -100,7 +105,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task MoveAsync_CreatesTheDestinationDirectory()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), Ctx(), ct);
 
         await _sut.MoveAsync(
             new BackupObjectRef("2025/Doc.pdf", null), "2030/_versions/Doc (v1).pdf", ct);
@@ -121,7 +126,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task DeleteAsync_RemovesTheFile()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), Ctx(), ct);
 
         await _sut.DeleteAsync(new BackupObjectRef("2025/Doc.pdf", "2025/Doc.pdf"), ct);
 
@@ -142,7 +147,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task DeleteAsync_PrunesTheNowEmptyShard()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), Ctx(), ct);
 
         await _sut.DeleteAsync(new BackupObjectRef("2025/Doc.pdf", null), ct);
 
@@ -154,8 +159,8 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task DeleteAsync_KeepsAShardThatStillHasFiles()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/A.pdf", null), Content("a"), "application/pdf", ct);
-        await _sut.PutAsync(new BackupObjectRef("2025/B.pdf", null), Content("b"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/A.pdf", null), Content("a"), Ctx(), ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/B.pdf", null), Content("b"), Ctx(), ct);
 
         await _sut.DeleteAsync(new BackupObjectRef("2025/A.pdf", null), ct);
 
@@ -172,7 +177,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task PutAsync_RefusesAPathThatEscapesTheRoot(string relativePath)
     {
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.PutAsync(
-            new BackupObjectRef(relativePath, null), Content("nope"), "application/pdf",
+            new BackupObjectRef(relativePath, null), Content("nope"), Ctx(),
             TestContext.Current.CancellationToken));
 
         Assert.Contains("escapes the target root", ex.Message);
@@ -182,7 +187,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task PutAsync_RefusesAnAbsolutePath()
     {
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.PutAsync(
-            new BackupObjectRef("/etc/passwd", null), Content("nope"), "application/pdf",
+            new BackupObjectRef("/etc/passwd", null), Content("nope"), Ctx(),
             TestContext.Current.CancellationToken));
 
         Assert.Contains("must be relative", ex.Message);
@@ -199,7 +204,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
     public async Task MoveAsync_RefusesADestinationThatEscapesTheRoot()
     {
         var ct = TestContext.Current.CancellationToken;
-        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), "application/pdf", ct);
+        await _sut.PutAsync(new BackupObjectRef("2025/Doc.pdf", null), Content("payload"), Ctx(), ct);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.MoveAsync(
             new BackupObjectRef("2025/Doc.pdf", null), "../escaped.pdf", ct));
@@ -216,7 +221,7 @@ public class LocalDirectoryBackupTargetTests : IDisposable
         Assert.False(unavailable.IsAvailable);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => unavailable.PutAsync(
-            new BackupObjectRef("2025/Doc.pdf", null), Content("nope"), "application/pdf",
+            new BackupObjectRef("2025/Doc.pdf", null), Content("nope"), Ctx(),
             TestContext.Current.CancellationToken));
     }
 }

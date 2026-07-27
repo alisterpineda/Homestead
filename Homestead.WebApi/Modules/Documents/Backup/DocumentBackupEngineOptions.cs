@@ -50,11 +50,9 @@ public class DocumentBackupEngineOptions
     /// </summary>
     public int MaxOpsPerMetadataBatch { get; set; } = 500;
 
-    // Floors: a degenerate configured value (0, negative) would produce zero-capacity batches and an
-    // infinite planning loop, so each cap is read through a resolver rather than used raw.
-    public int ResolveMaxFilesPerBatch() => Math.Max(1, MaxFilesPerBatch);
-    public long ResolveMaxBytesPerBatch() => Math.Max(1, MaxBytesPerBatch);
-    public int ResolveMaxOpsPerMetadataBatch() => Math.Max(1, MaxOpsPerMetadataBatch);
+    // Floors for the breaker thresholds. The three batching caps above are floored by BackupBatchCaps
+    // instead, which is also where a per-target override gets to win — the destination knows how fast a
+    // batch can possibly go, and these numbers were sized against local disk.
     public int ResolveMinAbsoluteDeletes() => Math.Max(0, MinAbsoluteDeletes);
     public double ResolveDeleteFraction() => Math.Clamp(DeleteFraction, 0d, 1d);
 }

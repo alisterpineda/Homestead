@@ -1,3 +1,4 @@
+using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Infrastructure.Storage;
 
 namespace Homestead.WebApi.Infrastructure.Backup;
@@ -14,13 +15,36 @@ public static class BackupServiceExtensions
         var storage = configuration.GetSection(FileStorageOptions.SectionName).Get<FileStorageOptions>()
             ?? new FileStorageOptions();
 
+        // The Google half. Registered unconditionally — a deployment with no Drive target simply never
+        // resolves any of it, and gating registration on config would make the gate service (which every
+        // target kind goes through) depend on whether a Drive target happens to exist.
+        services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
+        services.AddHttpClient<IGoogleDriveAccountClient, GoogleDriveAccountClient>(
+            c => c.Timeout = TimeSpan.FromSeconds(30));
+
+        services.AddSingleton<GoogleDriveTokenManager>();
+        services.AddScoped<IGoogleDriveGrantStore, GoogleDriveGrantStore>();
+        services.AddScoped<IBackupTargetGate, BackupTargetGate>();
+        services.AddSingleton<IGoogleDriveConnectTokenProtector, GoogleDriveConnectTokenProtector>();
+
+        var targets = BackupConfiguration.ReadTargets(configuration);
+        services.AddSingleton<IBackupTargetOptionsAccessor>(new BackupTargetOptionsAccessor(targets));
+
         // One registration per configured instance, enumerable rather than keyed: MS DI cannot enumerate
         // keyed registrations, and enumeration is what feeds the admin backup page — config stays the
         // single source of truth for what targets exist. An instance with an unusable Kind still
         // registers (as unavailable-with-reason) so one typo cannot take the app down; the resolver and
         // admin page surface the reason instead.
-        foreach (var (key, options) in BackupConfiguration.ReadTargets(configuration))
-            services.AddSingleton<IBackupTarget>(Create(key, options, storage));
+        //
+        // Factory-form rather than eager: a Drive target needs services (the token manager, a scope
+        // factory) that only exist once the provider is built.
+        foreach (var (key, options) in targets)
+        {
+            var capturedKey = key;
+            var capturedOptions = options;
+
+            services.AddSingleton<IBackupTarget>(sp => Create(capturedKey, capturedOptions, storage, sp));
+        }
 
         services.AddSingleton<IBackupTargetResolver>(sp =>
             new BackupTargetResolver(sp.GetServices<IBackupTarget>()));
@@ -35,9 +59,21 @@ public static class BackupServiceExtensions
         return services;
     }
 
-    // Only one kind exists in Phase 1, and an unknown/absent kind still needs an instance to carry its
-    // ConfigurationError to the admin page — LocalDirectoryBackupTarget computes that error itself via
-    // BackupConfiguration.Validate, so it is the right carrier even for a bag it can't service.
-    private static IBackupTarget Create(string key, BackupTargetOptions options, FileStorageOptions storage) =>
-        new LocalDirectoryBackupTarget(key, options, storage);
+    // A kind whose config is invalid still constructs: the instance is what carries ConfigurationError to
+    // the admin page. An absent or unknown kind falls to the local target, which computes that error
+    // itself via BackupConfiguration.Validate and is therefore the right carrier even for a bag it
+    // cannot service.
+    private static IBackupTarget Create(
+        string key, BackupTargetOptions options, FileStorageOptions storage, IServiceProvider sp) =>
+        options.Kind switch
+        {
+            BackupTargetKind.GoogleDrive => new GoogleDriveBackupTarget(
+                key,
+                options,
+                sp.GetRequiredService<GoogleDriveTokenManager>(),
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<ILogger<GoogleDriveBackupTarget>>()),
+
+            _ => new LocalDirectoryBackupTarget(key, options, storage)
+        };
 }

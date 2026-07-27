@@ -10,6 +10,7 @@ export interface BackupSourceItemResponse {
   isAvailable: boolean;
   isEnabled: boolean;
   lastRun?: (null | BackupRunStatus);
+  lastSuccessfulRunAt?: (string | null);
   pruneBlockedAt?: (string | null);
   pruneBlockedCount?: (number | null);
   schedule?: (null | BackupScheduleSummary);

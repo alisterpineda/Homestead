@@ -1,5 +1,6 @@
 using Homestead.WebApi.Domain.Finances;
 using Homestead.WebApi.Infrastructure.Ai;
+using Homestead.WebApi.Infrastructure.Backup.GoogleDrive;
 using Homestead.WebApi.Modules.Documents.Services;
 using Homestead.WebApi.Modules.Finances.PriceProviders;
 using Homestead.WebApi.Modules.Finances.Services;
@@ -36,6 +37,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
     /// <summary>The config key of the backup target the suite mirrors to.</summary>
     public const string BackupTargetKey = "local";
 
+    /// <summary>The config key of the Google Drive target the connect-flow suite exercises.</summary>
+    public const string GoogleDriveTargetKey = "gdrive";
+
+    /// <summary>Google's OAuth endpoints, faked. Script it before driving the connect flow.</summary>
+    public FakeGoogleOAuthClient GoogleOAuth { get; } = new();
+
+    /// <summary>Drive's about.get, faked — the one read both connect and validate depend on.</summary>
+    public FakeGoogleDriveAccountClient GoogleAccounts { get; } = new();
+
     /// <summary>
     /// The clock the WebApi resolves as <see cref="TimeProvider"/>. Follows system time by default;
     /// tests pin it via <see cref="ControllableTimeProvider.Freeze"/> to make cron-tick timing
@@ -68,6 +78,13 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
         // config, exactly as in production.
         builder.UseSetting($"Backup:Targets:{BackupTargetKey}:Kind", "Local");
         builder.UseSetting($"Backup:Targets:{BackupTargetKey}:Path", _backupPath);
+
+        // A second target of the OTHER kind, so the connect lifecycle runs against the real endpoints,
+        // the real grant store, and real Data Protection. Only its OAuth client is config; the grant is
+        // minted through the faked Google below, exactly as a human would mint it.
+        builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:Kind", "GoogleDrive");
+        builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:ClientId", "test-client-id");
+        builder.UseSetting($"Backup:Targets:{GoogleDriveTargetKey}:ClientSecret", "test-client-secret");
 
         // Satisfy OidcStartupValidator. OIDC is never actually exercised in integration tests
         // (auth happens through /test/force-login), so placeholder values are fine.
@@ -156,6 +173,15 @@ public class HomesteadApiFactory : WebApplicationFactory<Program>
             // background ImportCommodityPrices job (e.g. a RunNow enqueue) now resolves the fake instead of
             // making an outbound HTTP call.
             services.AddKeyedScoped<IPriceProvider, FakePriceProvider>(CommodityPriceSource.BankOfCanada);
+
+            // Swap Google's two HTTP surfaces for network-free fakes. Everything else in the Drive path
+            // stays real — the endpoints, the grant store's encryption, the connect-token protector, the
+            // gate — so what these tests exercise is the wiring that ships.
+            services.RemoveAll<IGoogleOAuthClient>();
+            services.AddSingleton<IGoogleOAuthClient>(GoogleOAuth);
+
+            services.RemoveAll<IGoogleDriveAccountClient>();
+            services.AddSingleton<IGoogleDriveAccountClient>(GoogleAccounts);
 
             // NO DbContext swap. AppDbContext uses the REAL production registration from Program.cs
             // (non-pooled AddDbContext + EnrichNpgsqlDbContext, with the command-transaction interceptors

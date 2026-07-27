@@ -167,6 +167,16 @@ export type { UpsertBackupSchedule$Params as UpsertBackupSchedule$Params } from 
 export { upsertBackupSchedule as upsertBackupSchedule } from './fn/admin/upsert-backup-schedule';
 export type { DeleteBackupSchedule$Params as DeleteBackupSchedule$Params } from './fn/admin/delete-backup-schedule';
 export { deleteBackupSchedule as deleteBackupSchedule } from './fn/admin/delete-backup-schedule';
+export type { ConnectBackupTarget$Params as ConnectBackupTarget$Params } from './fn/admin/connect-backup-target';
+export { connectBackupTarget as connectBackupTarget } from './fn/admin/connect-backup-target';
+export type { PollBackupTargetConnection$Params as PollBackupTargetConnection$Params } from './fn/admin/poll-backup-target-connection';
+export { pollBackupTargetConnection as pollBackupTargetConnection } from './fn/admin/poll-backup-target-connection';
+export type { ConfirmBackupTargetConnection$Params as ConfirmBackupTargetConnection$Params } from './fn/admin/confirm-backup-target-connection';
+export { confirmBackupTargetConnection as confirmBackupTargetConnection } from './fn/admin/confirm-backup-target-connection';
+export type { DisconnectBackupTarget$Params as DisconnectBackupTarget$Params } from './fn/admin/disconnect-backup-target';
+export { disconnectBackupTarget as disconnectBackupTarget } from './fn/admin/disconnect-backup-target';
+export type { ValidateBackupTargetConnection$Params as ValidateBackupTargetConnection$Params } from './fn/admin/validate-backup-target-connection';
+export { validateBackupTargetConnection as validateBackupTargetConnection } from './fn/admin/validate-backup-target-connection';
 export type { GetAccounts$Params as GetAccounts$Params } from './fn/finances/get-accounts';
 export { getAccounts as getAccounts } from './fn/finances/get-accounts';
 export type { CreateAccount$Params as CreateAccount$Params } from './fn/finances/create-account';

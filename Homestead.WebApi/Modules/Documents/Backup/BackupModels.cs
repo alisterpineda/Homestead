@@ -52,7 +52,19 @@ public enum BackupActionKind
     Move,
 
     /// <summary>Remove the object at <c>RelativePath</c> and drop its state row.</summary>
-    Delete
+    Delete,
+
+    /// <summary>
+    /// Remove the folder at <c>RelativePath</c> if it is now empty, walking up toward the kind root.
+    /// Best-effort and carries no state row.
+    /// </summary>
+    /// <remarks>
+    /// An action rather than an inline step because on an eventually-consistent destination an emptiness
+    /// check racing the same run's own moves could trash a folder with a just-arrived file inside it —
+    /// whose state row would still read "mirrored", a silent hole nothing would ever re-plan. These are
+    /// packed into one final batch that claims after every mutation batch in the run.
+    /// </remarks>
+    PruneFolder
 }
 
 /// <summary>

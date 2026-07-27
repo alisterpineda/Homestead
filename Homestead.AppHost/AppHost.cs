@@ -63,6 +63,18 @@ var webapi = builder.AddProject<Projects.Homestead_WebApi>("homestead-webapi")
         // "tesseract" instance; these only add to it.
         foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Ocr:Engines")))
             context.EnvironmentVariables[path.Replace(":", "__")] = value;
+
+        // Optional extra backup targets — in practice a Google Drive one, whose OAuth client is the
+        // admin's own and must never be committed, e.g.
+        //   dotnet user-secrets set "Backup:Targets:gdrive:Kind" "GoogleDrive"
+        //   dotnet user-secrets set "Backup:Targets:gdrive:ClientId" "<id>.apps.googleusercontent.com"
+        //   dotnet user-secrets set "Backup:Targets:gdrive:ClientSecret" "<secret>"
+        //
+        // Walked rather than enumerated for the same reason as the two above: target instance names are
+        // arbitrary. This ADDS to the hard-coded "local" target set above — it never replaces it, and the
+        // walk is a no-op when no secrets are set.
+        foreach (var (path, value) in LeafSettings(builder.Configuration.GetSection("Backup")))
+            context.EnvironmentVariables[path.Replace(":", "__")] = value;
     })
     .WithUrlForEndpoint("http", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" })
     .WithUrlForEndpoint("https", ep => new() { Url = "/scalar/v1", DisplayText = "Scalar" });

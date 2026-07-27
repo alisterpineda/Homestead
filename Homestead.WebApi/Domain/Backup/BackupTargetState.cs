@@ -24,6 +24,47 @@ public class BackupTargetState
     /// </summary>
     public bool IsEnabled { get; set; } = true;
 
+    // --- Credential lifecycle (GoogleDrive kinds; all null for Local) ---
+    //
+    // A Drive target can be *connected* as well as configured, which is the one thing Phase 2 added that
+    // config genuinely cannot express: the grant is minted by a human consenting at google.com/device,
+    // so it has nowhere to live but a row. All five columns are destination-level, not pairing-level —
+    // one revoked grant stops every kind mirrored to this target at once.
+
+    /// <summary>
+    /// Data-Protection ciphertext of the OAuth grant JSON (refresh token + last access token). Encrypted
+    /// rather than plain so a casual read of the table — a support dump, a partial disclosure — does not
+    /// hand over a live credential. See the design doc's honest caveat: the key ring lives in this same
+    /// database, so this is not protection against a full compromise.
+    /// </summary>
+    public string? EncryptedGrant { get; set; }
+
+    /// <summary>
+    /// The connected Google account, plain so the card can read "Connected as …" without decrypting
+    /// anything — and so a reconnect can detect that a <i>different</i> account is being attached.
+    /// </summary>
+    public string? ConnectedAccountEmail { get; set; }
+
+    /// <summary>
+    /// When the current grant was issued. Feeds the seven-day heuristic: an authorization that dies about
+    /// a week after issue is almost certainly an OAuth app left in Testing status.
+    /// </summary>
+    public DateTimeOffset? GrantIssuedAt { get; set; }
+
+    /// <summary>
+    /// When the grant was first observed to be dead. The persisted half of lazy detection: once set,
+    /// queued sibling batches short-circuit off this row instead of hammering Google's token endpoint in
+    /// turn. Cleared by a successful reconnect or validate.
+    /// </summary>
+    public DateTimeOffset? AuthFailedAt { get; set; }
+
+    /// <summary>
+    /// The reason, pre-built at latch time by the token manager rather than derived at read time — the
+    /// seven-day heuristic needs <see cref="GrantIssuedAt"/> and the failure moment together, and a
+    /// decrypt failure is a different sentence from a Google-side revocation.
+    /// </summary>
+    public string? AuthFailedReason { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

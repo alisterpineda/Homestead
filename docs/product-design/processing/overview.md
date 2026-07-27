@@ -37,7 +37,7 @@ The module is a **job-execution engine** plus a **cron-style schedule emitter** 
 - **Per-job dead-lettering or quarantine.** Failed jobs stay in the table with their error string; there is no separate dead-letter table or replay tooling.
 - **User-issued retries through the queue.** Reprocessing a single document version *is* available as a job type, but it is conceptually a fresh action initiated by the user, not a retry of a previous job.
 - **Visibility into per-job progress beyond child counts.** Within a single non-parent job, the UI sees `Pending → InProgress → terminal` with no intermediate progress. Parent jobs expose `(completed + failed) / total` only.
-- **Configurable timeouts or priorities at runtime.** Both are compile-time constants today (timeout) or set on enqueue (priority).
+- **Runtime-configurable priorities.** Priority is set on enqueue. The per-job timeout *is* configurable (`JobProcessingOptions.JobTimeout`, default 5 minutes), but only as deployment config — nothing changes it while the app runs.
 
 These are excluded from v1 but the model must not block adding them later. See *Future-compatibility*.
 
@@ -198,7 +198,9 @@ This exists for **tests and for any future operation that needs the queue quiesc
 
 Most v1 domain job types are initiated by the Documents module, with handlers under `Modules/Documents/Processing/`; Finances contributes `ImportCommodityPrices`, with its handler under `Modules/Finances/Processing/`. There is also a `NoOp` infrastructure job type used for smoke testing the queue and scheduler — its handler lives next to the queue framework, not under any module.
 
-A note on the two hard constraints that shape any new fan-out: the **5-minute per-job timeout** is a compile-time constant, and `MaxConcurrency` defaults to **1**, so a long job does not merely risk timing out — it blocks every upload behind it. Work whose size scales with the library (the backup mirror is the canonical case) must therefore split into fixed-size batches at low priority, with the parent doing only the DB-bound planning. See `BackupToTarget` / `BackupBatch` below.
+A note on the two hard constraints that shape any new fan-out: the **per-job timeout** is 5 minutes by default (`JobProcessingOptions.JobTimeout` — deployment config, not a runtime knob), and `MaxConcurrency` defaults to **1**, so a long job does not merely risk timing out — it blocks every upload behind it. Work whose size scales with the library (the backup mirror is the canonical case) must therefore split into fixed-size batches at low priority, with the parent doing only the DB-bound planning. See `BackupToTarget` / `BackupBatch` below.
+
+A handler may also *read* the timeout and pace itself against it. `BackupBatch` does: it stops starting new work with a safety margin left, persists what finished, and enqueues a continuation batch under the same parent before completing successfully — turning the timeout from a failure mode into a pacing device for work bounded by a slow uplink rather than by the database. That is why the value is bound options rather than a constant: a handler computing its own margin against a hard-coded 5 minutes would silently drift the moment the real timeout changed.
 
 ### `UploadDocument`
 

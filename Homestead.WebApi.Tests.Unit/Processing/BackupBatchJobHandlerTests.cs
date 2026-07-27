@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Homestead.WebApi.Domain.Backup;
 using Homestead.WebApi.Domain.Processing;
 using Homestead.WebApi.Infrastructure.Backup;
@@ -9,6 +10,7 @@ using Homestead.WebApi.Modules.Documents.Processing;
 using Homestead.WebApi.Processing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -22,6 +24,9 @@ public class BackupBatchJobHandlerTests : IDisposable
     private readonly string _mediaPath;
     private readonly RecordingTarget _target;
     private readonly IProcessingNotifier _notifier;
+    private readonly IJobSignal _signal;
+    private readonly IBackupTargetGate _gate;
+    private readonly FakeTimeProvider _timeProvider;
     private readonly BackupBatchJobHandler _sut;
 
     /// <summary>The pairing every batch in these tests belongs to, seeded by the constructor.</summary>
@@ -35,9 +40,21 @@ public class BackupBatchJobHandlerTests : IDisposable
 
         _target = new RecordingTarget(TargetKey);
         _notifier = Substitute.For<IProcessingNotifier>();
+        _signal = Substitute.For<IJobSignal>();
+        _timeProvider = new FakeTimeProvider();
 
         var resolver = Substitute.For<IBackupTargetResolver>();
         resolver.Resolve(Arg.Any<string>()).Returns(_target);
+
+        // Passes through to the target's own config verdict, which is what the local-target tests here
+        // are asserting on; the Drive-specific composition is covered in BackupTargetGateTests.
+        _gate = Substitute.For<IBackupTargetGate>();
+        _gate.CheckAsync(Arg.Any<IBackupTarget>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var t = call.Arg<IBackupTarget>();
+                return Task.FromResult(new TargetGateResult(t.IsAvailable, t.ConfigurationError));
+            });
 
         _db.BackupSources.Add(new BackupSource
         {
@@ -51,9 +68,12 @@ public class BackupBatchJobHandlerTests : IDisposable
         _db.SaveChanges();
 
         _sut = new BackupBatchJobHandler(
-            _db, resolver,
+            _db, resolver, _gate,
             Options.Create(new FileStorageOptions { MediaPath = _mediaPath }),
+            Options.Create(new JobProcessingOptions()),
             _notifier,
+            _signal,
+            _timeProvider,
             NullLogger<BackupBatchJobHandler>.Instance);
     }
 
@@ -444,29 +464,396 @@ public class BackupBatchJobHandlerTests : IDisposable
             () => _sut.HandleAsync(job, TestContext.Current.CancellationToken));
     }
 
+    // --- Deadline and continuations -------------------------------------------------------------------
+    //
+    // These cover the parentless shape, where the continuation is a plain insert. The atomic
+    // bump-then-insert against a live PARENT is exercised in the integration suite instead: it turns on
+    // ExecuteUpdate's database-side increment, which is what makes the count safe under concurrency and
+    // which the InMemory provider does not implement.
+
+    /// <summary>A job whose budget is already spent, so the handler must defer rather than start work.</summary>
+    private ProcessingJob CreateExhaustedJob(IEnumerable<BackupAction> actions, Guid? parentJobId = null)
+    {
+        var job = CreateJob(actions, parentJobId);
+
+        // Started long enough ago that the five-minute budget (less the 30 s margin) is gone.
+        job.StartedAt = _timeProvider.GetUtcNow().AddMinutes(-10);
+        return job;
+    }
+
+    private Task<ProcessingJob> ContinuationOf(ProcessingJob job, CancellationToken ct) =>
+        _db.ProcessingJobs.SingleAsync(
+            j => j.Type == ProcessingJobType.BackupBatch && j.Id != job.Id, ct);
+
+    // A large change set has to converge over a chain of GREEN batches — a serial procession of Failed
+    // runs makes a working backup read as broken.
+    [Fact]
+    public async Task PastTheDeadline_DefersTheRemainderAndCompletesSuccessfully()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        var job = CreateExhaustedJob(
+            [Put(Guid.NewGuid(), "2025/A.pdf", sourcePath, hash),
+             Put(Guid.NewGuid(), "2025/B.pdf", sourcePath, hash)]);
+
+        // No throw: running out of budget is pacing, not failure.
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Empty(_target.Objects);
+
+        var payload = (await ContinuationOf(job, ct)).GetPayload<BackupBatchPayload>()!;
+        Assert.Equal(2, payload.Actions.Count);
+        Assert.Equal(["2025/A.pdf", "2025/B.pdf"], payload.Actions.Select(a => a.RelativePath));
+
+        _signal.Received().Signal();
+    }
+
+    // Only the UNDONE actions are deferred; the ones that landed must not be redone.
+    [Fact]
+    public async Task WithBudgetLeft_NothingIsDeferred()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        var job = CreateJob([Put(Guid.NewGuid(), "2025/A.pdf", sourcePath, hash)]);
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Single(_target.Objects);
+        Assert.False(await _db.ProcessingJobs.AnyAsync(j => j.Id != job.Id, ct));
+    }
+
+    // Claim order is priority then CreatedAt, so an EQUAL priority keeps the continuation directly behind
+    // its predecessor — and, crucially, still ahead of the run's final prune batch.
+    [Fact]
+    public async Task AContinuation_InheritsItsPredecessorsPriorityAndProvenance()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        var job = CreateExhaustedJob([Put(Guid.NewGuid(), "2025/A.pdf", sourcePath, hash)]);
+        job.Priority = -104;
+
+        await _sut.HandleAsync(job, ct);
+
+        var continuation = await ContinuationOf(job, ct);
+
+        Assert.Equal(-104, continuation.Priority);
+        Assert.Equal(job.EntityId, continuation.EntityId);
+        Assert.Equal(job.CreatedByUserId, continuation.CreatedByUserId);
+        Assert.Equal(ProcessingJobStatus.Pending, continuation.Status);
+    }
+
+    // --- Suspended uploads ----------------------------------------------------------------------------
+
+    // Without this, a file larger than one budget window could NEVER be mirrored — every attempt would
+    // restart from zero and be cut off at the same place, forever.
+    [Fact]
+    public async Task ASuspendedPut_ParksTheSessionAndDefersTheAction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var versionId = Guid.NewGuid();
+
+        _target.SuspendPutsAt["2025/Big.pdf"] = new BackupPutResult.Suspended("https://session/1", 4096);
+
+        var job = CreateJob([Put(versionId, "2025/Big.pdf", sourcePath, hash)]);
+        await _sut.HandleAsync(job, ct);
+
+        var session = await _db.BackupUploadSessions.SingleAsync(s => s.DocumentVersionId == versionId, ct);
+        Assert.Equal("https://session/1", session.SessionUri);
+        Assert.Equal(4096, session.BytesCommitted);
+        Assert.Equal(hash, session.FileHash);
+
+        // Nothing is claimed as mirrored — the absence of a state row until success is load-bearing.
+        Assert.False(await _db.DocumentBackupStates.AnyAsync(s => s.DocumentVersionId == versionId, ct));
+
+        Assert.True(await _db.ProcessingJobs.AnyAsync(j => j.Id != job.Id, ct));
+    }
+
+    [Fact]
+    public async Task AParkedSession_IsHandedBackToTheTargetToResume()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var versionId = Guid.NewGuid();
+
+        _db.BackupUploadSessions.Add(new BackupUploadSession
+        {
+            Id = Guid.NewGuid(),
+            BackupSourceId = _sourceId,
+            DocumentVersionId = versionId,
+            SessionUri = "https://session/1",
+            BytesCommitted = 4096,
+            FileHash = hash,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        await _sut.HandleAsync(CreateJob([Put(versionId, "2025/Big.pdf", sourcePath, hash)]), ct);
+
+        var context = Assert.Single(_target.PutContexts);
+        Assert.Equal("https://session/1", context.ResumeSessionUri);
+        Assert.Equal(4096, context.ResumeOffset);
+    }
+
+    [Fact]
+    public async Task ACompletedPut_ClearsItsParkedSession()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var versionId = Guid.NewGuid();
+
+        _db.BackupUploadSessions.Add(new BackupUploadSession
+        {
+            Id = Guid.NewGuid(),
+            BackupSourceId = _sourceId,
+            DocumentVersionId = versionId,
+            SessionUri = "https://session/1",
+            BytesCommitted = 4096,
+            FileHash = hash,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        await _sut.HandleAsync(CreateJob([Put(versionId, "2025/Big.pdf", sourcePath, hash)]), ct);
+
+        Assert.False(await _db.BackupUploadSessions.AnyAsync(ct));
+    }
+
+    // Resuming a session whose content has changed would commit the tail of the new file on top of the
+    // head of the old one.
+    [Fact]
+    public async Task ASessionWhoseContentChanged_IsDiscardedRatherThanResumed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var versionId = Guid.NewGuid();
+
+        _db.BackupUploadSessions.Add(new BackupUploadSession
+        {
+            Id = Guid.NewGuid(),
+            BackupSourceId = _sourceId,
+            DocumentVersionId = versionId,
+            SessionUri = "https://session/1",
+            BytesCommitted = 4096,
+            FileHash = "a-completely-different-hash",
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await _db.SaveChangesAsync(ct);
+
+        await _sut.HandleAsync(CreateJob([Put(versionId, "2025/Big.pdf", sourcePath, hash)]), ct);
+
+        var context = Assert.Single(_target.PutContexts);
+        Assert.Null(context.ResumeSessionUri);
+        Assert.False(await _db.BackupUploadSessions.AnyAsync(ct));
+    }
+
+    [Fact]
+    public async Task APut_CarriesBothHashesSoTheTargetCanVerifyWhicheverItReports()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        _target.ContentHashSupported = true;
+
+        await _sut.HandleAsync(CreateJob([Put(Guid.NewGuid(), "2025/Doc.pdf", sourcePath, hash)]), ct);
+
+        var context = Assert.Single(_target.PutContexts);
+        Assert.Equal(hash, context.Sha256Hex);
+        Assert.False(string.IsNullOrEmpty(context.Md5Hex));
+    }
+
+    // MD5 is a fallback for destinations that report their own checksum; computing it for a filesystem
+    // that reports none is pure waste on every byte of the library.
+    [Fact]
+    public async Task APut_SkipsTheMd5PassForATargetThatReportsNoChecksum()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        await _sut.HandleAsync(CreateJob([Put(Guid.NewGuid(), "2025/Doc.pdf", sourcePath, hash)]), ct);
+
+        Assert.Null(Assert.Single(_target.PutContexts).Md5Hex);
+    }
+
+    // --- Out of space ---------------------------------------------------------------------------------
+
+    // Remaining puts cannot succeed, but moves and deletes still run — deletes are exactly what frees
+    // space.
+    [Fact]
+    public async Task OutOfSpace_SkipsRemainingPutsButStillRunsDeletes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        var deletedVersion = Guid.NewGuid();
+        SeedState(deletedVersion, "2025/Old.pdf");
+        _target.Objects["2025/Old.pdf"] = "old";
+
+        _target.OutOfSpaceAt = "2025/A.pdf";
+
+        var job = CreateJob([
+            Put(Guid.NewGuid(), "2025/A.pdf", sourcePath, hash),
+            Put(Guid.NewGuid(), "2025/B.pdf", sourcePath, hash),
+            new BackupAction
+            {
+                Kind = BackupActionKind.Delete,
+                VersionId = deletedVersion,
+                RelativePath = "2025/Old.pdf",
+                Handle = "2025/Old.pdf",
+            },
+        ]);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        // One clean sentence, not two hundred identical fragments.
+        Assert.Contains("out of storage space", ex.Message);
+        Assert.DoesNotContain(";", ex.Message);
+
+        Assert.DoesNotContain("2025/B.pdf", _target.Objects.Keys);
+        Assert.DoesNotContain("2025/Old.pdf", _target.Objects.Keys);
+        Assert.False(await _db.DocumentBackupStates.AnyAsync(s => s.DocumentVersionId == deletedVersion, ct));
+    }
+
+    // A typed marker, because the card must decide how to render without parsing message strings — and a
+    // parent job carries no error string of its own.
+    [Fact]
+    public async Task OutOfSpace_StagesACodedOutcomeOnTheJob()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+        _target.OutOfSpaceAt = "2025/A.pdf";
+
+        var job = CreateJob([
+            Put(Guid.NewGuid(), "2025/A.pdf", sourcePath, hash),
+            Put(Guid.NewGuid(), "2025/B.pdf", sourcePath, hash),
+        ]);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        var outcome = JsonSerializer.Deserialize<BackupBatchOutcome>(job.Result!)!;
+        Assert.Equal(BackupBatchOutcome.OutOfSpaceCode, outcome.ErrorCode);
+        Assert.Equal(2, outcome.SkippedPuts);
+    }
+
+    // --- Prune dispatch -------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task PruneFolderActions_AreDispatchedAsOneCallAndNeverCountAsFailures()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var job = CreateJob([
+            new BackupAction { Kind = BackupActionKind.PruneFolder, RelativePath = "Documents/2025/_versions" },
+            new BackupAction { Kind = BackupActionKind.PruneFolder, RelativePath = "Documents/2025" },
+        ]);
+
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Equal(["Documents/2025/_versions", "Documents/2025"], _target.PrunedFolders);
+        Assert.Equal(1, _target.PruneCallCount);
+    }
+
+    // Best-effort by design: failing the run's LAST batch over housekeeping would paint a fully-converged
+    // mirror red.
+    [Fact]
+    public async Task AFailingPrune_DoesNotFailTheBatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _target.FailPrune = true;
+
+        var job = CreateJob([
+            new BackupAction { Kind = BackupActionKind.PruneFolder, RelativePath = "Documents/2025" },
+        ]);
+
+        await _sut.HandleAsync(job, ct);
+    }
+
+    // --- Fail-fast off the latch ----------------------------------------------------------------------
+
+    // Every still-queued sibling batch of a run whose credential died mid-flight short-circuits off the
+    // persisted marker instead of hammering the token endpoint in turn.
+    [Fact]
+    public async Task AGateRefusal_FailsTheBatchBeforeTouchingTheTarget()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (sourcePath, hash) = SeedBlob("hello");
+
+        _gate.CheckAsync(Arg.Any<IBackupTarget>(), Arg.Any<CancellationToken>())
+            .Returns(new TargetGateResult(false, "Google revoked the authorization — reconnect."));
+
+        var job = CreateJob([Put(Guid.NewGuid(), "2025/Doc.pdf", sourcePath, hash)]);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _sut.HandleAsync(job, ct));
+
+        Assert.Contains("reconnect", ex.Message);
+        Assert.Empty(_target.Objects);
+    }
+
     /// <summary>An in-memory stand-in for a destination, so the handler's contract is what's under test.</summary>
     private sealed class RecordingTarget(string key) : IBackupTarget
     {
         public Dictionary<string, string> Objects { get; } = new(StringComparer.Ordinal);
         public bool Available { get; set; } = true;
         public string? FailPutsAt { get; set; }
+        public string? OutOfSpaceAt { get; set; }
+        public bool ContentHashSupported { get; set; }
+        public bool FailPrune { get; set; }
+        public int PruneCallCount { get; private set; }
 
         public string Key => key;
         public BackupTargetKind? Kind => BackupTargetKind.Local;
         public string? Location => "/tmp/mirror";
         public bool IsAvailable => Available;
         public string? ConfigurationError => Available ? null : "Path is required.";
-        public BackupTargetCapabilities Capabilities => BackupTargetCapabilities.Default;
+        public BackupTargetCapabilities Capabilities =>
+            BackupTargetCapabilities.Default with { SupportsContentHash = ContentHashSupported };
 
-        public async Task<string> PutAsync(
-            BackupObjectRef target, Stream content, string contentType, CancellationToken ct)
+        /// <summary>Paths whose put should park mid-upload instead of completing.</summary>
+        public Dictionary<string, BackupPutResult.Suspended> SuspendPutsAt { get; } =
+            new(StringComparer.Ordinal);
+
+        public List<BackupPutContext> PutContexts { get; } = [];
+        public List<string> PrunedFolders { get; } = [];
+        public List<string> EnsuredFolders { get; } = [];
+
+        public async Task<BackupPutResult> PutAsync(
+            BackupObjectRef target, Stream content, BackupPutContext context, CancellationToken ct)
         {
+            PutContexts.Add(context);
+
             if (FailPutsAt == target.RelativePath)
                 throw new InvalidOperationException($"Simulated write failure at {target.RelativePath}.");
 
+            if (OutOfSpaceAt == target.RelativePath)
+                throw new BackupTargetOutOfSpaceException("Simulated: the target is out of storage space.");
+
+            if (SuspendPutsAt.TryGetValue(target.RelativePath, out var suspended))
+                return suspended;
+
             using var reader = new StreamReader(content);
             Objects[target.RelativePath] = await reader.ReadToEndAsync(ct);
-            return target.RelativePath;
+            return new BackupPutResult.Completed(target.RelativePath);
+        }
+
+        public Task EnsureFoldersAsync(IReadOnlyCollection<string> folderPaths, CancellationToken ct)
+        {
+            EnsuredFolders.AddRange(folderPaths);
+            return Task.CompletedTask;
+        }
+
+        public Task PruneEmptyFoldersAsync(IReadOnlyCollection<string> folderPaths, CancellationToken ct)
+        {
+            PruneCallCount++;
+
+            if (FailPrune)
+                throw new InvalidOperationException("Simulated prune failure.");
+
+            PrunedFolders.AddRange(folderPaths);
+            return Task.CompletedTask;
         }
 
         public Task<string> MoveAsync(BackupObjectRef from, string toRelativePath, CancellationToken ct)

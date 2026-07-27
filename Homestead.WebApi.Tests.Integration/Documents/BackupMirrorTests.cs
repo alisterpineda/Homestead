@@ -128,10 +128,15 @@ public class BackupMirrorTests : IntegrationTestBase
         return await db.DocumentBackupStates.CountAsync(s => s.BackupSourceId == sourceId, CT);
     }
 
+    // The suite configures more than one target now (a Local one and a GoogleDrive one), so "the single
+    // card" is no longer a valid way to reach the one these tests mirror to.
+    private static TargetItem LocalTarget(TargetsResult targets) =>
+        targets.Items.Single(t => t.Key == TargetKey);
+
     private async Task<SourceItem> GetSourceAsync(HttpClient client, Guid sourceId)
     {
         var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        return Assert.Single(targets!.Items).Sources.Single(s => s.Id == sourceId);
+        return LocalTarget(targets!).Sources.Single(s => s.Id == sourceId);
     }
 
     private async Task AddVersionAndWaitAsync(HttpClient client, Guid documentId)
@@ -548,7 +553,7 @@ public class BackupMirrorTests : IntegrationTestBase
         await RunBackupExpectingSuccessAsync(client, sourceId);
 
         var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        var target = Assert.Single(targets!.Items);
+        var target = LocalTarget(targets!);
 
         Assert.Equal(TargetKey, target.Key);
         Assert.Equal("Local", target.Kind);
@@ -570,6 +575,23 @@ public class BackupMirrorTests : IntegrationTestBase
         Assert.Contains(targets.SourceKinds, k => k.Key == DocumentsBackupSourceDescriptor.SourceKey);
     }
 
+    // The catch-all staleness line renders "never" off a NULL, so a pairing that has never completed a
+    // run must send null — not the default DateTimeOffset, which reads as a date two millennia ago.
+    [Fact]
+    public async Task LastSuccessfulRunAt_IsNullUntilARunActuallyCompletes()
+    {
+        var client = await CreateAdminClientAsync();
+        var sourceId = await CreateSourceAsync(client);
+
+        Assert.Null((await GetSourceAsync(client, sourceId)).LastSuccessfulRunAt);
+
+        await RunBackupExpectingSuccessAsync(client, sourceId);
+
+        var after = (await GetSourceAsync(client, sourceId)).LastSuccessfulRunAt;
+        Assert.NotNull(after);
+        Assert.True(after > DateTimeOffset.UtcNow.AddMinutes(-5));
+    }
+
     [Fact]
     public async Task DisablingTheTarget_BlocksRunsForEverySourceOnIt()
     {
@@ -581,7 +603,7 @@ public class BackupMirrorTests : IntegrationTestBase
         patch.EnsureSuccessStatusCode();
 
         var targets = await client.GetFromJsonAsync<TargetsResult>("/api/v1/admin/backup/targets", CT);
-        Assert.False(Assert.Single(targets!.Items).IsEnabled);
+        Assert.False(LocalTarget(targets!).IsEnabled);
 
         var run = await client.PostAsJsonAsync(
             $"/api/v1/admin/backup/sources/{sourceId}/runs", new { }, CT);
@@ -718,6 +740,7 @@ public class BackupMirrorTests : IntegrationTestBase
         int BackedUpFileCount,
         long BackedUpBytes,
         RunStatusItem? LastRun,
+        DateTimeOffset? LastSuccessfulRunAt,
         ScheduleItem? Schedule);
 
     private record RunStatusItem(

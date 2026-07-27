@@ -45,8 +45,8 @@ public sealed class BackupTargetResolver : IBackupTargetResolver
 
         public BackupTargetCapabilities Capabilities => BackupTargetCapabilities.Default;
 
-        public Task<string> PutAsync(
-            BackupObjectRef target, Stream content, string contentType, CancellationToken ct) =>
+        public Task<BackupPutResult> PutAsync(
+            BackupObjectRef target, Stream content, BackupPutContext context, CancellationToken ct) =>
             throw Unavailable();
 
         public Task<string> MoveAsync(BackupObjectRef from, string toRelativePath, CancellationToken ct) =>

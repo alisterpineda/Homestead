@@ -23,6 +23,7 @@ public class RunBackupNowHandler(
     AppDbContext db,
     IBackupSourceCatalog catalog,
     IBackupTargetResolver resolver,
+    IBackupTargetGate gate,
     IJobQueue queue,
     ICurrentUserAccessor currentUser)
     : IRequestHandler<RunBackupNowCommand, RunBackupNowResponse>
@@ -40,9 +41,10 @@ public class RunBackupNowHandler(
 
         var target = resolver.Resolve(source.TargetKey);
 
-        if (!target.IsAvailable)
+        var verdict = await gate.CheckAsync(target, ct);
+        if (!verdict.IsAvailable)
             throw new BusinessRuleException(
-                $"Backup target '{source.TargetKey}' is unavailable: {target.ConfigurationError}");
+                $"Backup target '{source.TargetKey}' is unavailable: {verdict.Reason}");
 
         if (!source.IsEnabled)
             throw new BusinessRuleException("This backup is disabled.");

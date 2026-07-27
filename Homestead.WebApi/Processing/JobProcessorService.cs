@@ -12,7 +12,7 @@ public class JobProcessorService(
     ILogger<JobProcessorService> logger) : BackgroundService, IJobProcessorControl, IJobSignal
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan JobTimeout = TimeSpan.FromMinutes(5);
+    private readonly TimeSpan _jobTimeout = options.Value.ResolveJobTimeout();
     private readonly int _maxConcurrency = Math.Max(1, options.Value.MaxConcurrency);
     private readonly SemaphoreSlim _processingGate = new(
         Math.Max(1, options.Value.MaxConcurrency),
@@ -199,7 +199,7 @@ public class JobProcessorService(
             }
 
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(JobTimeout);
+            timeoutCts.CancelAfter(_jobTimeout);
 
             try
             {
@@ -207,7 +207,7 @@ public class JobProcessorService(
             }
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !ct.IsCancellationRequested)
             {
-                throw new TimeoutException($"Job {jobId} timed out after {JobTimeout.TotalMinutes} minutes");
+                throw new TimeoutException($"Job {jobId} timed out after {_jobTimeout.TotalMinutes} minutes");
             }
 
             if (handler is IParentJobHandler)

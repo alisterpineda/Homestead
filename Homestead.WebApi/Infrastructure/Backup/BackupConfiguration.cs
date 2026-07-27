@@ -33,11 +33,26 @@ public static class BackupConfiguration
         options.Kind switch
         {
             BackupTargetKind.Local => ValidateLocal(options, storage),
+            BackupTargetKind.GoogleDrive => ValidateGoogleDrive(options),
             // Refuse rather than defaulting to Local, which would silently write the mirror somewhere the
             // operator never named.
             null => $"Kind is required (one of: {string.Join(", ", Enum.GetNames<BackupTargetKind>())}).",
             var kind => $"Unknown target kind '{kind}'."
         };
+
+    // Config-shape only. Whether a grant is stored, still decrypts, and still works is database state
+    // that changes under a static verdict, so it is composed at read time by IBackupTargetGate — this
+    // answers strictly "could this target ever run", which is the question a constructor can answer once.
+    private static string? ValidateGoogleDrive(BackupTargetOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.ClientId))
+            return "ClientId is required for a GoogleDrive target.";
+
+        if (string.IsNullOrWhiteSpace(options.ClientSecret))
+            return "ClientSecret is required for a GoogleDrive target.";
+
+        return null;
+    }
 
     private static string? ValidateLocal(BackupTargetOptions options, FileStorageOptions storage)
     {

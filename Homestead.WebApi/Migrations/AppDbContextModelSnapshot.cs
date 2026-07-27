@@ -116,16 +116,64 @@ namespace Homestead.WebApi.Migrations
                     b.ToTable("sources", "backup");
                 });
 
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupTargetFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RemoteFolderId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetKey", "Path")
+                        .IsUnique();
+
+                    b.ToTable("target_folders", "backup");
+                });
+
             modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupTargetState", b =>
                 {
                     b.Property<string>("TargetKey")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<DateTimeOffset?>("AuthFailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AuthFailedReason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ConnectedAccountEmail")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("EncryptedGrant")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("GrantIssuedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsEnabled")
                         .ValueGeneratedOnAdd()
@@ -140,6 +188,48 @@ namespace Homestead.WebApi.Migrations
                     b.HasKey("TargetKey");
 
                     b.ToTable("target_state", "backup");
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupUploadSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BackupSourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("BytesCommitted")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("DocumentVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SessionUri")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BackupSourceId", "DocumentVersionId")
+                        .IsUnique();
+
+                    b.ToTable("upload_sessions", "backup");
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Backup.DocumentBackupState", b =>
@@ -1843,6 +1933,24 @@ namespace Homestead.WebApi.Migrations
                         .WithMany()
                         .HasForeignKey("ScheduleId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupTargetFolder", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Backup.BackupTargetState", null)
+                        .WithMany()
+                        .HasForeignKey("TargetKey")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homestead.WebApi.Domain.Backup.BackupUploadSession", b =>
+                {
+                    b.HasOne("Homestead.WebApi.Domain.Backup.BackupSource", null)
+                        .WithMany()
+                        .HasForeignKey("BackupSourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Homestead.WebApi.Domain.Backup.DocumentBackupState", b =>

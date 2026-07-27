@@ -31,6 +31,7 @@ namespace Homestead.WebApi.Modules.Documents.Processing;
 public class BackupToTargetJobHandler(
     AppDbContext db,
     IBackupTargetResolver targetResolver,
+    IBackupTargetGate gate,
     IOptions<DocumentBackupEngineOptions> engineOptions,
     IJobSignal signal,
     ILogger<BackupToTargetJobHandler> logger) : IParentJobHandler
@@ -104,9 +105,10 @@ public class BackupToTargetJobHandler(
         // fails loudly rather than completing quietly — a mirror that reports success while copying
         // nothing is the worst possible outcome for a backup. Checked AFTER the two enable flags: an
         // operator who has already paused this pairing should not be paged about the destination.
-        if (!target.IsAvailable)
+        var verdict = await gate.CheckAsync(target, ct);
+        if (!verdict.IsAvailable)
             throw new BusinessRuleException(
-                $"Backup target '{source.TargetKey}' is unavailable: {target.ConfigurationError}");
+                $"Backup target '{source.TargetKey}' is unavailable: {verdict.Reason}");
 
         // Single-flight, as a plain indexed query on EntityId. Two overlapping planners would each see a
         // pre-change state table and double-enqueue the same copies. The ParentJobId filter is
@@ -135,6 +137,14 @@ public class BackupToTargetJobHandler(
         if (!payload.DryRun)
             await ReconcilePruneLatchAsync(source, plan, payload.AllowLargePrune, ct);
 
+        // Appended last, so it takes the lowest child priority and therefore claims after every mutation
+        // batch in the run — including any continuation, which inherits its predecessor's priority and so
+        // still sits above this. That ordering is the whole reason the prune is a batch rather than an
+        // inline step.
+        var batches = payload.DryRun
+            ? plan.Batches
+            : AppendPruneBatch(plan, target);
+
         var summary = new BackupRunSummary
         {
             BackupSourceId = sourceId,
@@ -143,7 +153,7 @@ public class BackupToTargetJobHandler(
             Moves = plan.MoveCount,
             Deletes = plan.DeleteCount,
             Unchanged = plan.UnchangedCount,
-            BatchCount = payload.DryRun ? 0 : plan.Batches.Count,
+            BatchCount = payload.DryRun ? 0 : batches.Count,
             TotalBytes = plan.TotalBytes,
             PruneBlocked = plan.PruneBlocked,
             BlockedDeleteCount = plan.BlockedDeleteCount,
@@ -165,9 +175,16 @@ public class BackupToTargetJobHandler(
             return;
         }
 
-        for (var index = 0; index < plan.Batches.Count; index++)
+        // The one stated exception to "the planner does no I/O". An id-addressed destination cannot let
+        // batches find-or-create folders concurrently — that race mints twin year-shards and splits the
+        // mirror permanently — so folders are resolved once, here, sequentially. Bounded by the number of
+        // NEW folders (roughly, new year shards — tens), never by file count, so it cannot threaten the
+        // job timeout this rule exists to protect. A no-op for a filesystem target.
+        await target.EnsureFoldersAsync(PlannedFolders(batches), ct);
+
+        for (var index = 0; index < batches.Count; index++)
         {
-            var batch = plan.Batches[index];
+            var batch = batches[index];
 
             var child = new ProcessingJob
             {
@@ -186,15 +203,65 @@ public class BackupToTargetJobHandler(
             db.ProcessingJobs.Add(child);
         }
 
-        job.TotalChildCount = plan.Batches.Count;
+        job.TotalChildCount = batches.Count;
         await db.SaveChangesAsync(ct);
         signal.Signal();
 
         logger.LogInformation(
             "Backup run for source {SourceId} ({TargetKey}) fanned out {BatchCount} batch(es): " +
             "{Puts} put(s), {Moves} move(s), {Deletes} delete(s), {Unchanged} unchanged",
-            sourceId, source.TargetKey, plan.Batches.Count, plan.PutCount, plan.MoveCount,
+            sourceId, source.TargetKey, batches.Count, plan.PutCount, plan.MoveCount,
             plan.DeleteCount, plan.UnchangedCount);
+    }
+
+    /// <summary>
+    /// The plan's batches, plus a final trash-only folder sweep when the destination needs one.
+    /// </summary>
+    /// <remarks>
+    /// Candidates are the folders this run is about to empty — the parents of every delete and of every
+    /// move's ORIGIN. A move's destination is not a candidate: something just landed in it.
+    /// </remarks>
+    private static IReadOnlyList<BackupActionBatch> AppendPruneBatch(BackupPlan plan, IBackupTarget target)
+    {
+        if (!target.Capabilities.DefersFolderPrune)
+            return plan.Batches;
+
+        var candidates = plan.Batches
+            .SelectMany(b => b.Actions)
+            .Select(a => a.Kind switch
+            {
+                BackupActionKind.Delete => ParentFolder(a.RelativePath),
+                BackupActionKind.Move => ParentFolder(a.FromRelativePath ?? string.Empty),
+                _ => null
+            })
+            .OfType<string>()
+            .Where(p => p.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            // Deepest first, so trashing a leaf makes its parent a candidate within the same sweep.
+            .OrderByDescending(p => p.Count(c => c == '/'))
+            .ThenBy(p => p, StringComparer.Ordinal)
+            .Select(p => new BackupAction { Kind = BackupActionKind.PruneFolder, RelativePath = p })
+            .ToList();
+
+        if (candidates.Count == 0)
+            return plan.Batches;
+
+        return [.. plan.Batches, new BackupActionBatch(candidates)];
+    }
+
+    /// <summary>Every folder a batch is about to write into — what the ensure step has to guarantee.</summary>
+    private static IReadOnlyCollection<string> PlannedFolders(IReadOnlyList<BackupActionBatch> batches) =>
+        batches
+            .SelectMany(b => b.Actions)
+            .Where(a => a.Kind is BackupActionKind.Put or BackupActionKind.Move)
+            .Select(a => ParentFolder(a.RelativePath))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+    private static string ParentFolder(string relativePath)
+    {
+        var index = relativePath.LastIndexOf('/');
+        return index < 0 ? string.Empty : relativePath[..index];
     }
 
     private async Task<BackupPlan> BuildPlanAsync(
@@ -233,7 +300,18 @@ public class BackupToTargetJobHandler(
         var desired = BackupPathPlanner.Plan(
             versions, target.Capabilities, DocumentsBackupSourceDescriptor.RootFolderName);
 
-        return BackupPlanBuilder.Build(desired, existing, engineOptions.Value, allowLargePrune);
+        var options = engineOptions.Value;
+
+        // The documents engine's caps, then the destination's override on top. A Drive target says
+        // "25 files / 64 MB" here where local disk says "100 / 512 MB", because the binding constraint
+        // stopped being disk bandwidth and became the household's uplink.
+        var caps = BackupBatchCaps.Resolve(
+            options.MaxFilesPerBatch,
+            options.MaxBytesPerBatch,
+            options.MaxOpsPerMetadataBatch,
+            target.BatchCapOverrides);
+
+        return BackupPlanBuilder.Build(desired, existing, options, caps, allowLargePrune);
     }
 
     // Latches the breaker onto the SOURCE row so the admin page can show "N deletions were blocked" with

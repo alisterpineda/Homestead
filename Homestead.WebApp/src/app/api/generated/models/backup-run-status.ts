@@ -11,6 +11,7 @@ export interface BackupRunStatus {
   error?: (string | null);
   failedChildCount: number;
   jobId: string;
+  outOfSpace: boolean;
   startedAt?: (string | null);
   status: ProcessingJobStatus;
   summary?: (null | BackupRunSummary);

@@ -17,11 +17,19 @@ namespace Homestead.WebApi.Infrastructure.Backup;
 /// the file, which is what the state row exists to avoid) — declared so a Phase 2 cloud target can
 /// verify a copy landed intact without downloading it back.
 /// </param>
+/// <param name="DefersFolderPrune">
+/// True when emptied folders must be swept by a final pass after every mutation in the run, rather than
+/// inline as each delete happens. False for a filesystem, where "is this directory empty right now" is a
+/// true answer; true where listing is eventually consistent and an inline check would race the same run's
+/// own moves — trashing a folder with a just-arrived file inside it whose state row still reads
+/// "mirrored". The planner reads this to decide whether to emit a final prune batch.
+/// </param>
 public readonly record struct BackupTargetCapabilities(
     int MaxSegmentLength,
     int MaxPathLength,
     bool SupportsMove,
-    bool SupportsContentHash)
+    bool SupportsContentHash,
+    bool DefersFolderPrune = false)
 {
     /// <summary>
     /// Conservative caps that work everywhere: 255 bytes per segment is the floor across ext4/APFS/NTFS,

@@ -30,8 +30,16 @@ public sealed class LocalDirectoryBackupTarget : IBackupTarget
     // exactly the work the state row exists to avoid — so SupportsContentHash is false.
     public BackupTargetCapabilities Capabilities => BackupTargetCapabilities.Default;
 
-    public async Task<string> PutAsync(
-        BackupObjectRef target, Stream content, string contentType, CancellationToken ct)
+    // Disk bandwidth is what the source kind's caps were sized against, so there is nothing to override
+    // by default — but an operator with unusually slow storage can still say so per target.
+    public BackupBatchCapOverrides BatchCapOverrides => new(
+        _options.MaxFilesPerBatch, _options.MaxBytesPerBatch, _options.MaxOpsPerMetadataBatch);
+
+    // Ignores every extra on the context: a local write cannot be suspended (it runs at disk speed, so a
+    // deadline is not the binding constraint), there is no session to resume, and no checksum comes back
+    // from the filesystem to verify against.
+    public async Task<BackupPutResult> PutAsync(
+        BackupObjectRef target, Stream content, BackupPutContext context, CancellationToken ct)
     {
         var fullPath = ResolveWithinRoot(target.RelativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -59,7 +67,7 @@ public sealed class LocalDirectoryBackupTarget : IBackupTarget
             throw;
         }
 
-        return target.RelativePath;
+        return new BackupPutResult.Completed(target.RelativePath);
     }
 
     public Task<string> MoveAsync(BackupObjectRef from, string toRelativePath, CancellationToken ct)
@@ -144,6 +152,10 @@ public sealed class LocalDirectoryBackupTarget : IBackupTarget
     // Deleting the last file in a year shard (or a _versions folder) would otherwise leave an empty
     // directory behind forever, and the mirror's whole point is being browsable. Best-effort: a failure
     // here leaves an empty folder, which is cosmetic.
+    //
+    // Inline, and PruneEmptyFoldersAsync stays the interface's no-op: a filesystem listing is immediately
+    // consistent, so "is this directory empty right now" is a true answer here. The deferred final pass
+    // exists for destinations where it is not.
     private void TryPruneEmptyParents(string? directory)
     {
         if (_root is null || directory is null)

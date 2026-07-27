@@ -29,6 +29,12 @@ public class DomainExceptionHandler : IExceptionHandler
                 ProblemDetailsFactory.ValidationErrors(e.Errors
                     .GroupBy(f => f.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).ToArray())),
+            // A credential the operator has to fix — a wrong client id, a client of the wrong type, a
+            // revoked grant, a key ring that no longer decrypts. The message is built for a human to act
+            // on, so it must reach them: without this case it falls through to an unhandled 500 and the
+            // connect dialog shows "An unexpected server error occurred" instead of the actual fix.
+            Infrastructure.Backup.GoogleDrive.GoogleDriveAuthException e =>
+                ProblemDetailsFactory.BusinessRule(e.Message),
             // Minimal-API parameter binding throws this for malformed/missing query params (bad Guid,
             // non-numeric int, etc.). Without this case it falls through to an unhandled 500; surface
             // its intended status (400) instead. Defense-in-depth for the whole API.

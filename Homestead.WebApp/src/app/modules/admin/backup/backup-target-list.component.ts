@@ -9,6 +9,8 @@ import {
   lucidePlay,
   lucideEye,
   lucideTrash2,
+  lucideLink,
+  lucideUnlink,
 } from '@ng-icons/lucide';
 import { toast } from '@spartan-ng/brain/sonner';
 import { HlmIconImports } from '@/shared/components/spartan/icon';
@@ -24,13 +26,16 @@ import { AdminBackupApiService } from '@/api/services/admin-backup-api.service';
 import { ErrorHandlerService } from '@/shared/services/error-handler.service';
 import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import { formatBytes } from '@/shared/utils';
+import { formatRelativeAge } from '@/shared/utils/relative-age';
 import { handleMutationError, handleQueryError } from '@/shared/utils/rxjs-error.utils';
 import type { BackupTargetResponse } from '@/api/generated/models/backup-target-response';
 import type { BackupSourceItemResponse } from '@/api/generated/models/backup-source-item-response';
 import type { BackupSourceKindResponse } from '@/api/generated/models/backup-source-kind-response';
 import type { ProcessingJobStatus } from '@/api/generated/models/processing-job-status';
+import type { ValidateBackupTargetConnectionResponse } from '@/api/generated/models/validate-backup-target-connection-response';
 import { BackupScheduleDialogComponent } from './backup-schedule-dialog.component';
 import { AddBackupDialogComponent } from './add-backup-dialog.component';
+import { ConnectGoogleDialogComponent } from './connect-google-dialog.component';
 
 /** What the delete confirmation is currently offering, which escalates as the server pushes back. */
 type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
@@ -53,6 +58,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
     HlmAlertDialogImports,
     BackupScheduleDialogComponent,
     AddBackupDialogComponent,
+    ConnectGoogleDialogComponent,
   ],
   providers: [
     provideIcons({
@@ -62,6 +68,8 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
       lucidePlay,
       lucideEye,
       lucideTrash2,
+      lucideLink,
+      lucideUnlink,
     }),
   ],
   template: `
@@ -91,17 +99,19 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
               <div hlmEmptyTitle>No backup targets configured</div>
               <div hlmEmptyDescription>
                 Backup is off. Define a target with
-                <span class="font-mono">Backup:Targets:&#123;name&#125;:Kind</span> and
-                <span class="font-mono">:Path</span> — in AppHost user-secrets, or as
+                <span class="font-mono">Backup:Targets:&#123;name&#125;:Kind</span> — plus
+                <span class="font-mono">:Path</span> for a local directory, or
+                <span class="font-mono">:ClientId</span> and <span class="font-mono">:ClientSecret</span>
+                for Google Drive — in AppHost user-secrets, or as
                 <span class="font-mono">Backup__Targets__&#8230;</span> environment variables in Docker.
               </div>
             </div>
           </div>
         } @else {
           <p class="text-sm text-muted-foreground">
-            A one-way mirror onto a separate filesystem. Each dataset you add gets its own folder at the
-            destination root and is laid out with human-readable names. Files are copied out; nothing is
-            ever read back in.
+            A one-way mirror onto a separate destination — a filesystem, or a Google Drive you own. Each
+            dataset you add gets its own folder at the destination root and is laid out with
+            human-readable names. Files are copied out; nothing is ever read back in.
           </p>
 
           @for (t of list; track t.key) {
@@ -110,7 +120,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 hlmCardTitle class="font-mono text-base">{{ t.key }}</h2>
                   <span hlmBadge variant="secondary">{{ kindLabel(t.kind) }}</span>
-                  @if (t.isAvailable) {
+                  @if (available(t)) {
                     <span hlmBadge variant="default" data-testid="availability-badge">Available</span>
                   } @else {
                     <span
@@ -129,10 +139,116 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
               </div>
 
               <div hlmCardContent class="flex flex-col gap-4">
-                @if (!t.isAvailable) {
+                @if (!available(t)) {
                   <p class="text-sm text-destructive" data-testid="configuration-error">
-                    {{ t.configurationError ?? 'This target is unavailable.' }}
+                    {{ unavailableReason(t) ?? 'This target is unavailable.' }}
                   </p>
+                }
+
+                <!-- Only a kind that can be *connected* as well as configured shows any of this. -->
+                @if (t.connection; as conn) {
+                  <div
+                    class="flex flex-col gap-3 rounded-md border p-3"
+                    [attr.data-testid]="'connection-' + t.key"
+                  >
+                    @if (conn.isConnected) {
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-sm">
+                            Connected as
+                            <span class="font-medium" [attr.data-testid]="'connected-as-' + t.key">
+                              {{ conn.connectedAccountEmail ?? 'an unnamed Google account' }}
+                            </span>
+                          </span>
+                          @if (validating()[t.key]) {
+                            <span class="flex items-center gap-2 text-xs text-muted-foreground">
+                              <hlm-spinner class="size-3" />
+                              Checking with Google&hellip;
+                            </span>
+                          } @else if (freeSpaceLabel(t); as space) {
+                            <span
+                              class="text-xs text-muted-foreground"
+                              [attr.data-testid]="'free-space-' + t.key"
+                            >
+                              {{ space }}
+                            </span>
+                          }
+                        </div>
+
+                        <hlm-alert-dialog>
+                          <button
+                            hlmBtn
+                            variant="ghost"
+                            size="sm"
+                            hlmAlertDialogTrigger
+                            [attr.data-testid]="'disconnect-' + t.key"
+                            [disabled]="busy()"
+                          >
+                            <ng-icon hlm name="lucideUnlink" size="sm" />
+                            Disconnect
+                          </button>
+                          <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                            <div hlmAlertDialogHeader>
+                              <h2 hlmAlertDialogTitle>Disconnect this Google account?</h2>
+                              <p hlmAlertDialogDescription>
+                                Homestead forgets the credential and revokes it with Google. The mirrored
+                                files stay in
+                                {{ conn.connectedAccountEmail ?? 'the connected account' }}'s Drive —
+                                delete them there if you want them gone. Reconnecting the same account
+                                resumes where this left off.
+                              </p>
+                            </div>
+                            <div hlmAlertDialogFooter>
+                              <button hlmAlertDialogCancel (click)="ctx.close()">Cancel</button>
+                              <button
+                                hlmAlertDialogAction
+                                variant="destructive"
+                                [attr.data-testid]="'confirm-disconnect-' + t.key"
+                                (click)="disconnect(t, ctx)"
+                              >
+                                Disconnect
+                              </button>
+                            </div>
+                          </hlm-alert-dialog-content>
+                        </hlm-alert-dialog>
+                      </div>
+
+                      @if (authFailure(t); as reason) {
+                        <div
+                          class="flex flex-col gap-2 rounded-md border border-destructive/50 p-3 text-sm text-destructive"
+                          [attr.data-testid]="'auth-failed-banner-' + t.key"
+                        >
+                          <p class="flex items-start gap-2">
+                            <ng-icon hlm name="lucideTriangleAlert" size="sm" class="mt-0.5 shrink-0" />
+                            <span>{{ reason }}</span>
+                          </p>
+                          <div>
+                            <app-connect-google-dialog
+                              [targetKey]="t.key"
+                              triggerVariant="destructive"
+                              (connected)="load()"
+                            >
+                              <ng-icon hlm name="lucideLink" size="sm" />
+                              Reconnect
+                            </app-connect-google-dialog>
+                          </div>
+                        </div>
+                      }
+                    } @else {
+                      <div class="flex flex-col gap-2">
+                        <p class="text-sm text-muted-foreground">
+                          No Google account is connected yet. Homestead can only see and manage files it
+                          creates — never the rest of your Drive.
+                        </p>
+                        <div>
+                          <app-connect-google-dialog [targetKey]="t.key" (connected)="load()">
+                            <ng-icon hlm name="lucideLink" size="sm" />
+                            Connect Google account
+                          </app-connect-google-dialog>
+                        </div>
+                      </div>
+                    }
+                  </div>
                 }
 
                 <div class="flex items-center gap-2">
@@ -161,7 +277,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                       <div class="flex flex-col gap-3 p-3" [attr.data-testid]="'backup-source-' + s.id">
                         <div class="flex flex-wrap items-center gap-2">
                           <span class="font-medium">{{ s.sourceDisplayName ?? s.sourceKind }}</span>
-                          @if (!s.isAvailable) {
+                          @if (!sourceAvailable(t, s)) {
                             <span hlmBadge variant="outline" class="!text-muted-foreground">
                               Unavailable
                             </span>
@@ -188,12 +304,12 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                           }
                         </div>
 
-                        @if (s.unavailableReason) {
+                        @if (sourceUnavailableReason(t, s); as reason) {
                           <p
                             class="text-sm text-destructive"
                             [attr.data-testid]="'source-unavailable-' + s.id"
                           >
-                            {{ s.unavailableReason }}
+                            {{ reason }}
                           </p>
                         }
 
@@ -290,7 +406,7 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                                     · paused (backup disabled)
                                   } @else if (!t.isEnabled) {
                                     · paused (destination disabled)
-                                  } @else if (!s.isAvailable) {
+                                  } @else if (!sourceAvailable(t, s)) {
                                     · paused (unavailable)
                                   } @else {
                                     · next {{ sched.nextRunAt | date: 'short' }}
@@ -302,6 +418,19 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                             </div>
                           </div>
                         </div>
+
+                        <!-- The catch-all for every way a backup dies silently. A red "Failed" badge is
+                             obvious; a schedule that was disabled two months ago, or a run failing the
+                             same way since March, is not — and only the gap between "last run" and "last
+                             SUCCESSFUL run" says so. -->
+                        <p
+                          class="text-xs"
+                          [class.text-muted-foreground]="!isStale(s)"
+                          [class.text-destructive]="isStale(s)"
+                          [attr.data-testid]="'last-success-' + s.id"
+                        >
+                          Last successful run: {{ lastSuccessLabel(s) }}
+                        </p>
 
                         @if (s.lastRun?.summary; as summary) {
                           @if (summary.skipped) {
@@ -330,7 +459,16 @@ type DeleteStage = 'confirm' | 'cancelRun' | 'retry';
                           }
                         }
 
-                        @if (runFailures(s); as failures) {
+                        <!-- One rolled-up sentence, not two hundred identical batch fragments. Driven by
+                             the typed marker on the run, never by matching message strings. -->
+                        @if (s.lastRun?.outOfSpace) {
+                          <p
+                            class="text-sm break-words text-destructive"
+                            [attr.data-testid]="'out-of-space-' + s.id"
+                          >
+                            {{ outOfSpaceMessage(s) }}
+                          </p>
+                        } @else if (runFailures(s); as failures) {
                           @if (failures.length > 0) {
                             <div class="flex flex-col gap-1" [attr.data-testid]="'last-run-error-' + s.id">
                               @for (failure of failures; track $index) {
@@ -511,6 +649,12 @@ export class BackupTargetListComponent implements OnInit {
    */
   deleteStage = signal<DeleteStage>('confirm');
 
+  /** Which targets have a validate probe in flight, keyed by target key. */
+  validating = signal<Record<string, boolean>>({});
+
+  /** The probe's answer, which supersedes the list endpoint's cheap verdict for that target. */
+  validation = signal<Record<string, ValidateBackupTargetConnectionResponse>>({});
+
   ngOnInit(): void {
     this.load();
   }
@@ -527,6 +671,130 @@ export class BackupTargetListComponent implements OnInit {
         if (!response) return;
         this.targets.set(response.items);
         this.sourceKinds.set(response.sourceKinds);
+        this.validateConnected(response.items);
+      });
+  }
+
+  /**
+   * Corrects the availability badge after render, once per connected target.
+   *
+   * The list endpoint is deliberately a pure config+DB read — it cannot tell a stored credential that
+   * still works from one Google revoked an hour ago, and making every page load wait on a third party to
+   * find out would be the wrong trade. So the page renders what it knows, then asks.
+   */
+  private validateConnected(targets: BackupTargetResponse[]): void {
+    this.validation.set({});
+    this.validating.set({});
+
+    for (const target of targets) {
+      if (!target.connection?.isConnected) continue;
+
+      const key = target.key;
+      this.validating.update(state => ({ ...state, [key]: true }));
+
+      this.api.validate(key).subscribe({
+        next: result => {
+          this.validating.update(({ [key]: _, ...rest }) => rest);
+          this.validation.update(state => ({ ...state, [key]: result }));
+        },
+        error: () => {
+          // 5xx and network errors are already auto-toasted by the error interceptor; leaving the
+          // pre-probe verdict in place is the honest fallback.
+          this.validating.update(({ [key]: _, ...rest }) => rest);
+        },
+      });
+    }
+  }
+
+  /** The probe's verdict when we have one, else the list endpoint's. */
+  available(target: BackupTargetResponse): boolean {
+    return this.validation()[target.key]?.isAvailable ?? target.isAvailable;
+  }
+
+  unavailableReason(target: BackupTargetResponse): string | null | undefined {
+    const probed = this.validation()[target.key];
+    return probed ? probed.reason : target.configurationError;
+  }
+
+  sourceAvailable(target: BackupTargetResponse, source: BackupSourceItemResponse): boolean {
+    // A pairing can be unavailable for its own reason (an unregistered kind), which no probe changes.
+    return source.isAvailable && this.available(target);
+  }
+
+  sourceUnavailableReason(
+    target: BackupTargetResponse,
+    source: BackupSourceItemResponse,
+  ): string | null | undefined {
+    return source.unavailableReason ?? (this.available(target) ? null : this.unavailableReason(target));
+  }
+
+  /** The latch reason, unless a probe has since proved the credential works. */
+  authFailure(target: BackupTargetResponse): string | null | undefined {
+    if (this.validation()[target.key]?.isAvailable) return null;
+    return target.connection?.authFailedReason;
+  }
+
+  /** Only known after the probe — the list endpoint never asks Google how full the Drive is. */
+  freeSpaceLabel(target: BackupTargetResponse): string | null {
+    const probed = this.validation()[target.key];
+    if (!probed?.isAvailable) return null;
+
+    // Null limit means unlimited, which is a real state and not zero.
+    if (probed.storageLimitBytes == null) return 'Drive storage: unlimited';
+    if (probed.storageUsedBytes == null) return null;
+
+    const free = Math.max(0, probed.storageLimitBytes - probed.storageUsedBytes);
+    return `${this.formatBytes(free)} free of ${this.formatBytes(probed.storageLimitBytes)}`;
+  }
+
+  lastSuccessLabel(source: BackupSourceItemResponse): string {
+    return source.lastSuccessfulRunAt ? formatRelativeAge(source.lastSuccessfulRunAt) : 'never';
+  }
+
+  /**
+   * Whether the last success is old enough to be worth shouting about.
+   *
+   * Scaled to the schedule where one exists — roughly two missed runs — because "3 days ago" is alarming
+   * for an hourly backup and unremarkable for a weekly one. Only flagged when a schedule is armed: a
+   * manual-only backup is as stale as its owner intends.
+   */
+  isStale(source: BackupSourceItemResponse): boolean {
+    const schedule = source.schedule;
+    if (!schedule?.isEnabled || !source.isEnabled) return false;
+
+    const threshold = this.stalenessThresholdMs(schedule);
+    if (!source.lastSuccessfulRunAt) {
+      // Never succeeded, but only stale once a scheduled run has actually had time to happen.
+      const armed = new Date(schedule.nextRunAt).getTime() - threshold;
+      return Number.isFinite(armed) && Date.now() > armed;
+    }
+
+    const age = Date.now() - new Date(source.lastSuccessfulRunAt).getTime();
+    return Number.isFinite(age) && age > threshold;
+  }
+
+  private static readonly DefaultStalenessMs = 7 * 24 * 60 * 60 * 1000;
+
+  private stalenessThresholdMs(schedule: NonNullable<BackupSourceItemResponse['schedule']>): number {
+    if (!schedule.lastRunAt) return BackupTargetListComponent.DefaultStalenessMs;
+
+    const interval = new Date(schedule.nextRunAt).getTime() - new Date(schedule.lastRunAt).getTime();
+    if (!Number.isFinite(interval) || interval <= 0) return BackupTargetListComponent.DefaultStalenessMs;
+
+    return interval * 2;
+  }
+
+  disconnect(target: BackupTargetResponse, ctx: { close: () => void }): void {
+    this.begin(target.key);
+
+    this.api
+      .disconnect(target.key)
+      .pipe(handleMutationError(this.errorHandler, this.busy, 'Failed to disconnect the account.'))
+      .subscribe(() => {
+        this.end();
+        toast.success('Google account disconnected.');
+        ctx.close();
+        this.load();
       });
   }
 
@@ -536,7 +804,7 @@ export class BackupTargetListComponent implements OnInit {
    */
   canRun(target: BackupTargetResponse, source: BackupSourceItemResponse): boolean {
     return (
-      target.isAvailable && target.isEnabled && source.isAvailable && source.isEnabled && !this.busy()
+      this.sourceAvailable(target, source) && target.isEnabled && source.isEnabled && !this.busy()
     );
   }
 
@@ -564,6 +832,8 @@ export class BackupTargetListComponent implements OnInit {
     switch (kind) {
       case 'Local':
         return 'Local directory';
+      case 'GoogleDrive':
+        return 'Google Drive';
       default:
         return 'Unknown kind';
     }
@@ -609,6 +879,21 @@ export class BackupTargetListComponent implements OnInit {
     if (!run) return [];
 
     return [run.error, ...(run.batchErrors ?? [])].filter((m): m is string => !!m);
+  }
+
+  /**
+   * The destination's own out-of-space wording, shown once.
+   *
+   * Taken from the batch errors rather than hard-coded here: every failed batch in the run carries the
+   * same sentence, and which destination is full — and therefore how to free space — is the target's
+   * fact, not this component's. The fallback covers a run marked out-of-space whose child errors are no
+   * longer readable.
+   */
+  outOfSpaceMessage(source: BackupSourceItemResponse): string {
+    return (
+      this.runFailures(source)[0] ??
+      'The backup target is out of storage space.'
+    );
   }
 
   statusLabel(run: NonNullable<BackupSourceItemResponse['lastRun']>): string {

@@ -8,6 +8,7 @@ import { ProcessingHubService } from '@/shared/services/processing-hub.service';
 import type { BackupTargetResponse } from '@/api/generated/models/backup-target-response';
 import type { BackupSourceItemResponse } from '@/api/generated/models/backup-source-item-response';
 import type { GetBackupTargetsResponse } from '@/api/generated/models/get-backup-targets-response';
+import type { ValidateBackupTargetConnectionResponse } from '@/api/generated/models/validate-backup-target-connection-response';
 
 const SOURCE_ID = 'src-1';
 
@@ -35,6 +36,20 @@ function target(overrides: Partial<BackupTargetResponse> = {}): BackupTargetResp
     sources: [source()],
     ...overrides,
   };
+}
+
+/** A Google Drive card, which is the only kind that carries a connection section. */
+function driveTarget(
+  connection: Partial<NonNullable<BackupTargetResponse['connection']>> = {},
+  overrides: Partial<BackupTargetResponse> = {},
+): BackupTargetResponse {
+  return target({
+    key: 'gdrive',
+    kind: 'GoogleDrive',
+    location: 'Google Drive / Homestead Backup',
+    connection: { isConnected: true, ...connection },
+    ...overrides,
+  });
 }
 
 /** A target card carrying exactly one source, patched however the test needs. */
@@ -88,6 +103,21 @@ class FakeApi {
   deleteSchedule() {
     return of(void 0);
   }
+
+  validate(key: string) {
+    this.validateCalls.push(key);
+    return of(this.validateResult);
+  }
+
+  validateCalls: string[] = [];
+  validateResult: ValidateBackupTargetConnectionResponse = { isAvailable: true };
+
+  disconnect(key: string) {
+    this.disconnectCalls.push(key);
+    return of(void 0);
+  }
+
+  disconnectCalls: string[] = [];
 }
 
 class FakeHub {
@@ -101,9 +131,13 @@ class FakeHub {
   }
 }
 
-function setup(items: BackupTargetResponse[]) {
+function setup(
+  items: BackupTargetResponse[],
+  validateResult?: ValidateBackupTargetConnectionResponse,
+) {
   const api = new FakeApi();
   api.items = items;
+  if (validateResult) api.validateResult = validateResult;
   const hub = new FakeHub();
 
   TestBed.configureTestingModule({
@@ -330,6 +364,7 @@ describe('BackupTargetListComponent', () => {
           totalChildCount: 2,
           completedChildCount: 2,
           failedChildCount: 0,
+          outOfSpace: false,
           summary: {
             backupSourceId: SOURCE_ID,
             dryRun: false,
@@ -380,6 +415,7 @@ describe('BackupTargetListComponent', () => {
         totalChildCount: 1,
         completedChildCount: 0,
         failedChildCount: 1,
+        outOfSpace: false,
         summary: { backupSourceId: SOURCE_ID, dryRun },
       }) as NonNullable<BackupSourceItemResponse['lastRun']>;
 
@@ -407,6 +443,7 @@ describe('BackupTargetListComponent', () => {
           totalChildCount: 1,
           completedChildCount: 0,
           failedChildCount: 1,
+          outOfSpace: false,
         },
       }),
     ]);
@@ -431,6 +468,7 @@ describe('BackupTargetListComponent', () => {
             totalChildCount: 2,
             completedChildCount: 0,
             failedChildCount: 2,
+            outOfSpace: false,
           },
         }),
       ),
@@ -453,6 +491,7 @@ describe('BackupTargetListComponent', () => {
           totalChildCount: 0,
           completedChildCount: 0,
           failedChildCount: 0,
+          outOfSpace: false,
           summary: {
             backupSourceId: SOURCE_ID,
             skipped: true,
@@ -485,6 +524,7 @@ describe('BackupTargetListComponent', () => {
           totalChildCount: 3,
           completedChildCount: 1,
           failedChildCount: 0,
+          outOfSpace: false,
         },
       }),
     ]);
@@ -503,6 +543,7 @@ describe('BackupTargetListComponent', () => {
         totalChildCount: 5,
         completedChildCount: 4,
         failedChildCount: 1,
+        outOfSpace: false,
       }),
     ).toBe('Partial (1 failed)');
   });
@@ -612,6 +653,7 @@ describe('BackupTargetListComponent', () => {
           totalChildCount: 0,
           completedChildCount: 0,
           failedChildCount: 0,
+          outOfSpace: false,
         },
       }),
     ]);
@@ -689,5 +731,247 @@ describe('BackupTargetListComponent', () => {
 
     expect(closed).toBe(true);
     expect(component.deleteStage()).toBe('confirm');
+  });
+  // --- Connection section ---------------------------------------------------------------------------
+
+  it('renders no connection section for a local directory', () => {
+    const { element } = setup([target()]);
+
+    expect(element.querySelector('[data-testid="connection-local"]')).toBeNull();
+  });
+
+  it('offers Connect on a Drive target with no stored credential', () => {
+    const { element } = setup([driveTarget({ isConnected: false })]);
+
+    expect(element.querySelector('[data-testid="connection-gdrive"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="connect-google-gdrive"]')).not.toBeNull();
+    expect(element.querySelector('[data-testid="connected-as-gdrive"]')).toBeNull();
+  });
+
+  it('names the connected account and offers Disconnect', () => {
+    const { element } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' })]);
+
+    expect(element.querySelector('[data-testid="connected-as-gdrive"]')?.textContent).toContain(
+      'owner@example.test',
+    );
+    expect(element.querySelector('[data-testid="disconnect-gdrive"]')).not.toBeNull();
+  });
+
+  it('shows the latch reason with a Reconnect affordance', () => {
+    const { element } = setup(
+      [
+        driveTarget({
+          connectedAccountEmail: 'owner@example.test',
+          authFailedAt: '2026-07-01T00:00:00Z',
+          authFailedReason: 'Publish your consent screen to In production.',
+        }),
+      ],
+      { isAvailable: false, reason: 'Publish your consent screen to In production.' },
+    );
+
+    const banner = element.querySelector('[data-testid="auth-failed-banner-gdrive"]');
+    expect(banner?.textContent).toContain('Publish your consent screen');
+  });
+
+  // A probe that proves the credential works makes the stored latch stale — the banner must not linger
+  // past the evidence that it is wrong.
+  it('drops a stale latch banner once the probe succeeds', () => {
+    const { element } = setup(
+      [
+        driveTarget({
+          connectedAccountEmail: 'owner@example.test',
+          authFailedAt: '2026-07-01T00:00:00Z',
+          authFailedReason: 'Publish your consent screen to In production.',
+        }),
+      ],
+      { isAvailable: true },
+    );
+
+    expect(element.querySelector('[data-testid="auth-failed-banner-gdrive"]')).toBeNull();
+  });
+
+  it('disconnects through the API', () => {
+    const { fixture, api } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' })]);
+
+    let closed = false;
+    fixture.componentInstance.disconnect(driveTarget(), { close: () => (closed = true) });
+
+    expect(api.disconnectCalls).toEqual(['gdrive']);
+    expect(closed).toBe(true);
+  });
+
+  // --- The post-render validate probe ----------------------------------------------------------------
+
+  // The list endpoint is a pure config+DB read; proving the credential still works is a separate call
+  // fired after render so the page never waits on Google.
+  it('validates every connected Drive target after load', () => {
+    const { api } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' }), target()]);
+
+    expect(api.validateCalls).toEqual(['gdrive']);
+  });
+
+  it('does not validate a Drive target that has nothing to validate', () => {
+    const { api } = setup([driveTarget({ isConnected: false })]);
+
+    expect(api.validateCalls).toEqual([]);
+  });
+
+  it("the probe's verdict supersedes the list endpoint's badge", () => {
+    const { element } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' })], {
+      isAvailable: false,
+      reason: 'Google revoked the authorization.',
+    });
+
+    expect(element.querySelector('[data-testid="availability-badge"]')?.textContent).toContain(
+      'Unavailable',
+    );
+    expect(element.querySelector('[data-testid="configuration-error"]')?.textContent).toContain(
+      'Google revoked',
+    );
+  });
+
+  it('renders free space once the probe answers', () => {
+    const { element } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' })], {
+      isAvailable: true,
+      storageUsedBytes: 5_000_000_000,
+      storageLimitBytes: 15_000_000_000,
+    });
+
+    expect(element.querySelector('[data-testid="free-space-gdrive"]')?.textContent).toContain(
+      'free of',
+    );
+  });
+
+  // Null limit means unlimited, which is a real state and not zero.
+  it('reads an absent quota limit as unlimited rather than full', () => {
+    const { fixture } = setup([driveTarget({ connectedAccountEmail: 'owner@example.test' })]);
+
+    fixture.componentInstance.validation.set({
+      gdrive: { isAvailable: true, storageUsedBytes: 100, storageLimitBytes: null },
+    });
+
+    expect(fixture.componentInstance.freeSpaceLabel(driveTarget())).toContain('unlimited');
+  });
+
+  // --- Staleness ------------------------------------------------------------------------------------
+
+  it('reads never-succeeded as "never"', () => {
+    const { element } = setup([targetWithSource({ lastSuccessfulRunAt: null })]);
+
+    expect(element.querySelector(tid('last-success'))?.textContent).toContain('never');
+  });
+
+  it('renders a relative age for the last success', () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const { element } = setup([targetWithSource({ lastSuccessfulRunAt: twoDaysAgo })]);
+
+    expect(element.querySelector(tid('last-success'))?.textContent).toContain('2d ago');
+  });
+
+  // A manual-only backup is as stale as its owner intends — flagging it would be noise.
+  it('never flags staleness without an armed schedule', () => {
+    const ancient = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
+    const { fixture } = setup([targetWithSource({ lastSuccessfulRunAt: ancient })]);
+
+    expect(fixture.componentInstance.isStale(source({ lastSuccessfulRunAt: ancient }))).toBe(false);
+  });
+
+  // Scaled to the schedule — roughly two missed runs — because "3 days ago" is alarming for an hourly
+  // backup and unremarkable for a weekly one.
+  it('flags staleness past about two missed scheduled runs', () => {
+    const { fixture } = setup([target()]);
+    const component = fixture.componentInstance;
+
+    const hourly = {
+      id: 's',
+      cronExpression: '0 * * * *',
+      isEnabled: true,
+      priority: 0,
+      lastRunAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      nextRunAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    };
+
+    const fresh = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const stale = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
+
+    expect(component.isStale(source({ schedule: hourly, lastSuccessfulRunAt: fresh }))).toBe(false);
+    expect(component.isStale(source({ schedule: hourly, lastSuccessfulRunAt: stale }))).toBe(true);
+  });
+
+  it('never flags staleness while the schedule is disabled', () => {
+    const { fixture } = setup([target()]);
+
+    const disabled = {
+      id: 's',
+      cronExpression: '0 * * * *',
+      isEnabled: false,
+      priority: 0,
+      lastRunAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      nextRunAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    };
+
+    const ancient = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
+
+    expect(
+      fixture.componentInstance.isStale(source({ schedule: disabled, lastSuccessfulRunAt: ancient })),
+    ).toBe(false);
+  });
+
+  // --- Out of space ---------------------------------------------------------------------------------
+
+  // One rolled-up sentence, not two hundred identical batch fragments — and decided from the typed
+  // marker, never by matching message strings.
+  it('renders one message when the destination is full', () => {
+    const { element } = setup([
+      targetWithSource({
+        lastRun: {
+          jobId: 'j1',
+          status: 'Failed',
+          createdAt: '2026-07-01T00:00:00Z',
+          totalChildCount: 3,
+          completedChildCount: 1,
+          failedChildCount: 2,
+          outOfSpace: true,
+          batchErrors: [
+            'Google Drive is out of storage space — mirror deletes free space only after ' +
+              "Google's trash is emptied.",
+            'Google Drive is out of storage space — mirror deletes free space only after ' +
+              "Google's trash is emptied.",
+          ],
+        },
+      }),
+    ]);
+
+    // One rolled-up sentence, sourced from the destination rather than restated here.
+    const message = element.querySelector(tid('out-of-space'))?.textContent ?? '';
+    expect(message).toContain('out of storage space');
+    expect(message).toContain("Google's trash");
+    expect(element.querySelector(tid('last-run-error'))).toBeNull();
+  });
+
+  it('still stacks ordinary batch errors', () => {
+    const { element } = setup([
+      targetWithSource({
+        lastRun: {
+          jobId: 'j1',
+          status: 'Failed',
+          createdAt: '2026-07-01T00:00:00Z',
+          totalChildCount: 1,
+          completedChildCount: 0,
+          failedChildCount: 1,
+          outOfSpace: false,
+          batchErrors: ['Put failed'],
+        },
+      }),
+    ]);
+
+    expect(element.querySelector(tid('out-of-space'))).toBeNull();
+    expect(element.querySelector(tid('last-run-error'))?.textContent).toContain('Put failed');
+  });
+
+  it('labels the Google Drive kind', () => {
+    const { element } = setup([driveTarget()]);
+
+    expect(element.textContent).toContain('Google Drive');
   });
 });

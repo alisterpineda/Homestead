@@ -11,6 +11,11 @@ import { deleteBackupSource } from '@/api/generated/fn/admin/delete-backup-sourc
 import { runBackupNow } from '@/api/generated/fn/admin/run-backup-now';
 import { upsertBackupSchedule } from '@/api/generated/fn/admin/upsert-backup-schedule';
 import { deleteBackupSchedule } from '@/api/generated/fn/admin/delete-backup-schedule';
+import { connectBackupTarget } from '@/api/generated/fn/admin/connect-backup-target';
+import { pollBackupTargetConnection } from '@/api/generated/fn/admin/poll-backup-target-connection';
+import { confirmBackupTargetConnection } from '@/api/generated/fn/admin/confirm-backup-target-connection';
+import { disconnectBackupTarget } from '@/api/generated/fn/admin/disconnect-backup-target';
+import { validateBackupTargetConnection } from '@/api/generated/fn/admin/validate-backup-target-connection';
 import type { GetBackupTargetsResponse } from '@/api/generated/models/get-backup-targets-response';
 import type { PatchBackupTargetBody } from '@/api/generated/models/patch-backup-target-body';
 import type { PatchBackupTargetResponse } from '@/api/generated/models/patch-backup-target-response';
@@ -22,6 +27,10 @@ import type { RunBackupNowBody } from '@/api/generated/models/run-backup-now-bod
 import type { RunBackupNowResponse } from '@/api/generated/models/run-backup-now-response';
 import type { UpsertBackupScheduleBody } from '@/api/generated/models/upsert-backup-schedule-body';
 import type { UpsertBackupScheduleResponse } from '@/api/generated/models/upsert-backup-schedule-response';
+import type { ConnectBackupTargetResponse } from '@/api/generated/models/connect-backup-target-response';
+import type { PollBackupTargetConnectionResponse } from '@/api/generated/models/poll-backup-target-connection-response';
+import type { ConfirmBackupTargetConnectionResponse } from '@/api/generated/models/confirm-backup-target-connection-response';
+import type { ValidateBackupTargetConnectionResponse } from '@/api/generated/models/validate-backup-target-connection-response';
 
 @Injectable({ providedIn: 'root' })
 export class AdminBackupApiService {
@@ -61,5 +70,35 @@ export class AdminBackupApiService {
 
   deleteSchedule(sourceId: string): Observable<void> {
     return deleteBackupSchedule(this.http, this.config.rootUrl, { id: sourceId }).pipe(map(() => void 0));
+  }
+
+  /** Starts a Google device authorization. The returned `pollToken` seals the device code. */
+  connect(key: string): Observable<ConnectBackupTargetResponse> {
+    return connectBackupTarget(this.http, this.config.rootUrl, { key }).pipe(map(r => r.body));
+  }
+
+  /** Asks Google whether the admin has consented yet. Poll at the interval `connect` returned. */
+  pollConnection(key: string, pollToken: string): Observable<PollBackupTargetConnectionResponse> {
+    return pollBackupTargetConnection(this.http, this.config.rootUrl, { key, body: { pollToken } })
+      .pipe(map(r => r.body));
+  }
+
+  /**
+   * Accepts a grant for a DIFFERENT Google account than the one on file. Destructive: it forgets every
+   * recorded copy, because stored file ids mean nothing in another account's Drive.
+   */
+  confirmConnection(
+    key: string, pendingToken: string): Observable<ConfirmBackupTargetConnectionResponse> {
+    return confirmBackupTargetConnection(this.http, this.config.rootUrl, { key, body: { pendingToken } })
+      .pipe(map(r => r.body));
+  }
+
+  disconnect(key: string): Observable<void> {
+    return disconnectBackupTarget(this.http, this.config.rootUrl, { key }).pipe(map(() => void 0));
+  }
+
+  /** The one read-path call that actually touches Google — fired after render, never during it. */
+  validate(key: string): Observable<ValidateBackupTargetConnectionResponse> {
+    return validateBackupTargetConnection(this.http, this.config.rootUrl, { key }).pipe(map(r => r.body));
   }
 }

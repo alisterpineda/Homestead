@@ -1,3 +1,4 @@
+using Homestead.WebApi.Infrastructure.Backup;
 using Homestead.WebApi.Modules.Documents.Backup;
 
 namespace Homestead.WebApi.Tests.Unit.Documents.Backup;
@@ -18,6 +19,47 @@ public class BackupPlanBuilderTests
         MaxOpsPerMetadataBatch = maxOpsPerMetadataBatch,
     };
 
+    // The caps a target with no opinion produces: the engine options straight through. Kept as a helper
+    // so every call site reads the same way as before the per-target override seam was added.
+    private static BackupBatchCaps Caps(DocumentBackupEngineOptions options) => BackupBatchCaps.Resolve(
+        options.MaxFilesPerBatch, options.MaxBytesPerBatch, options.MaxOpsPerMetadataBatch, default);
+
+    // The caps seam: two independent things set these numbers, and the destination wins where it states
+    // one — a residential uplink makes the source kind's disk-sized caps wildly wrong.
+    [Fact]
+    public void Caps_ATargetOverrideBeatsTheSourceKindsOwnCap()
+    {
+        var caps = BackupBatchCaps.Resolve(
+            kindMaxFilesPerBatch: 100,
+            kindMaxBytesPerBatch: 512L * 1024 * 1024,
+            kindMaxOpsPerMetadataBatch: 500,
+            new BackupBatchCapOverrides(25, 64L * 1024 * 1024, null));
+
+        Assert.Equal(25, caps.MaxFilesPerBatch);
+        Assert.Equal(64L * 1024 * 1024, caps.MaxBytesPerBatch);
+        // Null defers to the kind rather than to zero.
+        Assert.Equal(500, caps.MaxOpsPerMetadataBatch);
+    }
+
+    // A degenerate value would produce zero-capacity batches and an infinite packing loop, so every cap
+    // is clamped on the way through rather than trusted from config.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Caps_ADegenerateValueIsFloored(int degenerate)
+    {
+        var fromKind = BackupBatchCaps.Resolve(degenerate, degenerate, degenerate, default);
+        Assert.Equal(1, fromKind.MaxFilesPerBatch);
+        Assert.Equal(1, fromKind.MaxBytesPerBatch);
+        Assert.Equal(1, fromKind.MaxOpsPerMetadataBatch);
+
+        var fromOverride = BackupBatchCaps.Resolve(
+            100, 100, 100, new BackupBatchCapOverrides(degenerate, degenerate, degenerate));
+        Assert.Equal(1, fromOverride.MaxFilesPerBatch);
+        Assert.Equal(1, fromOverride.MaxBytesPerBatch);
+        Assert.Equal(1, fromOverride.MaxOpsPerMetadataBatch);
+    }
+
     private static BackupDesiredFile Desired(
         Guid versionId, string path, string hash = "hash", long size = 1024, Guid? documentId = null) =>
         new(versionId, documentId ?? Guid.NewGuid(), path, hash, $"documents/files/aaaa/{hash}.pdf", size);
@@ -35,7 +77,7 @@ public class BackupPlanBuilderTests
         var versionId = Guid.NewGuid();
 
         var plan = BackupPlanBuilder.Build(
-            [Desired(versionId, "2025/Doc.pdf")], [], Options(), allowLargePrune: false);
+            [Desired(versionId, "2025/Doc.pdf")], [], Options(), Caps(Options()), allowLargePrune: false);
 
         var action = Assert.Single(Actions(plan));
         Assert.Equal(BackupActionKind.Put, action.Kind);
@@ -51,7 +93,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2025/Doc.pdf", hash: "new")],
             [State(versionId, "2025/Doc.pdf", hash: "old")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         var action = Assert.Single(Actions(plan));
         Assert.Equal(BackupActionKind.Put, action.Kind);
@@ -67,7 +109,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2026/Doc.pdf")],
             [State(versionId, "2025/Doc.pdf")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         var action = Assert.Single(Actions(plan));
         Assert.Equal(BackupActionKind.Move, action.Kind);
@@ -85,7 +127,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2025/Doc.pdf")],
             [State(versionId, "2025/Doc.pdf")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.Empty(Actions(plan));
         Assert.Equal(1, plan.UnchangedCount);
@@ -98,7 +140,7 @@ public class BackupPlanBuilderTests
         var gone = Guid.NewGuid();
 
         var plan = BackupPlanBuilder.Build(
-            [], [State(gone, "2025/Gone.pdf")], Options(), allowLargePrune: false);
+            [], [State(gone, "2025/Gone.pdf")], Options(), Caps(Options()), allowLargePrune: false);
 
         var action = Assert.Single(Actions(plan));
         Assert.Equal(BackupActionKind.Delete, action.Kind);
@@ -116,7 +158,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2025/Trashed.pdf")],
             [State(versionId, "2025/Trashed.pdf")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.Empty(Actions(plan));
     }
@@ -129,7 +171,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2025/Doc.pdf", hash: "ABCDEF")],
             [State(versionId, "2025/Doc.pdf", hash: "abcdef")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.Empty(Actions(plan));
     }
@@ -143,7 +185,7 @@ public class BackupPlanBuilderTests
             .Select(i => State(Guid.NewGuid(), $"2025/Doc{i}.pdf"))
             .ToList();
 
-        var plan = BackupPlanBuilder.Build([], existing, Options(minAbsoluteDeletes: 25), allowLargePrune: false);
+        var plan = BackupPlanBuilder.Build([], existing, Options(minAbsoluteDeletes: 25), Caps(Options(minAbsoluteDeletes: 25)), allowLargePrune: false);
 
         Assert.False(plan.PruneBlocked);
         Assert.Equal(25, plan.DeleteCount);
@@ -157,7 +199,7 @@ public class BackupPlanBuilderTests
             .Select(i => State(Guid.NewGuid(), $"2025/Doc{i}.pdf"))
             .ToList();
 
-        var plan = BackupPlanBuilder.Build([], existing, Options(minAbsoluteDeletes: 25), allowLargePrune: false);
+        var plan = BackupPlanBuilder.Build([], existing, Options(minAbsoluteDeletes: 25), Caps(Options(minAbsoluteDeletes: 25)), allowLargePrune: false);
 
         Assert.True(plan.PruneBlocked);
         Assert.Equal(0, plan.DeleteCount);
@@ -177,12 +219,12 @@ public class BackupPlanBuilderTests
             .Select(s => Desired(s.VersionId, s.RelativePath))
             .ToList();
 
-        var atThreshold = BackupPlanBuilder.Build(keep, existing, Options(), allowLargePrune: false);
+        var atThreshold = BackupPlanBuilder.Build(keep, existing, Options(), Caps(Options()), allowLargePrune: false);
         Assert.False(atThreshold.PruneBlocked);
         Assert.Equal(100, atThreshold.DeleteCount);
 
         var overThreshold = BackupPlanBuilder.Build(
-            keep.Skip(1).ToList(), existing, Options(), allowLargePrune: false);
+            keep.Skip(1).ToList(), existing, Options(), Caps(Options()), allowLargePrune: false);
         Assert.True(overThreshold.PruneBlocked);
         Assert.Equal(101, overThreshold.BlockedDeleteCount);
     }
@@ -194,7 +236,7 @@ public class BackupPlanBuilderTests
             .Select(i => State(Guid.NewGuid(), $"2025/Doc{i}.pdf"))
             .ToList();
 
-        var plan = BackupPlanBuilder.Build([], existing, Options(), allowLargePrune: true);
+        var plan = BackupPlanBuilder.Build([], existing, Options(), Caps(Options()), allowLargePrune: true);
 
         Assert.False(plan.PruneBlocked);
         Assert.Equal(500, plan.DeleteCount);
@@ -216,7 +258,7 @@ public class BackupPlanBuilderTests
             Desired(Guid.NewGuid(), "2026/BrandNew.pdf"),
         };
 
-        var plan = BackupPlanBuilder.Build(desired, existing, Options(), allowLargePrune: false);
+        var plan = BackupPlanBuilder.Build(desired, existing, Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.True(plan.PruneBlocked);
         Assert.Equal(0, plan.DeleteCount);
@@ -237,7 +279,7 @@ public class BackupPlanBuilderTests
             .Select(i => Desired(Guid.NewGuid(), $"2025/Doc{i}.pdf"))
             .ToList();
 
-        var plan = BackupPlanBuilder.Build(desired, [], Options(), allowLargePrune: false);
+        var plan = BackupPlanBuilder.Build(desired, [], Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.False(plan.PruneBlocked);
         Assert.Equal(5_000, plan.PutCount);
@@ -252,7 +294,7 @@ public class BackupPlanBuilderTests
             .Select(i => Desired(Guid.NewGuid(), $"2025/Doc{i:D4}.pdf", size: 1))
             .ToList();
 
-        var plan = BackupPlanBuilder.Build(desired, [], Options(maxFilesPerBatch: 100), allowLargePrune: false);
+        var plan = BackupPlanBuilder.Build(desired, [], Options(maxFilesPerBatch: 100), Caps(Options(maxFilesPerBatch: 100)), allowLargePrune: false);
 
         Assert.Equal(3, plan.Batches.Count);
         Assert.Equal([100, 100, 50], plan.Batches.Select(b => b.Actions.Count));
@@ -266,7 +308,7 @@ public class BackupPlanBuilderTests
             .ToList();
 
         var plan = BackupPlanBuilder.Build(
-            desired, [], Options(maxFilesPerBatch: 100, maxBytesPerBatch: 1000), allowLargePrune: false);
+            desired, [], Options(maxFilesPerBatch: 100, maxBytesPerBatch: 1000), Caps(Options(maxFilesPerBatch: 100, maxBytesPerBatch: 1000)), allowLargePrune: false);
 
         Assert.All(plan.Batches, b => Assert.True(b.Actions.Sum(a => a.FileSize) <= 1000));
         Assert.Equal(10, plan.Batches.Sum(b => b.Actions.Count));
@@ -281,7 +323,7 @@ public class BackupPlanBuilderTests
                 Desired(Guid.NewGuid(), "2025/Small.pdf", size: 10),
                 Desired(Guid.NewGuid(), "2025/Whale.mov", size: 5_000),
             ],
-            [], Options(maxBytesPerBatch: 1000), allowLargePrune: false);
+            [], Options(maxBytesPerBatch: 1000), Caps(Options(maxBytesPerBatch: 1000)), allowLargePrune: false);
 
         Assert.Equal(2, plan.Batches.Count);
         Assert.Equal(2, plan.Batches.Sum(b => b.Actions.Count));
@@ -295,7 +337,7 @@ public class BackupPlanBuilderTests
             .ToList();
 
         var plan = BackupPlanBuilder.Build(
-            [], existing, Options(maxOpsPerMetadataBatch: 5), allowLargePrune: true);
+            [], existing, Options(maxOpsPerMetadataBatch: 5), Caps(Options(maxOpsPerMetadataBatch: 5)), allowLargePrune: true);
 
         Assert.Equal(3, plan.Batches.Count);
         Assert.Equal([5, 5, 2], plan.Batches.Select(b => b.Actions.Count));
@@ -318,7 +360,7 @@ public class BackupPlanBuilderTests
                 State(movedVersion, "2025/Moved.pdf"),
                 State(goneVersion, "2025/Gone.pdf"),
             ],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         var kinds = Actions(plan).Select(a => a.Kind).ToList();
         Assert.Equal(
@@ -337,7 +379,7 @@ public class BackupPlanBuilderTests
                 Desired(Guid.NewGuid(), "2026/New.pdf", size: 100),
             ],
             [State(movedVersion, "2025/Moved.pdf", size: 900)],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.Equal(100, plan.TotalBytes);
     }
@@ -350,7 +392,7 @@ public class BackupPlanBuilderTests
         var plan = BackupPlanBuilder.Build(
             [Desired(versionId, "2025/Doc.pdf")],
             [State(versionId, "2025/Doc.pdf")],
-            Options(), allowLargePrune: false);
+            Options(), Caps(Options()), allowLargePrune: false);
 
         Assert.Empty(plan.Batches);
     }

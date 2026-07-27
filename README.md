@@ -162,6 +162,26 @@ dotnet user-secrets set "Ai:DefaultProvider" "local"
 | `Ocr__Engines__{key}__*` | — | Defines an additional text-extraction engine instance — see [Text extraction engines](#text-extraction-engines) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | OpenTelemetry collector endpoint (optional) |
 
+#### Backup targets
+
+Backup is off until at least one target is defined. `{key}` is any name you choose; it identifies the
+target on `/admin/backup` and is what backup pairings are stored against, so renaming it orphans them.
+
+| Variable | Default | Description |
+|---|---|---|
+| `Backup__Targets__{key}__Kind` | — | **Required**: `Local` or `GoogleDrive` |
+| `Backup__Targets__{key}__Path` | — | `Local` only: the mirror root. Must not overlap `FileStorage__MediaPath` or `__CachePath` |
+| `Backup__Targets__{key}__ClientId` | — | `GoogleDrive` only: your own OAuth client id — see [Google Drive backup setup](docs/google-drive-backup-setup.md) |
+| `Backup__Targets__{key}__ClientSecret` | — | `GoogleDrive` only: that client's secret. Google shows it **once**, at creation |
+| `Backup__Targets__{key}__RootFolderName` | `Homestead Backup` | `GoogleDrive` only: the app-managed folder in My Drive |
+| `Backup__Targets__{key}__MaxFilesPerBatch` | per-kind | Override how many file copies one batch attempts |
+| `Backup__Targets__{key}__MaxBytesPerBatch` | per-kind | Override the byte budget for one batch — lower this on a slow uplink |
+| `Backup__Targets__{key}__MaxOpsPerMetadataBatch` | per-kind | Override how many moves/deletes one batch attempts |
+
+A `GoogleDrive` target also has to be **connected** — config only names the OAuth client; the grant
+itself is minted by an admin at `google.com/device` from the target's card on `/admin/backup`. See
+[Google Drive backup setup](docs/google-drive-backup-setup.md) for the one-time Google Cloud steps.
+
 ### Volumes
 
 | Path | Purpose |

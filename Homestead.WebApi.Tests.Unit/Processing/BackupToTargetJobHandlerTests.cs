@@ -22,6 +22,8 @@ public class BackupToTargetJobHandlerTests : IDisposable
     private readonly IJobSignal _signal;
     private readonly IBackupTargetResolver _resolver;
     private readonly DocumentBackupEngineOptions _options = new();
+    private readonly IBackupTargetGate _gate;
+    private readonly StubTarget _target;
     private readonly BackupToTargetJobHandler _sut;
 
     /// <summary>The pairing every test runs against, seeded by the constructor.</summary>
@@ -32,7 +34,18 @@ public class BackupToTargetJobHandlerTests : IDisposable
         _db = TestAppDbContext.Create();
         _signal = Substitute.For<IJobSignal>();
         _resolver = Substitute.For<IBackupTargetResolver>();
-        _resolver.Resolve(Arg.Any<string>()).Returns(new StubTarget(TargetKey, available: true));
+        _target = new StubTarget(TargetKey, available: true);
+        _resolver.Resolve(Arg.Any<string>()).Returns(_target);
+
+        // Passes the target's own config verdict straight through — these tests are about the planner,
+        // and the composed (credential-aware) half is covered in BackupTargetGateTests.
+        _gate = Substitute.For<IBackupTargetGate>();
+        _gate.CheckAsync(Arg.Any<IBackupTarget>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var t = call.Arg<IBackupTarget>();
+                return Task.FromResult(new TargetGateResult(t.IsAvailable, t.ConfigurationError));
+            });
 
         _db.BackupSources.Add(new BackupSource
         {
@@ -46,7 +59,7 @@ public class BackupToTargetJobHandlerTests : IDisposable
         _db.SaveChanges();
 
         _sut = new BackupToTargetJobHandler(
-            _db, _resolver, Options.Create(_options), _signal,
+            _db, _resolver, _gate, Options.Create(_options), _signal,
             NullLogger<BackupToTargetJobHandler>.Instance);
     }
 
@@ -641,6 +654,129 @@ public class BackupToTargetJobHandlerTests : IDisposable
         Assert.Equal(0, job.TotalChildCount);
     }
 
+    // --- Folder ensure and the deferred prune batch ---------------------------------------------------
+
+    // The one stated exception to "the planner does no I/O". Bounded by the number of NEW folders, never
+    // by file count — so it cannot threaten the job timeout the rule exists to protect.
+    [Fact]
+    public async Task HandleAsync_EnsuresEveryPlannedParentFolderBeforeFanningOut()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocument("A", new DateOnly(2025, 1, 1));
+        SeedDocument("B", new DateOnly(2026, 1, 1));
+
+        await _sut.HandleAsync(CreateJob(), ct);
+
+        Assert.Equal(
+            ["Documents/2025", "Documents/2026"],
+            _target.EnsuredFolders.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task HandleAsync_DoesNotEnsureFoldersForADryRun()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedDocument("A", new DateOnly(2025, 1, 1));
+
+        await _sut.HandleAsync(CreateJob(dryRun: true), ct);
+
+        Assert.Empty(_target.EnsuredFolders);
+    }
+
+    // A filesystem prunes inline, where "is this directory empty right now" is a true answer. Emitting a
+    // sweep batch for it would be pure ceremony.
+    [Fact]
+    public async Task ATargetThatPrunesInline_GetsNoPruneBatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SeedMirroredState(1);
+        _db.SaveChanges();
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        var actions = (await ChildrenOf(job, ct))
+            .SelectMany(c => c.GetPayload<BackupBatchPayload>()!.Actions);
+
+        Assert.DoesNotContain(actions, a => a.Kind == BackupActionKind.PruneFolder);
+    }
+
+    // Appended last, so it takes the lowest child priority and therefore claims after every mutation
+    // batch in the run — which is the entire reason the sweep is a batch rather than an inline step.
+    [Fact]
+    public async Task ADeferredPruneTarget_GetsAFinalLowestPriorityPruneBatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _target.DefersFolderPrune = true;
+        SeedMirroredState(1, pathPrefix: "Documents/2019");
+        _db.SaveChanges();
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        var children = await ChildrenOf(job, ct);
+        var last = children.OrderBy(c => c.Priority).First();
+
+        var actions = last.GetPayload<BackupBatchPayload>()!.Actions;
+        Assert.All(actions, a => Assert.Equal(BackupActionKind.PruneFolder, a.Kind));
+        Assert.Equal("Documents/2019", Assert.Single(actions).RelativePath);
+
+        // Lowest priority of all its siblings: it claims after every mutation batch.
+        Assert.Equal(children.Min(c => c.Priority), last.Priority);
+        Assert.Equal(children.Count, job.TotalChildCount);
+    }
+
+    // Nothing was emptied, so there is nothing to sweep — and an empty batch would still cost a job row.
+    [Fact]
+    public async Task ADeferredPruneTarget_GetsNoPruneBatchWhenNothingIsRemoved()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _target.DefersFolderPrune = true;
+        SeedDocument("A", new DateOnly(2025, 1, 1));
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        var actions = (await ChildrenOf(job, ct))
+            .SelectMany(c => c.GetPayload<BackupBatchPayload>()!.Actions);
+
+        Assert.DoesNotContain(actions, a => a.Kind == BackupActionKind.PruneFolder);
+    }
+
+    // --- Per-target cap overrides ---------------------------------------------------------------------
+
+    // The engine's caps are per source KIND and were sized against local disk; the destination knows how
+    // fast a batch can possibly go, so where it states a number, that number wins.
+    [Fact]
+    public async Task ATargetsCapOverride_BeatsTheEngineOption()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _options.MaxFilesPerBatch = 100;
+        _target.CapOverrides = new BackupBatchCapOverrides(MaxFilesPerBatch: 1, null, null);
+
+        SeedDocument("A", new DateOnly(2025, 1, 1), versionCount: 3);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Equal(3, (await ChildrenOf(job, ct)).Count);
+    }
+
+    // A degenerate value would produce zero-capacity batches and an infinite packing loop.
+    [Fact]
+    public async Task ADegenerateCapOverride_IsFlooredRatherThanTrusted()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _target.CapOverrides = new BackupBatchCapOverrides(MaxFilesPerBatch: 0, null, null);
+
+        SeedDocument("A", new DateOnly(2025, 1, 1), versionCount: 2);
+
+        var job = CreateJob();
+        await _sut.HandleAsync(job, ct);
+
+        Assert.Equal(2, (await ChildrenOf(job, ct)).Count);
+    }
+
     [Fact]
     public async Task MissingPayload_Throws()
     {
@@ -658,19 +794,37 @@ public class BackupToTargetJobHandlerTests : IDisposable
 
     private sealed class StubTarget(string key, bool available) : IBackupTarget
     {
+        /// <summary>Set to model an id-addressed destination, which needs a deferred folder sweep.</summary>
+        public bool DefersFolderPrune { get; set; }
+
+        public BackupBatchCapOverrides CapOverrides { get; set; }
+
         public string Key => key;
         public BackupTargetKind? Kind => BackupTargetKind.Local;
         public string? Location => "/tmp/mirror";
         public bool IsAvailable => available;
         public string? ConfigurationError => available ? null : "Path is required.";
-        public BackupTargetCapabilities Capabilities => BackupTargetCapabilities.Default;
 
-        public Task<string> PutAsync(BackupObjectRef target, Stream content, string contentType, CancellationToken ct) =>
-            Task.FromResult(target.RelativePath);
+        public BackupTargetCapabilities Capabilities =>
+            BackupTargetCapabilities.Default with { DefersFolderPrune = DefersFolderPrune };
+
+        public BackupBatchCapOverrides BatchCapOverrides => CapOverrides;
+
+        public List<string> EnsuredFolders { get; } = [];
+
+        public Task<BackupPutResult> PutAsync(
+            BackupObjectRef target, Stream content, BackupPutContext context, CancellationToken ct) =>
+            Task.FromResult<BackupPutResult>(new BackupPutResult.Completed(target.RelativePath));
 
         public Task<string> MoveAsync(BackupObjectRef from, string toRelativePath, CancellationToken ct) =>
             Task.FromResult(toRelativePath);
 
         public Task DeleteAsync(BackupObjectRef target, CancellationToken ct) => Task.CompletedTask;
+
+        public Task EnsureFoldersAsync(IReadOnlyCollection<string> folderPaths, CancellationToken ct)
+        {
+            EnsuredFolders.AddRange(folderPaths);
+            return Task.CompletedTask;
+        }
     }
 }
